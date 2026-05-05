@@ -1,10 +1,9 @@
 package handlers
 
 import (
-	"fmt"
-
 	jwtware "github.com/gofiber/contrib/v3/jwt"
 	"github.com/gofiber/fiber/v3"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/yeferson59/svelte-go/internal/dtos/auth"
 )
 
@@ -41,7 +40,12 @@ func (handler *Handlers) Register(c fiber.Ctx) error {
 func (handler *Handlers) GetSession(c fiber.Ctx) error {
 	jwtToken := jwtware.FromContext(c)
 
-	fmt.Println(jwtToken.Claims)
+	claims := jwtToken.Claims.(jwt.MapClaims)
+	userID := claims["id"].(string)
+	email := claims["email"].(string)
 
-	return handler.responseStatusOk(c, "", "", "")
+	return handler.responseStatusOk(c, "", "", fiber.Map{
+		"userId": userID,
+		"email":  email,
+	})
 }
