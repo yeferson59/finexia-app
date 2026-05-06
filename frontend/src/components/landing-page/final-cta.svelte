@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { Button } from 'bits-ui';
 </script>
 
 <section class="mx-auto w-full max-w-4xl px-6 py-20 text-center">
@@ -13,12 +12,8 @@
 	</div>
 
 	<div class="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-		<Button.Root class="cta-primary" aria-label="Acceso gratis hoy">
-			Acceso gratis hoy
-		</Button.Root>
-		<Button.Root class="cta-ghost" aria-label="Explorar documentación">
-			Explorar docs
-		</Button.Root>
+		<button class="cta-primary" aria-label="Acceso gratis hoy" type="button">Acceso gratis hoy</button>
+		<button class="cta-ghost" aria-label="Explorar documentación" type="button">Explorar docs</button>
 	</div>
 
 	<p class="mt-8 text-xs font-600 tracking-widest uppercase text-[#a0a0a0]">

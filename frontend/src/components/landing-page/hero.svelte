@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { Button } from 'bits-ui';
-
 	const stats = [
 		{ label: 'Inversiones rastreadas', value: '47.000+' },
 		{ label: 'Brokers compatibles', value: '15' },
@@ -22,12 +20,8 @@
 			</p>
 		</div>
 		<div class="flex flex-wrap items-center gap-4">
-			<Button.Root class="cta-primary" aria-label="Empieza gratis">
-				Empieza gratis
-			</Button.Root>
-			<Button.Root class="cta-ghost" aria-label="Ver demo interactiva" href="#demo">
-				Ver demo
-			</Button.Root>
+			<button class="cta-primary" aria-label="Empieza gratis" type="button">Empieza gratis</button>
+			<a class="cta-ghost" aria-label="Ver demo interactiva" href="#demo">Ver demo</a>
 		</div>
 		<div class="pt-4">
 			<p class="mb-4 text-xs font-600 tracking-widest uppercase text-[#a0a0a0]">Sin tarjeta de crédito · Acceso inmediato</p>

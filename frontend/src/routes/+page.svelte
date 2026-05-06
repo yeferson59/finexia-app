@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { Tooltip } from 'bits-ui';
 	import Header from '$components/landing-page/header.svelte';
 	import Hero from '$components/landing-page/hero.svelte';
 	import PainPoints from '$components/landing-page/pain-points.svelte';
@@ -25,25 +24,23 @@
 </svelte:head>
 
 <main class="bg-charcoal text-gray-light">
-	<Tooltip.Provider delayDuration={200}>
-		<div class="page-foundation">
-			<Header />
+	<div class="page-foundation">
+		<Header />
 
-			<Hero />
+		<Hero />
 
-			<PainPoints />
+		<PainPoints />
 
-			<HowItWorks />
+		<HowItWorks />
 
-			<Features />
+		<Features />
 
-			<SocialProof />
+		<SocialProof />
 
-			<FinalCTA />
+		<FinalCTA />
 
-			<Footer />
-		</div>
-	</Tooltip.Provider>
+		<Footer />
+	</div>
 </main>
 
 <style>
