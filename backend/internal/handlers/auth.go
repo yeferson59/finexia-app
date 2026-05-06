@@ -42,10 +42,10 @@ func (handler *Handlers) GetSession(c fiber.Ctx) error {
 
 	claims := jwtToken.Claims.(jwt.MapClaims)
 	userID := claims["id"].(string)
-	email := claims["email"].(string)
+	name := claims["name"].(string)
 
 	return handler.responseStatusOk(c, "", "", fiber.Map{
-		"userId": userID,
-		"email":  email,
+		"id":   userID,
+		"name": name,
 	})
 }

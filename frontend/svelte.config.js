@@ -14,7 +14,8 @@ const config = {
 			runtime: 'nodejs24.x'
 		}),
 		alias: {
-			'$components/*': './src/components/*'
+			'$components/*': './src/components/*',
+			'$/*': './src/*'
 		}
 	}
 };

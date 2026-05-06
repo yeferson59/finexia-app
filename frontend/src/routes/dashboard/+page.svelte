@@ -3,6 +3,8 @@
 	import PortfolioOverview from '$components/dashboard/portfolio-overview.svelte';
 	import AssetAllocation from '$components/dashboard/asset-allocation.svelte';
 	import RecentActivity from '$components/dashboard/recent-activity.svelte';
+
+	const { data } = $props();
 </script>
 
 <svelte:head>
@@ -12,7 +14,7 @@
 
 <header class="dashboard-header-section">
 	<h1 id="dashboard-title" class="dashboard-title">Dashboard</h1>
-	<p class="dashboard-subtitle">Bienvenido de vuelta, Juan Pérez</p>
+	<p class="dashboard-subtitle">Bienvenido de vuelta, {data.name}</p>
 </header>
 
 <section class="net-worth-section" aria-labelledby="dashboard-title">

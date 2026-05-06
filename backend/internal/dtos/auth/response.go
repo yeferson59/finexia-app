@@ -9,7 +9,7 @@ type RegisterResponseDTO struct {
 }
 
 type LoginResponseDTO struct {
-	ID          uuid.UUID `json:"name"`
-	Email       string    `json:"email"`
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
 	AccessToken string    `json:"accessToken"`
 }

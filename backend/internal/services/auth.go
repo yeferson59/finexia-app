@@ -28,7 +28,7 @@ func (s *Services) Login(ctx context.Context, email, password string) (auth.Logi
 
 	expiresAt := time.Now().Add(s.cfg.JWTDuration)
 
-	jwToken, err := s.CreateJWToken(user.ID, user.Email, expiresAt)
+	jwToken, err := s.CreateJWToken(user.ID, user.Name, expiresAt)
 	if err != nil {
 		return auth.LoginResponseDTO{}, err
 	}
@@ -39,16 +39,16 @@ func (s *Services) Login(ctx context.Context, email, password string) (auth.Logi
 
 	return auth.LoginResponseDTO{
 		ID:          user.ID,
-		Email:       user.Email,
+		Name:        user.Name,
 		AccessToken: jwToken,
 	}, nil
 }
 
-func (s *Services) CreateJWToken(userID uuid.UUID, email string, expiresAt time.Time) (string, error) {
+func (s *Services) CreateJWToken(userID uuid.UUID, name string, expiresAt time.Time) (string, error) {
 	claims := jwt.MapClaims{
-		"id":    userID,
-		"email": email,
-		"exp":   expiresAt.Unix(),
+		"id":   userID,
+		"name": name,
+		"exp":  expiresAt.Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
