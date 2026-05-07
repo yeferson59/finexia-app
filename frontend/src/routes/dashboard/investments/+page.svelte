@@ -1,9 +1,19 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+
 	const opportunities = [
-		{ name: 'Tecnología IA', risk: 'Medio', roi: '12.4%', horizon: '18 meses' },
-		{ name: 'Energía Renovable', risk: 'Bajo', roi: '8.1%', horizon: '24 meses' },
-		{ name: 'Mercados Emergentes', risk: 'Alto', roi: '16.8%', horizon: '36 meses' }
+		{ id: '1', name: 'Fondo Crecimiento Tecnológico', risk: 'Medio', roi: '15.2%', horizon: '24 meses' },
+		{ id: '2', name: 'ETF Mercados Emergentes', risk: 'Alto', roi: '18.5%', horizon: '36 meses' },
+		{ id: '3', name: 'Energía Renovable', risk: 'Bajo', roi: '8.1%', horizon: '24 meses' }
 	];
+
+	function viewDetails(id: string) {
+		goto(`/dashboard/investments/${id}`);
+	}
+
+	function addNewProduct() {
+		goto('/dashboard/investments/add');
+	}
 </script>
 
 <svelte:head>
@@ -12,8 +22,18 @@
 </svelte:head>
 
 <header class="page-header">
-	<h1 class="page-title">Inversiones</h1>
-	<p class="page-subtitle">Descubre oportunidades alineadas con tu perfil y objetivos.</p>
+	<div class="header-top">
+		<div>
+			<h1 class="page-title">Inversiones</h1>
+			<p class="page-subtitle">Descubre oportunidades alineadas con tu perfil y objetivos.</p>
+		</div>
+		<button onclick={addNewProduct} class="btn-add-product">
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M12 5v14M5 12h14" />
+			</svg>
+			Agregar Producto
+		</button>
+	</div>
 </header>
 
 <section class="spotlight panel">
@@ -37,14 +57,20 @@
 			<span>Riesgo</span>
 			<span>ROI esperado</span>
 			<span>Horizonte</span>
+			<span></span>
 		</div>
-		{#each opportunities as item (item.name)}
-			<div class="row">
+		{#each opportunities as item (item.id)}
+			<button 
+				class="row row-interactive" 
+				onclick={() => viewDetails(item.id)}
+				aria-label={`Ver detalles de ${item.name}`}
+			>
 				<span>{item.name}</span>
 				<span>{item.risk}</span>
 				<span class="positive">{item.roi}</span>
 				<span>{item.horizon}</span>
-			</div>
+				<span class="row-icon">→</span>
+			</button>
 		{/each}
 	</div>
 </section>
@@ -54,6 +80,14 @@
 		margin-bottom: 2rem;
 		padding-bottom: 1.5rem;
 		border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+	}
+
+	.header-top {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 2rem;
+		flex-wrap: wrap;
 	}
 
 	.page-title {
@@ -68,6 +102,29 @@
 	.page-subtitle {
 		margin: 0;
 		color: rgba(224, 224, 224, 0.62);
+	}
+
+	.btn-add-product {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.85rem 1.5rem;
+		border: none;
+		border-radius: 10px;
+		background: linear-gradient(135deg, #d4af37, #e8c547);
+		color: #0f1419;
+		font-weight: 700;
+		font-family: 'Poppins', system-ui, sans-serif;
+		font-size: 0.95rem;
+		cursor: pointer;
+		transition: all 0.3s ease;
+		letter-spacing: 0.3px;
+		white-space: nowrap;
+	}
+
+	.btn-add-product:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 10px 25px rgba(212, 175, 55, 0.25);
 	}
 
 	.panel {
@@ -135,7 +192,7 @@
 
 	.row {
 		display: grid;
-		grid-template-columns: 1.4fr 0.8fr 0.8fr 0.8fr;
+		grid-template-columns: 1.4fr 0.8fr 0.8fr 0.8fr 0.2fr;
 		gap: 0.7rem;
 		padding: 0.85rem;
 		border-radius: 10px;
@@ -149,6 +206,35 @@
 		letter-spacing: 0.5px;
 		text-transform: uppercase;
 		color: rgba(224, 224, 224, 0.75);
+	}
+
+	.row.row-interactive {
+		border: none;
+		cursor: pointer;
+		transition: all 0.3s ease;
+		text-align: left;
+		font-family: inherit;
+		font-size: inherit;
+		color: inherit;
+	}
+
+	.row.row-interactive:hover {
+		background: rgba(212, 175, 55, 0.15);
+		transform: translateX(4px);
+	}
+
+	.row-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #d4af37;
+		font-weight: 700;
+		opacity: 0;
+		transition: opacity 0.3s ease;
+	}
+
+	.row.row-interactive:hover .row-icon {
+		opacity: 1;
 	}
 
 	.row span {
@@ -165,13 +251,20 @@
 			font-size: 1.85rem;
 		}
 
-		.spotlight {
+		.header-top {
 			flex-direction: column;
-			align-items: flex-start;
+		}
+
+		.btn-add-product {
+			width: 100%;
 		}
 
 		.row {
 			grid-template-columns: 1fr;
+		}
+
+		.row-icon {
+			display: none;
 		}
 	}
 </style>

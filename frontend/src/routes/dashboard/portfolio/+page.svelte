@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+
 	const holdings = [
 		{ symbol: 'AAPL', name: 'Apple Inc.', allocation: 22, value: 275000, day: 1.4 },
 		{ symbol: 'MSFT', name: 'Microsoft Corp.', allocation: 18, value: 225000, day: 0.8 },
@@ -6,6 +8,14 @@
 		{ symbol: 'AMZN', name: 'Amazon.com', allocation: 12, value: 150000, day: -0.6 },
 		{ symbol: 'GOOGL', name: 'Alphabet Inc.', allocation: 10, value: 125000, day: 0.5 }
 	];
+
+	function addAsset() {
+		goto('/dashboard/portfolio/add');
+	}
+
+	function viewAssetDetails(symbol: string) {
+		goto(`/dashboard/portfolio/assets/${symbol}`);
+	}
 </script>
 
 <svelte:head>
@@ -14,8 +24,18 @@
 </svelte:head>
 
 <header class="page-header">
-	<h1 class="page-title">Portafolio</h1>
-	<p class="page-subtitle">Visión detallada de posiciones, asignación y rendimiento diario.</p>
+	<div class="header-top">
+		<div>
+			<h1 class="page-title">Portafolio</h1>
+			<p class="page-subtitle">Visión detallada de posiciones, asignación y rendimiento diario.</p>
+		</div>
+		<button onclick={addAsset} class="btn-add-asset">
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M12 5v14M5 12h14" />
+			</svg>
+			Agregar Activo
+		</button>
+	</div>
 </header>
 
 <section class="cards-grid">
@@ -46,7 +66,18 @@
 
 	<div class="holdings-list">
 		{#each holdings as holding (holding.symbol)}
-			<article class="holding-row">
+			<article
+				class="holding-row"
+				role="button"
+				tabindex="0"
+				onclick={() => viewAssetDetails(holding.symbol)}
+				onkeydown={(e) => {
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault();
+						viewAssetDetails(holding.symbol);
+					}
+				}}
+			>
 				<div class="holding-main">
 					<p class="symbol">{holding.symbol}</p>
 					<p class="name">{holding.name}</p>
@@ -59,6 +90,9 @@
 					{holding.day >= 0 ? '+' : ''}
 					{holding.day}%
 				</p>
+				<svg class="arrow-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M9 18l6-6-6-6" />
+				</svg>
 			</article>
 		{/each}
 	</div>
@@ -69,6 +103,14 @@
 		margin-bottom: 2rem;
 		padding-bottom: 1.5rem;
 		border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+	}
+
+	.header-top {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 2rem;
+		flex-wrap: wrap;
 	}
 
 	.page-title {
@@ -84,6 +126,29 @@
 		margin: 0;
 		color: rgba(224, 224, 224, 0.62);
 		font-size: 1rem;
+	}
+
+	.btn-add-asset {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.85rem 1.5rem;
+		border: none;
+		border-radius: 10px;
+		background: linear-gradient(135deg, #d4af37, #e8c547);
+		color: #0f1419;
+		font-weight: 700;
+		font-family: 'Poppins', system-ui, sans-serif;
+		font-size: 0.95rem;
+		cursor: pointer;
+		transition: all 0.3s ease;
+		letter-spacing: 0.3px;
+		white-space: nowrap;
+	}
+
+	.btn-add-asset:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 10px 25px rgba(212, 175, 55, 0.25);
 	}
 
 	.cards-grid {
@@ -160,12 +225,21 @@
 
 	.holding-row {
 		display: grid;
-		grid-template-columns: 1.25fr 1.4fr 0.8fr 0.45fr;
+		grid-template-columns: 1.25fr 1.4fr 0.8fr 0.45fr auto;
 		align-items: center;
 		gap: 0.9rem;
 		padding: 0.85rem;
 		border-radius: 12px;
 		background: rgba(15, 20, 25, 0.45);
+		cursor: pointer;
+		transition: all 0.3s ease;
+		border: 1px solid rgba(212, 175, 55, 0);
+	}
+
+	.holding-row:hover {
+		background: rgba(26, 31, 46, 0.7);
+		border-color: rgba(212, 175, 55, 0.2);
+		transform: translateX(4px);
 	}
 
 	.holding-main .symbol {
@@ -210,6 +284,16 @@
 		color: #e74c3c;
 	}
 
+	.arrow-icon {
+		color: rgba(212, 175, 55, 0.4);
+		transition: all 0.3s ease;
+	}
+
+	.holding-row:hover .arrow-icon {
+		color: #e8c547;
+		transform: translateX(2px);
+	}
+
 	@media (max-width: 1024px) {
 		.cards-grid {
 			grid-template-columns: 1fr;
@@ -219,6 +303,15 @@
 	@media (max-width: 768px) {
 		.page-title {
 			font-size: 1.85rem;
+		}
+
+		.header-top {
+			flex-direction: column;
+		}
+
+		.btn-add-asset {
+			width: 100%;
+			justify-content: center;
 		}
 
 		.holding-row {
