@@ -229,7 +229,7 @@
 				</form>
 			{:else}
 				<!-- Register Form -->
-				<form onsubmit={handleRegisterSubmit} class="form-content" id="register-form">
+				<form method="POST" action="?/register" class="form-content" id="register-form">
 					<Input
 						label="Nombre completo"
 						id="register-name"
@@ -290,7 +290,7 @@
 						<Input
 							label="Confirmar contraseña"
 							id="register-confirm"
-							name="confirm-password"
+							name="confirmPassword"
 							type={showConfirmPassword ? 'text' : 'password'}
 							placeholder="Repite tu contraseña"
 							bind:value={registerConfirmPassword}

@@ -49,7 +49,54 @@ export const actions = {
 
 		return redirect(302, '/dashboard');
 	},
-	register: async (event) => {
-		// TODO register the user
+	register: async ({ request }) => {
+		const formData = await request.formData();
+
+		const { success, data, error } = await z
+			.object({
+				name: z.string().min(2),
+				email: z.email().min(2),
+				password: z.string().min(8),
+				confirmPassword: z.string().min(8).max(18),
+				terms: z.coerce.boolean()
+			})
+			.safeParseAsync({
+				name: formData.get('name'),
+				email: formData.get('email'),
+				password: formData.get('password'),
+				confirmPassword: formData.get('confirmPassword'),
+				terms: formData.get('terms')
+			});
+
+		if (!success) {
+			return { success: false, errors: error.issues };
+		}
+
+		if (data.password !== data.confirmPassword) {
+			return { success: false, errors: { confirmPassword: 'Passwords do not match' } };
+		}
+
+		if (!data.terms) {
+			return { success: false, errors: { terms: 'You must accept the terms and conditions' } };
+		}
+
+		const response = await fetch(`${env.baseApi}/auth/register`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(data)
+		});
+
+		if (!response.ok) {
+			const data = await response.json();
+			return { success: false, errors: { server: data.message || 'Registration failed' } };
+		}
+
+		const { success: registeredSuccess, message: registeredMessage } = await response.json();
+
+		if (!registeredSuccess) {
+			return { success: false, errors: { server: registeredMessage || 'Registration failed' } };
+		}
+
+		redirect(302, '/login');
 	}
 } satisfies Actions;
