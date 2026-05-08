@@ -97,6 +97,6 @@ export const actions = {
 			return { success: false, errors: { server: registeredMessage || 'Registration failed' } };
 		}
 
-		redirect(302, '/login');
+		redirect(302, '/auth');
 	}
 } satisfies Actions;
