@@ -20,13 +20,14 @@ COPY src ./src
 COPY static ./static
 COPY svelte.config.js vite.config.ts tsconfig.json ./
 
+ENV BASE_API=http://localhost:8080
+
 RUN pnpm run build
 
 # Stage 3: Runtime
 FROM node:24-alpine
 WORKDIR /app
 
-ENV BASE_API=http://localhost:8080
 ENV NODE_ENV=production
 
 # Copy production dependencies from dependencies stage
