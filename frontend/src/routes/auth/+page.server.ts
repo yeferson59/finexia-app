@@ -1,6 +1,6 @@
 import z from 'zod';
 import type { Actions } from './$types';
-import { envConfig } from '$/config/env';
+import { env } from '$env/dynamic/private';
 import { NODE_ENV } from '$env/static/private';
 import { redirect } from '@sveltejs/kit';
 
@@ -21,7 +21,7 @@ export const actions = {
 			return { success: false, errors: loginDto.error.issues };
 		}
 
-		const response = await fetch(`${envConfig.baseApi}/auth/login`, {
+		const response = await fetch(`${env.BASE_API}/auth/login`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ email: loginDto.data.email, password: loginDto.data.password })
@@ -80,7 +80,7 @@ export const actions = {
 			return { success: false, errors: { terms: 'You must accept the terms and conditions' } };
 		}
 
-		const response = await fetch(`${envConfig.baseApi}/auth/register`, {
+		const response = await fetch(`${env.BASE_API}/auth/register`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(data)
