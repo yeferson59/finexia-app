@@ -1,4 +1,4 @@
-import { env } from '$/config/env';
+import { envConfig } from '$/config/env';
 import type { LayoutServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
 
@@ -9,7 +9,7 @@ export const load: LayoutServerLoad = async ({ cookies, fetch }) => {
 		return redirect(303, '/auth');
 	}
 
-	const response = await fetch(`${env.baseApi}/auth/session`, {
+	const response = await fetch(`${envConfig.baseApi}/auth/session`, {
 		headers: {
 			Authorization: `Bearer ${accessToken}`
 		}

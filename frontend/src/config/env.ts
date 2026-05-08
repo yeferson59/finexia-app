@@ -1,10 +1,10 @@
-import { BASE_API } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 const EnvSchema = z.object({
 	baseApi: z.string()
 });
 
-export const env = EnvSchema.parse({
-	baseApi: BASE_API
+export const envConfig = EnvSchema.parse({
+	baseApi: env.BASE_API
 });

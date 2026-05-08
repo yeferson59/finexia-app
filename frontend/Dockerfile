@@ -20,8 +20,6 @@ COPY src ./src
 COPY static ./static
 COPY svelte.config.js vite.config.ts tsconfig.json ./
 
-ENV BASE_API=http://localhost:8080
-
 RUN pnpm run build
 
 # Stage 3: Runtime
