@@ -26,6 +26,7 @@ RUN pnpm run build
 FROM node:24-alpine
 WORKDIR /app
 
+ENV BASE_API=http://localhost:8080
 ENV NODE_ENV=production
 
 # Copy production dependencies from dependencies stage
