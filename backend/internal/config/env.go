@@ -9,31 +9,47 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// AWS_ACCESS_KEY_ID
+// AWS_DEFAULT_REGION
+// AWS_ENDPOINT_URL
+// AWS_S3_BUCKET_NAME
+// AWS_SECRET_ACCESS_KEY
+
 type Env struct {
-	Enviroment    string
-	Port          string
-	PathMigration string
-	DatabaseURL   string
-	CacheURL      string
-	JWTSecret     string
-	JWTDuration   time.Duration
-	CORSEnabled   bool
-	CORSOrigin    []string
+	Enviroment         string
+	Port               string
+	PathMigration      string
+	DatabaseURL        string
+	CacheURL           string
+	JWTSecret          string
+	JWTDuration        time.Duration
+	CORSEnabled        bool
+	CORSOrigin         []string
+	AWSAccessKeyID     string
+	AWSDefaultRegion   string
+	AWSEndpointURL     string
+	AWSS3BucketName    string
+	AWSSecretAccessKey string
 }
 
 func (c *Config) LoadEnvs() *Env {
 	_ = godotenv.Load()
 
 	return &Env{
-		Enviroment:    c.getString("ENVIROMENT", "development"),
-		Port:          c.getString("PORT", "8080"),
-		PathMigration: c.getString("PATH_MIGRATION", "file://internal/migrations"),
-		DatabaseURL:   c.getString("DATABASE_URL", ""),
-		CacheURL:      c.getString("CACHE_URL", ""),
-		JWTSecret:     c.getString("JWT_SECRET", "secret"),
-		JWTDuration:   c.getDuration("JWT_DURATION", time.Hour*24*7),
-		CORSEnabled:   c.getBool("CORS_ENABLED", true),
-		CORSOrigin:    c.getSlice("CORS_ORIGIN", "http://localhost:5173"),
+		Enviroment:         c.getString("ENVIROMENT", "development"),
+		Port:               c.getString("PORT", "8080"),
+		PathMigration:      c.getString("PATH_MIGRATION", "file://internal/migrations"),
+		DatabaseURL:        c.getString("DATABASE_URL", ""),
+		CacheURL:           c.getString("CACHE_URL", ""),
+		JWTSecret:          c.getString("JWT_SECRET", "secret"),
+		JWTDuration:        c.getDuration("JWT_DURATION", time.Hour*24*7),
+		CORSEnabled:        c.getBool("CORS_ENABLED", true),
+		CORSOrigin:         c.getSlice("CORS_ORIGIN", "http://localhost:5173"),
+		AWSAccessKeyID:     c.getString("AWS_ACCESS_KEY_ID", ""),
+		AWSDefaultRegion:   c.getString("AWS_DEFAULT_REGION", ""),
+		AWSEndpointURL:     c.getString("AWS_ENDPOINT_URL", ""),
+		AWSS3BucketName:    c.getString("AWS_S3_BUCKET_NAME", ""),
+		AWSSecretAccessKey: c.getString("AWS_SECRET_ACCESS_KEY", ""),
 	}
 }
 

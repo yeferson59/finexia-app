@@ -32,15 +32,20 @@ func main() {
 	}
 	defer dbPool.Close()
 
-	storage := cfg.ConnectionCache(envs.CacheURL)
+	storageCache := cfg.ConnectionCache(envs.CacheURL)
 
 	defer func() {
-		if err := storage.Close(); err != nil {
+		if err := storageCache.Close(); err != nil {
 			log.Fatal("failed to close cache store: " + err.Error())
 		}
 	}()
 
-	if err := internal.New(app, dbPool, envs, storage).Init(ctx); err != nil {
+	s3Client, err := cfg.Storage(ctx, envs.AWSAccessKeyID, envs.AWSDefaultRegion, envs.AWSEndpointURL, envs.AWSSecretAccessKey)
+	if err != nil {
+		log.Fatal("failed to create storage: " + err.Error())
+	}
+
+	if err := internal.New(app, dbPool, envs, storageCache, s3Client).Init(ctx); err != nil {
 		log.Fatal("failed to initialize app: " + err.Error())
 	}
 
