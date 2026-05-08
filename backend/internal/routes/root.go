@@ -25,8 +25,11 @@ func (r *Routes) Init() {
 	r.app.Use(
 		r.middlewares.Recovery(),
 		r.middlewares.RequestID(),
+		r.middlewares.ResponseTime(),
 		r.middlewares.Logger(),
 		r.middlewares.CORS(),
+		r.middlewares.Helmet(),
+		r.middlewares.Limiter(),
 	)
 
 	r.Health()
