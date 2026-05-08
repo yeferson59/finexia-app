@@ -14,6 +14,7 @@ type Env struct {
 	Port          string
 	PathMigration string
 	DatabaseURL   string
+	CacheURL      string
 	JWTSecret     string
 	JWTDuration   time.Duration
 	CORSEnabled   bool
@@ -28,6 +29,7 @@ func (c *Config) LoadEnvs() *Env {
 		Port:          c.getString("PORT", "8080"),
 		PathMigration: c.getString("PATH_MIGRATION", "file://internal/migrations"),
 		DatabaseURL:   c.getString("DATABASE_URL", ""),
+		CacheURL:      c.getString("CACHE_URL", ""),
 		JWTSecret:     c.getString("JWT_SECRET", "secret"),
 		JWTDuration:   c.getDuration("JWT_DURATION", time.Hour*24*7),
 		CORSEnabled:   c.getBool("CORS_ENABLED", true),

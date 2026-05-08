@@ -29,7 +29,15 @@ func main() {
 	}
 	defer dbPool.Close()
 
-	if err := internal.New(app, dbPool, envs).Init(ctx); err != nil {
+	storage := cfg.ConnectionCache(envs.CacheURL)
+
+	defer func() {
+		if err := storage.Close(); err != nil {
+			log.Fatal("failed to close cache store: " + err.Error())
+		}
+	}()
+
+	if err := internal.New(app, dbPool, envs, storage).Init(ctx); err != nil {
 		log.Fatal("failed to initialize app: " + err.Error())
 	}
 
