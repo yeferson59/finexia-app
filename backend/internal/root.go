@@ -5,12 +5,12 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/yeferson59/svelte-go/internal/config"
-	"github.com/yeferson59/svelte-go/internal/handlers"
-	"github.com/yeferson59/svelte-go/internal/middlewares"
-	"github.com/yeferson59/svelte-go/internal/repositories"
-	"github.com/yeferson59/svelte-go/internal/routes"
-	"github.com/yeferson59/svelte-go/internal/services"
+	"github.com/yeferson59/finexia-app/internal/config"
+	"github.com/yeferson59/finexia-app/internal/handlers"
+	"github.com/yeferson59/finexia-app/internal/middlewares"
+	"github.com/yeferson59/finexia-app/internal/repositories"
+	"github.com/yeferson59/finexia-app/internal/routes"
+	"github.com/yeferson59/finexia-app/internal/services"
 )
 
 type Bootstrap struct {

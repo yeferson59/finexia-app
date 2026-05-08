@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/yeferson59/svelte-go/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/entities"
 )
 
 func (r *Repository) ListUsers(ctx context.Context, offset, limit uint) ([]entities.User, uint, error) {

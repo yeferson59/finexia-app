@@ -7,8 +7,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/yeferson59/svelte-go/internal/dtos/auth"
-	"github.com/yeferson59/svelte-go/pkg/helpers"
+	"github.com/yeferson59/finexia-app/internal/dtos/auth"
+	"github.com/yeferson59/finexia-app/pkg/helpers"
 	"golang.org/x/crypto/bcrypt"
 )
 

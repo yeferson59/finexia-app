@@ -3,7 +3,7 @@ package middlewares
 import (
 	"context"
 
-	"github.com/yeferson59/svelte-go/internal/config"
+	"github.com/yeferson59/finexia-app/internal/config"
 )
 
 type Middlewares struct {

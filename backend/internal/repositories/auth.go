@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yeferson59/svelte-go/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/entities"
 )
 
 func (r *Repository) GetAccountByEmail(ctx context.Context, email string) (entities.User, entities.Account, error) {

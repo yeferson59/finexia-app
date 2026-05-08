@@ -2,8 +2,8 @@ package routes
 
 import (
 	"github.com/gofiber/fiber/v3"
-	"github.com/yeferson59/svelte-go/internal/handlers"
-	"github.com/yeferson59/svelte-go/internal/middlewares"
+	"github.com/yeferson59/finexia-app/internal/handlers"
+	"github.com/yeferson59/finexia-app/internal/middlewares"
 )
 
 type Routes struct {

@@ -1,8 +1,8 @@
 package services
 
 import (
-	"github.com/yeferson59/svelte-go/internal/config"
-	"github.com/yeferson59/svelte-go/internal/repositories"
+	"github.com/yeferson59/finexia-app/internal/config"
+	"github.com/yeferson59/finexia-app/internal/repositories"
 )
 
 type Services struct {

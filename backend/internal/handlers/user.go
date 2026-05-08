@@ -3,10 +3,10 @@ package handlers
 import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
-	"github.com/yeferson59/svelte-go/internal/dtos/user"
-	"github.com/yeferson59/svelte-go/internal/entities"
-	"github.com/yeferson59/svelte-go/pkg/dtos"
-	"github.com/yeferson59/svelte-go/pkg/helpers"
+	"github.com/yeferson59/finexia-app/internal/dtos/user"
+	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/pkg/dtos"
+	"github.com/yeferson59/finexia-app/pkg/helpers"
 )
 
 func (handler *Handlers) GetListUsers(c fiber.Ctx) error {

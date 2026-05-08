@@ -4,7 +4,7 @@ import (
 	jwtware "github.com/gofiber/contrib/v3/jwt"
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/yeferson59/svelte-go/internal/dtos/auth"
+	"github.com/yeferson59/finexia-app/internal/dtos/auth"
 )
 
 func (handler *Handlers) Login(c fiber.Ctx) error {

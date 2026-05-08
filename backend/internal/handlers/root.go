@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 
-	"github.com/yeferson59/svelte-go/internal/services"
+	"github.com/yeferson59/finexia-app/internal/services"
 )
 
 type Handlers struct {

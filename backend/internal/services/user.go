@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/yeferson59/svelte-go/internal/entities"
-	"github.com/yeferson59/svelte-go/pkg/helpers"
+	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/pkg/helpers"
 )
 
 func (s *Services) GetListUsers(ctx context.Context, offset, limit uint) ([]entities.User, uint, error) {

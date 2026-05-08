@@ -6,8 +6,8 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/log"
-	"github.com/yeferson59/svelte-go/internal"
-	"github.com/yeferson59/svelte-go/internal/config"
+	"github.com/yeferson59/finexia-app/internal"
+	"github.com/yeferson59/finexia-app/internal/config"
 )
 
 type structValidator struct {
