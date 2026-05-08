@@ -27,6 +27,7 @@ FROM node:24-alpine
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV BASE_API=http://localhost:8080
 
 # Copy production dependencies from dependencies stage
 COPY --from=dependencies /app/node_modules ./node_modules
