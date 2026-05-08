@@ -35,6 +35,6 @@ func (r *Routes) Init() {
 	r.Health()
 	r.Auth()
 
-	r.router = r.app.Use(r.middlewares.JWT())
+	r.router = r.app.Use(r.middlewares.Session(), r.middlewares.JWT())
 	r.Users()
 }
