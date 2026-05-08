@@ -66,17 +66,10 @@
 
 	<div class="holdings-list">
 		{#each holdings as holding (holding.symbol)}
-			<article
+			<button
 				class="holding-row"
-				role="button"
-				tabindex="0"
 				onclick={() => viewAssetDetails(holding.symbol)}
-				onkeydown={(e) => {
-					if (e.key === 'Enter' || e.key === ' ') {
-						e.preventDefault();
-						viewAssetDetails(holding.symbol);
-					}
-				}}
+				aria-label={`View details for ${holding.symbol}`}
 			>
 				<div class="holding-main">
 					<p class="symbol">{holding.symbol}</p>
@@ -93,7 +86,7 @@
 				<svg class="arrow-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 					<path d="M9 18l6-6-6-6" />
 				</svg>
-			</article>
+			</button>
 		{/each}
 	</div>
 </section>

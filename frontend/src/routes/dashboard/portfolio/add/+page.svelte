@@ -217,7 +217,7 @@
 				</div>
 
 				<div class="form-group">
-					<label class="form-label">Valor Total Invertido</label>
+					<span class="form-label">Valor Total Invertido</span>
 					<div class="value-display">
 						<p class="total-value">{formatCurrency(formData.totalValue)}</p>
 					</div>
