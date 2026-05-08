@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	"github.com/bytedance/sonic"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/log"
@@ -20,6 +21,8 @@ func (v *structValidator) Validate(out any) error {
 
 func main() {
 	app, cfg := fiber.New(fiber.Config{
+		JSONEncoder:     sonic.ConfigFastest.Marshal,
+		JSONDecoder:     sonic.ConfigFastest.Unmarshal,
 		StructValidator: new(structValidator{validate: validator.New()}),
 	}), config.New()
 	envs, ctx := cfg.LoadEnvs(), context.Background()
