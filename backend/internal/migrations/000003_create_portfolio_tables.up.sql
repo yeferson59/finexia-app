@@ -74,7 +74,8 @@ CREATE TABLE assets (
   asset_type asset_type NOT NULL,
   exchange VARCHAR(100),
   currency CHAR(3) NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE UNIQUE INDEX idx_assets_ticker_exchange ON assets(ticker, COALESCE(exchange, ''));
@@ -114,17 +115,12 @@ CREATE TABLE transactions (
   transaction_date DATE NOT NULL,
   notes VARCHAR(500),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT fk_transactions_entry FOREIGN KEY (entry_id) REFERENCES portfolio_entries(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_transactions_entry ON transactions(entry_id);
 CREATE INDEX idx_transactions_date  ON transactions(transaction_date DESC);
-
--- ============================================================
--- TABLA: exchange_rates
--- Tasas de cambio históricas para conversión multi-moneda.
--- Se puede poblar con una API externa (ej. Open Exchange Rates, ECB).
--- ============================================================
 
 CREATE TABLE exchange_rates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
