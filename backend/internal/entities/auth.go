@@ -1,6 +1,8 @@
 package entities
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -9,11 +11,11 @@ type Session struct {
 	ID        uuid.UUID `json:"id"`
 	UserID    uuid.UUID `json:"userId"`
 	Token     string    `json:"token"`
-	ExpiresAt string    `json:"expiresAt"`
-	IPAddress string    `json:"ipAddress"`
-	UserAgent string    `json:"userAgent"`
-	CreatedAt string    `json:"createdAt"`
-	UpdatedAt string    `json:"updatedAt"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	IPAddress *string   `json:"ipAddress"`
+	UserAgent *string   `json:"userAgent"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 type Account struct {
@@ -23,13 +25,13 @@ type Account struct {
 	ProviderID            string    `json:"provider"`
 	AccessToken           string    `json:"accessToken"`
 	RefreshToken          string    `json:"refreshToken"`
-	AccessTokenExpiresAt  string    `json:"accessTokenExpiresAt"`
-	RefreshTokenExpiresAt string    `json:"refreshTokenExpiresAt"`
+	AccessTokenExpiresAt  time.Time `json:"accessTokenExpiresAt"`
+	RefreshTokenExpiresAt time.Time `json:"refreshTokenExpiresAt"`
 	Scope                 string    `json:"scope"`
 	IDToken               string    `json:"idToken"`
 	Password              string    `json:"password"`
-	CreatedAt             string    `json:"createdAt"`
-	UpdatedAt             string    `json:"updatedAt"`
+	CreatedAt             time.Time `json:"createdAt"`
+	UpdatedAt             time.Time `json:"updatedAt"`
 }
 
 func (a *Account) ComparePassword(password string) error {
@@ -40,7 +42,7 @@ type Verification struct {
 	ID         uuid.UUID `json:"id"`
 	Identifier string    `json:"identifier"`
 	Value      string    `json:"value"`
-	ExpiresAt  string    `json:"expiresAt"`
-	CreatedAt  string    `json:"createdAt"`
-	UpdatedAt  string    `json:"updatedAt"`
+	ExpiresAt  time.Time `json:"expiresAt"`
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
 }

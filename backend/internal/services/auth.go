@@ -79,3 +79,15 @@ func (s *Services) Register(ctx context.Context, name, email, password string) (
 		Image: user.Image,
 	}, nil
 }
+
+func (s *Services) GetSession(ctx context.Context, userID uuid.UUID, token string) (auth.SessionResponseDTO, error) {
+	user, session, err := s.repos.GetSessionByUserIDToken(ctx, userID, token)
+	if err != nil {
+		return auth.SessionResponseDTO{}, err
+	}
+
+	return auth.SessionResponseDTO{
+		User:    user,
+		Session: session,
+	}, nil
+}

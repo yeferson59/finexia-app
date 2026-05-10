@@ -12,7 +12,7 @@ type Role struct {
 	Description string     `json:"description"`
 	CreatedAt   time.Time  `json:"createdAt"`
 	UpdatedAt   time.Time  `json:"updatedAt"`
-	DeletedAt   *time.Time `json:"deletedAt"`
+	DeletedAt   *time.Time `json:"-"`
 }
 
 type User struct {
@@ -25,5 +25,5 @@ type User struct {
 	PreferredCurrency string     `json:"preferredCurrency"`
 	CreatedAt         time.Time  `json:"createdAt"`
 	UpdatedAt         time.Time  `json:"updatedAt"`
-	DeletedAt         *time.Time `json:"deletedAt"`
+	DeletedAt         *time.Time `json:"-"`
 }

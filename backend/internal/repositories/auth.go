@@ -51,3 +51,33 @@ func (r *Repository) Register(ctx context.Context, name, email, password string)
 
 	return user, nil
 }
+
+func (r *Repository) GetSessionByUserIDToken(ctx context.Context, userID uuid.UUID, token string) (entities.User, entities.Session, error) {
+	var user entities.User
+	var session entities.Session
+
+	if err := r.db.QueryRow(ctx, "SELECT u.*, s.* FROM users u JOIN sessions s ON s.user_id = u.id WHERE s.user_id = $1 AND s.token = $2", userID.String(), token).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.EmailVerified,
+		&user.Image,
+		&user.RoleID,
+		&user.PreferredCurrency,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&user.DeletedAt,
+		&session.ID,
+		&session.UserID,
+		&session.Token,
+		&session.ExpiresAt,
+		&session.IPAddress,
+		&session.UserAgent,
+		&session.CreatedAt,
+		&session.UpdatedAt,
+	); err != nil {
+		return entities.User{}, entities.Session{}, err
+	}
+
+	return user, session, nil
+}
