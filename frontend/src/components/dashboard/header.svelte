@@ -1,9 +1,10 @@
 <script lang="ts">
-interface Props {
-	sidebarOpen?: boolean;
-}
+	interface Props {
+		sidebarOpen?: boolean;
+		data: { user: { name: string; email: string } };
+	}
 
-let { sidebarOpen = $bindable(false) }: Props = $props();
+	let { sidebarOpen = $bindable(false), data }: Props = $props();
 </script>
 
 <header class="dashboard-header">
@@ -15,7 +16,14 @@ let { sidebarOpen = $bindable(false) }: Props = $props();
 			aria-expanded={sidebarOpen}
 			aria-controls="dashboard-sidebar"
 		>
-			<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<svg
+				width="24"
+				height="24"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
 				<line x1="3" y1="12" x2="21" y2="12"></line>
 				<line x1="3" y1="6" x2="21" y2="6"></line>
 				<line x1="3" y1="18" x2="21" y2="18"></line>
@@ -29,7 +37,14 @@ let { sidebarOpen = $bindable(false) }: Props = $props();
 
 		<div class="header-actions">
 			<button class="icon-button" aria-label="Notificaciones">
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
 					<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
 					<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
 				</svg>
@@ -37,7 +52,14 @@ let { sidebarOpen = $bindable(false) }: Props = $props();
 			</button>
 
 			<button class="icon-button" aria-label="Configuración">
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
 					<circle cx="12" cy="12" r="1"></circle>
 					<circle cx="19" cy="12" r="1"></circle>
 					<circle cx="5" cy="12" r="1"></circle>
@@ -47,8 +69,8 @@ let { sidebarOpen = $bindable(false) }: Props = $props();
 			<div class="user-profile">
 				<div class="avatar"></div>
 				<div class="user-info">
-					<p class="user-name">Juan Pérez</p>
-					<p class="user-email">juan@email.com</p>
+					<p class="user-name">{data.user.name}</p>
+					<p class="user-email">{data.user.email}</p>
 				</div>
 			</div>
 		</div>

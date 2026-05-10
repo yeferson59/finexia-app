@@ -14,7 +14,7 @@
 
 <header class="dashboard-header-section">
 	<h1 id="dashboard-title" class="dashboard-title">Dashboard</h1>
-	<p class="dashboard-subtitle">Bienvenido de vuelta, {data.name}</p>
+	<p class="dashboard-subtitle">Bienvenido de vuelta, {data.user.name}</p>
 </header>
 
 <section class="net-worth-section" aria-labelledby="dashboard-title">

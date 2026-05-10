@@ -2,12 +2,14 @@
 	import DashboardHeader from '$components/dashboard/header.svelte';
 	import Sidebar from '$components/dashboard/sidebar.svelte';
 
-	let { children } = $props();
+	import type { LayoutProps } from './$types';
+
+	let { children, data }: LayoutProps = $props();
 	let sidebarOpen = $state(false);
 </script>
 
 <div class="dashboard-container">
-	<DashboardHeader bind:sidebarOpen />
+	<DashboardHeader bind:sidebarOpen {data} />
 	<Sidebar {sidebarOpen} />
 	{#if sidebarOpen}
 		<button
