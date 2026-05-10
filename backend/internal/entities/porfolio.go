@@ -65,7 +65,7 @@ type InvestmentSource struct {
 	UpdatedAt   time.Time  `json:"updatedAt"`
 }
 
-type Porfolio struct {
+type Portfolio struct {
 	ID           uuid.UUID `json:"id"`
 	UserID       uuid.UUID `json:"userId"`
 	Name         string    `json:"name"`

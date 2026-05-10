@@ -29,7 +29,7 @@ func (r *Repository) ListUsers(ctx context.Context, offset, limit uint) ([]entit
 	for rows.Next() {
 		var user entities.User
 
-		if err := rows.Scan(&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID, &user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt); err != nil {
 			return nil, 0, err
 		}
 
@@ -42,7 +42,7 @@ func (r *Repository) ListUsers(ctx context.Context, offset, limit uint) ([]entit
 func (r *Repository) GetUserByID(ctx context.Context, id uuid.UUID) (entities.User, error) {
 	var user entities.User
 
-	if err := r.db.QueryRow(ctx, "SELECT * FROM users WHERE id = $1", id.String()).Scan(&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.UpdatedAt, &user.CreatedAt, &user.DeletedAt); err != nil {
+	if err := r.db.QueryRow(ctx, "SELECT * FROM users WHERE id = $1", id.String()).Scan(&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID, &user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt); err != nil {
 		return entities.User{}, err
 	}
 
@@ -61,7 +61,7 @@ func (r *Repository) CreateUser(ctx context.Context, name, email string) (entiti
 			return entities.User{}, errors.New("failed create new user")
 		}
 
-		if tx.QueryRow(contextTimeout, "INSERT INTO users (name, email, role_id) VALUES ($1, $2, $3) RETURNING *", name, email, roleID).Scan(&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt) != nil {
+		if tx.QueryRow(contextTimeout, "INSERT INTO users (name, email, role_id) VALUES ($1, $2, $3) RETURNING *", name, email, roleID).Scan(&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID, &user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt) != nil {
 			return entities.User{}, errors.New("failed create new user")
 		}
 
@@ -73,7 +73,7 @@ func (r *Repository) CreateUser(ctx context.Context, name, email string) (entiti
 
 func (r *Repository) UpdateUser(ctx context.Context, id uuid.UUID, name, email, image string) (entities.User, error) {
 	var user entities.User
-	if err := r.db.QueryRow(ctx, "UPDATE users SET name = $1, email = $2, image = $3, updated_at = $4 WHERE id = $5 RETURNING *", name, email, image, time.Now(), id.String()).Scan(&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.UpdatedAt, &user.CreatedAt, &user.DeletedAt); err != nil {
+	if err := r.db.QueryRow(ctx, "UPDATE users SET name = $1, email = $2, image = $3, updated_at = $4 WHERE id = $5 RETURNING *", name, email, image, time.Now(), id.String()).Scan(&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID, &user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt); err != nil {
 		return entities.User{}, err
 	}
 
@@ -89,7 +89,7 @@ func (r *Repository) DeleteUser(ctx context.Context, id uuid.UUID) error {
 func (r *Repository) GetUserByEmail(ctx context.Context, email string) (entities.User, error) {
 	var user entities.User
 
-	if err := r.db.QueryRow(ctx, "SELECT * FROM users WHERE email = $1", email).Scan(&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.UpdatedAt, &user.CreatedAt, &user.DeletedAt); err != nil {
+	if err := r.db.QueryRow(ctx, "SELECT * FROM users WHERE email = $1", email).Scan(&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID, &user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt); err != nil {
 		return entities.User{}, err
 	}
 
