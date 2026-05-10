@@ -1,4 +1,4 @@
-.PHONY: lint run db down fmt
+.PHONY: lint run db cache down fmt
 
 lint:
 	@golangci-lint run ./...
@@ -8,6 +8,9 @@ run:
 
 db:
 	@docker-compose up -d db
+
+cache:
+	@docker-compose up -d cache
 
 down:
 	@docker-compose down

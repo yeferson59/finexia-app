@@ -1,7 +1,7 @@
 .PHONY: run kill-backend kill-frontend down
 
 run:
-	@cd backend && make db && make run &
+	@cd backend && make db && make cache && make run &
 	@cd frontend && pnpm run dev --open
 
 kill-backend:
