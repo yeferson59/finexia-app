@@ -33,11 +33,7 @@ type Account struct {
 }
 
 func (a *Account) ComparePassword(password string) error {
-	if err := bcrypt.CompareHashAndPassword([]byte(a.Password), []byte(password)); err != nil {
-		return err
-	}
-
-	return nil
+	return bcrypt.CompareHashAndPassword([]byte(a.Password), []byte(password))
 }
 
 type Verification struct {
