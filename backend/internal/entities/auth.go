@@ -32,12 +32,12 @@ type Account struct {
 	UpdatedAt             string    `json:"updatedAt"`
 }
 
-func (a *Account) ComparePassword(password string) bool {
-	if bcrypt.CompareHashAndPassword([]byte(a.Password), []byte(password)) != nil {
-		return false
+func (a *Account) ComparePassword(password string) error {
+	if err := bcrypt.CompareHashAndPassword([]byte(a.Password), []byte(password)); err != nil {
+		return err
 	}
 
-	return true
+	return nil
 }
 
 type Verification struct {

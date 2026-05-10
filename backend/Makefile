@@ -1,4 +1,7 @@
-.PHONY: run db down
+.PHONY: lint run db down fmt
+
+lint:
+	@golangci-lint run ./...
 
 run:
 	@go run cmd/api/main.go
@@ -8,3 +11,7 @@ db:
 
 down:
 	@docker-compose down
+
+fmt:
+	@go fmt ./...
+	@golangci-lint fmt ./...

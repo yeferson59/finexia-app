@@ -16,7 +16,7 @@ import (
 // AWS_SECRET_ACCESS_KEY
 
 type Env struct {
-	Enviroment         string
+	Environment        string
 	Port               string
 	PathMigration      string
 	DatabaseURL        string
@@ -36,7 +36,7 @@ func (c *Config) LoadEnvs() *Env {
 	_ = godotenv.Load()
 
 	return &Env{
-		Enviroment:         c.getString("ENVIROMENT", "development"),
+		Environment:        c.getString("ENVIRONMENT", "development"),
 		Port:               c.getString("PORT", "8080"),
 		PathMigration:      c.getString("PATH_MIGRATION", "file://internal/migrations"),
 		DatabaseURL:        c.getString("DATABASE_URL", ""),
@@ -127,7 +127,8 @@ func (Config) getDuration(key string, defaultValue time.Duration) time.Duration 
  }
 */
 
-func (Config) getInt64(key string, defaultValue int64) int64 {
+/*
+ * func (Config) getInt64(key string, defaultValue int64) int64 {
 	value := strings.TrimSpace(os.Getenv(strings.ToUpper(key)))
 	if value == "" {
 		return defaultValue
@@ -139,7 +140,8 @@ func (Config) getInt64(key string, defaultValue int64) int64 {
 	}
 
 	return int64Value
-}
+ }
+*/
 
 func (Config) getBool(key string, defaultValue bool) bool {
 	value := strings.TrimSpace(os.Getenv(strings.ToUpper(key)))

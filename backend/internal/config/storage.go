@@ -15,16 +15,16 @@ import (
 // AWS_S3_BUCKET_NAME
 // AWS_SECRET_ACCESS_KEY
 
-func (Config) Storage(ctx context.Context, AWSAccessKeyID, AWSDefaultRegion, AWSEndpointURL, AWSSecretAccessKey string) (*s3.Client, error) {
-	cfg, err := awsConfig.LoadDefaultConfig(ctx, awsConfig.WithRegion(AWSDefaultRegion), awsConfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(AWSAccessKeyID, AWSSecretAccessKey, "")))
+func (Config) Storage(ctx context.Context, awsAccessKeyID, awsDefaultRegion, awsEndpointURL, awsSecretAccessKey string) (*s3.Client, error) {
+	cfg, err := awsConfig.LoadDefaultConfig(ctx, awsConfig.WithRegion(awsDefaultRegion), awsConfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(awsAccessKeyID, awsSecretAccessKey, "")))
 	if err != nil {
 		panic("")
 	}
 
 	s3Client := s3.NewFromConfig(cfg)
-	if AWSEndpointURL != "" {
+	if awsEndpointURL != "" {
 		s3Client = s3.NewFromConfig(cfg, func(o *s3.Options) {
-			o.BaseEndpoint = aws.String(AWSEndpointURL)
+			o.BaseEndpoint = aws.String(awsEndpointURL)
 			o.UsePathStyle = true
 		})
 	}

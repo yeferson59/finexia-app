@@ -4,6 +4,7 @@ import (
 	jwtware "github.com/gofiber/contrib/v3/jwt"
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
+
 	"github.com/yeferson59/finexia-app/internal/dtos/auth"
 )
 

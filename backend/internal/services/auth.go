@@ -7,9 +7,10 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/yeferson59/finexia-app/internal/dtos/auth"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func (s *Services) Login(ctx context.Context, email, password string) (auth.LoginResponseDTO, error) {
@@ -22,7 +23,7 @@ func (s *Services) Login(ctx context.Context, email, password string) (auth.Logi
 		return auth.LoginResponseDTO{}, errors.New("invalid account")
 	}
 
-	if !account.ComparePassword(password) {
+	if err := account.ComparePassword(password); err != nil {
 		return auth.LoginResponseDTO{}, errors.New("invalid credentials")
 	}
 

@@ -1,0 +1,54 @@
+# GolangCI-Lint configuration for professional Go development
+
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - govet # Go's vet tool for catching suspicious constructs
+    - errcheck # Check that errors from functions are handled
+    - staticcheck # Advanced static analysis
+    - unused # Checks for unused variables/constants/functions/types
+    - gocritic # Heuristic checks for code quality
+    - revive # Style, documentation, and best-practices linter
+    # - depguard # Prevents usage of blacklisted imports (ARCHITECTURE VALIDATION) - Disabled temporallytemporarily due to configuration issues
+    - prealloc # Suggests slice preallocation
+    - ineffassign # Detects ineffectual assignments
+    - misspell # Detects commonly misspelled English words
+    - dupl # Detects code duplication
+    - nakedret # Finds naked returns in functions
+    - dogsled # Too many blank identifiers in assignment
+
+  settings:
+    dupl:
+      threshold: 150
+
+    gocritic:
+      disabled-checks: []
+
+    revive:
+      enable-all-rules: false
+      rules:
+        # Disable stuttering check to allow descriptive DTO names
+        - name: exported
+          disabled: true
+
+formatters:
+  enable:
+    - goimports
+  settings:
+    goimports:
+      # A list of prefixes, which, if set, checks import paths
+      # with the given prefixes are grouped after 3rd-party packages.
+      # Default: []
+      local-prefixes:
+        - github.com/yeferson59/finexia-app
+
+output:
+  show-stats: true
+
+# Run `golangci-lint run` to check your code!
+# Run `make lint` for integrated linting with architecture validation

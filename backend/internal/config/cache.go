@@ -5,8 +5,8 @@ import (
 	"github.com/gofiber/storage/redis/v3"
 )
 
-func (Config) ConnectionCache(URL string) fiber.Storage {
+func (Config) ConnectionCache(url string) fiber.Storage {
 	return redis.New(redis.Config{
-		URL: URL,
+		URL: url,
 	})
 }

@@ -9,6 +9,6 @@ func (m *Middlewares) Session() fiber.Handler {
 	return session.New(session.Config{
 		Storage:        m.storage,
 		CookieHTTPOnly: true,
-		CookieSecure:   m.envs.Enviroment == "production",
+		CookieSecure:   m.envs.Environment == "production",
 	})
 }

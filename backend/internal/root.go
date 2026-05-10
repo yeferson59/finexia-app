@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/yeferson59/finexia-app/internal/config"
 	"github.com/yeferson59/finexia-app/internal/handlers"
 	"github.com/yeferson59/finexia-app/internal/middlewares"
