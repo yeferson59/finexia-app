@@ -14,7 +14,7 @@ import (
 )
 
 func (s *Services) Login(ctx context.Context, email, password string) (auth.LoginResponseDTO, error) {
-	user, account, err := s.repos.GetAccountByEmail(ctx, email)
+	user, role, account, err := s.repos.GetAccountByEmail(ctx, email)
 	if err != nil {
 		return auth.LoginResponseDTO{}, err
 	}
@@ -29,7 +29,7 @@ func (s *Services) Login(ctx context.Context, email, password string) (auth.Logi
 
 	expiresAt := time.Now().Add(s.cfg.JWTDuration)
 
-	jwToken, err := s.CreateJWToken(user.ID, user.Name, expiresAt)
+	jwToken, err := s.CreateJWToken(user.ID, role, expiresAt)
 	if err != nil {
 		return auth.LoginResponseDTO{}, err
 	}
@@ -45,10 +45,10 @@ func (s *Services) Login(ctx context.Context, email, password string) (auth.Logi
 	}, nil
 }
 
-func (s *Services) CreateJWToken(userID uuid.UUID, name string, expiresAt time.Time) (string, error) {
+func (s *Services) CreateJWToken(userID uuid.UUID, role string, expiresAt time.Time) (string, error) {
 	claims := jwt.MapClaims{
 		"id":   userID,
-		"name": name,
+		"role": role,
 		"exp":  expiresAt.Unix(),
 	}
 
@@ -80,14 +80,30 @@ func (s *Services) Register(ctx context.Context, name, email, password string) (
 	}, nil
 }
 
-func (s *Services) GetSession(ctx context.Context, userID uuid.UUID, token string) (auth.SessionResponseDTO, error) {
+func (s *Services) GetSession(ctx context.Context, userID uuid.UUID, role, token string) (auth.UserSessionResponseDTO, error) {
 	user, session, err := s.repos.GetSessionByUserIDToken(ctx, userID, token)
 	if err != nil {
-		return auth.SessionResponseDTO{}, err
+		return auth.UserSessionResponseDTO{}, err
 	}
 
-	return auth.SessionResponseDTO{
-		User:    user,
-		Session: session,
+	return auth.UserSessionResponseDTO{
+		User: auth.UserResponseDTO{
+			Name:              user.Name,
+			Email:             user.Email,
+			EmailVerified:     user.EmailVerified,
+			Image:             user.Image,
+			Role:              role,
+			PreferredCurrency: user.PreferredCurrency,
+			CreatedAt:         user.CreatedAt,
+			UpdatedAt:         user.UpdatedAt,
+		},
+		Session: auth.SessionResponseDTO{
+			ID:        session.ID,
+			UserID:    session.UserID,
+			ExpiresAt: session.ExpiresAt,
+			IPAddress: session.IPAddress,
+			UserAgent: session.UserAgent,
+			CreatedAt: session.CreatedAt,
+		},
 	}, nil
 }

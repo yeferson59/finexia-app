@@ -43,12 +43,13 @@ func (handler *Handlers) GetSession(c fiber.Ctx) error {
 	jwtToken := jwtware.FromContext(c)
 
 	claims := jwtToken.Claims.(jwt.MapClaims)
+	role := claims["role"].(string)
 	userID, err := uuid.Parse(claims["id"].(string))
 	if err != nil {
 		return handler.responseBadRequest(c, "invalid user id", "auth:getSession")
 	}
 
-	userSession, err := handler.services.GetSession(handler.ctx, userID, jwtToken.Raw)
+	userSession, err := handler.services.GetSession(handler.ctx, userID, role, jwtToken.Raw)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "", "auth:getSession")
 	}

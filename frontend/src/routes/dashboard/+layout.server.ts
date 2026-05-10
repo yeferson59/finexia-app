@@ -5,11 +5,11 @@ import { redirect } from '@sveltejs/kit';
 type SessionResponse = {
 	data: {
 		user: {
-			id: string;
 			name: string;
 			email: string;
-			verified: boolean;
+			emailVerified: boolean;
 			image: string;
+			role: string;
 			preferredCurrency: string;
 			createdAt: string;
 			updatedAt: string;
@@ -18,10 +18,9 @@ type SessionResponse = {
 			id: string;
 			userId: string;
 			expiresAt: string;
-			ipAddress: string;
-			userAgent: string;
+			ipAddress: string | null;
+			userAgent: string | null;
 			createdAt: string;
-			updatedAt: string;
 		};
 	};
 	success: boolean;
@@ -47,6 +46,8 @@ export const load: LayoutServerLoad = async ({ cookies, fetch }) => {
 	}
 
 	const { data, success }: SessionResponse = await response.json();
+
+	console.log(data);
 
 	if (!success) {
 		return redirect(303, '/auth');

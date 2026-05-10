@@ -10,11 +10,12 @@ import (
 	"github.com/yeferson59/finexia-app/internal/entities"
 )
 
-func (r *Repository) GetAccountByEmail(ctx context.Context, email string) (entities.User, entities.Account, error) {
+func (r *Repository) GetAccountByEmail(ctx context.Context, email string) (entities.User, string, entities.Account, error) {
 	var account entities.Account
 	var user entities.User
+	var role string
 
-	if err := r.db.QueryRow(ctx, "SELECT u.id, u.name, u.email_verified, a.id, a.provider_id, a.account_id, a.password FROM users u JOIN accounts a ON u.id = a.user_id WHERE u.email = $1 AND u.deleted_at IS NULL", email).Scan(
+	if err := r.db.QueryRow(ctx, "SELECT u.id, u.name, u.email_verified, a.id, a.provider_id, a.account_id, a.password, r.name FROM users u JOIN accounts a ON u.id = a.user_id JOIN roles r ON u.role_id = r.id WHERE u.email = $1 AND u.deleted_at IS NULL", email).Scan(
 		&user.ID,
 		&user.Name,
 		&user.EmailVerified,
@@ -22,11 +23,12 @@ func (r *Repository) GetAccountByEmail(ctx context.Context, email string) (entit
 		&account.ProviderID,
 		&account.AccountID,
 		&account.Password,
+		&role,
 	); err != nil {
-		return entities.User{}, entities.Account{}, err
+		return entities.User{}, role, entities.Account{}, err
 	}
 
-	return user, account, nil
+	return user, role, account, nil
 }
 
 func (r *Repository) CreateSession(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) error {

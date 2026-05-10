@@ -4,7 +4,9 @@
 	import AssetAllocation from '$components/dashboard/asset-allocation.svelte';
 	import RecentActivity from '$components/dashboard/recent-activity.svelte';
 
-	const { data } = $props();
+	import type { PageProps } from './$types';
+
+	const { data }: PageProps = $props();
 </script>
 
 <svelte:head>
