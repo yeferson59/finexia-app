@@ -10,7 +10,7 @@ import (
 type Session struct {
 	ID        uuid.UUID `json:"id"`
 	UserID    uuid.UUID `json:"userId"`
-	Token     string    `json:"token"`
+	Token     string    `json:"-"`
 	ExpiresAt time.Time `json:"expiresAt"`
 	IPAddress *string   `json:"ipAddress"`
 	UserAgent *string   `json:"userAgent"`
@@ -29,7 +29,7 @@ type Account struct {
 	RefreshTokenExpiresAt time.Time `json:"refreshTokenExpiresAt"`
 	Scope                 string    `json:"scope"`
 	IDToken               string    `json:"idToken"`
-	Password              string    `json:"password"`
+	Password              string    `json:"-"`
 	CreatedAt             time.Time `json:"createdAt"`
 	UpdatedAt             time.Time `json:"updatedAt"`
 }

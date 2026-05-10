@@ -21,7 +21,7 @@ type User struct {
 	Email             string     `json:"email"`
 	EmailVerified     bool       `json:"emailVerified"`
 	Image             string     `json:"image"`
-	RoleID            uuid.UUID  `json:"roleId"`
+	RoleID            uuid.UUID  `json:"-"`
 	PreferredCurrency string     `json:"preferredCurrency"`
 	CreatedAt         time.Time  `json:"createdAt"`
 	UpdatedAt         time.Time  `json:"updatedAt"`
