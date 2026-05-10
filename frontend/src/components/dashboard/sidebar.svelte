@@ -9,7 +9,7 @@
 
 	const menuItems = [
 		{ label: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
-		{ label: 'Portafolio', icon: 'briefcase', href: '/dashboard/portfolio' },
+		{ label: 'Portafolios', icon: 'briefcase', href: '/dashboard/portafolios' },
 		{ label: 'Inversiones', icon: 'trending-up', href: '/dashboard/investments' },
 		{ label: 'Transacciones', icon: 'exchange', href: '/dashboard/transactions' },
 		{ label: 'Reportes', icon: 'bar-chart', href: '/dashboard/reports' },

@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 
+	const portfolioId = $page.params.id;
 	const symbol = $page.params.symbol.toUpperCase();
 
 	// Mock asset data
@@ -94,7 +95,7 @@
 	];
 
 	function goBack() {
-		goto('/dashboard/portfolio');
+		goto(`/dashboard/portafolios/${portfolioId}`);
 	}
 
 	function handleSell() {
@@ -107,7 +108,7 @@
 
 	function handleDelete() {
 		if (confirm(`¿Deseas eliminar la posición de ${symbol}?`)) {
-			goto('/dashboard/portfolio');
+			goto(`/dashboard/portafolios/${portfolioId}`);
 		}
 	}
 </script>

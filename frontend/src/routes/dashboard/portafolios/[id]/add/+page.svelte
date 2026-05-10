@@ -1,5 +1,8 @@
 <script lang="ts">
+	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+
+	const portfolioId = $page.params.id;
 
 	interface FormData {
 		assetType: string;
@@ -69,7 +72,7 @@
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 			submitSuccess = true;
 			setTimeout(() => {
-				goto('/dashboard/portfolio');
+				goto(`/dashboard/portafolios/${portfolioId}`);
 			}, 1500);
 		} catch (error) {
 			console.error('Error:', error);
@@ -79,7 +82,7 @@
 	}
 
 	function handleCancel() {
-		goto('/dashboard/portfolio');
+		goto(`/dashboard/portafolios/${portfolioId}`);
 	}
 
 	function formatCurrency(value: number): string {
@@ -89,6 +92,7 @@
 			minimumFractionDigits: 2
 		}).format(value);
 	}
+
 </script>
 
 <svelte:head>

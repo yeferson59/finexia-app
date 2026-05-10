@@ -1,5 +1,8 @@
 <script lang="ts">
+	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+
+	const portfolioId = $page.params.id;
 
 	const holdings = [
 		{ symbol: 'AAPL', name: 'Apple Inc.', allocation: 22, value: 275000, day: 1.4 },
@@ -9,12 +12,16 @@
 		{ symbol: 'GOOGL', name: 'Alphabet Inc.', allocation: 10, value: 125000, day: 0.5 }
 	];
 
+	function goBack() {
+		goto('/dashboard/portafolios');
+	}
+
 	function addAsset() {
-		goto('/dashboard/portfolio/add');
+		goto(`/dashboard/portafolios/${portfolioId}/add`);
 	}
 
 	function viewAssetDetails(symbol: string) {
-		goto(`/dashboard/portfolio/assets/${symbol}`);
+		goto(`/dashboard/portafolios/${portfolioId}/assets/${symbol}`);
 	}
 </script>
 
@@ -26,7 +33,12 @@
 <header class="page-header">
 	<div class="header-top">
 		<div>
-			<h1 class="page-title">Portafolio</h1>
+			<button onclick={goBack} class="btn-back" aria-label="Volver a portafolios">
+				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M19 12H5M12 19l-7-7 7-7" />
+				</svg>
+			</button>
+			<h1 class="page-title">Portafolio {portfolioId}</h1>
 			<p class="page-subtitle">Visión detallada de posiciones, asignación y rendimiento diario.</p>
 		</div>
 		<button onclick={addAsset} class="btn-add-asset">
@@ -119,6 +131,57 @@
 		margin: 0;
 		color: rgba(224, 224, 224, 0.62);
 		font-size: 1rem;
+	}
+
+	.btn-add-asset {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.85rem 1.5rem;
+		border: none;
+		border-radius: 10px;
+		background: linear-gradient(135deg, #d4af37, #e8c547);
+		color: #0f1419;
+		font-weight: 700;
+		font-family: 'Poppins', system-ui, sans-serif;
+		font-size: 0.95rem;
+		cursor: pointer;
+		transition: all 0.3s ease;
+		letter-spacing: 0.3px;
+		white-space: nowrap;
+	}
+
+	.btn-add-asset:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 10px 25px rgba(212, 175, 55, 0.25);
+	}
+
+	.btn-back {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		padding: 0;
+		margin-right: 1rem;
+		border: 1px solid rgba(212, 175, 55, 0.3);
+		border-radius: 8px;
+		background: rgba(212, 175, 55, 0.1);
+		color: #d4af37;
+		cursor: pointer;
+		transition: all 0.3s ease;
+	}
+
+	.btn-back:hover {
+		background: rgba(212, 175, 55, 0.2);
+		border-color: rgba(212, 175, 55, 0.5);
+		transform: translateX(-2px);
+	}
+
+	.header-top > div {
+		display: flex;
+		align-items: flex-start;
+		gap: 1rem;
 	}
 
 	.btn-add-asset {
