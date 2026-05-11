@@ -89,10 +89,11 @@ func (r *Repository) GetSessionByToken(ctx context.Context, token string) (entit
 	var role string
 	var session entities.Session
 
-	if err := r.db.QueryRow(ctx, "SELECT u.id, u.email_verified, r.name, s.token FROM users u JOIN sessions s ON s.user_id = u.id JOIN roles r ON u.role_id = r.id WHERE s.token = $1", token).Scan(
+	if err := r.db.QueryRow(ctx, "SELECT u.id, u.email_verified, r.name, s.expires_at, s.token FROM users u JOIN sessions s ON s.user_id = u.id JOIN roles r ON u.role_id = r.id WHERE s.token = $1", token).Scan(
 		&user.ID,
 		&user.EmailVerified,
 		&role,
+		&session.ExpiresAt,
 		&session.Token,
 	); err != nil {
 		return entities.User{}, role, entities.Session{}, err
