@@ -29,7 +29,7 @@ func (s *Services) Login(ctx context.Context, email, password string) (auth.Logi
 		return auth.LoginResponseDTO{}, errors.New("invalid credentials")
 	}
 
-	expiresAt := time.Now().Add(s.cfg.JWTDuration)
+	expiresAt := time.Now().UTC().Add(s.cfg.JWTDuration)
 
 	jwToken, err := s.CreateJWToken(user.ID, role, expiresAt)
 	if err != nil {
@@ -200,17 +200,20 @@ func (s *Services) ValidateToken(ctx context.Context, token string) (string, err
 		return "", errors.New("invalid access token")
 	}
 
-	expTime := time.Unix(expUnix, 0)
-	if time.Now().After(expTime) {
+	expTime := time.Unix(expUnix, 0).UTC()
+	now := time.Now().UTC()
+
+	const expirationLeeway = 30 * time.Second
+	if now.After(expTime.Add(expirationLeeway)) {
 		return "", errors.New("invalid access token")
 	}
 
-	if session.ExpiresAt.Unix() != expTime.Unix() {
-		return "", errors.New("invalid access token")
-	}
-
-	if err := s.storage.SetWithContext(ctx, cacheKey, []byte("true"), time.Hour*24); err != nil {
-		return "", err
+	cacheTTL := expTime.Sub(now)
+	cacheTTL = min(cacheTTL, 24*time.Hour)
+	if cacheTTL > 0 {
+		if err := s.storage.SetWithContext(ctx, cacheKey, []byte("true"), cacheTTL); err != nil {
+			return "", err
+		}
 	}
 
 	return token, nil
