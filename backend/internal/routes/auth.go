@@ -7,4 +7,5 @@ func (r *Routes) Auth() {
 	auth.Post("/login", r.handlers.Login)
 	auth.Use(r.middlewares.Session(), r.middlewares.JWT())
 	auth.Get("/session", r.handlers.GetSession)
+	auth.Post("/logout", r.handlers.Logout)
 }

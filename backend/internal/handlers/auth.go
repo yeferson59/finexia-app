@@ -56,3 +56,19 @@ func (handler *Handlers) GetSession(c fiber.Ctx) error {
 
 	return handler.responseStatusOk(c, "", "", userSession)
 }
+
+func (handler *Handlers) Logout(c fiber.Ctx) error {
+	jwtToken := jwtware.FromContext(c)
+
+	claims := jwtToken.Claims.(jwt.MapClaims)
+	userID, err := uuid.Parse(claims["id"].(string))
+	if err != nil {
+		return handler.responseBadRequest(c, "invalid user id", "auth:logout")
+	}
+
+	if err := handler.services.Logout(handler.ctx, userID, jwtToken.Raw); err != nil {
+		return handler.responseFromDomain(c, err, "", "auth:logout")
+	}
+
+	return handler.responseStatusOk(c, "successfully logged out", "valid access token", nil)
+}

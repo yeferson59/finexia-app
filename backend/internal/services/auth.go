@@ -215,3 +215,15 @@ func (s *Services) ValidateToken(ctx context.Context, token string) (string, err
 
 	return token, nil
 }
+
+func (s *Services) Logout(ctx context.Context, userID uuid.UUID, token string) error {
+	if err := s.storage.DeleteWithContext(ctx, "validateToken"+"-"+token); err != nil {
+		return err
+	}
+
+	if err := s.repos.DeleteSessionByUserIDToken(ctx, userID, token); err != nil {
+		return err
+	}
+
+	return nil
+}
