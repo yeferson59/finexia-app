@@ -131,6 +131,7 @@ func (s *Services) ValidateToken(ctx context.Context, token string) (string, err
 		return token, nil
 	}
 
+	fmt.Println("hola a todos")
 	jwtoken, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
 		return []byte(s.cfg.JWTSecret), nil
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
@@ -138,15 +139,21 @@ func (s *Services) ValidateToken(ctx context.Context, token string) (string, err
 		return "", errors.New("invalid access token")
 	}
 
+	fmt.Println(jwtoken, err)
+
 	claims, ok := jwtoken.Claims.(jwt.MapClaims)
 	if !ok {
 		return "", errors.New("invalid access token")
 	}
 
+	fmt.Println(claims)
+
 	userIDValue, ok := claims["id"]
 	if !ok {
 		return "", errors.New("invalid access token")
 	}
+
+	fmt.Println("paso por id")
 
 	var userID string
 	switch v := userIDValue.(type) {
@@ -163,10 +170,14 @@ func (s *Services) ValidateToken(ctx context.Context, token string) (string, err
 		return "", errors.New("invalid access token")
 	}
 
+	fmt.Println("role aqui", role)
+
 	user, roleName, session, err := s.repos.GetSessionByToken(ctx, token)
 	if err != nil {
 		return "", errors.New("invalid access token")
 	}
+
+	fmt.Println("user", user, "roleName", roleName, "session", session)
 
 	if userID != user.ID.String() {
 		return "", errors.New("invalid access token")
@@ -185,9 +196,14 @@ func (s *Services) ValidateToken(ctx context.Context, token string) (string, err
 		return "", errors.New("invalid access token")
 	}
 
+	fmt.Println(exp, "es el exp")
+
+	fmt.Println(session.ExpiresAt.After(time.Unix(int64(exp), 0)))
 	if session.ExpiresAt.After(time.Unix(int64(exp), 0)) {
 		return "", errors.New("invalid access token")
 	}
+
+	fmt.Println(exp, "es el exp")
 
 	if err := s.storage.SetWithContext(ctx, cacheKey, []byte("true"), time.Hour*24); err != nil {
 		return "", err
