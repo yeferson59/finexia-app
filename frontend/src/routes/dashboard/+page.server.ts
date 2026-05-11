@@ -1,4 +1,3 @@
-import z from 'zod';
 import type { Actions } from './$types';
 import { env } from '$env/dynamic/private';
 import { redirect } from '@sveltejs/kit';
@@ -9,7 +8,7 @@ export const actions = {
 
 		if (!token) return { success: false };
 
-		const response = await fetch(`${env.API_URL}/auth/logout`, {
+		const response = await fetch(`${env.BASE_API}/auth/logout`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
