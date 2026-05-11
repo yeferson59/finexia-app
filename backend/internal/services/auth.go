@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -106,4 +108,90 @@ func (s *Services) GetSession(ctx context.Context, userID uuid.UUID, role, token
 			CreatedAt: session.CreatedAt,
 		},
 	}, nil
+}
+
+func (s *Services) ValidateToken(ctx context.Context, token string) (string, error) {
+	cacheKey := "validateToken" + "-" + token
+
+	data, err := s.storage.GetWithContext(ctx, cacheKey)
+	if err != nil {
+		return "", err
+	}
+
+	if len(data) > 0 {
+		isValidToken, err := strconv.ParseBool(string(data))
+		if err != nil {
+			return "", err
+		}
+
+		if !isValidToken {
+			return "", errors.New("invalid access token")
+		}
+
+		return token, nil
+	}
+
+	jwtoken, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
+		return []byte(s.cfg.JWTSecret), nil
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
+	if err != nil || jwtoken == nil || !jwtoken.Valid {
+		return "", errors.New("invalid access token")
+	}
+
+	claims, ok := jwtoken.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.New("invalid access token")
+	}
+
+	userIDValue, ok := claims["id"]
+	if !ok {
+		return "", errors.New("invalid access token")
+	}
+
+	var userID string
+	switch v := userIDValue.(type) {
+	case string:
+		userID = v
+	case fmt.Stringer:
+		userID = v.String()
+	default:
+		userID = fmt.Sprint(v)
+	}
+
+	role, ok := claims["role"].(string)
+	if !ok || role == "" {
+		return "", errors.New("invalid access token")
+	}
+
+	user, roleName, session, err := s.repos.GetSessionByToken(ctx, token)
+	if err != nil {
+		return "", errors.New("invalid access token")
+	}
+
+	if userID != user.ID.String() {
+		return "", errors.New("invalid access token")
+	}
+
+	if token != session.Token {
+		return "", errors.New("invalid access token")
+	}
+
+	if role != roleName {
+		return "", errors.New("invalid access token")
+	}
+
+	exp, ok := claims["exp"].(float64)
+	if !ok {
+		return "", errors.New("invalid access token")
+	}
+
+	if session.ExpiresAt.After(time.Unix(int64(exp), 0)) {
+		return "", errors.New("invalid access token")
+	}
+
+	if err := s.storage.SetWithContext(ctx, cacheKey, []byte("true"), time.Hour*24); err != nil {
+		return "", err
+	}
+
+	return token, nil
 }

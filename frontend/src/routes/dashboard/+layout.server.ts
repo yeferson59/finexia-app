@@ -47,8 +47,6 @@ export const load: LayoutServerLoad = async ({ cookies, fetch }) => {
 
 	const { data, success }: SessionResponse = await response.json();
 
-	console.log(data);
-
 	if (!success) {
 		return redirect(303, '/auth');
 	}

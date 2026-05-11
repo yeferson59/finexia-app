@@ -35,8 +35,8 @@ func New(app *fiber.App, db *pgxpool.Pool, envs *config.Env, storage fiber.Stora
 
 func (b *Bootstrap) Init(ctx context.Context) error {
 	repos := repositories.New(b.db)
-	services := services.New(repos, b.envs, b.s3Client)
-	handlers, middlewares := handlers.New(ctx, services), middlewares.New(ctx, b.envs, b.storage)
+	services := services.New(repos, b.envs, b.s3Client, b.storage)
+	handlers, middlewares := handlers.New(ctx, services), middlewares.New(ctx, b.envs, b.storage, services)
 	routes := routes.New(b.app, middlewares, handlers)
 
 	routes.Init()
