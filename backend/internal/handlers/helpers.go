@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/session"
 	"github.com/google/uuid"
 )
 
@@ -96,4 +97,17 @@ func (handler *Handlers) responseFromDomain(c fiber.Ctx, err error, message, act
 		"action":    action,
 		"timestamp": time.Now(),
 	})
+}
+
+func (handler *Handlers) getUserIDTokenRole(c fiber.Ctx) (uuid.UUID, string, string, error) {
+	sess := session.FromContext(c)
+	userID, err := uuid.Parse(sess.Get("userID").(string))
+	if err != nil {
+		return uuid.Nil, "", "", err
+	}
+
+	role := sess.Get("role").(string)
+	token := sess.Get("token").(string)
+
+	return userID, token, role, nil
 }

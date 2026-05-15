@@ -1,10 +1,7 @@
 package handlers
 
 import (
-	jwtware "github.com/gofiber/contrib/v3/jwt"
 	"github.com/gofiber/fiber/v3"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/dtos/auth"
 )
@@ -40,16 +37,12 @@ func (handler *Handlers) Register(c fiber.Ctx) error {
 }
 
 func (handler *Handlers) GetSession(c fiber.Ctx) error {
-	jwtToken := jwtware.FromContext(c)
-
-	claims := jwtToken.Claims.(jwt.MapClaims)
-	role := claims["role"].(string)
-	userID, err := uuid.Parse(claims["id"].(string))
+	userID, jwtoken, role, err := handler.getUserIDTokenRole(c)
 	if err != nil {
 		return handler.responseBadRequest(c, "invalid user id", "auth:getSession")
 	}
 
-	userSession, err := handler.services.GetSession(handler.ctx, userID, role, jwtToken.Raw)
+	userSession, err := handler.services.GetSession(handler.ctx, userID, role, jwtoken)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "", "auth:getSession")
 	}
@@ -58,15 +51,12 @@ func (handler *Handlers) GetSession(c fiber.Ctx) error {
 }
 
 func (handler *Handlers) Logout(c fiber.Ctx) error {
-	jwtToken := jwtware.FromContext(c)
-
-	claims := jwtToken.Claims.(jwt.MapClaims)
-	userID, err := uuid.Parse(claims["id"].(string))
+	userID, jwtoken, _, err := handler.getUserIDTokenRole(c)
 	if err != nil {
 		return handler.responseBadRequest(c, "invalid user id", "auth:logout")
 	}
 
-	if err := handler.services.Logout(handler.ctx, userID, jwtToken.Raw); err != nil {
+	if err := handler.services.Logout(handler.ctx, userID, jwtoken); err != nil {
 		return handler.responseFromDomain(c, err, "", "auth:logout")
 	}
 
