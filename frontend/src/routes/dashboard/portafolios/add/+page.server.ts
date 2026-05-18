@@ -1,0 +1,60 @@
+import type { Actions } from './$types';
+import { z } from 'zod';
+import { env } from '$env/dynamic/private';
+import { is } from 'zod/v4/locales';
+
+export const actions = {
+	default: async ({ request, fetch, cookies }) => {
+		const accessToken = cookies.get('access_token_finexia');
+
+		const dataRequest = await request.formData();
+
+		const { success, data, error } = await z
+			.object({
+				name: z.string(),
+				description: z.string().nullable(),
+				type: z.string(),
+				riskId: z.coerce.string(),
+				currency: z.coerce.string(),
+				priceValue: z.coerce.number(),
+				isDefault: z.coerce.boolean()
+			})
+			.safeParseAsync({
+				name: dataRequest.get('name'),
+				description: dataRequest.get('description'),
+				type: dataRequest.get('type'),
+				riskId: dataRequest.get('riskId'),
+				currency: dataRequest.get('currency'),
+				priceValue: dataRequest.get('priceValue'),
+				isDefault: dataRequest.get('isDefault')
+			});
+
+		console.log(success, data, error);
+
+		if (!success) {
+			return { success, error: error.message };
+		}
+
+		const response = await fetch(`${env.BASE_API}/portfolios`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${accessToken}`
+			},
+			body: JSON.stringify(data)
+		});
+
+		if (!response.ok) {
+			return { success: false };
+		}
+
+		const { success: responseSuccess, data: responseData } = await response.json();
+		console.log(responseSuccess, responseData);
+
+		if (!responseSuccess) {
+			return { success: false };
+		}
+
+		return { success: true };
+	}
+} satisfies Actions;

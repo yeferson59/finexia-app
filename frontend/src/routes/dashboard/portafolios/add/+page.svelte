@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import type { PageProps } from './$types';
+
+	const { data }: PageProps = $props();
 
 	interface FormData {
 		name: string;
@@ -8,6 +11,7 @@
 		riskLevel: string;
 		currency: string;
 		targetAmount: string;
+		isDefault: boolean;
 	}
 
 	let formData: FormData = $state({
@@ -16,7 +20,8 @@
 		type: 'Acciones',
 		riskLevel: 'Moderado',
 		currency: 'USD',
-		targetAmount: ''
+		targetAmount: '',
+		isDefault: false
 	});
 
 	let isSubmitting = $state(false);
@@ -24,51 +29,15 @@
 	let errors: Record<string, string> = $state({});
 
 	const portfolioTypes = [
-		{ value: 'Acciones', label: 'Acciones y ETF', icon: '📈' },
-		{ value: 'Cripto', label: 'Criptomonedas', icon: '₿' },
-		{ value: 'Bonos', label: 'Bonos y Renta Fija', icon: '📊' },
-		{ value: 'Diverso', label: 'Portafolio Diverso', icon: '🎯' },
-		{ value: 'Forex', label: 'Divisas y Forex', icon: '💱' },
-		{ value: 'Commodities', label: 'Commodities', icon: '⛏️' }
-	];
-
-	const riskLevels = [
-		{ value: 'Bajo', label: 'Bajo Riesgo', description: 'Inversiones conservadoras' },
-		{ value: 'Moderado', label: 'Riesgo Moderado', description: 'Balance entre riesgo y retorno' },
-		{ value: 'Alto', label: 'Alto Riesgo', description: 'Busca máximo crecimiento' }
+		{ value: 'stock', label: 'Acciones y ETF', icon: '📈' },
+		{ value: 'crypto', label: 'Criptomonedas', icon: '₿' },
+		{ value: 'bonds', label: 'Bonos y Renta Fija', icon: '📊' },
+		{ value: 'diversified', label: 'Portafolio Diverso', icon: '🎯' },
+		{ value: 'forex', label: 'Divisas y Forex', icon: '💱' },
+		{ value: 'commodities', label: 'Commodities', icon: '⛏️' }
 	];
 
 	const currencies = ['USD', 'COP', 'EUR', 'MXN', 'ARS'];
-
-	async function handleSubmit(e: SubmitEvent) {
-		e.preventDefault();
-		errors = {};
-
-		if (!formData.name.trim()) {
-			errors.name = 'El nombre del portafolio es requerido';
-		}
-
-		if (formData.targetAmount && isNaN(parseFloat(formData.targetAmount))) {
-			errors.targetAmount = 'Ingresa una cantidad válida';
-		}
-
-		if (Object.keys(errors).length > 0) {
-			return;
-		}
-
-		isSubmitting = true;
-		try {
-			await new Promise((resolve) => setTimeout(resolve, 1200));
-			submitSuccess = true;
-			setTimeout(() => {
-				goto('/dashboard/portafolios');
-			}, 1500);
-		} catch (error) {
-			console.error('Error:', error);
-		} finally {
-			isSubmitting = false;
-		}
-	}
 
 	function handleCancel() {
 		goto('/dashboard/portafolios');
@@ -81,7 +50,14 @@
 </svelte:head>
 
 <button class="back-button" onclick={handleCancel} aria-label="Volver a portafolios">
-	<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+	<svg
+		width="20"
+		height="20"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="2"
+	>
 		<path d="M19 12H5M12 19l-7-7 7-7" />
 	</svg>
 	Volver
@@ -95,14 +71,21 @@
 
 	{#if submitSuccess}
 		<div class="success-message">
-			<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<svg
+				width="24"
+				height="24"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
 				<polyline points="20 6 9 17 4 12"></polyline>
 			</svg>
 			<span>Portafolio creado exitosamente</span>
 		</div>
 	{/if}
 
-	<form onsubmit={handleSubmit} class="form">
+	<form method="POST" action="/dashboard/portafolios/add" class="form">
 		<fieldset class="form-section">
 			<legend class="section-title">Información Básica</legend>
 
@@ -111,6 +94,7 @@
 				<input
 					type="text"
 					id="name"
+					name="name"
 					bind:value={formData.name}
 					placeholder="Ej: Mi Portafolio Principal"
 					class="input"
@@ -126,6 +110,7 @@
 				<label for="description" class="label">Descripción (opcional)</label>
 				<textarea
 					id="description"
+					name="description"
 					bind:value={formData.description}
 					placeholder="Describe el propósito de este portafolio"
 					class="textarea"
@@ -144,6 +129,7 @@
 					<select
 						id="type"
 						bind:value={formData.type}
+						name="type"
 						class="select"
 						disabled={isSubmitting}
 					>
@@ -159,6 +145,7 @@
 						id="currency"
 						bind:value={formData.currency}
 						class="select"
+						name="currency"
 						disabled={isSubmitting}
 					>
 						{#each currencies as curr}
@@ -169,19 +156,19 @@
 			</div>
 
 			<div class="form-group">
-				<label class="label">Nivel de Riesgo *</label>
+				<label class="label" for="risk">Nivel de Riesgo *</label>
 				<fieldset class="risk-options">
-					{#each riskLevels as risk}
+					{#each data.risks as risk (risk.id)}
 						<label class="radio-label">
 							<input
 								type="radio"
-								name="riskLevel"
-								value={risk.value}
+								name="riskId"
+								value={risk.id}
 								bind:group={formData.riskLevel}
 								disabled={isSubmitting}
 							/>
 							<span class="radio-content">
-								<span class="radio-title">{risk.label}</span>
+								<span class="radio-title">{risk.name}</span>
 								<span class="radio-description">{risk.description}</span>
 							</span>
 						</label>
@@ -203,6 +190,7 @@
 						bind:value={formData.targetAmount}
 						placeholder="0.00"
 						class="input"
+						name="priceValue"
 						class:error={errors.targetAmount}
 						disabled={isSubmitting}
 						step="0.01"
@@ -214,22 +202,31 @@
 				{/if}
 				<p class="help-text">Define el monto que deseas alcanzar en este portafolio</p>
 			</div>
+
+			<div class="form-group">
+				<label class="checkbox-label" for="isDefault">
+					<input
+						type="checkbox"
+						id="isDefault"
+						name="isDefault"
+						bind:checked={formData.isDefault}
+						disabled={isSubmitting}
+					/>
+					<span class="checkbox-content">
+						<span class="checkbox-title">Marcar como portafolio por defecto</span>
+						<span class="checkbox-description">
+							Este portafolio se usará como selección predeterminada
+						</span>
+					</span>
+				</label>
+			</div>
 		</fieldset>
 
 		<div class="form-actions">
-			<button
-				type="button"
-				onclick={handleCancel}
-				class="btn-cancel"
-				disabled={isSubmitting}
-			>
+			<button type="button" onclick={handleCancel} class="btn-cancel" disabled={isSubmitting}>
 				Cancelar
 			</button>
-			<button
-				type="submit"
-				class="btn-submit"
-				disabled={isSubmitting}
-			>
+			<button type="submit" class="btn-submit" disabled={isSubmitting}>
 				{#if isSubmitting}
 					<span class="spinner"></span>
 					Creando...
@@ -377,10 +374,6 @@
 	}
 
 	.input.error,
-	.select.error {
-		border-color: #e74c3c;
-	}
-
 	.input.error:focus {
 		box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
 	}
@@ -481,6 +474,52 @@
 	}
 
 	.radio-description {
+		font-size: 0.85rem;
+		color: rgba(224, 224, 224, 0.5);
+	}
+
+	.checkbox-label {
+		display: flex;
+		align-items: flex-start;
+		gap: 1rem;
+		padding: 1rem;
+		border: 1px solid rgba(212, 175, 55, 0.15);
+		border-radius: 10px;
+		background: rgba(15, 20, 25, 0.3);
+		cursor: pointer;
+		transition: all 0.3s ease;
+	}
+
+	.checkbox-label:hover {
+		background: rgba(212, 175, 55, 0.08);
+		border-color: rgba(212, 175, 55, 0.3);
+	}
+
+	.checkbox-label input[type='checkbox'] {
+		margin-top: 0.2rem;
+		cursor: pointer;
+		accent-color: #d4af37;
+		width: 18px;
+		height: 18px;
+	}
+
+	.checkbox-label input[type='checkbox']:disabled {
+		cursor: not-allowed;
+		opacity: 0.6;
+	}
+
+	.checkbox-content {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+
+	.checkbox-title {
+		font-weight: 600;
+		color: #e0e0e0;
+	}
+
+	.checkbox-description {
 		font-size: 0.85rem;
 		color: rgba(224, 224, 224, 0.5);
 	}

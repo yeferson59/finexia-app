@@ -42,17 +42,58 @@ const (
 	Interest    TransactionType = "interest"
 )
 
-type PortfolioCategory string
+type PortfolioEntryCategory string
 
 const (
-	Stocks      PortfolioCategory = "stocks"
-	ETFs        PortfolioCategory = "etf"
-	Cryptos     PortfolioCategory = "crypto"
-	Bonds       PortfolioCategory = "bonds"
-	Cashs       PortfolioCategory = "cash"
-	RealEstate  PortfolioCategory = "real_estate"
-	Commodities PortfolioCategory = "commodities"
-	Others      PortfolioCategory = "other"
+	Stocks      PortfolioEntryCategory = "stocks"
+	ETFs        PortfolioEntryCategory = "etf"
+	Cryptos     PortfolioEntryCategory = "crypto"
+	Bonds       PortfolioEntryCategory = "bonds"
+	Cashs       PortfolioEntryCategory = "cash"
+	RealEstate  PortfolioEntryCategory = "real_estate"
+	Commodities PortfolioEntryCategory = "commodities"
+	Others      PortfolioEntryCategory = "other"
+)
+
+type PortfolioType string
+
+const (
+	PortfolioTypeOnlyStock       PortfolioType = "stock"
+	PortfolioTypeOnlyETF         PortfolioType = "etf"
+	PortfolioTypeOnlyCrypto      PortfolioType = "crypto"
+	PortfolioTypeOnlyBond        PortfolioType = "bond"
+	PortfolioTypeOnlyCash        PortfolioType = "cash"
+	PortfolioTypeOnlyRealEstate  PortfolioType = "real_estate"
+	PortfolioTypeOnlyCommodities PortfolioType = "commodities"
+
+	PortfolioTypeStockAndETF         PortfolioType = "stock_etf"
+	PortfolioTypeStockAndCrypto      PortfolioType = "stock_crypto"
+	PortfolioTypeStockAndBond        PortfolioType = "stock_bond"
+	PortfolioTypeStockAndCash        PortfolioType = "stock_cash"
+	PortfolioTypeStockAndRealEstate  PortfolioType = "stock_real_estate"
+	PortfolioTypeStockAndCommodities PortfolioType = "stock_commodities"
+
+	PortfolioTypeETFAndCrypto      PortfolioType = "etf_crypto"
+	PortfolioTypeETFAndBond        PortfolioType = "etf_bond"
+	PortfolioTypeETFAndCash        PortfolioType = "etf_cash"
+	PortfolioTypeETFAndRealEstate  PortfolioType = "etf_real_estate"
+	PortfolioTypeETFAndCommodities PortfolioType = "etf_commodities"
+
+	PortfolioTypeCryptoAndBond        PortfolioType = "crypto_bond"
+	PortfolioTypeCryptoAndCash        PortfolioType = "crypto_cash"
+	PortfolioTypeCryptoAndRealEstate  PortfolioType = "crypto_real_estate"
+	PortfolioTypeCryptoAndCommodities PortfolioType = "crypto_commodities"
+
+	PortfolioTypeBondAndCash        PortfolioType = "bond_cash"
+	PortfolioTypeBondAndRealEstate  PortfolioType = "bond_real_estate"
+	PortfolioTypeBondAndCommodities PortfolioType = "bond_commodities"
+
+	PortfolioTypeCashAndRealEstate  PortfolioType = "cash_real_estate"
+	PortfolioTypeCashAndCommodities PortfolioType = "cash_commodities"
+
+	PortfolioTypeRealEstateAndCommodities PortfolioType = "real_estate_commodities"
+
+	PortfolioTypeMultiple PortfolioType = "multiple"
 )
 
 type InvestmentSource struct {
@@ -65,15 +106,26 @@ type InvestmentSource struct {
 	UpdatedAt   time.Time  `json:"updatedAt"`
 }
 
+type Risk struct {
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
 type Portfolio struct {
-	ID           uuid.UUID `json:"id"`
-	UserID       uuid.UUID `json:"userId"`
-	Name         string    `json:"name"`
-	Description  string    `json:"description"`
-	BaseCurrency string    `json:"baseCurrency"`
-	IsDefault    bool      `json:"isDefault"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	ID           uuid.UUID     `json:"id"`
+	UserID       uuid.UUID     `json:"userId"`
+	Name         string        `json:"name"`
+	Description  string        `json:"description"`
+	Type         PortfolioType `json:"type"`
+	RiskID       uuid.UUID     `json:"riskId"`
+	BaseCurrency string        `json:"baseCurrency"`
+	IsDefault    bool          `json:"isDefault"`
+	PriceValue   *money.Money  `json:"priceValue"`
+	CreatedAt    time.Time     `json:"createdAt"`
+	UpdatedAt    time.Time     `json:"updatedAt"`
 }
 
 type Asset struct {
@@ -88,18 +140,18 @@ type Asset struct {
 }
 
 type PortfolioEntry struct {
-	ID           uuid.UUID         `json:"id"`
-	PortfolioID  uuid.UUID         `json:"portfolioId"`
-	AssetID      uuid.UUID         `json:"assetId"`
-	SourceID     uuid.UUID         `json:"sourceId"`
-	Quantity     money.Decimal     `json:"quantity"`
-	AvgCostPrice money.Money       `json:"avgCostPrice"`
-	CostCurrency string            `json:"costCurrency"`
-	Category     PortfolioCategory `json:"category"`
-	EntryDate    time.Time         `json:"entryDate"`
-	Notes        string            `json:"notes"`
-	CreatedAt    time.Time         `json:"createdAt"`
-	UpdatedAt    time.Time         `json:"updatedAt"`
+	ID           uuid.UUID              `json:"id"`
+	PortfolioID  uuid.UUID              `json:"portfolioId"`
+	AssetID      uuid.UUID              `json:"assetId"`
+	SourceID     uuid.UUID              `json:"sourceId"`
+	Quantity     money.Decimal          `json:"quantity"`
+	AvgCostPrice money.Money            `json:"avgCostPrice"`
+	CostCurrency string                 `json:"costCurrency"`
+	Category     PortfolioEntryCategory `json:"category"`
+	EntryDate    time.Time              `json:"entryDate"`
+	Notes        string                 `json:"notes"`
+	CreatedAt    time.Time              `json:"createdAt"`
+	UpdatedAt    time.Time              `json:"updatedAt"`
 }
 
 type Transaction struct {

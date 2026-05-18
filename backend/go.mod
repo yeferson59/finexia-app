@@ -19,7 +19,7 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/joho/godotenv v1.5.1
 	github.com/rs/zerolog v1.35.1
-	github.com/yeferson59/gofinance v1.2.3
+	github.com/yeferson59/gofinance v1.2.4
 	golang.org/x/crypto v0.51.0
 )
 
