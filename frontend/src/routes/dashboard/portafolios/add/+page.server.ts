@@ -1,7 +1,7 @@
 import type { Actions } from './$types';
 import { z } from 'zod';
 import { env } from '$env/dynamic/private';
-import { is } from 'zod/v4/locales';
+import { redirect } from '@sveltejs/kit';
 
 export const actions = {
 	default: async ({ request, fetch, cookies }) => {
@@ -55,6 +55,6 @@ export const actions = {
 			return { success: false };
 		}
 
-		return { success: true };
+		redirect(302, '/dashboard/portafolios');
 	}
 } satisfies Actions;
