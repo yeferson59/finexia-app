@@ -78,11 +78,11 @@
 					</div>
 					<div
 						class="risk-badge"
-						class:low={portfolio.riskLevel === 'Bajo'}
-						class:moderate={portfolio.riskLevel === 'Moderado'}
-						class:high={portfolio.riskLevel === 'Alto'}
+						class:low={portfolio.risk.name.toLowerCase().includes('bajo')}
+						class:moderate={portfolio.risk.name.toLowerCase().includes('moderado')}
+						class:high={portfolio.risk.name.toLowerCase().includes('alto')}
 					>
-						{portfolio.riskId}
+						{portfolio.risk.name}
 					</div>
 				</div>
 

@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"fmt"
-
 	"github.com/gofiber/fiber/v3"
 	"github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"
@@ -16,7 +14,6 @@ func (h *Handlers) GetPortfolios(c fiber.Ctx) error {
 
 	portfolios, err := h.services.GetPortfolios(h.ctx, userID)
 	if err != nil {
-		fmt.Println(err.Error())
 		return h.responseFromDomain(c, err, "", "")
 	}
 
@@ -43,8 +40,6 @@ func (h *Handlers) CreatePortfolio(c fiber.Ctx) error {
 	if err := c.Bind().JSON(&req); err != nil {
 		return h.responseBadRequest(c, "Invalid request", err.Error())
 	}
-
-	fmt.Println(req)
 
 	portfolio, err := h.services.CreatePortfolio(h.ctx, userID, req.Name, req.Description, req.Currency, req.RiskID, entities.PortfolioType(req.Type), req.PriceValue, req.IsDefault)
 	if err != nil {

@@ -29,8 +29,6 @@ export const actions = {
 				isDefault: dataRequest.get('isDefault')
 			});
 
-		console.log(success, data, error);
-
 		if (!success) {
 			return { success, error: error.message };
 		}
@@ -48,8 +46,7 @@ export const actions = {
 			return { success: false };
 		}
 
-		const { success: responseSuccess, data: responseData } = await response.json();
-		console.log(responseSuccess, responseData);
+		const { success: responseSuccess } = await response.json();
 
 		if (!responseSuccess) {
 			return { success: false };

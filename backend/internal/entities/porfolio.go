@@ -126,6 +126,7 @@ type Portfolio struct {
 	PriceValue   *money.Money  `json:"priceValue"`
 	CreatedAt    time.Time     `json:"createdAt"`
 	UpdatedAt    time.Time     `json:"updatedAt"`
+	Risk         Risk          `json:"risk,omitzero"`
 }
 
 type Asset struct {
