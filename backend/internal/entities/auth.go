@@ -16,6 +16,7 @@ type Session struct {
 	UserAgent *string   `json:"userAgent"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+	User      User      `json:"user,omitzero"`
 }
 
 type Account struct {
@@ -32,6 +33,7 @@ type Account struct {
 	Password              string    `json:"-"`
 	CreatedAt             time.Time `json:"createdAt"`
 	UpdatedAt             time.Time `json:"updatedAt"`
+	User                  User      `json:"user,omitzero"`
 }
 
 func (a *Account) ComparePassword(password string) error {

@@ -13,6 +13,7 @@ type Role struct {
 	CreatedAt   time.Time  `json:"createdAt"`
 	UpdatedAt   time.Time  `json:"updatedAt"`
 	DeletedAt   *time.Time `json:"-"`
+	Users       []User     `json:"users,omitempty"`
 }
 
 type User struct {
@@ -28,4 +29,7 @@ type User struct {
 	DeletedAt         *time.Time         `json:"-"`
 	Sources           []InvestmentSource `json:"sources"`
 	Portfolios        []Portfolio        `json:"portfolios"`
+	Role              Role               `json:"role,omitzero"`
+	Sessions          []Session          `json:"sessions,omitempty"`
+	Accounts          []Account          `json:"accounts,omitempty"`
 }
