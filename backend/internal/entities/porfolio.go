@@ -97,47 +97,54 @@ const (
 )
 
 type InvestmentSource struct {
-	ID          uuid.UUID  `json:"id"`
-	UserID      uuid.UUID  `json:"userId"`
-	Name        string     `json:"name"`
-	SourceType  SourceType `json:"sourceType"`
-	Description string     `json:"description"`
-	CreatedAt   time.Time  `json:"createdAt"`
-	UpdatedAt   time.Time  `json:"updatedAt"`
+	ID               uuid.UUID        `json:"id"`
+	UserID           uuid.UUID        `json:"userId"`
+	Name             string           `json:"name"`
+	SourceType       SourceType       `json:"sourceType"`
+	Description      string           `json:"description"`
+	CreatedAt        time.Time        `json:"createdAt"`
+	UpdatedAt        time.Time        `json:"updatedAt"`
+	User             User             `json:"user,omitzero"`
+	PortfolioEntries []PortfolioEntry `json:"portfolioEntries,omitempty"`
 }
 
 type Risk struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID          uuid.UUID   `json:"id"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	CreatedAt   time.Time   `json:"createdAt"`
+	UpdatedAt   time.Time   `json:"updatedAt"`
+	Portfolios  []Portfolio `json:"portfolios,omitempty"`
 }
 
 type Portfolio struct {
-	ID           uuid.UUID     `json:"id"`
-	UserID       uuid.UUID     `json:"userId"`
-	Name         string        `json:"name"`
-	Description  string        `json:"description"`
-	Type         PortfolioType `json:"type"`
-	RiskID       uuid.UUID     `json:"riskId"`
-	BaseCurrency string        `json:"baseCurrency"`
-	IsDefault    bool          `json:"isDefault"`
-	PriceValue   *money.Money  `json:"priceValue"`
-	CreatedAt    time.Time     `json:"createdAt"`
-	UpdatedAt    time.Time     `json:"updatedAt"`
-	Risk         Risk          `json:"risk,omitzero"`
+	ID                 uuid.UUID           `json:"id"`
+	UserID             uuid.UUID           `json:"userId"`
+	Name               string              `json:"name"`
+	Description        string              `json:"description"`
+	Type               PortfolioType       `json:"type"`
+	RiskID             uuid.UUID           `json:"riskId"`
+	BaseCurrency       string              `json:"baseCurrency"`
+	IsDefault          bool                `json:"isDefault"`
+	PriceValue         *money.Money        `json:"priceValue"`
+	CreatedAt          time.Time           `json:"createdAt"`
+	UpdatedAt          time.Time           `json:"updatedAt"`
+	Risk               Risk                `json:"risk,omitzero"`
+	User               User                `json:"user,omitzero"`
+	PortfolioEntries   []PortfolioEntry    `json:"portfolioEntries,omitempty"`
+	PortfolioSnapshots []PortfolioSnapshot `json:"portfolioSnapshots,omitempty"`
 }
 
 type Asset struct {
-	ID        uuid.UUID `json:"id"`
-	Ticker    string    `json:"ticker"`
-	Name      string    `json:"name"`
-	AssetType AssetType `json:"assetType"`
-	Exchange  string    `json:"exchange"`
-	Currency  string    `json:"currency"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID               uuid.UUID        `json:"id"`
+	Ticker           string           `json:"ticker"`
+	Name             string           `json:"name"`
+	AssetType        AssetType        `json:"assetType"`
+	Exchange         string           `json:"exchange"`
+	Currency         string           `json:"currency"`
+	CreatedAt        time.Time        `json:"createdAt"`
+	UpdatedAt        time.Time        `json:"updatedAt"`
+	PortfolioEntries []PortfolioEntry `json:"portfolioEntries,omitempty"`
 }
 
 type PortfolioEntry struct {
@@ -153,6 +160,10 @@ type PortfolioEntry struct {
 	Notes        string                 `json:"notes"`
 	CreatedAt    time.Time              `json:"createdAt"`
 	UpdatedAt    time.Time              `json:"updatedAt"`
+	Portfolio    Portfolio              `json:"portfolio,omitzero"`
+	Asset        Asset                  `json:"asset,omitzero"`
+	Source       InvestmentSource       `json:"source,omitzero"`
+	Transactions []Transaction          `json:"transactions,omitempty"`
 }
 
 type Transaction struct {
@@ -167,6 +178,7 @@ type Transaction struct {
 	Notes           string          `json:"notes"`
 	CreatedAt       time.Time       `json:"createdAt"`
 	UpdatedAt       time.Time       `json:"updatedAt"`
+	Entry           PortfolioEntry  `json:"entry,omitzero"`
 }
 
 type ExchangeRate struct {
@@ -189,6 +201,7 @@ type PortfolioSnapshot struct {
 	TotalGainLoss    money.Money `json:"totalGainLoss"`
 	TotalGainLossPCT money.Money `json:"totalGainLossPCT"`
 	CreatedAt        time.Time   `json:"createdAt"`
+	Portfolio        Portfolio   `json:"portfolio,omitzero"`
 }
 
 type PorfolioSummary struct {
