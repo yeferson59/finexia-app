@@ -8,6 +8,6 @@ import (
 func (m *Middlewares) Limiter() fiber.Handler {
 	return limiter.New(limiter.Config{
 		Storage: m.storage,
-		Max:     10,
+		Max:     20,
 	})
 }
