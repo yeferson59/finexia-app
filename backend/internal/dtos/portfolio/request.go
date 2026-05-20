@@ -14,3 +14,9 @@ type CreatePortfolioRequestDTO struct {
 	PriceValue  money.Money `json:"priceValue"`
 	IsDefault   bool        `json:"isDefault"`
 }
+
+type CreatePlatformRequestDTO struct {
+	Name        string `json:"name" validate:"required"`
+	Description string `json:"description"`
+	Type        string `json:"type" validate:"required"`
+}

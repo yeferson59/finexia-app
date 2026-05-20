@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/yeferson59/finexia-app/internal/entities"
@@ -33,4 +34,13 @@ func (s *Services) CreatePortfolio(ctx context.Context, userID uuid.UUID, name s
 	}
 
 	return portfolio, nil
+}
+
+func (s *Services) CreatePlatform(ctx context.Context, userID uuid.UUID, sourceType entities.SourceType, name, description string) (entities.InvestmentSource, error) {
+	platform, err := s.repos.CreatePlatform(ctx, userID, sourceType, strings.ToLower(name), description)
+	if err != nil {
+		return entities.InvestmentSource{}, err
+	}
+
+	return platform, nil
 }

@@ -48,3 +48,28 @@ func (h *Handlers) CreatePortfolio(c fiber.Ctx) error {
 
 	return h.responseStatusOk(c, "Portfolio created", "Portfolio created successfully", portfolio)
 }
+
+func (h *Handlers) CreatePlatform(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	var req portfolio.CreatePlatformRequestDTO
+
+	if err := c.Bind().JSON(&req); err != nil {
+		return h.responseBadRequest(c, "Invalid request", err.Error())
+	}
+
+	sourceType := entities.SourceType(req.Type)
+	if !sourceType.IsValid() {
+		return h.responseBadRequest(c, "Invalid source type", "Source type must be one of: broker, bank, tradingPlatform, neobank, defi, cryptoWallet, mutualFunds, brokerageHouse, other")
+	}
+
+	platform, err := h.services.CreatePlatform(h.ctx, userID, sourceType, req.Name, req.Description)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error creating platform", "Could not create platform")
+	}
+
+	return h.responseStatusOk(c, "Platform created", "Platform created successfully", platform)
+}

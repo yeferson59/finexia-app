@@ -59,3 +59,13 @@ func (r *Repository) GetPortfoliosRisks(ctx context.Context) ([]entities.Risk, e
 
 	return risks, nil
 }
+
+func (r *Repository) CreatePlatform(ctx context.Context, userID uuid.UUID, ty entities.SourceType, name, desciption string) (entities.InvestmentSource, error) {
+	var platform entities.InvestmentSource
+	err := r.db.QueryRow(ctx, "INSERT INTO investment_sources(user_id, source_type, name, description) VALUES ($1, $2, $3, $4) RETURNING id, name, description, created_at, updated_at", userID, ty, name, desciption).Scan(&platform.ID, &platform.Name, &platform.Description, &platform.CreatedAt, &platform.UpdatedAt)
+	if err != nil {
+		return entities.InvestmentSource{}, err
+	}
+
+	return platform, nil
+}

@@ -32,6 +32,15 @@ const (
 	OtherType       SourceType = "other"
 )
 
+func (s SourceType) IsValid() bool {
+	switch s {
+	case Broker, Bank, TradingPlatform, Neobank, DeFi, CryptoWallet, MutualFunds, BrokerageHouse, OtherType:
+		return true
+	default:
+		return false
+	}
+}
+
 type TransactionType string
 
 const (
