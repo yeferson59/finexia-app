@@ -113,7 +113,8 @@ CREATE TABLE IF NOT EXISTS investment_sources (
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT fk_sources_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT fk_sources_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT uk_sources_user UNIQUE (user_id, name)
 );
 
 CREATE INDEX IF NOT EXISTS idx_sources_user ON investment_sources(user_id);
