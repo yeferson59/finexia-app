@@ -42,7 +42,6 @@ func (s *Services) Login(ctx context.Context, email, password string) (auth.Logi
 
 	return auth.LoginResponseDTO{
 		ID:          user.ID,
-		Name:        user.Name,
 		AccessToken: jwToken,
 	}, nil
 }
@@ -82,7 +81,7 @@ func (s *Services) Register(ctx context.Context, name, email, password string) (
 	}, nil
 }
 
-func (s *Services) GetSession(ctx context.Context, userID uuid.UUID, role, token string) (auth.UserSessionResponseDTO, error) {
+func (s *Services) GetSession(ctx context.Context, userID uuid.UUID, token string) (auth.UserSessionResponseDTO, error) {
 	user, err := s.repos.GetSessionByUserIDToken(ctx, userID, token)
 	if err != nil {
 		return auth.UserSessionResponseDTO{}, err
@@ -94,7 +93,7 @@ func (s *Services) GetSession(ctx context.Context, userID uuid.UUID, role, token
 			Email:             user.Email,
 			EmailVerified:     user.EmailVerified,
 			Image:             user.Image,
-			Role:              role,
+			Role:              user.Role.Name,
 			PreferredCurrency: user.PreferredCurrency,
 			CreatedAt:         user.CreatedAt,
 			UpdatedAt:         user.UpdatedAt,

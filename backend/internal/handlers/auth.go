@@ -37,12 +37,12 @@ func (handler *Handlers) Register(c fiber.Ctx) error {
 }
 
 func (handler *Handlers) GetSession(c fiber.Ctx) error {
-	userID, jwtoken, role, err := handler.getUserIDTokenRole(c)
+	userID, jwtoken, _, err := handler.getUserIDTokenRole(c)
 	if err != nil {
 		return handler.responseBadRequest(c, "invalid user id", "auth:getSession")
 	}
 
-	userSession, err := handler.services.GetSession(handler.ctx, userID, role, jwtoken)
+	userSession, err := handler.services.GetSession(handler.ctx, userID, jwtoken)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "failed to get session", "auth:getSession")
 	}
