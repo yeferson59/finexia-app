@@ -21,12 +21,15 @@ const (
 type SourceType string
 
 const (
-	Broker         SourceType = "broker"
-	Bank           SourceType = "bank"
-	CryptoExchange SourceType = "crypto_exchange"
-	Platform       SourceType = "platform"
-	Excel          SourceType = "excel"
-	Manual         SourceType = "manual"
+	Broker          SourceType = "broker"
+	Bank            SourceType = "investment_bank"
+	TradingPlatform SourceType = "trading_platform"
+	Neobank         SourceType = "neobank"
+	DeFi            SourceType = "de_fi"
+	CryptoWallet    SourceType = "crypto_wallet"
+	MutualFunds     SourceType = "mutual_funds"
+	BrokerageHouse  SourceType = "brokerage_house"
+	OtherType       SourceType = "other"
 )
 
 type TransactionType string
@@ -102,6 +105,7 @@ type InvestmentSource struct {
 	Name             string           `json:"name"`
 	SourceType       SourceType       `json:"sourceType"`
 	Description      string           `json:"description"`
+	IsActive         bool             `json:"isActive"`
 	CreatedAt        time.Time        `json:"createdAt"`
 	UpdatedAt        time.Time        `json:"updatedAt"`
 	User             User             `json:"user,omitzero"`

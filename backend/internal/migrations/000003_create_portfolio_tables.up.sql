@@ -22,11 +22,14 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'source_type') THEN
     CREATE TYPE source_type AS ENUM (
       'broker',
-      'bank',
-      'crypto_exchange',
-      'platform',
-      'excel',
-      'manual'
+      'investment_bank',
+      'trading_platform',
+      'neobank',
+      'de_fi',
+      'crypto_wallet',
+      'mutual_funds',
+      'brokerage_house',
+      'other'
     );
   END IF;
 END$$;
@@ -107,6 +110,7 @@ CREATE TABLE IF NOT EXISTS investment_sources (
   name VARCHAR(255) NOT NULL,
   source_type source_type NOT NULL,
   description VARCHAR(500),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT fk_sources_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
