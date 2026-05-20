@@ -19,9 +19,11 @@ func (r *Repository) GetPortfoliosByUserID(ctx context.Context, userID uuid.UUID
 	portfolios := make([]entities.Portfolio, 0)
 	for rows.Next() {
 		var portfolio entities.Portfolio
+
 		if err := rows.Scan(&portfolio.ID, &portfolio.UserID, &portfolio.Name, &portfolio.Description, &portfolio.Type, &portfolio.RiskID, &portfolio.BaseCurrency, &portfolio.IsDefault, &portfolio.PriceValue, &portfolio.CreatedAt, &portfolio.UpdatedAt, &portfolio.Risk.ID, &portfolio.Risk.Name, &portfolio.Risk.Description, &portfolio.Risk.CreatedAt, &portfolio.Risk.UpdatedAt); err != nil {
 			return nil, err
 		}
+
 		portfolios = append(portfolios, portfolio)
 	}
 
@@ -47,9 +49,11 @@ func (r *Repository) GetPortfoliosRisks(ctx context.Context) ([]entities.Risk, e
 	risks := make([]entities.Risk, 0)
 	for rows.Next() {
 		var risk entities.Risk
+
 		if err := rows.Scan(&risk.ID, &risk.Name, &risk.Description, &risk.CreatedAt, &risk.UpdatedAt); err != nil {
 			return nil, err
 		}
+
 		risks = append(risks, risk)
 	}
 
