@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import type { PageProps } from './$types';
 	import { goto } from '$app/navigation';
 
-	const portfolioId = $page.params.id;
+	const { params }: PageProps = $props();
 
 	interface FormData {
 		assetType: string;
@@ -72,7 +72,7 @@
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 			submitSuccess = true;
 			setTimeout(() => {
-				goto(`/dashboard/portafolios/${portfolioId}`);
+				goto(`/dashboard/portafolios/${params.id}`);
 			}, 1500);
 		} catch (error) {
 			console.error('Error:', error);
@@ -82,7 +82,7 @@
 	}
 
 	function handleCancel() {
-		goto(`/dashboard/portafolios/${portfolioId}`);
+		goto(`/dashboard/portafolios/${params.id}`);
 	}
 
 	function formatCurrency(value: number): string {
@@ -92,7 +92,6 @@
 			minimumFractionDigits: 2
 		}).format(value);
 	}
-
 </script>
 
 <svelte:head>
@@ -101,7 +100,14 @@
 </svelte:head>
 
 <button class="back-button" onclick={handleCancel} aria-label="Volver al portafolio">
-	<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+	<svg
+		width="20"
+		height="20"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="2"
+	>
 		<path d="M19 12H5M12 19l-7-7 7-7" />
 	</svg>
 	Volver
@@ -140,7 +146,9 @@
 
 			<div class="form-row">
 				<div class="form-group">
-					<label for="symbol" class="form-label">Símbolo/Ticker <span class="required">*</span></label>
+					<label for="symbol" class="form-label"
+						>Símbolo/Ticker <span class="required">*</span></label
+					>
 					<input
 						id="symbol"
 						type="text"
@@ -154,7 +162,9 @@
 				</div>
 
 				<div class="form-group">
-					<label for="name" class="form-label">Nombre Completo <span class="required">*</span></label>
+					<label for="name" class="form-label"
+						>Nombre Completo <span class="required">*</span></label
+					>
 					<input
 						id="name"
 						type="text"
@@ -191,7 +201,9 @@
 				</div>
 
 				<div class="form-group">
-					<label for="purchasePrice" class="form-label">Precio de Compra <span class="required">*</span></label>
+					<label for="purchasePrice" class="form-label"
+						>Precio de Compra <span class="required">*</span></label
+					>
 					<div class="input-addon">
 						<span class="addon-text">$</span>
 						<input

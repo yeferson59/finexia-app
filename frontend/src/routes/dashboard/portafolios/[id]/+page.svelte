@@ -34,15 +34,29 @@
 	<div class="header-top">
 		<div>
 			<button onclick={goBack} class="btn-back" aria-label="Volver a portafolios">
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
 					<path d="M19 12H5M12 19l-7-7 7-7" />
 				</svg>
 			</button>
-			<h1 class="page-title">Portafolio {portfolioId}</h1>
+			<h1 class="page-title">{portfolioId}</h1>
 			<p class="page-subtitle">Visión detallada de posiciones, asignación y rendimiento diario.</p>
 		</div>
 		<button onclick={addAsset} class="btn-add-asset">
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
 				<path d="M12 5v14M5 12h14" />
 			</svg>
 			Agregar Activo
@@ -95,7 +109,15 @@
 					{holding.day >= 0 ? '+' : ''}
 					{holding.day}%
 				</p>
-				<svg class="arrow-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<svg
+					class="arrow-icon"
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
 					<path d="M9 18l6-6-6-6" />
 				</svg>
 			</button>

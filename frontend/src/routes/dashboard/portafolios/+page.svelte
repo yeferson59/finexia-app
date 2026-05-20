@@ -67,7 +67,7 @@
 		{#each data.portfolios as portfolio (portfolio.id)}
 			<button
 				class="portfolio-card"
-				onclick={() => openPortfolio(portfolio.id)}
+				onclick={() => openPortfolio(portfolio.name)}
 				aria-label={`Abrir ${portfolio.name}`}
 			>
 				<div class="card-header">

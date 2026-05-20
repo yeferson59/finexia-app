@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import type { PageProps } from './$types';
 	import { goto } from '$app/navigation';
 
-	const portfolioId = $page.params.id;
-	const symbol = $page.params.symbol.toUpperCase();
+	const { params }: PageProps = $props();
 
 	// Mock asset data
 	const assetData: Record<string, any> = {
@@ -85,7 +84,7 @@
 		}
 	};
 
-	const asset = assetData[symbol] || assetData.AAPL;
+	const asset = $derived(assetData[params.symbol] || assetData.AAPL);
 
 	// Mock transaction history
 	const transactions = [
@@ -95,34 +94,41 @@
 	];
 
 	function goBack() {
-		goto(`/dashboard/portafolios/${portfolioId}`);
+		goto(`/dashboard/portafolios/${params.id}`);
 	}
 
 	function handleSell() {
-		alert(`Vender ${symbol} - Página en desarrollo`);
+		alert(`Vender ${params.symbol} - Página en desarrollo`);
 	}
 
 	function handleEdit() {
-		alert(`Editar ${symbol} - Página en desarrollo`);
+		alert(`Editar ${params.symbol} - Página en desarrollo`);
 	}
 
 	function handleDelete() {
-		if (confirm(`¿Deseas eliminar la posición de ${symbol}?`)) {
-			goto(`/dashboard/portafolios/${portfolioId}`);
+		if (confirm(`¿Deseas eliminar la posición de ${params.symbol}?`)) {
+			goto(`/dashboard/portafolios/${params.id}`);
 		}
 	}
 </script>
 
 <svelte:head>
-	<title>{symbol} - Portfolio - FINEXIA</title>
-	<meta name="description" content="Detalles de la posición {symbol}" />
+	<title>{params.symbol} - Portfolio - FINEXIA</title>
+	<meta name="description" content="Detalles de la posición {params.symbol}" />
 </svelte:head>
 
 <div class="container">
 	<!-- Header -->
 	<div class="header-section">
 		<button class="btn-back" onclick={goBack}>
-			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<svg
+				width="20"
+				height="20"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
 				<path d="M15 19l-7-7 7-7" />
 			</svg>
 			Volver
@@ -132,13 +138,15 @@
 			<div class="symbol-badge">
 				<span class="icon">{asset.icon}</span>
 				<div class="symbol-info">
-					<h1>{symbol}</h1>
+					<h1>{params.symbol}</h1>
 					<p>{asset.name}</p>
 				</div>
 			</div>
 
 			<div class="price-display">
-				<p class="current-price">${asset.currentPrice.toLocaleString('es-CO', { minimumFractionDigits: 2 })}</p>
+				<p class="current-price">
+					${asset.currentPrice.toLocaleString('es-CO', { minimumFractionDigits: 2 })}
+				</p>
 				<p class={`price-change ${asset.dayChange >= 0 ? 'positive' : 'negative'}`}>
 					{asset.dayChange >= 0 ? '+' : ''}{asset.dayChange}% hoy
 				</p>
@@ -163,34 +171,44 @@
 				<p class="metric-label">Cantidad</p>
 				<p class="metric-value">
 					{asset.quantity}
-					<span class="metric-unit">{symbol}</span>
+					<span class="metric-unit">{params.symbol}</span>
 				</p>
 			</article>
 
 			<article class="metric-card">
 				<p class="metric-label">Costo Promedio</p>
-				<p class="metric-value">${asset.averageCost.toLocaleString('es-CO', { maximumFractionDigits: 2 })}</p>
+				<p class="metric-value">
+					${asset.averageCost.toLocaleString('es-CO', { maximumFractionDigits: 2 })}
+				</p>
 			</article>
 
 			<article class="metric-card">
 				<p class="metric-label">Precio Actual</p>
-				<p class="metric-value">${asset.currentPrice.toLocaleString('es-CO', { minimumFractionDigits: 2 })}</p>
+				<p class="metric-value">
+					${asset.currentPrice.toLocaleString('es-CO', { minimumFractionDigits: 2 })}
+				</p>
 			</article>
 
 			<article class="metric-card">
 				<p class="metric-label">Costo Total</p>
-				<p class="metric-value">${asset.totalCost.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
+				<p class="metric-value">
+					${asset.totalCost.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+				</p>
 			</article>
 
 			<article class="metric-card">
 				<p class="metric-label">Valor Actual</p>
-				<p class="metric-value">${asset.totalValue.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
+				<p class="metric-value">
+					${asset.totalValue.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+				</p>
 			</article>
 
 			<article class="metric-card gain">
 				<p class="metric-label">Ganancia/Pérdida</p>
 				<p class={`metric-value ${asset.gainLoss >= 0 ? 'positive' : 'negative'}`}>
-					{asset.gainLoss >= 0 ? '+' : ''}${Math.abs(asset.gainLoss).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+					{asset.gainLoss >= 0 ? '+' : ''}${Math.abs(asset.gainLoss).toLocaleString('es-CO', {
+						maximumFractionDigits: 0
+					})}
 				</p>
 				<p class={`metric-pct ${asset.gainLoss >= 0 ? 'positive' : 'negative'}`}>
 					{asset.gainLoss >= 0 ? '+' : ''}{asset.gainLossPercent.toFixed(1)}%
@@ -273,7 +291,7 @@
 				<div class="table-row">
 					<p class="date">{new Date(tx.date).toLocaleDateString('es-CO')}</p>
 					<p class={`type type-${tx.type}`}>{tx.type === 'buy' ? 'Compra' : 'Venta'}</p>
-					<p class="qty">{tx.quantity} {symbol}</p>
+					<p class="qty">{tx.quantity} {params.symbol}</p>
 					<p class="price">${tx.price.toLocaleString('es-CO', { minimumFractionDigits: 2 })}</p>
 					<p class="total">${tx.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
 				</div>
