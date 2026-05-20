@@ -10,10 +10,9 @@ import (
 	"github.com/yeferson59/finexia-app/internal/entities"
 )
 
-func (r *Repository) GetAccountByEmail(ctx context.Context, email string) (entities.User, string, entities.Account, error) {
+func (r *Repository) GetAccountByEmail(ctx context.Context, email string) (entities.User, error) {
 	var account entities.Account
 	var user entities.User
-	var role string
 
 	if err := r.db.QueryRow(ctx, "SELECT u.id, u.name, u.email_verified, a.id, a.provider_id, a.account_id, a.password, r.name FROM users u JOIN accounts a ON u.id = a.user_id JOIN roles r ON u.role_id = r.id WHERE u.email = $1 AND u.deleted_at IS NULL", email).Scan(
 		&user.ID,
@@ -23,12 +22,14 @@ func (r *Repository) GetAccountByEmail(ctx context.Context, email string) (entit
 		&account.ProviderID,
 		&account.AccountID,
 		&account.Password,
-		&role,
+		&user.Role.Name,
 	); err != nil {
-		return entities.User{}, role, entities.Account{}, err
+		return entities.User{}, err
 	}
 
-	return user, role, account, nil
+	user.Accounts = append(user.Accounts, account)
+
+	return user, nil
 }
 
 func (r *Repository) CreateSession(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) error {
@@ -54,7 +55,7 @@ func (r *Repository) Register(ctx context.Context, name, email, password string)
 	return user, nil
 }
 
-func (r *Repository) GetSessionByUserIDToken(ctx context.Context, userID uuid.UUID, token string) (entities.User, entities.Session, error) {
+func (r *Repository) GetSessionByUserIDToken(ctx context.Context, userID uuid.UUID, token string) (entities.User, error) {
 	var user entities.User
 	var session entities.Session
 
@@ -78,28 +79,31 @@ func (r *Repository) GetSessionByUserIDToken(ctx context.Context, userID uuid.UU
 		&session.CreatedAt,
 		&session.UpdatedAt,
 	); err != nil {
-		return entities.User{}, entities.Session{}, err
+		return entities.User{}, err
 	}
 
-	return user, session, nil
+	user.Sessions = append(user.Sessions, session)
+
+	return user, nil
 }
 
-func (r *Repository) GetSessionByToken(ctx context.Context, token string) (entities.User, string, entities.Session, error) {
+func (r *Repository) GetSessionByToken(ctx context.Context, token string) (entities.User, error) {
 	var user entities.User
-	var role string
 	var session entities.Session
 
 	if err := r.db.QueryRow(ctx, "SELECT u.id, u.email_verified, r.name, s.expires_at, s.token FROM users u JOIN sessions s ON s.user_id = u.id JOIN roles r ON u.role_id = r.id WHERE s.token = $1", token).Scan(
 		&user.ID,
 		&user.EmailVerified,
-		&role,
+		&user.Role.Name,
 		&session.ExpiresAt,
 		&session.Token,
 	); err != nil {
-		return entities.User{}, role, entities.Session{}, err
+		return entities.User{}, err
 	}
 
-	return user, role, session, nil
+	user.Sessions = append(user.Sessions, session)
+
+	return user, nil
 }
 
 func (r *Repository) DeleteSessionByUserIDToken(ctx context.Context, userID uuid.UUID, token string) error {

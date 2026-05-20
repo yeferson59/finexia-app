@@ -16,7 +16,7 @@ import (
 )
 
 func (s *Services) Login(ctx context.Context, email, password string) (auth.LoginResponseDTO, error) {
-	user, role, account, err := s.repos.GetAccountByEmail(ctx, email)
+	user, err := s.repos.GetAccountByEmail(ctx, email)
 	if err != nil {
 		return auth.LoginResponseDTO{}, err
 	}
@@ -25,13 +25,13 @@ func (s *Services) Login(ctx context.Context, email, password string) (auth.Logi
 		return auth.LoginResponseDTO{}, errors.New("invalid account")
 	}
 
-	if err := account.ComparePassword(password); err != nil {
+	if err := user.Accounts[0].ComparePassword(password); err != nil {
 		return auth.LoginResponseDTO{}, errors.New("invalid credentials")
 	}
 
 	expiresAt := time.Now().UTC().Add(s.cfg.JWTDuration)
 
-	jwToken, err := s.CreateJWToken(user.ID, role, expiresAt)
+	jwToken, err := s.CreateJWToken(user.ID, user.Role.Name, expiresAt)
 	if err != nil {
 		return auth.LoginResponseDTO{}, err
 	}
@@ -83,7 +83,7 @@ func (s *Services) Register(ctx context.Context, name, email, password string) (
 }
 
 func (s *Services) GetSession(ctx context.Context, userID uuid.UUID, role, token string) (auth.UserSessionResponseDTO, error) {
-	user, session, err := s.repos.GetSessionByUserIDToken(ctx, userID, token)
+	user, err := s.repos.GetSessionByUserIDToken(ctx, userID, token)
 	if err != nil {
 		return auth.UserSessionResponseDTO{}, err
 	}
@@ -100,12 +100,12 @@ func (s *Services) GetSession(ctx context.Context, userID uuid.UUID, role, token
 			UpdatedAt:         user.UpdatedAt,
 		},
 		Session: auth.SessionResponseDTO{
-			ID:        session.ID,
-			UserID:    session.UserID,
-			ExpiresAt: session.ExpiresAt,
-			IPAddress: session.IPAddress,
-			UserAgent: session.UserAgent,
-			CreatedAt: session.CreatedAt,
+			ID:        user.Sessions[0].ID,
+			UserID:    user.Sessions[0].UserID,
+			ExpiresAt: user.Sessions[0].ExpiresAt,
+			IPAddress: user.Sessions[0].IPAddress,
+			UserAgent: user.Sessions[0].UserAgent,
+			CreatedAt: user.Sessions[0].CreatedAt,
 		},
 	}, nil
 }
@@ -163,7 +163,7 @@ func (s *Services) ValidateToken(ctx context.Context, token string) (string, err
 		return "", errors.New("invalid access token")
 	}
 
-	user, roleName, session, err := s.repos.GetSessionByToken(ctx, token)
+	user, err := s.repos.GetSessionByToken(ctx, token)
 	if err != nil {
 		return "", errors.New("invalid access token")
 	}
@@ -172,11 +172,11 @@ func (s *Services) ValidateToken(ctx context.Context, token string) (string, err
 		return "", errors.New("invalid access token")
 	}
 
-	if token != session.Token {
+	if token != user.Sessions[0].Token {
 		return "", errors.New("invalid access token")
 	}
 
-	if role != roleName {
+	if role != user.Role.Name {
 		return "", errors.New("invalid access token")
 	}
 
