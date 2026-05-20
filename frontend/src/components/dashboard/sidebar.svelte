@@ -11,6 +11,7 @@
 		{ label: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
 		{ label: 'Portafolios', icon: 'briefcase', href: '/dashboard/portafolios' },
 		{ label: 'Inversiones', icon: 'trending-up', href: '/dashboard/investments' },
+		{ label: 'Plataformas', icon: 'layers', href: '/dashboard/platforms' },
 		{ label: 'Transacciones', icon: 'exchange', href: '/dashboard/transactions' },
 		{ label: 'Reportes', icon: 'bar-chart', href: '/dashboard/reports' },
 		{ label: 'Configuración', icon: 'settings', href: '/dashboard/settings' }
@@ -66,6 +67,20 @@
 								>
 									<polyline points="23 6 13.5 15.5 8.5 10.5 1 17"></polyline>
 									<polyline points="17 6 23 6 23 12"></polyline>
+								</svg>
+							{:else if item.icon === 'layers'}
+								<svg
+									width="18"
+									height="18"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<polygon points="12 2 20 6 20 18 12 22 4 18 4 6 12 2"></polygon>
+									<polyline points="12 22 12 12"></polyline>
+									<polyline points="4 6 12 12 20 6"></polyline>
+									<polyline points="4 18 12 12 20 18"></polyline>
 								</svg>
 							{:else if item.icon === 'exchange'}
 								<svg
