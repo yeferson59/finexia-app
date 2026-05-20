@@ -392,26 +392,6 @@
 		letter-spacing: 0.3px;
 	}
 
-	.info-link {
-		color: #d4af37;
-		text-decoration: none;
-		font-size: 0.9rem;
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		transition: all 0.3s ease;
-	}
-
-	.info-link:hover {
-		color: #e8c547;
-		transform: translateX(2px);
-	}
-
-	.info-empty {
-		color: rgba(224, 224, 224, 0.5);
-		font-style: italic;
-	}
-
 	.info-description {
 		margin-top: 1.5rem;
 		padding-top: 1.5rem;
