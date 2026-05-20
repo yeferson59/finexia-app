@@ -14,19 +14,19 @@ func (h *Handlers) GetPortfolios(c fiber.Ctx) error {
 
 	portfolios, err := h.services.GetPortfolios(h.ctx, userID)
 	if err != nil {
-		return h.responseFromDomain(c, err, "", "")
+		return h.responseFromDomain(c, err, "Error retrieving portfolios", "Could not retrieve portfolios")
 	}
 
-	return h.responseStatusOk(c, "", "", portfolios)
+	return h.responseStatusOk(c, "Portfolios retrieved", "Portfolios retrieved successfully", portfolios)
 }
 
 func (h *Handlers) GetPortfoliosRisks(c fiber.Ctx) error {
 	risks, err := h.services.GetPortfoliosRisks(h.ctx)
 	if err != nil {
-		return h.responseFromDomain(c, err, "", "")
+		return h.responseFromDomain(c, err, "Error retrieving portfolio risks", "Could not retrieve portfolio risks")
 	}
 
-	return h.responseStatusOk(c, "", "", risks)
+	return h.responseStatusOk(c, "Portfolio risks retrieved", "Portfolio risks retrieved successfully", risks)
 }
 
 func (h *Handlers) CreatePortfolio(c fiber.Ctx) error {
@@ -43,8 +43,8 @@ func (h *Handlers) CreatePortfolio(c fiber.Ctx) error {
 
 	portfolio, err := h.services.CreatePortfolio(h.ctx, userID, req.Name, req.Description, req.Currency, req.RiskID, entities.PortfolioType(req.Type), req.PriceValue, req.IsDefault)
 	if err != nil {
-		return h.responseFromDomain(c, err, "", "")
+		return h.responseFromDomain(c, err, "Error creating portfolio", "Could not create portfolio")
 	}
 
-	return h.responseStatusOk(c, "", "", portfolio)
+	return h.responseStatusOk(c, "Portfolio created", "Portfolio created successfully", portfolio)
 }

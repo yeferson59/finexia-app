@@ -10,30 +10,30 @@ func (handler *Handlers) Login(c fiber.Ctx) error {
 	var loginDto auth.LoginRequestDTO
 
 	if err := c.Bind().Body(&loginDto); err != nil {
-		return handler.responseBadRequest(c, "", "")
+		return handler.responseBadRequest(c, "invalid request body", "auth:login")
 	}
 
 	login, err := handler.services.Login(handler.ctx, loginDto.Email, loginDto.Password)
 	if err != nil {
-		return handler.responseFromDomain(c, err, "", "auth:login")
+		return handler.responseFromDomain(c, err, "failed to login", "auth:login")
 	}
 
-	return handler.responseStatusOk(c, "", "", login)
+	return handler.responseStatusOk(c, "successfully logged in", "valid credentials", login)
 }
 
 func (handler *Handlers) Register(c fiber.Ctx) error {
 	var registerDto auth.RegisterRequestDTO
 
 	if err := c.Bind().Body(&registerDto); err != nil {
-		return handler.responseBadRequest(c, "", "")
+		return handler.responseBadRequest(c, "invalid request body", "auth:register")
 	}
 
 	user, err := handler.services.Register(handler.ctx, registerDto.Name, registerDto.Email, registerDto.Password)
 	if err != nil {
-		return handler.responseFromDomain(c, err, "", "auth:register")
+		return handler.responseFromDomain(c, err, "failed to register", "auth:register")
 	}
 
-	return handler.responseStatusOk(c, "", "", user)
+	return handler.responseStatusOk(c, "successfully registered", "valid registration data", user)
 }
 
 func (handler *Handlers) GetSession(c fiber.Ctx) error {
@@ -44,10 +44,10 @@ func (handler *Handlers) GetSession(c fiber.Ctx) error {
 
 	userSession, err := handler.services.GetSession(handler.ctx, userID, role, jwtoken)
 	if err != nil {
-		return handler.responseFromDomain(c, err, "", "auth:getSession")
+		return handler.responseFromDomain(c, err, "failed to get session", "auth:getSession")
 	}
 
-	return handler.responseStatusOk(c, "", "", userSession)
+	return handler.responseStatusOk(c, "successfully retrieved session", "valid access token", userSession)
 }
 
 func (handler *Handlers) Logout(c fiber.Ctx) error {
@@ -57,7 +57,7 @@ func (handler *Handlers) Logout(c fiber.Ctx) error {
 	}
 
 	if err := handler.services.Logout(handler.ctx, userID, jwtoken); err != nil {
-		return handler.responseFromDomain(c, err, "", "auth:logout")
+		return handler.responseFromDomain(c, err, "failed to logout", "auth:logout")
 	}
 
 	return handler.responseStatusOk(c, "successfully logged out", "valid access token", nil)
