@@ -6,5 +6,5 @@ func (r *Routes) Portfolios() {
 	portfolios.Get("/risks", r.handlers.GetPortfoliosRisks)
 	portfolios.Get("/id", r.handlers.GetPortfolios)
 	portfolios.Post("", r.handlers.CreatePortfolio)
-	portfolios.Post("/source", r.handlers.CreatePlatform)
+	portfolios.Post("/sources", r.handlers.CreatePlatform)
 }
