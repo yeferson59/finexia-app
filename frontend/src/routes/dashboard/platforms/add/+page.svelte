@@ -18,37 +18,17 @@
 	let isSubmitting = $state(false);
 	let submitSuccess = $state(false);
 
-	const platformTypes = [
-		'Bróker',
-		'Banco de Inversión',
-		'Plataforma de Trading',
-		'DeFi',
-		'Billetera Cripto',
-		'Fondos Mutuos',
-		'Casa de Bolsa',
-		'Otro'
-	];
-
-	async function handleSubmit(e: SubmitEvent) {
-		e.preventDefault();
-		if (!formData.name || !formData.type) {
-			alert('Por favor completa los campos requeridos');
-			return;
-		}
-
-		isSubmitting = true;
-		try {
-			await new Promise((resolve) => setTimeout(resolve, 1000));
-			submitSuccess = true;
-			setTimeout(() => {
-				goto('/dashboard/platforms');
-			}, 1500);
-		} catch (error) {
-			console.error('Error:', error);
-		} finally {
-			isSubmitting = false;
-		}
-	}
+	const platformTypes = new Map<string, string>([
+		['broker', 'Bróker'],
+		['investment_bank', 'Banco de Inversión'],
+		['trading_platform', 'Plataforma de Trading'],
+		['neobank', 'NeoBank'],
+		['de_fi', 'DeFi'],
+		['crypto_wallet', 'Billetera Cripto'],
+		['mutual_funds', 'Fondos Mutuos'],
+		['brokerage_house', 'Casa de Bolsa'],
+		['other', 'Otro']
+	]);
 
 	function handleCancel() {
 		goto('/dashboard/platforms');
@@ -68,7 +48,7 @@
 </header>
 
 <div class="form-container">
-	<form onsubmit={handleSubmit} class="platform-form">
+	<form method="POST" action="/dashboard/platforms/add" class="platform-form">
 		<!-- Basic Information Section -->
 		<section class="form-section">
 			<h2 class="section-title">Información Básica</h2>
@@ -79,6 +59,7 @@
 				>
 				<input
 					id="name"
+					name="name"
 					type="text"
 					bind:value={formData.name}
 					placeholder="ej: Interactive Brokers"
@@ -91,6 +72,7 @@
 				<label for="description" class="form-label">Descripción</label>
 				<textarea
 					id="description"
+					name="description"
 					bind:value={formData.description}
 					placeholder="Describe qué tipo de inversiones realizas en esta plataforma..."
 					class="form-textarea"
@@ -103,18 +85,10 @@
 					<label for="type" class="form-label"
 						>Tipo de Plataforma <span class="required">*</span></label
 					>
-					<select id="type" bind:value={formData.type} class="form-select" required>
-						{#each platformTypes as type}
-							<option value={type}>{type}</option>
+					<select id="type" name="type" bind:value={formData.type} class="form-select" required>
+						{#each platformTypes.entries() as [key, type]}
+							<option value={key}>{type}</option>
 						{/each}
-					</select>
-				</div>
-
-				<div class="form-group">
-					<label for="status" class="form-label">Estado</label>
-					<select id="status" bind:value={formData.status} class="form-select">
-						<option value="Activo">Activo</option>
-						<option value="Inactivo">Inactivo</option>
 					</select>
 				</div>
 			</div>
