@@ -16,6 +16,5 @@ export const load: LayoutServerLoad = async ({ cookies, fetch }) => {
 		return { platforms: [] };
 	}
 
-	console.log(data[0].portfolioEntries);
 	return { platforms: data };
 };
