@@ -73,3 +73,17 @@ func (h *Handlers) CreatePlatform(c fiber.Ctx) error {
 
 	return h.responseStatusOk(c, "Platform created", "Platform created successfully", platform)
 }
+
+func (h *Handlers) GetPlatforms(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	platforms, err := h.services.GetPlatforms(h.ctx, userID)
+	if err != nil {
+		return h.responseFromDomain(c, err, "", "")
+	}
+
+	return h.responseStatusOk(c, "", "", platforms)
+}

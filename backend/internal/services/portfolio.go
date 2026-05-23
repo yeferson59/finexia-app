@@ -44,3 +44,7 @@ func (s *Services) CreatePlatform(ctx context.Context, userID uuid.UUID, sourceT
 
 	return platform, nil
 }
+
+func (s *Services) GetPlatforms(ctx context.Context, userID uuid.UUID) ([]entities.InvestmentSource, error) {
+	return s.repos.GetPlatforms(ctx, userID)
+}

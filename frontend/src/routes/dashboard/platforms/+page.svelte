@@ -1,41 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import type { PageProps } from './$types';
 
-	interface Platform {
-		id: string;
-		name: string;
-		type: string;
-		status: 'Activo' | 'Inactivo';
-		investments: number;
-		totalValue: string;
-	}
-
-	let platforms = $state<Platform[]>([
-		{
-			id: '1',
-			name: 'Interactive Brokers',
-			type: 'Bróker',
-			status: 'Activo',
-			investments: 12,
-			totalValue: '$45,230.50'
-		},
-		{
-			id: '2',
-			name: 'Celsius Network',
-			type: 'DeFi',
-			status: 'Activo',
-			investments: 5,
-			totalValue: '$18,900.00'
-		},
-		{
-			id: '3',
-			name: 'Goldman Sachs',
-			type: 'Banco de Inversión',
-			status: 'Inactivo',
-			investments: 8,
-			totalValue: '$120,000.00'
-		}
-	]);
+	const { data }: PageProps = $props();
 
 	let showDeleteConfirm = $state(false);
 	let platformToDelete: string | null = $state(null);
@@ -57,21 +24,13 @@
 		showDeleteConfirm = true;
 	}
 
-	function deletePlatform() {
-		if (platformToDelete) {
-			platforms = platforms.filter((p) => p.id !== platformToDelete);
-			showDeleteConfirm = false;
-			platformToDelete = null;
-		}
-	}
-
 	function cancelDelete() {
 		showDeleteConfirm = false;
 		platformToDelete = null;
 	}
 
-	function getStatusColor(status: string) {
-		return status === 'Activo' ? '#2ecc71' : '#e74c3c';
+	function getStatusColor(status: boolean) {
+		return status === true ? '#2ecc71' : '#e74c3c';
 	}
 </script>
 
@@ -105,10 +64,12 @@
 <section class="panel table-panel">
 	<header class="table-head">
 		<h2>Tus Plataformas</h2>
-		<p class="platform-count">{platforms.length} plataforma{platforms.length !== 1 ? 's' : ''}</p>
+		<p class="platform-count">
+			{data.platforms.length} plataforma{data.platforms.length !== 1 ? 's' : ''}
+		</p>
 	</header>
 
-	{#if platforms.length === 0}
+	{#if data.platforms.length === 0}
 		<div class="empty-state">
 			<svg
 				width="64"
@@ -128,26 +89,26 @@
 		</div>
 	{:else}
 		<div class="platforms-grid">
-			{#each platforms as platform (platform.id)}
+			{#each data.platforms as platform (platform.id)}
 				<div class="platform-card">
 					<div class="card-header">
 						<div class="card-title-section">
 							<h3 class="platform-name">{platform.name}</h3>
-							<span class="platform-type">{platform.type}</span>
+							<span class="platform-type">{platform.sourceType}</span>
 						</div>
-						<div class="status-badge" style="--status-color: {getStatusColor(platform.status)}">
-							{platform.status}
+						<div class="status-badge" style="--status-color: {getStatusColor(platform.isActive)}">
+							{platform.isActive ? 'Activo' : 'Inactivo'}
 						</div>
 					</div>
 
 					<div class="card-stats">
 						<div class="stat-item">
 							<span class="stat-label">Inversiones</span>
-							<span class="stat-value">{platform.investments}</span>
+							<span class="stat-value">{platform.investments ?? 0}</span>
 						</div>
 						<div class="stat-item">
 							<span class="stat-label">Valor Total</span>
-							<span class="stat-value">{platform.totalValue}</span>
+							<span class="stat-value">{platform.totalValue ?? 0}</span>
 						</div>
 					</div>
 
@@ -222,7 +183,7 @@
 			<p>¿Estás seguro de que deseas eliminar esta plataforma? Esta acción no se puede deshacer.</p>
 			<div class="modal-actions">
 				<button onclick={cancelDelete} class="btn btn-secondary">Cancelar</button>
-				<button onclick={deletePlatform} class="btn btn-danger">Eliminar</button>
+				<button onclick={() => console.log('delete')} class="btn btn-danger">Eliminar</button>
 			</div>
 		</div>
 	</div>
