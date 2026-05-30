@@ -2,7 +2,7 @@ package repositories
 
 import (
 	"context"
-	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -104,13 +104,11 @@ func (r *Repository) GetPlatforms(ctx context.Context, userID uuid.UUID) ([]enti
 			&platform.CreatedAt,
 			&platform.UpdatedAt,
 		); err != nil {
-			fmt.Println(err.Error())
 			return nil, err
 		}
 
 		portfolioEntries, err := r.GetPortfolioEntries(ctx, platform.ID)
 		if err != nil {
-			fmt.Println(err.Error())
 			return []entities.InvestmentSource{}, err
 		}
 
@@ -149,7 +147,6 @@ func (r *Repository) GetPortfolioEntries(ctx context.Context, sourceID uuid.UUID
 			&portfolioEntry.CreatedAt,
 			&portfolioEntry.UpdatedAt,
 		); err != nil {
-			fmt.Println(err)
 			return nil, err
 		}
 
@@ -160,4 +157,38 @@ func (r *Repository) GetPortfolioEntries(ctx context.Context, sourceID uuid.UUID
 	}
 
 	return portfolioEntries, nil
+}
+
+func (r *Repository) GetAssets(ctx context.Context, offset, limit uint) ([]entities.Asset, error) {
+	rows, err := r.db.Query(ctx, "SELECT * FROM assets LIMIT $1 OFFSET $2", limit, offset)
+	if err != nil {
+		return []entities.Asset{}, err
+	}
+
+	assets := make([]entities.Asset, 0)
+
+	for rows.Next() {
+		var asset entities.Asset
+
+		if err := rows.Scan(
+			&asset.ID,
+			&asset.Ticker,
+			&asset.Name,
+			&asset.AssetType,
+			&asset.Exchange,
+			&asset.Currency,
+			&asset.CreatedAt,
+			&asset.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		assets = append(assets, asset)
+	}
+
+	return assets, nil
+}
+
+func (r *Repository) CreatePortfolioEntry(ctx context.Context, portfolioID, assetID, sourceID uuid.UUID, quantity money.Decimal, avgCostPrice money.Money, costCurrency money.Currency, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) {
+	r.db.QueryRow(ctx, "INSERT INTO portfolio_entries()")
 }

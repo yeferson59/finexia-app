@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"
 )
@@ -86,4 +87,18 @@ func (h *Handlers) GetPlatforms(c fiber.Ctx) error {
 	}
 
 	return h.responseStatusOk(c, "", "", platforms)
+}
+
+func (h *Handlers) GetAssets(c fiber.Ctx) error {
+	paginateInfo, ok := paginate.FromContext(c)
+	if !ok {
+		return h.responseInternalServerError(c, "", "paginate info not found")
+	}
+
+	assests, err := h.services.GetAssets(h.ctx, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
+	if err != nil {
+		return h.responseFromDomain(c, err, "", "")
+	}
+
+	return h.responseStatusOk(c, "", "", assests)
 }

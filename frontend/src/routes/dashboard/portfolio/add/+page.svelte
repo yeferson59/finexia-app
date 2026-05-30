@@ -1,66 +1,55 @@
 <script lang="ts">
-	import type { PageProps } from './$types';
 	import { goto } from '$app/navigation';
 
-	interface Asset {
-		id: string;
-		ticker: string;
-		name: string;
-		assetType: string;
-		exchange: string;
-		currency: string;
-		createdAt: string;
-		updatedAt: string;
-	}
-
-	interface Platform {
-		id: string;
-		name: string;
-	}
-
-	interface PageData {
-		platforms?: Platform[];
-		assets?: Asset[];
-	}
-
-	const { params, data }: PageProps & { data: PageData } = $props();
-
 	interface FormData {
-		platformId: string;
-		assetId: string;
+		assetType: string;
+		symbol: string;
+		name: string;
 		quantity: string;
 		purchasePrice: string;
 		purchaseDate: string;
 		totalValue: number;
 		notes: string;
+		brokerName: string;
 	}
 
 	let formData: FormData = $state({
-		platformId: '',
-		assetId: '',
+		assetType: 'Acciones',
+		symbol: '',
+		name: '',
 		quantity: '',
 		purchasePrice: '',
 		purchaseDate: new Date().toISOString().split('T')[0],
 		totalValue: 0,
-		notes: ''
+		notes: '',
+		brokerName: ''
 	});
 
 	let isSubmitting = $state(false);
 	let submitSuccess = $state(false);
 
-	const platforms = $derived(data?.platforms || []);
-	const assets = $derived(data?.assets || []);
-	const selectedAsset = $derived(assets.find((a) => a.id === formData.assetId));
-	const assetTypeIcon: Record<string, string> = {
-		stock: '📈',
-		crypto: '₿',
-		bond: '📊',
-		etf: '🎯',
-		commodity: '⛏️',
-		fund: '💼',
-		option: '⚙️',
-		forex: '💱'
-	};
+	const assetTypes = [
+		{ value: 'Acciones', label: 'Acciones', icon: '📈' },
+		{ value: 'Criptomonedas', label: 'Criptomonedas', icon: '₿' },
+		{ value: 'Bonos', label: 'Bonos', icon: '📊' },
+		{ value: 'ETF', label: 'ETF', icon: '🎯' },
+		{ value: 'Commodities', label: 'Commodities', icon: '⛏️' },
+		{ value: 'Fondos', label: 'Fondos Mutuos', icon: '💼' },
+		{ value: 'Opciones', label: 'Opciones', icon: '⚙️' },
+		{ value: 'Divisas', label: 'Divisas', icon: '💱' }
+	];
+
+	const brokers = [
+		'Interactive Brokers',
+		'Charles Schwab',
+		'E-Trade',
+		'Fidelity',
+		'Coinbase',
+		'Kraken',
+		'Binance',
+		'TD Ameritrade',
+		'Otro'
+	];
 
 	$effect(() => {
 		const qty = parseFloat(formData.quantity) || 0;
@@ -70,13 +59,8 @@
 
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
-		if (!formData.assetId || !formData.quantity || !formData.purchasePrice) {
+		if (!formData.symbol || !formData.name || !formData.quantity || !formData.purchasePrice) {
 			alert('Por favor completa todos los campos requeridos');
-			return;
-		}
-
-		if (!formData.platformId) {
-			alert('Por favor selecciona una plataforma');
 			return;
 		}
 
@@ -85,7 +69,7 @@
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 			submitSuccess = true;
 			setTimeout(() => {
-				goto(`/dashboard/portafolios/${params.id}`);
+				goto('/dashboard/portfolio');
 			}, 1500);
 		} catch (error) {
 			console.error('Error:', error);
@@ -95,11 +79,7 @@
 	}
 
 	function handleCancel() {
-		goto(`/dashboard/portafolios/${params.id}`);
-	}
-
-	function createNewPlatform() {
-		goto('/dashboard/platforms/add?redirect=/dashboard/portafolios/' + params.id + '/add');
+		goto('/dashboard/portfolio');
 	}
 
 	function formatCurrency(value: number): string {
@@ -117,14 +97,7 @@
 </svelte:head>
 
 <button class="back-button" onclick={handleCancel} aria-label="Volver al portafolio">
-	<svg
-		width="20"
-		height="20"
-		viewBox="0 0 24 24"
-		fill="none"
-		stroke="currentColor"
-		stroke-width="2"
-	>
+	<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 		<path d="M19 12H5M12 19l-7-7 7-7" />
 	</svg>
 	Volver
@@ -136,80 +109,58 @@
 </header>
 
 <div class="form-container">
-<form onsubmit={handleSubmit} class="portfolio-form">
-		<!-- Platform Selection -->
+	<form onsubmit={handleSubmit} class="portfolio-form">
+		<!-- Asset Type Selection -->
 		<section class="form-section">
-			<h2 class="section-title">Plataforma de Inversión</h2>
-			<div class="form-group">
-				<label for="platformId" class="form-label"
-					>Selecciona una Plataforma <span class="required">*</span></label
-				>
-				{#if platforms.length > 0}
-					<select id="platformId" bind:value={formData.platformId} class="form-select" required>
-						<option value="">-- Elige una plataforma --</option>
-						{#each platforms as platform}
-							<option value={platform.id}>{platform.name}</option>
-						{/each}
-					</select>
-					<p class="field-hint">Selecciona dónde realizarás esta inversión</p>
-				{:else}
-					<div class="empty-platforms">
-						<p class="empty-text">No tienes plataformas registradas</p>
-						<button type="button" onclick={createNewPlatform} class="btn-link">
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<path d="M12 5v14M5 12h14" />
-							</svg>
-							Crear tu primera plataforma
-						</button>
-					</div>
-				{/if}
+			<h2 class="section-title">Tipo de Activo</h2>
+			<div class="asset-type-grid">
+				{#each assetTypes as type}
+					<label class="asset-type-card" class:active={formData.assetType === type.value}>
+						<input
+							type="radio"
+							name="assetType"
+							value={type.value}
+							bind:group={formData.assetType}
+							class="radio-input"
+						/>
+						<span class="type-icon">{type.icon}</span>
+						<span class="type-label">{type.label}</span>
+					</label>
+				{/each}
 			</div>
 		</section>
 
-		<!-- Asset Selection -->
+		<!-- Asset Information -->
 		<section class="form-section">
-			<h2 class="section-title">Seleccionar Activo</h2>
-			<div class="form-group">
-				<label for="assetId" class="form-label"
-					>Elige un Activo <span class="required">*</span></label
-				>
-				{#if assets.length > 0}
-					<select id="assetId" bind:value={formData.assetId} class="form-select" required>
-						<option value="">-- Selecciona un activo --</option>
-						{#each assets as asset}
-							<option value={asset.id}>
-								{asset.ticker} - {asset.name} ({asset.assetType})
-							</option>
-						{/each}
-					</select>
-					<p class="field-hint">Selecciona de la lista de activos disponibles</p>
+			<h2 class="section-title">Información del Activo</h2>
 
-					{#if selectedAsset}
-						<div class="asset-preview">
-							<div class="preview-item">
-								<span class="preview-label">Ticker</span>
-								<span class="preview-value">{selectedAsset.ticker}</span>
-							</div>
-							<div class="preview-item">
-								<span class="preview-label">Nombre</span>
-								<span class="preview-value">{selectedAsset.name}</span>
-							</div>
-							<div class="preview-item">
-								<span class="preview-label">Tipo</span>
-								<span class="preview-value">{selectedAsset.assetType}</span>
-							</div>
-							<div class="preview-item">
-								<span class="preview-label">Exchange</span>
-								<span class="preview-value">{selectedAsset.exchange}</span>
-							</div>
-						</div>
-					{/if}
-				{:else}
-					<div class="empty-assets">
-						<p class="empty-text">No hay activos disponibles en el sistema</p>
-						<p class="empty-hint">Contacta al administrador para agregar nuevos activos</p>
-					</div>
-				{/if}
+			<div class="form-row">
+				<div class="form-group">
+					<label for="symbol" class="form-label">Símbolo/Ticker <span class="required">*</span></label>
+					<input
+						id="symbol"
+						type="text"
+						bind:value={formData.symbol}
+						placeholder="ej: AAPL, BTC, TSLA"
+						class="form-input"
+						required
+						maxlength="10"
+					/>
+					<p class="field-hint">Símbolo del mercado (ej: AAPL para Apple)</p>
+				</div>
+
+				<div class="form-group">
+					<label for="name" class="form-label">Nombre Completo <span class="required">*</span></label>
+					<input
+						id="name"
+						type="text"
+						bind:value={formData.name}
+						placeholder="ej: Apple Inc."
+						class="form-input"
+						required
+					/>
+					<p class="field-hint">Nombre completo del activo</p>
+				</div>
 			</div>
 		</section>
 
@@ -236,9 +187,7 @@
 				</div>
 
 				<div class="form-group">
-					<label for="purchasePrice" class="form-label"
-						>Precio de Compra <span class="required">*</span></label
-					>
+					<label for="purchasePrice" class="form-label">Precio de Compra <span class="required">*</span></label>
 					<div class="input-addon">
 						<span class="addon-text">$</span>
 						<input
@@ -268,7 +217,7 @@
 				</div>
 
 				<div class="form-group">
-					<span class="form-label">Valor Total Invertido</span>
+					<label class="form-label">Valor Total Invertido</label>
 					<div class="value-display">
 						<p class="total-value">{formatCurrency(formData.totalValue)}</p>
 					</div>
@@ -276,31 +225,42 @@
 			</div>
 		</section>
 
-		<!-- Additional Notes -->
+		<!-- Broker & Additional Info -->
 		<section class="form-section">
-			<h2 class="section-title">Notas y Observaciones</h2>
+			<h2 class="section-title">Información Adicional</h2>
+
+			<div class="form-group">
+				<label for="brokerName" class="form-label">Broker/Proveedor</label>
+				<select id="brokerName" bind:value={formData.brokerName} class="form-select">
+					<option value="">Selecciona un broker</option>
+					{#each brokers as broker}
+						<option value={broker}>{broker}</option>
+					{/each}
+				</select>
+				<p class="field-hint">Dónde compraste este activo</p>
+			</div>
 
 			<div class="form-group">
 				<label for="notes" class="form-label">Notas</label>
 				<textarea
 					id="notes"
 					bind:value={formData.notes}
-					placeholder="Agrega observaciones, estrategia o detalles especiales sobre este activo..."
+					placeholder="Agrega observaciones, estrategia o detalles especiales..."
 					class="form-textarea"
 					rows="3"
 				></textarea>
-				<p class="field-hint">Notas personales sobre este activo (opcional)</p>
+				<p class="field-hint">Notas personales sobre este activo</p>
 			</div>
 		</section>
 
 		<!-- Summary Card -->
-		{#if selectedAsset && formData.quantity && formData.purchasePrice}
+		{#if formData.quantity && formData.purchasePrice}
 			<section class="summary-card">
 				<h3 class="summary-title">Resumen de Inversión</h3>
 				<div class="summary-items">
 					<div class="summary-item">
 						<span class="summary-label">Activo</span>
-						<span class="summary-value">{selectedAsset.ticker} - {selectedAsset.name}</span>
+						<span class="summary-value">{formData.symbol} - {formData.name}</span>
 					</div>
 					<div class="summary-item">
 						<span class="summary-label">Cantidad</span>
@@ -407,60 +367,60 @@
 		font-family: 'Poppins', system-ui, sans-serif;
 	}
 
-	.asset-preview {
+	.asset-type-grid {
 		display: grid;
-		grid-template-columns: repeat(2, 1fr);
+		grid-template-columns: repeat(4, 1fr);
 		gap: 1rem;
-		margin-top: 1rem;
-		padding: 1rem;
+	}
+
+	.asset-type-card {
+		position: relative;
+		padding: 1.25rem;
+		border: 2px solid rgba(212, 175, 55, 0.15);
 		border-radius: 12px;
-		background: rgba(212, 175, 55, 0.05);
-		border: 1px solid rgba(212, 175, 55, 0.15);
-	}
-
-	.preview-item {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-	}
-
-	.preview-label {
-		font-size: 0.75rem;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		color: rgba(224, 224, 224, 0.5);
-		font-weight: 600;
-	}
-
-	.preview-value {
-		font-size: 0.95rem;
-		color: #d4af37;
-		font-weight: 600;
-	}
-
-	.empty-assets {
+		background: rgba(15, 20, 25, 0.5);
+		cursor: pointer;
+		transition: all 0.3s ease;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 2rem 1.5rem;
-		border-radius: 10px;
-		background: rgba(231, 76, 60, 0.05);
-		border: 1px dashed rgba(231, 76, 60, 0.2);
+		gap: 0.75rem;
 		text-align: center;
 	}
 
-	.empty-text {
-		margin: 0;
-		font-size: 0.95rem;
-		color: rgba(224, 224, 224, 0.7);
-		font-weight: 500;
+	.asset-type-card:hover {
+		border-color: rgba(212, 175, 55, 0.4);
+		background: rgba(15, 20, 25, 0.7);
 	}
 
-	.empty-hint {
-		margin: 0;
+	.asset-type-card.active {
+		border-color: #d4af37;
+		background: rgba(212, 175, 55, 0.15);
+		box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+	}
+
+	.radio-input {
+		position: absolute;
+		opacity: 0;
+		cursor: pointer;
+		width: 0;
+		height: 0;
+	}
+
+	.type-icon {
+		font-size: 1.8rem;
+		display: block;
+	}
+
+	.type-label {
 		font-size: 0.85rem;
-		color: rgba(224, 224, 224, 0.5);
+		font-weight: 600;
+		color: #e0e0e0;
+		letter-spacing: 0.2px;
+	}
+
+	.asset-type-card.active .type-label {
+		color: #d4af37;
 	}
 
 	.form-group {
@@ -528,45 +488,6 @@
 		font-size: 0.8rem;
 		color: rgba(224, 224, 224, 0.4);
 		font-style: italic;
-	}
-
-	.empty-platforms {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 1.5rem;
-		border-radius: 10px;
-		background: rgba(212, 175, 55, 0.05);
-		border: 1px dashed rgba(212, 175, 55, 0.2);
-		text-align: center;
-	}
-
-	.empty-text {
-		margin: 0;
-		font-size: 0.95rem;
-		color: rgba(224, 224, 224, 0.6);
-	}
-
-	.btn-link {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.65rem 1.2rem;
-		border: none;
-		background: rgba(212, 175, 55, 0.15);
-		color: #d4af37;
-		border-radius: 8px;
-		font-weight: 600;
-		font-size: 0.9rem;
-		cursor: pointer;
-		transition: all 0.3s ease;
-		font-family: 'Poppins', system-ui, sans-serif;
-	}
-
-	.btn-link:hover {
-		background: rgba(212, 175, 55, 0.25);
-		transform: translateX(2px);
 	}
 
 	.input-addon {
@@ -748,8 +669,8 @@
 	}
 
 	@media (max-width: 1024px) {
-		.asset-preview {
-			grid-template-columns: 1fr;
+		.asset-type-grid {
+			grid-template-columns: repeat(3, 1fr);
 		}
 	}
 
@@ -758,8 +679,8 @@
 			font-size: 1.85rem;
 		}
 
-		.asset-preview {
-			grid-template-columns: 1fr;
+		.asset-type-grid {
+			grid-template-columns: repeat(2, 1fr);
 		}
 
 		.form-row {

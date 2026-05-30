@@ -4,7 +4,7 @@ lint:
 	@golangci-lint run ./...
 
 run:
-	@go run cmd/api/main.go
+	@fiber dev -t ./cmd/api/main.go
 
 db:
 	@docker-compose up -d db

@@ -48,3 +48,7 @@ func (s *Services) CreatePlatform(ctx context.Context, userID uuid.UUID, sourceT
 func (s *Services) GetPlatforms(ctx context.Context, userID uuid.UUID) ([]entities.InvestmentSource, error) {
 	return s.repos.GetPlatforms(ctx, userID)
 }
+
+func (s *Services) GetAssets(ctx context.Context, offset, limit uint) ([]entities.Asset, error) {
+	return s.repos.GetAssets(ctx, offset, limit)
+}

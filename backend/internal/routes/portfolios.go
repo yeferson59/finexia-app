@@ -1,5 +1,7 @@
 package routes
 
+import "github.com/gofiber/fiber/v3/middleware/paginate"
+
 func (r *Routes) Portfolios() {
 	portfolios := r.router.Group("/portfolios")
 
@@ -8,4 +10,5 @@ func (r *Routes) Portfolios() {
 	portfolios.Post("", r.handlers.CreatePortfolio)
 	portfolios.Post("/sources", r.handlers.CreatePlatform)
 	portfolios.Get("/sources", r.handlers.GetPlatforms)
+	portfolios.Get("/assets", paginate.New(), r.handlers.GetAssets)
 }
