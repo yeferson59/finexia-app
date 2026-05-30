@@ -10,13 +10,36 @@ import (
 type AssetType string
 
 const (
-	Stock  AssetType = "stock"
-	ETF    AssetType = "etf"
-	Crypto AssetType = "crypto"
-	Bond   AssetType = "bond"
-	Cash   AssetType = "cash"
-	Other  AssetType = "other"
+	Stock      AssetType = "stock"
+	ETF        AssetType = "etf"
+	Crypto     AssetType = "crypto"
+	Bond       AssetType = "bond"
+	Cash       AssetType = "cash"
+	RealEstate AssetType = "real_estate"
+	Commodity  AssetType = "commodity"
+	Other      AssetType = "other"
 )
+
+func (a AssetType) Transform() PortfolioEntryCategory {
+	switch a {
+	case Stock:
+		return Stocks
+	case ETF:
+		return ETFs
+	case Crypto:
+		return Cryptos
+	case Bond:
+		return Bonds
+	case Cash:
+		return Cashs
+	case RealEstate:
+		return RealEstates
+	case Commodity:
+		return Commodities
+	default:
+		return Others
+	}
+}
 
 type SourceType string
 
@@ -58,14 +81,23 @@ type PortfolioEntryCategory string
 
 const (
 	Stocks      PortfolioEntryCategory = "stocks"
-	ETFs        PortfolioEntryCategory = "etf"
-	Cryptos     PortfolioEntryCategory = "crypto"
+	ETFs        PortfolioEntryCategory = "etfs"
+	Cryptos     PortfolioEntryCategory = "cryptos"
 	Bonds       PortfolioEntryCategory = "bonds"
 	Cashs       PortfolioEntryCategory = "cash"
-	RealEstate  PortfolioEntryCategory = "real_estate"
+	RealEstates PortfolioEntryCategory = "real_estates"
 	Commodities PortfolioEntryCategory = "commodities"
-	Others      PortfolioEntryCategory = "other"
+	Others      PortfolioEntryCategory = "others"
 )
+
+func (c PortfolioEntryCategory) IsValid() bool {
+	switch c {
+	case Stocks, ETFs, Cryptos, Bonds, Cashs, RealEstates, Commodities, Others:
+		return true
+	default:
+		return false
+	}
+}
 
 type PortfolioType string
 

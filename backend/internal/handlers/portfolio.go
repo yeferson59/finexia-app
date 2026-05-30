@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/yeferson59/finexia-app/internal/dtos/portfolio"
@@ -44,6 +46,7 @@ func (h *Handlers) CreatePortfolio(c fiber.Ctx) error {
 
 	portfolio, err := h.services.CreatePortfolio(h.ctx, userID, req.Name, req.Description, req.Currency, req.RiskID, entities.PortfolioType(req.Type), req.PriceValue, req.IsDefault)
 	if err != nil {
+		fmt.Println(err.Error())
 		return h.responseFromDomain(c, err, "Error creating portfolio", "Could not create portfolio")
 	}
 
@@ -87,6 +90,36 @@ func (h *Handlers) GetPlatforms(c fiber.Ctx) error {
 	}
 
 	return h.responseStatusOk(c, "", "", platforms)
+}
+
+func (h *Handlers) CreatePortfolioEntry(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	var req portfolio.CreatePortfolioEntryRequestDTO
+
+	if err := c.Bind().JSON(&req); err != nil {
+		return h.responseBadRequest(c, "Invalid request", err.Error())
+	}
+
+	AssetType := entities.AssetType(req.Category)
+	category := AssetType.Transform()
+
+	if !category.IsValid() {
+		return h.responseBadRequest(c, "Invalid category", "Category must be one of: stocks, etf, crypto, bonds, cash, real_estate, commodities, other")
+	}
+
+	fmt.Println(req)
+
+	entry, err := h.services.CreatePortfolioEntry(h.ctx, userID, req.PortfolioID, req.AssetID, req.SourceID, req.Quantity, req.AvgCostPrice, req.CostCurrency, category, req.EntryDate, req.Notes)
+	if err != nil {
+		fmt.Println(err.Error())
+		return h.responseFromDomain(c, err, "Error creating portfolio entry", "Could not create portfolio entry")
+	}
+
+	return h.responseStatusOk(c, "Portfolio entry created", "Portfolio entry created successfully", entry)
 }
 
 func (h *Handlers) GetAssets(c fiber.Ctx) error {

@@ -29,8 +29,8 @@
 	let errors: Record<string, string> = $state({});
 
 	const portfolioTypes = [
-		{ value: 'stock', label: 'Acciones y ETF', icon: '📈' },
-		{ value: 'crypto', label: 'Criptomonedas', icon: '₿' },
+		{ value: 'stocks', label: 'Acciones y ETF', icon: '📈' },
+		{ value: 'cryptos', label: 'Criptomonedas', icon: '₿' },
 		{ value: 'bonds', label: 'Bonos y Renta Fija', icon: '📊' },
 		{ value: 'diversified', label: 'Portafolio Diverso', icon: '🎯' },
 		{ value: 'forex', label: 'Divisas y Forex', icon: '💱' },
@@ -85,7 +85,7 @@
 		</div>
 	{/if}
 
-	<form method="POST" action="/dashboard/portafolios/add" class="form">
+	<form method="POST" action="/dashboard/portfolios/add" class="form">
 		<fieldset class="form-section">
 			<legend class="section-title">Información Básica</legend>
 

@@ -2,9 +2,12 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/yeferson59/finexia-app/internal/entities"
 	"github.com/yeferson59/gofinance/money"
@@ -189,6 +192,50 @@ func (r *Repository) GetAssets(ctx context.Context, offset, limit uint) ([]entit
 	return assets, nil
 }
 
-func (r *Repository) CreatePortfolioEntry(ctx context.Context, portfolioID, assetID, sourceID uuid.UUID, quantity money.Decimal, avgCostPrice money.Money, costCurrency money.Currency, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) {
-	r.db.QueryRow(ctx, "INSERT INTO portfolio_entries()")
+func (r *Repository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, quantity money.Decimal, avgCostPrice money.Money, costCurrency string, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) (entities.PortfolioEntry, error) {
+	var entry entities.PortfolioEntry
+	var quantityValue string
+	var avgCostValue string
+	var sourceIDResult pgtype.UUID
+
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, avg_cost_price, cost_currency, category, entry_date, notes)
+		SELECT $1::uuid, $2::uuid, $3::uuid, $4::numeric, $5::numeric, $6::char(3), $7::portfolio_entry_category, $8::date, $9
+		WHERE EXISTS (
+			SELECT 1 FROM portfolios p WHERE p.id = $1 AND p.user_id = $10
+		)
+		AND ($3::uuid IS NULL OR EXISTS (
+			SELECT 1 FROM investment_sources s WHERE s.id = $3 AND s.user_id = $10
+		))
+		RETURNING id, portfolio_id, asset_id, source_id, quantity, avg_cost_price, cost_currency, category, entry_date, notes, created_at, updated_at
+	`, portfolioID, assetID, sourceID, quantity.String(), avgCostPrice.String(), costCurrency, category, entryDate, notes, userID).Scan(
+		&entry.ID,
+		&entry.PortfolioID,
+		&entry.AssetID,
+		&sourceIDResult,
+		&quantityValue,
+		&avgCostValue,
+		&entry.CostCurrency,
+		&entry.Category,
+		&entry.EntryDate,
+		&entry.Notes,
+		&entry.CreatedAt,
+		&entry.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entities.PortfolioEntry{}, errors.New("portfolio or source not found")
+		}
+
+		return entities.PortfolioEntry{}, err
+	}
+
+	if sourceIDResult.Valid {
+		entry.SourceID = uuid.UUID(sourceIDResult.Bytes)
+	}
+
+	entry.Quantity = money.MustFromString(quantityValue)
+	entry.AvgCostPrice = money.MustMoneyFromString(avgCostValue, money.USD)
+
+	return entry, nil
 }

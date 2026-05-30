@@ -7,12 +7,14 @@ DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'asset_type') THEN
     CREATE TYPE asset_type AS ENUM (
-      'stock',
-      'etf',
-      'crypto',
-      'bond',
-      'cash',
-      'other'
+    'stock',
+    'etf',
+    'crypto',
+    'bond',
+    'cash',
+    'real_estate',
+    'commodity',
+    'other'
     );
   END IF;
 END$$;
@@ -55,13 +57,13 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'portfolio_entry_category') THEN
     CREATE TYPE portfolio_entry_category AS ENUM (
       'stocks',
-      'etf',
-      'crypto',
+      'etfs',
+      'cryptos',
       'bonds',
       'cash',
-      'real_estate',
+      'real_estates',
       'commodities',
-      'other'
+      'others'
     );
   END IF;
 END$$;
@@ -70,35 +72,43 @@ DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'portfolio_type') THEN
     CREATE TYPE portfolio_type AS ENUM (
-      'stock',
-      'etf',
-      'crypto',
+      'stocks',
+      'etfs',
+      'cryptos',
       'bonds',
       'cash',
-      'real_estate',
+      'forex',
+      'real_estates',
       'commodities',
-      'stock_etf',
-      'stock_crypto',
-      'stock_bond',
-      'stock_cash',
-      'stock_real_estate',
-      'stock_commodities',
-      'etf_crypto',
-      'etf_bond',
-      'etf_cash',
-      'etf_real_estate',
-      'etf_commodities',
-      'crypto_bond',
-      'crypto_cash',
-      'crypto_real_estate',
-      'crypto_commodities',
-      'bond_cash',
-      'bond_real_estate',
-      'bond_commodities',
-      'cash_real_estate',
+      'forex_stocks',
+      'forex_etfs',
+      'forex_cryptos',
+      'forex_bonds',
+      'forex_cash',
+      'forex_real_states',
+      'forex_commodities',
+      'stocks_etfs',
+      'stocks_cryptos',
+      'stocks_bonds',
+      'stocks_cash',
+      'stocks_real_estates',
+      'stocks_commodities',
+      'etfs_cryptos',
+      'etfs_bonds',
+      'etfs_cash',
+      'etfs_real_estates',
+      'etfs_commodities',
+      'cryptos_bonds',
+      'cryptos_cash',
+      'cryptos_real_estates',
+      'cryptos_commodities',
+      'bonds_cash',
+      'bonds_real_estates',
+      'bonds_commodities',
+      'cash_real_estates',
       'cash_commodities',
-      'real_estate_commodities',
-      'multiple'
+      'real_estates_commodities',
+      'diversified'
     );
   END IF;
 END$$;
@@ -158,7 +168,7 @@ CREATE TABLE IF NOT EXISTS assets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ticker VARCHAR(20) NOT NULL,
   name VARCHAR(255) NOT NULL,
-  asset_type asset_type NOT NULL,
+  asset_type asset_type NOT NULL DEFAULT 'stock',
   exchange VARCHAR(100),
   currency CHAR(3) NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -179,11 +189,11 @@ CREATE TABLE IF NOT EXISTS portfolio_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   portfolio_id UUID NOT NULL,
   asset_id UUID NOT NULL,
-  source_id UUID,
+  source_id UUID NOT NULL,
   quantity NUMERIC(20, 8) NOT NULL DEFAULT 0,
   avg_cost_price NUMERIC(20, 8) NOT NULL,
   cost_currency CHAR(3) NOT NULL,
-  category portfolio_entry_category NOT NULL DEFAULT 'other',
+  category portfolio_entry_category NOT NULL DEFAULT 'others',
   entry_date DATE NOT NULL,
   notes VARCHAR(500),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

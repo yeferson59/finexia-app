@@ -2,28 +2,7 @@
 	import type { PageProps } from './$types';
 	import { goto } from '$app/navigation';
 
-	interface Asset {
-		id: string;
-		ticker: string;
-		name: string;
-		assetType: string;
-		exchange: string;
-		currency: string;
-		createdAt: string;
-		updatedAt: string;
-	}
-
-	interface Platform {
-		id: string;
-		name: string;
-	}
-
-	interface PageData {
-		platforms?: Platform[];
-		assets?: Asset[];
-	}
-
-	const { params, data }: PageProps & { data: PageData } = $props();
+	const { params, data }: PageProps = $props();
 
 	interface FormData {
 		platformId: string;
@@ -51,16 +30,6 @@
 	const platforms = $derived(data?.platforms || []);
 	const assets = $derived(data?.assets || []);
 	const selectedAsset = $derived(assets.find((a) => a.id === formData.assetId));
-	const assetTypeIcon: Record<string, string> = {
-		stock: '📈',
-		crypto: '₿',
-		bond: '📊',
-		etf: '🎯',
-		commodity: '⛏️',
-		fund: '💼',
-		option: '⚙️',
-		forex: '💱'
-	};
 
 	$effect(() => {
 		const qty = parseFloat(formData.quantity) || 0;
@@ -68,38 +37,12 @@
 		formData.totalValue = qty * price;
 	});
 
-	async function handleSubmit(e: SubmitEvent) {
-		e.preventDefault();
-		if (!formData.assetId || !formData.quantity || !formData.purchasePrice) {
-			alert('Por favor completa todos los campos requeridos');
-			return;
-		}
-
-		if (!formData.platformId) {
-			alert('Por favor selecciona una plataforma');
-			return;
-		}
-
-		isSubmitting = true;
-		try {
-			await new Promise((resolve) => setTimeout(resolve, 1000));
-			submitSuccess = true;
-			setTimeout(() => {
-				goto(`/dashboard/portfolios/${params.id}`);
-			}, 1500);
-		} catch (error) {
-			console.error('Error:', error);
-		} finally {
-			isSubmitting = false;
-		}
-	}
-
 	function handleCancel() {
 		goto(`/dashboard/portfolios/${params.id}`);
 	}
 
 	function createNewPlatform() {
-		goto('/dashboard/platforms/add?redirect=/dashboard/portafolios/' + params.id + '/add');
+		goto('/dashboard/platforms/add?redirect=/dashboard/portfolios/' + params.id + '/add');
 	}
 
 	function formatCurrency(value: number): string {
@@ -136,7 +79,7 @@
 </header>
 
 <div class="form-container">
-	<form onsubmit={handleSubmit} class="portfolio-form">
+	<form method="POST" action={`/dashboard/portfolios/${params.id}/add`} class="portfolio-form">
 		<!-- Platform Selection -->
 		<section class="form-section">
 			<h2 class="section-title">Plataforma de Inversión</h2>
@@ -145,7 +88,13 @@
 					>Selecciona una Plataforma <span class="required">*</span></label
 				>
 				{#if platforms.length > 0}
-					<select id="platformId" bind:value={formData.platformId} class="form-select" required>
+					<select
+						id="platformId"
+						bind:value={formData.platformId}
+						name="platformId"
+						class="form-select"
+						required
+					>
 						<option value="">-- Elige una plataforma --</option>
 						{#each platforms as platform}
 							<option value={platform.id}>{platform.name}</option>
@@ -181,12 +130,19 @@
 					>Elige un Activo <span class="required">*</span></label
 				>
 				{#if assets.length > 0}
-					<select id="assetId" bind:value={formData.assetId} class="form-select" required>
+					<select
+						id="assetId"
+						bind:value={formData.assetId}
+						name="assetId"
+						class="form-select"
+						required
+					>
 						<option value="">-- Selecciona un activo --</option>
 						{#each assets as asset}
 							<option value={asset.id}>
 								{asset.ticker} - {asset.name} ({asset.assetType})
 							</option>
+							<input type="hidden" name="category" value={asset.assetType} />
 						{/each}
 					</select>
 					<p class="field-hint">Selecciona de la lista de activos disponibles</p>
@@ -231,6 +187,7 @@
 						<input
 							id="quantity"
 							type="number"
+							name="quantity"
 							bind:value={formData.quantity}
 							placeholder="1000"
 							class="form-input"
@@ -251,6 +208,7 @@
 						<input
 							id="purchasePrice"
 							type="number"
+							name="purchasePrice"
 							bind:value={formData.purchasePrice}
 							placeholder="150.50"
 							class="form-input"
@@ -268,7 +226,8 @@
 					<label for="purchaseDate" class="form-label">Fecha de Compra</label>
 					<input
 						id="purchaseDate"
-						type="date"
+						type="datetime"
+						name="purchaseDate"
 						bind:value={formData.purchaseDate}
 						class="form-input"
 					/>
@@ -292,6 +251,7 @@
 				<textarea
 					id="notes"
 					bind:value={formData.notes}
+					name="notes"
 					placeholder="Agrega observaciones, estrategia o detalles especiales sobre este activo..."
 					class="form-textarea"
 					rows="3"
