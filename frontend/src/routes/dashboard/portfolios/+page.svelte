@@ -5,11 +5,11 @@
 	const { data }: PageProps = $props();
 
 	function openPortfolio(id: string) {
-		goto(`/dashboard/portafolios/${id}`);
+		goto(`/dashboard/portfolios/${id}`);
 	}
 
 	function createPortfolio() {
-		goto('/dashboard/portafolios/add');
+		goto('/dashboard/portfolios/add');
 	}
 </script>
 

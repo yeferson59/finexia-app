@@ -94,7 +94,7 @@
 	];
 
 	function goBack() {
-		goto(`/dashboard/portafolios/${params.id}`);
+		goto(`/dashboard/portfolios/${params.id}`);
 	}
 
 	function handleSell() {
@@ -107,7 +107,7 @@
 
 	function handleDelete() {
 		if (confirm(`¿Deseas eliminar la posición de ${params.symbol}?`)) {
-			goto(`/dashboard/portafolios/${params.id}`);
+			goto(`/dashboard/portfolios/${params.id}`);
 		}
 	}
 </script>

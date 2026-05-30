@@ -85,7 +85,7 @@
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 			submitSuccess = true;
 			setTimeout(() => {
-				goto(`/dashboard/portafolios/${params.id}`);
+				goto(`/dashboard/portfolios/${params.id}`);
 			}, 1500);
 		} catch (error) {
 			console.error('Error:', error);
@@ -95,7 +95,7 @@
 	}
 
 	function handleCancel() {
-		goto(`/dashboard/portafolios/${params.id}`);
+		goto(`/dashboard/portfolios/${params.id}`);
 	}
 
 	function createNewPlatform() {
@@ -136,7 +136,7 @@
 </header>
 
 <div class="form-container">
-<form onsubmit={handleSubmit} class="portfolio-form">
+	<form onsubmit={handleSubmit} class="portfolio-form">
 		<!-- Platform Selection -->
 		<section class="form-section">
 			<h2 class="section-title">Plataforma de Inversión</h2>
@@ -156,7 +156,14 @@
 					<div class="empty-platforms">
 						<p class="empty-text">No tienes plataformas registradas</p>
 						<button type="button" onclick={createNewPlatform} class="btn-link">
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<svg
+								width="16"
+								height="16"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+							>
 								<path d="M12 5v14M5 12h14" />
 							</svg>
 							Crear tu primera plataforma

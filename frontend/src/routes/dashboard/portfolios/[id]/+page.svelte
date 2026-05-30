@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import type { PageProps } from './$types';
 	import { goto } from '$app/navigation';
 
-	const portfolioId = $page.params.id;
+	const { params }: PageProps = $props();
 
 	const holdings = [
 		{ symbol: 'AAPL', name: 'Apple Inc.', allocation: 22, value: 275000, day: 1.4 },
@@ -13,15 +13,15 @@
 	];
 
 	function goBack() {
-		goto('/dashboard/portafolios');
+		goto('/dashboard/portfolios');
 	}
 
 	function addAsset() {
-		goto(`/dashboard/portafolios/${portfolioId}/add`);
+		goto(`/dashboard/portfolios/${params.id}/add`);
 	}
 
 	function viewAssetDetails(symbol: string) {
-		goto(`/dashboard/portafolios/${portfolioId}/assets/${symbol}`);
+		goto(`/dashboard/portfolios/${params.id}/assets/${symbol}`);
 	}
 </script>
 
@@ -45,7 +45,7 @@
 					<path d="M19 12H5M12 19l-7-7 7-7" />
 				</svg>
 			</button>
-			<h1 class="page-title">{portfolioId}</h1>
+			<h1 class="page-title">{params.id}</h1>
 			<p class="page-subtitle">Visión detallada de posiciones, asignación y rendimiento diario.</p>
 		</div>
 		<button onclick={addAsset} class="btn-add-asset">

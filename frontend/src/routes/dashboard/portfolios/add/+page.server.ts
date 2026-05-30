@@ -52,6 +52,6 @@ export const actions = {
 			return { success: false };
 		}
 
-		redirect(302, '/dashboard/portafolios');
+		redirect(302, '/dashboard/portfolios');
 	}
 } satisfies Actions;

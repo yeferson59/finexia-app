@@ -40,7 +40,7 @@
 	const currencies = ['USD', 'COP', 'EUR', 'MXN', 'ARS'];
 
 	function handleCancel() {
-		goto('/dashboard/portafolios');
+		goto('/dashboard/portfolios');
 	}
 </script>
 
