@@ -198,7 +198,7 @@ type PortfolioEntry struct {
 	AssetID      uuid.UUID              `json:"assetId"`
 	SourceID     uuid.UUID              `json:"sourceId"`
 	Quantity     money.Decimal          `json:"quantity"`
-	AvgCostPrice money.Money            `json:"avgCostPrice"`
+	Price        money.Money            `json:"price"`
 	CostCurrency string                 `json:"costCurrency"`
 	Category     PortfolioEntryCategory `json:"category"`
 	EntryDate    time.Time              `json:"entryDate"`

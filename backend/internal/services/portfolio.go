@@ -54,8 +54,8 @@ func (s *Services) GetAssets(ctx context.Context, offset, limit uint) ([]entitie
 	return s.repos.GetAssets(ctx, offset, limit)
 }
 
-func (s *Services) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, quantity money.Decimal, avgCostPrice money.Money, costCurrency string, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) (entities.PortfolioEntry, error) {
-	entry, err := s.repos.CreatePortfolioEntry(ctx, userID, portfolioID, assetID, sourceID, quantity, avgCostPrice, costCurrency, category, entryDate, notes)
+func (s *Services) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, quantity money.Decimal, price money.Money, costCurrency string, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) (entities.PortfolioEntry, error) {
+	entry, err := s.repos.CreatePortfolioEntry(ctx, userID, portfolioID, assetID, sourceID, quantity, price, costCurrency, category, entryDate, notes)
 	if err != nil {
 		return entities.PortfolioEntry{}, err
 	}

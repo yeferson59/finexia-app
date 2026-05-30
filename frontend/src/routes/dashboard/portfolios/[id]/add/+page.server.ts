@@ -15,7 +15,7 @@ export const actions = {
 				assetId: z.coerce.string(),
 				sourceId: z.uuid(),
 				quantity: z.coerce.number(),
-				avgCostPrice: z.coerce.number(),
+				price: z.coerce.number(),
 				costCurrency: z.coerce.string(),
 				category: z.coerce.string(),
 				entryDate: z.coerce.date(),
@@ -26,14 +26,13 @@ export const actions = {
 				assetId: formData.get('assetId'),
 				sourceId: formData.get('platformId'),
 				quantity: formData.get('quantity'),
-				avgCostPrice: formData.get('purchasePrice'),
+				price: formData.get('purchasePrice'),
 				costCurrency: 'USD',
 				category: formData.get('category'),
 				entryDate: formData.get('purchaseDate'),
 				notes: formData.get('notes')
 			});
 
-		console.log(success, error, data);
 		if (!success) {
 			return { success, error: error.message };
 		}

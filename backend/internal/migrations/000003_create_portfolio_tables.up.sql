@@ -191,7 +191,7 @@ CREATE TABLE IF NOT EXISTS portfolio_entries (
   asset_id UUID NOT NULL,
   source_id UUID NOT NULL,
   quantity NUMERIC(20, 8) NOT NULL DEFAULT 0,
-  avg_cost_price NUMERIC(20, 8) NOT NULL,
+  price NUMERIC(20, 8) NOT NULL,
   cost_currency CHAR(3) NOT NULL,
   category portfolio_entry_category NOT NULL DEFAULT 'others',
   entry_date DATE NOT NULL,
@@ -340,7 +340,7 @@ BEGIN
     UPDATE portfolio_entries
     SET
       quantity       = v_total_qty,
-      avg_cost_price = v_total_cost / v_total_qty,
+      price = v_total_cost / v_total_qty,
       updated_at     = NOW()
     WHERE id = NEW.entry_id;
   END IF;
@@ -369,7 +369,7 @@ SELECT
   p.base_currency,
   COUNT(pe.id)        AS total_positions,
   SUM(
-    pe.quantity * pe.avg_cost_price *
+    pe.quantity * pe.price *
     COALESCE(
       (SELECT er.rate FROM exchange_rates er
        WHERE er.from_currency = pe.cost_currency

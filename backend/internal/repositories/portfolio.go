@@ -134,7 +134,7 @@ func (r *Repository) GetPortfolioEntries(ctx context.Context, sourceID uuid.UUID
 	for rows.Next() {
 		var portfolioEntry entities.PortfolioEntry
 		var quantity string
-		var avgCostPrice string
+		var price string
 
 		if err := rows.Scan(
 			&portfolioEntry.ID,
@@ -142,7 +142,7 @@ func (r *Repository) GetPortfolioEntries(ctx context.Context, sourceID uuid.UUID
 			&portfolioEntry.AssetID,
 			&portfolioEntry.SourceID,
 			&quantity,
-			&avgCostPrice,
+			&price,
 			&portfolioEntry.CostCurrency,
 			&portfolioEntry.Category,
 			&portfolioEntry.EntryDate,
@@ -154,7 +154,7 @@ func (r *Repository) GetPortfolioEntries(ctx context.Context, sourceID uuid.UUID
 		}
 
 		portfolioEntry.Quantity = money.MustFromString(quantity)
-		portfolioEntry.AvgCostPrice = money.MustMoneyFromString(avgCostPrice, money.USD)
+		portfolioEntry.Price = money.MustMoneyFromString(price, money.USD)
 
 		portfolioEntries = append(portfolioEntries, portfolioEntry)
 	}
@@ -192,14 +192,14 @@ func (r *Repository) GetAssets(ctx context.Context, offset, limit uint) ([]entit
 	return assets, nil
 }
 
-func (r *Repository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, quantity money.Decimal, avgCostPrice money.Money, costCurrency string, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) (entities.PortfolioEntry, error) {
+func (r *Repository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, quantity money.Decimal, price money.Money, costCurrency string, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) (entities.PortfolioEntry, error) {
 	var entry entities.PortfolioEntry
 	var quantityValue string
-	var avgCostValue string
+	var priceValue string
 	var sourceIDResult pgtype.UUID
 
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, avg_cost_price, cost_currency, category, entry_date, notes)
+		INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, category, entry_date, notes)
 		SELECT $1::uuid, $2::uuid, $3::uuid, $4::numeric, $5::numeric, $6::char(3), $7::portfolio_entry_category, $8::date, $9
 		WHERE EXISTS (
 			SELECT 1 FROM portfolios p WHERE p.id = $1 AND p.user_id = $10
@@ -207,14 +207,14 @@ func (r *Repository) CreatePortfolioEntry(ctx context.Context, userID, portfolio
 		AND ($3::uuid IS NULL OR EXISTS (
 			SELECT 1 FROM investment_sources s WHERE s.id = $3 AND s.user_id = $10
 		))
-		RETURNING id, portfolio_id, asset_id, source_id, quantity, avg_cost_price, cost_currency, category, entry_date, notes, created_at, updated_at
-	`, portfolioID, assetID, sourceID, quantity.String(), avgCostPrice.String(), costCurrency, category, entryDate, notes, userID).Scan(
+		RETURNING id, portfolio_id, asset_id, source_id, quantity, price, cost_currency, category, entry_date, notes, created_at, updated_at
+	`, portfolioID, assetID, sourceID, quantity.String(), price.String(), costCurrency, category, entryDate, notes, userID).Scan(
 		&entry.ID,
 		&entry.PortfolioID,
 		&entry.AssetID,
 		&sourceIDResult,
 		&quantityValue,
-		&avgCostValue,
+		&priceValue,
 		&entry.CostCurrency,
 		&entry.Category,
 		&entry.EntryDate,
@@ -235,7 +235,7 @@ func (r *Repository) CreatePortfolioEntry(ctx context.Context, userID, portfolio
 	}
 
 	entry.Quantity = money.MustFromString(quantityValue)
-	entry.AvgCostPrice = money.MustMoneyFromString(avgCostValue, money.USD)
+	entry.Price = money.MustMoneyFromString(priceValue, money.USD)
 
 	return entry, nil
 }
