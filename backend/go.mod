@@ -18,6 +18,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/joho/godotenv v1.5.1
+	github.com/resend/resend-go/v3 v3.7.0
 	github.com/rs/zerolog v1.35.1
 	github.com/yeferson59/gofinance v1.2.5
 	golang.org/x/crypto v0.53.0
