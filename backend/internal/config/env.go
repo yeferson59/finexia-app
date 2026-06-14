@@ -9,12 +9,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// AWS_ACCESS_KEY_ID
-// AWS_DEFAULT_REGION
-// AWS_ENDPOINT_URL
-// AWS_S3_BUCKET_NAME
-// AWS_SECRET_ACCESS_KEY
-
 type Env struct {
 	Environment        string
 	Port               string
@@ -30,6 +24,8 @@ type Env struct {
 	AWSEndpointURL     string
 	AWSS3BucketName    string
 	AWSSecretAccessKey string
+	ResendAPIKey       string
+	EmailFrom          string
 }
 
 func (c *Config) LoadEnvs() *Env {
@@ -50,6 +46,8 @@ func (c *Config) LoadEnvs() *Env {
 		AWSEndpointURL:     c.getString("AWS_ENDPOINT_URL", ""),
 		AWSS3BucketName:    c.getString("AWS_S3_BUCKET_NAME", ""),
 		AWSSecretAccessKey: c.getString("AWS_SECRET_ACCESS_KEY", ""),
+		ResendAPIKey:       c.getString("RESEND_API_KEY", ""),
+		EmailFrom:          c.getString("EMAIL_FROM", "Finexia <noreply@finexia.me>"),
 	}
 }
 

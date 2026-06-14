@@ -11,6 +11,7 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal"
 	"github.com/yeferson59/finexia-app/internal/config"
+	"github.com/yeferson59/finexia-app/internal/mail"
 )
 
 type structValidator struct {
@@ -53,7 +54,12 @@ func run() error {
 		return errors.New("failed to create storage: " + err.Error())
 	}
 
-	if err := internal.New(app, dbPool, envs, storageCache, s3Client).Init(ctx); err != nil {
+	mailService, err := mail.New(envs.ResendAPIKey, envs.EmailFrom)
+	if err != nil {
+		return errors.New("failed to init mail service: " + err.Error())
+	}
+
+	if err := internal.New(app, dbPool, envs, storageCache, s3Client, mailService).Init(ctx); err != nil {
 		return errors.New("failed to initialize app: " + err.Error())
 	}
 

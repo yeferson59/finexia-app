@@ -5,6 +5,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yeferson59/finexia-app/internal/config"
+	"github.com/yeferson59/finexia-app/internal/mail"
 	"github.com/yeferson59/finexia-app/internal/repositories"
 )
 
@@ -13,13 +14,15 @@ type Services struct {
 	cfg      *config.Env
 	s3Client *s3.Client
 	storage  fiber.Storage
+	mail     *mail.Service
 }
 
-func New(repos repositories.Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.Storage) Services {
+func New(repos repositories.Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.Storage, mailService *mail.Service) Services {
 	return Services{
 		repos:    repos,
 		cfg:      cfg,
 		s3Client: s3Client,
 		storage:  storage,
+		mail:     mailService,
 	}
 }
