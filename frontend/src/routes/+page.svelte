@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import type { PageProps } from './$types';
+	const { form }: PageProps = $props();
 
 	let openFaqIndex = $state<number | null>(null);
 	let waitlistEmail = $state('');
-	let waitlistSuccess = $state(false);
 	let waitlistError = $state(false);
 
 	let cdDays: HTMLElement;
@@ -59,8 +60,7 @@
 		if (metricsEl) metricsIo.observe(metricsEl);
 
 		const scrollHandler = () => {
-			headerEl.style.boxShadow =
-				window.scrollY > 10 ? '0 1px 0 rgba(255,255,255,0.04)' : 'none';
+			headerEl.style.boxShadow = window.scrollY > 10 ? '0 1px 0 rgba(255,255,255,0.04)' : 'none';
 		};
 		window.addEventListener('scroll', scrollHandler);
 
@@ -71,20 +71,6 @@
 			window.removeEventListener('scroll', scrollHandler);
 		};
 	});
-
-	function submitWaitlist(e: Event) {
-		e.preventDefault();
-		const val = waitlistEmail.trim();
-		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
-			waitlistError = true;
-			setTimeout(() => (waitlistError = false), 1200);
-			return;
-		}
-		try {
-			localStorage.setItem('finexia_waitlist', val);
-		} catch {}
-		waitlistSuccess = true;
-	}
 
 	function toggleFaq(index: number) {
 		openFaqIndex = openFaqIndex === index ? null : index;
@@ -201,9 +187,9 @@
 				Todo tu patrimonio,<br /><em>en tu mapa.</em>
 			</h1>
 			<p class="hero-sub reveal">
-				Registra manualmente dónde tienes tus activos y agrúpalos en los portafolios que
-				tú imaginas, aunque estén en distintas plataformas. Sin conectar cuentas, sin dar
-				acceso a nadie.
+				Registra manualmente dónde tienes tus activos y agrúpalos en los portafolios que tú
+				imaginas, aunque estén en distintas plataformas. Sin conectar cuentas, sin dar acceso a
+				nadie.
 			</p>
 
 			<div class="countdown reveal" aria-label="Cuenta regresiva para el lanzamiento">
@@ -226,7 +212,7 @@
 			</div>
 
 			<div class="waitlist reveal" id="waitlist">
-				{#if waitlistSuccess}
+				{#if form?.success}
 					<div class="wl-success">
 						<span class="check-ico" aria-hidden="true">
 							<svg
@@ -237,19 +223,19 @@
 								stroke="currentColor"
 								stroke-width="3.2"
 								stroke-linecap="round"
-								stroke-linejoin="round"
-								><path d="M20 6 9 17l-5-5" /></svg
+								stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg
 							>
 						</span>
 						<span>¡Listo! Te avisaremos en cuanto Finexia esté disponible.</span>
 					</div>
 				{:else}
-					<form class="wl-form" class:error={waitlistError} onsubmit={submitWaitlist} novalidate>
+					<form class="wl-form" class:error={waitlistError} method="POST" action="/" novalidate>
 						<input
 							type="email"
 							bind:value={waitlistEmail}
 							placeholder="tu@email.com"
 							autocomplete="email"
+							name="email"
 							required
 							aria-label="Correo electrónico"
 						/>
@@ -356,8 +342,8 @@
 				<div class="bcontent">
 					<h3>Registro manual, total control</h3>
 					<p>
-						Anota tus brokers, exchanges, bancos o plataformas y los activos que tienes en cada
-						uno. Tú decides qué incluir y cómo nombrarlo.
+						Anota tus brokers, exchanges, bancos o plataformas y los activos que tienes en cada uno.
+						Tú decides qué incluir y cómo nombrarlo.
 					</p>
 				</div>
 			</div>
@@ -476,12 +462,7 @@
 			</div>
 
 			<div class="chart-zone">
-				<svg
-					class="chart-svg"
-					viewBox="0 0 1000 280"
-					preserveAspectRatio="none"
-					aria-hidden="true"
-				>
+				<svg class="chart-svg" viewBox="0 0 1000 280" preserveAspectRatio="none" aria-hidden="true">
 					<defs>
 						<linearGradient id="growthFill" x1="0" y1="0" x2="0" y2="1">
 							<stop offset="0%" stop-color="rgba(212,145,42,0.2)" />
@@ -508,7 +489,14 @@
 					/>
 					<g class="chart-dot">
 						<circle class="pulse-ring" cx="982" cy="26" r="6" fill="rgba(212,145,42,0.35)" />
-						<circle cx="982" cy="26" r="5" fill="var(--amber)" stroke="#08090a" stroke-width="2.5" />
+						<circle
+							cx="982"
+							cy="26"
+							r="5"
+							fill="var(--amber)"
+							stroke="#08090a"
+							stroke-width="2.5"
+						/>
 					</g>
 				</svg>
 				<div class="chart-flag">
