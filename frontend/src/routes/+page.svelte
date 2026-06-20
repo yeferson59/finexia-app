@@ -1,7 +1,18 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
+	import {
+		SITE_URL,
+		SITE_NAME,
+		DEFAULT_TITLE,
+		DEFAULT_DESCRIPTION,
+		OG_IMAGE,
+		LOCALE,
+		absoluteUrl
+	} from '$lib/seo';
 	const { form }: PageProps = $props();
+
+	const canonical = absoluteUrl('/');
 
 	let openFaqIndex = $state<number | null>(null);
 	let waitlistEmail = $state('');
@@ -98,20 +109,65 @@
 			a: 'Es algo que estamos contemplando para más adelante. Por ahora todo el registro es manual para que tú mantengas el control, pero tenemos en mente ofrecer en el futuro una zona centralizada y automatizada que conecte con plataformas. Lo evaluaremos próximamente según las condiciones técnicas y de seguridad que permitan hacerlo bien.'
 		}
 	];
+
+	// Structured data — single @graph keeps Organization, WebSite and FAQPage
+	// in one script and lets Google relate them via @id references.
+	const jsonLd = JSON.stringify({
+		'@context': 'https://schema.org',
+		'@graph': [
+			{
+				'@type': 'Organization',
+				'@id': `${SITE_URL}/#organization`,
+				name: SITE_NAME,
+				url: SITE_URL,
+				logo: `${SITE_URL}/favicon.svg`,
+				description: DEFAULT_DESCRIPTION
+			},
+			{
+				'@type': 'WebSite',
+				'@id': `${SITE_URL}/#website`,
+				url: SITE_URL,
+				name: SITE_NAME,
+				inLanguage: 'es',
+				publisher: { '@id': `${SITE_URL}/#organization` }
+			},
+			{
+				'@type': 'FAQPage',
+				'@id': `${SITE_URL}/#faq`,
+				mainEntity: faqs.map((faq) => ({
+					'@type': 'Question',
+					name: faq.q,
+					acceptedAnswer: { '@type': 'Answer', text: faq.a }
+				}))
+			}
+		]
+	});
 </script>
 
 <svelte:head>
-	<title>Finexia — Próximamente</title>
-	<meta
-		name="description"
-		content="Registra tus activos manualmente y agrúpalos en los portafolios que tú imaginas. Sin conectar cuentas. Lanzamiento 1 oct 2026."
-	/>
-	<link rel="preconnect" href="https://fonts.googleapis.com" />
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
-	<link
-		rel="stylesheet"
-		href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,500&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600&display=swap"
-	/>
+	<title>{DEFAULT_TITLE}</title>
+	<meta name="description" content={DEFAULT_DESCRIPTION} />
+	<link rel="canonical" href={canonical} />
+
+	<!-- Open Graph -->
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content={SITE_NAME} />
+	<meta property="og:locale" content={LOCALE} />
+	<meta property="og:url" content={canonical} />
+	<meta property="og:title" content={DEFAULT_TITLE} />
+	<meta property="og:description" content={DEFAULT_DESCRIPTION} />
+	<meta property="og:image" content={OG_IMAGE} />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+
+	<!-- Twitter -->
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content={DEFAULT_TITLE} />
+	<meta name="twitter:description" content={DEFAULT_DESCRIPTION} />
+	<meta name="twitter:image" content={OG_IMAGE} />
+
+	<!-- Structured data -->
+	{@html `<script type="application/ld+json">${jsonLd}</scr` + 'ipt>'}
 </svelte:head>
 
 <div class="scanlines" aria-hidden="true"></div>
