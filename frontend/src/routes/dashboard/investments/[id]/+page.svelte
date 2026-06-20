@@ -80,21 +80,21 @@
 
 	$effect(() => {
 		const id = page.params.id;
-		investment = investmentDetails[id] || null;
+		investment = id ? (investmentDetails[id] ?? null) : null;
 	});
 
 	function getRiskColor(risk: string): string {
 		switch (risk) {
 			case 'Bajo':
-				return '#2ecc71';
+				return 'var(--green)';
 			case 'Medio':
-				return '#e8c547';
+				return 'var(--amber-light)';
 			case 'Alto':
-				return '#e67e22';
+				return 'var(--amber)';
 			case 'Muy Alto':
-				return '#e74c3c';
+				return 'var(--red)';
 			default:
-				return '#e0e0e0';
+				return 'var(--text)';
 		}
 	}
 
@@ -119,7 +119,14 @@
 </svelte:head>
 
 <button class="back-button" onclick={handleBack} aria-label="Volver a inversiones">
-	<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+	<svg
+		width="20"
+		height="20"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="2"
+	>
 		<path d="M19 12H5M12 19l-7-7 7-7" />
 	</svg>
 	Volver
@@ -138,28 +145,40 @@
 
 	<!-- Hero Section with Key Metrics -->
 	<section class="hero-section">
-		<article class="metric-card" style="--metric-color: #d4af37">
+		<article class="metric-card" style="--metric-color: var(--amber)">
 			<p class="metric-label">ROI Esperado</p>
 			<h2 class="metric-value">{investment.expectedROI}%</h2>
 			<p class="metric-secondary">Proyectado {investment.horizon} meses</p>
 		</article>
 
-		<article class="metric-card" style="--metric-color: #2ecc71">
+		<article class="metric-card" style="--metric-color: var(--green)">
 			<p class="metric-label">ROI Actual</p>
 			<h2 class="metric-value">{investment.currentROI}%</h2>
 			<p class="metric-secondary">Rendimiento desde inicio</p>
 		</article>
 
-		<article class="metric-card" style="--metric-color: #3498db">
+		<article class="metric-card" style="--metric-color: #6b8cef">
 			<p class="metric-label">Total Invertido</p>
-			<h2 class="metric-value">${new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(investment.totalInvested)}</h2>
+			<h2 class="metric-value">
+				${new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(
+					investment.totalInvested
+				)}
+			</h2>
 			<p class="metric-secondary">{investment.investors} inversores</p>
 		</article>
 
-		<article class="metric-card" style="--metric-color: #9b59b6">
+		<article class="metric-card" style="--metric-color: #b988e0">
 			<p class="metric-label">Valor Actual</p>
-			<h2 class="metric-value">${new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(investment.currentValue)}</h2>
-			<p class="metric-secondary">+${new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(investment.currentValue - investment.totalInvested)}</p>
+			<h2 class="metric-value">
+				${new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(
+					investment.currentValue
+				)}
+			</h2>
+			<p class="metric-secondary">
+				+${new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(
+					investment.currentValue - investment.totalInvested
+				)}
+			</p>
 		</article>
 	</section>
 
@@ -186,7 +205,10 @@
 				</div>
 				<div class="detail-item">
 					<span class="detail-label">Nivel de Riesgo</span>
-					<span class="detail-value risk-badge" style={`--risk-color: ${getRiskColor(investment.riskLevel)}`}>
+					<span
+						class="detail-value risk-badge"
+						style={`--risk-color: ${getRiskColor(investment.riskLevel)}`}
+					>
 						{investment.riskLevel}
 					</span>
 				</div>
@@ -202,7 +224,9 @@
 			<div class="detail-list">
 				<div class="detail-item">
 					<span class="detail-label">Inversión Mínima</span>
-					<span class="detail-value">${new Intl.NumberFormat('es-CO').format(investment.minimumInvestment)}</span>
+					<span class="detail-value"
+						>${new Intl.NumberFormat('es-CO').format(investment.minimumInvestment)}</span
+					>
 				</div>
 				<div class="detail-item">
 					<span class="detail-label">Horizonte Temporal</span>
@@ -214,7 +238,8 @@
 				</div>
 				<div class="detail-item">
 					<span class="detail-label">Fecha de Vencimiento</span>
-					<span class="detail-value">{dateFormatter.format(new Date(investment.maturityDate))}</span>
+					<span class="detail-value">{dateFormatter.format(new Date(investment.maturityDate))}</span
+					>
 				</div>
 			</div>
 		</article>
@@ -242,7 +267,7 @@
 				<polyline
 					points="0,120 50,100 100,80 150,60 200,75 250,50 300,65 350,40 400,35"
 					fill="none"
-					stroke="#d4af37"
+					stroke="var(--amber)"
 					stroke-width="2"
 				/>
 				<polyline
@@ -252,8 +277,8 @@
 				/>
 				<defs>
 					<linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-						<stop offset="0%" style="stop-color:#d4af37;stop-opacity:0.3" />
-						<stop offset="100%" style="stop-color:#d4af37;stop-opacity:0" />
+						<stop offset="0%" style="stop-color:var(--amber);stop-opacity:0.3" />
+						<stop offset="100%" style="stop-color:var(--amber);stop-opacity:0" />
 					</linearGradient>
 				</defs>
 			</svg>
@@ -275,25 +300,25 @@
 		margin-bottom: 1.5rem;
 		padding: 0.65rem 1rem;
 		background: transparent;
-		border: 1.5px solid rgba(212, 175, 55, 0.25);
+		border: 1.5px solid rgba(212, 145, 42, 0.25);
 		border-radius: 8px;
-		color: #d4af37;
+		color: var(--amber);
 		font-weight: 600;
 		font-size: 0.9rem;
 		cursor: pointer;
 		transition: all 0.3s ease;
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-family: var(--font-body);
 	}
 
 	.back-button:hover {
-		background: rgba(212, 175, 55, 0.1);
-		border-color: #d4af37;
+		background: var(--border);
+		border-color: var(--amber);
 	}
 
 	.investment-header {
 		margin-bottom: 2.5rem;
 		padding-bottom: 2rem;
-		border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+		border-bottom: 1px solid var(--border);
 		animation: fade-in 0.5s ease-out;
 	}
 
@@ -308,8 +333,8 @@
 		display: inline-block;
 		padding: 0.6rem 1rem;
 		border-radius: 20px;
-		background: rgba(212, 175, 55, 0.1);
-		border: 1px solid rgba(212, 175, 55, 0.25);
+		background: var(--border);
+		border: 1px solid rgba(212, 145, 42, 0.25);
 		color: var(--risk-color);
 		font-size: 0.85rem;
 		font-weight: 700;
@@ -321,15 +346,15 @@
 		margin: 0;
 		font-size: 2.8rem;
 		font-weight: 800;
-		color: #e0e0e0;
-		font-family: 'Poppins', system-ui, sans-serif;
+		color: var(--text);
+		font-family: var(--font-body);
 		letter-spacing: -0.5px;
 	}
 
 	.investment-type {
 		margin: 0.5rem 0 0;
 		font-size: 1rem;
-		color: rgba(224, 224, 224, 0.6);
+		color: rgba(236, 234, 229, 0.6);
 		font-weight: 500;
 	}
 
@@ -342,9 +367,9 @@
 	}
 
 	.metric-card {
-		border: 1px solid rgba(212, 175, 55, 0.15);
+		border: 1px solid var(--border-strong);
 		border-radius: 16px;
-		background: linear-gradient(135deg, rgba(26, 31, 46, 0.9) 0%, rgba(32, 39, 56, 0.9) 100%);
+		background: var(--surface);
 		box-shadow:
 			0 20px 60px rgba(0, 0, 0, 0.3),
 			inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -359,27 +384,29 @@
 		font-size: 0.75rem;
 		letter-spacing: 0.7px;
 		text-transform: uppercase;
-		color: rgba(224, 224, 224, 0.5);
+		color: rgba(236, 234, 229, 0.5);
 	}
 
 	.metric-value {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 		margin: 0 0 0.4rem;
 		font-size: 1.85rem;
 		font-weight: 800;
 		color: var(--metric-color);
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-family: var(--font-body);
 	}
 
 	.metric-secondary {
 		margin: 0;
 		font-size: 0.8rem;
-		color: rgba(224, 224, 224, 0.5);
+		color: rgba(236, 234, 229, 0.5);
 	}
 
 	.content-panel {
-		border: 1px solid rgba(212, 175, 55, 0.15);
+		border: 1px solid var(--border-strong);
 		border-radius: 16px;
-		background: linear-gradient(135deg, rgba(26, 31, 46, 0.9) 0%, rgba(32, 39, 56, 0.9) 100%);
+		background: var(--surface);
 		box-shadow:
 			0 20px 60px rgba(0, 0, 0, 0.3),
 			inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -392,26 +419,26 @@
 	.section-title {
 		margin: 0 0 1.5rem;
 		font-size: 1.35rem;
-		font-weight: 700;
-		color: #e0e0e0;
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-weight: 400;
+		color: var(--text);
+		font-family: var(--font-display);
 	}
 
 	.description-text {
 		margin: 0 0 1.5rem;
 		font-size: 1rem;
 		line-height: 1.7;
-		color: rgba(224, 224, 224, 0.75);
+		color: rgba(236, 234, 229, 0.75);
 	}
 
 	.cta-button {
 		padding: 1rem 2rem;
 		border: none;
 		border-radius: 12px;
-		background: linear-gradient(135deg, #d4af37, #e8c547);
-		color: #0f1419;
+		background: var(--amber);
+		color: #0d0800;
 		font-weight: 700;
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-family: var(--font-body);
 		font-size: 1rem;
 		cursor: pointer;
 		transition: all 0.3s ease;
@@ -420,7 +447,7 @@
 
 	.cta-button:hover {
 		transform: translateY(-3px);
-		box-shadow: 0 15px 35px rgba(212, 175, 55, 0.3);
+		box-shadow: 0 15px 35px rgba(212, 145, 42, 0.3);
 	}
 
 	.details-grid {
@@ -432,9 +459,9 @@
 	}
 
 	.detail-card {
-		border: 1px solid rgba(212, 175, 55, 0.15);
+		border: 1px solid var(--border-strong);
 		border-radius: 16px;
-		background: linear-gradient(135deg, rgba(26, 31, 46, 0.9) 0%, rgba(32, 39, 56, 0.9) 100%);
+		background: var(--surface);
 		box-shadow:
 			0 20px 60px rgba(0, 0, 0, 0.3),
 			inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -446,8 +473,8 @@
 		margin: 0 0 1.5rem;
 		font-size: 1.15rem;
 		font-weight: 700;
-		color: #e0e0e0;
-		font-family: 'Poppins', system-ui, sans-serif;
+		color: var(--text);
+		font-family: var(--font-body);
 	}
 
 	.detail-list {
@@ -460,7 +487,7 @@
 		justify-content: space-between;
 		align-items: center;
 		padding-bottom: 1rem;
-		border-bottom: 1px solid rgba(212, 175, 55, 0.08);
+		border-bottom: 1px solid var(--border);
 	}
 
 	.detail-item:last-child {
@@ -470,13 +497,13 @@
 
 	.detail-label {
 		font-size: 0.9rem;
-		color: rgba(224, 224, 224, 0.6);
+		color: rgba(236, 234, 229, 0.6);
 		font-weight: 500;
 	}
 
 	.detail-value {
 		font-size: 0.95rem;
-		color: #e0e0e0;
+		color: var(--text);
 		font-weight: 600;
 		text-align: right;
 	}
@@ -485,7 +512,7 @@
 		display: inline-block;
 		padding: 0.35rem 0.75rem;
 		border-radius: 6px;
-		background: rgba(212, 175, 55, 0.1);
+		background: var(--border);
 		color: var(--risk-color);
 		font-weight: 700;
 		font-size: 0.8rem;
@@ -495,8 +522,8 @@
 		display: inline-block;
 		padding: 0.35rem 0.75rem;
 		border-radius: 6px;
-		background: rgba(46, 204, 113, 0.15);
-		color: #2ecc71;
+		background: rgba(34, 201, 126, 0.15);
+		color: var(--green);
 		font-weight: 700;
 		font-size: 0.8rem;
 	}
@@ -518,7 +545,7 @@
 		align-items: flex-start;
 		gap: 1rem;
 		font-size: 0.95rem;
-		color: rgba(224, 224, 224, 0.75);
+		color: rgba(236, 234, 229, 0.75);
 		line-height: 1.6;
 	}
 
@@ -530,8 +557,8 @@
 		width: 24px;
 		height: 24px;
 		border-radius: 50%;
-		background: rgba(212, 175, 55, 0.15);
-		color: #2ecc71;
+		background: var(--border-strong);
+		color: var(--green);
 		font-weight: 700;
 		font-size: 0.85rem;
 	}
@@ -542,10 +569,10 @@
 		align-items: center;
 		justify-content: center;
 		padding: 2rem 1rem;
-		background: rgba(15, 20, 25, 0.5);
+		background: rgba(255, 255, 255, 0.022);
 		border-radius: 12px;
 		min-height: 200px;
-		color: rgba(224, 224, 224, 0.5);
+		color: rgba(236, 234, 229, 0.5);
 		animation: fade-in 0.5s ease-out 0.3s both;
 	}
 
@@ -557,31 +584,31 @@
 	.error-state {
 		text-align: center;
 		padding: 3rem 1rem;
-		border: 2px dashed rgba(212, 175, 55, 0.2);
+		border: 2px dashed rgba(212, 145, 42, 0.2);
 		border-radius: 16px;
-		background: rgba(26, 31, 46, 0.5);
+		background: rgba(255, 255, 255, 0.03);
 	}
 
 	.error-state h2 {
-		color: #d4af37;
-		font-family: 'Poppins', system-ui, sans-serif;
+		color: var(--amber);
+		font-family: var(--font-body);
 		margin-bottom: 1rem;
 	}
 
 	.error-state p {
-		color: rgba(224, 224, 224, 0.6);
+		color: rgba(236, 234, 229, 0.6);
 		margin-bottom: 1.5rem;
 	}
 
 	.btn-back {
 		padding: 0.8rem 1.5rem;
-		background: linear-gradient(135deg, #d4af37, #e8c547);
-		color: #0f1419;
+		background: var(--amber);
+		color: #0d0800;
 		border: none;
 		border-radius: 8px;
 		font-weight: 700;
 		cursor: pointer;
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-family: var(--font-body);
 	}
 
 	@keyframes fade-in {

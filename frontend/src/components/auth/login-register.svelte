@@ -37,7 +37,17 @@
 		<!-- Header Section -->
 		<header class="auth-header">
 			<div class="logo-container">
-				<div class="logo-mark" aria-hidden="true"></div>
+				<div class="logo-mark" aria-hidden="true">
+					<svg width="32" height="32" viewBox="0 0 30 30" fill="none">
+						<path
+							d="M7 22L12.5 14.5L16.5 18.5L23 9"
+							stroke="#0c0a06"
+							stroke-width="2.6"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
+					</svg>
+				</div>
 			</div>
 			<div class="header-text">
 				<h1 class="auth-title">FINEXIA</h1>
@@ -283,20 +293,20 @@
 
 <style>
 	main.auth-container {
-		--gold-primary: #d4af37;
-		--gold-light: #e8c547;
-		--text-primary: #e0e0e0;
-		--text-secondary: rgba(224, 224, 224, 0.6);
-		--bg-dark: #0f1419;
-		--bg-card: #1a1f2e;
-		--border-gold: rgba(212, 175, 55, 0.1);
-		--error-color: #e74c3c;
+		--gold-primary: var(--amber);
+		--gold-light: var(--amber-light);
+		--text-primary: var(--text);
+		--text-secondary: rgba(236, 234, 229, 0.6);
+		--bg-dark: #0d0800;
+		--bg-card: #08090a;
+		--border-gold: var(--border);
+		--error-color: var(--red);
 		min-height: 100dvh;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		padding: clamp(1rem, 3vw, 2rem);
-		background: linear-gradient(135deg, var(--bg-dark) 0%, #16191f 50%, var(--bg-dark) 100%);
+		background: linear-gradient(135deg, var(--bg-dark) 0%, #08090a 50%, var(--bg-dark) 100%);
 		position: relative;
 		overflow: hidden;
 	}
@@ -308,7 +318,7 @@
 		width: 600px;
 		height: 600px;
 		border-radius: 50%;
-		background: radial-gradient(circle, rgba(212, 175, 55, 0.06) 0%, transparent 65%);
+		background: radial-gradient(circle, var(--border) 0%, transparent 65%);
 		pointer-events: none;
 		filter: blur(40px);
 	}
@@ -320,7 +330,7 @@
 		width: 500px;
 		height: 500px;
 		border-radius: 50%;
-		background: radial-gradient(circle, rgba(46, 204, 113, 0.04) 0%, transparent 65%);
+		background: radial-gradient(circle, rgba(34, 201, 126, 0.04) 0%, transparent 65%);
 		pointer-events: none;
 		filter: blur(40px);
 	}
@@ -330,9 +340,9 @@
 		max-width: 440px;
 		position: relative;
 		z-index: 10;
-		background: rgba(26, 31, 46, 0.65);
+		background: rgba(255, 255, 255, 0.03);
 		backdrop-filter: blur(16px) saturate(180%);
-		border: 1px solid rgba(212, 175, 55, 0.08);
+		border: 1px solid var(--border);
 		border-radius: 20px;
 		padding: clamp(2rem, 5vw, 3.5rem);
 		box-shadow:
@@ -354,13 +364,16 @@
 	}
 
 	.logo-mark {
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		width: 56px;
 		height: 56px;
 		border-radius: 14px;
-		background: linear-gradient(135deg, #d4af37 0%, #c49e26 100%);
-		border: 1px solid rgba(232, 197, 71, 0.4);
+		background: var(--amber);
+		border: 1px solid rgba(232, 165, 53, 0.4);
 		box-shadow:
-			0 0 25px rgba(212, 175, 55, 0.25),
+			0 0 25px rgba(212, 145, 42, 0.25),
 			inset 0 1px 2px rgba(255, 255, 255, 0.2);
 		animation: logo-float 3s ease-in-out infinite;
 	}
@@ -370,14 +383,20 @@
 		100% {
 			transform: translateY(0px);
 			box-shadow:
-				0 0 25px rgba(212, 175, 55, 0.25),
+				0 0 25px rgba(212, 145, 42, 0.25),
 				inset 0 1px 2px rgba(255, 255, 255, 0.2);
 		}
 		50% {
 			transform: translateY(-4px);
 			box-shadow:
-				0 8px 32px rgba(212, 175, 55, 0.35),
+				0 8px 32px rgba(212, 145, 42, 0.35),
 				inset 0 1px 2px rgba(255, 255, 255, 0.2);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.logo-mark {
+			animation: none;
 		}
 	}
 
@@ -389,11 +408,10 @@
 
 	.auth-title {
 		font-size: clamp(1.5rem, 5vw, 2rem);
-		font-weight: 700;
-		letter-spacing: 1.5px;
-		color: var(--gold-primary);
-		font-family: 'Poppins', system-ui, sans-serif;
-		text-transform: uppercase;
+		font-weight: 600;
+		letter-spacing: 0.1em;
+		color: var(--text);
+		font-family: var(--font-display);
 		margin: 0;
 	}
 
@@ -423,7 +441,7 @@
 		color: var(--text-secondary);
 		font-size: 0.95rem;
 		font-weight: 600;
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-family: var(--font-body);
 		border-radius: 10px;
 		cursor: pointer;
 		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -432,14 +450,14 @@
 	}
 
 	.mode-toggle button.active {
-		background: linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(46, 204, 113, 0.05));
+		background: rgba(212, 145, 42, 0.12);
 		color: var(--gold-primary);
-		border: 1px solid rgba(212, 175, 55, 0.25);
-		box-shadow: 0 4px 12px rgba(212, 175, 55, 0.1);
+		border: 1px solid rgba(212, 145, 42, 0.25);
+		box-shadow: 0 4px 12px var(--border);
 	}
 
 	.mode-toggle button:hover:not(.active) {
-		color: rgba(224, 224, 224, 0.8);
+		color: rgba(236, 234, 229, 0.8);
 	}
 
 	.forms-container {
@@ -535,7 +553,7 @@
 		color: var(--gold-primary);
 		cursor: pointer;
 		font-weight: 700;
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-family: var(--font-body);
 		transition: all 0.25s ease;
 		padding: 0;
 		letter-spacing: 0.4px;
@@ -591,13 +609,13 @@
 		justify-content: center;
 		gap: 0.75rem;
 		padding: 0.95rem 1.25rem;
-		background: rgba(212, 175, 55, 0.05);
+		background: var(--surface);
 		border: 1px solid var(--border-gold);
 		border-radius: 10px;
 		color: var(--text-primary);
 		font-size: 0.85rem;
 		font-weight: 600;
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-family: var(--font-body);
 		cursor: pointer;
 		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 		letter-spacing: 0.3px;
@@ -613,15 +631,15 @@
 		left: -100%;
 		width: 100%;
 		height: 100%;
-		background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.1), transparent);
+		background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
 		transition: left 0.5s ease;
 	}
 
 	.social-button:hover {
-		background: rgba(212, 175, 55, 0.12);
-		border-color: rgba(212, 175, 55, 0.25);
+		background: rgba(212, 145, 42, 0.12);
+		border-color: rgba(212, 145, 42, 0.25);
 		color: var(--gold-primary);
-		box-shadow: 0 4px 12px rgba(212, 175, 55, 0.15);
+		box-shadow: 0 4px 12px var(--border-strong);
 		transform: translateY(-2px);
 	}
 

@@ -1,7 +1,7 @@
 import z from 'zod';
 import type { Actions } from './$types';
 import { env } from '$env/dynamic/private';
-import { NODE_ENV } from '$env/static/private';
+import { dev } from '$app/environment';
 import { redirect } from '@sveltejs/kit';
 
 export const actions = {
@@ -41,7 +41,7 @@ export const actions = {
 		cookies.set('access_token_finexia', data.accessToken, {
 			path: '/',
 			httpOnly: true,
-			secure: NODE_ENV === 'production',
+			secure: !dev,
 			maxAge: 60 * 60 * 24 * 7,
 			expires: new Date(Date.now() + 60 * 60 * 24 * 7 * 1000),
 			sameSite: 'lax'

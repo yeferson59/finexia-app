@@ -245,18 +245,18 @@
 		gap: 0.6rem;
 		margin-bottom: 2rem;
 		padding: 0.7rem 1.2rem;
-		border: 1px solid rgba(212, 175, 55, 0.3);
+		border: 1px solid rgba(212, 145, 42, 0.3);
 		border-radius: 8px;
-		background: rgba(212, 175, 55, 0.05);
-		color: #d4af37;
+		background: var(--surface);
+		color: var(--amber);
 		font-weight: 600;
 		cursor: pointer;
 		transition: all 0.3s ease;
 	}
 
 	.back-button:hover {
-		background: rgba(212, 175, 55, 0.15);
-		border-color: rgba(212, 175, 55, 0.5);
+		background: var(--border-strong);
+		border-color: rgba(212, 145, 42, 0.5);
 		transform: translateX(-2px);
 	}
 
@@ -268,20 +268,20 @@
 	.form-header {
 		margin-bottom: 2rem;
 		padding-bottom: 1.5rem;
-		border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+		border-bottom: 1px solid var(--border);
 	}
 
 	.form-title {
 		margin: 0 0 0.5rem;
 		font-size: 2rem;
 		font-weight: 700;
-		color: #d4af37;
-		font-family: 'Poppins', system-ui, sans-serif;
+		color: var(--amber);
+		font-family: var(--font-body);
 	}
 
 	.form-subtitle {
 		margin: 0;
-		color: rgba(224, 224, 224, 0.62);
+		color: rgba(236, 234, 229, 0.62);
 		font-size: 1rem;
 	}
 
@@ -292,9 +292,9 @@
 		margin-bottom: 2rem;
 		padding: 1rem 1.5rem;
 		border-radius: 12px;
-		background: rgba(46, 204, 113, 0.1);
-		border: 1px solid rgba(46, 204, 113, 0.3);
-		color: #2ecc71;
+		background: rgba(34, 201, 126, 0.1);
+		border: 1px solid rgba(34, 201, 126, 0.3);
+		color: var(--green);
 		font-weight: 600;
 	}
 
@@ -307,17 +307,17 @@
 		display: grid;
 		gap: 1.5rem;
 		padding: 1.5rem;
-		border: 1px solid rgba(212, 175, 55, 0.15);
+		border: 1px solid var(--border-strong);
 		border-radius: 16px;
-		background: linear-gradient(135deg, rgba(26, 31, 46, 0.6) 0%, rgba(32, 39, 56, 0.6) 100%);
+		background: var(--surface);
 		backdrop-filter: blur(16px);
 	}
 
 	.section-title {
 		margin: 0 0 0.5rem;
 		font-size: 1.15rem;
-		font-weight: 600;
-		color: #e8c547;
+		font-weight: 400;
+		color: var(--amber-light);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 	}
@@ -336,18 +336,18 @@
 	.label {
 		font-size: 0.95rem;
 		font-weight: 600;
-		color: #e0e0e0;
+		color: var(--text);
 	}
 
 	.input,
 	.select,
 	.textarea {
 		padding: 0.85rem;
-		border: 1px solid rgba(212, 175, 55, 0.2);
+		border: 1px solid rgba(212, 145, 42, 0.2);
 		border-radius: 10px;
-		background: rgba(15, 20, 25, 0.5);
-		color: #e0e0e0;
-		font-family: 'Lato', system-ui, sans-serif;
+		background: rgba(255, 255, 255, 0.022);
+		color: var(--text);
+		font-family: var(--font-body);
 		font-size: 0.95rem;
 		transition: all 0.3s ease;
 	}
@@ -356,14 +356,14 @@
 	.select:focus,
 	.textarea:focus {
 		outline: none;
-		border-color: #d4af37;
-		background: rgba(15, 20, 25, 0.8);
-		box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+		border-color: var(--amber);
+		background: rgba(255, 255, 255, 0.022);
+		box-shadow: 0 0 0 3px var(--border);
 	}
 
 	.input::placeholder,
 	.textarea::placeholder {
-		color: rgba(224, 224, 224, 0.4);
+		color: rgba(236, 234, 229, 0.4);
 	}
 
 	.input:disabled,
@@ -375,42 +375,42 @@
 
 	.input.error,
 	.input.error:focus {
-		box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
+		box-shadow: 0 0 0 3px rgba(224, 90, 90, 0.1);
 	}
 
 	.error-message {
 		font-size: 0.8rem;
-		color: #e74c3c;
+		color: var(--red);
 	}
 
 	.help-text {
 		margin: 0;
 		font-size: 0.8rem;
-		color: rgba(224, 224, 224, 0.5);
+		color: rgba(236, 234, 229, 0.5);
 	}
 
 	.input-with-prefix {
 		display: flex;
 		align-items: center;
-		border: 1px solid rgba(212, 175, 55, 0.2);
+		border: 1px solid rgba(212, 145, 42, 0.2);
 		border-radius: 10px;
-		background: rgba(15, 20, 25, 0.5);
+		background: rgba(255, 255, 255, 0.022);
 		overflow: hidden;
 		transition: all 0.3s ease;
 	}
 
 	.input-with-prefix:focus-within {
-		border-color: #d4af37;
-		background: rgba(15, 20, 25, 0.8);
-		box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+		border-color: var(--amber);
+		background: rgba(255, 255, 255, 0.022);
+		box-shadow: 0 0 0 3px var(--border);
 	}
 
 	.prefix {
 		padding: 0.85rem;
-		color: #d4af37;
+		color: var(--amber);
 		font-weight: 600;
-		border-right: 1px solid rgba(212, 175, 55, 0.2);
-		background: rgba(212, 175, 55, 0.05);
+		border-right: 1px solid rgba(212, 145, 42, 0.2);
+		background: var(--surface);
 	}
 
 	.input-with-prefix .input {
@@ -437,22 +437,22 @@
 		align-items: flex-start;
 		gap: 1rem;
 		padding: 1rem;
-		border: 1px solid rgba(212, 175, 55, 0.15);
+		border: 1px solid var(--border-strong);
 		border-radius: 10px;
-		background: rgba(15, 20, 25, 0.3);
+		background: rgba(255, 255, 255, 0.022);
 		cursor: pointer;
 		transition: all 0.3s ease;
 	}
 
 	.radio-label:hover {
-		background: rgba(212, 175, 55, 0.08);
-		border-color: rgba(212, 175, 55, 0.3);
+		background: var(--border);
+		border-color: rgba(212, 145, 42, 0.3);
 	}
 
 	.radio-label input[type='radio'] {
 		margin-top: 0.25rem;
 		cursor: pointer;
-		accent-color: #d4af37;
+		accent-color: var(--amber);
 		width: 18px;
 		height: 18px;
 	}
@@ -470,12 +470,12 @@
 
 	.radio-title {
 		font-weight: 600;
-		color: #e0e0e0;
+		color: var(--text);
 	}
 
 	.radio-description {
 		font-size: 0.85rem;
-		color: rgba(224, 224, 224, 0.5);
+		color: rgba(236, 234, 229, 0.5);
 	}
 
 	.checkbox-label {
@@ -483,22 +483,22 @@
 		align-items: flex-start;
 		gap: 1rem;
 		padding: 1rem;
-		border: 1px solid rgba(212, 175, 55, 0.15);
+		border: 1px solid var(--border-strong);
 		border-radius: 10px;
-		background: rgba(15, 20, 25, 0.3);
+		background: rgba(255, 255, 255, 0.022);
 		cursor: pointer;
 		transition: all 0.3s ease;
 	}
 
 	.checkbox-label:hover {
-		background: rgba(212, 175, 55, 0.08);
-		border-color: rgba(212, 175, 55, 0.3);
+		background: var(--border);
+		border-color: rgba(212, 145, 42, 0.3);
 	}
 
 	.checkbox-label input[type='checkbox'] {
 		margin-top: 0.2rem;
 		cursor: pointer;
-		accent-color: #d4af37;
+		accent-color: var(--amber);
 		width: 18px;
 		height: 18px;
 	}
@@ -516,12 +516,12 @@
 
 	.checkbox-title {
 		font-weight: 600;
-		color: #e0e0e0;
+		color: var(--text);
 	}
 
 	.checkbox-description {
 		font-size: 0.85rem;
-		color: rgba(224, 224, 224, 0.5);
+		color: rgba(236, 234, 229, 0.5);
 	}
 
 	.form-actions {
@@ -537,7 +537,7 @@
 		border: none;
 		border-radius: 10px;
 		font-weight: 700;
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-family: var(--font-body);
 		font-size: 0.95rem;
 		cursor: pointer;
 		transition: all 0.3s ease;
@@ -546,26 +546,26 @@
 
 	.btn-cancel {
 		background: transparent;
-		border: 1px solid rgba(212, 175, 55, 0.3);
-		color: #d4af37;
+		border: 1px solid rgba(212, 145, 42, 0.3);
+		color: var(--amber);
 	}
 
 	.btn-cancel:hover:not(:disabled) {
-		background: rgba(212, 175, 55, 0.1);
-		border-color: rgba(212, 175, 55, 0.5);
+		background: var(--border);
+		border-color: rgba(212, 145, 42, 0.5);
 	}
 
 	.btn-submit {
 		display: flex;
 		align-items: center;
 		gap: 0.6rem;
-		background: linear-gradient(135deg, #d4af37, #e8c547);
-		color: #0f1419;
+		background: var(--amber);
+		color: #0d0800;
 	}
 
 	.btn-submit:hover:not(:disabled) {
 		transform: translateY(-2px);
-		box-shadow: 0 10px 25px rgba(212, 175, 55, 0.25);
+		box-shadow: 0 10px 25px rgba(212, 145, 42, 0.25);
 	}
 
 	.btn-cancel:disabled,
@@ -578,8 +578,8 @@
 		display: inline-block;
 		width: 14px;
 		height: 14px;
-		border: 2px solid rgba(15, 20, 25, 0.3);
-		border-top-color: #0f1419;
+		border: 2px solid rgba(255, 255, 255, 0.022);
+		border-top-color: #0d0800;
 		border-radius: 50%;
 		animation: spin 0.6s linear infinite;
 	}

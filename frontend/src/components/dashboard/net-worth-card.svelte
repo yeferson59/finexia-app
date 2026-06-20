@@ -7,46 +7,40 @@
 
 <div class="net-worth-card">
 	<div class="card-header">
-		<h2 class="card-title">Patrimonio Neto</h2>
-		<span class="period-label">Mes actual</span>
+		<div>
+			<p class="card-eyebrow">Patrimonio total</p>
+			<h2 class="card-title">Patrimonio Neto</h2>
+		</div>
+		<span class="status-pill">Mes actual</span>
 	</div>
 
 	<div class="net-worth-content">
 		<div class="main-metric">
-			<span class="label">Tu patrimonio total</span>
 			<h1 class="amount">
 				${new Intl.NumberFormat('es-CO').format(netWorth)}
 			</h1>
+			<p class="amount-delta" class:positive={isIncreasing} class:negative={!isIncreasing}>
+				{isIncreasing ? '+' : '−'}${new Intl.NumberFormat('es-CO').format(Math.abs(monthlyChange))}
+				· {new Intl.NumberFormat('es-CO', { minimumFractionDigits: 1 }).format(
+					monthlyChangePercent
+				)}% este mes
+			</p>
 		</div>
 
 		<div class="metric-stats">
 			<div class="stat-item">
-				<span class="stat-label">Cambio mensual</span>
-				<p class="stat-value" class:positive={isIncreasing} class:negative={!isIncreasing}>
-					<span class="direction-icon">
-						{#if isIncreasing}
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-								<path d="M12 2l7 7h-5v8h-4v-8H5l7-7z"></path>
-							</svg>
-						{:else}
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-								<path d="M12 22l-7-7h5V7h4v8h5l-7 7z"></path>
-							</svg>
-						{/if}
-					</span>
-					${new Intl.NumberFormat('es-CO').format(Math.abs(monthlyChange))}
-					<span class="percentage">({monthlyChangePercent}%)</span>
-				</p>
-			</div>
-
-			<div class="stat-item">
-				<span class="stat-label">Activos invertidos</span>
-				<p class="stat-value highlight">5 clases</p>
+				<span class="stat-label">Clases de activo</span>
+				<p class="stat-value">5</p>
 			</div>
 
 			<div class="stat-item">
 				<span class="stat-label">Tasa promedio</span>
-				<p class="stat-value highlight">7.4% anual</p>
+				<p class="stat-value highlight">7,4%<span class="stat-unit">anual</span></p>
+			</div>
+
+			<div class="stat-item">
+				<span class="stat-label">Liquidez</span>
+				<p class="stat-value positive">72h</p>
 			</div>
 		</div>
 	</div>
@@ -59,14 +53,30 @@
 
 <style>
 	.net-worth-card {
-		background: linear-gradient(135deg, rgba(26, 31, 46, 0.9) 0%, rgba(32, 39, 56, 0.9) 100%);
-		border: 1px solid rgba(212, 175, 55, 0.15);
-		border-radius: 16px;
+		position: relative;
+		overflow: hidden;
+		background: var(--surface);
+		border: 1px solid var(--border-strong);
+		border-radius: 14px;
 		padding: 2rem;
-		box-shadow:
-			0 20px 60px rgba(0, 0, 0, 0.3),
-			inset 0 1px 0 rgba(255, 255, 255, 0.05);
-		backdrop-filter: blur(16px);
+		backdrop-filter: blur(10px);
+	}
+
+	/* Warm amber wash anchoring the hero figure */
+	.net-worth-card::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: radial-gradient(
+			ellipse 60% 90% at 0% 0%,
+			rgba(212, 145, 42, 0.07),
+			transparent 55%
+		);
+		pointer-events: none;
+	}
+
+	.net-worth-card > * {
+		position: relative;
 	}
 
 	.card-header {
@@ -74,24 +84,41 @@
 		justify-content: space-between;
 		align-items: flex-start;
 		margin-bottom: 2rem;
-		padding-bottom: 1rem;
-		border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+		padding-bottom: 1.25rem;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.card-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.625rem;
+		font-weight: 500;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		color: var(--text-dim);
+		margin: 0 0 0.4rem 0;
 	}
 
 	.card-title {
-		font-size: 1.25rem;
-		font-weight: 700;
-		color: #e0e0e0;
+		font-family: var(--font-display);
+		font-size: 1.15rem;
+		font-weight: 500;
+		letter-spacing: -0.01em;
+		color: var(--text);
 		margin: 0;
-		letter-spacing: 0.5px;
 	}
 
-	.period-label {
-		font-size: 0.8rem;
-		color: rgba(224, 224, 224, 0.5);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
+	.status-pill {
+		font-family: var(--font-mono);
+		font-size: 0.625rem;
 		font-weight: 600;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		padding: 0.25rem 0.6rem;
+		border-radius: 4px;
+		white-space: nowrap;
 	}
 
 	.net-worth-content {
@@ -99,7 +126,7 @@
 		grid-template-columns: 1fr 1fr;
 		gap: 3rem;
 		margin-bottom: 2rem;
-		align-items: start;
+		align-items: end;
 	}
 
 	.main-metric {
@@ -108,21 +135,29 @@
 		gap: 0.5rem;
 	}
 
-	.label {
-		font-size: 0.85rem;
-		color: rgba(224, 224, 224, 0.6);
-		font-weight: 500;
-		letter-spacing: 0.3px;
+	.amount {
+		font-family: var(--font-mono);
+		font-size: clamp(2.25rem, 4.5vw, 3rem);
+		font-weight: 600;
+		color: var(--text);
+		margin: 0;
+		line-height: 1;
+		letter-spacing: -0.03em;
+		font-variant-numeric: tabular-nums;
 	}
 
-	.amount {
-		font-size: 2.75rem;
-		font-weight: 700;
-		color: #d4af37;
+	.amount-delta {
+		font-size: 0.85rem;
+		font-weight: 400;
 		margin: 0;
-		line-height: 1.1;
-		letter-spacing: -0.5px;
-		font-family: 'Poppins', system-ui, sans-serif;
+	}
+
+	.amount-delta.positive {
+		color: var(--green);
+	}
+
+	.amount-delta.negative {
+		color: var(--red);
 	}
 
 	.metric-stats {
@@ -138,88 +173,91 @@
 	}
 
 	.stat-label {
-		font-size: 0.75rem;
-		color: rgba(224, 224, 224, 0.5);
+		font-family: var(--font-mono);
+		font-size: 0.625rem;
+		color: var(--text-dim);
 		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		font-weight: 600;
+		letter-spacing: 0.12em;
+		font-weight: 500;
 	}
 
 	.stat-value {
 		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 1rem;
-		font-weight: 700;
-		color: #e0e0e0;
+		align-items: baseline;
+		gap: 0.4rem;
+		font-family: var(--font-mono);
+		font-size: 1.15rem;
+		font-weight: 600;
+		color: var(--text);
 		margin: 0;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.stat-value.positive {
-		color: #2ecc71;
-	}
-
-	.stat-value.negative {
-		color: #e74c3c;
+		color: var(--green);
 	}
 
 	.stat-value.highlight {
-		color: #d4af37;
+		color: var(--amber-light);
 	}
 
-	.direction-icon {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 20px;
-		height: 20px;
-	}
-
-	.percentage {
-		font-size: 0.85rem;
-		opacity: 0.7;
+	.stat-unit {
+		font-size: 0.7rem;
+		font-weight: 400;
+		color: var(--text-dim);
 	}
 
 	.card-footer {
 		display: flex;
-		gap: 1rem;
+		gap: 0.75rem;
 	}
 
 	.action-button {
 		flex: 1;
-		padding: 0.875rem 1.5rem;
-		border: none;
-		border-radius: 8px;
+		padding: 0.75rem 1.5rem;
+		border-radius: 6px;
 		font-weight: 600;
-		font-size: 0.9rem;
+		font-size: 0.85rem;
 		cursor: pointer;
-		transition: all 0.25s ease;
-		font-family: 'Poppins', system-ui, sans-serif;
-		letter-spacing: 0.3px;
+		transition:
+			background 0.2s ease,
+			border-color 0.2s ease,
+			color 0.2s ease,
+			transform 0.15s ease;
+		font-family: var(--font-body);
 	}
 
 	.action-button.primary {
-		background: linear-gradient(135deg, #d4af37 0%, #e8c547 100%);
-		color: #0f1419;
-		box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
+		border: none;
+		background: var(--amber);
+		color: #0d0800;
 	}
 
 	.action-button.primary:hover {
-		background: linear-gradient(135deg, #e8c547 0%, #d4af37 100%);
-		transform: translateY(-2px);
-		box-shadow: 0 6px 20px rgba(212, 175, 55, 0.3);
+		background: var(--amber-light);
+		transform: translateY(-1px);
+	}
+
+	.action-button.primary:active {
+		transform: none;
 	}
 
 	.action-button.secondary {
 		background: transparent;
-		border: 1.5px solid rgba(212, 175, 55, 0.2);
-		color: #e0e0e0;
+		border: 1px solid var(--border-strong);
+		color: var(--text);
 	}
 
 	.action-button.secondary:hover {
-		background: rgba(212, 175, 55, 0.1);
-		border-color: rgba(212, 175, 55, 0.3);
-		color: #d4af37;
+		background: rgba(212, 145, 42, 0.06);
+		border-color: rgba(212, 145, 42, 0.4);
+		color: var(--amber-light);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.action-button.primary:hover {
+			transform: none;
+		}
 	}
 
 	@media (max-width: 1024px) {
@@ -229,11 +267,7 @@
 		}
 
 		.metric-stats {
-			grid-template-columns: repeat(2, 1fr);
-		}
-
-		.amount {
-			font-size: 2.25rem;
+			grid-template-columns: repeat(3, 1fr);
 		}
 	}
 
@@ -244,14 +278,6 @@
 
 		.net-worth-content {
 			gap: 1.5rem;
-		}
-
-		.metric-stats {
-			grid-template-columns: 1fr;
-		}
-
-		.amount {
-			font-size: 1.875rem;
 		}
 
 		.action-button {

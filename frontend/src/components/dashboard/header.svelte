@@ -30,10 +30,26 @@
 			</svg>
 		</button>
 
-		<div class="header-brand">
-			<div class="logo-mark" aria-hidden="true"></div>
+		<a class="header-brand" href="/dashboard" aria-label="Finexia, ir al inicio">
+			<svg
+				class="brand-icon"
+				width="30"
+				height="30"
+				viewBox="0 0 30 30"
+				fill="none"
+				aria-hidden="true"
+			>
+				<rect width="30" height="30" rx="7" fill="var(--amber)" />
+				<path
+					d="M7 22L12.5 14.5L16.5 18.5L23 9"
+					stroke="#0c0a06"
+					stroke-width="2.6"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				/>
+			</svg>
 			<span class="brand-name">FINEXIA</span>
-		</div>
+		</a>
 
 		<div class="header-actions">
 			<button class="icon-button" aria-label="Notificaciones">
@@ -67,7 +83,7 @@
 			</button>
 
 			<div class="user-profile">
-				<div class="avatar"></div>
+				<div class="avatar" aria-hidden="true">{data.user.name.trim().charAt(0).toUpperCase()}</div>
 				<div class="user-info">
 					<p class="user-name">{data.user.name}</p>
 					<p class="user-email">{data.user.email}</p>
@@ -84,9 +100,10 @@
 		left: 0;
 		right: 0;
 		height: 72px;
-		background: rgba(15, 20, 25, 0.95);
-		backdrop-filter: blur(12px);
-		border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+		background: rgba(8, 9, 10, 0.82);
+		backdrop-filter: blur(16px);
+		-webkit-backdrop-filter: blur(16px);
+		border-bottom: 1px solid var(--border);
 		z-index: 40;
 	}
 
@@ -105,38 +122,33 @@
 		display: none;
 		background: none;
 		border: none;
-		color: #e0e0e0;
+		color: var(--text-muted);
 		cursor: pointer;
 		padding: 0.5rem;
-		transition: color 0.25s ease;
+		transition: color 0.2s ease;
 	}
 
 	.menu-toggle:hover {
-		color: #d4af37;
+		color: var(--text);
 	}
 
 	.header-brand {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
+		gap: 0.65rem;
 		flex-shrink: 0;
 	}
 
-	.logo-mark {
-		width: 36px;
-		height: 36px;
-		border-radius: 8px;
-		background: linear-gradient(135deg, #d4af37 0%, #c49e26 100%);
-		border: 1px solid rgba(232, 197, 71, 0.4);
-		box-shadow: 0 0 12px rgba(212, 175, 55, 0.25);
+	.brand-icon {
+		flex-shrink: 0;
 	}
 
 	.brand-name {
+		font-family: var(--font-display);
+		font-weight: 600;
 		font-size: 1.25rem;
-		font-weight: 700;
-		color: #d4af37;
-		letter-spacing: 1px;
-		font-family: 'Poppins', system-ui, sans-serif;
+		letter-spacing: 0.1em;
+		color: var(--text);
 	}
 
 	.header-actions {
@@ -149,63 +161,71 @@
 	.icon-button {
 		background: none;
 		border: none;
-		color: #e0e0e0;
+		color: var(--text-muted);
 		cursor: pointer;
 		padding: 0.5rem;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		transition: color 0.25s ease;
+		transition: color 0.2s ease;
 		position: relative;
 	}
 
 	.icon-button:hover {
-		color: #d4af37;
+		color: var(--text);
 	}
 
 	.notification-badge {
 		position: absolute;
-		top: 2px;
-		right: 2px;
-		width: 8px;
-		height: 8px;
-		background: #e74c3c;
+		top: 4px;
+		right: 4px;
+		width: 6px;
+		height: 6px;
+		background: var(--amber);
 		border-radius: 50%;
 	}
 
 	.user-profile {
 		display: flex;
 		align-items: center;
-		gap: 0.875rem;
+		gap: 0.75rem;
 		padding-left: 1rem;
-		border-left: 1px solid rgba(212, 175, 55, 0.1);
+		border-left: 1px solid var(--border);
 	}
 
 	.avatar {
-		width: 40px;
-		height: 40px;
+		width: 36px;
+		height: 36px;
 		border-radius: 50%;
-		background: linear-gradient(135deg, #d4af37, #2ecc71);
-		border: 2px solid rgba(212, 175, 55, 0.3);
+		background: var(--surface-3);
+		border: 1px solid var(--border-strong);
+		color: var(--amber);
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		font-weight: 600;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		flex-shrink: 0;
 	}
 
 	.user-info {
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
+		gap: 0.1rem;
 	}
 
 	.user-name {
 		font-size: 0.85rem;
-		font-weight: 600;
-		color: #e0e0e0;
+		font-weight: 500;
+		color: var(--text);
 		margin: 0;
 	}
 
 	.user-email {
-		font-size: 0.75rem;
-		color: rgba(224, 224, 224, 0.5);
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--text-dim);
 		margin: 0;
 	}
 

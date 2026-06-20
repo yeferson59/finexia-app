@@ -5,7 +5,20 @@
 		{ title: 'Riesgo y volatilidad', period: 'YTD 2026', format: 'PDF', size: '2.1 MB' }
 	];
 
-	const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+	const months = [
+		'Ene',
+		'Feb',
+		'Mar',
+		'Abr',
+		'May',
+		'Jun',
+		'Jul',
+		'Ago',
+		'Sep',
+		'Oct',
+		'Nov',
+		'Dic'
+	];
 
 	const performanceCalendars = [
 		{ year: '2026', values: [1.5, 0.8, 2.4, -0.6, 1.1, 1.9, 0.7, -0.2, 1.6, 2.1, 0.9, 1.3] },
@@ -94,8 +107,8 @@
 		<svg class="projection-chart" viewBox="0 0 600 280" preserveAspectRatio="xMidYMid meet">
 			<defs>
 				<linearGradient id="projectionGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-					<stop offset="0%" style="stop-color: #d4af37; stop-opacity: 0.25" />
-					<stop offset="100%" style="stop-color: #d4af37; stop-opacity: 0" />
+					<stop offset="0%" style="stop-color: var(--amber); stop-opacity: 0.25" />
+					<stop offset="100%" style="stop-color: var(--amber); stop-opacity: 0" />
 				</linearGradient>
 			</defs>
 			{#each Array.from({ length: 5 }) as _, i (i)}
@@ -104,7 +117,7 @@
 					y1={35 + i * 50}
 					x2="560"
 					y2={35 + i * 50}
-					stroke="rgba(212, 175, 55, 0.08)"
+					stroke="var(--border)"
 					stroke-width="1"
 				/>
 			{/each}
@@ -117,7 +130,7 @@
 					})
 					.join(' ')}
 				fill="none"
-				stroke="#d4af37"
+				stroke="var(--amber)"
 				stroke-width="3"
 				stroke-linecap="round"
 				stroke-linejoin="round"
@@ -137,11 +150,17 @@
 					cx={40 + i * 130}
 					cy={230 - ((point.value - projectionMin) / projectionRange) * 180}
 					r="4"
-					fill="#e8c547"
-					stroke="rgba(15, 20, 25, 0.9)"
+					fill="var(--amber-light)"
+					stroke="rgba(255, 255, 255, 0.022)"
 					stroke-width="2"
 				/>
-				<text x={40 + i * 130} y="260" text-anchor="middle" fill="rgba(224,224,224,0.56)" font-size="12">
+				<text
+					x={40 + i * 130}
+					y="260"
+					text-anchor="middle"
+					fill="rgba(236, 234, 229,0.56)"
+					font-size="12"
+				>
 					{point.period}
 				</text>
 			{/each}
@@ -164,20 +183,21 @@
 	.page-header {
 		margin-bottom: 2rem;
 		padding-bottom: 1.5rem;
-		border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+		border-bottom: 1px solid var(--border);
 	}
 
 	.page-title {
 		margin: 0 0 0.5rem;
 		font-size: 2.35rem;
-		font-weight: 700;
-		color: #d4af37;
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-weight: 300;
+		color: var(--text);
+		font-family: var(--font-display);
+		letter-spacing: -0.02em;
 	}
 
 	.page-subtitle {
 		margin: 0;
-		color: rgba(224, 224, 224, 0.62);
+		color: rgba(236, 234, 229, 0.62);
 	}
 
 	.analytics-grid {
@@ -201,9 +221,9 @@
 	}
 
 	.panel {
-		border: 1px solid rgba(212, 175, 55, 0.15);
+		border: 1px solid var(--border-strong);
 		border-radius: 16px;
-		background: linear-gradient(135deg, rgba(26, 31, 46, 0.9) 0%, rgba(32, 39, 56, 0.9) 100%);
+		background: var(--surface);
 		box-shadow:
 			0 20px 60px rgba(0, 0, 0, 0.3),
 			inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -220,15 +240,15 @@
 	.section-head h2 {
 		margin: 0;
 		font-size: 1rem;
-		color: #e0e0e0;
+		color: var(--text);
 	}
 
 	.section-head span {
 		font-size: 0.75rem;
 		padding: 0.25rem 0.6rem;
 		border-radius: 999px;
-		background: rgba(212, 175, 55, 0.12);
-		color: #e8c547;
+		background: rgba(212, 145, 42, 0.12);
+		color: var(--amber-light);
 	}
 
 	.calendar-card {
@@ -244,14 +264,14 @@
 	.month-cell {
 		padding: 0.5rem;
 		border-radius: 8px;
-		background: rgba(15, 20, 25, 0.4);
+		background: rgba(255, 255, 255, 0.022);
 		border: 1px solid transparent;
 	}
 
 	.month {
 		margin: 0;
 		font-size: 0.65rem;
-		color: rgba(224, 224, 224, 0.55);
+		color: rgba(236, 234, 229, 0.55);
 	}
 
 	.percent {
@@ -261,33 +281,33 @@
 	}
 
 	.month-cell.strong-positive {
-		background: rgba(46, 204, 113, 0.26);
-		border-color: rgba(46, 204, 113, 0.45);
-		color: #7df2ae;
+		background: rgba(34, 201, 126, 0.26);
+		border-color: rgba(34, 201, 126, 0.45);
+		color: var(--green);
 	}
 
 	.month-cell.positive {
-		background: rgba(46, 204, 113, 0.18);
-		border-color: rgba(46, 204, 113, 0.3);
-		color: #66dea2;
+		background: rgba(34, 201, 126, 0.18);
+		border-color: rgba(34, 201, 126, 0.3);
+		color: var(--green);
 	}
 
 	.month-cell.flat-positive {
-		background: rgba(212, 175, 55, 0.2);
-		border-color: rgba(212, 175, 55, 0.35);
-		color: #e8c547;
+		background: rgba(212, 145, 42, 0.2);
+		border-color: rgba(212, 145, 42, 0.35);
+		color: var(--amber-light);
 	}
 
 	.month-cell.negative {
-		background: rgba(231, 76, 60, 0.16);
-		border-color: rgba(231, 76, 60, 0.3);
-		color: #ff9f93;
+		background: rgba(224, 90, 90, 0.16);
+		border-color: rgba(224, 90, 90, 0.3);
+		color: var(--red);
 	}
 
 	.month-cell.strong-negative {
-		background: rgba(231, 76, 60, 0.26);
-		border-color: rgba(231, 76, 60, 0.46);
-		color: #ff9f93;
+		background: rgba(224, 90, 90, 0.26);
+		border-color: rgba(224, 90, 90, 0.46);
+		color: var(--red);
 	}
 
 	.stats-card {
@@ -303,7 +323,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		background: rgba(15, 20, 25, 0.4);
+		background: rgba(255, 255, 255, 0.022);
 		padding: 0.6rem 0.75rem;
 		border-radius: 8px;
 	}
@@ -314,12 +334,12 @@
 	}
 
 	.stat-row p:first-child {
-		color: rgba(224, 224, 224, 0.62);
+		color: rgba(236, 234, 229, 0.62);
 	}
 
 	.stat-row p:last-child {
 		font-weight: 700;
-		color: #e8c547;
+		color: var(--amber-light);
 	}
 
 	.projection-card {
@@ -345,29 +365,29 @@
 		letter-spacing: 0.5px;
 		padding: 0.3rem 0.55rem;
 		border-radius: 999px;
-		background: rgba(212, 175, 55, 0.18);
-		color: #e8c547;
+		background: var(--border-strong);
+		color: var(--amber-light);
 	}
 
 	h2 {
 		margin: 0;
 		font-size: 1.05rem;
-		color: #e0e0e0;
+		color: var(--text);
 	}
 
 	.meta {
 		margin: 0;
 		font-size: 0.82rem;
-		color: rgba(224, 224, 224, 0.56);
+		color: rgba(236, 234, 229, 0.56);
 	}
 
 	.download {
 		margin-top: 0.35rem;
-		border: 1px solid rgba(212, 175, 55, 0.25);
+		border: 1px solid rgba(212, 145, 42, 0.25);
 		border-radius: 8px;
 		padding: 0.75rem 1rem;
-		background: rgba(212, 175, 55, 0.1);
-		color: #e0e0e0;
+		background: var(--border);
+		color: var(--text);
 		font-weight: 600;
 		cursor: pointer;
 	}

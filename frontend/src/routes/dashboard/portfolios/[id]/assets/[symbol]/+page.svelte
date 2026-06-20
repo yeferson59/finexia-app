@@ -302,14 +302,14 @@
 
 <style>
 	.container {
-		--gold: #d4af37;
-		--gold-accent: #e8c547;
-		--dark-bg: #0f1419;
-		--dark-secondary: #1a1f2e;
-		--dark-tertiary: #16191f;
-		--text-primary: #e0e0e0;
-		--text-secondary: rgba(224, 224, 224, 0.6);
-		--gold-border: rgba(212, 175, 55, 0.15);
+		--gold: var(--amber);
+		--gold-accent: var(--amber-light);
+		--dark-bg: #0d0800;
+		--dark-secondary: #08090a;
+		--dark-tertiary: #08090a;
+		--text-primary: var(--text);
+		--text-secondary: rgba(236, 234, 229, 0.6);
+		--gold-border: var(--border-strong);
 
 		max-width: 1400px;
 		margin: 0 auto;
@@ -332,7 +332,7 @@
 		background: transparent;
 		border: 1px solid var(--gold-border);
 		color: var(--text-primary);
-		font-family: 'Poppins', sans-serif;
+		font-family: var(--font-body);
 		font-size: 0.9rem;
 		cursor: pointer;
 		border-radius: 8px;
@@ -342,7 +342,7 @@
 	.btn-back:hover {
 		border-color: var(--gold-accent);
 		color: var(--gold-accent);
-		background: rgba(232, 197, 71, 0.05);
+		background: rgba(232, 165, 53, 0.05);
 	}
 
 	.header-content {
@@ -382,6 +382,8 @@
 	}
 
 	.price-display {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 		text-align: right;
 	}
 
@@ -393,17 +395,19 @@
 	}
 
 	.price-change {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 		margin: 0;
 		font-size: 0.95rem;
 		font-weight: 500;
 	}
 
 	.price-change.positive {
-		color: #4ade80;
+		color: var(--green);
 	}
 
 	.price-change.negative {
-		color: #f87171;
+		color: var(--red);
 	}
 
 	.actions {
@@ -416,7 +420,7 @@
 		padding: 0.75rem 1.5rem;
 		border: none;
 		border-radius: 8px;
-		font-family: 'Poppins', sans-serif;
+		font-family: var(--font-body);
 		font-size: 0.9rem;
 		font-weight: 600;
 		cursor: pointer;
@@ -425,12 +429,12 @@
 
 	.btn-primary {
 		background: linear-gradient(135deg, var(--gold) 0%, var(--gold-accent) 100%);
-		color: #0f1419;
+		color: #0d0800;
 	}
 
 	.btn-primary:hover {
 		transform: translateY(-2px);
-		box-shadow: 0 8px 24px rgba(212, 175, 55, 0.3);
+		box-shadow: 0 8px 24px rgba(212, 145, 42, 0.3);
 	}
 
 	.btn-secondary {
@@ -441,24 +445,24 @@
 
 	.btn-secondary:hover {
 		border-color: var(--gold-accent);
-		background: rgba(232, 197, 71, 0.05);
+		background: rgba(232, 165, 53, 0.05);
 		color: var(--gold-accent);
 	}
 
 	.btn-danger {
 		background: transparent;
-		border: 1px solid rgba(248, 113, 113, 0.3);
-		color: #f87171;
+		border: 1px solid rgba(224, 90, 90, 0.3);
+		color: var(--red);
 	}
 
 	.btn-danger:hover {
-		border-color: #f87171;
-		background: rgba(248, 113, 113, 0.1);
+		border-color: var(--red);
+		background: rgba(224, 90, 90, 0.1);
 	}
 
 	/* Panels */
 	.panel {
-		background: rgba(26, 31, 46, 0.6);
+		background: rgba(255, 255, 255, 0.03);
 		backdrop-filter: blur(16px);
 		border: 1px solid var(--gold-border);
 		border-radius: 12px;
@@ -473,7 +477,7 @@
 		gap: 1rem;
 		margin-bottom: 1.5rem;
 		padding-bottom: 1rem;
-		border-bottom: 1px solid rgba(212, 175, 55, 0.08);
+		border-bottom: 1px solid var(--border);
 	}
 
 	.panel-header h2 {
@@ -496,8 +500,8 @@
 	}
 
 	.metric-card {
-		background: linear-gradient(135deg, rgba(232, 197, 71, 0.06) 0%, rgba(212, 175, 55, 0.03) 100%);
-		border: 1px solid rgba(212, 175, 55, 0.2);
+		background: rgba(212, 145, 42, 0.06);
+		border: 1px solid rgba(212, 145, 42, 0.2);
 		border-radius: 10px;
 		padding: 1.25rem;
 		text-align: center;
@@ -505,12 +509,12 @@
 	}
 
 	.metric-card:hover {
-		border-color: rgba(212, 175, 55, 0.4);
+		border-color: rgba(212, 145, 42, 0.4);
 		transform: translateY(-2px);
 	}
 
 	.metric-card.gain {
-		border-color: rgba(212, 175, 55, 0.25);
+		border-color: rgba(212, 145, 42, 0.25);
 	}
 
 	.metric-label {
@@ -523,6 +527,8 @@
 	}
 
 	.metric-value {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 		margin: 0;
 		font-size: 1.35rem;
 		font-weight: 700;
@@ -530,11 +536,11 @@
 	}
 
 	.metric-value.positive {
-		color: #4ade80;
+		color: var(--green);
 	}
 
 	.metric-value.negative {
-		color: #f87171;
+		color: var(--red);
 	}
 
 	.metric-unit {
@@ -551,11 +557,11 @@
 	}
 
 	.metric-pct.positive {
-		color: #4ade80;
+		color: var(--green);
 	}
 
 	.metric-pct.negative {
-		color: #f87171;
+		color: var(--red);
 	}
 
 	/* Performance Grid */
@@ -566,8 +572,8 @@
 	}
 
 	.perf-card {
-		background: rgba(16, 20, 30, 0.4);
-		border: 1px solid rgba(212, 175, 55, 0.1);
+		background: rgba(255, 255, 255, 0.022);
+		border: 1px solid var(--border);
 		border-radius: 10px;
 		padding: 1.25rem;
 		text-align: center;
@@ -590,29 +596,29 @@
 	}
 
 	.perf-value.positive {
-		color: #4ade80;
+		color: var(--green);
 	}
 
 	.perf-value.negative {
-		color: #f87171;
+		color: var(--red);
 	}
 
 	.risk-moderate {
-		color: #fbbf24;
+		color: var(--amber-light);
 	}
 
 	.risk-high {
-		color: #f87171;
+		color: var(--red);
 	}
 
 	.risk-low {
-		color: #4ade80;
+		color: var(--green);
 	}
 
 	.bar-wrap {
 		width: 100%;
 		height: 4px;
-		background: rgba(212, 175, 55, 0.1);
+		background: var(--border);
 		border-radius: 2px;
 		margin-top: 0.5rem;
 		overflow: hidden;
@@ -651,13 +657,13 @@
 		grid-template-columns: 100px 80px 100px 120px 120px;
 		gap: 1rem;
 		padding: 1rem;
-		border-bottom: 1px solid rgba(212, 175, 55, 0.08);
+		border-bottom: 1px solid var(--border);
 		align-items: center;
 		transition: background 0.2s ease;
 	}
 
 	.table-row:hover {
-		background: rgba(232, 197, 71, 0.03);
+		background: rgba(232, 165, 53, 0.03);
 	}
 
 	.table-row:last-child {
@@ -679,11 +685,11 @@
 	}
 
 	.type-buy {
-		color: #4ade80;
+		color: var(--green);
 	}
 
 	.type-sell {
-		color: #f87171;
+		color: var(--red);
 	}
 
 	.qty {
@@ -692,6 +698,8 @@
 	}
 
 	.price {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 		color: var(--gold-accent);
 		font-weight: 500;
 	}
@@ -811,7 +819,7 @@
 		}
 
 		.table-row {
-			background: rgba(16, 20, 30, 0.4);
+			background: rgba(255, 255, 255, 0.022);
 			border: 1px solid var(--gold-border);
 			border-radius: 8px;
 			margin-bottom: 1rem;

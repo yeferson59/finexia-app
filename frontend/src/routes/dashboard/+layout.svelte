@@ -9,6 +9,7 @@
 </script>
 
 <div class="dashboard-container">
+	<div class="dashboard-scanlines" aria-hidden="true"></div>
 	<DashboardHeader bind:sidebarOpen {data} />
 	<Sidebar {sidebarOpen} />
 	{#if sidebarOpen}
@@ -28,13 +29,33 @@
 
 <style>
 	.dashboard-container {
+		position: relative;
 		display: flex;
 		min-height: 100dvh;
-		background: linear-gradient(135deg, #0f1419 0%, #16191f 50%, #0f1419 100%);
-		color: #e0e0e0;
+		background:
+			radial-gradient(ellipse 80% 50% at 70% -10%, rgba(212, 145, 42, 0.06), transparent 60%),
+			var(--bg);
+		color: var(--text);
+	}
+
+	/* Subtle film-grain scanline texture carried over from the landing page */
+	.dashboard-scanlines {
+		position: fixed;
+		inset: 0;
+		z-index: 0;
+		pointer-events: none;
+		background: repeating-linear-gradient(
+			0deg,
+			transparent,
+			transparent 3px,
+			rgba(255, 255, 255, 0.006) 3px,
+			rgba(255, 255, 255, 0.006) 4px
+		);
 	}
 
 	.dashboard-main {
+		position: relative;
+		z-index: 1;
 		flex: 1;
 		display: flex;
 		flex-direction: column;

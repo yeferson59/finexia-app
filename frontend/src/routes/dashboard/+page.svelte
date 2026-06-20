@@ -15,8 +15,11 @@
 </svelte:head>
 
 <header class="dashboard-header-section">
-	<h1 id="dashboard-title" class="dashboard-title">Dashboard</h1>
-	<p class="dashboard-subtitle">Bienvenido de vuelta, {data.user.name}</p>
+	<p class="dashboard-eyebrow">Resumen</p>
+	<h1 id="dashboard-title" class="dashboard-title">
+		Hola, <em>{data.user.name}</em>
+	</h1>
+	<p class="dashboard-subtitle">Aquí está tu patrimonio, de un vistazo.</p>
 </header>
 
 <section class="net-worth-section" aria-labelledby="dashboard-title">
@@ -39,23 +42,41 @@
 
 <style>
 	.dashboard-header-section {
-		margin-bottom: 2rem;
-		padding-bottom: 1.5rem;
-		border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+		margin-bottom: 2.5rem;
+		padding-bottom: 1.75rem;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.dashboard-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.6875rem;
+		font-weight: 500;
+		letter-spacing: 0.2em;
+		text-transform: uppercase;
+		color: var(--amber);
+		margin: 0 0 0.75rem 0;
 	}
 
 	.dashboard-title {
-		font-size: 2.5rem;
-		font-weight: 700;
-		color: #d4af37;
-		margin: 0 0 0.5rem 0;
-		letter-spacing: 0.5px;
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-family: var(--font-display);
+		font-size: clamp(2rem, 4vw, 2.75rem);
+		font-weight: 300;
+		line-height: 1.05;
+		letter-spacing: -0.02em;
+		color: var(--text);
+		margin: 0 0 0.6rem 0;
+	}
+
+	.dashboard-title em {
+		font-style: italic;
+		font-weight: 500;
+		color: var(--amber-light);
 	}
 
 	.dashboard-subtitle {
-		font-size: 1rem;
-		color: rgba(224, 224, 224, 0.6);
+		font-size: 0.95rem;
+		font-weight: 300;
+		color: var(--text-muted);
 		margin: 0;
 	}
 
@@ -101,19 +122,15 @@
 		}
 	}
 
-	@media (max-width: 1024px) {
-		.content-grid {
-			grid-template-columns: 1fr;
-		}
-
-		.dashboard-title {
-			font-size: 2rem;
+	@media (prefers-reduced-motion: reduce) {
+		.grid-item {
+			animation: none;
 		}
 	}
 
-	@media (max-width: 768px) {
-		.dashboard-title {
-			font-size: 1.75rem;
+	@media (max-width: 1024px) {
+		.content-grid {
+			grid-template-columns: 1fr;
 		}
 	}
 </style>

@@ -2,7 +2,13 @@
 	import { goto } from '$app/navigation';
 
 	const opportunities = [
-		{ id: '1', name: 'Fondo Crecimiento Tecnológico', risk: 'Medio', roi: '15.2%', horizon: '24 meses' },
+		{
+			id: '1',
+			name: 'Fondo Crecimiento Tecnológico',
+			risk: 'Medio',
+			roi: '15.2%',
+			horizon: '24 meses'
+		},
 		{ id: '2', name: 'ETF Mercados Emergentes', risk: 'Alto', roi: '18.5%', horizon: '36 meses' },
 		{ id: '3', name: 'Energía Renovable', risk: 'Bajo', roi: '8.1%', horizon: '24 meses' }
 	];
@@ -28,7 +34,14 @@
 			<p class="page-subtitle">Descubre oportunidades alineadas con tu perfil y objetivos.</p>
 		</div>
 		<button onclick={addNewProduct} class="btn-add-product">
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
 				<path d="M12 5v14M5 12h14" />
 			</svg>
 			Agregar Producto
@@ -60,8 +73,8 @@
 			<span></span>
 		</div>
 		{#each opportunities as item (item.id)}
-			<button 
-				class="row row-interactive" 
+			<button
+				class="row row-interactive"
 				onclick={() => viewDetails(item.id)}
 				aria-label={`Ver detalles de ${item.name}`}
 			>
@@ -79,7 +92,7 @@
 	.page-header {
 		margin-bottom: 2rem;
 		padding-bottom: 1.5rem;
-		border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+		border-bottom: 1px solid var(--border);
 	}
 
 	.header-top {
@@ -93,15 +106,15 @@
 	.page-title {
 		margin: 0 0 0.5rem;
 		font-size: 2.35rem;
-		font-weight: 700;
-		letter-spacing: 0.5px;
-		color: #d4af37;
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-weight: 300;
+		letter-spacing: -0.02em;
+		color: var(--text);
+		font-family: var(--font-display);
 	}
 
 	.page-subtitle {
 		margin: 0;
-		color: rgba(224, 224, 224, 0.62);
+		color: rgba(236, 234, 229, 0.62);
 	}
 
 	.btn-add-product {
@@ -111,10 +124,10 @@
 		padding: 0.85rem 1.5rem;
 		border: none;
 		border-radius: 10px;
-		background: linear-gradient(135deg, #d4af37, #e8c547);
-		color: #0f1419;
+		background: var(--amber);
+		color: #0d0800;
 		font-weight: 700;
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-family: var(--font-body);
 		font-size: 0.95rem;
 		cursor: pointer;
 		transition: all 0.3s ease;
@@ -124,13 +137,13 @@
 
 	.btn-add-product:hover {
 		transform: translateY(-2px);
-		box-shadow: 0 10px 25px rgba(212, 175, 55, 0.25);
+		box-shadow: 0 10px 25px rgba(212, 145, 42, 0.25);
 	}
 
 	.panel {
-		border: 1px solid rgba(212, 175, 55, 0.15);
+		border: 1px solid var(--border-strong);
 		border-radius: 16px;
-		background: linear-gradient(135deg, rgba(26, 31, 46, 0.9) 0%, rgba(32, 39, 56, 0.9) 100%);
+		background: var(--surface);
 		box-shadow:
 			0 20px 60px rgba(0, 0, 0, 0.3),
 			inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -151,17 +164,17 @@
 		font-size: 0.72rem;
 		letter-spacing: 0.7px;
 		text-transform: uppercase;
-		color: rgba(224, 224, 224, 0.46);
+		color: rgba(236, 234, 229, 0.46);
 	}
 
 	.spotlight h2 {
 		margin: 0;
-		color: #e8c547;
+		color: var(--amber-light);
 	}
 
 	.spotlight p {
 		margin: 0.6rem 0 0;
-		color: rgba(224, 224, 224, 0.62);
+		color: rgba(236, 234, 229, 0.62);
 		max-width: 62ch;
 	}
 
@@ -169,8 +182,8 @@
 		border: none;
 		border-radius: 8px;
 		padding: 0.8rem 1.2rem;
-		background: linear-gradient(135deg, #d4af37, #e8c547);
-		color: #0f1419;
+		background: var(--amber);
+		color: #0d0800;
 		font-weight: 700;
 		cursor: pointer;
 	}
@@ -181,7 +194,7 @@
 
 	.table-head h2 {
 		margin: 0 0 1rem;
-		color: #e0e0e0;
+		color: var(--text);
 		font-size: 1.15rem;
 	}
 
@@ -196,16 +209,16 @@
 		gap: 0.7rem;
 		padding: 0.85rem;
 		border-radius: 10px;
-		background: rgba(15, 20, 25, 0.42);
+		background: rgba(255, 255, 255, 0.022);
 	}
 
 	.row.heading {
-		background: rgba(212, 175, 55, 0.12);
+		background: rgba(212, 145, 42, 0.12);
 		font-size: 0.75rem;
 		font-weight: 700;
 		letter-spacing: 0.5px;
 		text-transform: uppercase;
-		color: rgba(224, 224, 224, 0.75);
+		color: rgba(236, 234, 229, 0.75);
 	}
 
 	.row.row-interactive {
@@ -219,7 +232,7 @@
 	}
 
 	.row.row-interactive:hover {
-		background: rgba(212, 175, 55, 0.15);
+		background: var(--border-strong);
 		transform: translateX(4px);
 	}
 
@@ -227,7 +240,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: #d4af37;
+		color: var(--amber);
 		font-weight: 700;
 		opacity: 0;
 		transition: opacity 0.3s ease;
@@ -239,11 +252,11 @@
 
 	.row span {
 		font-size: 0.85rem;
-		color: #e0e0e0;
+		color: var(--text);
 	}
 
 	.positive {
-		color: #2ecc71;
+		color: var(--green);
 	}
 
 	@media (max-width: 768px) {

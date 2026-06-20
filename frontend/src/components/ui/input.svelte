@@ -42,8 +42,6 @@
 		isFocused = true;
 		onfocus?.(e);
 	};
-
-
 </script>
 
 <div class="input-wrapper">
@@ -84,7 +82,7 @@
 	.input-label {
 		font-size: 0.875rem;
 		font-weight: 500;
-		color: #e0e0e0;
+		color: var(--text);
 		letter-spacing: 0.3px;
 	}
 
@@ -93,48 +91,48 @@
 		padding: 0.875rem 1rem;
 		padding-right: 3rem;
 		border-radius: 8px;
-		border: 1px solid rgba(212, 175, 55, 0.2);
-		background: rgba(26, 31, 46, 0.5);
-		color: #e0e0e0;
+		border: 1px solid rgba(212, 145, 42, 0.2);
+		background: rgba(255, 255, 255, 0.03);
+		color: var(--text);
 		font-size: 0.95rem;
-		font-family: 'Lato', system-ui, sans-serif;
+		font-family: var(--font-body);
 		transition: all 0.25s ease;
 		outline: none;
 		box-sizing: border-box;
 	}
 
 	.input-field::placeholder {
-		color: rgba(224, 224, 224, 0.4);
+		color: rgba(236, 234, 229, 0.4);
 	}
 
 	.input-field:hover:not(:disabled) {
-		border-color: rgba(212, 175, 55, 0.35);
-		background: rgba(26, 31, 46, 0.7);
+		border-color: rgba(212, 145, 42, 0.35);
+		background: rgba(255, 255, 255, 0.03);
 	}
 
 	.input-field:focus {
-		border-color: #d4af37;
-		background: rgba(26, 31, 46, 0.9);
-		box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+		border-color: var(--amber);
+		background: rgba(255, 255, 255, 0.03);
+		box-shadow: 0 0 0 3px var(--border);
 	}
 
 	.input-field.input-error {
-		border-color: #e74c3c;
+		border-color: var(--red);
 	}
 
 	.input-field.input-error:focus {
-		box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
+		box-shadow: 0 0 0 3px rgba(224, 90, 90, 0.1);
 	}
 
 	.input-field:disabled {
-		background: rgba(26, 31, 46, 0.3);
-		color: rgba(224, 224, 224, 0.5);
+		background: rgba(255, 255, 255, 0.03);
+		color: rgba(236, 234, 229, 0.5);
 		cursor: not-allowed;
 	}
 
 	.input-error-text {
 		font-size: 0.8rem;
-		color: #e74c3c;
+		color: var(--red);
 		letter-spacing: 0.2px;
 	}
 </style>

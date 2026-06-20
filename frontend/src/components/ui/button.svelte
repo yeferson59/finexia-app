@@ -61,7 +61,7 @@
 
 <style>
 	button {
-		font-family: 'Poppins', sans-serif;
+		font-family: var(--font-body);
 		border: none;
 		cursor: pointer;
 		border-radius: 8px;
@@ -77,15 +77,15 @@
 
 	/* Primary variant */
 	.btn-primary {
-		background: #d4af37;
-		color: #0f1419;
-		box-shadow: 0 4px 16px rgba(212, 175, 55, 0.2);
+		background: var(--amber);
+		color: #0d0800;
+		box-shadow: 0 4px 16px rgba(212, 145, 42, 0.2);
 	}
 
 	.btn-primary:hover:not(:disabled) {
-		background: #e8c547;
+		background: var(--amber-light);
 		transform: translateY(-2px);
-		box-shadow: 0 6px 24px rgba(212, 175, 55, 0.35);
+		box-shadow: 0 6px 24px rgba(212, 145, 42, 0.35);
 	}
 
 	.btn-primary:active:not(:disabled) {
@@ -95,38 +95,38 @@
 	/* Secondary variant */
 	.btn-secondary {
 		background: transparent;
-		border: 1.5px solid #d4af37;
-		color: #d4af37;
+		border: 1.5px solid var(--amber);
+		color: var(--amber);
 	}
 
 	.btn-secondary:hover:not(:disabled) {
-		background: rgba(212, 175, 55, 0.1);
-		border-color: #e8c547;
-		color: #e8c547;
+		background: var(--border);
+		border-color: var(--amber-light);
+		color: var(--amber-light);
 	}
 
 	/* Ghost variant */
 	.btn-ghost {
 		background: transparent;
-		border: 1.5px solid rgba(224, 224, 224, 0.2);
-		color: #e0e0e0;
+		border: 1.5px solid rgba(236, 234, 229, 0.2);
+		color: var(--text);
 	}
 
 	.btn-ghost:hover:not(:disabled) {
-		background: rgba(212, 175, 55, 0.1);
-		border-color: #d4af37;
-		color: #d4af37;
+		background: var(--border);
+		border-color: var(--amber);
+		color: var(--amber);
 	}
 
 	/* Tertiary variant */
 	.btn-tertiary {
 		background: transparent;
-		color: #d4af37;
+		color: var(--amber);
 		font-size: 0.9rem;
 	}
 
 	.btn-tertiary:hover:not(:disabled) {
-		color: #e8c547;
+		color: var(--amber-light);
 	}
 
 	/* Sizes */
@@ -163,8 +163,8 @@
 		position: absolute;
 		width: 16px;
 		height: 16px;
-		border: 2px solid rgba(212, 175, 55, 0.3);
-		border-top-color: #d4af37;
+		border: 2px solid rgba(212, 145, 42, 0.3);
+		border-top-color: var(--amber);
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 	}

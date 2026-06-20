@@ -2,6 +2,67 @@
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
+/*
+ * Finexia design tokens — single source of truth shared by the marketing
+ * landing page and the authenticated dashboard. Editorial near-black canvas,
+ * a single muted amber accent, green for gains, and a serif/mono/sans trio.
+ */
+:root {
+	--bg: #08090a;
+	--surface: rgba(255, 255, 255, 0.028);
+	--surface-2: rgba(255, 255, 255, 0.05);
+	--surface-3: rgba(255, 255, 255, 0.075);
+	--border: rgba(255, 255, 255, 0.07);
+	--border-strong: rgba(255, 255, 255, 0.12);
+	--text: #eceae5;
+	--text-muted: #8a8780;
+	--text-dim: #555250;
+	--amber: #d4912a;
+	--amber-light: #e8a535;
+	--green: #22c97e;
+	--red: #e05a5a;
+	--font-display: 'Fraunces', Georgia, serif;
+	--font-mono: 'JetBrains Mono', 'Courier New', monospace;
+	--font-body: 'Outfit', system-ui, sans-serif;
+}
+
+@layer base {
+	body {
+		background: var(--bg);
+		color: var(--text);
+		font-family: var(--font-body);
+		-webkit-font-smoothing: antialiased;
+	}
+
+	::selection {
+		background: rgba(212, 145, 42, 0.25);
+		color: #fff;
+	}
+}
+
+/*
+ * Form controls: @tailwindcss/forms paints checked checkboxes/radios from the
+ * `color` property (not accent-color), so set both to keep them on-palette.
+ * Unlayered so it wins over the plugin's base-layer defaults.
+ */
+input[type='checkbox'],
+input[type='radio'] {
+	accent-color: var(--amber);
+	color: var(--amber);
+}
+
+input[type='checkbox']:focus-visible,
+input[type='radio']:focus-visible,
+a:focus-visible,
+button:focus-visible,
+[role='button']:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+	outline: 2px solid var(--amber);
+	outline-offset: 2px;
+}
+
 @layer components {
 	.rounded-12 {
 		@apply rounded-[12px];

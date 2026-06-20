@@ -1,10 +1,10 @@
 <script lang="ts">
 	const assets = [
-		{ name: 'Acciones', value: 450000, percent: 36, color: '#d4af37' },
-		{ name: 'Bonos', value: 350000, percent: 28, color: '#2ecc71' },
-		{ name: 'Fondos Mutuos', value: 250000, percent: 20, color: '#3498db' },
-		{ name: 'Inmuebles', value: 150000, percent: 12, color: '#9b59b6' },
-		{ name: 'Efectivo', value: 50000, percent: 4, color: '#e74c3c' }
+		{ name: 'Acciones', value: 450000, percent: 36, color: '#d4912a' },
+		{ name: 'Bonos', value: 350000, percent: 28, color: '#22c97e' },
+		{ name: 'Fondos Mutuos', value: 250000, percent: 20, color: '#6b8cef' },
+		{ name: 'Inmuebles', value: 150000, percent: 12, color: '#b988e0' },
+		{ name: 'Efectivo', value: 50000, percent: 4, color: '#8a8780' }
 	];
 
 	function polarToCartesian(angle: number, radius: number, cx = 100, cy = 100) {
@@ -17,7 +17,7 @@
 
 	function generatePieSlice(
 		percent: number,
-		startAngle: number,
+		startAngle: number
 	): { d: string; startAngle: number; endAngle: number } {
 		const cx = 100;
 		const cy = 100;
@@ -48,22 +48,39 @@
 
 <div class="asset-card">
 	<div class="card-header">
+		<p class="card-eyebrow">Distribución</p>
 		<h2 class="card-title">Asignación de Activos</h2>
 	</div>
 
 	<div class="pie-container">
 		<svg class="pie-chart" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
 			{#each slices as slice (slice.name)}
-				<path d={slice.d} fill={slice.color} fill-opacity="0.85" stroke="rgba(15, 20, 25, 0.95)" stroke-width="2" />
+				<path d={slice.d} fill={slice.color} fill-opacity="0.9" stroke="#08090a" stroke-width="2" />
 			{/each}
 
 			<!-- Center circle -->
-			<circle cx="100" cy="100" r="45" fill="rgba(15, 20, 25, 0.95)" />
-			<text x="100" y="98" text-anchor="middle" fill="#d4af37" font-size="22" font-weight="700" font-family="'Poppins', sans-serif">
+			<circle cx="100" cy="100" r="45" fill="#08090a" />
+			<text
+				x="100"
+				y="98"
+				text-anchor="middle"
+				fill="#e8a535"
+				font-size="20"
+				font-weight="600"
+				font-family="'JetBrains Mono', monospace"
+			>
 				100%
 			</text>
-			<text x="100" y="113" text-anchor="middle" fill="rgba(224, 224, 224, 0.5)" font-size="9" font-family="'Lato', sans-serif">
-				Diversificado
+			<text
+				x="100"
+				y="114"
+				text-anchor="middle"
+				fill="#8a8780"
+				font-size="8"
+				letter-spacing="1"
+				font-family="'JetBrains Mono', monospace"
+			>
+				DIVERSIFICADO
 			</text>
 		</svg>
 
@@ -73,7 +90,9 @@
 					<div class="legend-color" style="background-color: {asset.color}"></div>
 					<div class="legend-text">
 						<p class="legend-label">{asset.name}</p>
-						<p class="legend-value">${new Intl.NumberFormat('es-CO').format(asset.value)} ({asset.percent}%)</p>
+						<p class="legend-value">
+							${new Intl.NumberFormat('es-CO').format(asset.value)} ({asset.percent}%)
+						</p>
 					</div>
 				</div>
 			{/each}
@@ -87,14 +106,11 @@
 
 <style>
 	.asset-card {
-		background: linear-gradient(135deg, rgba(26, 31, 46, 0.9) 0%, rgba(32, 39, 56, 0.9) 100%);
-		border: 1px solid rgba(212, 175, 55, 0.15);
-		border-radius: 16px;
+		background: var(--surface);
+		border: 1px solid var(--border-strong);
+		border-radius: 14px;
 		padding: 2rem;
-		box-shadow: 
-			0 20px 60px rgba(0, 0, 0, 0.3),
-			inset 0 1px 0 rgba(255, 255, 255, 0.05);
-		backdrop-filter: blur(16px);
+		backdrop-filter: blur(10px);
 		display: flex;
 		flex-direction: column;
 		height: 100%;
@@ -102,16 +118,27 @@
 
 	.card-header {
 		margin-bottom: 1.5rem;
-		padding-bottom: 1rem;
-		border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+		padding-bottom: 1.25rem;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.card-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.625rem;
+		font-weight: 500;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		color: var(--text-dim);
+		margin: 0 0 0.4rem 0;
 	}
 
 	.card-title {
-		font-size: 1.25rem;
-		font-weight: 700;
-		color: #e0e0e0;
+		font-family: var(--font-display);
+		font-size: 1.15rem;
+		font-weight: 500;
+		letter-spacing: -0.01em;
+		color: var(--text);
 		margin: 0;
-		letter-spacing: 0.5px;
 	}
 
 	.pie-container {
@@ -146,12 +173,12 @@
 	}
 
 	.legend-item:hover {
-		background: rgba(212, 175, 55, 0.1);
+		background: var(--surface);
 	}
 
 	.legend-color {
-		width: 12px;
-		height: 12px;
+		width: 10px;
+		height: 10px;
 		border-radius: 3px;
 		flex-shrink: 0;
 	}
@@ -163,45 +190,48 @@
 
 	.legend-label {
 		font-size: 0.8rem;
-		font-weight: 600;
-		color: #e0e0e0;
+		font-weight: 500;
+		color: var(--text);
 		margin: 0;
-		letter-spacing: 0.3px;
 	}
 
 	.legend-value {
+		font-family: var(--font-mono);
 		font-size: 0.7rem;
-		color: rgba(224, 224, 224, 0.5);
+		color: var(--text-dim);
 		margin: 0;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.card-footer {
-		border-top: 1px solid rgba(212, 175, 55, 0.1);
+		border-top: 1px solid var(--border);
 		padding-top: 1.5rem;
 	}
 
 	.footer-button {
 		width: 100%;
-		padding: 0.875rem 1.5rem;
+		padding: 0.75rem 1.5rem;
 		background: transparent;
-		border: 1.5px solid rgba(212, 175, 55, 0.2);
-		color: #e0e0e0;
-		border-radius: 8px;
+		border: 1px solid var(--border-strong);
+		color: var(--text);
+		border-radius: 6px;
 		font-weight: 600;
-		font-size: 0.9rem;
+		font-size: 0.85rem;
 		cursor: pointer;
-		transition: all 0.25s ease;
-		font-family: 'Poppins', system-ui, sans-serif;
-		letter-spacing: 0.3px;
+		transition:
+			background 0.2s ease,
+			border-color 0.2s ease,
+			color 0.2s ease;
+		font-family: var(--font-body);
 	}
 
 	.footer-button:hover {
-		background: rgba(212, 175, 55, 0.1);
-		border-color: rgba(212, 175, 55, 0.3);
-		color: #d4af37;
+		background: rgba(212, 145, 42, 0.06);
+		border-color: rgba(212, 145, 42, 0.4);
+		color: var(--amber-light);
 	}
 
 	@media (max-width: 1024px) {

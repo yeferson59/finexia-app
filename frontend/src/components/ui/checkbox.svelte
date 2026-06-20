@@ -21,7 +21,6 @@
 		class: className = '',
 		...rest
 	}: Props = $props();
-
 </script>
 
 <div class="checkbox-wrapper">
@@ -54,9 +53,9 @@
 		appearance: none;
 		width: 20px;
 		height: 20px;
-		border: 1.5px solid rgba(212, 175, 55, 0.3);
+		border: 1.5px solid rgba(212, 145, 42, 0.3);
 		border-radius: 6px;
-		background: rgba(26, 31, 46, 0.5);
+		background: rgba(255, 255, 255, 0.03);
 		cursor: pointer;
 		transition: all 0.25s ease;
 		position: relative;
@@ -64,12 +63,12 @@
 	}
 
 	.checkbox-input:hover:not(:disabled) {
-		border-color: rgba(212, 175, 55, 0.5);
+		border-color: rgba(212, 145, 42, 0.5);
 	}
 
 	.checkbox-input:checked {
-		background: #d4af37;
-		border-color: #d4af37;
+		background: var(--amber);
+		border-color: var(--amber);
 	}
 
 	.checkbox-input:checked::after {
@@ -78,14 +77,14 @@
 		top: 50%;
 		left: 50%;
 		transform: translate(-50%, -50%);
-		color: #0f1419;
+		color: #0d0800;
 		font-size: 0.875rem;
 		font-weight: 700;
 	}
 
 	.checkbox-input:focus {
 		outline: none;
-		box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+		box-shadow: 0 0 0 3px var(--border);
 	}
 
 	.checkbox-input:disabled {
@@ -95,7 +94,7 @@
 
 	.checkbox-label {
 		font-size: 0.8rem;
-		color: #e0e0e0;
+		color: var(--text);
 		cursor: pointer;
 		transition: color 0.25s ease;
 		letter-spacing: 0.2px;
@@ -103,6 +102,6 @@
 	}
 
 	.checkbox-input:hover:not(:disabled) ~ .checkbox-label {
-		color: #d4af37;
+		color: var(--amber);
 	}
 </style>

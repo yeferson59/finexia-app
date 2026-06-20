@@ -47,26 +47,27 @@
 	.page-header {
 		margin-bottom: 2rem;
 		padding-bottom: 1.5rem;
-		border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+		border-bottom: 1px solid var(--border);
 	}
 
 	.page-title {
 		margin: 0 0 0.5rem;
 		font-size: 2.35rem;
-		font-weight: 700;
-		color: #d4af37;
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-weight: 300;
+		color: var(--text);
+		font-family: var(--font-display);
+		letter-spacing: -0.02em;
 	}
 
 	.page-subtitle {
 		margin: 0;
-		color: rgba(224, 224, 224, 0.62);
+		color: rgba(236, 234, 229, 0.62);
 	}
 
 	.panel {
-		border: 1px solid rgba(212, 175, 55, 0.15);
+		border: 1px solid var(--border-strong);
 		border-radius: 16px;
-		background: linear-gradient(135deg, rgba(26, 31, 46, 0.9) 0%, rgba(32, 39, 56, 0.9) 100%);
+		background: var(--surface);
 		box-shadow:
 			0 20px 60px rgba(0, 0, 0, 0.3),
 			inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -83,13 +84,13 @@
 	.setting-block {
 		padding: 1rem;
 		border-radius: 12px;
-		background: rgba(15, 20, 25, 0.45);
+		background: rgba(255, 255, 255, 0.022);
 	}
 
 	.setting-block h2 {
 		margin: 0 0 1rem;
 		font-size: 1rem;
-		color: #e0e0e0;
+		color: var(--text);
 	}
 
 	.toggle-row {
@@ -98,19 +99,19 @@
 		align-items: center;
 		margin-bottom: 0.85rem;
 		font-size: 0.86rem;
-		color: rgba(224, 224, 224, 0.7);
+		color: rgba(236, 234, 229, 0.7);
 	}
 
 	input[type='checkbox'] {
 		width: 18px;
 		height: 18px;
-		accent-color: #d4af37;
+		accent-color: var(--amber);
 	}
 
 	.hint {
 		margin: 0;
 		font-size: 0.8rem;
-		color: rgba(224, 224, 224, 0.5);
+		color: rgba(236, 234, 229, 0.5);
 	}
 
 	.action {
@@ -119,16 +120,16 @@
 		border: none;
 		border-radius: 8px;
 		padding: 0.75rem;
-		background: linear-gradient(135deg, #d4af37, #e8c547);
-		color: #0f1419;
+		background: var(--amber);
+		color: #0d0800;
 		font-weight: 700;
 		cursor: pointer;
 	}
 
 	.action.secondary {
-		background: rgba(212, 175, 55, 0.12);
-		color: #e0e0e0;
-		border: 1px solid rgba(212, 175, 55, 0.25);
+		background: rgba(212, 145, 42, 0.12);
+		color: var(--text);
+		border: 1px solid rgba(212, 145, 42, 0.25);
 	}
 
 	@media (max-width: 1024px) {

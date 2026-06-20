@@ -134,21 +134,21 @@
 	.page-header {
 		margin-bottom: 2rem;
 		padding-bottom: 1.5rem;
-		border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+		border-bottom: 1px solid var(--border);
 	}
 
 	.page-title {
 		margin: 0 0 0.5rem;
 		font-size: 2.5rem;
-		font-weight: 700;
-		letter-spacing: 0.5px;
-		color: #d4af37;
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-weight: 300;
+		letter-spacing: -0.02em;
+		color: var(--text);
+		font-family: var(--font-display);
 	}
 
 	.page-subtitle {
 		margin: 0;
-		color: rgba(224, 224, 224, 0.62);
+		color: rgba(236, 234, 229, 0.62);
 		font-size: 1rem;
 	}
 
@@ -167,10 +167,10 @@
 		padding: 0.85rem 1.5rem;
 		border: none;
 		border-radius: 10px;
-		background: linear-gradient(135deg, #d4af37, #e8c547);
-		color: #0f1419;
+		background: var(--amber);
+		color: #0d0800;
 		font-weight: 700;
-		font-family: 'Poppins', system-ui, sans-serif;
+		font-family: var(--font-body);
 		font-size: 0.95rem;
 		cursor: pointer;
 		transition: all 0.3s ease;
@@ -180,7 +180,7 @@
 
 	.btn-create-portfolio:hover {
 		transform: translateY(-2px);
-		box-shadow: 0 10px 25px rgba(212, 175, 55, 0.25);
+		box-shadow: 0 10px 25px rgba(212, 145, 42, 0.25);
 	}
 
 	.summary-cards {
@@ -199,29 +199,31 @@
 		font-size: 0.72rem;
 		letter-spacing: 0.7px;
 		text-transform: uppercase;
-		color: rgba(224, 224, 224, 0.46);
+		color: rgba(236, 234, 229, 0.46);
 	}
 
 	.hero-value {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 		margin: 0;
 		font-size: 1.6rem;
-		color: #e0e0e0;
+		color: var(--text);
 	}
 
 	.hero-delta {
 		margin: 0.4rem 0 0;
 		font-size: 0.82rem;
-		color: rgba(224, 224, 224, 0.55);
+		color: rgba(236, 234, 229, 0.55);
 	}
 
 	.hero-delta.positive {
-		color: #2ecc71;
+		color: var(--green);
 	}
 
 	.panel {
-		border: 1px solid rgba(212, 175, 55, 0.15);
+		border: 1px solid var(--border-strong);
 		border-radius: 16px;
-		background: linear-gradient(135deg, rgba(26, 31, 46, 0.9) 0%, rgba(32, 39, 56, 0.9) 100%);
+		background: var(--surface);
 		box-shadow:
 			0 20px 60px rgba(0, 0, 0, 0.3),
 			inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -234,8 +236,9 @@
 
 	.section-title {
 		font-size: 1.3rem;
-		font-weight: 600;
-		color: #e0e0e0;
+		font-weight: 400;
+		color: var(--text);
+		font-family: var(--font-display);
 		margin: 0 0 1.5rem;
 	}
 
@@ -251,9 +254,9 @@
 		flex-direction: column;
 		gap: 1rem;
 		padding: 1.35rem;
-		border: 1px solid rgba(212, 175, 55, 0.15);
+		border: 1px solid var(--border-strong);
 		border-radius: 16px;
-		background: linear-gradient(135deg, rgba(26, 31, 46, 0.9) 0%, rgba(32, 39, 56, 0.9) 100%);
+		background: var(--surface);
 		box-shadow:
 			0 20px 60px rgba(0, 0, 0, 0.3),
 			inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -263,8 +266,8 @@
 	}
 
 	.portfolio-card:hover {
-		background: linear-gradient(135deg, rgba(32, 39, 56, 0.95) 0%, rgba(38, 46, 65, 0.95) 100%);
-		border-color: rgba(212, 175, 55, 0.3);
+		background: var(--surface-2);
+		border-color: rgba(212, 145, 42, 0.3);
 		transform: translateY(-4px);
 		box-shadow:
 			0 30px 80px rgba(0, 0, 0, 0.4),
@@ -290,14 +293,14 @@
 	.portfolio-name {
 		margin: 0 0 0.3rem;
 		font-size: 1.15rem;
-		color: #e0e0e0;
+		color: var(--text);
 		font-weight: 600;
 	}
 
 	.portfolio-type {
 		margin: 0;
 		font-size: 0.8rem;
-		color: rgba(224, 224, 224, 0.52);
+		color: rgba(236, 234, 229, 0.52);
 	}
 
 	.risk-badge {
@@ -311,21 +314,21 @@
 	}
 
 	.risk-badge.low {
-		background: rgba(46, 204, 113, 0.15);
-		color: #2ecc71;
-		border: 1px solid rgba(46, 204, 113, 0.3);
+		background: rgba(34, 201, 126, 0.15);
+		color: var(--green);
+		border: 1px solid rgba(34, 201, 126, 0.3);
 	}
 
 	.risk-badge.moderate {
 		background: rgba(241, 196, 15, 0.15);
-		color: #f1c40f;
+		color: var(--amber-light);
 		border: 1px solid rgba(241, 196, 15, 0.3);
 	}
 
 	.risk-badge.high {
-		background: rgba(231, 76, 60, 0.15);
-		color: #e74c3c;
-		border: 1px solid rgba(231, 76, 60, 0.3);
+		background: rgba(224, 90, 90, 0.15);
+		color: var(--red);
+		border: 1px solid rgba(224, 90, 90, 0.3);
 	}
 
 	.card-metrics {
@@ -333,8 +336,8 @@
 		grid-template-columns: repeat(3, 1fr);
 		gap: 1rem;
 		padding: 1rem 0;
-		border-top: 1px solid rgba(212, 175, 55, 0.1);
-		border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+		border-top: 1px solid var(--border);
+		border-bottom: 1px solid var(--border);
 	}
 
 	.metric {
@@ -348,22 +351,22 @@
 		font-size: 0.7rem;
 		letter-spacing: 0.5px;
 		text-transform: uppercase;
-		color: rgba(224, 224, 224, 0.46);
+		color: rgba(236, 234, 229, 0.46);
 	}
 
 	.metric .value {
 		margin: 0;
 		font-size: 1.1rem;
 		font-weight: 600;
-		color: #e8c547;
+		color: var(--amber-light);
 	}
 
 	.metric .value.positive {
-		color: #2ecc71;
+		color: var(--green);
 	}
 
 	.metric .value.negative {
-		color: #e74c3c;
+		color: var(--red);
 	}
 
 	.card-footer {
@@ -375,32 +378,32 @@
 	.allocation-bar {
 		height: 6px;
 		border-radius: 999px;
-		background: rgba(224, 224, 224, 0.12);
+		background: rgba(236, 234, 229, 0.12);
 		overflow: hidden;
 	}
 
 	.bar-fill {
 		height: 100%;
 		border-radius: inherit;
-		background: linear-gradient(90deg, #d4af37, #e8c547);
+		background: var(--amber);
 	}
 
 	.allocation-text {
 		margin: 0;
 		font-size: 0.75rem;
-		color: rgba(224, 224, 224, 0.5);
+		color: rgba(236, 234, 229, 0.5);
 	}
 
 	.arrow-icon {
 		position: absolute;
 		top: 1rem;
 		right: 1rem;
-		color: rgba(212, 175, 55, 0.3);
+		color: rgba(212, 145, 42, 0.3);
 		transition: all 0.3s ease;
 	}
 
 	.portfolio-card:hover .arrow-icon {
-		color: #e8c547;
+		color: var(--amber-light);
 		transform: translateX(4px);
 	}
 

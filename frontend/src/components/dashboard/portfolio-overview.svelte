@@ -8,14 +8,17 @@
 		{ month: 'Jun', value: 1250000 }
 	];
 
-	const maxValue = Math.max(...portfolioData.map(d => d.value));
-	const minValue = Math.min(...portfolioData.map(d => d.value));
+	const maxValue = Math.max(...portfolioData.map((d) => d.value));
+	const minValue = Math.min(...portfolioData.map((d) => d.value));
 	const range = maxValue - minValue;
 </script>
 
 <div class="portfolio-card">
 	<div class="card-header">
-		<h2 class="card-title">Desempeño del Portafolio</h2>
+		<div>
+			<p class="card-eyebrow">Evolución</p>
+			<h2 class="card-title">Desempeño del Portafolio</h2>
+		</div>
 		<div class="header-actions">
 			<button class="period-button" class:active={true}>6M</button>
 			<button class="period-button">1A</button>
@@ -25,11 +28,14 @@
 
 	<div class="chart-container">
 		<svg class="chart" viewBox="0 0 600 300" preserveAspectRatio="xMidYMid meet">
-			<!-- Grid lines -->
 			<defs>
 				<linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-					<stop offset="0%" style="stop-color: #d4af37; stop-opacity: 0.2" />
-					<stop offset="100%" style="stop-color: #d4af37; stop-opacity: 0" />
+					<stop offset="0%" style="stop-color: #d4912a; stop-opacity: 0.22" />
+					<stop offset="100%" style="stop-color: #d4912a; stop-opacity: 0" />
+				</linearGradient>
+				<linearGradient id="chartStroke" x1="0%" y1="0%" x2="100%" y2="0%">
+					<stop offset="0%" style="stop-color: #22c97e" />
+					<stop offset="100%" style="stop-color: #d4912a" />
 				</linearGradient>
 			</defs>
 
@@ -37,10 +43,10 @@
 			{#each Array.from({ length: 5 }) as _, i}
 				<line
 					x1="40"
-					y1={40 + (i * 50)}
+					y1={40 + i * 50}
 					x2="580"
-					y2={40 + (i * 50)}
-					stroke="rgba(212, 175, 55, 0.05)"
+					y2={40 + i * 50}
+					stroke="rgba(255, 255, 255, 0.04)"
 					stroke-width="1"
 				/>
 			{/each}
@@ -49,7 +55,7 @@
 			<polyline
 				points={portfolioData
 					.map((d, i) => {
-						const x = 40 + (i * 90);
+						const x = 40 + i * 90;
 						const y = 240 - ((d.value - minValue) / range) * 180;
 						return `${x},${y}`;
 					})
@@ -62,13 +68,13 @@
 			<polyline
 				points={portfolioData
 					.map((d, i) => {
-						const x = 40 + (i * 90);
+						const x = 40 + i * 90;
 						const y = 240 - ((d.value - minValue) / range) * 180;
 						return `${x},${y}`;
 					})
 					.join(' ')}
-				stroke="#d4af37"
-				stroke-width="3"
+				stroke="url(#chartStroke)"
+				stroke-width="2.5"
 				fill="none"
 				stroke-linecap="round"
 				stroke-linejoin="round"
@@ -77,24 +83,24 @@
 			<!-- Data points -->
 			{#each portfolioData as d, i}
 				<circle
-					cx={40 + (i * 90)}
+					cx={40 + i * 90}
 					cy={240 - ((d.value - minValue) / range) * 180}
-					r="4"
-					fill="#d4af37"
-					stroke="rgba(15, 20, 25, 0.9)"
-					stroke-width="2"
+					r="3.5"
+					fill="#d4912a"
+					stroke="#08090a"
+					stroke-width="2.5"
 				/>
 			{/each}
 
 			<!-- X-axis labels -->
 			{#each portfolioData as d, i}
 				<text
-					x={40 + (i * 90)}
+					x={40 + i * 90}
 					y="280"
 					text-anchor="middle"
-					fill="rgba(224, 224, 224, 0.5)"
-					font-size="12"
-					font-family="'Lato', sans-serif"
+					fill="#8a8780"
+					font-size="11"
+					font-family="'JetBrains Mono', monospace"
 				>
 					{d.month}
 				</text>
@@ -105,76 +111,90 @@
 	<div class="chart-stats">
 		<div class="stat">
 			<span class="label">Ganancia YTD</span>
-			<p class="value positive">+$150,000 (+13.6%)</p>
+			<p class="value positive">+$150.000 · +13,6%</p>
 		</div>
 		<div class="stat">
 			<span class="label">Volatilidad</span>
-			<p class="value">6.2%</p>
+			<p class="value">6,2%</p>
 		</div>
 		<div class="stat">
 			<span class="label">Rentabilidad Anual</span>
-			<p class="value highlight">7.4%</p>
+			<p class="value highlight">7,4%</p>
 		</div>
 	</div>
 </div>
 
 <style>
 	.portfolio-card {
-		background: linear-gradient(135deg, rgba(26, 31, 46, 0.9) 0%, rgba(32, 39, 56, 0.9) 100%);
-		border: 1px solid rgba(212, 175, 55, 0.15);
-		border-radius: 16px;
+		background: var(--surface);
+		border: 1px solid var(--border-strong);
+		border-radius: 14px;
 		padding: 2rem;
-		box-shadow: 
-			0 20px 60px rgba(0, 0, 0, 0.3),
-			inset 0 1px 0 rgba(255, 255, 255, 0.05);
-		backdrop-filter: blur(16px);
+		backdrop-filter: blur(10px);
 	}
 
 	.card-header {
 		display: flex;
 		justify-content: space-between;
-		align-items: center;
+		align-items: flex-start;
 		margin-bottom: 2rem;
-		padding-bottom: 1rem;
-		border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+		padding-bottom: 1.25rem;
+		border-bottom: 1px solid var(--border);
+		gap: 1rem;
+	}
+
+	.card-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.625rem;
+		font-weight: 500;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		color: var(--text-dim);
+		margin: 0 0 0.4rem 0;
 	}
 
 	.card-title {
-		font-size: 1.25rem;
-		font-weight: 700;
-		color: #e0e0e0;
+		font-family: var(--font-display);
+		font-size: 1.15rem;
+		font-weight: 500;
+		letter-spacing: -0.01em;
+		color: var(--text);
 		margin: 0;
-		letter-spacing: 0.5px;
 	}
 
 	.header-actions {
 		display: flex;
-		gap: 0.5rem;
+		gap: 0.4rem;
+		flex-shrink: 0;
 	}
 
 	.period-button {
-		padding: 0.5rem 1rem;
+		padding: 0.4rem 0.75rem;
 		background: transparent;
-		border: 1px solid rgba(212, 175, 55, 0.1);
-		color: rgba(224, 224, 224, 0.6);
-		border-radius: 6px;
-		font-weight: 600;
-		font-size: 0.8rem;
+		border: 1px solid var(--border);
+		color: var(--text-muted);
+		border-radius: 5px;
+		font-family: var(--font-mono);
+		font-weight: 500;
+		font-size: 0.7rem;
 		cursor: pointer;
-		transition: all 0.25s ease;
+		transition:
+			border-color 0.2s ease,
+			background 0.2s ease,
+			color 0.2s ease;
 		text-transform: uppercase;
-		letter-spacing: 0.3px;
+		letter-spacing: 0.06em;
 	}
 
 	.period-button:hover {
-		border-color: rgba(212, 175, 55, 0.3);
-		color: #e0e0e0;
+		border-color: var(--border-strong);
+		color: var(--text);
 	}
 
 	.period-button.active {
-		background: rgba(212, 175, 55, 0.15);
-		border-color: rgba(212, 175, 55, 0.3);
-		color: #d4af37;
+		background: rgba(212, 145, 42, 0.1);
+		border-color: rgba(212, 145, 42, 0.3);
+		color: var(--amber-light);
 	}
 
 	.chart-container {
@@ -193,7 +213,7 @@
 		grid-template-columns: repeat(3, 1fr);
 		gap: 1.5rem;
 		padding-top: 1.5rem;
-		border-top: 1px solid rgba(212, 175, 55, 0.1);
+		border-top: 1px solid var(--border);
 	}
 
 	.stat {
@@ -203,26 +223,29 @@
 	}
 
 	.label {
-		font-size: 0.75rem;
-		color: rgba(224, 224, 224, 0.5);
+		font-family: var(--font-mono);
+		font-size: 0.625rem;
+		color: var(--text-dim);
 		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		font-weight: 600;
+		letter-spacing: 0.12em;
+		font-weight: 500;
 	}
 
 	.value {
-		font-size: 0.95rem;
-		font-weight: 700;
-		color: #e0e0e0;
+		font-family: var(--font-mono);
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--text);
 		margin: 0;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.value.positive {
-		color: #2ecc71;
+		color: var(--green);
 	}
 
 	.value.highlight {
-		color: #d4af37;
+		color: var(--amber-light);
 	}
 
 	@media (max-width: 1024px) {
