@@ -1,18 +1,44 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	interface Props {
-		form?: { success?: boolean; error?: string; message?: string } | null;
-	}
-
-	let { form }: Props = $props();
-
 	let waitlistEmail = $state('');
 	let waitlistError = $state(false);
+	let waitlistErrorMessage = $state('');
+	let waitlistSuccess = $state(false);
+	let submitting = $state(false);
 	let countdown = $state({ days: '00', hours: '00', mins: '00', secs: '00' });
 
 	function pad(n: number) {
 		return String(n).padStart(2, '0');
+	}
+
+	async function submitWaitlist(event: SubmitEvent) {
+		event.preventDefault();
+		const formEl = event.currentTarget as HTMLFormElement;
+		waitlistError = false;
+		waitlistErrorMessage = '';
+		submitting = true;
+
+		try {
+			const res = await fetch('/api/waitlist', {
+				method: 'POST',
+				headers: { accept: 'application/json' },
+				body: new FormData(formEl)
+			});
+			const data = await res.json();
+
+			if (data.success) {
+				waitlistSuccess = true;
+			} else {
+				waitlistError = true;
+				waitlistErrorMessage = data.error ?? 'Ocurrió un error. Inténtalo de nuevo.';
+			}
+		} catch {
+			waitlistError = true;
+			waitlistErrorMessage = 'Ocurrió un error. Inténtalo de nuevo.';
+		} finally {
+			submitting = false;
+		}
 	}
 
 	onMount(() => {
@@ -62,7 +88,7 @@
 		</div>
 
 		<div class="waitlist reveal" id="waitlist">
-			{#if form?.success}
+			{#if waitlistSuccess}
 				<div class="wl-success">
 					<span class="check-ico" aria-hidden="true">
 						<svg
@@ -79,7 +105,14 @@
 					<span>¡Listo! Te avisaremos en cuanto Finexia esté disponible.</span>
 				</div>
 			{:else}
-				<form class="wl-form" class:error={waitlistError} method="POST" action="/" novalidate>
+				<form
+					class="wl-form"
+					class:error={waitlistError}
+					method="POST"
+					action="/api/waitlist"
+					onsubmit={submitWaitlist}
+					novalidate
+				>
 					<input
 						type="email"
 						bind:value={waitlistEmail}
@@ -89,8 +122,13 @@
 						required
 						aria-label="Correo electrónico"
 					/>
-					<button type="submit" class="btn-amber">Acceso anticipado</button>
+					<button type="submit" class="btn-amber" disabled={submitting}>
+						{submitting ? 'Enviando...' : 'Acceso anticipado'}
+					</button>
 				</form>
+				{#if waitlistError && waitlistErrorMessage}
+					<p class="wl-error" role="alert">{waitlistErrorMessage}</p>
+				{/if}
 				<div class="wl-note">
 					<svg
 						width="13"
@@ -295,6 +333,11 @@
 		display: flex;
 		align-items: center;
 		gap: 7px;
+	}
+	.wl-error {
+		margin-top: 10px;
+		font-size: 12.5px;
+		color: #e05a5a;
 	}
 	.wl-success {
 		display: flex;

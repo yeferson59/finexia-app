@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import PageHeader from '$components/ui/page-header.svelte';
@@ -87,7 +88,18 @@
 		</div>
 	{/if}
 
-	<form method="POST" action="/dashboard/portfolios/add" class="form">
+	<form
+		method="POST"
+		action="/dashboard/portfolios/add"
+		class="form"
+		use:enhance={() => {
+			isSubmitting = true;
+			return async ({ update }) => {
+				await update();
+				isSubmitting = false;
+			};
+		}}
+	>
 		<fieldset class="form-section">
 			<legend class="section-title">Información Básica</legend>
 

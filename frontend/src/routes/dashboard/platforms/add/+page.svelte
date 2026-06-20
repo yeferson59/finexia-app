@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import PageHeader from '$components/ui/page-header.svelte';
@@ -48,7 +49,18 @@
 />
 
 <div class="form-container">
-	<form method="POST" action="/dashboard/platforms/add" class="platform-form">
+	<form
+		method="POST"
+		action="/dashboard/platforms/add"
+		class="platform-form"
+		use:enhance={() => {
+			isSubmitting = true;
+			return async ({ update }) => {
+				await update();
+				isSubmitting = false;
+			};
+		}}
+	>
 		<!-- Basic Information Section -->
 		<section class="form-section">
 			<h2 class="section-title">Información Básica</h2>
