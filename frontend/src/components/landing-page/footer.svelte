@@ -1,59 +1,49 @@
-<footer class="border-t border-[rgba(212,175,55,0.1)] bg-[#0f1419]">
-	<div
-		class="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-16 md:flex-row md:items-start md:justify-between"
-	>
-		<div class="space-y-2">
-			<p class="font-display text-lg font-bold text-[#d4af37]">FINEXIA</p>
-			<p class="text-sm text-[#a0a0a0]">Tu dinero, bajo control</p>
-		</div>
+<script lang="ts">
+	import Brand from './brand.svelte';
 
-		<div class="grid grid-cols-2 gap-8 md:flex md:gap-16">
-			<div>
-				<h4 class="mb-4 font-bold uppercase tracking-widest text-[#d4af37]">Producto</h4>
-				<ul class="space-y-2">
-					<li><a href="#caracteristicas-principales" class="footer-link">Características</a></li>
-					<li><a href="#como-funciona" class="footer-link">Cómo funciona</a></li>
-					<li><a href="[PLACEHOLDER]/precios" rel="external" class="footer-link">Precios</a></li>
-					<li><a href="[PLACEHOLDER]/blog" rel="external" class="footer-link">Blog</a></li>
-				</ul>
-			</div>
-			<div>
-				<h4 class="mb-4 font-bold uppercase tracking-widest text-[#d4af37]">Compañía</h4>
-				<ul class="space-y-2">
-					<li><a href="[PLACEHOLDER]/acerca" rel="external" class="footer-link">Acerca de</a></li>
-					<li><a href="[PLACEHOLDER]/contacto" rel="external" class="footer-link">Contacto</a></li>
-					<li><a href="[PLACEHOLDER]/soporte" rel="external" class="footer-link">Soporte</a></li>
-					<li>
-						<a href="[PLACEHOLDER]/comunidad" rel="external" class="footer-link">Comunidad</a>
-					</li>
-				</ul>
-			</div>
-			<div>
-				<h4 class="mb-4 font-bold uppercase tracking-widest text-[#d4af37]">Legal</h4>
-				<ul class="space-y-2">
-					<li>
-						<a href="[PLACEHOLDER]/privacidad" rel="external" class="footer-link">Privacidad</a>
-					</li>
-					<li><a href="[PLACEHOLDER]/terminos" rel="external" class="footer-link">Términos</a></li>
-					<li><a href="[PLACEHOLDER]/cookies" rel="external" class="footer-link">Cookies</a></li>
-				</ul>
-			</div>
-		</div>
+	const currentYear = new Date().getFullYear();
+</script>
 
-		<p class="text-xs font-600 tracking-widest uppercase text-[#a0a0a0]">© 2024 FINEXIA</p>
+<footer>
+	<div class="wrap foot">
+		<Brand iconSize={26} nameSize={18} />
+		<nav class="foot-links">
+			<a href="#beneficios">Beneficios</a>
+			<a href="#como-funciona">Cómo funciona</a>
+			<a href="#faq">Preguntas</a>
+			<a href="#waitlist">Lista de espera</a>
+		</nav>
+		<div class="foot-copy">© {currentYear} Finexia. Todos los derechos reservados.</div>
 	</div>
 </footer>
 
 <style>
-	.footer-link {
-		color: #a0a0a0;
-		font-size: 0.95rem;
-		text-decoration: none;
-		transition: color 0.25s ease;
-		font-weight: 500;
+	footer {
+		border-top: 1px solid var(--border);
+		padding: 40px 0 52px;
+		margin-top: 40px;
 	}
-
-	.footer-link:hover {
-		color: #d4af37;
+	.foot {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 24px;
+		flex-wrap: wrap;
+	}
+	.foot-links {
+		display: flex;
+		gap: 24px;
+	}
+	.foot-links a {
+		font-size: 13.5px;
+		color: var(--text-muted);
+		transition: color 0.2s;
+	}
+	.foot-links a:hover {
+		color: var(--text);
+	}
+	.foot-copy {
+		font-size: 13px;
+		color: var(--text-dim);
 	}
 </style>

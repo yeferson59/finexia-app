@@ -1,0 +1,100 @@
+/*
+ * Shared utility classes for the marketing landing page. Imported once from
+ * the route so the classes are global and every landing-page/*.svelte section
+ * component can use them without redeclaring them in its scoped <style>.
+ */
+
+.wrap {
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 0 36px;
+}
+
+/* Section heading block */
+.sec-head {
+	max-width: 640px;
+	margin: 0 auto 56px;
+	text-align: center;
+}
+.eyebrow {
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+	color: var(--amber);
+}
+.sec-title {
+	font-family: var(--font-display);
+	font-weight: 300;
+	font-size: clamp(28px, 4vw, 46px);
+	line-height: 1.1;
+	letter-spacing: -0.02em;
+	margin-top: 14px;
+	text-wrap: balance;
+}
+.sec-desc {
+	margin-top: 16px;
+	font-size: 16px;
+	color: var(--text-muted);
+	font-weight: 300;
+}
+
+.divider {
+	height: 1px;
+	background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
+
+/* Amber button — hero waitlist + final CTA */
+.btn-amber {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 12px 22px;
+	border-radius: 6px;
+	border: none;
+	cursor: pointer;
+	font-family: var(--font-body);
+	font-size: 14px;
+	font-weight: 600;
+	color: #0d0800;
+	background: var(--amber);
+	transition:
+		background 0.2s,
+		transform 0.15s;
+}
+.btn-amber:hover {
+	background: var(--amber-light);
+	transform: translateY(-1px);
+}
+.btn-amber:active {
+	transform: none;
+}
+.btn-amber-lg {
+	display: inline-flex;
+	padding: 15px 30px;
+	font-size: 15.5px;
+	border-radius: 8px;
+}
+
+/* Scroll reveal — toggled to `.in` by the IntersectionObserver in +page.svelte */
+.reveal {
+	opacity: 0;
+	transform: translateY(16px);
+	transition:
+		opacity 0.65s ease,
+		transform 0.65s ease;
+}
+.reveal.in {
+	opacity: 1;
+	transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reveal {
+		opacity: 1;
+		transform: none;
+		transition: none;
+	}
+}

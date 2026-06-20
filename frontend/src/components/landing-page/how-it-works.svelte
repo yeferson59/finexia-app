@@ -1,97 +1,81 @@
 <script lang="ts">
 	const steps = [
 		{
-			number: '01',
-			title: 'Importa o vincula',
-			description:
-				'Conecta tus brokers, bancos o plataformas (o sube un Excel) con tus datos de inversión.'
+			num: '01',
+			title: 'Registra tus plataformas',
+			body: 'Añade manualmente cada broker, exchange o banco donde tienes activos y anota qué tienes en cada uno. Sin conectar cuentas.'
 		},
 		{
-			number: '02',
-			title: 'FINEXIA lo centraliza',
-			description:
-				'Nuestro motor de datos consolida todo, deduplicando activos y normalizando nomenclaturas automáticamente.'
+			num: '02',
+			title: 'Crea tus portafolios',
+			body: 'Agrupa los activos según los portafolios que tienes en mente, combinando lo que está en distintas plataformas.'
 		},
 		{
-			number: '03',
-			title: 'Visualiza tu patrimonio',
-			description:
-				'Accede a dashboards, gráficas en tiempo real y métricas de rendimiento al instante.'
+			num: '03',
+			title: 'Visualiza el conjunto',
+			body: 'Ve la distribución y el peso de cada portafolio en una sola vista, y decide con tu patrimonio completo a la vista.'
 		}
 	];
 </script>
 
-<section id="como-funciona" class="mx-auto w-full max-w-7xl px-6 py-20">
-	<div class="mb-16 space-y-4 text-center">
-		<p class="text-xs font-600 tracking-widest uppercase text-[#d4af37]">Proceso simple</p>
-		<h2 class="font-display text-4xl font-bold leading-tight text-[#ffffff]">Conecta en minutos</h2>
+<section class="block wrap" id="como-funciona">
+	<div class="sec-head reveal">
+		<div class="eyebrow">Cómo funciona</div>
+		<h2 class="sec-title">De plataformas dispersas<br />a un solo mapa</h2>
 	</div>
-
-	<div class="grid gap-8 md:grid-cols-3">
-		{#each steps as step, index (step.number)}
-			<div class="relative">
-				<div class="step-card">
-					<div class="step-number">{step.number}</div>
-					<h3 class="font-display mb-3 text-lg font-bold text-[#ffffff]">{step.title}</h3>
-					<p class="text-sm text-[#a0a0a0]">{step.description}</p>
+	<div class="steps">
+		{#each steps as step (step.num)}
+			<div class="step reveal">
+				<div class="step-num">{step.num}</div>
+				<div class="step-body">
+					<h3>{step.title}</h3>
+					<p>{step.body}</p>
 				</div>
-				{#if index < steps.length - 1}
-					<div class="hidden step-connector md:block">→</div>
-				{/if}
 			</div>
 		{/each}
 	</div>
 </section>
 
 <style>
-	.step-card {
-		border: 1px solid rgba(212, 175, 55, 0.2);
-		background: linear-gradient(135deg, #1a1f2e 0%, #141a24 100%);
-		padding: 2rem;
-		border-radius: 16px;
-		backdrop-filter: blur(10px);
-		position: relative;
-		transition: all 0.3s ease;
+	.block {
+		padding: 88px 0;
 	}
-
-	.step-card:hover {
-		border-color: rgba(212, 175, 55, 0.4);
-		transform: translateY(-6px);
-		box-shadow: 0 12px 40px rgba(212, 175, 55, 0.2);
+	.steps {
+		display: flex;
+		flex-direction: column;
+		max-width: 660px;
+		margin: 0 auto;
 	}
-
-	.step-number {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		height: 48px;
-		width: 48px;
-		margin-bottom: 1rem;
-		border-radius: 12px;
-		background: linear-gradient(135deg, #d4af37, #2ecc71);
-		font-family: 'IBM Plex Mono', monospace;
-		font-weight: 700;
-		font-size: 1.2rem;
-		color: #0f1419;
+	.step {
+		display: flex;
+		gap: 32px;
+		padding: 32px 0;
+		border-bottom: 1px solid var(--border);
 	}
-
-	.step-connector {
-		position: absolute;
-		top: 50%;
-		right: -3rem;
-		transform: translateY(-50%);
-		font-size: 2rem;
-		color: rgba(212, 175, 55, 0.4);
-		font-weight: bold;
+	.step:last-child {
+		border-bottom: none;
 	}
-
-	@media (max-width: 768px) {
-		.step-card {
-			padding: 1.5rem;
-		}
-
-		.step-connector {
-			display: none;
-		}
+	.step-num {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--amber);
+		letter-spacing: 0.06em;
+		flex-shrink: 0;
+		padding-top: 5px;
+		min-width: 26px;
+	}
+	.step-body h3 {
+		font-family: var(--font-display);
+		font-weight: 500;
+		font-size: 21px;
+		letter-spacing: -0.01em;
+		margin-bottom: 10px;
+	}
+	.step-body p {
+		font-size: 14.5px;
+		color: var(--text-muted);
+		line-height: 1.65;
+		font-weight: 300;
 	}
 </style>
