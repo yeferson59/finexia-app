@@ -96,9 +96,6 @@
 </section>
 
 <style>
-	.block {
-		padding: 88px 0;
-	}
 	.metrics-wrap {
 		position: relative;
 		border-radius: 14px;

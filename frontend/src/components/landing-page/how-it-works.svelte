@@ -37,9 +37,6 @@
 </section>
 
 <style>
-	.block {
-		padding: 88px 0;
-	}
 	.steps {
 		display: flex;
 		flex-direction: column;

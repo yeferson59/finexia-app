@@ -77,4 +77,13 @@
 			display: none;
 		}
 	}
+	@media (max-width: 480px) {
+		.nav {
+			height: 58px;
+		}
+		.nav-cta {
+			padding: 8px 14px;
+			font-size: 13px;
+		}
+	}
 </style>
