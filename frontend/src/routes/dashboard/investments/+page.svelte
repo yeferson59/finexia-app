@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import PageHeader from '$components/ui/page-header.svelte';
+	import Card from '$components/ui/card.svelte';
 
 	const opportunities = [
 		{
@@ -28,12 +30,11 @@
 	<meta name="description" content="Oportunidades y estrategias de inversión FINEXIA" />
 </svelte:head>
 
-<header class="page-header">
-	<div class="header-top">
-		<div>
-			<h1 class="page-title">Inversiones</h1>
-			<p class="page-subtitle">Descubre oportunidades alineadas con tu perfil y objetivos.</p>
-		</div>
+<PageHeader
+	title="Inversiones"
+	subtitle="Descubre oportunidades alineadas con tu perfil y objetivos."
+>
+	{#snippet actions()}
 		<button onclick={addNewProduct} class="btn-add-product">
 			<svg
 				width="18"
@@ -47,75 +48,60 @@
 			</svg>
 			Agregar Producto
 		</button>
-	</div>
-</header>
+	{/snippet}
+</PageHeader>
 
-<section class="spotlight panel">
-	<div>
-		<p class="eyebrow">Recomendación destacada</p>
-		<h2>Portafolio crecimiento equilibrado</h2>
-		<p>
-			Estrategia diseñada para optimizar rendimiento en un escenario mixto con sesgo tecnológico.
-		</p>
-	</div>
-	<button class="action">Explorar estrategia</button>
-</section>
-
-<section class="panel table-panel">
-	<header class="table-head">
-		<h2>Oportunidades activas</h2>
-	</header>
-	<div class="table">
-		<div class="row heading">
-			<span>Instrumento</span>
-			<span>Riesgo</span>
-			<span>ROI esperado</span>
-			<span>Horizonte</span>
-			<span></span>
+<div class="panel-stack">
+	<Card variant="elevated" padding="none">
+		<div class="spotlight">
+			<div>
+				<p class="eyebrow">Recomendación destacada</p>
+				<h2>Portafolio crecimiento equilibrado</h2>
+				<p>
+					Estrategia diseñada para optimizar rendimiento en un escenario mixto con sesgo
+					tecnológico.
+				</p>
+			</div>
+			<button class="action">Explorar estrategia</button>
 		</div>
-		{#each opportunities as item (item.id)}
-			<button
-				class="row row-interactive"
-				onclick={() => viewDetails(item.id)}
-				aria-label={`Ver detalles de ${item.name}`}
-			>
-				<span>{item.name}</span>
-				<span>{item.risk}</span>
-				<span class="positive">{item.roi}</span>
-				<span>{item.horizon}</span>
-				<span class="row-icon">→</span>
-			</button>
-		{/each}
-	</div>
-</section>
+	</Card>
+
+	<Card variant="elevated" padding="none">
+		<div class="table-panel">
+			<header class="table-head">
+				<h2>Oportunidades activas</h2>
+			</header>
+			<div class="table">
+				<div class="row heading">
+					<span>Instrumento</span>
+					<span>Riesgo</span>
+					<span>ROI esperado</span>
+					<span>Horizonte</span>
+					<span></span>
+				</div>
+				{#each opportunities as item (item.id)}
+					<button
+						class="row row-interactive"
+						onclick={() => viewDetails(item.id)}
+						aria-label={`Ver detalles de ${item.name}`}
+					>
+						<span>{item.name}</span>
+						<span>{item.risk}</span>
+						<span class="positive">{item.roi}</span>
+						<span>{item.horizon}</span>
+						<span class="row-icon">→</span>
+					</button>
+				{/each}
+			</div>
+		</div>
+	</Card>
+</div>
 
 <style>
-	.page-header {
-		margin-bottom: 2rem;
-		padding-bottom: 1.5rem;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.header-top {
+	.panel-stack {
 		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 2rem;
-		flex-wrap: wrap;
-	}
-
-	.page-title {
-		margin: 0 0 0.5rem;
-		font-size: 2.35rem;
-		font-weight: 300;
-		letter-spacing: -0.02em;
-		color: var(--text);
-		font-family: var(--font-display);
-	}
-
-	.page-subtitle {
-		margin: 0;
-		color: rgba(236, 234, 229, 0.62);
+		flex-direction: column;
+		gap: 1.5rem;
 	}
 
 	.btn-add-product {
@@ -141,23 +127,12 @@
 		box-shadow: 0 10px 25px rgba(212, 145, 42, 0.25);
 	}
 
-	.panel {
-		border: 1px solid var(--border-strong);
-		border-radius: 16px;
-		background: var(--surface);
-		box-shadow:
-			0 20px 60px rgba(0, 0, 0, 0.3),
-			inset 0 1px 0 rgba(255, 255, 255, 0.05);
-		backdrop-filter: blur(16px);
-	}
-
 	.spotlight {
 		display: flex;
 		align-items: flex-end;
 		justify-content: space-between;
 		gap: 1rem;
 		padding: 1.5rem;
-		margin-bottom: 1.5rem;
 	}
 
 	.eyebrow {
@@ -261,14 +236,6 @@
 	}
 
 	@media (max-width: 768px) {
-		.page-title {
-			font-size: 1.85rem;
-		}
-
-		.header-top {
-			flex-direction: column;
-		}
-
 		.btn-add-product {
 			width: 100%;
 		}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import PageHeader from '$components/ui/page-header.svelte';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
@@ -65,10 +66,10 @@
 </button>
 
 <main class="form-container">
-	<header class="form-header">
-		<h1 class="form-title">Crear Nuevo Portafolio</h1>
-		<p class="form-subtitle">Configura un nuevo portafolio para gestionar tus inversiones</p>
-	</header>
+	<PageHeader
+		title="Crear Nuevo Portafolio"
+		subtitle="Configura un nuevo portafolio para gestionar tus inversiones"
+	/>
 
 	{#if submitSuccess}
 		<div class="success-message">
@@ -263,26 +264,6 @@
 	.form-container {
 		max-width: 800px;
 		margin: 0 auto;
-	}
-
-	.form-header {
-		margin-bottom: 2rem;
-		padding-bottom: 1.5rem;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.form-title {
-		margin: 0 0 0.5rem;
-		font-size: 2rem;
-		font-weight: 700;
-		color: var(--amber);
-		font-family: var(--font-body);
-	}
-
-	.form-subtitle {
-		margin: 0;
-		color: rgba(236, 234, 229, 0.62);
-		font-size: 1rem;
 	}
 
 	.success-message {
@@ -602,10 +583,6 @@
 		.btn-cancel,
 		.btn-submit {
 			width: 100%;
-		}
-
-		.form-title {
-			font-size: 1.5rem;
 		}
 	}
 </style>

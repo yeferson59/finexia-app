@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import CardHeader from '$components/ui/card-header.svelte';
 
 	const activities = [
 		{
@@ -68,13 +69,11 @@
 </script>
 
 <div class="activity-card">
-	<div class="card-header">
-		<div>
-			<p class="card-eyebrow">Movimientos</p>
-			<h2 class="card-title">Actividad Reciente</h2>
-		</div>
-		<a href={resolve('/dashboard/transactions')} class="view-all">Ver todo →</a>
-	</div>
+	<CardHeader eyebrow="Movimientos" title="Actividad Reciente">
+		{#snippet action()}
+			<a href={resolve('/dashboard/transactions')} class="view-all">Ver todo →</a>
+		{/snippet}
+	</CardHeader>
 
 	<div class="activity-list">
 		{#each activities as activity (activity.id)}
@@ -148,35 +147,6 @@
 		display: flex;
 		flex-direction: column;
 		height: 100%;
-	}
-
-	.card-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		margin-bottom: 1.5rem;
-		padding-bottom: 1.25rem;
-		border-bottom: 1px solid var(--border);
-		gap: 1rem;
-	}
-
-	.card-eyebrow {
-		font-family: var(--font-mono);
-		font-size: 0.625rem;
-		font-weight: 500;
-		letter-spacing: 0.18em;
-		text-transform: uppercase;
-		color: var(--text-dim);
-		margin: 0 0 0.4rem 0;
-	}
-
-	.card-title {
-		font-family: var(--font-display);
-		font-size: 1.15rem;
-		font-weight: 500;
-		letter-spacing: -0.01em;
-		color: var(--text);
-		margin: 0;
 	}
 
 	.view-all {

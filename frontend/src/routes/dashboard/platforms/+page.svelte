@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import PageHeader from '$components/ui/page-header.svelte';
+	import Card from '$components/ui/card.svelte';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
@@ -40,12 +42,11 @@
 	<meta name="description" content="Gestiona tus plataformas de inversión" />
 </svelte:head>
 
-<header class="page-header">
-	<div class="header-top">
-		<div>
-			<h1 class="page-title">Plataformas de Inversión</h1>
-			<p class="page-subtitle">Administra todas tus plataformas y corredurías en un solo lugar.</p>
-		</div>
+<PageHeader
+	title="Plataformas de Inversión"
+	subtitle="Administra todas tus plataformas y corredurías en un solo lugar."
+>
+	{#snippet actions()}
 		<button onclick={addNewPlatform} class="btn-add-platform">
 			<svg
 				width="18"
@@ -59,123 +60,125 @@
 			</svg>
 			Agregar Plataforma
 		</button>
+	{/snippet}
+</PageHeader>
+
+<Card variant="elevated" padding="none">
+	<div class="table-panel">
+		<header class="table-head">
+			<h2>Tus Plataformas</h2>
+			<p class="platform-count">
+				{data.platforms.length} plataforma{data.platforms.length !== 1 ? 's' : ''}
+			</p>
+		</header>
+
+		{#if data.platforms.length === 0}
+			<div class="empty-state">
+				<svg
+					width="64"
+					height="64"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+				>
+					<rect x="3" y="3" width="18" height="18" rx="2" />
+					<path d="M3 9h18" />
+					<path d="M9 3v18" />
+				</svg>
+				<h3>No hay plataformas registradas</h3>
+				<p>Comienza agregando tu primera plataforma de inversión</p>
+				<button onclick={addNewPlatform} class="btn-empty-action">Agregar Plataforma</button>
+			</div>
+		{:else}
+			<div class="platforms-grid">
+				{#each data.platforms as platform (platform.id)}
+					<div class="platform-card">
+						<div class="card-header">
+							<div class="card-title-section">
+								<h3 class="platform-name">{platform.name}</h3>
+								<span class="platform-type">{platform.sourceType}</span>
+							</div>
+							<div class="status-badge" style="--status-color: {getStatusColor(platform.isActive)}">
+								{platform.isActive ? 'Activo' : 'Inactivo'}
+							</div>
+						</div>
+
+						<div class="card-stats">
+							<div class="stat-item">
+								<span class="stat-label">Inversiones</span>
+								<span class="stat-value">{platform.investments ?? 0}</span>
+							</div>
+							<div class="stat-item">
+								<span class="stat-label">Valor Total</span>
+								<span class="stat-value">{platform.totalValue ?? 0}</span>
+							</div>
+						</div>
+
+						<div class="card-actions">
+							<button
+								onclick={() => viewDetails(platform.id)}
+								class="action-btn view-btn"
+								aria-label={`Ver detalles de ${platform.name}`}
+							>
+								<svg
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+									<circle cx="12" cy="12" r="3" />
+								</svg>
+								Ver
+							</button>
+							<button
+								onclick={() => editPlatform(platform.id)}
+								class="action-btn edit-btn"
+								aria-label={`Editar ${platform.name}`}
+							>
+								<svg
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+									<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+								</svg>
+								Editar
+							</button>
+							<button
+								onclick={() => confirmDelete(platform.id)}
+								class="action-btn delete-btn"
+								aria-label={`Eliminar ${platform.name}`}
+							>
+								<svg
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<polyline points="3 6 5 6 21 6" />
+									<path
+										d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+									/>
+								</svg>
+								Eliminar
+							</button>
+						</div>
+					</div>
+				{/each}
+			</div>
+		{/if}
 	</div>
-</header>
-
-<section class="panel table-panel">
-	<header class="table-head">
-		<h2>Tus Plataformas</h2>
-		<p class="platform-count">
-			{data.platforms.length} plataforma{data.platforms.length !== 1 ? 's' : ''}
-		</p>
-	</header>
-
-	{#if data.platforms.length === 0}
-		<div class="empty-state">
-			<svg
-				width="64"
-				height="64"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="1.5"
-			>
-				<rect x="3" y="3" width="18" height="18" rx="2" />
-				<path d="M3 9h18" />
-				<path d="M9 3v18" />
-			</svg>
-			<h3>No hay plataformas registradas</h3>
-			<p>Comienza agregando tu primera plataforma de inversión</p>
-			<button onclick={addNewPlatform} class="btn-empty-action">Agregar Plataforma</button>
-		</div>
-	{:else}
-		<div class="platforms-grid">
-			{#each data.platforms as platform (platform.id)}
-				<div class="platform-card">
-					<div class="card-header">
-						<div class="card-title-section">
-							<h3 class="platform-name">{platform.name}</h3>
-							<span class="platform-type">{platform.sourceType}</span>
-						</div>
-						<div class="status-badge" style="--status-color: {getStatusColor(platform.isActive)}">
-							{platform.isActive ? 'Activo' : 'Inactivo'}
-						</div>
-					</div>
-
-					<div class="card-stats">
-						<div class="stat-item">
-							<span class="stat-label">Inversiones</span>
-							<span class="stat-value">{platform.investments ?? 0}</span>
-						</div>
-						<div class="stat-item">
-							<span class="stat-label">Valor Total</span>
-							<span class="stat-value">{platform.totalValue ?? 0}</span>
-						</div>
-					</div>
-
-					<div class="card-actions">
-						<button
-							onclick={() => viewDetails(platform.id)}
-							class="action-btn view-btn"
-							aria-label={`Ver detalles de ${platform.name}`}
-						>
-							<svg
-								width="16"
-								height="16"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-							>
-								<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-								<circle cx="12" cy="12" r="3" />
-							</svg>
-							Ver
-						</button>
-						<button
-							onclick={() => editPlatform(platform.id)}
-							class="action-btn edit-btn"
-							aria-label={`Editar ${platform.name}`}
-						>
-							<svg
-								width="16"
-								height="16"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-							>
-								<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-								<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-							</svg>
-							Editar
-						</button>
-						<button
-							onclick={() => confirmDelete(platform.id)}
-							class="action-btn delete-btn"
-							aria-label={`Eliminar ${platform.name}`}
-						>
-							<svg
-								width="16"
-								height="16"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-							>
-								<polyline points="3 6 5 6 21 6" />
-								<path
-									d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-								/>
-							</svg>
-							Eliminar
-						</button>
-					</div>
-				</div>
-			{/each}
-		</div>
-	{/if}
-</section>
+</Card>
 
 {#if showDeleteConfirm && platformToDelete}
 	<div class="modal-overlay">
@@ -191,34 +194,6 @@
 {/if}
 
 <style>
-	.page-header {
-		margin-bottom: 2rem;
-		padding-bottom: 1.5rem;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.header-top {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 2rem;
-		flex-wrap: wrap;
-	}
-
-	.page-title {
-		margin: 0 0 0.5rem;
-		font-size: 2.35rem;
-		font-weight: 300;
-		letter-spacing: -0.02em;
-		color: var(--text);
-		font-family: var(--font-display);
-	}
-
-	.page-subtitle {
-		margin: 0;
-		color: rgba(236, 234, 229, 0.62);
-	}
-
 	.btn-add-platform {
 		display: flex;
 		align-items: center;
@@ -240,16 +215,6 @@
 	.btn-add-platform:hover {
 		transform: translateY(-2px);
 		box-shadow: 0 10px 25px rgba(212, 145, 42, 0.25);
-	}
-
-	.panel {
-		border: 1px solid var(--border-strong);
-		border-radius: 16px;
-		background: var(--surface);
-		box-shadow:
-			0 20px 60px rgba(0, 0, 0, 0.3),
-			inset 0 1px 0 rgba(255, 255, 255, 0.05);
-		backdrop-filter: blur(16px);
 	}
 
 	.table-panel {
@@ -535,14 +500,6 @@
 	}
 
 	@media (max-width: 768px) {
-		.page-title {
-			font-size: 1.85rem;
-		}
-
-		.header-top {
-			flex-direction: column;
-		}
-
 		.btn-add-platform {
 			width: 100%;
 		}

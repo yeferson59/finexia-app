@@ -1,4 +1,6 @@
 <script lang="ts">
+	import CardHeader from '$components/ui/card-header.svelte';
+
 	const assets = [
 		{ name: 'Acciones', value: 450000, percent: 36, color: '#d4912a' },
 		{ name: 'Bonos', value: 350000, percent: 28, color: '#22c97e' },
@@ -47,10 +49,7 @@
 </script>
 
 <div class="asset-card">
-	<div class="card-header">
-		<p class="card-eyebrow">Distribución</p>
-		<h2 class="card-title">Asignación de Activos</h2>
-	</div>
+	<CardHeader eyebrow="Distribución" title="Asignación de Activos" />
 
 	<div class="pie-container">
 		<svg class="pie-chart" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
@@ -114,31 +113,6 @@
 		display: flex;
 		flex-direction: column;
 		height: 100%;
-	}
-
-	.card-header {
-		margin-bottom: 1.5rem;
-		padding-bottom: 1.25rem;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.card-eyebrow {
-		font-family: var(--font-mono);
-		font-size: 0.625rem;
-		font-weight: 500;
-		letter-spacing: 0.18em;
-		text-transform: uppercase;
-		color: var(--text-dim);
-		margin: 0 0 0.4rem 0;
-	}
-
-	.card-title {
-		font-family: var(--font-display);
-		font-size: 1.15rem;
-		font-weight: 500;
-		letter-spacing: -0.01em;
-		color: var(--text);
-		margin: 0;
 	}
 
 	.pie-container {

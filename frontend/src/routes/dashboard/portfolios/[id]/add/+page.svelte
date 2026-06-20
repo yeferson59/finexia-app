@@ -2,6 +2,7 @@
 	import type { PageProps } from './$types';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import PageHeader from '$components/ui/page-header.svelte';
 
 	const { params, data }: PageProps = $props();
 
@@ -74,10 +75,10 @@
 	Volver
 </button>
 
-<header class="page-header">
-	<h1 class="page-title">Agregar Activo al Portafolio</h1>
-	<p class="page-subtitle">Registra un nuevo activo en tu cartera de inversiones</p>
-</header>
+<PageHeader
+	title="Agregar Activo al Portafolio"
+	subtitle="Registra un nuevo activo en tu cartera de inversiones"
+/>
 
 <div class="form-container">
 	<form method="POST" action={`/dashboard/portfolios/${params.id}/add`} class="portfolio-form">
@@ -323,26 +324,6 @@
 	.back-button:hover {
 		background: var(--border);
 		border-color: var(--amber);
-	}
-
-	.page-header {
-		margin-bottom: 2rem;
-		padding-bottom: 1.5rem;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.page-title {
-		margin: 0 0 0.5rem;
-		font-size: 2.35rem;
-		font-weight: 300;
-		letter-spacing: -0.02em;
-		color: var(--text);
-		font-family: var(--font-display);
-	}
-
-	.page-subtitle {
-		margin: 0;
-		color: rgba(236, 234, 229, 0.62);
 	}
 
 	.form-container {
@@ -725,10 +706,6 @@
 	}
 
 	@media (max-width: 768px) {
-		.page-title {
-			font-size: 1.85rem;
-		}
-
 		.asset-preview {
 			grid-template-columns: 1fr;
 		}

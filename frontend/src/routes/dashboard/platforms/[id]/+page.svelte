@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import Card from '$components/ui/card.svelte';
 
 	interface FormData {
 		name: string;
@@ -125,115 +126,127 @@
 		<main class="main-content">
 			{#if !isEditing}
 				<!-- View Mode -->
-				<section class="panel info-section">
-					<h2 class="section-title">Información de la Plataforma</h2>
+				<Card variant="elevated" padding="none">
+					<div class="panel-body">
+						<h2 class="section-title">Información de la Plataforma</h2>
 
-					<div class="info-group">
-						<div class="info-item">
-							<span class="info-label">Estado</span>
-							<div
-								class="status-badge"
-								style="--status-color: {formData.status === 'Activo'
-									? 'var(--green)'
-									: 'var(--red)'}"
-							>
-								{formData.status}
+						<div class="info-group">
+							<div class="info-item">
+								<span class="info-label">Estado</span>
+								<div
+									class="status-badge"
+									style="--status-color: {formData.status === 'Activo'
+										? 'var(--green)'
+										: 'var(--red)'}"
+								>
+									{formData.status}
+								</div>
+							</div>
+							<div class="info-item">
+								<span class="info-label">Tipo de Plataforma</span>
+								<span class="info-value">{formData.type}</span>
 							</div>
 						</div>
-						<div class="info-item">
-							<span class="info-label">Tipo de Plataforma</span>
-							<span class="info-value">{formData.type}</span>
-						</div>
-					</div>
 
-					{#if formData.description}
-						<div class="info-description">
-							<h3>Descripción</h3>
-							<p>{formData.description}</p>
-						</div>
-					{/if}
-				</section>
+						{#if formData.description}
+							<div class="info-description">
+								<h3>Descripción</h3>
+								<p>{formData.description}</p>
+							</div>
+						{/if}
+					</div>
+				</Card>
 
 				<!-- Statistics Panel -->
-				<section class="panel stats-section">
-					<h2 class="section-title">Resumen de Inversiones</h2>
-					<div class="stats-grid">
-						<div class="stat-card">
-							<span class="stat-icon">📊</span>
-							<div class="stat-content">
-								<span class="stat-label">Número de Inversiones</span>
-								<span class="stat-value">{formData.investments}</span>
+				<Card variant="elevated" padding="none">
+					<div class="panel-body">
+						<h2 class="section-title">Resumen de Inversiones</h2>
+						<div class="stats-grid">
+							<div class="stat-card">
+								<span class="stat-icon">📊</span>
+								<div class="stat-content">
+									<span class="stat-label">Número de Inversiones</span>
+									<span class="stat-value">{formData.investments}</span>
+								</div>
 							</div>
-						</div>
-						<div class="stat-card">
-							<span class="stat-icon">💰</span>
-							<div class="stat-content">
-								<span class="stat-label">Valor Total Invertido</span>
-								<span class="stat-value">{formData.totalValue}</span>
+							<div class="stat-card">
+								<span class="stat-icon">💰</span>
+								<div class="stat-content">
+									<span class="stat-label">Valor Total Invertido</span>
+									<span class="stat-value">{formData.totalValue}</span>
+								</div>
 							</div>
 						</div>
 					</div>
-				</section>
+				</Card>
 			{:else}
 				<!-- Edit Mode -->
-				<section class="panel edit-section">
-					<h2 class="section-title">Editar Plataforma</h2>
+				<Card variant="elevated" padding="none">
+					<div class="panel-body edit-section">
+						<h2 class="section-title">Editar Plataforma</h2>
 
-					<form onsubmit={handleSubmit} class="platform-form">
-						<div class="form-group">
-							<label for="name" class="form-label"
-								>Nombre de la Plataforma <span class="required">*</span></label
-							>
-							<input id="name" type="text" bind:value={formData.name} class="form-input" required />
-						</div>
-
-						<div class="form-group">
-							<label for="description" class="form-label">Descripción</label>
-							<textarea
-								id="description"
-								bind:value={formData.description}
-								class="form-textarea"
-								rows="4"></textarea>
-						</div>
-
-						<div class="form-row">
+						<form onsubmit={handleSubmit} class="platform-form">
 							<div class="form-group">
-								<label for="type" class="form-label"
-									>Tipo de Plataforma <span class="required">*</span></label
+								<label for="name" class="form-label"
+									>Nombre de la Plataforma <span class="required">*</span></label
 								>
-								<select id="type" bind:value={formData.type} class="form-select" required>
-									{#each platformTypes as type (type)}
-										<option value={type}>{type}</option>
-									{/each}
-								</select>
+								<input
+									id="name"
+									type="text"
+									bind:value={formData.name}
+									class="form-input"
+									required
+								/>
 							</div>
 
 							<div class="form-group">
-								<label for="status" class="form-label">Estado</label>
-								<select id="status" bind:value={formData.status} class="form-select">
-									<option value="Activo">Activo</option>
-									<option value="Inactivo">Inactivo</option>
-								</select>
+								<label for="description" class="form-label">Descripción</label>
+								<textarea
+									id="description"
+									bind:value={formData.description}
+									class="form-textarea"
+									rows="4"></textarea>
 							</div>
-						</div>
 
-						<div class="form-actions">
-							<button type="button" onclick={handleCancel} class="btn btn-secondary">
-								Cancelar
-							</button>
-							<button type="submit" disabled={isSubmitting} class="btn btn-primary">
-								{#if isSubmitting}
-									<span class="spinner"></span>
-									Guardando...
-								{:else if submitSuccess}
-									✓ Guardado
-								{:else}
-									Guardar Cambios
-								{/if}
-							</button>
-						</div>
-					</form>
-				</section>
+							<div class="form-row">
+								<div class="form-group">
+									<label for="type" class="form-label"
+										>Tipo de Plataforma <span class="required">*</span></label
+									>
+									<select id="type" bind:value={formData.type} class="form-select" required>
+										{#each platformTypes as type (type)}
+											<option value={type}>{type}</option>
+										{/each}
+									</select>
+								</div>
+
+								<div class="form-group">
+									<label for="status" class="form-label">Estado</label>
+									<select id="status" bind:value={formData.status} class="form-select">
+										<option value="Activo">Activo</option>
+										<option value="Inactivo">Inactivo</option>
+									</select>
+								</div>
+							</div>
+
+							<div class="form-actions">
+								<button type="button" onclick={handleCancel} class="btn btn-secondary">
+									Cancelar
+								</button>
+								<button type="submit" disabled={isSubmitting} class="btn btn-primary">
+									{#if isSubmitting}
+										<span class="spinner"></span>
+										Guardando...
+									{:else if submitSuccess}
+										✓ Guardado
+									{:else}
+										Guardar Cambios
+									{/if}
+								</button>
+							</div>
+						</form>
+					</div>
+				</Card>
 			{/if}
 		</main>
 	</div>
@@ -337,14 +350,7 @@
 		gap: 2rem;
 	}
 
-	.panel {
-		border: 1px solid var(--border-strong);
-		border-radius: 16px;
-		background: var(--surface);
-		box-shadow:
-			0 20px 60px rgba(0, 0, 0, 0.3),
-			inset 0 1px 0 rgba(255, 255, 255, 0.05);
-		backdrop-filter: blur(16px);
+	.panel-body {
 		padding: 1.75rem;
 	}
 

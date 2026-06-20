@@ -1,4 +1,7 @@
 <script lang="ts">
+	import PageHeader from '$components/ui/page-header.svelte';
+	import Card from '$components/ui/card.svelte';
+
 	let emailAlerts = $state(true);
 	let weeklySummary = $state(true);
 	let darkGoldTheme = $state(true);
@@ -9,71 +12,43 @@
 	<meta name="description" content="Preferencias de cuenta y notificaciones de FINEXIA" />
 </svelte:head>
 
-<header class="page-header">
-	<h1 class="page-title">Configuración</h1>
-	<p class="page-subtitle">Ajusta preferencias de experiencia, alertas y seguridad de cuenta.</p>
-</header>
+<PageHeader
+	title="Configuración"
+	subtitle="Ajusta preferencias de experiencia, alertas y seguridad de cuenta."
+/>
 
-<section class="panel settings-grid">
-	<article class="setting-block">
-		<h2>Notificaciones</h2>
-		<label class="toggle-row">
-			<span>Alertas por correo</span>
-			<input type="checkbox" bind:checked={emailAlerts} />
-		</label>
-		<label class="toggle-row">
-			<span>Resumen semanal</span>
-			<input type="checkbox" bind:checked={weeklySummary} />
-		</label>
-	</article>
+<Card variant="elevated" padding="none">
+	<div class="settings-grid">
+		<article class="setting-block">
+			<h2>Notificaciones</h2>
+			<label class="toggle-row">
+				<span>Alertas por correo</span>
+				<input type="checkbox" bind:checked={emailAlerts} />
+			</label>
+			<label class="toggle-row">
+				<span>Resumen semanal</span>
+				<input type="checkbox" bind:checked={weeklySummary} />
+			</label>
+		</article>
 
-	<article class="setting-block">
-		<h2>Apariencia</h2>
-		<label class="toggle-row">
-			<span>Tema oscuro FINEXIA</span>
-			<input type="checkbox" bind:checked={darkGoldTheme} />
-		</label>
-		<p class="hint">El tema actual mantiene el estilo premium oscuro con acentos dorados.</p>
-	</article>
+		<article class="setting-block">
+			<h2>Apariencia</h2>
+			<label class="toggle-row">
+				<span>Tema oscuro FINEXIA</span>
+				<input type="checkbox" bind:checked={darkGoldTheme} />
+			</label>
+			<p class="hint">El tema actual mantiene el estilo premium oscuro con acentos dorados.</p>
+		</article>
 
-	<article class="setting-block">
-		<h2>Seguridad</h2>
-		<button class="action">Cambiar contraseña</button>
-		<button class="action secondary">Gestionar dispositivos</button>
-	</article>
-</section>
+		<article class="setting-block">
+			<h2>Seguridad</h2>
+			<button class="action">Cambiar contraseña</button>
+			<button class="action secondary">Gestionar dispositivos</button>
+		</article>
+	</div>
+</Card>
 
 <style>
-	.page-header {
-		margin-bottom: 2rem;
-		padding-bottom: 1.5rem;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.page-title {
-		margin: 0 0 0.5rem;
-		font-size: 2.35rem;
-		font-weight: 300;
-		color: var(--text);
-		font-family: var(--font-display);
-		letter-spacing: -0.02em;
-	}
-
-	.page-subtitle {
-		margin: 0;
-		color: rgba(236, 234, 229, 0.62);
-	}
-
-	.panel {
-		border: 1px solid var(--border-strong);
-		border-radius: 16px;
-		background: var(--surface);
-		box-shadow:
-			0 20px 60px rgba(0, 0, 0, 0.3),
-			inset 0 1px 0 rgba(255, 255, 255, 0.05);
-		backdrop-filter: blur(16px);
-	}
-
 	.settings-grid {
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -135,12 +110,6 @@
 	@media (max-width: 1024px) {
 		.settings-grid {
 			grid-template-columns: 1fr;
-		}
-	}
-
-	@media (max-width: 768px) {
-		.page-title {
-			font-size: 1.85rem;
 		}
 	}
 </style>

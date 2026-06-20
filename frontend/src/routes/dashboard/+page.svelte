@@ -3,6 +3,7 @@
 	import PortfolioOverview from '$components/dashboard/portfolio-overview.svelte';
 	import AssetAllocation from '$components/dashboard/asset-allocation.svelte';
 	import RecentActivity from '$components/dashboard/recent-activity.svelte';
+	import PageHeader from '$components/ui/page-header.svelte';
 
 	import type { PageProps } from './$types';
 
@@ -14,13 +15,13 @@
 	<meta name="description" content="Tu panel de control de inversiones y patrimonio" />
 </svelte:head>
 
-<header class="dashboard-header-section">
-	<p class="dashboard-eyebrow">Resumen</p>
-	<h1 id="dashboard-title" class="dashboard-title">
-		Hola, <em>{data.user.name}</em>
-	</h1>
-	<p class="dashboard-subtitle">Aquí está tu patrimonio, de un vistazo.</p>
-</header>
+<PageHeader
+	eyebrow="Resumen"
+	titleId="dashboard-title"
+	subtitle="Aquí está tu patrimonio, de un vistazo."
+>
+	Hola, <em>{data.user.name}</em>
+</PageHeader>
 
 <section class="net-worth-section" aria-labelledby="dashboard-title">
 	<NetWorthCard />
@@ -41,45 +42,6 @@
 </section>
 
 <style>
-	.dashboard-header-section {
-		margin-bottom: 2.5rem;
-		padding-bottom: 1.75rem;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.dashboard-eyebrow {
-		font-family: var(--font-mono);
-		font-size: 0.6875rem;
-		font-weight: 500;
-		letter-spacing: 0.2em;
-		text-transform: uppercase;
-		color: var(--amber);
-		margin: 0 0 0.75rem 0;
-	}
-
-	.dashboard-title {
-		font-family: var(--font-display);
-		font-size: clamp(2rem, 4vw, 2.75rem);
-		font-weight: 300;
-		line-height: 1.05;
-		letter-spacing: -0.02em;
-		color: var(--text);
-		margin: 0 0 0.6rem 0;
-	}
-
-	.dashboard-title em {
-		font-style: italic;
-		font-weight: 500;
-		color: var(--amber-light);
-	}
-
-	.dashboard-subtitle {
-		font-size: 0.95rem;
-		font-weight: 300;
-		color: var(--text-muted);
-		margin: 0;
-	}
-
 	.net-worth-section {
 		margin-bottom: 2.5rem;
 	}

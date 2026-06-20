@@ -1,4 +1,8 @@
 <script lang="ts">
+	import Card from '$components/ui/card.svelte';
+	import CardHeader from '$components/ui/card-header.svelte';
+	import Stat from '$components/ui/stat.svelte';
+
 	const portfolioData = [
 		{ month: 'Ene', value: 1100000 },
 		{ month: 'Feb', value: 1150000 },
@@ -13,18 +17,16 @@
 	const range = maxValue - minValue;
 </script>
 
-<div class="portfolio-card">
-	<div class="card-header">
-		<div>
-			<p class="card-eyebrow">Evolución</p>
-			<h2 class="card-title">Desempeño del Portafolio</h2>
-		</div>
-		<div class="header-actions">
-			<button class="period-button" class:active={true}>6M</button>
-			<button class="period-button">1A</button>
-			<button class="period-button">Todo</button>
-		</div>
-	</div>
+<Card>
+	<CardHeader eyebrow="Evolución" title="Desempeño del Portafolio">
+		{#snippet action()}
+			<div class="header-actions">
+				<button class="period-button" class:active={true}>6M</button>
+				<button class="period-button">1A</button>
+				<button class="period-button">Todo</button>
+			</div>
+		{/snippet}
+	</CardHeader>
 
 	<div class="chart-container">
 		<svg class="chart" viewBox="0 0 600 300" preserveAspectRatio="xMidYMid meet">
@@ -109,59 +111,13 @@
 	</div>
 
 	<div class="chart-stats">
-		<div class="stat">
-			<span class="label">Ganancia YTD</span>
-			<p class="value positive">+$150.000 · +13,6%</p>
-		</div>
-		<div class="stat">
-			<span class="label">Volatilidad</span>
-			<p class="value">6,2%</p>
-		</div>
-		<div class="stat">
-			<span class="label">Rentabilidad Anual</span>
-			<p class="value highlight">7,4%</p>
-		</div>
+		<Stat label="Ganancia YTD" tone="positive" value="+$150.000 · +13,6%" />
+		<Stat label="Volatilidad" value="6,2%" />
+		<Stat label="Rentabilidad Anual" tone="highlight" value="7,4%" />
 	</div>
-</div>
+</Card>
 
 <style>
-	.portfolio-card {
-		background: var(--surface);
-		border: 1px solid var(--border-strong);
-		border-radius: 14px;
-		padding: 2rem;
-		backdrop-filter: blur(10px);
-	}
-
-	.card-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		margin-bottom: 2rem;
-		padding-bottom: 1.25rem;
-		border-bottom: 1px solid var(--border);
-		gap: 1rem;
-	}
-
-	.card-eyebrow {
-		font-family: var(--font-mono);
-		font-size: 0.625rem;
-		font-weight: 500;
-		letter-spacing: 0.18em;
-		text-transform: uppercase;
-		color: var(--text-dim);
-		margin: 0 0 0.4rem 0;
-	}
-
-	.card-title {
-		font-family: var(--font-display);
-		font-size: 1.15rem;
-		font-weight: 500;
-		letter-spacing: -0.01em;
-		color: var(--text);
-		margin: 0;
-	}
-
 	.header-actions {
 		display: flex;
 		gap: 0.4rem;
@@ -216,55 +172,13 @@
 		border-top: 1px solid var(--border);
 	}
 
-	.stat {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.label {
-		font-family: var(--font-mono);
-		font-size: 0.625rem;
-		color: var(--text-dim);
-		text-transform: uppercase;
-		letter-spacing: 0.12em;
-		font-weight: 500;
-	}
-
-	.value {
-		font-family: var(--font-mono);
-		font-size: 1rem;
-		font-weight: 600;
-		color: var(--text);
-		margin: 0;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.value.positive {
-		color: var(--green);
-	}
-
-	.value.highlight {
-		color: var(--amber-light);
-	}
-
 	@media (max-width: 1024px) {
-		.card-header {
-			flex-direction: column;
-			gap: 1rem;
-			align-items: flex-start;
-		}
-
 		.chart-stats {
 			grid-template-columns: repeat(2, 1fr);
 		}
 	}
 
 	@media (max-width: 768px) {
-		.portfolio-card {
-			padding: 1.5rem;
-		}
-
 		.chart-stats {
 			grid-template-columns: 1fr;
 		}

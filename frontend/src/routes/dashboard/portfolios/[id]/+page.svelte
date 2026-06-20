@@ -2,6 +2,7 @@
 	import type { PageProps } from './$types';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import Card from '$components/ui/card.svelte';
 
 	const { params }: PageProps = $props();
 
@@ -66,65 +67,67 @@
 </header>
 
 <section class="cards-grid">
-	<article class="panel summary">
+	<Card variant="elevated" padding="sm">
 		<p class="eyebrow">Valor total</p>
 		<h2 class="hero-value">$1,250,000</h2>
 		<p class="hero-delta positive">+3.7% este mes</p>
-	</article>
+	</Card>
 
-	<article class="panel summary">
+	<Card variant="elevated" padding="sm">
 		<p class="eyebrow">Riesgo estimado</p>
 		<h2 class="hero-value">Moderado</h2>
 		<p class="hero-delta">Volatilidad 6.2%</p>
-	</article>
+	</Card>
 
-	<article class="panel summary">
+	<Card variant="elevated" padding="sm">
 		<p class="eyebrow">Diversificación</p>
 		<h2 class="hero-value">5 sectores</h2>
 		<p class="hero-delta">Balance global</p>
-	</article>
+	</Card>
 </section>
 
-<section class="panel holdings">
-	<header class="panel-header">
-		<h2>Posiciones principales</h2>
-		<span>Actualizado hace 5 min</span>
-	</header>
+<Card variant="elevated" padding="none">
+	<div class="holdings">
+		<header class="panel-header">
+			<h2>Posiciones principales</h2>
+			<span>Actualizado hace 5 min</span>
+		</header>
 
-	<div class="holdings-list">
-		{#each holdings as holding (holding.symbol)}
-			<button
-				class="holding-row"
-				onclick={() => viewAssetDetails(holding.symbol)}
-				aria-label={`View details for ${holding.symbol}`}
-			>
-				<div class="holding-main">
-					<p class="symbol">{holding.symbol}</p>
-					<p class="name">{holding.name}</p>
-				</div>
-				<div class="bar-wrap" aria-label={`Asignación ${holding.allocation}%`}>
-					<div class="bar-fill" style={`width: ${holding.allocation}%`}></div>
-				</div>
-				<p class="metric">${new Intl.NumberFormat('es-CO').format(holding.value)}</p>
-				<p class={`metric delta ${holding.day >= 0 ? 'positive' : 'negative'}`}>
-					{holding.day >= 0 ? '+' : ''}
-					{holding.day}%
-				</p>
-				<svg
-					class="arrow-icon"
-					width="20"
-					height="20"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
+		<div class="holdings-list">
+			{#each holdings as holding (holding.symbol)}
+				<button
+					class="holding-row"
+					onclick={() => viewAssetDetails(holding.symbol)}
+					aria-label={`View details for ${holding.symbol}`}
 				>
-					<path d="M9 18l6-6-6-6" />
-				</svg>
-			</button>
-		{/each}
+					<div class="holding-main">
+						<p class="symbol">{holding.symbol}</p>
+						<p class="name">{holding.name}</p>
+					</div>
+					<div class="bar-wrap" aria-label={`Asignación ${holding.allocation}%`}>
+						<div class="bar-fill" style={`width: ${holding.allocation}%`}></div>
+					</div>
+					<p class="metric">${new Intl.NumberFormat('es-CO').format(holding.value)}</p>
+					<p class={`metric delta ${holding.day >= 0 ? 'positive' : 'negative'}`}>
+						{holding.day >= 0 ? '+' : ''}
+						{holding.day}%
+					</p>
+					<svg
+						class="arrow-icon"
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path d="M9 18l6-6-6-6" />
+					</svg>
+				</button>
+			{/each}
+		</div>
 	</div>
-</section>
+</Card>
 
 <style>
 	.page-header {
@@ -235,20 +238,6 @@
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 1rem;
 		margin-bottom: 1.5rem;
-	}
-
-	.panel {
-		border: 1px solid var(--border-strong);
-		border-radius: 16px;
-		background: var(--surface);
-		box-shadow:
-			0 20px 60px rgba(0, 0, 0, 0.3),
-			inset 0 1px 0 rgba(255, 255, 255, 0.05);
-		backdrop-filter: blur(16px);
-	}
-
-	.summary {
-		padding: 1.35rem;
 	}
 
 	.eyebrow {

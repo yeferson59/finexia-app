@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import PageHeader from '$components/ui/page-header.svelte';
 
 	interface FormData {
 		name: string;
@@ -72,10 +73,10 @@
 	<meta name="description" content="Crea un nuevo producto de inversión" />
 </svelte:head>
 
-<header class="page-header">
-	<h1 class="page-title">Agregar Producto de Inversión</h1>
-	<p class="page-subtitle">Configura los detalles de tu nuevo producto de inversión</p>
-</header>
+<PageHeader
+	title="Agregar Producto de Inversión"
+	subtitle="Configura los detalles de tu nuevo producto de inversión"
+/>
 
 <div class="form-container">
 	<form onsubmit={handleSubmit} class="investment-form">
@@ -234,26 +235,6 @@
 </div>
 
 <style>
-	.page-header {
-		margin-bottom: 2rem;
-		padding-bottom: 1.5rem;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.page-title {
-		margin: 0 0 0.5rem;
-		font-size: 2.35rem;
-		font-weight: 300;
-		letter-spacing: -0.02em;
-		color: var(--text);
-		font-family: var(--font-display);
-	}
-
-	.page-subtitle {
-		margin: 0;
-		color: rgba(236, 234, 229, 0.62);
-	}
-
 	.form-container {
 		max-width: 900px;
 	}
@@ -451,10 +432,6 @@
 	}
 
 	@media (max-width: 768px) {
-		.page-title {
-			font-size: 1.85rem;
-		}
-
 		.form-row {
 			grid-template-columns: 1fr;
 		}

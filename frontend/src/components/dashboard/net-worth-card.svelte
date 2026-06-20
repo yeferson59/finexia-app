@@ -1,4 +1,8 @@
 <script lang="ts">
+	import CardHeader from '$components/ui/card-header.svelte';
+	import Badge from '$components/ui/badge.svelte';
+	import Stat from '$components/ui/stat.svelte';
+
 	let netWorth = $state(1250000);
 	let monthlyChange = $state(45000);
 	let monthlyChangePercent = $state(3.7);
@@ -6,13 +10,11 @@
 </script>
 
 <div class="net-worth-card">
-	<div class="card-header">
-		<div>
-			<p class="card-eyebrow">Patrimonio total</p>
-			<h2 class="card-title">Patrimonio Neto</h2>
-		</div>
-		<span class="status-pill">Mes actual</span>
-	</div>
+	<CardHeader eyebrow="Patrimonio total" title="Patrimonio Neto">
+		{#snippet action()}
+			<Badge tone="neutral" pill={false}>Mes actual</Badge>
+		{/snippet}
+	</CardHeader>
 
 	<div class="net-worth-content">
 		<div class="main-metric">
@@ -28,20 +30,9 @@
 		</div>
 
 		<div class="metric-stats">
-			<div class="stat-item">
-				<span class="stat-label">Clases de activo</span>
-				<p class="stat-value">5</p>
-			</div>
-
-			<div class="stat-item">
-				<span class="stat-label">Tasa promedio</span>
-				<p class="stat-value highlight">7,4%<span class="stat-unit">anual</span></p>
-			</div>
-
-			<div class="stat-item">
-				<span class="stat-label">Liquidez</span>
-				<p class="stat-value positive">72h</p>
-			</div>
+			<Stat label="Clases de activo" value="5" />
+			<Stat label="Tasa promedio" tone="highlight" value="7,4%" unit="anual" />
+			<Stat label="Liquidez" tone="positive" value="72h" />
 		</div>
 	</div>
 
@@ -77,48 +68,6 @@
 
 	.net-worth-card > * {
 		position: relative;
-	}
-
-	.card-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		margin-bottom: 2rem;
-		padding-bottom: 1.25rem;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.card-eyebrow {
-		font-family: var(--font-mono);
-		font-size: 0.625rem;
-		font-weight: 500;
-		letter-spacing: 0.18em;
-		text-transform: uppercase;
-		color: var(--text-dim);
-		margin: 0 0 0.4rem 0;
-	}
-
-	.card-title {
-		font-family: var(--font-display);
-		font-size: 1.15rem;
-		font-weight: 500;
-		letter-spacing: -0.01em;
-		color: var(--text);
-		margin: 0;
-	}
-
-	.status-pill {
-		font-family: var(--font-mono);
-		font-size: 0.625rem;
-		font-weight: 600;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
-		color: var(--text-muted);
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		padding: 0.25rem 0.6rem;
-		border-radius: 4px;
-		white-space: nowrap;
 	}
 
 	.net-worth-content {
@@ -164,47 +113,6 @@
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
 		gap: 1.5rem;
-	}
-
-	.stat-item {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.stat-label {
-		font-family: var(--font-mono);
-		font-size: 0.625rem;
-		color: var(--text-dim);
-		text-transform: uppercase;
-		letter-spacing: 0.12em;
-		font-weight: 500;
-	}
-
-	.stat-value {
-		display: flex;
-		align-items: baseline;
-		gap: 0.4rem;
-		font-family: var(--font-mono);
-		font-size: 1.15rem;
-		font-weight: 600;
-		color: var(--text);
-		margin: 0;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.stat-value.positive {
-		color: var(--green);
-	}
-
-	.stat-value.highlight {
-		color: var(--amber-light);
-	}
-
-	.stat-unit {
-		font-size: 0.7rem;
-		font-weight: 400;
-		color: var(--text-dim);
 	}
 
 	.card-footer {

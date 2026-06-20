@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import PageHeader from '$components/ui/page-header.svelte';
+	import Badge from '$components/ui/badge.svelte';
+	import ProgressBar from '$components/ui/progress-bar.svelte';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
@@ -12,6 +15,14 @@
 	function createPortfolio() {
 		goto(resolve('/dashboard/portfolios/add'));
 	}
+
+	function riskTone(name: string): 'success' | 'warning' | 'danger' | 'neutral' {
+		const n = name.toLowerCase();
+		if (n.includes('bajo')) return 'success';
+		if (n.includes('moderado')) return 'warning';
+		if (n.includes('alto')) return 'danger';
+		return 'neutral';
+	}
 </script>
 
 <svelte:head>
@@ -19,12 +30,11 @@
 	<meta name="description" content="Gestión de múltiples portafolios de inversión" />
 </svelte:head>
 
-<header class="page-header">
-	<div class="header-top">
-		<div>
-			<h1 class="page-title">Portafolios</h1>
-			<p class="page-subtitle">Gestiona tus múltiples portafolios de inversión en un solo lugar.</p>
-		</div>
+<PageHeader
+	title="Portafolios"
+	subtitle="Gestiona tus múltiples portafolios de inversión en un solo lugar."
+>
+	{#snippet actions()}
 		<button onclick={createPortfolio} class="btn-create-portfolio">
 			<svg
 				width="18"
@@ -38,8 +48,8 @@
 			</svg>
 			Crear Portafolio
 		</button>
-	</div>
-</header>
+	{/snippet}
+</PageHeader>
 
 <section class="summary-cards">
 	<article class="panel summary-card">
@@ -77,14 +87,7 @@
 						<h3 class="portfolio-name">{portfolio.name}</h3>
 						<p class="portfolio-type">{portfolio.type}</p>
 					</div>
-					<div
-						class="risk-badge"
-						class:low={portfolio.risk.name.toLowerCase().includes('bajo')}
-						class:moderate={portfolio.risk.name.toLowerCase().includes('moderado')}
-						class:high={portfolio.risk.name.toLowerCase().includes('alto')}
-					>
-						{portfolio.risk.name}
-					</div>
+					<Badge tone={riskTone(portfolio.risk.name)} size="md">{portfolio.risk.name}</Badge>
 				</div>
 
 				<div class="card-metrics">
@@ -108,12 +111,11 @@
 					</div>
 				</div>
 
-				<div class="card-footer">
-					<div class="allocation-bar">
-						<div class="bar-fill" style={`width: ${portfolio.allocation}%`}></div>
-					</div>
-					<p class="allocation-text">{portfolio.allocation}% de tu portafolio</p>
-				</div>
+				<ProgressBar
+					value={portfolio.allocation}
+					label={`${portfolio.allocation}% de tu portafolio`}
+					ariaLabel={`Asignación de ${portfolio.name}`}
+				/>
 
 				<svg
 					class="arrow-icon"
@@ -132,35 +134,6 @@
 </section>
 
 <style>
-	.page-header {
-		margin-bottom: 2rem;
-		padding-bottom: 1.5rem;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.page-title {
-		margin: 0 0 0.5rem;
-		font-size: 2.5rem;
-		font-weight: 300;
-		letter-spacing: -0.02em;
-		color: var(--text);
-		font-family: var(--font-display);
-	}
-
-	.page-subtitle {
-		margin: 0;
-		color: rgba(236, 234, 229, 0.62);
-		font-size: 1rem;
-	}
-
-	.header-top {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 2rem;
-		flex-wrap: wrap;
-	}
-
 	.btn-create-portfolio {
 		display: flex;
 		align-items: center;
@@ -304,34 +277,6 @@
 		color: rgba(236, 234, 229, 0.52);
 	}
 
-	.risk-badge {
-		padding: 0.3rem 0.7rem;
-		border-radius: 20px;
-		font-size: 0.7rem;
-		font-weight: 600;
-		letter-spacing: 0.5px;
-		text-transform: uppercase;
-		white-space: nowrap;
-	}
-
-	.risk-badge.low {
-		background: rgba(34, 201, 126, 0.15);
-		color: var(--green);
-		border: 1px solid rgba(34, 201, 126, 0.3);
-	}
-
-	.risk-badge.moderate {
-		background: rgba(241, 196, 15, 0.15);
-		color: var(--amber-light);
-		border: 1px solid rgba(241, 196, 15, 0.3);
-	}
-
-	.risk-badge.high {
-		background: rgba(224, 90, 90, 0.15);
-		color: var(--red);
-		border: 1px solid rgba(224, 90, 90, 0.3);
-	}
-
 	.card-metrics {
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
@@ -368,31 +313,6 @@
 
 	.metric .value.negative {
 		color: var(--red);
-	}
-
-	.card-footer {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.allocation-bar {
-		height: 6px;
-		border-radius: 999px;
-		background: rgba(236, 234, 229, 0.12);
-		overflow: hidden;
-	}
-
-	.bar-fill {
-		height: 100%;
-		border-radius: inherit;
-		background: var(--amber);
-	}
-
-	.allocation-text {
-		margin: 0;
-		font-size: 0.75rem;
-		color: rgba(236, 234, 229, 0.5);
 	}
 
 	.arrow-icon {

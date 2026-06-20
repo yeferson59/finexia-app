@@ -1,4 +1,7 @@
 <script lang="ts">
+	import PageHeader from '$components/ui/page-header.svelte';
+	import Card from '$components/ui/card.svelte';
+
 	const txs = [
 		{ id: 'TRX-9218', type: 'Compra', asset: 'AAPL', amount: '$5,000', status: 'Completada' },
 		{
@@ -24,12 +27,12 @@
 	<meta name="description" content="Historial de movimientos y estados de transacciones" />
 </svelte:head>
 
-<header class="page-header">
-	<h1 class="page-title">Transacciones</h1>
-	<p class="page-subtitle">Monitorea en tiempo real todos los movimientos de tu cuenta.</p>
-</header>
+<PageHeader
+	title="Transacciones"
+	subtitle="Monitorea en tiempo real todos los movimientos de tu cuenta."
+/>
 
-<section class="panel">
+<Card variant="elevated" padding="sm">
 	<div class="table">
 		<div class="row heading">
 			<span>ID</span>
@@ -48,40 +51,9 @@
 			</div>
 		{/each}
 	</div>
-</section>
+</Card>
 
 <style>
-	.page-header {
-		margin-bottom: 2rem;
-		padding-bottom: 1.5rem;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.page-title {
-		margin: 0 0 0.5rem;
-		font-size: 2.35rem;
-		font-weight: 300;
-		color: var(--text);
-		font-family: var(--font-display);
-		letter-spacing: -0.02em;
-	}
-
-	.page-subtitle {
-		margin: 0;
-		color: rgba(236, 234, 229, 0.62);
-	}
-
-	.panel {
-		border: 1px solid var(--border-strong);
-		border-radius: 16px;
-		background: var(--surface);
-		box-shadow:
-			0 20px 60px rgba(0, 0, 0, 0.3),
-			inset 0 1px 0 rgba(255, 255, 255, 0.05);
-		backdrop-filter: blur(16px);
-		padding: 1.35rem;
-	}
-
 	.table {
 		display: grid;
 		gap: 0.55rem;
@@ -123,10 +95,6 @@
 	}
 
 	@media (max-width: 768px) {
-		.page-title {
-			font-size: 1.85rem;
-		}
-
 		.row {
 			grid-template-columns: 1fr;
 		}
