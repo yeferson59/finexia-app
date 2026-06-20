@@ -34,7 +34,7 @@
 
 	let isFocused = $state(false);
 
-	const handleBlur = (e: Event) => {
+	const handleBlur = () => {
 		isFocused = false;
 	};
 

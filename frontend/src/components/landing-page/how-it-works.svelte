@@ -3,17 +3,20 @@
 		{
 			number: '01',
 			title: 'Importa o vincula',
-			description: 'Conecta tus brokers, bancos o plataformas (o sube un Excel) con tus datos de inversión.'
+			description:
+				'Conecta tus brokers, bancos o plataformas (o sube un Excel) con tus datos de inversión.'
 		},
 		{
 			number: '02',
 			title: 'FINEXIA lo centraliza',
-			description: 'Nuestro motor de datos consolida todo, deduplicando activos y normalizando nomenclaturas automáticamente.'
+			description:
+				'Nuestro motor de datos consolida todo, deduplicando activos y normalizando nomenclaturas automáticamente.'
 		},
 		{
 			number: '03',
 			title: 'Visualiza tu patrimonio',
-			description: 'Accede a dashboards, gráficas en tiempo real y métricas de rendimiento al instante.'
+			description:
+				'Accede a dashboards, gráficas en tiempo real y métricas de rendimiento al instante.'
 		}
 	];
 </script>
@@ -21,9 +24,7 @@
 <section id="como-funciona" class="mx-auto w-full max-w-7xl px-6 py-20">
 	<div class="mb-16 space-y-4 text-center">
 		<p class="text-xs font-600 tracking-widest uppercase text-[#d4af37]">Proceso simple</p>
-		<h2 class="font-display text-4xl font-bold leading-tight text-[#ffffff]">
-			Conecta en minutos
-		</h2>
+		<h2 class="font-display text-4xl font-bold leading-tight text-[#ffffff]">Conecta en minutos</h2>
 	</div>
 
 	<div class="grid gap-8 md:grid-cols-3">

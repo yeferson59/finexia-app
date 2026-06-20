@@ -3,39 +3,47 @@
 		{
 			icon: '💰',
 			name: 'Patrimonio Total',
-			description: 'Suma consolidada y en tiempo real de todas tus inversiones, sin importar plataforma. Es el número que importa.'
+			description:
+				'Suma consolidada y en tiempo real de todas tus inversiones, sin importar plataforma. Es el número que importa.'
 		},
 		{
 			icon: '📊',
 			name: 'Composición del portafolio',
-			description: 'Visualiza qué porcentaje representa cada activo respecto a tu patrimonio total. Identifica concentración y balance.'
+			description:
+				'Visualiza qué porcentaje representa cada activo respecto a tu patrimonio total. Identifica concentración y balance.'
 		},
 		{
 			icon: '🏷️',
 			name: 'Diversificación por categoría',
-			description: 'Agrupa tus inversiones por tipo (Acciones, ETFs, Cripto, Bonos, Fondos, Efectivo) y monitorea tu diversificación.'
+			description:
+				'Agrupa tus inversiones por tipo (Acciones, ETFs, Cripto, Bonos, Fondos, Efectivo) y monitorea tu diversificación.'
 		},
 		{
 			icon: '📈',
 			name: 'Rendimiento individual',
-			description: 'Cada inversión muestra su retorno (%) desde que fue ingresada, más su valor en ganancia o pérdida absoluta.'
+			description:
+				'Cada inversión muestra su retorno (%) desde que fue ingresada, más su valor en ganancia o pérdida absoluta.'
 		},
 		{
 			icon: '💹',
 			name: 'P&L (Ganancia/Pérdida)',
-			description: 'Resumen claro de cuánto has ganado o perdido en total y por activo. Diferenciación visual inmediata.'
+			description:
+				'Resumen claro de cuánto has ganado o perdido en total y por activo. Diferenciación visual inmediata.'
 		},
 		{
 			icon: '📉',
 			name: 'Análisis avanzados',
-			description: 'Comparativa vs. benchmark, histórico patrimonial, alertas de rebalanceo y mucho más.'
+			description:
+				'Comparativa vs. benchmark, histórico patrimonial, alertas de rebalanceo y mucho más.'
 		}
 	];
 </script>
 
 <section id="caracteristicas-principales" class="mx-auto w-full max-w-7xl px-6 py-20">
 	<div class="mb-16 space-y-4 text-center">
-		<p class="text-xs font-600 tracking-widest uppercase text-[#d4af37]">Funcionalidades principales</p>
+		<p class="text-xs font-600 tracking-widest uppercase text-[#d4af37]">
+			Funcionalidades principales
+		</p>
 		<h2 class="font-display text-4xl font-bold leading-tight text-[#ffffff]">
 			Controla tu patrimonio con precisión
 		</h2>

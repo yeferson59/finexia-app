@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	const { params, data }: PageProps = $props();
 
@@ -38,11 +39,11 @@
 	});
 
 	function handleCancel() {
-		goto(`/dashboard/portfolios/${params.id}`);
+		goto(resolve('/dashboard/portfolios/[id]', { id: params.id }));
 	}
 
 	function createNewPlatform() {
-		goto('/dashboard/platforms/add?redirect=/dashboard/portfolios/' + params.id + '/add');
+		goto(resolve('/dashboard/platforms/add'));
 	}
 
 	function formatCurrency(value: number): string {
@@ -96,7 +97,7 @@
 						required
 					>
 						<option value="">-- Elige una plataforma --</option>
-						{#each platforms as platform}
+						{#each platforms as platform (platform.id)}
 							<option value={platform.id}>{platform.name}</option>
 						{/each}
 					</select>
@@ -138,7 +139,7 @@
 						required
 					>
 						<option value="">-- Selecciona un activo --</option>
-						{#each assets as asset}
+						{#each assets as asset (asset.id)}
 							<option value={asset.id}>
 								{asset.ticker} - {asset.name} ({asset.assetType})
 							</option>
@@ -254,8 +255,7 @@
 					name="notes"
 					placeholder="Agrega observaciones, estrategia o detalles especiales sobre este activo..."
 					class="form-textarea"
-					rows="3"
-				></textarea>
+					rows="3"></textarea>
 				<p class="field-hint">Notas personales sobre este activo (opcional)</p>
 			</div>
 		</section>

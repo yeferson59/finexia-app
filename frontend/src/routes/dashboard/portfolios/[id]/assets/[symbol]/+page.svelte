@@ -1,11 +1,32 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	const { params }: PageProps = $props();
 
+	interface AssetInfo {
+		name: string;
+		type: string;
+		sector: string;
+		icon: string;
+		quantity: number;
+		averageCost: number;
+		currentPrice: number;
+		dayChange: number;
+		totalCost: number;
+		totalValue: number;
+		gainLoss: number;
+		gainLossPercent: number;
+		allocation: number;
+		broker: string;
+		riskLevel: string;
+		volatility: number;
+		beta: number;
+	}
+
 	// Mock asset data
-	const assetData: Record<string, any> = {
+	const assetData: Record<string, AssetInfo> = {
 		AAPL: {
 			name: 'Apple Inc.',
 			type: 'Stock',
@@ -94,7 +115,7 @@
 	];
 
 	function goBack() {
-		goto(`/dashboard/portfolios/${params.id}`);
+		goto(resolve('/dashboard/portfolios/[id]', { id: params.id }));
 	}
 
 	function handleSell() {
@@ -107,7 +128,7 @@
 
 	function handleDelete() {
 		if (confirm(`¿Deseas eliminar la posición de ${params.symbol}?`)) {
-			goto(`/dashboard/portfolios/${params.id}`);
+			goto(resolve('/dashboard/portfolios/[id]', { id: params.id }));
 		}
 	}
 </script>

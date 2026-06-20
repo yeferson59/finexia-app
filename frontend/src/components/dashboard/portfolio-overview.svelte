@@ -40,7 +40,7 @@
 			</defs>
 
 			<!-- Horizontal grid lines -->
-			{#each Array.from({ length: 5 }) as _, i}
+			{#each Array.from({ length: 5 }) as _, i (i)}
 				<line
 					x1="40"
 					y1={40 + i * 50}
@@ -81,7 +81,7 @@
 			/>
 
 			<!-- Data points -->
-			{#each portfolioData as d, i}
+			{#each portfolioData as d, i (d.month)}
 				<circle
 					cx={40 + i * 90}
 					cy={240 - ((d.value - minValue) / range) * 180}
@@ -93,7 +93,7 @@
 			{/each}
 
 			<!-- X-axis labels -->
-			{#each portfolioData as d, i}
+			{#each portfolioData as d, i (d.month)}
 				<text
 					x={40 + i * 90}
 					y="280"

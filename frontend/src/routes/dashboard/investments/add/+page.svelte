@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	interface FormData {
 		name: string;
@@ -49,10 +50,10 @@
 		isSubmitting = true;
 		try {
 			// Simular API call
-			await new Promise((resolve) => setTimeout(resolve, 1000));
+			await new Promise((done) => setTimeout(done, 1000));
 			submitSuccess = true;
 			setTimeout(() => {
-				goto('/dashboard/investments');
+				goto(resolve('/dashboard/investments'));
 			}, 1500);
 		} catch (error) {
 			console.error('Error:', error);
@@ -62,7 +63,7 @@
 	}
 
 	function handleCancel() {
-		goto('/dashboard/investments');
+		goto(resolve('/dashboard/investments'));
 	}
 </script>
 
@@ -106,15 +107,14 @@
 					placeholder="Describe los objetivos, estrategia y características del producto..."
 					class="form-textarea"
 					rows="4"
-					required
-				></textarea>
+					required></textarea>
 			</div>
 
 			<div class="form-row">
 				<div class="form-group">
 					<label for="type" class="form-label">Tipo de Instrumento</label>
 					<select id="type" bind:value={formData.type} class="form-select">
-						{#each investmentTypes as type}
+						{#each investmentTypes as type (type)}
 							<option value={type}>{type}</option>
 						{/each}
 					</select>
@@ -123,7 +123,7 @@
 				<div class="form-group">
 					<label for="category" class="form-label">Categoría</label>
 					<select id="category" bind:value={formData.category} class="form-select">
-						{#each categories as category}
+						{#each categories as category (category)}
 							<option value={category}>{category}</option>
 						{/each}
 					</select>
@@ -179,7 +179,7 @@
 				<div class="form-group">
 					<label for="risk" class="form-label">Nivel de Riesgo</label>
 					<select id="risk" bind:value={formData.riskLevel} class="form-select">
-						{#each riskLevels as level}
+						{#each riskLevels as level (level)}
 							<option value={level}>{level}</option>
 						{/each}
 					</select>

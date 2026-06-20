@@ -3,22 +3,26 @@
 		{
 			icon: '📦',
 			title: 'Inversiones dispersas',
-			description: 'Acciones en Bono, ETFs en Interactive Brokers, cripto en Kraken, fondos en tu banco local. Todo fragmentado.'
+			description:
+				'Acciones en Bono, ETFs en Interactive Brokers, cripto en Kraken, fondos en tu banco local. Todo fragmentado.'
 		},
 		{
 			icon: '👁️',
 			title: 'Cero visibilidad del todo',
-			description: 'Tienes que revisar cada plataforma, cada login diferente, cada interfaz extraña. Agotador.'
+			description:
+				'Tienes que revisar cada plataforma, cada login diferente, cada interfaz extraña. Agotador.'
 		},
 		{
 			icon: '❓',
 			title: 'Decisiones en la incertidumbre',
-			description: 'No ves claramente qué te está ganando dinero, qué pesa demasiado o cómo está realmente compuesto.'
+			description:
+				'No ves claramente qué te está ganando dinero, qué pesa demasiado o cómo está realmente compuesto.'
 		},
 		{
 			icon: '📊',
 			title: 'Trabajo manual y errores',
-			description: 'Excel con actualizaciones manuales. Datos desactualizados. Fórmulas rotas. Frustración.'
+			description:
+				'Excel con actualizaciones manuales. Datos desactualizados. Fórmulas rotas. Frustración.'
 		}
 	];
 </script>
@@ -30,7 +34,8 @@
 			¿Tu dinero está en 5 lugares diferentes y no sabes ni cuánto has ganado?
 		</h2>
 		<p class="mx-auto max-w-2xl text-lg text-[#a0a0a0]">
-			Millones de inversionistas viven esta frustración. Múltiples plataformas. Cero visibilidad. Sin control real.
+			Millones de inversionistas viven esta frustración. Múltiples plataformas. Cero visibilidad.
+			Sin control real.
 		</p>
 	</div>
 

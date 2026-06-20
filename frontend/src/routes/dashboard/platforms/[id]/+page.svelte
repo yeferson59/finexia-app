@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { resolve } from '$app/paths';
 
 	interface FormData {
 		name: string;
@@ -66,12 +66,12 @@
 		if (isEditing) {
 			isEditing = false;
 		} else {
-			goto('/dashboard/platforms');
+			goto(resolve('/dashboard/platforms'));
 		}
 	}
 
 	function goBack() {
-		goto('/dashboard/platforms');
+		goto(resolve('/dashboard/platforms'));
 	}
 </script>
 
@@ -193,8 +193,7 @@
 								id="description"
 								bind:value={formData.description}
 								class="form-textarea"
-								rows="4"
-							></textarea>
+								rows="4"></textarea>
 						</div>
 
 						<div class="form-row">
@@ -203,7 +202,7 @@
 									>Tipo de Plataforma <span class="required">*</span></label
 								>
 								<select id="type" bind:value={formData.type} class="form-select" required>
-									{#each platformTypes as type}
+									{#each platformTypes as type (type)}
 										<option value={type}>{type}</option>
 									{/each}
 								</select>

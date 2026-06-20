@@ -7,7 +7,8 @@
 
 	const testimonials = [
 		{
-			quote: 'Finalmente veo todo junto. Pasé de estar ansioso a tener control real sobre mi dinero.',
+			quote:
+				'Finalmente veo todo junto. Pasé de estar ansioso a tener control real sobre mi dinero.',
 			author: 'Andrés',
 			age: '34',
 			context: 'Inversionista con 4 brokers'

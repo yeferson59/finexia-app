@@ -85,7 +85,7 @@
 		</svg>
 
 		<div class="pie-legend">
-			{#each assets as asset}
+			{#each assets as asset (asset.name)}
 				<div class="legend-item">
 					<div class="legend-color" style="background-color: {asset.color}"></div>
 					<div class="legend-text">

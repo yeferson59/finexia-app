@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+
 	interface Props {
 		sidebarOpen?: boolean;
 		data: { user: { name: string; email: string } };
@@ -30,7 +32,7 @@
 			</svg>
 		</button>
 
-		<a class="header-brand" href="/dashboard" aria-label="Finexia, ir al inicio">
+		<a class="header-brand" href={resolve('/dashboard')} aria-label="Finexia, ir al inicio">
 			<svg
 				class="brand-icon"
 				width="30"

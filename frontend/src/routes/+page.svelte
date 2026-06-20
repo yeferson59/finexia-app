@@ -18,10 +18,7 @@
 	let waitlistEmail = $state('');
 	let waitlistError = $state(false);
 
-	let cdDays: HTMLElement;
-	let cdHours: HTMLElement;
-	let cdMins: HTMLElement;
-	let cdSecs: HTMLElement;
+	let countdown = $state({ days: '00', hours: '00', mins: '00', secs: '00' });
 	let metricsEl: HTMLElement;
 	let headerEl: HTMLElement;
 
@@ -33,10 +30,12 @@
 		const target = new Date('2026-10-01T09:00:00').getTime();
 		function tick() {
 			const diff = Math.max(0, target - Date.now());
-			cdDays.textContent = pad(Math.floor(diff / 86400000));
-			cdHours.textContent = pad(Math.floor((diff % 86400000) / 3600000));
-			cdMins.textContent = pad(Math.floor((diff % 3600000) / 60000));
-			cdSecs.textContent = pad(Math.floor((diff % 60000) / 1000));
+			countdown = {
+				days: pad(Math.floor(diff / 86400000)),
+				hours: pad(Math.floor((diff % 86400000) / 3600000)),
+				mins: pad(Math.floor((diff % 3600000) / 60000)),
+				secs: pad(Math.floor((diff % 60000) / 1000))
+			};
 		}
 		tick();
 		const countdownInterval = setInterval(tick, 1000);
@@ -166,7 +165,8 @@
 	<meta name="twitter:description" content={DEFAULT_DESCRIPTION} />
 	<meta name="twitter:image" content={OG_IMAGE} />
 
-	<!-- Structured data -->
+	<!-- Structured data (app-controlled JSON-LD, no user input) -->
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 	{@html `<script type="application/ld+json">${jsonLd}</scr` + 'ipt>'}
 </svelte:head>
 
@@ -250,19 +250,19 @@
 
 			<div class="countdown reveal" aria-label="Cuenta regresiva para el lanzamiento">
 				<div class="cd-cell">
-					<div class="cd-num" bind:this={cdDays}>00</div>
+					<div class="cd-num">{countdown.days}</div>
 					<div class="cd-label">días</div>
 				</div>
 				<div class="cd-cell">
-					<div class="cd-num" bind:this={cdHours}>00</div>
+					<div class="cd-num">{countdown.hours}</div>
 					<div class="cd-label">hrs</div>
 				</div>
 				<div class="cd-cell">
-					<div class="cd-num" bind:this={cdMins}>00</div>
+					<div class="cd-num">{countdown.mins}</div>
 					<div class="cd-label">min</div>
 				</div>
 				<div class="cd-cell">
-					<div class="cd-num" bind:this={cdSecs}>00</div>
+					<div class="cd-num">{countdown.secs}</div>
 					<div class="cd-label">seg</div>
 				</div>
 			</div>
@@ -572,7 +572,7 @@
 			<h2 class="sec-title">Lo que necesitas saber</h2>
 		</div>
 		<div class="faq">
-			{#each faqs as faq, i}
+			{#each faqs as faq, i (faq.q)}
 				<div class="faq-item reveal" class:open={openFaqIndex === i}>
 					<button class="faq-q" onclick={() => toggleFaq(i)}>
 						{faq.q}<span class="plus" aria-hidden="true"></span>

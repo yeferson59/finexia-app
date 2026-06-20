@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	const { params }: PageProps = $props();
 
@@ -13,15 +14,15 @@
 	];
 
 	function goBack() {
-		goto('/dashboard/portfolios');
+		goto(resolve('/dashboard/portfolios'));
 	}
 
 	function addAsset() {
-		goto(`/dashboard/portfolios/${params.id}/add`);
+		goto(resolve('/dashboard/portfolios/[id]/add', { id: params.id }));
 	}
 
 	function viewAssetDetails(symbol: string) {
-		goto(`/dashboard/portfolios/${params.id}/assets/${symbol}`);
+		goto(resolve('/dashboard/portfolios/[id]/assets/[symbol]', { id: params.id, symbol }));
 	}
 </script>
 

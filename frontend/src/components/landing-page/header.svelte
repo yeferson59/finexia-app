@@ -1,7 +1,10 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 </script>
 
-<header class="sticky top-0 z-50 border-b border-[rgba(212,175,55,0.1)] bg-[#0f1419]/95 backdrop-blur-md">
+<header
+	class="sticky top-0 z-50 border-b border-[rgba(212,175,55,0.1)] bg-[#0f1419]/95 backdrop-blur-md"
+>
 	<nav class="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4">
 		<div class="flex items-center gap-3">
 			<div class="logo-mark" aria-hidden="true"></div>
@@ -15,7 +18,7 @@
 		</div>
 		<div class="flex items-center gap-3">
 			<button class="cta-secondary" aria-label="Ver demo" type="button">Ver demo</button>
-			<a href="/auth" class="cta-primary" aria-label="Acceder a la plataforma">
+			<a href={resolve('/auth')} class="cta-primary" aria-label="Acceder a la plataforma">
 				Acceder
 			</a>
 		</div>

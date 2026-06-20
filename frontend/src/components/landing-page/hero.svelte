@@ -9,14 +9,19 @@
 <section class="mx-auto grid w-full max-w-7xl gap-12 px-6 py-24 lg:grid-cols-[1.1fr_0.9fr]">
 	<div class="space-y-8">
 		<div class="space-y-6">
-			<div class="inline-block rounded-full border border-[rgba(212,175,55,0.3)] bg-[rgba(212,175,55,0.05)] px-4 py-2">
-				<p class="text-xs font-600 tracking-widest uppercase text-[#d4af37]">Gestión centralizada</p>
+			<div
+				class="inline-block rounded-full border border-[rgba(212,175,55,0.3)] bg-[rgba(212,175,55,0.05)] px-4 py-2"
+			>
+				<p class="text-xs font-600 tracking-widest uppercase text-[#d4af37]">
+					Gestión centralizada
+				</p>
 			</div>
 			<h1 class="font-display text-5xl font-bold leading-tight text-[#ffffff] lg:text-6xl">
 				Tu patrimonio, bajo control
 			</h1>
 			<p class="text-lg leading-relaxed text-[#a0a0a0]">
-				Centraliza todas tus inversiones en un solo lugar. Sin dispersión. Sin confusión. Solo claridad financiera.
+				Centraliza todas tus inversiones en un solo lugar. Sin dispersión. Sin confusión. Solo
+				claridad financiera.
 			</p>
 		</div>
 		<div class="flex flex-wrap items-center gap-4">
@@ -24,11 +29,15 @@
 			<a class="cta-ghost" aria-label="Ver demo interactiva" href="#demo">Ver demo</a>
 		</div>
 		<div class="pt-4">
-			<p class="mb-4 text-xs font-600 tracking-widest uppercase text-[#a0a0a0]">Sin tarjeta de crédito · Acceso inmediato</p>
+			<p class="mb-4 text-xs font-600 tracking-widest uppercase text-[#a0a0a0]">
+				Sin tarjeta de crédito · Acceso inmediato
+			</p>
 			<div class="stats-grid">
 				{#each stats as stat (stat.label)}
 					<div class="stat-item">
-						<span class="text-xs font-600 tracking-widest uppercase text-[#d4af37]">{stat.label}</span>
+						<span class="text-xs font-600 tracking-widest uppercase text-[#d4af37]"
+							>{stat.label}</span
+						>
 						<p class="text-2xl font-bold text-[#ffffff]">{stat.value}</p>
 					</div>
 				{/each}
@@ -39,7 +48,9 @@
 		<div class="dashboard-card">
 			<div class="flex items-center justify-between border-b border-[rgba(212,175,55,0.1)] pb-4">
 				<p class="text-xs font-600 tracking-widest uppercase text-[#a0a0a0]">Tablero</p>
-				<span class="rounded-full bg-[rgba(46,204,113,0.2)] px-3 py-1 text-xs font-600 text-[#2ecc71]">
+				<span
+					class="rounded-full bg-[rgba(46,204,113,0.2)] px-3 py-1 text-xs font-600 text-[#2ecc71]"
+				>
 					Activo
 				</span>
 			</div>
@@ -59,12 +70,7 @@
 					</div>
 				</div>
 				<div class="space-y-4">
-					{#each [
-						{ label: 'Acciones', value: 40 },
-						{ label: 'ETFs', value: 35 },
-						{ label: 'Cripto', value: 15 },
-						{ label: 'Efectivo', value: 10 }
-					] as slice (slice.label)}
+					{#each [{ label: 'Acciones', value: 40 }, { label: 'ETFs', value: 35 }, { label: 'Cripto', value: 15 }, { label: 'Efectivo', value: 10 }] as slice (slice.label)}
 						<div>
 							<div class="flex items-center justify-between text-sm">
 								<span class="text-[#a0a0a0]">{slice.label}</span>

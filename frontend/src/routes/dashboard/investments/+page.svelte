@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	const opportunities = [
 		{
@@ -14,11 +15,11 @@
 	];
 
 	function viewDetails(id: string) {
-		goto(`/dashboard/investments/${id}`);
+		goto(resolve('/dashboard/investments/[id]', { id }));
 	}
 
 	function addNewProduct() {
-		goto('/dashboard/investments/add');
+		goto(resolve('/dashboard/investments/add'));
 	}
 </script>
 

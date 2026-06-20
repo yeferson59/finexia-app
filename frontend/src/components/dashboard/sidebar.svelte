@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 
 	interface Props {
 		sidebarOpen?: boolean;
@@ -8,13 +9,13 @@
 	let { sidebarOpen = false }: Props = $props();
 
 	const menuItems = [
-		{ label: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
-		{ label: 'Portafolios', icon: 'briefcase', href: '/dashboard/portfolios' },
-		{ label: 'Inversiones', icon: 'trending-up', href: '/dashboard/investments' },
-		{ label: 'Plataformas', icon: 'layers', href: '/dashboard/platforms' },
-		{ label: 'Transacciones', icon: 'exchange', href: '/dashboard/transactions' },
-		{ label: 'Reportes', icon: 'bar-chart', href: '/dashboard/reports' },
-		{ label: 'Configuración', icon: 'settings', href: '/dashboard/settings' }
+		{ label: 'Dashboard', icon: 'dashboard', href: resolve('/dashboard') },
+		{ label: 'Portafolios', icon: 'briefcase', href: resolve('/dashboard/portfolios') },
+		{ label: 'Inversiones', icon: 'trending-up', href: resolve('/dashboard/investments') },
+		{ label: 'Plataformas', icon: 'layers', href: resolve('/dashboard/platforms') },
+		{ label: 'Transacciones', icon: 'exchange', href: resolve('/dashboard/transactions') },
+		{ label: 'Reportes', icon: 'bar-chart', href: resolve('/dashboard/reports') },
+		{ label: 'Configuración', icon: 'settings', href: resolve('/dashboard/settings') }
 	];
 
 	function isActive(href: string): boolean {

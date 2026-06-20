@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	interface FormData {
 		name: string;
@@ -31,7 +32,7 @@
 	]);
 
 	function handleCancel() {
-		goto('/dashboard/platforms');
+		goto(resolve('/dashboard/platforms'));
 	}
 </script>
 
@@ -76,8 +77,7 @@
 					bind:value={formData.description}
 					placeholder="Describe qué tipo de inversiones realizas en esta plataforma..."
 					class="form-textarea"
-					rows="4"
-				></textarea>
+					rows="4"></textarea>
 			</div>
 
 			<div class="form-row">
@@ -86,7 +86,7 @@
 						>Tipo de Plataforma <span class="required">*</span></label
 					>
 					<select id="type" name="type" bind:value={formData.type} class="form-select" required>
-						{#each platformTypes.entries() as [key, type]}
+						{#each platformTypes.entries() as [key, type] (key)}
 							<option value={key}>{type}</option>
 						{/each}
 					</select>

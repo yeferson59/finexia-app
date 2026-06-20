@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
@@ -8,15 +9,15 @@
 	let platformToDelete: string | null = $state(null);
 
 	function viewDetails(id: string) {
-		goto(`/dashboard/platforms/${id}`);
+		goto(resolve('/dashboard/platforms/[id]', { id }));
 	}
 
 	function addNewPlatform() {
-		goto('/dashboard/platforms/add');
+		goto(resolve('/dashboard/platforms/add'));
 	}
 
 	function editPlatform(id: string) {
-		goto(`/dashboard/platforms/${id}`);
+		goto(resolve('/dashboard/platforms/[id]', { id }));
 	}
 
 	function confirmDelete(id: string) {

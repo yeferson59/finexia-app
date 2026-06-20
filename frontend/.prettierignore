@@ -7,3 +7,9 @@ bun.lockb
 
 # Miscellaneous
 /static/
+.claude/
+build/
+.svelte-kit/
+.opencode/
+node_modules/
+.vscode/

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+
 	const activities = [
 		{
 			id: 1,
@@ -71,7 +73,7 @@
 			<p class="card-eyebrow">Movimientos</p>
 			<h2 class="card-title">Actividad Reciente</h2>
 		</div>
-		<a href="/dashboard/transactions" class="view-all">Ver todo →</a>
+		<a href={resolve('/dashboard/transactions')} class="view-all">Ver todo →</a>
 	</div>
 
 	<div class="activity-list">
@@ -132,7 +134,7 @@
 	</div>
 
 	<div class="card-footer">
-		<a href="/dashboard/reports" class="footer-link">Descargar extracto →</a>
+		<a href={resolve('/dashboard/reports')} class="footer-link">Descargar extracto →</a>
 	</div>
 </div>
 

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	interface Investment {
 		id: string;
@@ -103,7 +104,7 @@
 	}
 
 	function handleBack() {
-		goto('/dashboard/investments');
+		goto(resolve('/dashboard/investments'));
 	}
 
 	const dateFormatter = new Intl.DateTimeFormat('es-CO', {
@@ -249,7 +250,7 @@
 	<section class="content-panel highlights-section">
 		<h2 class="section-title">Características Destacadas</h2>
 		<ul class="highlights-list">
-			{#each investment.highlights as highlight}
+			{#each investment.highlights as highlight (highlight)}
 				<li class="highlight-item">
 					<span class="highlight-icon">✓</span>
 					{highlight}

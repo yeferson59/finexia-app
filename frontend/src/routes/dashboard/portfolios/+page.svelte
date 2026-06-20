@@ -1,15 +1,16 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
 
 	function openPortfolio(id: string) {
-		goto(`/dashboard/portfolios/${id}`);
+		goto(resolve('/dashboard/portfolios/[id]', { id }));
 	}
 
 	function createPortfolio() {
-		goto('/dashboard/portfolios/add');
+		goto(resolve('/dashboard/portfolios/add'));
 	}
 </script>
 

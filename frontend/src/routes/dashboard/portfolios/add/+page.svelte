@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
@@ -40,7 +41,7 @@
 	const currencies = ['USD', 'COP', 'EUR', 'MXN', 'ARS'];
 
 	function handleCancel() {
-		goto('/dashboard/portfolios');
+		goto(resolve('/dashboard/portfolios'));
 	}
 </script>
 
@@ -115,8 +116,7 @@
 					placeholder="Describe el propósito de este portafolio"
 					class="textarea"
 					disabled={isSubmitting}
-					rows="3"
-				></textarea>
+					rows="3"></textarea>
 			</div>
 		</fieldset>
 
@@ -133,7 +133,7 @@
 						class="select"
 						disabled={isSubmitting}
 					>
-						{#each portfolioTypes as type}
+						{#each portfolioTypes as type (type.value)}
 							<option value={type.value}>{type.label}</option>
 						{/each}
 					</select>
@@ -148,7 +148,7 @@
 						name="currency"
 						disabled={isSubmitting}
 					>
-						{#each currencies as curr}
+						{#each currencies as curr (curr)}
 							<option value={curr}>{curr}</option>
 						{/each}
 					</select>
