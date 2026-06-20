@@ -46,4 +46,17 @@
 		font-size: 13px;
 		color: var(--text-dim);
 	}
+	@media (max-width: 640px) {
+		.foot {
+			flex-direction: column;
+			align-items: center;
+			text-align: center;
+			gap: 20px;
+		}
+		.foot-links {
+			flex-wrap: wrap;
+			justify-content: center;
+			gap: 16px 20px;
+		}
+	}
 </style>

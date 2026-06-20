@@ -42,9 +42,6 @@
 </section>
 
 <style>
-	.block {
-		padding: 88px 0;
-	}
 	.benefits-list {
 		display: grid;
 		grid-template-columns: 1fr 1fr;

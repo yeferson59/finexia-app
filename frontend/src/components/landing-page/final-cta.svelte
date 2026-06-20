@@ -8,9 +8,6 @@
 </section>
 
 <style>
-	.block {
-		padding: 88px 0;
-	}
 	.final-cta {
 		text-align: center;
 		padding: 92px 40px;
@@ -60,5 +57,18 @@
 	.final-cta :global(.btn-amber-lg) {
 		margin-top: 32px;
 		position: relative;
+	}
+	@media (max-width: 640px) {
+		.final-cta {
+			padding: 56px 22px;
+		}
+		.final-cta :global(.btn-amber-lg) {
+			margin-top: 26px;
+		}
+	}
+	@media (max-width: 480px) {
+		.final-cta {
+			padding: 44px 18px;
+		}
 	}
 </style>

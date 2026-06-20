@@ -518,7 +518,8 @@
 	@media (max-width: 940px) {
 		.hero {
 			grid-template-columns: 1fr;
-			gap: 52px;
+			gap: 48px;
+			padding: 60px 0 68px;
 		}
 		.hero-right {
 			flex-direction: row;
@@ -533,6 +534,10 @@
 		}
 	}
 	@media (max-width: 640px) {
+		.hero {
+			gap: 40px;
+			padding: 44px 0 52px;
+		}
 		.hero-right {
 			flex-direction: column;
 		}
@@ -544,6 +549,20 @@
 		}
 		.countdown {
 			flex-wrap: wrap;
+		}
+	}
+	@media (max-width: 480px) {
+		.hero-title {
+			margin-top: 16px;
+		}
+		.countdown {
+			margin-top: 32px;
+		}
+		.cd-cell {
+			padding: 14px 16px;
+		}
+		.waitlist {
+			margin-top: 28px;
 		}
 	}
 </style>

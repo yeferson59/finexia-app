@@ -35,9 +35,6 @@
 </section>
 
 <style>
-	.block {
-		padding: 88px 0;
-	}
 	.faq {
 		max-width: 720px;
 		margin: 0 auto;

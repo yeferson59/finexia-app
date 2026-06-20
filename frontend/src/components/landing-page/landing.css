@@ -10,6 +10,32 @@
 	padding: 0 36px;
 }
 
+/*
+ * Vertical rhythm for each landing section. Defined once here (global) instead of
+ * per-component so the responsive scale lives in a single place.
+ */
+.block {
+	padding: 88px 0;
+}
+
+@media (max-width: 768px) {
+	.wrap {
+		padding: 0 24px;
+	}
+	.block {
+		padding: 64px 0;
+	}
+}
+
+@media (max-width: 480px) {
+	.wrap {
+		padding: 0 18px;
+	}
+	.block {
+		padding: 52px 0;
+	}
+}
+
 /* Section heading block */
 .sec-head {
 	max-width: 640px;
