@@ -38,46 +38,34 @@ function withRobots(event: Parameters<Handle>[0]['event'], response: Response): 
 	return response;
 }
 
+// Only private areas need the session; validating it on public pages (landing,
+// sitemap, etc.) would add a backend round-trip to the most-visited routes.
+function needsSession(pathname: string): boolean {
+	return PRIVATE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
+	event.locals.user = null;
+	event.locals.session = null;
+
 	const accessToken = event.cookies.get('access_token_finexia');
 
-	if (!accessToken) {
-		event.locals.user = null;
-		event.locals.session = null;
+	if (accessToken && needsSession(event.url.pathname)) {
+		const res = await event.fetch(`${env.BASE_API}/auth/session`, {
+			headers: {
+				Authorization: `Bearer ${accessToken}`
+			}
+		});
 
-		const response = await resolve(event);
+		if (res.ok) {
+			const { data, success }: SessionResponse = await res.json();
 
-		return withRobots(event, response);
-	}
-
-	const res = await event.fetch(`${env.BASE_API}/auth/session`, {
-		headers: {
-			Authorization: `Bearer ${accessToken}`
+			if (success) {
+				event.locals.user = data.user;
+				event.locals.session = data.session;
+			}
 		}
-	});
-
-	if (!res.ok) {
-		event.locals.user = null;
-		event.locals.session = null;
-
-		const response = await resolve(event);
-
-		return withRobots(event, response);
 	}
-
-	const { data, success }: SessionResponse = await res.json();
-
-	if (!success) {
-		event.locals.user = null;
-		event.locals.session = null;
-
-		const response = await resolve(event);
-
-		return withRobots(event, response);
-	}
-
-	event.locals.user = data.user;
-	event.locals.session = data.session;
 
 	const response = await resolve(event);
 

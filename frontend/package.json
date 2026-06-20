@@ -48,9 +48,6 @@
 	},
 	"dependencies": {
 		"bits-ui": "2.18.1",
-		"d3-array": "3.2.4",
-		"d3-scale": "4.0.2",
-		"layerchart": "1.0.13",
 		"zod": "4.4.3"
 	}
 }

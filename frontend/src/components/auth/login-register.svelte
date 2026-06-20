@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import Button from '$components/ui/button.svelte';
 	import Input from '$components/ui/input.svelte';
 	import Checkbox from '$components/ui/checkbox.svelte';
@@ -81,7 +82,19 @@
 		<section class="forms-container">
 			<!-- Login Form -->
 			{#if isLoginMode}
-				<form method="POST" action="?/login" class="form-content" id="login-form">
+				<form
+					method="POST"
+					action="?/login"
+					class="form-content"
+					id="login-form"
+					use:enhance={() => {
+						isSubmitting = true;
+						return async ({ update }) => {
+							await update();
+							isSubmitting = false;
+						};
+					}}
+				>
 					<Input
 						label="Email"
 						id="login-email"
@@ -142,7 +155,19 @@
 				</form>
 			{:else}
 				<!-- Register Form -->
-				<form method="POST" action="?/register" class="form-content" id="register-form">
+				<form
+					method="POST"
+					action="?/register"
+					class="form-content"
+					id="register-form"
+					use:enhance={() => {
+						isSubmitting = true;
+						return async ({ update }) => {
+							await update();
+							isSubmitting = false;
+						};
+					}}
+				>
 					<Input
 						label="Nombre completo"
 						id="register-name"

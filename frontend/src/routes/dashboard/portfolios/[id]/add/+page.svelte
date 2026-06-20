@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
+	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import PageHeader from '$components/ui/page-header.svelte';
@@ -81,7 +82,18 @@
 />
 
 <div class="form-container">
-	<form method="POST" action={`/dashboard/portfolios/${params.id}/add`} class="portfolio-form">
+	<form
+		method="POST"
+		action={`/dashboard/portfolios/${params.id}/add`}
+		class="portfolio-form"
+		use:enhance={() => {
+			isSubmitting = true;
+			return async ({ update }) => {
+				await update();
+				isSubmitting = false;
+			};
+		}}
+	>
 		<!-- Platform Selection -->
 		<section class="form-section">
 			<h2 class="section-title">Plataforma de Inversión</h2>

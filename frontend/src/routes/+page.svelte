@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { PageProps } from './$types';
 	import {
 		SITE_URL,
 		SITE_NAME,
@@ -20,8 +19,6 @@
 	import Faq from '$/components/landing-page/faq.svelte';
 	import FinalCta from '$/components/landing-page/final-cta.svelte';
 	import Footer from '$/components/landing-page/footer.svelte';
-
-	const { form }: PageProps = $props();
 
 	const canonical = absoluteUrl('/');
 
@@ -135,7 +132,7 @@
 <Header />
 
 <main>
-	<Hero {form} />
+	<Hero />
 
 	<div class="wrap"><div class="divider"></div></div>
 	<Benefits />
