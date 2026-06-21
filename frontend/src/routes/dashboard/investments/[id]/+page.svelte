@@ -2,6 +2,10 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import {
+		investmentStore,
+		type Investment as StoredInvestment
+	} from '$lib/stores/investments.svelte';
 
 	interface Investment {
 		id: string;
@@ -79,9 +83,51 @@
 
 	let investment = $state<Investment | null>(null);
 
+	/**
+	 * Builds a detail view for products that exist only in the shared store
+	 * (e.g. just created via the "add product" form) and therefore have no rich
+	 * mock entry. Fields not collected by the form fall back to sensible defaults.
+	 */
+	function fromStore(stored: StoredInvestment): Investment {
+		const start = new Date();
+		const maturity = new Date(
+			start.getFullYear(),
+			start.getMonth() + stored.horizon,
+			start.getDate()
+		);
+		const highlights = [`Tipo de instrumento: ${stored.type}`, `Categoría: ${stored.category}`];
+		if (stored.minimumInvestment > 0) {
+			highlights.push(`Inversión mínima: $${stored.minimumInvestment.toLocaleString('es-CO')}`);
+		}
+		return {
+			id: stored.id,
+			name: stored.name,
+			type: stored.type,
+			category: stored.category,
+			description: stored.description,
+			riskLevel: stored.riskLevel,
+			expectedROI: stored.expectedROI,
+			currentROI: 0,
+			horizon: stored.horizon,
+			minimumInvestment: stored.minimumInvestment,
+			totalInvested: 0,
+			currentValue: 0,
+			investors: 0,
+			status: stored.status,
+			startDate: start.toISOString().slice(0, 10),
+			maturityDate: maturity.toISOString().slice(0, 10),
+			highlights
+		};
+	}
+
 	$effect(() => {
 		const id = page.params.id;
-		investment = id ? (investmentDetails[id] ?? null) : null;
+		if (!id) {
+			investment = null;
+			return;
+		}
+		const stored = investmentStore.getById(id);
+		investment = investmentDetails[id] ?? (stored ? fromStore(stored) : null);
 	});
 
 	function getRiskColor(risk: string): string {

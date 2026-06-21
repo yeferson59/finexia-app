@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import PageHeader from '$components/ui/page-header.svelte';
+	import { investmentStore } from '$lib/stores/investments.svelte';
 
 	interface FormData {
 		name: string;
@@ -29,6 +30,7 @@
 
 	let isSubmitting = $state(false);
 	let submitSuccess = $state(false);
+	let errors: Partial<Record<keyof FormData, string>> = $state({});
 
 	const investmentTypes = ['Fondos', 'Acciones', 'ETF', 'Bonos', 'Criptomonedas', 'Derivados'];
 	const riskLevels = ['Bajo', 'Medio', 'Alto', 'Muy Alto'];
@@ -41,24 +43,39 @@
 		'Divisas'
 	];
 
-	async function handleSubmit(e: SubmitEvent) {
+	function validate(): boolean {
+		const nextErrors: Partial<Record<keyof FormData, string>> = {};
+		if (!formData.name.trim()) nextErrors.name = 'El nombre es obligatorio';
+		if (!formData.description.trim()) nextErrors.description = 'La descripción es obligatoria';
+		if (!formData.expectedROI) nextErrors.expectedROI = 'Indica el ROI esperado';
+		if (!formData.horizon) nextErrors.horizon = 'Indica el horizonte de inversión';
+		errors = nextErrors;
+		return Object.keys(nextErrors).length === 0;
+	}
+
+	function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
-		if (!formData.name || !formData.description || !formData.expectedROI || !formData.horizon) {
-			alert('Por favor completa todos los campos requeridos');
-			return;
-		}
+		if (!validate()) return;
 
 		isSubmitting = true;
 		try {
-			// Simular API call
-			await new Promise((done) => setTimeout(done, 1000));
+			investmentStore.addInvestment({
+				name: formData.name.trim(),
+				description: formData.description.trim(),
+				type: formData.type,
+				category: formData.category,
+				riskLevel: formData.riskLevel,
+				expectedROI: Number(formData.expectedROI),
+				horizon: Number(formData.horizon),
+				minimumInvestment: Number(formData.minimumInvestment) || 0,
+				status: formData.status
+			});
 			submitSuccess = true;
 			setTimeout(() => {
 				goto(resolve('/dashboard/investments'));
 			}, 1500);
 		} catch (error) {
 			console.error('Error:', error);
-		} finally {
 			isSubmitting = false;
 		}
 	}
@@ -96,6 +113,7 @@
 					class="form-input"
 					required
 				/>
+				{#if errors.name}<span class="field-error">{errors.name}</span>{/if}
 			</div>
 
 			<div class="form-group">
@@ -109,6 +127,7 @@
 					class="form-textarea"
 					rows="4"
 					required></textarea>
+				{#if errors.description}<span class="field-error">{errors.description}</span>{/if}
 			</div>
 
 			<div class="form-row">
@@ -155,6 +174,7 @@
 						/>
 						<span class="addon-text">%</span>
 					</div>
+					{#if errors.expectedROI}<span class="field-error">{errors.expectedROI}</span>{/if}
 				</div>
 
 				<div class="form-group">
@@ -173,6 +193,7 @@
 						/>
 						<span class="addon-text">meses</span>
 					</div>
+					{#if errors.horizon}<span class="field-error">{errors.horizon}</span>{/if}
 				</div>
 			</div>
 
@@ -290,6 +311,12 @@
 
 	.required {
 		color: var(--red);
+	}
+
+	.field-error {
+		font-size: 0.8rem;
+		color: var(--red);
+		letter-spacing: 0.2px;
 	}
 
 	.form-input,

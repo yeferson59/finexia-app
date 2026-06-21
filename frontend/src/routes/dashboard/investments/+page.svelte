@@ -3,18 +3,9 @@
 	import { resolve } from '$app/paths';
 	import PageHeader from '$components/ui/page-header.svelte';
 	import Card from '$components/ui/card.svelte';
+	import { investmentStore } from '$lib/stores/investments.svelte';
 
-	const opportunities = [
-		{
-			id: '1',
-			name: 'Fondo Crecimiento Tecnológico',
-			risk: 'Medio',
-			roi: '15.2%',
-			horizon: '24 meses'
-		},
-		{ id: '2', name: 'ETF Mercados Emergentes', risk: 'Alto', roi: '18.5%', horizon: '36 meses' },
-		{ id: '3', name: 'Energía Renovable', risk: 'Bajo', roi: '8.1%', horizon: '24 meses' }
-	];
+	const opportunities = $derived(investmentStore.items);
 
 	function viewDetails(id: string) {
 		goto(resolve('/dashboard/investments/[id]', { id }));
@@ -86,9 +77,9 @@
 						aria-label={`Ver detalles de ${item.name}`}
 					>
 						<span>{item.name}</span>
-						<span>{item.risk}</span>
-						<span class="positive">{item.roi}</span>
-						<span>{item.horizon}</span>
+						<span>{item.riskLevel}</span>
+						<span class="positive">{item.expectedROI}%</span>
+						<span>{item.horizon} meses</span>
 						<span class="row-icon">→</span>
 					</button>
 				{/each}
