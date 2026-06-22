@@ -145,6 +145,30 @@ func (h *Handlers) CreatePortfolioEntry(c fiber.Ctx) error {
 	return h.responseStatusOk(c, "Portfolio entry created", "Portfolio entry created successfully", entry)
 }
 
+func (h *Handlers) UpdateAssetPrice(c fiber.Ctx) error {
+	if _, _, _, err := h.getUserIDTokenRole(c); err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	assetID, err := h.getParamUUID(c, "id")
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid asset ID", err.Error())
+	}
+
+	var req portfolio.UpdateAssetPriceRequestDTO
+
+	if err := c.Bind().JSON(&req); err != nil {
+		return h.responseBadRequest(c, "Invalid request", err.Error())
+	}
+
+	asset, err := h.services.UpdateAssetPrice(h.ctx, assetID, req.Price)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error updating asset price", "Could not update asset price")
+	}
+
+	return h.responseStatusOk(c, "Asset price updated", "Asset price updated successfully", asset)
+}
+
 func (h *Handlers) GetAssets(c fiber.Ctx) error {
 	paginateInfo, ok := paginate.FromContext(c)
 	if !ok {

@@ -94,7 +94,7 @@ func (r *Repository) GetPortfolioByID(ctx context.Context, portfolioID, userID u
 func (r *Repository) GetEntriesByPortfolioID(ctx context.Context, portfolioID uuid.UUID) ([]entities.PortfolioEntry, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT pe.id, pe.portfolio_id, pe.asset_id, pe.source_id, pe.quantity, pe.price, pe.cost_currency, pe.category, pe.entry_date, COALESCE(pe.notes, ''), pe.created_at, pe.updated_at,
-		       a.id, a.ticker, a.name, a.asset_type, COALESCE(a.exchange, ''), a.currency, a.created_at, a.updated_at
+		       a.id, a.ticker, a.name, a.asset_type, COALESCE(a.exchange, ''), a.currency, a.current_price, a.price_updated_at, a.created_at, a.updated_at
 		FROM portfolio_entries pe
 		JOIN assets a ON a.id = pe.asset_id
 		WHERE pe.portfolio_id = $1
@@ -131,6 +131,8 @@ func (r *Repository) GetEntriesByPortfolioID(ctx context.Context, portfolioID uu
 			&entry.Asset.AssetType,
 			&entry.Asset.Exchange,
 			&entry.Asset.Currency,
+			&entry.Asset.CurrentPrice,
+			&entry.Asset.PriceUpdatedAt,
 			&entry.Asset.CreatedAt,
 			&entry.Asset.UpdatedAt,
 		); err != nil {
@@ -258,10 +260,16 @@ func (r *Repository) GetPortfolioEntries(ctx context.Context, sourceID uuid.UUID
 }
 
 func (r *Repository) GetAssets(ctx context.Context, offset, limit uint) ([]entities.Asset, error) {
-	rows, err := r.db.Query(ctx, "SELECT * FROM assets LIMIT $1 OFFSET $2", limit, offset)
+	rows, err := r.db.Query(ctx, `
+		SELECT id, ticker, name, asset_type, COALESCE(exchange, ''), currency, current_price, price_updated_at, created_at, updated_at
+		FROM assets
+		ORDER BY ticker
+		LIMIT $1 OFFSET $2
+	`, limit, offset)
 	if err != nil {
 		return []entities.Asset{}, err
 	}
+	defer rows.Close()
 
 	assets := make([]entities.Asset, 0)
 
@@ -275,6 +283,8 @@ func (r *Repository) GetAssets(ctx context.Context, offset, limit uint) ([]entit
 			&asset.AssetType,
 			&asset.Exchange,
 			&asset.Currency,
+			&asset.CurrentPrice,
+			&asset.PriceUpdatedAt,
 			&asset.CreatedAt,
 			&asset.UpdatedAt,
 		); err != nil {
@@ -285,6 +295,36 @@ func (r *Repository) GetAssets(ctx context.Context, offset, limit uint) ([]entit
 	}
 
 	return assets, nil
+}
+
+func (r *Repository) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, price money.Money) (entities.Asset, error) {
+	var asset entities.Asset
+
+	err := r.db.QueryRow(ctx, `
+		UPDATE assets
+		SET current_price = $2::numeric, price_updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, ticker, name, asset_type, COALESCE(exchange, ''), currency, current_price, price_updated_at, created_at, updated_at
+	`, assetID, price.String()).Scan(
+		&asset.ID,
+		&asset.Ticker,
+		&asset.Name,
+		&asset.AssetType,
+		&asset.Exchange,
+		&asset.Currency,
+		&asset.CurrentPrice,
+		&asset.PriceUpdatedAt,
+		&asset.CreatedAt,
+		&asset.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entities.Asset{}, errors.New("asset not found")
+		}
+		return entities.Asset{}, err
+	}
+
+	return asset, nil
 }
 
 func (r *Repository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, quantity money.Decimal, price money.Money, costCurrency string, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) (entities.PortfolioEntry, error) {

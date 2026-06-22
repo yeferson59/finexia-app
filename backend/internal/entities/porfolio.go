@@ -218,6 +218,8 @@ type Asset struct {
 	AssetType        AssetType        `json:"assetType"`
 	Exchange         string           `json:"exchange"`
 	Currency         string           `json:"currency"`
+	CurrentPrice     *money.Money     `json:"currentPrice"`
+	PriceUpdatedAt   *time.Time       `json:"priceUpdatedAt"`
 	CreatedAt        time.Time        `json:"createdAt"`
 	UpdatedAt        time.Time        `json:"updatedAt"`
 	PortfolioEntries []PortfolioEntry `json:"portfolioEntries,omitempty"`

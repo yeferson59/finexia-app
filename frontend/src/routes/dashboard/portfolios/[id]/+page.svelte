@@ -14,8 +14,12 @@
 		name: string;
 		assetType: string;
 		quantity: number;
-		price: number;
+		costPrice: number;
+		marketPrice: number;
+		costBasis: number;
 		value: number;
+		gainLoss: number;
+		gainLossPct: number;
 		allocation: number;
 	}
 
@@ -23,15 +27,24 @@
 		const list = portfolio?.holdings ?? [];
 		const computed = list.map((h) => {
 			const quantity = parseFloat(h.quantity) || 0;
-			const price = parseFloat(h.price) || 0;
+			const costPrice = parseFloat(h.price) || 0;
+			// Fall back to cost price when the asset has no market price yet.
+			const marketPrice = parseFloat(h.marketPrice) || costPrice;
+			const costBasis = quantity * costPrice;
+			const value = quantity * marketPrice;
+			const gainLoss = value - costBasis;
 			return {
 				id: h.id,
 				symbol: h.ticker,
 				name: h.name,
 				assetType: h.assetType,
 				quantity,
-				price,
-				value: quantity * price
+				costPrice,
+				marketPrice,
+				costBasis,
+				value,
+				gainLoss,
+				gainLossPct: costBasis > 0 ? (gainLoss / costBasis) * 100 : 0
 			};
 		});
 		const total = computed.reduce((sum, h) => sum + h.value, 0);
@@ -42,7 +55,14 @@
 	});
 
 	const totalValue = $derived(holdings.reduce((sum, h) => sum + h.value, 0));
+	const totalCost = $derived(holdings.reduce((sum, h) => sum + h.costBasis, 0));
+	const totalGainLoss = $derived(totalValue - totalCost);
+	const totalGainLossPct = $derived(totalCost > 0 ? (totalGainLoss / totalCost) * 100 : 0);
 	const baseCurrency = $derived(portfolio?.baseCurrency?.trim() || 'USD');
+
+	function formatPct(value: number): string {
+		return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+	}
 
 	function formatCurrency(value: number): string {
 		return new Intl.NumberFormat('es-CO', {
@@ -108,21 +128,28 @@
 
 <section class="cards-grid">
 	<Card variant="elevated" padding="sm">
-		<p class="eyebrow">Valor total (costo)</p>
+		<p class="eyebrow">Valor de mercado</p>
 		<h2 class="hero-value">{formatCurrency(totalValue)}</h2>
-		<p class="hero-delta">Base {baseCurrency}</p>
+		<p class="hero-delta">Costo: {formatCurrency(totalCost)} · {baseCurrency}</p>
 	</Card>
 
 	<Card variant="elevated" padding="sm">
-		<p class="eyebrow">Nivel de riesgo</p>
+		<p class="eyebrow">Ganancia / Pérdida</p>
+		<h2 class="hero-value {totalGainLoss >= 0 ? 'positive' : 'negative'}">
+			{formatCurrency(totalGainLoss)}
+		</h2>
+		<p class="hero-delta {totalGainLoss >= 0 ? 'positive' : 'negative'}">
+			{formatPct(totalGainLossPct)} sobre costo
+		</p>
+	</Card>
+
+	<Card variant="elevated" padding="sm">
+		<p class="eyebrow">Riesgo · Activos</p>
 		<h2 class="hero-value">{portfolio?.riskName ?? '—'}</h2>
-		<p class="hero-delta">Perfil del portafolio</p>
-	</Card>
-
-	<Card variant="elevated" padding="sm">
-		<p class="eyebrow">Diversificación</p>
-		<h2 class="hero-value">{holdings.length} {holdings.length === 1 ? 'activo' : 'activos'}</h2>
-		<p class="hero-delta">Posiciones registradas</p>
+		<p class="hero-delta">
+			{holdings.length}
+			{holdings.length === 1 ? 'activo' : 'activos'}
+		</p>
 	</Card>
 </section>
 
@@ -149,8 +176,8 @@
 							<div class="bar-fill" style={`width: ${holding.allocation}%`}></div>
 						</div>
 						<p class="metric">{formatCurrency(holding.value)}</p>
-						<p class="metric delta">
-							{holding.allocation.toFixed(1)}%
+						<p class="metric delta {holding.gainLoss >= 0 ? 'positive' : 'negative'}">
+							{formatPct(holding.gainLossPct)}
 						</p>
 						<svg
 							class="arrow-icon"
@@ -420,6 +447,24 @@
 
 	.metric.delta {
 		color: var(--amber-light);
+	}
+
+	.metric.delta.positive,
+	.hero-value.positive {
+		color: var(--green);
+	}
+
+	.metric.delta.negative,
+	.hero-value.negative {
+		color: var(--red);
+	}
+
+	.hero-delta.positive {
+		color: var(--green);
+	}
+
+	.hero-delta.negative {
+		color: var(--red);
 	}
 
 	.arrow-icon {

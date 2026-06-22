@@ -19,6 +19,7 @@ type HoldingResponseDTO struct {
 	Currency     string    `json:"currency"`
 	Quantity     string    `json:"quantity"`
 	Price        string    `json:"price"`
+	MarketPrice  string    `json:"marketPrice"`
 	CostCurrency string    `json:"costCurrency"`
 	Category     string    `json:"category"`
 	EntryDate    time.Time `json:"entryDate"`
@@ -47,6 +48,11 @@ type PortfolioDetailResponseDTO struct {
 func NewPortfolioDetailResponse(p entities.Portfolio) PortfolioDetailResponseDTO {
 	holdings := make([]HoldingResponseDTO, 0, len(p.PortfolioEntries))
 	for _, entry := range p.PortfolioEntries {
+		marketPrice := ""
+		if entry.Asset.CurrentPrice != nil {
+			marketPrice = entry.Asset.CurrentPrice.String()
+		}
+
 		holdings = append(holdings, HoldingResponseDTO{
 			ID:           entry.ID,
 			AssetID:      entry.AssetID,
@@ -57,6 +63,7 @@ func NewPortfolioDetailResponse(p entities.Portfolio) PortfolioDetailResponseDTO
 			Currency:     entry.Asset.Currency,
 			Quantity:     entry.Quantity.String(),
 			Price:        entry.Price.String(),
+			MarketPrice:  marketPrice,
 			CostCurrency: entry.CostCurrency,
 			Category:     string(entry.Category),
 			EntryDate:    entry.EntryDate,

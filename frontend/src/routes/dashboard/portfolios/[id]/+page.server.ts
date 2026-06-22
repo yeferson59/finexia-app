@@ -12,6 +12,7 @@ interface Holding {
 	currency: string;
 	quantity: string;
 	price: string;
+	marketPrice: string;
 	costCurrency: string;
 	category: string;
 	entryDate: string;
