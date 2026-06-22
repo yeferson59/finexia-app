@@ -23,6 +23,10 @@ type CreatePlatformRequestDTO struct {
 	Type        string `json:"type" validate:"required"`
 }
 
+type UpdateAssetPriceRequestDTO struct {
+	Price money.Money `json:"price" validate:"required"`
+}
+
 type CreatePortfolioEntryRequestDTO struct {
 	PortfolioID  uuid.UUID     `json:"portfolioId" validate:"required"`
 	AssetID      uuid.UUID     `json:"assetId" validate:"required"`

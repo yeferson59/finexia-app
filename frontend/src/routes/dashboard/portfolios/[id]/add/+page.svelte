@@ -156,9 +156,9 @@
 							<option value={asset.id}>
 								{asset.ticker} - {asset.name} ({asset.assetType})
 							</option>
-							<input type="hidden" name="category" value={asset.assetType} />
 						{/each}
 					</select>
+					<input type="hidden" name="category" value={selectedAsset?.assetType ?? ''} />
 					<p class="field-hint">Selecciona de la lista de activos disponibles</p>
 
 					{#if selectedAsset}
@@ -240,10 +240,11 @@
 					<label for="purchaseDate" class="form-label">Fecha de Compra</label>
 					<input
 						id="purchaseDate"
-						type="datetime"
+						type="date"
 						name="purchaseDate"
 						bind:value={formData.purchaseDate}
 						class="form-input"
+						required
 					/>
 				</div>
 

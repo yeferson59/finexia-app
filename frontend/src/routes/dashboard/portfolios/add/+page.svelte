@@ -20,8 +20,8 @@
 	let formData: FormData = $state({
 		name: '',
 		description: '',
-		type: 'Acciones',
-		riskLevel: 'Moderado',
+		type: 'stocks_etfs',
+		riskLevel: '',
 		currency: 'USD',
 		targetAmount: '',
 		isDefault: false
@@ -32,7 +32,8 @@
 	let errors: Record<string, string> = $state({});
 
 	const portfolioTypes = [
-		{ value: 'stocks', label: 'Acciones y ETF', icon: '📈' },
+		{ value: 'stocks_etfs', label: 'Acciones y ETF', icon: '📈' },
+		{ value: 'stocks', label: 'Solo Acciones', icon: '🏛️' },
 		{ value: 'cryptos', label: 'Criptomonedas', icon: '₿' },
 		{ value: 'bonds', label: 'Bonos y Renta Fija', icon: '📊' },
 		{ value: 'diversified', label: 'Portafolio Diverso', icon: '🎯' },
@@ -179,6 +180,7 @@
 								value={risk.id}
 								bind:group={formData.riskLevel}
 								disabled={isSubmitting}
+								required
 							/>
 							<span class="radio-content">
 								<span class="radio-title">{risk.name}</span>

@@ -3,6 +3,7 @@ package handlers
 import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
+	"github.com/google/uuid"
 	"github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"
 )
@@ -19,6 +20,25 @@ func (h *Handlers) GetPortfolios(c fiber.Ctx) error {
 	}
 
 	return h.responseStatusOk(c, "Portfolios retrieved", "Portfolios retrieved successfully", portfolios)
+}
+
+func (h *Handlers) GetPortfolio(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	portfolioID, err := h.getParamUUID(c, "id")
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid portfolio ID", err.Error())
+	}
+
+	portfolioDetail, err := h.services.GetPortfolio(h.ctx, userID, portfolioID)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error retrieving portfolio", "Could not retrieve portfolio")
+	}
+
+	return h.responseStatusOk(c, "Portfolio retrieved", "Portfolio retrieved successfully", portfolio.NewPortfolioDetailResponse(portfolioDetail))
 }
 
 func (h *Handlers) GetPortfoliosRisks(c fiber.Ctx) error {
@@ -42,7 +62,16 @@ func (h *Handlers) CreatePortfolio(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid request", err.Error())
 	}
 
-	portfolio, err := h.services.CreatePortfolio(h.ctx, userID, req.Name, req.Description, req.Currency, req.RiskID, entities.PortfolioType(req.Type), req.PriceValue, req.IsDefault)
+	portfolioType := entities.PortfolioType(req.Type)
+	if !portfolioType.IsValid() {
+		return h.responseBadRequest(c, "Invalid portfolio type", "Portfolio type must be one of the supported values: stocks, etfs, cryptos, bonds, cash, forex, real_estates, commodities, their combinations or diversified")
+	}
+
+	if req.RiskID == uuid.Nil {
+		return h.responseBadRequest(c, "Invalid risk", "A valid risk level is required")
+	}
+
+	portfolio, err := h.services.CreatePortfolio(h.ctx, userID, req.Name, req.Description, req.Currency, req.RiskID, portfolioType, req.PriceValue, req.IsDefault)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error creating portfolio", "Could not create portfolio")
 	}
@@ -114,6 +143,30 @@ func (h *Handlers) CreatePortfolioEntry(c fiber.Ctx) error {
 	}
 
 	return h.responseStatusOk(c, "Portfolio entry created", "Portfolio entry created successfully", entry)
+}
+
+func (h *Handlers) UpdateAssetPrice(c fiber.Ctx) error {
+	if _, _, _, err := h.getUserIDTokenRole(c); err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	assetID, err := h.getParamUUID(c, "id")
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid asset ID", err.Error())
+	}
+
+	var req portfolio.UpdateAssetPriceRequestDTO
+
+	if err := c.Bind().JSON(&req); err != nil {
+		return h.responseBadRequest(c, "Invalid request", err.Error())
+	}
+
+	asset, err := h.services.UpdateAssetPrice(h.ctx, assetID, req.Price)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error updating asset price", "Could not update asset price")
+	}
+
+	return h.responseStatusOk(c, "Asset price updated", "Asset price updated successfully", asset)
 }
 
 func (h *Handlers) GetAssets(c fiber.Ctx) error {
