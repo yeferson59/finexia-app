@@ -22,6 +22,25 @@ func (h *Handlers) GetPortfolios(c fiber.Ctx) error {
 	return h.responseStatusOk(c, "Portfolios retrieved", "Portfolios retrieved successfully", portfolios)
 }
 
+func (h *Handlers) GetPortfolio(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	portfolioID, err := h.getParamUUID(c, "id")
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid portfolio ID", err.Error())
+	}
+
+	portfolioDetail, err := h.services.GetPortfolio(h.ctx, userID, portfolioID)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error retrieving portfolio", "Could not retrieve portfolio")
+	}
+
+	return h.responseStatusOk(c, "Portfolio retrieved", "Portfolio retrieved successfully", portfolio.NewPortfolioDetailResponse(portfolioDetail))
+}
+
 func (h *Handlers) GetPortfoliosRisks(c fiber.Ctx) error {
 	risks, err := h.services.GetPortfoliosRisks(h.ctx)
 	if err != nil {

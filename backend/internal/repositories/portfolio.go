@@ -55,6 +55,101 @@ func (r *Repository) CreatePortfolio(ctx context.Context, userID uuid.UUID, name
 	return portfolio, nil
 }
 
+func (r *Repository) GetPortfolioByID(ctx context.Context, portfolioID, userID uuid.UUID) (entities.Portfolio, error) {
+	var portfolio entities.Portfolio
+	err := r.db.QueryRow(ctx, `
+		SELECT p.id, p.user_id, p.name, COALESCE(p.description, ''), p.type, p.risk_id, p.base_currency, p.is_default, p.price_value, p.created_at, p.updated_at,
+		       r.id, r.name, COALESCE(r.description, ''), r.created_at, r.updated_at
+		FROM portfolios p
+		JOIN risks r ON p.risk_id = r.id
+		WHERE p.id = $1 AND p.user_id = $2
+	`, portfolioID, userID).Scan(
+		&portfolio.ID,
+		&portfolio.UserID,
+		&portfolio.Name,
+		&portfolio.Description,
+		&portfolio.Type,
+		&portfolio.RiskID,
+		&portfolio.BaseCurrency,
+		&portfolio.IsDefault,
+		&portfolio.PriceValue,
+		&portfolio.CreatedAt,
+		&portfolio.UpdatedAt,
+		&portfolio.Risk.ID,
+		&portfolio.Risk.Name,
+		&portfolio.Risk.Description,
+		&portfolio.Risk.CreatedAt,
+		&portfolio.Risk.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entities.Portfolio{}, errors.New("portfolio not found")
+		}
+		return entities.Portfolio{}, err
+	}
+
+	return portfolio, nil
+}
+
+func (r *Repository) GetEntriesByPortfolioID(ctx context.Context, portfolioID uuid.UUID) ([]entities.PortfolioEntry, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT pe.id, pe.portfolio_id, pe.asset_id, pe.source_id, pe.quantity, pe.price, pe.cost_currency, pe.category, pe.entry_date, COALESCE(pe.notes, ''), pe.created_at, pe.updated_at,
+		       a.id, a.ticker, a.name, a.asset_type, COALESCE(a.exchange, ''), a.currency, a.created_at, a.updated_at
+		FROM portfolio_entries pe
+		JOIN assets a ON a.id = pe.asset_id
+		WHERE pe.portfolio_id = $1
+		ORDER BY pe.created_at DESC
+	`, portfolioID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	entries := make([]entities.PortfolioEntry, 0)
+	for rows.Next() {
+		var entry entities.PortfolioEntry
+		var quantity string
+		var price string
+		var sourceID pgtype.UUID
+
+		if err := rows.Scan(
+			&entry.ID,
+			&entry.PortfolioID,
+			&entry.AssetID,
+			&sourceID,
+			&quantity,
+			&price,
+			&entry.CostCurrency,
+			&entry.Category,
+			&entry.EntryDate,
+			&entry.Notes,
+			&entry.CreatedAt,
+			&entry.UpdatedAt,
+			&entry.Asset.ID,
+			&entry.Asset.Ticker,
+			&entry.Asset.Name,
+			&entry.Asset.AssetType,
+			&entry.Asset.Exchange,
+			&entry.Asset.Currency,
+			&entry.Asset.CreatedAt,
+			&entry.Asset.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		if sourceID.Valid {
+			entry.SourceID = uuid.UUID(sourceID.Bytes)
+		}
+
+		entry.Quantity = money.MustFromString(quantity)
+		entry.Price = money.MustMoneyFromString(price, money.USD)
+
+		entries = append(entries, entry)
+	}
+
+	return entries, nil
+}
+
 func (r *Repository) GetPortfoliosRisks(ctx context.Context) ([]entities.Risk, error) {
 	rows, err := r.db.Query(ctx, "SELECT * FROM risks")
 	if err != nil {

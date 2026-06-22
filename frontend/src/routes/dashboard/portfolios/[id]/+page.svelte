@@ -4,15 +4,53 @@
 	import { resolve } from '$app/paths';
 	import Card from '$components/ui/card.svelte';
 
-	const { params }: PageProps = $props();
+	const { params, data }: PageProps = $props();
 
-	const holdings = [
-		{ symbol: 'AAPL', name: 'Apple Inc.', allocation: 22, value: 275000, day: 1.4 },
-		{ symbol: 'MSFT', name: 'Microsoft Corp.', allocation: 18, value: 225000, day: 0.8 },
-		{ symbol: 'NVDA', name: 'NVIDIA Corp.', allocation: 16, value: 200000, day: 2.1 },
-		{ symbol: 'AMZN', name: 'Amazon.com', allocation: 12, value: 150000, day: -0.6 },
-		{ symbol: 'GOOGL', name: 'Alphabet Inc.', allocation: 10, value: 125000, day: 0.5 }
-	];
+	const portfolio = $derived(data.portfolio);
+
+	interface HoldingView {
+		id: string;
+		symbol: string;
+		name: string;
+		assetType: string;
+		quantity: number;
+		price: number;
+		value: number;
+		allocation: number;
+	}
+
+	const holdings = $derived.by<HoldingView[]>(() => {
+		const list = portfolio?.holdings ?? [];
+		const computed = list.map((h) => {
+			const quantity = parseFloat(h.quantity) || 0;
+			const price = parseFloat(h.price) || 0;
+			return {
+				id: h.id,
+				symbol: h.ticker,
+				name: h.name,
+				assetType: h.assetType,
+				quantity,
+				price,
+				value: quantity * price
+			};
+		});
+		const total = computed.reduce((sum, h) => sum + h.value, 0);
+		return computed.map((h) => ({
+			...h,
+			allocation: total > 0 ? (h.value / total) * 100 : 0
+		}));
+	});
+
+	const totalValue = $derived(holdings.reduce((sum, h) => sum + h.value, 0));
+	const baseCurrency = $derived(portfolio?.baseCurrency?.trim() || 'USD');
+
+	function formatCurrency(value: number): string {
+		return new Intl.NumberFormat('es-CO', {
+			style: 'currency',
+			currency: baseCurrency,
+			minimumFractionDigits: 2
+		}).format(value);
+	}
 
 	function goBack() {
 		goto(resolve('/dashboard/portfolios'));
@@ -47,8 +85,10 @@
 					<path d="M19 12H5M12 19l-7-7 7-7" />
 				</svg>
 			</button>
-			<h1 class="page-title">{params.id}</h1>
-			<p class="page-subtitle">Visión detallada de posiciones, asignación y rendimiento diario.</p>
+			<h1 class="page-title">{portfolio?.name ?? 'Portafolio'}</h1>
+			<p class="page-subtitle">
+				{portfolio?.description || 'Visión detallada de posiciones y asignación.'}
+			</p>
 		</div>
 		<button onclick={addAsset} class="btn-add-asset">
 			<svg
@@ -68,64 +108,82 @@
 
 <section class="cards-grid">
 	<Card variant="elevated" padding="sm">
-		<p class="eyebrow">Valor total</p>
-		<h2 class="hero-value">$1,250,000</h2>
-		<p class="hero-delta positive">+3.7% este mes</p>
+		<p class="eyebrow">Valor total (costo)</p>
+		<h2 class="hero-value">{formatCurrency(totalValue)}</h2>
+		<p class="hero-delta">Base {baseCurrency}</p>
 	</Card>
 
 	<Card variant="elevated" padding="sm">
-		<p class="eyebrow">Riesgo estimado</p>
-		<h2 class="hero-value">Moderado</h2>
-		<p class="hero-delta">Volatilidad 6.2%</p>
+		<p class="eyebrow">Nivel de riesgo</p>
+		<h2 class="hero-value">{portfolio?.riskName ?? '—'}</h2>
+		<p class="hero-delta">Perfil del portafolio</p>
 	</Card>
 
 	<Card variant="elevated" padding="sm">
 		<p class="eyebrow">Diversificación</p>
-		<h2 class="hero-value">5 sectores</h2>
-		<p class="hero-delta">Balance global</p>
+		<h2 class="hero-value">{holdings.length} {holdings.length === 1 ? 'activo' : 'activos'}</h2>
+		<p class="hero-delta">Posiciones registradas</p>
 	</Card>
 </section>
 
 <Card variant="elevated" padding="none">
 	<div class="holdings">
 		<header class="panel-header">
-			<h2>Posiciones principales</h2>
-			<span>Actualizado hace 5 min</span>
+			<h2>Posiciones</h2>
+			<span>{holdings.length} {holdings.length === 1 ? 'activo' : 'activos'}</span>
 		</header>
 
-		<div class="holdings-list">
-			{#each holdings as holding (holding.symbol)}
-				<button
-					class="holding-row"
-					onclick={() => viewAssetDetails(holding.symbol)}
-					aria-label={`View details for ${holding.symbol}`}
-				>
-					<div class="holding-main">
-						<p class="symbol">{holding.symbol}</p>
-						<p class="name">{holding.name}</p>
-					</div>
-					<div class="bar-wrap" aria-label={`Asignación ${holding.allocation}%`}>
-						<div class="bar-fill" style={`width: ${holding.allocation}%`}></div>
-					</div>
-					<p class="metric">${new Intl.NumberFormat('es-CO').format(holding.value)}</p>
-					<p class={`metric delta ${holding.day >= 0 ? 'positive' : 'negative'}`}>
-						{holding.day >= 0 ? '+' : ''}
-						{holding.day}%
-					</p>
+		{#if holdings.length > 0}
+			<div class="holdings-list">
+				{#each holdings as holding (holding.id)}
+					<button
+						class="holding-row"
+						onclick={() => viewAssetDetails(holding.symbol)}
+						aria-label={`Ver detalles de ${holding.symbol}`}
+					>
+						<div class="holding-main">
+							<p class="symbol">{holding.symbol}</p>
+							<p class="name">{holding.name}</p>
+						</div>
+						<div class="bar-wrap" aria-label={`Asignación ${holding.allocation.toFixed(1)}%`}>
+							<div class="bar-fill" style={`width: ${holding.allocation}%`}></div>
+						</div>
+						<p class="metric">{formatCurrency(holding.value)}</p>
+						<p class="metric delta">
+							{holding.allocation.toFixed(1)}%
+						</p>
+						<svg
+							class="arrow-icon"
+							width="20"
+							height="20"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path d="M9 18l6-6-6-6" />
+						</svg>
+					</button>
+				{/each}
+			</div>
+		{:else}
+			<div class="empty-holdings">
+				<p class="empty-text">Este portafolio aún no tiene activos.</p>
+				<button onclick={addAsset} class="btn-add-asset">
 					<svg
-						class="arrow-icon"
-						width="20"
-						height="20"
+						width="18"
+						height="18"
 						viewBox="0 0 24 24"
 						fill="none"
 						stroke="currentColor"
 						stroke-width="2"
 					>
-						<path d="M9 18l6-6-6-6" />
+						<path d="M12 5v14M5 12h14" />
 					</svg>
+					Agregar tu primer activo
 				</button>
-			{/each}
-		</div>
+			</div>
+		{/if}
 	</div>
 </Card>
 
@@ -262,10 +320,6 @@
 		color: rgba(236, 234, 229, 0.55);
 	}
 
-	.hero-delta.positive {
-		color: var(--green);
-	}
-
 	.holdings {
 		padding: 1.5rem;
 	}
@@ -291,6 +345,24 @@
 	.holdings-list {
 		display: grid;
 		gap: 0.75rem;
+	}
+
+	.empty-holdings {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1rem;
+		padding: 2.5rem 1.5rem;
+		border-radius: 12px;
+		background: rgba(255, 255, 255, 0.022);
+		border: 1px dashed rgba(212, 145, 42, 0.25);
+		text-align: center;
+	}
+
+	.empty-text {
+		margin: 0;
+		font-size: 0.95rem;
+		color: rgba(236, 234, 229, 0.6);
 	}
 
 	.holding-row {
@@ -346,12 +418,8 @@
 		color: var(--text);
 	}
 
-	.metric.delta.positive {
-		color: var(--green);
-	}
-
-	.metric.delta.negative {
-		color: var(--red);
+	.metric.delta {
+		color: var(--amber-light);
 	}
 
 	.arrow-icon {
