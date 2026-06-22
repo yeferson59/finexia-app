@@ -11,12 +11,12 @@ export const actions = {
 
 		const { success, data, error } = await z
 			.object({
-				name: z.string(),
+				name: z.string().min(1),
 				description: z.string().nullable(),
-				type: z.string(),
-				riskId: z.coerce.string(),
-				currency: z.coerce.string(),
-				priceValue: z.coerce.number(),
+				type: z.string().min(1),
+				riskId: z.uuid(),
+				currency: z.string().min(1),
+				priceValue: z.coerce.number().nonnegative().default(0),
 				isDefault: z.coerce.boolean()
 			})
 			.safeParseAsync({

@@ -14,10 +14,10 @@ export const actions = {
 				portfolioId: z.uuid(),
 				assetId: z.coerce.string(),
 				sourceId: z.uuid(),
-				quantity: z.coerce.number(),
-				price: z.coerce.number(),
+				quantity: z.coerce.number().positive(),
+				price: z.coerce.number().positive(),
 				costCurrency: z.coerce.string(),
-				category: z.coerce.string(),
+				category: z.coerce.string().min(1),
 				entryDate: z.coerce.date(),
 				notes: z.coerce.string().optional()
 			})
@@ -56,6 +56,6 @@ export const actions = {
 			return { success: false };
 		}
 
-		redirect(302, '/dashboard/portfolios');
+		redirect(303, `/dashboard/portfolios/${params.id}`);
 	}
 } satisfies Actions;

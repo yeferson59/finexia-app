@@ -101,44 +101,75 @@ func (c PortfolioEntryCategory) IsValid() bool {
 
 type PortfolioType string
 
+// PortfolioType values must stay in sync with the `portfolio_type` enum
+// defined in 000003_create_portfolio_tables.up.sql.
 const (
-	PortfolioTypeOnlyStock       PortfolioType = "stock"
-	PortfolioTypeOnlyETF         PortfolioType = "etf"
-	PortfolioTypeOnlyCrypto      PortfolioType = "crypto"
-	PortfolioTypeOnlyBond        PortfolioType = "bond"
-	PortfolioTypeOnlyCash        PortfolioType = "cash"
-	PortfolioTypeOnlyRealEstate  PortfolioType = "real_estate"
-	PortfolioTypeOnlyCommodities PortfolioType = "commodities"
+	PortfolioTypeStocks      PortfolioType = "stocks"
+	PortfolioTypeETFs        PortfolioType = "etfs"
+	PortfolioTypeCryptos     PortfolioType = "cryptos"
+	PortfolioTypeBonds       PortfolioType = "bonds"
+	PortfolioTypeCash        PortfolioType = "cash"
+	PortfolioTypeForex       PortfolioType = "forex"
+	PortfolioTypeRealEstates PortfolioType = "real_estates"
+	PortfolioTypeCommodities PortfolioType = "commodities"
 
-	PortfolioTypeStockAndETF         PortfolioType = "stock_etf"
-	PortfolioTypeStockAndCrypto      PortfolioType = "stock_crypto"
-	PortfolioTypeStockAndBond        PortfolioType = "stock_bond"
-	PortfolioTypeStockAndCash        PortfolioType = "stock_cash"
-	PortfolioTypeStockAndRealEstate  PortfolioType = "stock_real_estate"
-	PortfolioTypeStockAndCommodities PortfolioType = "stock_commodities"
+	PortfolioTypeForexStocks      PortfolioType = "forex_stocks"
+	PortfolioTypeForexETFs        PortfolioType = "forex_etfs"
+	PortfolioTypeForexCryptos     PortfolioType = "forex_cryptos"
+	PortfolioTypeForexBonds       PortfolioType = "forex_bonds"
+	PortfolioTypeForexCash        PortfolioType = "forex_cash"
+	PortfolioTypeForexRealStates  PortfolioType = "forex_real_states"
+	PortfolioTypeForexCommodities PortfolioType = "forex_commodities"
 
-	PortfolioTypeETFAndCrypto      PortfolioType = "etf_crypto"
-	PortfolioTypeETFAndBond        PortfolioType = "etf_bond"
-	PortfolioTypeETFAndCash        PortfolioType = "etf_cash"
-	PortfolioTypeETFAndRealEstate  PortfolioType = "etf_real_estate"
-	PortfolioTypeETFAndCommodities PortfolioType = "etf_commodities"
+	PortfolioTypeStocksETFs        PortfolioType = "stocks_etfs"
+	PortfolioTypeStocksCryptos     PortfolioType = "stocks_cryptos"
+	PortfolioTypeStocksBonds       PortfolioType = "stocks_bonds"
+	PortfolioTypeStocksCash        PortfolioType = "stocks_cash"
+	PortfolioTypeStocksRealEstates PortfolioType = "stocks_real_estates"
+	PortfolioTypeStocksCommodities PortfolioType = "stocks_commodities"
 
-	PortfolioTypeCryptoAndBond        PortfolioType = "crypto_bond"
-	PortfolioTypeCryptoAndCash        PortfolioType = "crypto_cash"
-	PortfolioTypeCryptoAndRealEstate  PortfolioType = "crypto_real_estate"
-	PortfolioTypeCryptoAndCommodities PortfolioType = "crypto_commodities"
+	PortfolioTypeETFsCryptos     PortfolioType = "etfs_cryptos"
+	PortfolioTypeETFsBonds       PortfolioType = "etfs_bonds"
+	PortfolioTypeETFsCash        PortfolioType = "etfs_cash"
+	PortfolioTypeETFsRealEstates PortfolioType = "etfs_real_estates"
+	PortfolioTypeETFsCommodities PortfolioType = "etfs_commodities"
 
-	PortfolioTypeBondAndCash        PortfolioType = "bond_cash"
-	PortfolioTypeBondAndRealEstate  PortfolioType = "bond_real_estate"
-	PortfolioTypeBondAndCommodities PortfolioType = "bond_commodities"
+	PortfolioTypeCryptosBonds       PortfolioType = "cryptos_bonds"
+	PortfolioTypeCryptosCash        PortfolioType = "cryptos_cash"
+	PortfolioTypeCryptosRealEstates PortfolioType = "cryptos_real_estates"
+	PortfolioTypeCryptosCommodities PortfolioType = "cryptos_commodities"
 
-	PortfolioTypeCashAndRealEstate  PortfolioType = "cash_real_estate"
-	PortfolioTypeCashAndCommodities PortfolioType = "cash_commodities"
+	PortfolioTypeBondsCash        PortfolioType = "bonds_cash"
+	PortfolioTypeBondsRealEstates PortfolioType = "bonds_real_estates"
+	PortfolioTypeBondsCommodities PortfolioType = "bonds_commodities"
 
-	PortfolioTypeRealEstateAndCommodities PortfolioType = "real_estate_commodities"
+	PortfolioTypeCashRealEstates PortfolioType = "cash_real_estates"
+	PortfolioTypeCashCommodities PortfolioType = "cash_commodities"
 
-	PortfolioTypeMultiple PortfolioType = "multiple"
+	PortfolioTypeRealEstatesCommodities PortfolioType = "real_estates_commodities"
+
+	PortfolioTypeDiversified PortfolioType = "diversified"
 )
+
+func (t PortfolioType) IsValid() bool {
+	switch t {
+	case PortfolioTypeStocks, PortfolioTypeETFs, PortfolioTypeCryptos, PortfolioTypeBonds,
+		PortfolioTypeCash, PortfolioTypeForex, PortfolioTypeRealEstates, PortfolioTypeCommodities,
+		PortfolioTypeForexStocks, PortfolioTypeForexETFs, PortfolioTypeForexCryptos, PortfolioTypeForexBonds,
+		PortfolioTypeForexCash, PortfolioTypeForexRealStates, PortfolioTypeForexCommodities,
+		PortfolioTypeStocksETFs, PortfolioTypeStocksCryptos, PortfolioTypeStocksBonds, PortfolioTypeStocksCash,
+		PortfolioTypeStocksRealEstates, PortfolioTypeStocksCommodities,
+		PortfolioTypeETFsCryptos, PortfolioTypeETFsBonds, PortfolioTypeETFsCash, PortfolioTypeETFsRealEstates,
+		PortfolioTypeETFsCommodities,
+		PortfolioTypeCryptosBonds, PortfolioTypeCryptosCash, PortfolioTypeCryptosRealEstates, PortfolioTypeCryptosCommodities,
+		PortfolioTypeBondsCash, PortfolioTypeBondsRealEstates, PortfolioTypeBondsCommodities,
+		PortfolioTypeCashRealEstates, PortfolioTypeCashCommodities,
+		PortfolioTypeRealEstatesCommodities, PortfolioTypeDiversified:
+		return true
+	default:
+		return false
+	}
+}
 
 type InvestmentSource struct {
 	ID               uuid.UUID        `json:"id"`

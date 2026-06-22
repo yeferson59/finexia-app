@@ -3,6 +3,7 @@ package handlers
 import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
+	"github.com/google/uuid"
 	"github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"
 )
@@ -42,7 +43,16 @@ func (h *Handlers) CreatePortfolio(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid request", err.Error())
 	}
 
-	portfolio, err := h.services.CreatePortfolio(h.ctx, userID, req.Name, req.Description, req.Currency, req.RiskID, entities.PortfolioType(req.Type), req.PriceValue, req.IsDefault)
+	portfolioType := entities.PortfolioType(req.Type)
+	if !portfolioType.IsValid() {
+		return h.responseBadRequest(c, "Invalid portfolio type", "Portfolio type must be one of the supported values: stocks, etfs, cryptos, bonds, cash, forex, real_estates, commodities, their combinations or diversified")
+	}
+
+	if req.RiskID == uuid.Nil {
+		return h.responseBadRequest(c, "Invalid risk", "A valid risk level is required")
+	}
+
+	portfolio, err := h.services.CreatePortfolio(h.ctx, userID, req.Name, req.Description, req.Currency, req.RiskID, portfolioType, req.PriceValue, req.IsDefault)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error creating portfolio", "Could not create portfolio")
 	}
