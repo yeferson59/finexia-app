@@ -5,7 +5,7 @@
 	import { resolve } from '$app/paths';
 	import PageHeader from '$components/ui/page-header.svelte';
 
-	const { params, data }: PageProps = $props();
+	const { params, data, form }: PageProps = $props();
 
 	interface FormData {
 		platformId: string;
@@ -29,6 +29,7 @@
 
 	let isSubmitting = $state(false);
 	let submitSuccess = $state(false);
+	let submitError = $derived(form?.success === false);
 
 	const platforms = $derived(data?.platforms || []);
 	const assets = $derived(data?.assets || []);
@@ -179,6 +180,14 @@
 								<span class="preview-label">Exchange</span>
 								<span class="preview-value">{selectedAsset.exchange}</span>
 							</div>
+							{#if selectedAsset.currentPrice}
+								<div class="preview-item">
+									<span class="preview-label">Precio de mercado</span>
+									<span class="preview-value"
+										>{formatCurrency(parseFloat(selectedAsset.currentPrice.value))}</span
+									>
+								</div>
+							{/if}
 						</div>
 					{/if}
 				{:else}
@@ -297,6 +306,14 @@
 					</div>
 				</div>
 			</section>
+		{/if}
+
+		<!-- Error feedback -->
+		{#if submitError}
+			<div class="form-error">
+				No se pudo registrar el activo. Verifica que todos los campos sean correctos e intenta de
+				nuevo.
+			</div>
 		{/if}
 
 		<!-- Action Buttons -->
@@ -621,6 +638,16 @@
 	.summary-value.highlight {
 		color: var(--amber);
 		font-size: 1.1rem;
+	}
+
+	.form-error {
+		padding: 1rem 1.25rem;
+		border-radius: 10px;
+		background: rgba(224, 90, 90, 0.1);
+		border: 1px solid rgba(224, 90, 90, 0.3);
+		color: rgba(224, 90, 90, 0.9);
+		font-size: 0.9rem;
+		font-weight: 500;
 	}
 
 	.form-actions {

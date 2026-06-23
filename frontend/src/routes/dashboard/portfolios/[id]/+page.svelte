@@ -9,12 +9,10 @@
 	const portfolio = $derived(data.portfolio);
 
 	interface HoldingView {
-		id: string;
 		symbol: string;
 		name: string;
 		assetType: string;
 		quantity: number;
-		costPrice: number;
 		marketPrice: number;
 		costBasis: number;
 		value: number;
@@ -23,35 +21,46 @@
 		allocation: number;
 	}
 
+	// Group entries by ticker so the same asset held in multiple platforms
+	// appears as a single row with aggregated quantity and cost basis.
 	const holdings = $derived.by<HoldingView[]>(() => {
 		const list = portfolio?.holdings ?? [];
-		const computed = list.map((h) => {
+		const grouped: Record<string, HoldingView> = {};
+
+		for (const h of list) {
 			const quantity = parseFloat(h.quantity) || 0;
 			const costPrice = parseFloat(h.price) || 0;
-			// Fall back to cost price when the asset has no market price yet.
 			const marketPrice = parseFloat(h.marketPrice) || costPrice;
 			const costBasis = quantity * costPrice;
 			const value = quantity * marketPrice;
-			const gainLoss = value - costBasis;
-			return {
-				id: h.id,
-				symbol: h.ticker,
-				name: h.name,
-				assetType: h.assetType,
-				quantity,
-				costPrice,
-				marketPrice,
-				costBasis,
-				value,
-				gainLoss,
-				gainLossPct: costBasis > 0 ? (gainLoss / costBasis) * 100 : 0
-			};
-		});
-		const total = computed.reduce((sum, h) => sum + h.value, 0);
-		return computed.map((h) => ({
-			...h,
-			allocation: total > 0 ? (h.value / total) * 100 : 0
-		}));
+
+			const existing = grouped[h.ticker];
+			if (existing) {
+				existing.quantity += quantity;
+				existing.costBasis += costBasis;
+				existing.value += value;
+				existing.gainLoss = existing.value - existing.costBasis;
+				existing.gainLossPct =
+					existing.costBasis > 0 ? (existing.gainLoss / existing.costBasis) * 100 : 0;
+			} else {
+				grouped[h.ticker] = {
+					symbol: h.ticker,
+					name: h.name,
+					assetType: h.assetType,
+					quantity,
+					marketPrice,
+					costBasis,
+					value,
+					gainLoss: value - costBasis,
+					gainLossPct: costBasis > 0 ? ((value - costBasis) / costBasis) * 100 : 0,
+					allocation: 0
+				};
+			}
+		}
+
+		const rows = Object.values(grouped);
+		const total = rows.reduce((sum, h) => sum + h.value, 0);
+		return rows.map((h) => ({ ...h, allocation: total > 0 ? (h.value / total) * 100 : 0 }));
 	});
 
 	const totalValue = $derived(holdings.reduce((sum, h) => sum + h.value, 0));
@@ -71,6 +80,51 @@
 			minimumFractionDigits: 2
 		}).format(value);
 	}
+
+	const ASSET_TYPE_LABELS: Record<string, string> = {
+		stock: 'Acciones',
+		etf: 'ETFs',
+		crypto: 'Cripto',
+		bond: 'Bonos',
+		cash: 'Efectivo',
+		real_estate: 'Inmobiliario',
+		commodity: 'Materias primas',
+		other: 'Otros'
+	};
+
+	const ASSET_TYPE_COLORS: Record<string, string> = {
+		stock: '#4f8ef7',
+		etf: '#d4912a',
+		crypto: '#f97316',
+		bond: '#22c55e',
+		cash: '#94a3b8',
+		real_estate: '#a855f7',
+		commodity: '#b45309',
+		other: '#6b7280'
+	};
+
+	const typeBreakdown = $derived.by(() => {
+		const grouped: Record<string, { label: string; value: number; color: string }> = {};
+		for (const h of holdings) {
+			const key = h.assetType;
+			if (!grouped[key]) {
+				grouped[key] = {
+					label: ASSET_TYPE_LABELS[key] ?? key,
+					value: 0,
+					color: ASSET_TYPE_COLORS[key] ?? '#6b7280'
+				};
+			}
+			grouped[key].value += h.value;
+		}
+		const total = Object.values(grouped).reduce((s, v) => s + v.value, 0);
+		return Object.entries(grouped)
+			.map(([type, data]) => ({
+				type,
+				...data,
+				pct: total > 0 ? (data.value / total) * 100 : 0
+			}))
+			.sort((a, b) => b.value - a.value);
+	});
 
 	function goBack() {
 		goto(resolve('/dashboard/portfolios'));
@@ -153,6 +207,38 @@
 	</Card>
 </section>
 
+{#if typeBreakdown.length > 0}
+	<Card variant="elevated" padding="none">
+		<div class="distribution">
+			<header class="panel-header">
+				<h2>Distribución por tipo</h2>
+				<span>{typeBreakdown.length} {typeBreakdown.length === 1 ? 'tipo' : 'tipos'}</span>
+			</header>
+
+			<div class="stacked-bar">
+				{#each typeBreakdown as slice (slice.type)}
+					<div
+						class="stack-segment"
+						style="width: {slice.pct}%; background: {slice.color};"
+						title="{slice.label}: {slice.pct.toFixed(1)}%"
+					></div>
+				{/each}
+			</div>
+
+			<div class="type-legend">
+				{#each typeBreakdown as slice (slice.type)}
+					<div class="legend-item">
+						<span class="legend-dot" style="background: {slice.color};"></span>
+						<span class="legend-label">{slice.label}</span>
+						<span class="legend-pct">{slice.pct.toFixed(1)}%</span>
+						<span class="legend-value">{formatCurrency(slice.value)}</span>
+					</div>
+				{/each}
+			</div>
+		</div>
+	</Card>
+{/if}
+
 <Card variant="elevated" padding="none">
 	<div class="holdings">
 		<header class="panel-header">
@@ -162,7 +248,7 @@
 
 		{#if holdings.length > 0}
 			<div class="holdings-list">
-				{#each holdings as holding (holding.id)}
+				{#each holdings as holding (holding.symbol)}
 					<button
 						class="holding-row"
 						onclick={() => viewAssetDetails(holding.symbol)}
@@ -345,6 +431,74 @@
 		margin: 0.4rem 0 0;
 		font-size: 0.82rem;
 		color: rgba(236, 234, 229, 0.55);
+	}
+
+	.distribution {
+		padding: 1.5rem;
+	}
+
+	.stacked-bar {
+		display: flex;
+		height: 12px;
+		border-radius: 999px;
+		overflow: hidden;
+		background: rgba(236, 234, 229, 0.08);
+		gap: 2px;
+		margin-bottom: 1.25rem;
+	}
+
+	.stack-segment {
+		height: 100%;
+		border-radius: 999px;
+		transition: opacity 0.2s ease;
+		min-width: 4px;
+	}
+
+	.stack-segment:hover {
+		opacity: 0.8;
+	}
+
+	.type-legend {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+		gap: 0.55rem;
+	}
+
+	.legend-item {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		padding: 0.55rem 0.7rem;
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.022);
+	}
+
+	.legend-dot {
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+		flex-shrink: 0;
+	}
+
+	.legend-label {
+		flex: 1;
+		font-size: 0.82rem;
+		color: var(--text);
+	}
+
+	.legend-pct {
+		font-size: 0.82rem;
+		font-weight: 700;
+		font-family: var(--font-mono);
+		color: var(--text);
+	}
+
+	.legend-value {
+		font-size: 0.75rem;
+		color: rgba(236, 234, 229, 0.5);
+		font-family: var(--font-mono);
+		min-width: 4rem;
+		text-align: right;
 	}
 
 	.holdings {

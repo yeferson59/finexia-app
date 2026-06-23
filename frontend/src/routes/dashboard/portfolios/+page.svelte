@@ -8,6 +8,31 @@
 
 	const { data }: PageProps = $props();
 
+	const portfolios = $derived(data.portfolios ?? []);
+
+	// Aggregate totals across all portfolios
+	const totalMarketValue = $derived(
+		portfolios.reduce((s, p) => s + (parseFloat(p.totalMarketValue) || 0), 0)
+	);
+	const totalCostBase = $derived(
+		portfolios.reduce((s, p) => s + (parseFloat(p.totalCostBase) || 0), 0)
+	);
+	const totalGainLoss = $derived(totalMarketValue - totalCostBase);
+	const totalGainLossPct = $derived(totalCostBase > 0 ? (totalGainLoss / totalCostBase) * 100 : 0);
+
+	function fmt(value: number, currency = 'USD'): string {
+		return new Intl.NumberFormat('es-CO', {
+			style: 'currency',
+			currency,
+			minimumFractionDigits: 0,
+			maximumFractionDigits: 0
+		}).format(value);
+	}
+
+	function fmtPct(value: number): string {
+		return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+	}
+
 	function openPortfolio(id: string) {
 		goto(resolve('/dashboard/portfolios/[id]', { id }));
 	}
@@ -22,6 +47,56 @@
 		if (n.includes('moderado')) return 'warning';
 		if (n.includes('alto')) return 'danger';
 		return 'neutral';
+	}
+
+	// Each portfolio's share of total market value (for the progress bar)
+	function allocation(marketValue: string): number {
+		const v = parseFloat(marketValue) || 0;
+		return totalMarketValue > 0 ? (v / totalMarketValue) * 100 : 0;
+	}
+
+	const TYPE_LABELS: Record<string, string> = {
+		stocks: 'Acciones',
+		etfs: 'ETFs',
+		cryptos: 'Criptomonedas',
+		bonds: 'Bonos',
+		cash: 'Efectivo',
+		forex: 'Forex',
+		real_estates: 'Inmobiliario',
+		commodities: 'Materias primas',
+		stocks_etfs: 'Acciones & ETFs',
+		stocks_cryptos: 'Acciones & Cripto',
+		stocks_bonds: 'Acciones & Bonos',
+		stocks_cash: 'Acciones & Efectivo',
+		stocks_real_estates: 'Acciones & Inmobiliario',
+		stocks_commodities: 'Acciones & Materias primas',
+		etfs_cryptos: 'ETFs & Cripto',
+		etfs_bonds: 'ETFs & Bonos',
+		etfs_cash: 'ETFs & Efectivo',
+		etfs_real_estates: 'ETFs & Inmobiliario',
+		etfs_commodities: 'ETFs & Materias primas',
+		cryptos_bonds: 'Cripto & Bonos',
+		cryptos_cash: 'Cripto & Efectivo',
+		cryptos_real_estates: 'Cripto & Inmobiliario',
+		cryptos_commodities: 'Cripto & Materias primas',
+		bonds_cash: 'Bonos & Efectivo',
+		bonds_real_estates: 'Bonos & Inmobiliario',
+		bonds_commodities: 'Bonos & Materias primas',
+		cash_real_estates: 'Efectivo & Inmobiliario',
+		cash_commodities: 'Efectivo & Materias primas',
+		real_estates_commodities: 'Inmobiliario & Materias primas',
+		forex_stocks: 'Forex & Acciones',
+		forex_etfs: 'Forex & ETFs',
+		forex_cryptos: 'Forex & Cripto',
+		forex_bonds: 'Forex & Bonos',
+		forex_cash: 'Forex & Efectivo',
+		forex_real_states: 'Forex & Inmobiliario',
+		forex_commodities: 'Forex & Materias primas',
+		diversified: 'Diversificado'
+	};
+
+	function formatType(type: string): string {
+		return TYPE_LABELS[type] ?? type.replace(/_/g, ' ');
 	}
 </script>
 
@@ -53,21 +128,27 @@
 
 <section class="summary-cards">
 	<article class="panel summary-card">
-		<p class="eyebrow">Valor total</p>
-		<h2 class="hero-value">$2,000,000</h2>
-		<p class="hero-delta positive">+0.9% hoy</p>
+		<p class="eyebrow">Valor de mercado</p>
+		<h2 class="hero-value">{fmt(totalMarketValue)}</h2>
+		<p class="hero-delta">Costo base: {fmt(totalCostBase)}</p>
 	</article>
 
 	<article class="panel summary-card">
 		<p class="eyebrow">Portafolios activos</p>
-		<h2 class="hero-value">3</h2>
-		<p class="hero-delta">Diversificados</p>
+		<h2 class="hero-value">{portfolios.length}</h2>
+		<p class="hero-delta">
+			{portfolios.reduce((s, p) => s + p.totalPositions, 0)} activos en total
+		</p>
 	</article>
 
 	<article class="panel summary-card">
-		<p class="eyebrow">Rendimiento</p>
-		<h2 class="hero-value">+12.3%</h2>
-		<p class="hero-delta positive">Este año</p>
+		<p class="eyebrow">Ganancia / Pérdida total</p>
+		<h2 class="hero-value {totalGainLoss >= 0 ? 'positive' : 'negative'}">
+			{fmt(totalGainLoss)}
+		</h2>
+		<p class="hero-delta {totalGainLoss >= 0 ? 'positive' : 'negative'}">
+			{fmtPct(totalGainLossPct)} sobre costo
+		</p>
 	</article>
 </section>
 
@@ -75,59 +156,59 @@
 	<h2 class="section-title">Tus Portafolios</h2>
 
 	<div class="portfolios-grid">
-		{#each data.portfolios as portfolio (portfolio.id)}
+		{#each portfolios as portfolio (portfolio.id)}
+			{@const marketValue = parseFloat(portfolio.totalMarketValue) || 0}
+			{@const gainLoss = parseFloat(portfolio.totalGainLoss) || 0}
+			{@const gainLossPct = parseFloat(portfolio.totalGainLossPct) || 0}
+			{@const alloc = allocation(portfolio.totalMarketValue)}
 			<button
 				class="portfolio-card"
 				onclick={() => openPortfolio(portfolio.id)}
 				aria-label={`Abrir ${portfolio.name}`}
 			>
 				<div class="card-header">
-					<div class="icon-container">{portfolio.icon}</div>
 					<div class="portfolio-info">
 						<h3 class="portfolio-name">{portfolio.name}</h3>
-						<p class="portfolio-type">{portfolio.type}</p>
+						<p class="portfolio-type">{formatType(portfolio.type)}</p>
 					</div>
-					<Badge tone={riskTone(portfolio.risk.name)} size="md">{portfolio.risk.name}</Badge>
+					<div class="card-header-right">
+						<Badge tone={riskTone(portfolio.riskName)} size="md">{portfolio.riskName}</Badge>
+						<svg
+							class="arrow-icon"
+							width="18"
+							height="18"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path d="M9 18l6-6-6-6" />
+						</svg>
+					</div>
 				</div>
 
 				<div class="card-metrics">
 					<div class="metric">
 						<p class="label">Valor</p>
-						<p class="value">
-							${new Intl.NumberFormat('es-CO').format(portfolio.priceValue.value)}
-						</p>
+						<p class="value">{fmt(marketValue, portfolio.baseCurrency)}</p>
 					</div>
 
 					<div class="metric">
 						<p class="label">Activos</p>
-						<p class="value">{portfolio.assets}</p>
+						<p class="value">{portfolio.totalPositions}</p>
 					</div>
 
 					<div class="metric">
-						<p class={`value ${portfolio.dayChange >= 0 ? 'positive' : 'negative'}`}>
-							{portfolio.dayChange >= 0 ? '+' : ''}{portfolio.dayChange}%
-						</p>
-						<p class="label">Hoy</p>
+						<p class="label">ROI</p>
+						<p class="value {gainLoss >= 0 ? 'positive' : 'negative'}">{fmtPct(gainLossPct)}</p>
 					</div>
 				</div>
 
 				<ProgressBar
-					value={portfolio.allocation}
-					label={`${portfolio.allocation}% de tu portafolio`}
+					value={alloc}
+					label={`${alloc.toFixed(1)}% del total`}
 					ariaLabel={`Asignación de ${portfolio.name}`}
 				/>
-
-				<svg
-					class="arrow-icon"
-					width="20"
-					height="20"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<path d="M9 18l6-6-6-6" />
-				</svg>
 			</button>
 		{/each}
 	</div>
@@ -184,6 +265,14 @@
 		color: var(--text);
 	}
 
+	.hero-value.positive {
+		color: var(--green);
+	}
+
+	.hero-value.negative {
+		color: var(--red);
+	}
+
 	.hero-delta {
 		margin: 0.4rem 0 0;
 		font-size: 0.82rem;
@@ -192,6 +281,10 @@
 
 	.hero-delta.positive {
 		color: var(--green);
+	}
+
+	.hero-delta.negative {
+		color: var(--red);
 	}
 
 	.panel {
@@ -223,7 +316,6 @@
 	}
 
 	.portfolio-card {
-		position: relative;
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
@@ -237,6 +329,7 @@
 		backdrop-filter: blur(16px);
 		cursor: pointer;
 		transition: all 0.3s ease;
+		text-align: left;
 	}
 
 	.portfolio-card:hover {
@@ -251,13 +344,8 @@
 	.card-header {
 		display: flex;
 		align-items: flex-start;
+		justify-content: space-between;
 		gap: 1rem;
-		position: relative;
-	}
-
-	.icon-container {
-		font-size: 2.5rem;
-		min-width: 50px;
 	}
 
 	.portfolio-info {
@@ -315,12 +403,17 @@
 		color: var(--red);
 	}
 
+	.card-header-right {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		flex-shrink: 0;
+	}
+
 	.arrow-icon {
-		position: absolute;
-		top: 1rem;
-		right: 1rem;
 		color: rgba(212, 145, 42, 0.3);
 		transition: all 0.3s ease;
+		flex-shrink: 0;
 	}
 
 	.portfolio-card:hover .arrow-icon {
@@ -339,10 +432,6 @@
 	}
 
 	@media (max-width: 768px) {
-		.page-title {
-			font-size: 2rem;
-		}
-
 		.summary-cards {
 			grid-template-columns: 1fr;
 		}

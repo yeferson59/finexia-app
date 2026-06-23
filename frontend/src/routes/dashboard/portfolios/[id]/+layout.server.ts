@@ -8,6 +8,7 @@ interface Asset {
 	assetType: string;
 	exchange: string;
 	currency: string;
+	currentPrice: { value: string; currency: string } | null;
 	createdAt: string;
 	updatedAt: string;
 }
