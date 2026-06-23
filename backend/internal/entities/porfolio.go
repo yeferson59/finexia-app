@@ -90,6 +90,15 @@ const (
 	Others      PortfolioEntryCategory = "others"
 )
 
+func (t TransactionType) IsValid() bool {
+	switch t {
+	case Buy, Sell, Dividend, Split, TransferIn, TransferOut, Fee, Interest:
+		return true
+	default:
+		return false
+	}
+}
+
 func (c PortfolioEntryCategory) IsValid() bool {
 	switch c {
 	case Stocks, ETFs, Cryptos, Bonds, Cashs, RealEstates, Commodities, Others:
@@ -282,12 +291,33 @@ type PortfolioSnapshot struct {
 	Portfolio        Portfolio   `json:"portfolio,omitzero"`
 }
 
+// PortfolioSummaryView is the result of joining portfolios + risks + portfolio_summary view.
+type PortfolioSummaryView struct {
+	ID               uuid.UUID     `json:"id"`
+	Name             string        `json:"name"`
+	Description      string        `json:"description"`
+	Type             PortfolioType `json:"type"`
+	BaseCurrency     string        `json:"baseCurrency"`
+	IsDefault        bool          `json:"isDefault"`
+	RiskID           uuid.UUID     `json:"riskId"`
+	RiskName         string        `json:"riskName"`
+	TotalPositions   int64         `json:"totalPositions"`
+	TotalCostBase    string        `json:"totalCostBase"`
+	TotalMarketValue string        `json:"totalMarketValue"`
+	TotalGainLoss    string        `json:"totalGainLoss"`
+	TotalGainLossPct string        `json:"totalGainLossPct"`
+	CreatedAt        time.Time     `json:"createdAt"`
+}
+
 type PorfolioSummary struct {
-	PortfolioID    uuid.UUID     `json:"portfolioId"`
-	UserID         uuid.UUID     `json:"userId"`
-	PorfolioName   string        `json:"porfolioName"`
-	BaseCurrency   string        `json:"baseCurrency"`
-	TotalPosicions money.Decimal `json:"totalPosicions"`
-	TotalCostBase  money.Money   `json:"totalCostBase"`
-	CreatedAt      time.Time     `json:"createdAt"`
+	PortfolioID      uuid.UUID     `json:"portfolioId"`
+	UserID           uuid.UUID     `json:"userId"`
+	PorfolioName     string        `json:"porfolioName"`
+	BaseCurrency     string        `json:"baseCurrency"`
+	TotalPosicions   money.Decimal `json:"totalPosicions"`
+	TotalCostBase    money.Money   `json:"totalCostBase"`
+	TotalMarketValue money.Money   `json:"totalMarketValue"`
+	TotalGainLoss    money.Money   `json:"totalGainLoss"`
+	TotalGainLossPct money.Decimal `json:"totalGainLossPct"`
+	CreatedAt        time.Time     `json:"createdAt"`
 }

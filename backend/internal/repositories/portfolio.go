@@ -13,6 +13,60 @@ import (
 	"github.com/yeferson59/gofinance/money"
 )
 
+func (r *Repository) GetPortfoliosSummaryByUserID(ctx context.Context, userID uuid.UUID) ([]entities.PortfolioSummaryView, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			p.id,
+			p.name,
+			COALESCE(p.description, ''),
+			p.type,
+			p.base_currency,
+			p.is_default,
+			ri.id,
+			ri.name,
+			COALESCE(ps.total_positions, 0)::bigint,
+			COALESCE(ps.total_cost_base,    0)::text,
+			COALESCE(ps.total_market_value, 0)::text,
+			COALESCE(ps.total_gain_loss,    0)::text,
+			COALESCE(ps.total_gain_loss_pct,0)::text,
+			p.created_at
+		FROM portfolios p
+		JOIN  risks ri          ON ri.id = p.risk_id
+		LEFT JOIN portfolio_summary ps ON ps.portfolio_id = p.id
+		WHERE p.user_id = $1
+		ORDER BY p.created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]entities.PortfolioSummaryView, 0)
+	for rows.Next() {
+		var item entities.PortfolioSummaryView
+		if err := rows.Scan(
+			&item.ID,
+			&item.Name,
+			&item.Description,
+			&item.Type,
+			&item.BaseCurrency,
+			&item.IsDefault,
+			&item.RiskID,
+			&item.RiskName,
+			&item.TotalPositions,
+			&item.TotalCostBase,
+			&item.TotalMarketValue,
+			&item.TotalGainLoss,
+			&item.TotalGainLossPct,
+			&item.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	return result, nil
+}
+
 func (r *Repository) GetPortfoliosByUserID(ctx context.Context, userID uuid.UUID) ([]entities.Portfolio, error) {
 	rows, err := r.db.Query(ctx, "SELECT p.*, r.* FROM portfolios p JOIN risks r ON p.risk_id = r.id WHERE user_id = $1", userID)
 	if err != nil {
@@ -327,23 +381,148 @@ func (r *Repository) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, pr
 	return asset, nil
 }
 
-func (r *Repository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, quantity money.Decimal, price money.Money, costCurrency string, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) (entities.PortfolioEntry, error) {
-	var entry entities.PortfolioEntry
-	var quantityValue string
-	var priceValue string
-	var sourceIDResult pgtype.UUID
-
-	err := r.db.QueryRow(ctx, `
-		INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, category, entry_date, notes)
-		SELECT $1::uuid, $2::uuid, $3::uuid, $4::numeric, $5::numeric, $6::char(3), $7::portfolio_entry_category, $8::date, $9
-		WHERE EXISTS (
-			SELECT 1 FROM portfolios p WHERE p.id = $1 AND p.user_id = $10
+func (r *Repository) GetTransactionsByEntryID(ctx context.Context, userID, entryID uuid.UUID) ([]entities.Transaction, error) {
+	var owned bool
+	if err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM portfolio_entries pe
+			JOIN portfolios p ON p.id = pe.portfolio_id
+			WHERE pe.id = $1 AND p.user_id = $2
 		)
-		AND ($3::uuid IS NULL OR EXISTS (
-			SELECT 1 FROM investment_sources s WHERE s.id = $3 AND s.user_id = $10
-		))
-		RETURNING id, portfolio_id, asset_id, source_id, quantity, price, cost_currency, category, entry_date, notes, created_at, updated_at
-	`, portfolioID, assetID, sourceID, quantity.String(), price.String(), costCurrency, category, entryDate, notes, userID).Scan(
+	`, entryID, userID).Scan(&owned); err != nil {
+		return nil, err
+	}
+	if !owned {
+		return nil, errors.New("portfolio entry not found")
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT id, entry_id, type, quantity, price, currency, fees, transaction_date, COALESCE(notes, ''), created_at, updated_at
+		FROM transactions
+		WHERE entry_id = $1
+		ORDER BY transaction_date DESC, created_at DESC
+	`, entryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	txns := make([]entities.Transaction, 0)
+	for rows.Next() {
+		var txn entities.Transaction
+		var quantity, price, fees string
+		if err := rows.Scan(
+			&txn.ID,
+			&txn.EntryID,
+			&txn.Type,
+			&quantity,
+			&price,
+			&txn.Currency,
+			&fees,
+			&txn.TransactionDate,
+			&txn.Notes,
+			&txn.CreatedAt,
+			&txn.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		txn.Quantity = money.MustFromString(quantity)
+		txn.Price = money.MustMoneyFromString(price, money.USD)
+		txn.Fees = money.MustMoneyFromString(fees, money.USD)
+		txns = append(txns, txn)
+	}
+	return txns, nil
+}
+
+func (r *Repository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error) {
+	var owned bool
+	if err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM portfolio_entries pe
+			JOIN portfolios p ON p.id = pe.portfolio_id
+			WHERE pe.id = $1 AND p.user_id = $2
+		)
+	`, entryID, userID).Scan(&owned); err != nil {
+		return entities.Transaction{}, err
+	}
+	if !owned {
+		return entities.Transaction{}, errors.New("portfolio entry not found")
+	}
+
+	var txn entities.Transaction
+	var quantityValue, priceValue, feesValue string
+	if err := r.db.QueryRow(ctx, `
+		INSERT INTO transactions (entry_id, type, quantity, price, currency, fees, transaction_date, notes)
+		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::date, $8)
+		RETURNING id, entry_id, type, quantity, price, currency, fees, transaction_date, COALESCE(notes, ''), created_at, updated_at
+	`, entryID, txnType, quantity.String(), price.String(), currency, fees.String(), transactionDate, notes).Scan(
+		&txn.ID,
+		&txn.EntryID,
+		&txn.Type,
+		&quantityValue,
+		&priceValue,
+		&txn.Currency,
+		&feesValue,
+		&txn.TransactionDate,
+		&txn.Notes,
+		&txn.CreatedAt,
+		&txn.UpdatedAt,
+	); err != nil {
+		return entities.Transaction{}, err
+	}
+
+	txn.Quantity = money.MustFromString(quantityValue)
+	txn.Price = money.MustMoneyFromString(priceValue, money.USD)
+	txn.Fees = money.MustMoneyFromString(feesValue, money.USD)
+	return txn, nil
+}
+
+func (r *Repository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, costCurrency string, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) (entities.PortfolioEntry, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return entities.PortfolioEntry{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	var owned bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM portfolios WHERE id = $1 AND user_id = $2)
+		   AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM investment_sources WHERE id = $3 AND user_id = $2))
+	`, portfolioID, userID, sourceID).Scan(&owned); err != nil {
+		return entities.PortfolioEntry{}, err
+	}
+
+	if !owned {
+		return entities.PortfolioEntry{}, errors.New("portfolio or source not found")
+	}
+
+	var entryID uuid.UUID
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, category, entry_date, notes)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, 0, $4::numeric, $5::char(3), $6::portfolio_entry_category, $7::date, $8)
+		ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, ''))
+		DO UPDATE SET updated_at = NOW()
+		RETURNING id
+	`, portfolioID, assetID, sourceID, price.String(), costCurrency, category, entryDate, notes).Scan(&entryID); err != nil {
+		return entities.PortfolioEntry{}, err
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO transactions (entry_id, type, quantity, price, currency, fees, transaction_date, notes)
+		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), 0, $6::date, $7)
+	`, entryID, txnType, quantity.String(), price.String(), costCurrency, entryDate, notes); err != nil {
+		return entities.PortfolioEntry{}, err
+	}
+
+	// Read the position back with the values the trigger just recomputed.
+	var entry entities.PortfolioEntry
+	var quantityValue, priceValue string
+	var sourceIDResult pgtype.UUID
+	if err := tx.QueryRow(ctx, `
+		SELECT id, portfolio_id, asset_id, source_id, quantity, price, cost_currency, category, entry_date, COALESCE(notes, ''), created_at, updated_at
+		FROM portfolio_entries
+		WHERE id = $1
+	`, entryID).Scan(
 		&entry.ID,
 		&entry.PortfolioID,
 		&entry.AssetID,
@@ -356,12 +535,11 @@ func (r *Repository) CreatePortfolioEntry(ctx context.Context, userID, portfolio
 		&entry.Notes,
 		&entry.CreatedAt,
 		&entry.UpdatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return entities.PortfolioEntry{}, errors.New("portfolio or source not found")
-		}
+	); err != nil {
+		return entities.PortfolioEntry{}, err
+	}
 
+	if err := tx.Commit(ctx); err != nil {
 		return entities.PortfolioEntry{}, err
 	}
 

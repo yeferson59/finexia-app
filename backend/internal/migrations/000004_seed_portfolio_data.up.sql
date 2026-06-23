@@ -6,38 +6,38 @@
 -- Safe to run multiple times.
 
 -- ASSETS (idempotent: insert only if same ticker+exchange combination doesn't exist)
-INSERT INTO assets (id, ticker, name, asset_type, exchange, currency, created_at, updated_at)
-SELECT 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'AAPL', 'Apple Inc.', 'stock', 'NASDAQ', 'USD', NOW(), NOW()
+INSERT INTO assets (id, ticker, name, asset_type, exchange, currency, current_price, price_updated_at, created_at, updated_at)
+SELECT 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'AAPL', 'Apple Inc.', 'stock', 'NASDAQ', 'USD', 195.00, NOW(), NOW(), NOW()
 WHERE NOT EXISTS (
   SELECT 1 FROM assets WHERE ticker = 'AAPL' AND COALESCE(exchange, '') = 'NASDAQ'
 );
 
-INSERT INTO assets (id, ticker, name, asset_type, exchange, currency, created_at, updated_at)
-SELECT 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'MSFT', 'Microsoft Corporation', 'stock', 'NASDAQ', 'USD', NOW(), NOW()
+INSERT INTO assets (id, ticker, name, asset_type, exchange, currency, current_price, price_updated_at, created_at, updated_at)
+SELECT 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'MSFT', 'Microsoft Corporation', 'stock', 'NASDAQ', 'USD', 330.00, NOW(), NOW(), NOW()
 WHERE NOT EXISTS (
   SELECT 1 FROM assets WHERE ticker = 'MSFT' AND COALESCE(exchange, '') = 'NASDAQ'
 );
 
-INSERT INTO assets (id, ticker, name, asset_type, exchange, currency, created_at, updated_at)
-SELECT 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'SPY', 'SPDR S&P 500 ETF Trust', 'etf', 'NYSEARCA', 'USD', NOW(), NOW()
+INSERT INTO assets (id, ticker, name, asset_type, exchange, currency, current_price, price_updated_at, created_at, updated_at)
+SELECT 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'SPY', 'SPDR S&P 500 ETF Trust', 'etf', 'NYSEARCA', 'USD', 450.00, NOW(), NOW(), NOW()
 WHERE NOT EXISTS (
   SELECT 1 FROM assets WHERE ticker = 'SPY' AND COALESCE(exchange, '') = 'NYSEARCA'
 );
 
-INSERT INTO assets (id, ticker, name, asset_type, exchange, currency, created_at, updated_at)
-SELECT 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'BTC-USD', 'Bitcoin', 'crypto', 'Coinbase', 'USD', NOW(), NOW()
+INSERT INTO assets (id, ticker, name, asset_type, exchange, currency, current_price, price_updated_at, created_at, updated_at)
+SELECT 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'BTC-USD', 'Bitcoin', 'crypto', 'Coinbase', 'USD', 60000.00, NOW(), NOW(), NOW()
 WHERE NOT EXISTS (
   SELECT 1 FROM assets WHERE ticker = 'BTC-USD' AND COALESCE(exchange, '') = 'Coinbase'
 );
 
-INSERT INTO assets (id, ticker, name, asset_type, exchange, currency, created_at, updated_at)
-SELECT 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'ETH-USD', 'Ethereum', 'crypto', 'Coinbase', 'USD', NOW(), NOW()
+INSERT INTO assets (id, ticker, name, asset_type, exchange, currency, current_price, price_updated_at, created_at, updated_at)
+SELECT 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'ETH-USD', 'Ethereum', 'crypto', 'Coinbase', 'USD', 4000.00, NOW(), NOW(), NOW()
 WHERE NOT EXISTS (
   SELECT 1 FROM assets WHERE ticker = 'ETH-USD' AND COALESCE(exchange, '') = 'Coinbase'
 );
 
-INSERT INTO assets (id, ticker, name, asset_type, exchange, currency, created_at, updated_at)
-SELECT 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'BND', 'Vanguard Total Bond Market ETF', 'bond', 'NASDAQ', 'USD', NOW(), NOW()
+INSERT INTO assets (id, ticker, name, asset_type, exchange, currency, current_price, price_updated_at, created_at, updated_at)
+SELECT 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'BND', 'Vanguard Total Bond Market ETF', 'bond', 'NASDAQ', 'USD', 100.00, NOW(), NOW(), NOW()
 WHERE NOT EXISTS (
   SELECT 1 FROM assets WHERE ticker = 'BND' AND COALESCE(exchange, '') = 'NASDAQ'
 );

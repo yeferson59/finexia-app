@@ -7,6 +7,42 @@ import (
 	"github.com/yeferson59/finexia-app/internal/entities"
 )
 
+type TransactionResponseDTO struct {
+	ID              uuid.UUID `json:"id"`
+	EntryID         uuid.UUID `json:"entryId"`
+	Type            string    `json:"type"`
+	Quantity        string    `json:"quantity"`
+	Price           string    `json:"price"`
+	Currency        string    `json:"currency"`
+	Fees            string    `json:"fees"`
+	TransactionDate time.Time `json:"transactionDate"`
+	Notes           string    `json:"notes"`
+	CreatedAt       time.Time `json:"createdAt"`
+}
+
+func NewTransactionResponse(t entities.Transaction) TransactionResponseDTO {
+	return TransactionResponseDTO{
+		ID:              t.ID,
+		EntryID:         t.EntryID,
+		Type:            string(t.Type),
+		Quantity:        t.Quantity.String(),
+		Price:           t.Price.String(),
+		Currency:        t.Currency,
+		Fees:            t.Fees.String(),
+		TransactionDate: t.TransactionDate,
+		Notes:           t.Notes,
+		CreatedAt:       t.CreatedAt,
+	}
+}
+
+func NewTransactionListResponse(txns []entities.Transaction) []TransactionResponseDTO {
+	result := make([]TransactionResponseDTO, 0, len(txns))
+	for _, t := range txns {
+		result = append(result, NewTransactionResponse(t))
+	}
+	return result
+}
+
 // HoldingResponseDTO is a flattened representation of a portfolio entry joined
 // with its asset, ready to be consumed by the frontend holdings view.
 type HoldingResponseDTO struct {

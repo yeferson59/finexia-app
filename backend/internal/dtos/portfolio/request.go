@@ -28,13 +28,24 @@ type UpdateAssetPriceRequestDTO struct {
 }
 
 type CreatePortfolioEntryRequestDTO struct {
-	PortfolioID  uuid.UUID     `json:"portfolioId" validate:"required"`
-	AssetID      uuid.UUID     `json:"assetId" validate:"required"`
-	SourceID     uuid.UUID     `json:"sourceId" validate:"required"`
-	Quantity     money.Decimal `json:"quantity" validate:"required"`
-	Price        money.Money   `json:"price" validate:"required"`
-	CostCurrency string        `json:"costCurrency" validate:"required"`
-	Category     string        `json:"category"`
-	EntryDate    time.Time     `json:"entryDate" validate:"required"`
-	Notes        string        `json:"notes"`
+	PortfolioID     uuid.UUID     `json:"portfolioId" validate:"required"`
+	AssetID         uuid.UUID     `json:"assetId" validate:"required"`
+	SourceID        uuid.UUID     `json:"sourceId" validate:"required"`
+	TransactionType string        `json:"transactionType"`
+	Quantity        money.Decimal `json:"quantity" validate:"required"`
+	Price           money.Money   `json:"price" validate:"required"`
+	CostCurrency    string        `json:"costCurrency" validate:"required"`
+	Category        string        `json:"category"`
+	EntryDate       time.Time     `json:"entryDate" validate:"required"`
+	Notes           string        `json:"notes"`
+}
+
+type CreateTransactionRequestDTO struct {
+	Type            string        `json:"type" validate:"required"`
+	Quantity        money.Decimal `json:"quantity" validate:"required"`
+	Price           money.Money   `json:"price" validate:"required"`
+	Currency        string        `json:"currency" validate:"required"`
+	Fees            money.Money   `json:"fees"`
+	TransactionDate time.Time     `json:"transactionDate" validate:"required"`
+	Notes           string        `json:"notes"`
 }

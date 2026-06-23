@@ -28,6 +28,10 @@ func (s *Services) GetPortfolios(ctx context.Context, userID uuid.UUID) ([]entit
 	return portfolios, nil
 }
 
+func (s *Services) GetPortfoliosSummary(ctx context.Context, userID uuid.UUID) ([]entities.PortfolioSummaryView, error) {
+	return s.repos.GetPortfoliosSummaryByUserID(ctx, userID)
+}
+
 func (s *Services) GetPortfolio(ctx context.Context, userID, portfolioID uuid.UUID) (entities.Portfolio, error) {
 	portfolio, err := s.repos.GetPortfolioByID(ctx, portfolioID, userID)
 	if err != nil {
@@ -74,11 +78,19 @@ func (s *Services) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, pric
 	return s.repos.UpdateAssetPrice(ctx, assetID, price)
 }
 
-func (s *Services) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, quantity money.Decimal, price money.Money, costCurrency string, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) (entities.PortfolioEntry, error) {
-	entry, err := s.repos.CreatePortfolioEntry(ctx, userID, portfolioID, assetID, sourceID, quantity, price, costCurrency, category, entryDate, notes)
+func (s *Services) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, costCurrency string, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) (entities.PortfolioEntry, error) {
+	entry, err := s.repos.CreatePortfolioEntry(ctx, userID, portfolioID, assetID, sourceID, txnType, quantity, price, costCurrency, category, entryDate, notes)
 	if err != nil {
 		return entities.PortfolioEntry{}, err
 	}
 
 	return entry, nil
+}
+
+func (s *Services) GetTransactionsByEntry(ctx context.Context, userID, entryID uuid.UUID) ([]entities.Transaction, error) {
+	return s.repos.GetTransactionsByEntryID(ctx, userID, entryID)
+}
+
+func (s *Services) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error) {
+	return s.repos.CreateTransaction(ctx, userID, entryID, txnType, quantity, price, currency, fees, transactionDate, notes)
 }

@@ -22,6 +22,20 @@ func (h *Handlers) GetPortfolios(c fiber.Ctx) error {
 	return h.responseStatusOk(c, "Portfolios retrieved", "Portfolios retrieved successfully", portfolios)
 }
 
+func (h *Handlers) GetPortfoliosSummary(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	summaries, err := h.services.GetPortfoliosSummary(h.ctx, userID)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error retrieving portfolio summaries", "Could not retrieve portfolio summaries")
+	}
+
+	return h.responseStatusOk(c, "Portfolio summaries retrieved", "Portfolio summaries retrieved successfully", summaries)
+}
+
 func (h *Handlers) GetPortfolio(c fiber.Ctx) error {
 	userID, _, _, err := h.getUserIDTokenRole(c)
 	if err != nil {
@@ -137,7 +151,14 @@ func (h *Handlers) CreatePortfolioEntry(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid category", "Category must be one of: stocks, etf, crypto, bonds, cash, real_estate, commodities, other")
 	}
 
-	entry, err := h.services.CreatePortfolioEntry(h.ctx, userID, req.PortfolioID, req.AssetID, req.SourceID, req.Quantity, req.Price, req.CostCurrency, category, req.EntryDate, req.Notes)
+	txnType := entities.TransactionType(req.TransactionType)
+	if req.TransactionType == "" {
+		txnType = entities.Buy
+	} else if !txnType.IsValid() {
+		return h.responseBadRequest(c, "Invalid transaction type", "Type must be one of: buy, sell, dividend, split, transfer_in, transfer_out, fee, interest")
+	}
+
+	entry, err := h.services.CreatePortfolioEntry(h.ctx, userID, req.PortfolioID, req.AssetID, req.SourceID, txnType, req.Quantity, req.Price, req.CostCurrency, category, req.EntryDate, req.Notes)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error creating portfolio entry", "Could not create portfolio entry")
 	}
@@ -167,6 +188,54 @@ func (h *Handlers) UpdateAssetPrice(c fiber.Ctx) error {
 	}
 
 	return h.responseStatusOk(c, "Asset price updated", "Asset price updated successfully", asset)
+}
+
+func (h *Handlers) GetTransactions(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	entryID, err := h.getParamUUID(c, "entryId")
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid entry ID", err.Error())
+	}
+
+	txns, err := h.services.GetTransactionsByEntry(h.ctx, userID, entryID)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error retrieving transactions", "Could not retrieve transactions")
+	}
+
+	return h.responseStatusOk(c, "Transactions retrieved", "Transactions retrieved successfully", portfolio.NewTransactionListResponse(txns))
+}
+
+func (h *Handlers) CreateTransaction(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	entryID, err := h.getParamUUID(c, "entryId")
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid entry ID", err.Error())
+	}
+
+	var req portfolio.CreateTransactionRequestDTO
+	if err := c.Bind().JSON(&req); err != nil {
+		return h.responseBadRequest(c, "Invalid request", err.Error())
+	}
+
+	txnType := entities.TransactionType(req.Type)
+	if !txnType.IsValid() {
+		return h.responseBadRequest(c, "Invalid transaction type", "Type must be one of: buy, sell, dividend, split, transfer_in, transfer_out, fee, interest")
+	}
+
+	txn, err := h.services.CreateTransaction(h.ctx, userID, entryID, txnType, req.Quantity, req.Price, req.Currency, req.Fees, req.TransactionDate, req.Notes)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error creating transaction", "Could not create transaction")
+	}
+
+	return h.responseStatusOk(c, "Transaction created", "Transaction created successfully", portfolio.NewTransactionResponse(txn))
 }
 
 func (h *Handlers) GetAssets(c fiber.Ctx) error {

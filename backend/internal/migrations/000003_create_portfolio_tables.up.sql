@@ -171,6 +171,8 @@ CREATE TABLE IF NOT EXISTS assets (
   asset_type asset_type NOT NULL DEFAULT 'stock',
   exchange VARCHAR(100),
   currency CHAR(3) NOT NULL,
+  current_price NUMERIC(20, 8),
+  price_updated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -325,25 +327,27 @@ END$$;
 CREATE OR REPLACE FUNCTION recalculate_avg_cost()
 RETURNS TRIGGER AS $$
 DECLARE
-  v_total_qty   NUMERIC;
-  v_total_cost  NUMERIC;
+  v_net_qty   NUMERIC;
+  v_buy_qty   NUMERIC;
+  v_buy_cost  NUMERIC;
 BEGIN
   SELECT
-    SUM(CASE WHEN type IN ('buy', 'transfer_in') THEN quantity ELSE -quantity END),
-    SUM(CASE WHEN type IN ('buy', 'transfer_in') THEN quantity * price ELSE 0 END)
-  INTO v_total_qty, v_total_cost
+    COALESCE(SUM(CASE
+      WHEN type IN ('buy', 'transfer_in')   THEN quantity
+      WHEN type IN ('sell', 'transfer_out') THEN -quantity
+      ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN type IN ('buy', 'transfer_in') THEN quantity ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN type IN ('buy', 'transfer_in') THEN quantity * price ELSE 0 END), 0)
+  INTO v_net_qty, v_buy_qty, v_buy_cost
   FROM transactions
-  WHERE entry_id = NEW.entry_id
-    AND type IN ('buy', 'sell', 'transfer_in', 'transfer_out');
+  WHERE entry_id = NEW.entry_id;
 
-  IF v_total_qty > 0 THEN
-    UPDATE portfolio_entries
-    SET
-      quantity       = v_total_qty,
-      price = v_total_cost / v_total_qty,
-      updated_at     = NOW()
-    WHERE id = NEW.entry_id;
-  END IF;
+  UPDATE portfolio_entries
+  SET
+    quantity   = GREATEST(v_net_qty, 0),
+    price      = CASE WHEN v_buy_qty > 0 THEN v_buy_cost / v_buy_qty ELSE price END,
+    updated_at = NOW()
+  WHERE id = NEW.entry_id;
 
   RETURN NEW;
 END;
@@ -360,25 +364,79 @@ BEGIN
   END IF;
 END$$;
 
+-- Retroactively recompute quantity and avg cost for all existing entries
+-- that predate the trigger. Safe to run multiple times (idempotent).
+UPDATE portfolio_entries pe
+SET
+  quantity = GREATEST(COALESCE((
+    SELECT SUM(CASE
+      WHEN t.type IN ('buy', 'transfer_in')   THEN t.quantity
+      WHEN t.type IN ('sell', 'transfer_out') THEN -t.quantity
+      ELSE 0 END)
+    FROM transactions t WHERE t.entry_id = pe.id
+  ), 0), 0),
+  price = COALESCE((
+    SELECT CASE
+      WHEN SUM(CASE WHEN t.type IN ('buy', 'transfer_in') THEN t.quantity ELSE 0 END) > 0
+        THEN SUM(CASE WHEN t.type IN ('buy', 'transfer_in') THEN t.quantity * t.price ELSE 0 END) /
+             SUM(CASE WHEN t.type IN ('buy', 'transfer_in') THEN t.quantity ELSE 0 END)
+      ELSE pe.price END
+    FROM transactions t WHERE t.entry_id = pe.id
+  ), pe.price);
+
 -- VIEW (create or replace)
+-- portfolio_summary aggregates per-portfolio totals using trigger-maintained
+-- entry quantities and the asset's current_price for market value.
 CREATE OR REPLACE VIEW portfolio_summary AS
+WITH base AS (
+  SELECT
+    p.id                           AS portfolio_id,
+    p.user_id,
+    p.name                         AS portfolio_name,
+    p.base_currency,
+    COUNT(DISTINCT pe.asset_id)    AS total_positions,
+    -- Cost basis: quantity × weighted-avg-cost, converted to base currency.
+    COALESCE(SUM(
+      pe.quantity * pe.price *
+      COALESCE(
+        (SELECT er.rate FROM exchange_rates er
+         WHERE er.from_currency = pe.cost_currency
+           AND er.to_currency   = p.base_currency
+         ORDER BY er.rate_date DESC LIMIT 1),
+        1
+      )
+    ), 0)                          AS total_cost_base,
+    -- Market value: quantity × current_price (falls back to avg cost),
+    -- converted from the asset's native currency to the portfolio base currency.
+    COALESCE(SUM(
+      pe.quantity *
+      COALESCE(a.current_price, pe.price) *
+      COALESCE(
+        (SELECT er.rate FROM exchange_rates er
+         WHERE er.from_currency = COALESCE(a.currency, pe.cost_currency)
+           AND er.to_currency   = p.base_currency
+         ORDER BY er.rate_date DESC LIMIT 1),
+        1
+      )
+    ), 0)                          AS total_market_value,
+    p.created_at
+  FROM portfolios p
+  LEFT JOIN portfolio_entries pe ON pe.portfolio_id = p.id
+  LEFT JOIN assets a              ON a.id = pe.asset_id
+  GROUP BY p.id, p.user_id, p.name, p.base_currency, p.created_at
+)
 SELECT
-  p.id                AS portfolio_id,
-  p.user_id,
-  p.name              AS portfolio_name,
-  p.base_currency,
-  COUNT(pe.id)        AS total_positions,
-  SUM(
-    pe.quantity * pe.price *
-    COALESCE(
-      (SELECT er.rate FROM exchange_rates er
-       WHERE er.from_currency = pe.cost_currency
-         AND er.to_currency   = p.base_currency
-       ORDER BY er.rate_date DESC LIMIT 1),
-      1
-    )
-  )                   AS total_cost_base,
-  p.created_at
-FROM portfolios p
-LEFT JOIN portfolio_entries pe ON pe.portfolio_id = p.id
-GROUP BY p.id;
+  portfolio_id,
+  user_id,
+  portfolio_name,
+  base_currency,
+  total_positions,
+  total_cost_base,
+  total_market_value,
+  total_market_value - total_cost_base                              AS total_gain_loss,
+  CASE WHEN total_cost_base > 0
+    THEN (total_market_value - total_cost_base) / total_cost_base * 100
+    ELSE 0
+  END                                                               AS total_gain_loss_pct,
+  created_at
+FROM base;

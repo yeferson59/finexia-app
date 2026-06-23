@@ -82,7 +82,7 @@ func (handler *Handlers) responseFromDomain(c fiber.Ctx, err error, message, act
 		})
 	}
 
-	if strings.Contains(err.Error(), "found") || strings.Contains(err.Error(), "exist") || strings.Contains(err.Error(), "existing") {
+	if strings.Contains(err.Error(), "already exist") || strings.Contains(err.Error(), "already found") || strings.Contains(err.Error(), "duplicate") {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
 			"success":   false,
 			"message":   message,
