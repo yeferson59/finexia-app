@@ -39,25 +39,19 @@ export const actions = {
 
 		if (!token) return { success: false };
 
-		const response = await fetch(`${env.BASE_API}/auth/logout`, {
+		const refreshToken = cookies.get('refresh_token');
+
+		await fetch(`${env.BASE_API}/auth/logout`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				Authorization: `Bearer ${token}`
+				Authorization: `Bearer ${token}`,
+				...(refreshToken ? { Cookie: `refresh_token=${refreshToken}` } : {})
 			}
 		});
 
-		if (!response.ok) {
-			return { success: false };
-		}
-
-		const { success } = await response.json();
-
-		if (!success) {
-			return { success: false };
-		}
-
 		cookies.delete('access_token_finexia', { path: '/' });
+		cookies.delete('refresh_token', { path: '/' });
 
 		return redirect(302, '/auth');
 	}

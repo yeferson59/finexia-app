@@ -47,6 +47,17 @@ export const actions = {
 			sameSite: 'lax'
 		});
 
+		const rawRefreshToken = response.headers.get('set-cookie')?.match(/refresh_token=([^;]+)/)?.[1];
+		if (rawRefreshToken) {
+			cookies.set('refresh_token', rawRefreshToken, {
+				path: '/',
+				httpOnly: true,
+				secure: !dev,
+				maxAge: 60 * 60 * 24 * 30,
+				sameSite: 'lax'
+			});
+		}
+
 		return redirect(302, '/dashboard');
 	},
 	register: async ({ request }) => {
