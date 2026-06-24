@@ -34,8 +34,12 @@ func (s *AssetPriceScheduler) Start(ctx context.Context) {
 	case <-time.After(s.startDelay):
 	}
 
-	s.log.Info("running initial asset price sync")
-	s.runOnce(ctx)
+	if s.svc.WasAssetPriceSyncedRecently() {
+		s.log.Info("skipping initial asset price sync — last run within 24h")
+	} else {
+		s.log.Info("running initial asset price sync")
+		s.runOnce(ctx)
+	}
 
 	for {
 		next := assetNextRunTime(s.targetHourUTC)

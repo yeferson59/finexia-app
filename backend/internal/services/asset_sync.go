@@ -13,17 +13,50 @@ import (
 	"github.com/yeferson59/finexia-app/internal/logger"
 )
 
+const assetSyncCacheKey = "finexia:sync:asset_prices"
+const assetSyncTTL = 24 * time.Hour
+
+func (s *Services) WasAssetPriceSyncedRecently() bool {
+	v, err := s.storage.Get(assetSyncCacheKey)
+	return err == nil && len(v) > 0
+}
+
+type defaultAsset struct {
+	Ticker    string
+	Name      string
+	AssetType entities.AssetType
+	Exchange  string
+	Currency  string
+}
+
+var defaultAssets = []defaultAsset{
+	{"AAPL", "Apple Inc.", entities.Stock, "NASDAQ", "USD"},
+	{"MSFT", "Microsoft Corporation", entities.Stock, "NASDAQ", "USD"},
+	{"SPY", "SPDR S&P 500 ETF Trust", entities.ETF, "NYSEARCA", "USD"},
+	{"BTC-USD", "Bitcoin", entities.Crypto, "Coinbase", "USD"},
+	{"ETH-USD", "Ethereum", entities.Crypto, "Coinbase", "USD"},
+	{"BND", "Vanguard Total Bond Market ETF", entities.Bond, "NASDAQ", "USD"},
+}
+
 func (s *Services) SyncAssetPrices(ctx context.Context) ([]entities.Asset, []error) {
 	log := s.log.With(logger.Str("job", "asset_price_sync"))
 	client := alphavantage.New(s.cfg.AlphaVantageAPIKey)
 
+	var errs []error
+
+	for _, da := range defaultAssets {
+		if _, err := s.repos.UpsertAsset(ctx, da.Ticker, da.Name, da.AssetType, da.Exchange, da.Currency); err != nil {
+			log.Error("upsert default asset failed", logger.Err(err), logger.Str("ticker", da.Ticker))
+			errs = append(errs, err)
+		}
+	}
+
 	allAssets, err := s.repos.GetAssets(ctx, 0, 1000)
 	if err != nil {
-		return nil, []error{fmt.Errorf("asset_price_sync: fetch assets: %w", err)}
+		return nil, append(errs, fmt.Errorf("asset_price_sync: fetch assets: %w", err))
 	}
 
 	results := make([]entities.Asset, 0, len(allAssets))
-	var errs []error
 	apiCallMade := false
 
 	for _, asset := range allAssets {
@@ -104,5 +137,6 @@ func (s *Services) SyncAssetPrices(ctx context.Context) ([]entities.Asset, []err
 		results = append(results, updated)
 	}
 
+	_ = s.storage.Set(assetSyncCacheKey, []byte(time.Now().UTC().Format(time.RFC3339)), assetSyncTTL)
 	return results, errs
 }

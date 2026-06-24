@@ -11,6 +11,14 @@ import (
 	"github.com/yeferson59/finexia-app/internal/logger"
 )
 
+const rateSyncCacheKey = "finexia:sync:exchange_rates"
+const rateSyncTTL = 24 * time.Hour
+
+func (s *Services) WasExchangeRateSyncedRecently() bool {
+	v, err := s.storage.Get(rateSyncCacheKey)
+	return err == nil && len(v) > 0
+}
+
 type CurrencyPair struct{ From, To string }
 
 var defaultPairs = []CurrencyPair{
@@ -61,5 +69,6 @@ func (s *Services) SyncExchangeRates(ctx context.Context) ([]entities.ExchangeRa
 		}
 	}
 
+	_ = s.storage.Set(rateSyncCacheKey, []byte(time.Now().UTC().Format(time.RFC3339)), rateSyncTTL)
 	return results, errs
 }

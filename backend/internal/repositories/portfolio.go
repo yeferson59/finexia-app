@@ -467,6 +467,29 @@ func (r *Repository) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, pr
 	return asset, nil
 }
 
+func (r *Repository) UpsertAsset(ctx context.Context, ticker, name string, assetType entities.AssetType, exchange, currency string) (entities.Asset, error) {
+	var asset entities.Asset
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO assets (ticker, name, asset_type, exchange, currency, created_at, updated_at)
+		VALUES ($1, $2, $3::asset_type, NULLIF($4, ''), $5, NOW(), NOW())
+		ON CONFLICT (ticker, COALESCE(exchange, ''))
+		DO UPDATE SET name = EXCLUDED.name, asset_type = EXCLUDED.asset_type, currency = EXCLUDED.currency, updated_at = NOW()
+		RETURNING id, ticker, name, asset_type, COALESCE(exchange, ''), currency, current_price, price_updated_at, created_at, updated_at
+	`, ticker, name, assetType, exchange, currency).Scan(
+		&asset.ID,
+		&asset.Ticker,
+		&asset.Name,
+		&asset.AssetType,
+		&asset.Exchange,
+		&asset.Currency,
+		&asset.CurrentPrice,
+		&asset.PriceUpdatedAt,
+		&asset.CreatedAt,
+		&asset.UpdatedAt,
+	)
+	return asset, err
+}
+
 func (r *Repository) GetRecentTransactionsByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]entities.Transaction, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fees,

@@ -26,8 +26,12 @@ func NewExchangeRateScheduler(svc services.Services, targetHourUTC int, log logg
 // Designed to be called as a goroutine: go sched.Start(ctx).
 // Exits cleanly when ctx is cancelled.
 func (s *ExchangeRateScheduler) Start(ctx context.Context) {
-	s.log.Info("running initial exchange rate sync")
-	s.runOnce(ctx)
+	if s.svc.WasExchangeRateSyncedRecently() {
+		s.log.Info("skipping initial exchange rate sync — last run within 24h")
+	} else {
+		s.log.Info("running initial exchange rate sync")
+		s.runOnce(ctx)
+	}
 
 	for {
 		next := nextRunTime(s.targetHourUTC)
