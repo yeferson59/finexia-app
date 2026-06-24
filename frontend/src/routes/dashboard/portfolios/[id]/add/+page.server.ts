@@ -12,7 +12,7 @@ export const actions = {
 		const { success, error, data } = await z
 			.object({
 				portfolioId: z.uuid(),
-				assetId: z.coerce.string(),
+				assetId: z.uuid(),
 				sourceId: z.uuid(),
 				quantity: z.coerce.number().positive(),
 				price: z.coerce.number().positive(),
