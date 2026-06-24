@@ -24,20 +24,20 @@
 </PageHeader>
 
 <section class="net-worth-section" aria-labelledby="dashboard-title">
-	<NetWorthCard />
+	<NetWorthCard summaries={data.portfolioSummaries} />
 </section>
 
 <section class="content-grid" aria-label="Resumen financiero">
 	<div class="grid-item full-width">
-		<PortfolioOverview />
+		<PortfolioOverview summaries={data.portfolioSummaries} />
 	</div>
 
 	<div class="grid-item">
-		<AssetAllocation />
+		<AssetAllocation allocation={data.allocation} />
 	</div>
 
 	<div class="grid-item">
-		<RecentActivity />
+		<RecentActivity transactions={data.recentTransactions} />
 	</div>
 </section>
 

@@ -1,13 +1,51 @@
 <script lang="ts">
 	import CardHeader from '$components/ui/card-header.svelte';
 
-	const assets = [
-		{ name: 'Acciones', value: 450000, percent: 36, color: '#d4912a' },
-		{ name: 'Bonos', value: 350000, percent: 28, color: '#22c97e' },
-		{ name: 'Fondos Mutuos', value: 250000, percent: 20, color: '#6b8cef' },
-		{ name: 'Inmuebles', value: 150000, percent: 12, color: '#b988e0' },
-		{ name: 'Efectivo', value: 50000, percent: 4, color: '#8a8780' }
-	];
+	interface AllocationItem {
+		category: string;
+		marketValue: string;
+		percent: number;
+	}
+
+	interface AssetEntry {
+		name: string;
+		value: number;
+		percent: number;
+		color: string;
+	}
+
+	const { allocation = [] }: { allocation: AllocationItem[] } = $props();
+
+	const categoryLabels: Record<string, string> = {
+		stocks: 'Acciones',
+		etfs: 'ETFs',
+		cryptos: 'Crypto',
+		bonds: 'Bonos',
+		cash: 'Efectivo',
+		real_estates: 'Inmuebles',
+		commodities: 'Commodities',
+		others: 'Otros'
+	};
+
+	const categoryColors: Record<string, string> = {
+		stocks: '#d4912a',
+		etfs: '#22c97e',
+		cryptos: '#6b8cef',
+		bonds: '#b988e0',
+		cash: '#8a8780',
+		real_estates: '#e0885a',
+		commodities: '#e0c15a',
+		others: '#5ab4e0'
+	};
+
+	const assets = $derived<AssetEntry[]>(
+		allocation.map((item) => ({
+			name: categoryLabels[item.category] ?? item.category,
+			value: parseFloat(item.marketValue || '0'),
+			percent: item.percent,
+			color: categoryColors[item.category] ?? '#5ab4e0'
+		}))
+	);
 
 	function polarToCartesian(angle: number, radius: number, cx = 100, cy = 100) {
 		const radians = (angle - 90) * (Math.PI / 180);
@@ -40,63 +78,95 @@
 		return { d, startAngle, endAngle };
 	}
 
-	let currentAngle = 0;
-	const slices = assets.map((asset) => {
-		const slice = generatePieSlice(asset.percent, currentAngle);
-		currentAngle = slice.endAngle;
-		return { ...asset, ...slice };
-	});
+	function buildSlices(items: AssetEntry[]) {
+		let angle = 0;
+		return items.map((asset) => {
+			const slice = generatePieSlice(asset.percent, angle);
+			angle = slice.endAngle;
+			return { ...asset, ...slice };
+		});
+	}
+
+	const slices = $derived(buildSlices(assets));
+
+	const totalPct = $derived(
+		allocation.reduce((acc, item) => acc + item.percent, 0)
+	);
 </script>
 
 <div class="asset-card">
 	<CardHeader eyebrow="Distribución" title="Asignación de Activos" />
 
-	<div class="pie-container">
-		<svg class="pie-chart" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
-			{#each slices as slice (slice.name)}
-				<path d={slice.d} fill={slice.color} fill-opacity="0.9" stroke="#08090a" stroke-width="2" />
-			{/each}
-
-			<!-- Center circle -->
-			<circle cx="100" cy="100" r="45" fill="#08090a" />
-			<text
-				x="100"
-				y="98"
-				text-anchor="middle"
-				fill="#e8a535"
-				font-size="20"
-				font-weight="600"
-				font-family="'JetBrains Mono', monospace"
+	{#if allocation.length === 0}
+		<div class="empty-state">
+			<svg
+				width="48"
+				height="48"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.5"
 			>
-				100%
-			</text>
-			<text
-				x="100"
-				y="114"
-				text-anchor="middle"
-				fill="#8a8780"
-				font-size="8"
-				letter-spacing="1"
-				font-family="'JetBrains Mono', monospace"
-			>
-				DIVERSIFICADO
-			</text>
-		</svg>
-
-		<div class="pie-legend">
-			{#each assets as asset (asset.name)}
-				<div class="legend-item">
-					<div class="legend-color" style="background-color: {asset.color}"></div>
-					<div class="legend-text">
-						<p class="legend-label">{asset.name}</p>
-						<p class="legend-value">
-							${new Intl.NumberFormat('es-CO').format(asset.value)} ({asset.percent}%)
-						</p>
-					</div>
-				</div>
-			{/each}
+				<circle cx="12" cy="12" r="10" />
+				<path d="M12 2a10 10 0 0 1 10 10" />
+				<path d="M12 12L2 12" />
+			</svg>
+			<p>Sin posiciones registradas</p>
 		</div>
-	</div>
+	{:else}
+		<div class="pie-container">
+			<svg class="pie-chart" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
+				{#each slices as slice (slice.name)}
+					<path d={slice.d} fill={slice.color} fill-opacity="0.9" stroke="#08090a" stroke-width="2" />
+				{/each}
+
+				<!-- Center circle -->
+				<circle cx="100" cy="100" r="45" fill="#08090a" />
+				<text
+					x="100"
+					y="98"
+					text-anchor="middle"
+					fill="#e8a535"
+					font-size="20"
+					font-weight="600"
+					font-family="'JetBrains Mono', monospace"
+				>
+					{Math.round(totalPct)}%
+				</text>
+				<text
+					x="100"
+					y="114"
+					text-anchor="middle"
+					fill="#8a8780"
+					font-size="8"
+					letter-spacing="1"
+					font-family="'JetBrains Mono', monospace"
+				>
+					DIVERSIFICADO
+				</text>
+			</svg>
+
+			<div class="pie-legend">
+				{#each assets as asset (asset.name)}
+					<div class="legend-item">
+						<div class="legend-color" style="background-color: {asset.color}"></div>
+						<div class="legend-text">
+							<p class="legend-label">{asset.name}</p>
+							<p class="legend-value">
+								${new Intl.NumberFormat('es-CO', {
+									minimumFractionDigits: 2,
+									maximumFractionDigits: 2
+								}).format(asset.value)} ({new Intl.NumberFormat('es-CO', {
+									minimumFractionDigits: 2,
+									maximumFractionDigits: 2
+								}).format(asset.percent)}%)
+							</p>
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
 
 	<div class="card-footer">
 		<button class="footer-button">Rebalancear portafolio</button>
@@ -113,6 +183,23 @@
 		display: flex;
 		flex-direction: column;
 		height: 100%;
+	}
+
+	.empty-state {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.75rem;
+		padding: 2rem;
+		color: rgba(236, 234, 229, 0.4);
+		text-align: center;
+	}
+
+	.empty-state p {
+		margin: 0;
+		font-size: 0.9rem;
 	}
 
 	.pie-container {

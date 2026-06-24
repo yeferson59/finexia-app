@@ -3,36 +3,70 @@
 	import Badge from '$components/ui/badge.svelte';
 	import Stat from '$components/ui/stat.svelte';
 
-	let netWorth = $state(1250000);
-	let monthlyChange = $state(45000);
-	let monthlyChangePercent = $state(3.7);
-	let isIncreasing = $derived(monthlyChange >= 0);
+	interface PortfolioSummary {
+		id: string;
+		name: string;
+		totalMarketValue: string;
+		totalCostBase: string;
+		totalGainLoss: string;
+		totalGainLossPct: string;
+		totalPositions: number;
+	}
+
+	const { summaries = [] }: { summaries: PortfolioSummary[] } = $props();
+
+	const netWorth = $derived(
+		summaries.reduce((acc, s) => acc + parseFloat(s.totalMarketValue || '0'), 0)
+	);
+	const totalGainLoss = $derived(
+		summaries.reduce((acc, s) => acc + parseFloat(s.totalGainLoss || '0'), 0)
+	);
+	const totalCostBase = $derived(
+		summaries.reduce((acc, s) => acc + parseFloat(s.totalCostBase || '0'), 0)
+	);
+	const totalPositions = $derived(summaries.reduce((acc, s) => acc + (s.totalPositions ?? 0), 0));
+	const gainLossPct = $derived(totalCostBase > 0 ? (totalGainLoss / totalCostBase) * 100 : 0);
+	const isIncreasing = $derived(totalGainLoss >= 0);
 </script>
 
 <div class="net-worth-card">
 	<CardHeader eyebrow="Patrimonio total" title="Patrimonio Neto">
 		{#snippet action()}
-			<Badge tone="neutral" pill={false}>Mes actual</Badge>
+			<Badge tone="neutral" pill={false}>Acumulado</Badge>
 		{/snippet}
 	</CardHeader>
 
 	<div class="net-worth-content">
 		<div class="main-metric">
 			<h1 class="amount">
-				${new Intl.NumberFormat('es-CO').format(netWorth)}
+				${new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(netWorth)}
 			</h1>
-			<p class="amount-delta" class:positive={isIncreasing} class:negative={!isIncreasing}>
-				{isIncreasing ? '+' : '−'}${new Intl.NumberFormat('es-CO').format(Math.abs(monthlyChange))}
-				· {new Intl.NumberFormat('es-CO', { minimumFractionDigits: 1 }).format(
-					monthlyChangePercent
-				)}% este mes
-			</p>
+			{#if summaries.length > 0}
+				<p class="amount-delta" class:positive={isIncreasing} class:negative={!isIncreasing}>
+					{isIncreasing ? '+' : '−'}${new Intl.NumberFormat('es-CO', {
+						minimumFractionDigits: 2,
+						maximumFractionDigits: 2
+					}).format(Math.abs(totalGainLoss))}
+					· {new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+						Math.abs(gainLossPct)
+					)}% total
+				</p>
+			{:else}
+				<p class="amount-delta neutral">Sin portafolios registrados</p>
+			{/if}
 		</div>
 
 		<div class="metric-stats">
-			<Stat label="Clases de activo" value="5" />
-			<Stat label="Tasa promedio" tone="highlight" value="7,4%" unit="anual" />
-			<Stat label="Liquidez" tone="positive" value="72h" />
+			<Stat label="Portafolios" value={String(summaries.length)} />
+			<Stat label="Posiciones" tone="highlight" value={String(totalPositions)} />
+			<Stat
+				label="Ganancia"
+				tone={isIncreasing ? 'positive' : 'negative'}
+				value="{isIncreasing ? '+' : ''}{new Intl.NumberFormat('es-CO', {
+					minimumFractionDigits: 2,
+					maximumFractionDigits: 2
+				}).format(gainLossPct)}%"
+			/>
 		</div>
 	</div>
 
@@ -107,6 +141,10 @@
 
 	.amount-delta.negative {
 		color: var(--red);
+	}
+
+	.amount-delta.neutral {
+		color: rgba(236, 234, 229, 0.5);
 	}
 
 	.metric-stats {

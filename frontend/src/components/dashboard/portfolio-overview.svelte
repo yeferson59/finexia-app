@@ -3,165 +3,228 @@
 	import CardHeader from '$components/ui/card-header.svelte';
 	import Stat from '$components/ui/stat.svelte';
 
-	const portfolioData = [
-		{ month: 'Ene', value: 1100000 },
-		{ month: 'Feb', value: 1150000 },
-		{ month: 'Mar', value: 1120000 },
-		{ month: 'Abr', value: 1180000 },
-		{ month: 'May', value: 1205000 },
-		{ month: 'Jun', value: 1250000 }
-	];
+	interface PortfolioSummary {
+		id: string;
+		name: string;
+		type: string;
+		baseCurrency: string;
+		totalPositions: number;
+		totalCostBase: string;
+		totalMarketValue: string;
+		totalGainLoss: string;
+		totalGainLossPct: string;
+	}
 
-	const maxValue = Math.max(...portfolioData.map((d) => d.value));
-	const minValue = Math.min(...portfolioData.map((d) => d.value));
-	const range = maxValue - minValue;
+	const { summaries = [] }: { summaries: PortfolioSummary[] } = $props();
+
+	const totalInvested = $derived(
+		summaries.reduce((acc, s) => acc + parseFloat(s.totalCostBase || '0'), 0)
+	);
+	const totalValue = $derived(
+		summaries.reduce((acc, s) => acc + parseFloat(s.totalMarketValue || '0'), 0)
+	);
+	const totalGainLoss = $derived(
+		summaries.reduce((acc, s) => acc + parseFloat(s.totalGainLoss || '0'), 0)
+	);
+	const totalGainLossPct = $derived(
+		totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0
+	);
+
+	function fmt(value: number): string {
+		return new Intl.NumberFormat('es-CO', {
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2
+		}).format(value);
+	}
+
+	function fmtPct(value: number): string {
+		return new Intl.NumberFormat('es-CO', {
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2
+		}).format(value);
+	}
 </script>
 
 <Card>
-	<CardHeader eyebrow="Evolución" title="Desempeño del Portafolio">
-		{#snippet action()}
-			<div class="header-actions">
-				<button class="period-button" class:active={true}>6M</button>
-				<button class="period-button">1A</button>
-				<button class="period-button">Todo</button>
-			</div>
-		{/snippet}
-	</CardHeader>
+	<CardHeader eyebrow="Resumen" title="Portafolios" />
 
-	<div class="chart-container">
-		<svg class="chart" viewBox="0 0 600 300" preserveAspectRatio="xMidYMid meet">
-			<defs>
-				<linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-					<stop offset="0%" style="stop-color: #d4912a; stop-opacity: 0.22" />
-					<stop offset="100%" style="stop-color: #d4912a; stop-opacity: 0" />
-				</linearGradient>
-				<linearGradient id="chartStroke" x1="0%" y1="0%" x2="100%" y2="0%">
-					<stop offset="0%" style="stop-color: #22c97e" />
-					<stop offset="100%" style="stop-color: #d4912a" />
-				</linearGradient>
-			</defs>
-
-			<!-- Horizontal grid lines -->
-			{#each Array.from({ length: 5 }) as _, i (i)}
-				<line
-					x1="40"
-					y1={40 + i * 50}
-					x2="580"
-					y2={40 + i * 50}
-					stroke="rgba(255, 255, 255, 0.04)"
-					stroke-width="1"
-				/>
-			{/each}
-
-			<!-- Chart area -->
-			<polyline
-				points={portfolioData
-					.map((d, i) => {
-						const x = 40 + i * 90;
-						const y = 240 - ((d.value - minValue) / range) * 180;
-						return `${x},${y}`;
-					})
-					.join(' ')}
-				fill="url(#chartGradient)"
-				stroke="none"
-			/>
-
-			<!-- Chart line -->
-			<polyline
-				points={portfolioData
-					.map((d, i) => {
-						const x = 40 + i * 90;
-						const y = 240 - ((d.value - minValue) / range) * 180;
-						return `${x},${y}`;
-					})
-					.join(' ')}
-				stroke="url(#chartStroke)"
-				stroke-width="2.5"
+	{#if summaries.length === 0}
+		<div class="empty-state">
+			<svg
+				width="48"
+				height="48"
+				viewBox="0 0 24 24"
 				fill="none"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			/>
+				stroke="currentColor"
+				stroke-width="1.5"
+			>
+				<rect x="2" y="3" width="20" height="14" rx="2" />
+				<path d="M8 21h8M12 17v4" />
+			</svg>
+			<p>Sin portafolios registrados</p>
+		</div>
+	{:else}
+		<div class="portfolio-list">
+			<div class="list-header">
+				<span>Nombre</span>
+				<span>Tipo</span>
+				<span class="align-right">Valor actual</span>
+				<span class="align-right">Invertido</span>
+				<span class="align-right">Ganancia/Pérdida</span>
+			</div>
 
-			<!-- Data points -->
-			{#each portfolioData as d, i (d.month)}
-				<circle
-					cx={40 + i * 90}
-					cy={240 - ((d.value - minValue) / range) * 180}
-					r="3.5"
-					fill="#d4912a"
-					stroke="#08090a"
-					stroke-width="2.5"
-				/>
+			{#each summaries as s (s.id)}
+				{@const gainLoss = parseFloat(s.totalGainLoss || '0')}
+				{@const marketValue = parseFloat(s.totalMarketValue || '0')}
+				{@const costBase = parseFloat(s.totalCostBase || '0')}
+				{@const pct = parseFloat(s.totalGainLossPct || '0')}
+				{@const isUp = gainLoss >= 0}
+				<div class="list-row">
+					<div class="portfolio-name">
+						<span class="name">{s.name}</span>
+						<span class="currency">{s.baseCurrency}</span>
+					</div>
+					<span class="type-badge">{s.type}</span>
+					<span class="align-right mono">${fmt(marketValue)}</span>
+					<span class="align-right mono dim">${fmt(costBase)}</span>
+					<div class="align-right gain-cell" class:positive={isUp} class:negative={!isUp}>
+						<span class="mono">{isUp ? '+' : '−'}${fmt(Math.abs(gainLoss))}</span>
+						<span class="pct">{isUp ? '+' : ''}{fmtPct(pct)}%</span>
+					</div>
+				</div>
 			{/each}
-
-			<!-- X-axis labels -->
-			{#each portfolioData as d, i (d.month)}
-				<text
-					x={40 + i * 90}
-					y="280"
-					text-anchor="middle"
-					fill="#8a8780"
-					font-size="11"
-					font-family="'JetBrains Mono', monospace"
-				>
-					{d.month}
-				</text>
-			{/each}
-		</svg>
-	</div>
+		</div>
+	{/if}
 
 	<div class="chart-stats">
-		<Stat label="Ganancia YTD" tone="positive" value="+$150.000 · +13,6%" />
-		<Stat label="Volatilidad" value="6,2%" />
-		<Stat label="Rentabilidad Anual" tone="highlight" value="7,4%" />
+		<Stat
+			label="Total Invertido"
+			value="${fmt(totalInvested)}"
+		/>
+		<Stat
+			label="Valor Actual"
+			tone="highlight"
+			value="${fmt(totalValue)}"
+		/>
+		<Stat
+			label="Ganancia Total"
+			tone={totalGainLoss >= 0 ? 'positive' : 'negative'}
+			value="{totalGainLoss >= 0 ? '+' : ''}{fmtPct(totalGainLossPct)}%"
+		/>
 	</div>
 </Card>
 
 <style>
-	.header-actions {
+	.empty-state {
 		display: flex;
-		gap: 0.4rem;
-		flex-shrink: 0;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.75rem;
+		padding: 3rem 2rem;
+		color: rgba(236, 234, 229, 0.4);
+		text-align: center;
 	}
 
-	.period-button {
-		padding: 0.4rem 0.75rem;
-		background: transparent;
-		border: 1px solid var(--border);
-		color: var(--text-muted);
-		border-radius: 5px;
-		font-family: var(--font-mono);
-		font-weight: 500;
-		font-size: 0.7rem;
-		cursor: pointer;
-		transition:
-			border-color 0.2s ease,
-			background 0.2s ease,
-			color 0.2s ease;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
+	.empty-state p {
+		margin: 0;
+		font-size: 0.9rem;
 	}
 
-	.period-button:hover {
-		border-color: var(--border-strong);
-		color: var(--text);
-	}
-
-	.period-button.active {
-		background: rgba(212, 145, 42, 0.1);
-		border-color: rgba(212, 145, 42, 0.3);
-		color: var(--amber-light);
-	}
-
-	.chart-container {
-		margin-bottom: 2rem;
+	.portfolio-list {
+		margin-bottom: 1.5rem;
 		overflow-x: auto;
 	}
 
-	.chart {
-		width: 100%;
-		min-height: 300px;
-		display: block;
+	.list-header {
+		display: grid;
+		grid-template-columns: 2fr 1fr 1fr 1fr 1.2fr;
+		gap: 1rem;
+		padding: 0.5rem 1rem;
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: rgba(236, 234, 229, 0.45);
+		font-weight: 600;
+		border-bottom: 1px solid var(--border);
+		margin-bottom: 0.25rem;
+	}
+
+	.list-row {
+		display: grid;
+		grid-template-columns: 2fr 1fr 1fr 1fr 1.2fr;
+		gap: 1rem;
+		padding: 0.9rem 1rem;
+		border-radius: 8px;
+		transition: background 0.2s ease;
+		align-items: center;
+	}
+
+	.list-row:hover {
+		background: rgba(255, 255, 255, 0.03);
+	}
+
+	.portfolio-name {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+
+	.name {
+		font-weight: 600;
+		color: var(--text);
+		font-size: 0.9rem;
+	}
+
+	.currency {
+		font-size: 0.72rem;
+		color: rgba(236, 234, 229, 0.45);
+		text-transform: uppercase;
+		font-family: var(--font-mono);
+	}
+
+	.type-badge {
+		font-size: 0.72rem;
+		color: rgba(212, 145, 42, 0.75);
+		text-transform: uppercase;
+		letter-spacing: 0.3px;
+		font-weight: 600;
+	}
+
+	.align-right {
+		text-align: right;
+	}
+
+	.mono {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		font-size: 0.85rem;
+	}
+
+	.dim {
+		color: rgba(236, 234, 229, 0.55);
+	}
+
+	.gain-cell {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+
+	.gain-cell.positive .mono,
+	.gain-cell.positive .pct {
+		color: var(--green);
+	}
+
+	.gain-cell.negative .mono,
+	.gain-cell.negative .pct {
+		color: var(--red);
+	}
+
+	.pct {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.chart-stats {
@@ -173,12 +236,37 @@
 	}
 
 	@media (max-width: 1024px) {
+		.list-header,
+		.list-row {
+			grid-template-columns: 2fr 1fr 1fr 1.2fr;
+		}
+
+		.list-header :nth-child(4),
+		.list-row :nth-child(4) {
+			display: none;
+		}
+
 		.chart-stats {
 			grid-template-columns: repeat(2, 1fr);
 		}
 	}
 
 	@media (max-width: 768px) {
+		.list-header {
+			display: none;
+		}
+
+		.list-row {
+			grid-template-columns: 1fr auto;
+			grid-template-rows: auto auto;
+		}
+
+		.list-row :nth-child(2),
+		.list-row :nth-child(3),
+		.list-row :nth-child(4) {
+			display: none;
+		}
+
 		.chart-stats {
 			grid-template-columns: 1fr;
 		}

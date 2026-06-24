@@ -7,29 +7,12 @@
 
 	const { data }: PageProps = $props();
 
-	let showDeleteConfirm = $state(false);
-	let platformToDelete: string | null = $state(null);
-
 	function viewDetails(id: string) {
 		goto(resolve('/dashboard/platforms/[id]', { id }));
 	}
 
 	function addNewPlatform() {
 		goto(resolve('/dashboard/platforms/add'));
-	}
-
-	function editPlatform(id: string) {
-		goto(resolve('/dashboard/platforms/[id]', { id }));
-	}
-
-	function confirmDelete(id: string) {
-		platformToDelete = id;
-		showDeleteConfirm = true;
-	}
-
-	function cancelDelete() {
-		showDeleteConfirm = false;
-		platformToDelete = null;
 	}
 
 	function getStatusColor(status: boolean) {
@@ -106,19 +89,24 @@
 
 						<div class="card-stats">
 							<div class="stat-item">
-								<span class="stat-label">Inversiones</span>
-								<span class="stat-value">{platform.investments ?? 0}</span>
+								<span class="stat-label">Posiciones</span>
+								<span class="stat-value">{platform.investments}</span>
 							</div>
 							<div class="stat-item">
-								<span class="stat-label">Valor Total</span>
-								<span class="stat-value">{platform.totalValue ?? 0}</span>
+								<span class="stat-label">Invertido</span>
+								<span class="stat-value"
+									>${new Intl.NumberFormat('es-CO', {
+										minimumFractionDigits: 2,
+										maximumFractionDigits: 2
+									}).format(parseFloat(platform.totalValue) || 0)}</span
+								>
 							</div>
 						</div>
 
 						<div class="card-actions">
 							<button
 								onclick={() => viewDetails(platform.id)}
-								class="action-btn view-btn"
+								class="action-btn"
 								aria-label={`Ver detalles de ${platform.name}`}
 							>
 								<svg
@@ -132,45 +120,7 @@
 									<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
 									<circle cx="12" cy="12" r="3" />
 								</svg>
-								Ver
-							</button>
-							<button
-								onclick={() => editPlatform(platform.id)}
-								class="action-btn edit-btn"
-								aria-label={`Editar ${platform.name}`}
-							>
-								<svg
-									width="16"
-									height="16"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-									<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-								</svg>
-								Editar
-							</button>
-							<button
-								onclick={() => confirmDelete(platform.id)}
-								class="action-btn delete-btn"
-								aria-label={`Eliminar ${platform.name}`}
-							>
-								<svg
-									width="16"
-									height="16"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<polyline points="3 6 5 6 21 6" />
-									<path
-										d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-									/>
-								</svg>
-								Eliminar
+								Ver detalles
 							</button>
 						</div>
 					</div>
@@ -180,18 +130,6 @@
 	</div>
 </Card>
 
-{#if showDeleteConfirm && platformToDelete}
-	<div class="modal-overlay">
-		<div class="modal-content">
-			<h3>Confirmar eliminación</h3>
-			<p>¿Estás seguro de que deseas eliminar esta plataforma? Esta acción no se puede deshacer.</p>
-			<div class="modal-actions">
-				<button onclick={cancelDelete} class="btn btn-secondary">Cancelar</button>
-				<button onclick={() => console.log('delete')} class="btn btn-danger">Eliminar</button>
-			</div>
-		</div>
-	</div>
-{/if}
 
 <style>
 	.btn-add-platform {
@@ -409,83 +347,6 @@
 		border-color: rgba(212, 145, 42, 0.5);
 		color: var(--amber);
 		background: var(--border);
-	}
-
-	.delete-btn:hover {
-		border-color: var(--red);
-		color: var(--red);
-		background: rgba(224, 90, 90, 0.1);
-	}
-
-	.modal-overlay {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.5);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 1000;
-		backdrop-filter: blur(4px);
-	}
-
-	.modal-content {
-		background: var(--surface-2);
-		border: 1px solid rgba(212, 145, 42, 0.2);
-		border-radius: 16px;
-		padding: 2rem;
-		max-width: 400px;
-		box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
-	}
-
-	.modal-content h3 {
-		margin: 0 0 1rem;
-		color: var(--text);
-		font-size: 1.3rem;
-	}
-
-	.modal-content p {
-		margin: 0 0 1.5rem;
-		color: rgba(236, 234, 229, 0.7);
-		line-height: 1.6;
-	}
-
-	.modal-actions {
-		display: flex;
-		gap: 1rem;
-	}
-
-	.btn {
-		flex: 1;
-		padding: 0.75rem 1.5rem;
-		border: none;
-		border-radius: 8px;
-		font-weight: 700;
-		font-size: 0.9rem;
-		cursor: pointer;
-		transition: all 0.3s ease;
-		font-family: var(--font-body);
-	}
-
-	.btn-secondary {
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
-		background: transparent;
-		color: var(--text);
-	}
-
-	.btn-secondary:hover {
-		border-color: var(--amber);
-		color: var(--amber);
-		background: var(--border);
-	}
-
-	.btn-danger {
-		background: var(--red);
-		color: white;
-	}
-
-	.btn-danger:hover {
-		background: var(--red);
-		box-shadow: 0 10px 25px rgba(224, 90, 90, 0.3);
 	}
 
 	@keyframes fade-in {
