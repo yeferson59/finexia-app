@@ -10,23 +10,24 @@ import (
 )
 
 type Env struct {
-	Environment        string
-	Port               string
-	PathMigration      string
-	DatabaseURL        string
-	CacheURL           string
-	JWTSecret          string
-	JWTDuration        time.Duration
-	CORSEnabled        bool
-	CORSOrigin         []string
-	AWSAccessKeyID     string
-	AWSDefaultRegion   string
-	AWSEndpointURL     string
-	AWSS3BucketName    string
-	AWSSecretAccessKey string
-	ResendAPIKey       string
-	EmailFrom          string
-	AlphaVantageAPIKey string
+	Environment         string
+	Port                string
+	PathMigration       string
+	DatabaseURL         string
+	CacheURL            string
+	JWTSecret           string
+	JWTAccessDuration   time.Duration
+	JWTRefreshDuration  time.Duration
+	CORSEnabled         bool
+	CORSOrigin          []string
+	AWSAccessKeyID      string
+	AWSDefaultRegion    string
+	AWSEndpointURL      string
+	AWSS3BucketName     string
+	AWSSecretAccessKey  string
+	ResendAPIKey        string
+	EmailFrom           string
+	AlphaVantageAPIKey  string
 }
 
 func (c *Config) LoadEnvs() *Env {
@@ -38,8 +39,9 @@ func (c *Config) LoadEnvs() *Env {
 		PathMigration:      c.getString("PATH_MIGRATION", "file://internal/migrations"),
 		DatabaseURL:        c.getString("DATABASE_URL", ""),
 		CacheURL:           c.getString("CACHE_URL", ""),
-		JWTSecret:          c.getString("JWT_SECRET", "secret"),
-		JWTDuration:        c.getDuration("JWT_DURATION", time.Hour*24*7),
+		JWTSecret:           c.getString("JWT_SECRET", "secret"),
+		JWTAccessDuration:   c.getDuration("JWT_ACCESS_DURATION", 15*time.Minute),
+		JWTRefreshDuration:  c.getDuration("JWT_REFRESH_DURATION", 30*24*time.Hour),
 		CORSEnabled:        c.getBool("CORS_ENABLED", true),
 		CORSOrigin:         c.getSlice("CORS_ORIGIN", "http://localhost:5173"),
 		AWSAccessKeyID:     c.getString("AWS_ACCESS_KEY_ID", ""),

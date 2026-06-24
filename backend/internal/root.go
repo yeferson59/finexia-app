@@ -49,7 +49,7 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 
 	repos := repositories.New(b.db)
 	services := services.New(repos, b.envs, b.s3Client, b.storage, b.mailService, rootLog)
-	handlers, middlewares := handlers.New(ctx, services), middlewares.New(ctx, b.envs, b.storage, services)
+	handlers, middlewares := handlers.New(ctx, services, b.envs), middlewares.New(ctx, b.envs, b.storage, services)
 	routes := routes.New(b.app, middlewares, handlers)
 
 	routes.Init()

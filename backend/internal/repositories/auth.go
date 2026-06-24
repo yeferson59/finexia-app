@@ -32,13 +32,57 @@ func (r *Repository) GetAccountByEmail(ctx context.Context, email string) (entit
 	return user, nil
 }
 
-func (r *Repository) CreateSession(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) error {
-	_, err := r.db.Exec(ctx, "INSERT INTO sessions(user_id, token, expires_at) VALUES($1, $2, $3)", userID.String(), token, expiresAt)
+func (r *Repository) CreateSession(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := r.db.QueryRow(ctx, "INSERT INTO sessions(user_id, token, expires_at) VALUES($1, $2, $3) RETURNING id", userID.String(), token, expiresAt).Scan(&id)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
-	return nil
+	return id, nil
+}
+
+func (r *Repository) UpdateSessionToken(ctx context.Context, sessionID uuid.UUID, newToken string, expiresAt time.Time) error {
+	_, err := r.db.Exec(ctx, "UPDATE sessions SET token=$1, expires_at=$2, updated_at=NOW() WHERE id=$3", newToken, expiresAt, sessionID)
+	return err
+}
+
+func (r *Repository) CreateRefreshToken(ctx context.Context, userID uuid.UUID, tokenHash string, familyID, sessionID uuid.UUID, ip, ua *string, expiresAt time.Time) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := r.db.QueryRow(ctx,
+		"INSERT INTO refresh_tokens(user_id, token_hash, family_id, session_id, ip_address, user_agent, expires_at) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id",
+		userID, tokenHash, familyID, sessionID, ip, ua, expiresAt,
+	).Scan(&id)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return id, nil
+}
+
+func (r *Repository) GetRefreshTokenByHash(ctx context.Context, tokenHash string) (entities.RefreshToken, error) {
+	var rt entities.RefreshToken
+	err := r.db.QueryRow(ctx,
+		`SELECT rt.id, rt.user_id, rt.family_id, rt.session_id, rt.expires_at, rt.used_at, rt.revoked_at, r.name
+		 FROM refresh_tokens rt
+		 JOIN users u ON u.id = rt.user_id
+		 JOIN roles r ON r.id = u.role_id
+		 WHERE rt.token_hash = $1 AND u.deleted_at IS NULL`,
+		tokenHash,
+	).Scan(&rt.ID, &rt.UserID, &rt.FamilyID, &rt.SessionID, &rt.ExpiresAt, &rt.UsedAt, &rt.RevokedAt, &rt.Role)
+	if err != nil {
+		return entities.RefreshToken{}, err
+	}
+	return rt, nil
+}
+
+func (r *Repository) MarkRefreshTokenUsed(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.Exec(ctx, "UPDATE refresh_tokens SET used_at=NOW() WHERE id=$1", id)
+	return err
+}
+
+func (r *Repository) RevokeRefreshTokenFamily(ctx context.Context, familyID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, "UPDATE refresh_tokens SET revoked_at=NOW() WHERE family_id=$1 AND revoked_at IS NULL", familyID)
+	return err
 }
 
 func (r *Repository) Register(ctx context.Context, name, email, password string) (entities.User, error) {

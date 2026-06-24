@@ -2,9 +2,14 @@ package services
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -15,34 +20,82 @@ import (
 	"github.com/yeferson59/finexia-app/pkg/helpers"
 )
 
-func (s *Services) Login(ctx context.Context, email, password string) (auth.LoginResponseDTO, error) {
+func generateRefreshToken() (raw, hash string, err error) {
+	b := make([]byte, 32)
+	if _, err = rand.Read(b); err != nil {
+		return
+	}
+	raw = base64.URLEncoding.EncodeToString(b)
+	h := sha256.Sum256(b)
+	hash = hex.EncodeToString(h[:])
+	return
+}
+
+func hashRefreshToken(raw string) (string, error) {
+	b, err := base64.URLEncoding.DecodeString(raw)
+	if err != nil {
+		return "", err
+	}
+	h := sha256.Sum256(b)
+	return hex.EncodeToString(h[:]), nil
+}
+
+func refreshCacheKey(hash string) string {
+	return "refresh:" + hash
+}
+
+func (s *Services) Login(ctx context.Context, email, password string) (auth.LoginInternalDTO, error) {
 	user, err := s.repos.GetAccountByEmail(ctx, email)
 	if err != nil {
-		return auth.LoginResponseDTO{}, err
+		return auth.LoginInternalDTO{}, err
 	}
 
 	if !user.EmailVerified {
-		return auth.LoginResponseDTO{}, errors.New("invalid account")
+		return auth.LoginInternalDTO{}, errors.New("invalid account")
 	}
 
 	if err := user.Accounts[0].ComparePassword(password); err != nil {
-		return auth.LoginResponseDTO{}, errors.New("invalid credentials")
+		return auth.LoginInternalDTO{}, errors.New("invalid credentials")
 	}
 
-	expiresAt := time.Now().UTC().Add(s.cfg.JWTDuration)
+	accessExpiresAt := time.Now().UTC().Add(s.cfg.JWTAccessDuration)
 
-	jwToken, err := s.CreateJWToken(user.ID, user.Role.Name, expiresAt)
+	jwToken, err := s.CreateJWToken(user.ID, user.Role.Name, accessExpiresAt)
 	if err != nil {
-		return auth.LoginResponseDTO{}, err
+		return auth.LoginInternalDTO{}, err
 	}
 
-	if err := s.repos.CreateSession(ctx, user.ID, jwToken, expiresAt); err != nil {
-		return auth.LoginResponseDTO{}, err
+	sessionID, err := s.repos.CreateSession(ctx, user.ID, jwToken, accessExpiresAt)
+	if err != nil {
+		return auth.LoginInternalDTO{}, err
 	}
 
-	return auth.LoginResponseDTO{
-		ID:          user.ID,
-		AccessToken: jwToken,
+	rawRefresh, refreshHash, err := generateRefreshToken()
+	if err != nil {
+		return auth.LoginInternalDTO{}, err
+	}
+
+	familyID := uuid.New()
+	refreshExpiresAt := time.Now().UTC().Add(s.cfg.JWTRefreshDuration)
+
+	rtID, err := s.repos.CreateRefreshToken(ctx, user.ID, refreshHash, familyID, sessionID, nil, nil, refreshExpiresAt)
+	if err != nil {
+		return auth.LoginInternalDTO{}, err
+	}
+
+	cacheValue := fmt.Sprintf("%s|%s|%s|%s|%s|%d",
+		rtID, user.ID, user.Role.Name, familyID, sessionID, refreshExpiresAt.Unix(),
+	)
+	cacheTTL := time.Until(refreshExpiresAt)
+	if cacheTTL > 0 {
+		_ = s.storage.SetWithContext(ctx, refreshCacheKey(refreshHash), []byte(cacheValue), cacheTTL)
+	}
+
+	return auth.LoginInternalDTO{
+		ID:               user.ID,
+		AccessToken:      jwToken,
+		RawRefreshToken:  rawRefresh,
+		RefreshExpiresAt: refreshExpiresAt,
 	}, nil
 }
 
@@ -218,12 +271,144 @@ func (s *Services) ValidateToken(ctx context.Context, token string) (string, err
 	return token, nil
 }
 
-func (s *Services) Logout(ctx context.Context, userID uuid.UUID, token string) error {
-	if err := s.storage.DeleteWithContext(ctx, "validateToken"+"-"+token); err != nil {
+func (s *Services) RefreshToken(ctx context.Context, rawToken, ipAddress, userAgent string) (auth.LoginInternalDTO, error) {
+	oldHash, err := hashRefreshToken(rawToken)
+	if err != nil {
+		return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
+	}
+	oldCacheKey := refreshCacheKey(oldHash)
+
+	var (
+		tokenID   uuid.UUID
+		userID    uuid.UUID
+		role      string
+		familyID  uuid.UUID
+		sessionID uuid.UUID
+	)
+
+	cached, err := s.storage.GetWithContext(ctx, oldCacheKey)
+	if err != nil {
+		return auth.LoginInternalDTO{}, err
+	}
+
+	if len(cached) > 0 {
+		// format: tokenID|userID|role|familyID|sessionID|expiresUnix
+		parts := strings.SplitN(string(cached), "|", 6)
+		if len(parts) != 6 {
+			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
+		}
+		tokenID, err = uuid.Parse(parts[0])
+		if err != nil {
+			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
+		}
+		userID, err = uuid.Parse(parts[1])
+		if err != nil {
+			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
+		}
+		role = parts[2]
+		familyID, err = uuid.Parse(parts[3])
+		if err != nil {
+			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
+		}
+		sessionID, err = uuid.Parse(parts[4])
+		if err != nil {
+			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
+		}
+		expiresUnix, parseErr := strconv.ParseInt(parts[5], 10, 64)
+		if parseErr != nil {
+			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
+		}
+		if time.Now().UTC().After(time.Unix(expiresUnix, 0).UTC()) {
+			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
+		}
+	} else {
+		rt, dbErr := s.repos.GetRefreshTokenByHash(ctx, oldHash)
+		if dbErr != nil {
+			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
+		}
+		// Token reuse attack: token already consumed → revoke entire family
+		if rt.UsedAt != nil {
+			_ = s.repos.RevokeRefreshTokenFamily(ctx, rt.FamilyID)
+			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
+		}
+		if rt.RevokedAt != nil {
+			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
+		}
+		if time.Now().UTC().After(rt.ExpiresAt) {
+			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
+		}
+		tokenID = rt.ID
+		userID = rt.UserID
+		role = rt.Role
+		familyID = rt.FamilyID
+		sessionID = rt.SessionID
+	}
+
+	// Rotation: mark current token as used before issuing new pair
+	if err := s.repos.MarkRefreshTokenUsed(ctx, tokenID); err != nil {
+		return auth.LoginInternalDTO{}, err
+	}
+	_ = s.storage.DeleteWithContext(ctx, oldCacheKey)
+
+	// Issue new access token
+	newAccessExpiresAt := time.Now().UTC().Add(s.cfg.JWTAccessDuration)
+	newJWT, err := s.CreateJWToken(userID, role, newAccessExpiresAt)
+	if err != nil {
+		return auth.LoginInternalDTO{}, err
+	}
+
+	// Update session with new access token
+	if err := s.repos.UpdateSessionToken(ctx, sessionID, newJWT, newAccessExpiresAt); err != nil {
+		return auth.LoginInternalDTO{}, err
+	}
+
+	// Generate new refresh token (same family)
+	rawNew, newHash, err := generateRefreshToken()
+	if err != nil {
+		return auth.LoginInternalDTO{}, err
+	}
+
+	refreshExpiresAt := time.Now().UTC().Add(s.cfg.JWTRefreshDuration)
+
+	var ip, ua *string
+	if ipAddress != "" {
+		ip = &ipAddress
+	}
+	if userAgent != "" {
+		ua = &userAgent
+	}
+
+	newRTID, err := s.repos.CreateRefreshToken(ctx, userID, newHash, familyID, sessionID, ip, ua, refreshExpiresAt)
+	if err != nil {
+		return auth.LoginInternalDTO{}, err
+	}
+
+	newCacheValue := fmt.Sprintf("%s|%s|%s|%s|%s|%d",
+		newRTID, userID, role, familyID, sessionID, refreshExpiresAt.Unix(),
+	)
+	if ttl := time.Until(refreshExpiresAt); ttl > 0 {
+		_ = s.storage.SetWithContext(ctx, refreshCacheKey(newHash), []byte(newCacheValue), ttl)
+	}
+
+	return auth.LoginInternalDTO{
+		AccessToken:      newJWT,
+		RawRefreshToken:  rawNew,
+		RefreshExpiresAt: refreshExpiresAt,
+	}, nil
+}
+
+func (s *Services) Logout(ctx context.Context, userID uuid.UUID, accessToken, rawRefreshToken string) error {
+	if err := s.storage.DeleteWithContext(ctx, "validateToken"+"-"+accessToken); err != nil {
 		return err
 	}
 
-	if err := s.repos.DeleteSessionByUserIDToken(ctx, userID, token); err != nil {
+	if rawRefreshToken != "" {
+		if hash, err := hashRefreshToken(rawRefreshToken); err == nil {
+			_ = s.storage.DeleteWithContext(ctx, refreshCacheKey(hash))
+		}
+	}
+
+	if err := s.repos.DeleteSessionByUserIDToken(ctx, userID, accessToken); err != nil {
 		return err
 	}
 

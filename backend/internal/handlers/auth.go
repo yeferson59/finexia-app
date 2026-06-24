@@ -13,12 +13,23 @@ func (handler *Handlers) Login(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:login")
 	}
 
-	login, err := handler.services.Login(handler.ctx, loginDto.Email, loginDto.Password)
+	result, err := handler.services.Login(handler.ctx, loginDto.Email, loginDto.Password)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "failed to login", "auth:login")
 	}
 
-	return handler.responseStatusOk(c, "successfully logged in", "valid credentials", login)
+	c.Cookie(&fiber.Cookie{
+		Name:     "refresh_token",
+		Value:    result.RawRefreshToken,
+		Path:     "/auth",
+		HTTPOnly: true,
+		Secure:   handler.cfg.Environment == "production",
+		SameSite: "Strict",
+		MaxAge:   int(handler.cfg.JWTRefreshDuration.Seconds()),
+	})
+
+	return handler.responseStatusOk(c, "successfully logged in", "valid credentials",
+		auth.LoginResponseDTO{ID: result.ID, AccessToken: result.AccessToken})
 }
 
 func (handler *Handlers) Register(c fiber.Ctx) error {
@@ -34,6 +45,31 @@ func (handler *Handlers) Register(c fiber.Ctx) error {
 	}
 
 	return handler.responseStatusOk(c, "successfully registered", "valid registration data", user)
+}
+
+func (handler *Handlers) Refresh(c fiber.Ctx) error {
+	rawToken := c.Cookies("refresh_token")
+	if rawToken == "" {
+		return handler.responseUnauthorized(c, "missing refresh token", "auth:refresh")
+	}
+
+	result, err := handler.services.RefreshToken(handler.ctx, rawToken, c.IP(), c.Get("User-Agent"))
+	if err != nil {
+		return handler.responseUnauthorized(c, "invalid refresh token", "auth:refresh")
+	}
+
+	c.Cookie(&fiber.Cookie{
+		Name:     "refresh_token",
+		Value:    result.RawRefreshToken,
+		Path:     "/auth",
+		HTTPOnly: true,
+		Secure:   handler.cfg.Environment == "production",
+		SameSite: "Strict",
+		MaxAge:   int(handler.cfg.JWTRefreshDuration.Seconds()),
+	})
+
+	return handler.responseStatusOk(c, "token refreshed", "valid refresh token",
+		auth.LoginResponseDTO{AccessToken: result.AccessToken})
 }
 
 func (handler *Handlers) GetSession(c fiber.Ctx) error {
@@ -56,9 +92,17 @@ func (handler *Handlers) Logout(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid user id", "auth:logout")
 	}
 
-	if err := handler.services.Logout(handler.ctx, userID, jwtoken); err != nil {
+	rawRefreshToken := c.Cookies("refresh_token")
+
+	if err := handler.services.Logout(handler.ctx, userID, jwtoken, rawRefreshToken); err != nil {
 		return handler.responseFromDomain(c, err, "failed to logout", "auth:logout")
 	}
+
+	c.Cookie(&fiber.Cookie{
+		Name:   "refresh_token",
+		Value:  "",
+		MaxAge: -1,
+	})
 
 	return handler.responseStatusOk(c, "successfully logged out", "valid access token", nil)
 }

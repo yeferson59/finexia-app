@@ -99,6 +99,15 @@ func (handler *Handlers) responseFromDomain(c fiber.Ctx, err error, message, act
 	})
 }
 
+func (handler *Handlers) responseUnauthorized(c fiber.Ctx, message, details string) error {
+	return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+		"success":   false,
+		"message":   message,
+		"details":   details,
+		"timestamp": time.Now(),
+	})
+}
+
 func (handler *Handlers) getUserIDTokenRole(c fiber.Ctx) (uuid.UUID, string, string, error) {
 	sess := session.FromContext(c)
 	userID, err := uuid.Parse(sess.Get("userID").(string))

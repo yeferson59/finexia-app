@@ -41,3 +41,11 @@ type UserSessionResponseDTO struct {
 	User    UserResponseDTO    `json:"user"`
 	Session SessionResponseDTO `json:"session"`
 }
+
+// LoginInternalDTO is used only between service and handler; never serialized to JSON.
+type LoginInternalDTO struct {
+	ID               uuid.UUID
+	AccessToken      string
+	RawRefreshToken  string
+	RefreshExpiresAt time.Time
+}
