@@ -42,16 +42,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM assets WHERE ticker = 'BND' AND COALESCE(exchange, '') = 'NASDAQ'
 );
 
--- EXCHANGE RATES (idempotent by from_currency, to_currency, rate_date)
-INSERT INTO exchange_rates (id, from_currency, to_currency, rate, rate_date, fetched_at)
-VALUES
-  ('81818181-8181-8181-8181-818181818181', 'EUR', 'USD', 1.20, '2021-06-01', NOW()),
-  ('82828282-8282-8282-8282-828282828282', 'GBP', 'USD', 1.39, '2021-06-01', NOW()),
-  ('83838383-8383-8383-8383-838383838383', 'USD', 'USD', 1.00000000, '2021-06-01', NOW())
-ON CONFLICT (from_currency, to_currency, rate_date) DO UPDATE
-  SET rate = EXCLUDED.rate,
-      fetched_at = NOW();
-
 INSERT INTO risks (id, name, description, created_at, updated_at)
 VALUES
   ('25549e04-2eb7-4a05-9f07-4698324588ce', 'Bajo Riesgo', 'Inversiones conservadoras', NOW(), NOW()),

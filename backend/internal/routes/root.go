@@ -40,4 +40,6 @@ func (r *Routes) Init() {
 	r.router = r.app.Use(r.middlewares.Session(), r.middlewares.JWT())
 	r.Users()
 	r.Portfolios()
+	r.ExchangeRates()
+	r.Assets()
 }

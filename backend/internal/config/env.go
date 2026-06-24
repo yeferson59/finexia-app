@@ -26,6 +26,7 @@ type Env struct {
 	AWSSecretAccessKey string
 	ResendAPIKey       string
 	EmailFrom          string
+	AlphaVantageAPIKey string
 }
 
 func (c *Config) LoadEnvs() *Env {
@@ -48,6 +49,7 @@ func (c *Config) LoadEnvs() *Env {
 		AWSSecretAccessKey: c.getString("AWS_SECRET_ACCESS_KEY", ""),
 		ResendAPIKey:       c.getString("RESEND_API_KEY", ""),
 		EmailFrom:          c.getString("EMAIL_FROM", "Finexia <noreply@finexia.me>"),
+		AlphaVantageAPIKey: c.getString("ALPHA_VANTAGE_API_KEY", ""),
 	}
 }
 

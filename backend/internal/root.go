@@ -2,6 +2,8 @@ package internal
 
 import (
 	"context"
+	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gofiber/fiber/v3"
@@ -9,10 +11,12 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal/config"
 	"github.com/yeferson59/finexia-app/internal/handlers"
+	"github.com/yeferson59/finexia-app/internal/logger"
 	"github.com/yeferson59/finexia-app/internal/mail"
 	"github.com/yeferson59/finexia-app/internal/middlewares"
 	"github.com/yeferson59/finexia-app/internal/repositories"
 	"github.com/yeferson59/finexia-app/internal/routes"
+	"github.com/yeferson59/finexia-app/internal/scheduler"
 	"github.com/yeferson59/finexia-app/internal/services"
 )
 
@@ -37,12 +41,24 @@ func New(app *fiber.App, db *pgxpool.Pool, envs *config.Env, storage fiber.Stora
 }
 
 func (b *Bootstrap) Init(ctx context.Context) error {
+	rootLog := logger.New(logger.Config{
+		Level:       logger.LevelInfo,
+		Output:      os.Stderr,
+		Environment: b.envs.Environment,
+	})
+
 	repos := repositories.New(b.db)
-	services := services.New(repos, b.envs, b.s3Client, b.storage, b.mailService)
+	services := services.New(repos, b.envs, b.s3Client, b.storage, b.mailService, rootLog)
 	handlers, middlewares := handlers.New(ctx, services), middlewares.New(ctx, b.envs, b.storage, services)
 	routes := routes.New(b.app, middlewares, handlers)
 
 	routes.Init()
+
+	sched := scheduler.NewExchangeRateScheduler(services, 6, rootLog) // 06:00 UTC daily
+	go sched.Start(ctx)
+
+	assetSched := scheduler.NewAssetPriceScheduler(services, 14, 90*time.Second, rootLog) // 14:00 UTC, 90s startup delay
+	go assetSched.Start(ctx)
 
 	return nil
 }

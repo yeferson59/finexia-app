@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"github.com/gofiber/fiber/v3"
+
 	"github.com/yeferson59/finexia-app/internal/dtos/marketing"
 )
 

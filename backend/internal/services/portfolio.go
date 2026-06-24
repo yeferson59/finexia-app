@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yeferson59/finexia-app/internal/entities"
 	"github.com/yeferson59/gofinance/money"
+
+	"github.com/yeferson59/finexia-app/internal/entities"
 )
 
 func (s *Services) GetPortfoliosRisks(ctx context.Context) ([]entities.Risk, error) {

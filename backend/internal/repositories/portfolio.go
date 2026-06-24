@@ -9,8 +9,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/yeferson59/finexia-app/internal/entities"
 	"github.com/yeferson59/gofinance/money"
+
+	"github.com/yeferson59/finexia-app/internal/entities"
 )
 
 func (r *Repository) GetPortfoliosSummaryByUserID(ctx context.Context, userID uuid.UUID) ([]entities.PortfolioSummaryView, error) {
@@ -634,7 +635,9 @@ func (r *Repository) CreatePortfolioEntry(ctx context.Context, userID, portfolio
 	if err != nil {
 		return entities.PortfolioEntry{}, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var owned bool
 	if err := tx.QueryRow(ctx, `
