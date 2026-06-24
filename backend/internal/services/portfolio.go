@@ -66,8 +66,16 @@ func (s *Services) CreatePlatform(ctx context.Context, userID uuid.UUID, sourceT
 	return platform, nil
 }
 
-func (s *Services) GetPlatforms(ctx context.Context, userID uuid.UUID) ([]entities.InvestmentSource, error) {
-	return s.repos.GetPlatforms(ctx, userID)
+func (s *Services) GetPlatforms(ctx context.Context, userID uuid.UUID) ([]entities.PlatformStats, error) {
+	return s.repos.GetPlatformsWithStats(ctx, userID)
+}
+
+func (s *Services) UpdatePlatform(ctx context.Context, userID, sourceID uuid.UUID, name, description string, sourceType entities.SourceType, isActive bool) (entities.PlatformStats, error) {
+	return s.repos.UpdatePlatform(ctx, userID, sourceID, name, description, sourceType, isActive)
+}
+
+func (s *Services) DeletePlatform(ctx context.Context, userID, sourceID uuid.UUID) error {
+	return s.repos.DeletePlatform(ctx, userID, sourceID)
 }
 
 func (s *Services) GetAssets(ctx context.Context, offset, limit uint) ([]entities.Asset, error) {
@@ -89,6 +97,14 @@ func (s *Services) CreatePortfolioEntry(ctx context.Context, userID, portfolioID
 
 func (s *Services) GetTransactionsByEntry(ctx context.Context, userID, entryID uuid.UUID) ([]entities.Transaction, error) {
 	return s.repos.GetTransactionsByEntryID(ctx, userID, entryID)
+}
+
+func (s *Services) GetRecentUserTransactions(ctx context.Context, userID uuid.UUID, limit int) ([]entities.Transaction, error) {
+	return s.repos.GetRecentTransactionsByUserID(ctx, userID, limit)
+}
+
+func (s *Services) GetAssetAllocation(ctx context.Context, userID uuid.UUID) ([]entities.AllocationItem, error) {
+	return s.repos.GetAssetAllocationByUserID(ctx, userID)
 }
 
 func (s *Services) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error) {

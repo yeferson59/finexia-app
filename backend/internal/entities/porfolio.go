@@ -291,6 +291,25 @@ type PortfolioSnapshot struct {
 	Portfolio        Portfolio   `json:"portfolio,omitzero"`
 }
 
+// AllocationItem is the result of grouping portfolio_entries by category.
+type AllocationItem struct {
+	Category    PortfolioEntryCategory `json:"category"`
+	MarketValue string                 `json:"marketValue"`
+}
+
+// PlatformStats is the result of joining investment_sources with portfolio_entries stats.
+type PlatformStats struct {
+	ID          uuid.UUID  `json:"id"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	SourceType  SourceType `json:"sourceType"`
+	IsActive    bool       `json:"isActive"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	UpdatedAt   time.Time  `json:"updatedAt"`
+	Investments int64      `json:"investments"`
+	TotalValue  string     `json:"totalValue"`
+}
+
 // PortfolioSummaryView is the result of joining portfolios + risks + portfolio_summary view.
 type PortfolioSummaryView struct {
 	ID               uuid.UUID     `json:"id"`

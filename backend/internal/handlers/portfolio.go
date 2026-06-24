@@ -129,7 +129,79 @@ func (h *Handlers) GetPlatforms(c fiber.Ctx) error {
 		return h.responseFromDomain(c, err, "", "")
 	}
 
-	return h.responseStatusOk(c, "", "", platforms)
+	dtos := make([]portfolio.PlatformResponseDTO, 0, len(platforms))
+	for _, p := range platforms {
+		dtos = append(dtos, portfolio.PlatformResponseDTO{
+			ID:          p.ID,
+			Name:        p.Name,
+			Description: p.Description,
+			SourceType:  string(p.SourceType),
+			IsActive:    p.IsActive,
+			CreatedAt:   p.CreatedAt,
+			UpdatedAt:   p.UpdatedAt,
+			Investments: p.Investments,
+			TotalValue:  p.TotalValue,
+		})
+	}
+
+	return h.responseStatusOk(c, "", "", dtos)
+}
+
+func (h *Handlers) UpdatePlatform(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	sourceID, err := h.getParamUUID(c, "id")
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid platform ID", err.Error())
+	}
+
+	var req portfolio.UpdatePlatformRequestDTO
+	if err := c.Bind().JSON(&req); err != nil {
+		return h.responseBadRequest(c, "Invalid request", err.Error())
+	}
+
+	sourceType := entities.SourceType(req.Type)
+	if req.Type != "" && !sourceType.IsValid() {
+		return h.responseBadRequest(c, "Invalid source type", "Source type must be one of: broker, investment_bank, trading_platform, neobank, de_fi, crypto_wallet, mutual_funds, brokerage_house, other")
+	}
+
+	p, err := h.services.UpdatePlatform(h.ctx, userID, sourceID, req.Name, req.Description, sourceType, req.IsActive)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error updating platform", "Could not update platform")
+	}
+
+	return h.responseStatusOk(c, "Platform updated", "Platform updated successfully", portfolio.PlatformResponseDTO{
+		ID:          p.ID,
+		Name:        p.Name,
+		Description: p.Description,
+		SourceType:  string(p.SourceType),
+		IsActive:    p.IsActive,
+		CreatedAt:   p.CreatedAt,
+		UpdatedAt:   p.UpdatedAt,
+		Investments: p.Investments,
+		TotalValue:  p.TotalValue,
+	})
+}
+
+func (h *Handlers) DeletePlatform(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	sourceID, err := h.getParamUUID(c, "id")
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid platform ID", err.Error())
+	}
+
+	if err := h.services.DeletePlatform(h.ctx, userID, sourceID); err != nil {
+		return h.responseFromDomain(c, err, "Error deleting platform", "Could not delete platform")
+	}
+
+	return h.responseStatusOk(c, "Platform deleted", "Platform deleted successfully", nil)
 }
 
 func (h *Handlers) CreatePortfolioEntry(c fiber.Ctx) error {
@@ -188,6 +260,34 @@ func (h *Handlers) UpdateAssetPrice(c fiber.Ctx) error {
 	}
 
 	return h.responseStatusOk(c, "Asset price updated", "Asset price updated successfully", asset)
+}
+
+func (h *Handlers) GetAssetAllocation(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	items, err := h.services.GetAssetAllocation(h.ctx, userID)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error retrieving asset allocation", "Could not retrieve asset allocation")
+	}
+
+	return h.responseStatusOk(c, "Asset allocation retrieved", "Asset allocation retrieved successfully", portfolio.NewAllocationResponse(items))
+}
+
+func (h *Handlers) GetUserTransactions(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	txns, err := h.services.GetRecentUserTransactions(h.ctx, userID, 50)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error retrieving transactions", "Could not retrieve transactions")
+	}
+
+	return h.responseStatusOk(c, "Transactions retrieved", "Transactions retrieved successfully", portfolio.NewUserTransactionListResponse(txns))
 }
 
 func (h *Handlers) GetTransactions(c fiber.Ctx) error {

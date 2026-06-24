@@ -227,6 +227,91 @@ func (r *Repository) GetPortfoliosRisks(ctx context.Context) ([]entities.Risk, e
 	return risks, nil
 }
 
+func (r *Repository) GetPlatformsWithStats(ctx context.Context, userID uuid.UUID) ([]entities.PlatformStats, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			is_.id,
+			is_.name,
+			COALESCE(is_.description, ''),
+			is_.source_type,
+			is_.is_active,
+			is_.created_at,
+			is_.updated_at,
+			COUNT(pe.id)::bigint AS investments,
+			COALESCE(SUM(pe.quantity::numeric * pe.price::numeric), 0)::text AS total_value
+		FROM investment_sources is_
+		LEFT JOIN portfolio_entries pe ON pe.source_id = is_.id
+		WHERE is_.user_id = $1
+		GROUP BY is_.id
+		ORDER BY is_.created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]entities.PlatformStats, 0)
+	for rows.Next() {
+		var p entities.PlatformStats
+		if err := rows.Scan(
+			&p.ID, &p.Name, &p.Description, &p.SourceType,
+			&p.IsActive, &p.CreatedAt, &p.UpdatedAt,
+			&p.Investments, &p.TotalValue,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, p)
+	}
+	return result, nil
+}
+
+func (r *Repository) UpdatePlatform(ctx context.Context, userID, sourceID uuid.UUID, name, description string, sourceType entities.SourceType, isActive bool) (entities.PlatformStats, error) {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE investment_sources
+		SET name = $3, description = $4, source_type = $5, is_active = $6, updated_at = NOW()
+		WHERE id = $1 AND user_id = $2
+	`, sourceID, userID, name, description, sourceType, isActive)
+	if err != nil {
+		return entities.PlatformStats{}, err
+	}
+	if tag.RowsAffected() == 0 {
+		return entities.PlatformStats{}, errors.New("platform not found")
+	}
+
+	var p entities.PlatformStats
+	if err := r.db.QueryRow(ctx, `
+		SELECT
+			is_.id, is_.name, COALESCE(is_.description, ''),
+			is_.source_type, is_.is_active, is_.created_at, is_.updated_at,
+			COUNT(pe.id)::bigint,
+			COALESCE(SUM(pe.quantity::numeric * pe.price::numeric), 0)::text
+		FROM investment_sources is_
+		LEFT JOIN portfolio_entries pe ON pe.source_id = is_.id
+		WHERE is_.id = $1 AND is_.user_id = $2
+		GROUP BY is_.id
+	`, sourceID, userID).Scan(
+		&p.ID, &p.Name, &p.Description, &p.SourceType,
+		&p.IsActive, &p.CreatedAt, &p.UpdatedAt,
+		&p.Investments, &p.TotalValue,
+	); err != nil {
+		return entities.PlatformStats{}, err
+	}
+	return p, nil
+}
+
+func (r *Repository) DeletePlatform(ctx context.Context, userID, sourceID uuid.UUID) error {
+	tag, err := r.db.Exec(ctx, `
+		DELETE FROM investment_sources WHERE id = $1 AND user_id = $2
+	`, sourceID, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return errors.New("platform not found")
+	}
+	return nil
+}
+
 func (r *Repository) CreatePlatform(ctx context.Context, userID uuid.UUID, sourceType entities.SourceType, name, desciption string) (entities.InvestmentSource, error) {
 	var platform entities.InvestmentSource
 	err := r.db.QueryRow(ctx, "INSERT INTO investment_sources(user_id, source_type, name, description) VALUES ($1, $2, $3, $4) RETURNING id, name, description, created_at, updated_at", userID, sourceType, name, desciption).Scan(&platform.ID, &platform.Name, &platform.Description, &platform.CreatedAt, &platform.UpdatedAt)
@@ -379,6 +464,73 @@ func (r *Repository) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, pr
 	}
 
 	return asset, nil
+}
+
+func (r *Repository) GetRecentTransactionsByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]entities.Transaction, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fees,
+		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at,
+		       a.ticker, a.name
+		FROM transactions t
+		JOIN portfolio_entries pe ON pe.id = t.entry_id
+		JOIN portfolios p ON p.id = pe.portfolio_id
+		JOIN assets a ON a.id = pe.asset_id
+		WHERE p.user_id = $1
+		ORDER BY t.transaction_date DESC, t.created_at DESC
+		LIMIT $2
+	`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	txns := make([]entities.Transaction, 0)
+	for rows.Next() {
+		var txn entities.Transaction
+		var quantity, price, fees string
+		if err := rows.Scan(
+			&txn.ID, &txn.EntryID, &txn.Type, &quantity, &price,
+			&txn.Currency, &fees, &txn.TransactionDate, &txn.Notes,
+			&txn.CreatedAt, &txn.UpdatedAt,
+			&txn.Entry.Asset.Ticker, &txn.Entry.Asset.Name,
+		); err != nil {
+			return nil, err
+		}
+		txn.Quantity = money.MustFromString(quantity)
+		txn.Price = money.MustMoneyFromString(price, money.USD)
+		txn.Fees = money.MustMoneyFromString(fees, money.USD)
+		txns = append(txns, txn)
+	}
+	return txns, nil
+}
+
+func (r *Repository) GetAssetAllocationByUserID(ctx context.Context, userID uuid.UUID) ([]entities.AllocationItem, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			pe.category,
+			COALESCE(SUM(pe.quantity::numeric * COALESCE(a.current_price::numeric, pe.price::numeric)), 0)::text AS market_value
+		FROM portfolio_entries pe
+		JOIN portfolios p ON p.id = pe.portfolio_id
+		JOIN assets a ON a.id = pe.asset_id
+		WHERE p.user_id = $1
+		  AND pe.quantity::numeric > 0
+		GROUP BY pe.category
+		ORDER BY market_value::numeric DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]entities.AllocationItem, 0)
+	for rows.Next() {
+		var item entities.AllocationItem
+		if err := rows.Scan(&item.Category, &item.MarketValue); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	return result, nil
 }
 
 func (r *Repository) GetTransactionsByEntryID(ctx context.Context, userID, entryID uuid.UUID) ([]entities.Transaction, error) {

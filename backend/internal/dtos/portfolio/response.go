@@ -1,6 +1,8 @@
 package portfolio
 
 import (
+	"math"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,6 +43,87 @@ func NewTransactionListResponse(txns []entities.Transaction) []TransactionRespon
 		result = append(result, NewTransactionResponse(t))
 	}
 	return result
+}
+
+type UserTransactionResponseDTO struct {
+	ID              uuid.UUID `json:"id"`
+	EntryID         uuid.UUID `json:"entryId"`
+	Type            string    `json:"type"`
+	Quantity        string    `json:"quantity"`
+	Price           string    `json:"price"`
+	Currency        string    `json:"currency"`
+	Fees            string    `json:"fees"`
+	TransactionDate time.Time `json:"transactionDate"`
+	Notes           string    `json:"notes"`
+	CreatedAt       time.Time `json:"createdAt"`
+	AssetTicker     string    `json:"assetTicker"`
+	AssetName       string    `json:"assetName"`
+}
+
+func NewUserTransactionResponse(t entities.Transaction) UserTransactionResponseDTO {
+	return UserTransactionResponseDTO{
+		ID:              t.ID,
+		EntryID:         t.EntryID,
+		Type:            string(t.Type),
+		Quantity:        t.Quantity.String(),
+		Price:           t.Price.String(),
+		Currency:        t.Currency,
+		Fees:            t.Fees.String(),
+		TransactionDate: t.TransactionDate,
+		Notes:           t.Notes,
+		CreatedAt:       t.CreatedAt,
+		AssetTicker:     t.Entry.Asset.Ticker,
+		AssetName:       t.Entry.Asset.Name,
+	}
+}
+
+func NewUserTransactionListResponse(txns []entities.Transaction) []UserTransactionResponseDTO {
+	result := make([]UserTransactionResponseDTO, 0, len(txns))
+	for _, t := range txns {
+		result = append(result, NewUserTransactionResponse(t))
+	}
+	return result
+}
+
+type AllocationItemDTO struct {
+	Category    string  `json:"category"`
+	MarketValue string  `json:"marketValue"`
+	Percent     float64 `json:"percent"`
+}
+
+func NewAllocationResponse(items []entities.AllocationItem) []AllocationItemDTO {
+	var total float64
+	for _, item := range items {
+		v, _ := strconv.ParseFloat(item.MarketValue, 64)
+		total += v
+	}
+
+	result := make([]AllocationItemDTO, 0, len(items))
+	for _, item := range items {
+		v, _ := strconv.ParseFloat(item.MarketValue, 64)
+		var pct float64
+		if total > 0 {
+			pct = math.Round((v/total)*10000) / 100
+		}
+		result = append(result, AllocationItemDTO{
+			Category:    string(item.Category),
+			MarketValue: item.MarketValue,
+			Percent:     pct,
+		})
+	}
+	return result
+}
+
+type PlatformResponseDTO struct {
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	SourceType  string    `json:"sourceType"`
+	IsActive    bool      `json:"isActive"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	Investments int64     `json:"investments"`
+	TotalValue  string    `json:"totalValue"`
 }
 
 // HoldingResponseDTO is a flattened representation of a portfolio entry joined

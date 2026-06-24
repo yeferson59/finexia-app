@@ -23,6 +23,13 @@ type CreatePlatformRequestDTO struct {
 	Type        string `json:"type" validate:"required"`
 }
 
+type UpdatePlatformRequestDTO struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Type        string `json:"type"`
+	IsActive    bool   `json:"isActive"`
+}
+
 type UpdateAssetPriceRequestDTO struct {
 	Price money.Money `json:"price" validate:"required"`
 }
