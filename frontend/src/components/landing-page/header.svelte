@@ -5,11 +5,18 @@
 	let headerEl: HTMLElement;
 
 	onMount(() => {
+		let ticking = false;
 		const onScroll = () => {
-			headerEl.style.boxShadow = window.scrollY > 10 ? '0 1px 0 rgba(255,255,255,0.04)' : 'none';
+			if (!ticking) {
+				ticking = true;
+				requestAnimationFrame(() => {
+					headerEl.classList.toggle('scrolled', window.scrollY > 10);
+					ticking = false;
+				});
+			}
 		};
-		window.addEventListener('scroll', onScroll);
-		return () => window.removeEventListener('scroll', onScroll);
+		window.addEventListener('scroll', onScroll, { passive: true });
+		return () => window.removeEventListener('scroll', onScroll, { passive: true } as EventListenerOptions);
 	});
 </script>
 
@@ -26,6 +33,9 @@
 </header>
 
 <style>
+	header.scrolled {
+		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+	}
 	header {
 		position: sticky;
 		top: 0;
