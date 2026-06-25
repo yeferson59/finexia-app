@@ -539,7 +539,7 @@ func (r *Repository) GetAssetAllocationByUserID(ctx context.Context, userID uuid
 		WHERE p.user_id = $1
 		  AND pe.quantity::numeric > 0
 		GROUP BY pe.category
-		ORDER BY market_value::numeric DESC
+		ORDER BY COALESCE(SUM(pe.quantity::numeric * COALESCE(a.current_price::numeric, pe.price::numeric)), 0) DESC
 	`, userID)
 	if err != nil {
 		return nil, err
@@ -553,6 +553,9 @@ func (r *Repository) GetAssetAllocationByUserID(ctx context.Context, userID uuid
 			return nil, err
 		}
 		result = append(result, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return result, nil
 }
