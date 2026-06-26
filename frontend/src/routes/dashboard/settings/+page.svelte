@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { untrack } from 'svelte';
 	import PageHeader from '$components/ui/page-header.svelte';
 	import Card from '$components/ui/card.svelte';
 	import Input from '$components/ui/input.svelte';
@@ -10,19 +11,20 @@
 
 	let { data, form }: PageProps = $props();
 
-	// Capture server-provided values once; user edits them locally
-	const initialUser = data.user;
-	const initialPrefs = data.preferences;
-
-	// Profile section
-	let profileName = $state(initialUser?.name ?? '');
-	let profileCurrency = $state(initialUser?.preferredCurrency ?? 'USD');
-	let profileImage = $state(initialUser?.image ?? '');
+	// Profile section — seeded from server once; user edits locally
+	let profileName = $state(untrack(() => data.user?.name ?? ''));
+	let profileCurrency = $state(untrack(() => data.user?.preferredCurrency ?? 'USD'));
 	let profileLoading = $state(false);
 
-	// Notifications section
-	let emailAlerts = $state(initialPrefs.emailAlerts);
-	let weeklySummary = $state(initialPrefs.weeklySummary);
+	// Avatar section
+	let avatarPreview = $state<string | null>(null);
+	let avatarFile = $state<File | null>(null);
+	let avatarLoading = $state(false);
+	let avatarFileInput = $state<HTMLInputElement | null>(null);
+
+	// Notifications section — seeded from server once
+	let emailAlerts = $state(untrack(() => data.preferences.emailAlerts));
+	let weeklySummary = $state(untrack(() => data.preferences.weeklySummary));
 	let prefsLoading = $state(false);
 
 	// Security section
@@ -31,13 +33,28 @@
 	let confirmPassword = $state('');
 	let passwordLoading = $state(false);
 
-	// Feedback derived from form action result
+	// Form action feedback
 	const profileSuccess = $derived(form?.action === 'updateProfile' && (form as { success?: boolean })?.success);
 	const profileError = $derived(form?.action === 'updateProfile' ? (form as { error?: string })?.error ?? '' : '');
+	const avatarSuccess = $derived(form?.action === 'uploadAvatar' && (form as { success?: boolean })?.success);
+	const avatarError = $derived(form?.action === 'uploadAvatar' ? (form as { error?: string })?.error ?? '' : '');
 	const prefsSuccess = $derived(form?.action === 'updatePreferences' && (form as { success?: boolean })?.success);
 	const prefsError = $derived(form?.action === 'updatePreferences' ? (form as { error?: string })?.error ?? '' : '');
 	const passwordSuccess = $derived(form?.action === 'changePassword' && (form as { success?: boolean })?.success);
 	const passwordError = $derived(form?.action === 'changePassword' ? (form as { error?: string })?.error ?? '' : '');
+
+	// Avatar URL: prefer the uploaded URL returned by the server action, then the stored image
+	const savedAvatarUrl = $derived(
+		avatarSuccess
+			? ((form as { imageUrl?: string })?.imageUrl ?? data.user?.image ?? '')
+			: (data.user?.image ?? '')
+	);
+
+	const displayAvatar = $derived(
+		avatarPreview ?? (savedAvatarUrl && savedAvatarUrl !== 'avatar.png' ? savedAvatarUrl : null)
+	);
+
+	const userInitial = $derived((data.user?.name ?? '').trim().charAt(0).toUpperCase());
 
 	$effect(() => {
 		if (passwordSuccess) {
@@ -46,6 +63,22 @@
 			confirmPassword = '';
 		}
 	});
+
+	$effect(() => {
+		if (avatarSuccess) {
+			avatarPreview = null;
+			avatarFile = null;
+		}
+	});
+
+	function onFileChange(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+		avatarFile = file;
+		avatarPreview = URL.createObjectURL(file);
+	}
 </script>
 
 <svelte:head>
@@ -63,6 +96,61 @@
 	<Card variant="elevated" padding="none">
 		<div class="section">
 			<h2 class="section-title">Perfil</h2>
+
+			<!-- Avatar upload -->
+			<div class="avatar-section">
+				<div class="avatar-display">
+					{#if displayAvatar}
+						<img src={displayAvatar} alt="Avatar de usuario" class="avatar-img" />
+					{:else}
+						<div class="avatar-initials" aria-hidden="true">{userInitial}</div>
+					{/if}
+				</div>
+				<div class="avatar-controls">
+					<form
+						method="POST"
+						action="?/uploadAvatar"
+						enctype="multipart/form-data"
+						use:enhance={() => {
+							avatarLoading = true;
+							return async ({ update }) => {
+								await update();
+								avatarLoading = false;
+							};
+						}}
+					>
+						<input
+							bind:this={avatarFileInput}
+							type="file"
+							name="avatar"
+							accept="image/jpeg,image/png,image/webp"
+							class="file-input-hidden"
+							onchange={onFileChange}
+						/>
+						<button
+							type="button"
+							class="btn-pick-file"
+							onclick={() => avatarFileInput?.click()}
+						>
+							Cambiar foto
+						</button>
+						{#if avatarFile}
+							<Button type="submit" loading={avatarLoading}>
+								{avatarLoading ? 'Subiendo…' : 'Guardar foto'}
+							</Button>
+						{/if}
+					</form>
+					<p class="avatar-hint">JPEG, PNG o WebP · máx. 5 MB</p>
+					{#if avatarError}
+						<p class="feedback error">{avatarError}</p>
+					{/if}
+					{#if avatarSuccess}
+						<p class="feedback success">Foto actualizada correctamente.</p>
+					{/if}
+				</div>
+			</div>
+
+			<!-- Profile fields -->
 			<form
 				method="POST"
 				action="?/updateProfile"
@@ -87,12 +175,6 @@
 						name="preferredCurrency"
 						bind:value={profileCurrency}
 						placeholder="USD"
-					/>
-					<Input
-						label="URL de avatar"
-						name="image"
-						bind:value={profileImage}
-						placeholder="https://..."
 					/>
 				</div>
 				{#if profileError}
@@ -243,6 +325,86 @@
 		letter-spacing: 0.3px;
 	}
 
+	/* Avatar */
+	.avatar-section {
+		display: flex;
+		align-items: center;
+		gap: 1.25rem;
+		margin-bottom: 1.5rem;
+		padding-bottom: 1.5rem;
+		border-bottom: 1px solid rgba(212, 145, 42, 0.1);
+	}
+
+	.avatar-display {
+		flex-shrink: 0;
+	}
+
+	.avatar-img {
+		width: 64px;
+		height: 64px;
+		border-radius: 50%;
+		object-fit: cover;
+		border: 2px solid var(--border-strong);
+	}
+
+	.avatar-initials {
+		width: 64px;
+		height: 64px;
+		border-radius: 50%;
+		background: var(--surface-3);
+		border: 2px solid var(--border-strong);
+		color: var(--amber);
+		font-family: var(--font-mono);
+		font-size: 1.35rem;
+		font-weight: 600;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.avatar-controls {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.avatar-controls form {
+		display: flex;
+		align-items: center;
+		gap: 0.625rem;
+		flex-wrap: wrap;
+	}
+
+	.file-input-hidden {
+		display: none;
+	}
+
+	.btn-pick-file {
+		padding: 0.45rem 1rem;
+		border-radius: 6px;
+		border: 1px solid rgba(212, 145, 42, 0.4);
+		background: rgba(212, 145, 42, 0.08);
+		color: var(--amber);
+		font-size: 0.825rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition:
+			background 0.2s ease,
+			border-color 0.2s ease;
+	}
+
+	.btn-pick-file:hover {
+		background: rgba(212, 145, 42, 0.15);
+		border-color: rgba(212, 145, 42, 0.65);
+	}
+
+	.avatar-hint {
+		margin: 0;
+		font-size: 0.75rem;
+		color: rgba(236, 234, 229, 0.4);
+	}
+
+	/* Form */
 	.form-fields {
 		display: flex;
 		flex-direction: column;

@@ -1,6 +1,10 @@
 package handlers
 
 import (
+	"bytes"
+	"path/filepath"
+	"strings"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 
@@ -130,6 +134,63 @@ func (handler *Handlers) UpdateMe(c fiber.Ctx) error {
 	}
 
 	return handler.responseStatusOk(c, "User updated", "User updated successfully", u)
+}
+
+func (handler *Handlers) UploadAvatar(c fiber.Ctx) error {
+	userID, _, _, err := handler.getUserIDTokenRole(c)
+	if err != nil {
+		return handler.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	fileHeader, err := c.FormFile("avatar")
+	if err != nil {
+		return handler.responseBadRequest(c, "Missing file", "avatar file is required")
+	}
+
+	const maxSize = 5 << 20 // 5 MB
+	if fileHeader.Size > maxSize {
+		return handler.responseBadRequest(c, "File too large", "avatar must be smaller than 5 MB")
+	}
+
+	contentType := fileHeader.Header.Get("Content-Type")
+	allowed := map[string]string{
+		"image/jpeg": ".jpg",
+		"image/png":  ".png",
+		"image/webp": ".webp",
+	}
+	ext, ok := allowed[strings.ToLower(contentType)]
+	if !ok {
+		ext = strings.ToLower(filepath.Ext(fileHeader.Filename))
+		switch ext {
+		case ".jpg", ".jpeg":
+			ext = ".jpg"
+			contentType = "image/jpeg"
+		case ".png":
+			contentType = "image/png"
+		case ".webp":
+			contentType = "image/webp"
+		default:
+			return handler.responseBadRequest(c, "Invalid file type", "only JPEG, PNG and WebP are allowed")
+		}
+	}
+
+	f, err := fileHeader.Open()
+	if err != nil {
+		return handler.responseInternalServerError(c, "File open error", err.Error())
+	}
+	defer f.Close()
+
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(f); err != nil {
+		return handler.responseInternalServerError(c, "File read error", err.Error())
+	}
+
+	u, err := handler.services.UploadAvatarToS3(handler.ctx, userID, &buf, contentType, ext)
+	if err != nil {
+		return handler.responseInternalServerError(c, "Upload failed", err.Error())
+	}
+
+	return handler.responseStatusOk(c, "Avatar uploaded", "Avatar uploaded successfully", u)
 }
 
 func (handler *Handlers) GetMyPreferences(c fiber.Ctx) error {

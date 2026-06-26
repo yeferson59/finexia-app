@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { env } from '$env/dynamic/private';
 import { fail } from '@sveltejs/kit';
 
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
 interface UserPreferences {
 	userId: string;
 	emailAlerts: boolean;
@@ -102,6 +104,44 @@ export const actions = {
 		}
 
 		return { action: 'updatePreferences', success: true };
+	},
+
+	uploadAvatar: async ({ request, fetch, cookies }) => {
+		const accessToken = cookies.get('access_token_finexia');
+		const formData = await request.formData();
+		const file = formData.get('avatar');
+
+		if (!file || !(file instanceof File) || file.size === 0) {
+			return fail(400, { action: 'uploadAvatar', error: 'Selecciona una imagen para subir' });
+		}
+
+		if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+			return fail(400, { action: 'uploadAvatar', error: 'Solo se permiten imágenes JPEG, PNG o WebP' });
+		}
+
+		if (file.size > 5 * 1024 * 1024) {
+			return fail(400, { action: 'uploadAvatar', error: 'La imagen no puede superar 5 MB' });
+		}
+
+		const body = new FormData();
+		body.append('avatar', file);
+
+		const res = await fetch(`${env.BASE_API}/users/me/avatar`, {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${accessToken}` },
+			body
+		});
+
+		if (!res.ok) {
+			const err = await res.json().catch(() => ({}));
+			return fail(res.status, {
+				action: 'uploadAvatar',
+				error: err.details ?? 'Error al subir la imagen'
+			});
+		}
+
+		const { data } = await res.json();
+		return { action: 'uploadAvatar', success: true, imageUrl: data?.image ?? '' };
 	},
 
 	changePassword: async ({ request, fetch, cookies }) => {
