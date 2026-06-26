@@ -1,8 +1,12 @@
 <script lang="ts">
+	import type { PageProps } from './$types';
+
+	const { data }: PageProps = $props();
+
 	const reports = [
-		{ title: 'Resumen mensual', period: 'Abr 2026', format: 'PDF', size: '1.8 MB' },
-		{ title: 'Estado de resultados', period: 'Q1 2026', format: 'XLSX', size: '940 KB' },
-		{ title: 'Riesgo y volatilidad', period: 'YTD 2026', format: 'PDF', size: '2.1 MB' }
+		{ title: 'Resumen mensual', format: 'XLSX', type: 'summary' },
+		{ title: 'Estado de resultados', format: 'XLSX', type: 'transactions' },
+		{ title: 'Riesgo y volatilidad', format: 'XLSX', type: 'risk' }
 	];
 
 	const months = [
@@ -20,32 +24,13 @@
 		'Dic'
 	];
 
-	const performanceCalendars = [
-		{ year: '2026', values: [1.5, 0.8, 2.4, -0.6, 1.1, 1.9, 0.7, -0.2, 1.6, 2.1, 0.9, 1.3] },
-		{ year: '2025', values: [0.9, 1.2, -0.4, 1.6, 2.0, 1.4, 0.5, 1.1, -0.8, 1.7, 1.3, 0.6] },
-		{ year: '2024', values: [1.1, 0.4, 1.8, 0.7, -0.5, 1.5, 1.9, 0.3, 1.2, 1.6, 0.8, 1.4] }
-	];
-
-	const keyStatistics = [
-		{ label: 'Alpha', value: '1.84' },
-		{ label: 'Beta', value: '0.92' },
-		{ label: 'Sharpe Ratio', value: '1.42' },
-		{ label: 'Max Drawdown', value: '-6.3%' },
-		{ label: 'Volatilidad', value: '6.2%' },
-		{ label: 'Tracking Error', value: '2.1%' }
-	];
-
-	const growthProjection = [
-		{ period: '2026', value: 1250000 },
-		{ period: '2027', value: 1375000 },
-		{ period: '2028', value: 1510000 },
-		{ period: '2029', value: 1680000 },
-		{ period: '2030', value: 1865000 }
-	];
-
-	const projectionMax = Math.max(...growthProjection.map((item) => item.value));
-	const projectionMin = Math.min(...growthProjection.map((item) => item.value));
-	const projectionRange = projectionMax - projectionMin;
+	const projectionMax = $derived(
+		data.growthProjection.length > 0 ? Math.max(...data.growthProjection.map((p) => p.value)) : 0
+	);
+	const projectionMin = $derived(
+		data.growthProjection.length > 0 ? Math.min(...data.growthProjection.map((p) => p.value)) : 0
+	);
+	const projectionRange = $derived(projectionMax - projectionMin || 1);
 
 	function performanceClass(value: number): string {
 		if (value >= 2) return 'strong-positive';
@@ -67,22 +52,35 @@
 </header>
 
 <section class="analytics-grid">
-	{#each performanceCalendars as calendar (calendar.year)}
-		<article class="panel calendar-card">
-			<div class="section-head">
-				<h2>Performance Calendar (%)</h2>
-				<span>{calendar.year}</span>
-			</div>
-			<div class="calendar-grid">
-				{#each calendar.values as value, index (`${calendar.year}-${months[index]}`)}
-					<div class={`month-cell ${performanceClass(value)}`}>
-						<p class="month">{months[index]}</p>
-						<p class="percent">{value > 0 ? '+' : ''}{value}%</p>
-					</div>
-				{/each}
-			</div>
-		</article>
-	{/each}
+	{#if data.performanceCalendars.length > 0}
+		{#each data.performanceCalendars as calendar (calendar.year)}
+			<article class="panel calendar-card">
+				<div class="section-head">
+					<h2>Performance Calendar (%)</h2>
+					<span>{calendar.year}</span>
+				</div>
+				<div class="calendar-grid">
+					{#each calendar.values as value, index (`${calendar.year}-${months[index]}`)}
+						{#if value === null}
+							<div class="month-cell null-cell">
+								<p class="month">{months[index]}</p>
+								<p class="percent">–</p>
+							</div>
+						{:else}
+							<div class={`month-cell ${performanceClass(value)}`}>
+								<p class="month">{months[index]}</p>
+								<p class="percent">{value > 0 ? '+' : ''}{value.toFixed(1)}%</p>
+							</div>
+						{/if}
+					{/each}
+				</div>
+			</article>
+		{/each}
+	{:else}
+		<div class="panel empty-panel">
+			<p class="empty-text">Sin datos históricos</p>
+		</div>
+	{/if}
 </section>
 
 <section class="insights-grid">
@@ -91,12 +89,16 @@
 			<h2>Key Statistics</h2>
 		</div>
 		<div class="stats-list">
-			{#each keyStatistics as stat (stat.label)}
-				<div class="stat-row">
-					<p>{stat.label}</p>
-					<p>{stat.value}</p>
-				</div>
-			{/each}
+			{#if data.keyStatistics.length > 0}
+				{#each data.keyStatistics as stat (stat.label)}
+					<div class="stat-row">
+						<p>{stat.label}</p>
+						<p>{stat.value}</p>
+					</div>
+				{/each}
+			{:else}
+				<p class="empty-text">Sin datos</p>
+			{/if}
 		</div>
 	</article>
 
@@ -104,67 +106,73 @@
 		<div class="section-head">
 			<h2>Growth Projection</h2>
 		</div>
-		<svg class="projection-chart" viewBox="0 0 600 280" preserveAspectRatio="xMidYMid meet">
-			<defs>
-				<linearGradient id="projectionGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-					<stop offset="0%" style="stop-color: var(--amber); stop-opacity: 0.25" />
-					<stop offset="100%" style="stop-color: var(--amber); stop-opacity: 0" />
-				</linearGradient>
-			</defs>
-			{#each Array.from({ length: 5 }) as _, i (i)}
-				<line
-					x1="40"
-					y1={35 + i * 50}
-					x2="560"
-					y2={35 + i * 50}
-					stroke="var(--border)"
-					stroke-width="1"
+		{#if data.growthProjection.length > 0}
+			<svg class="projection-chart" viewBox="0 0 600 280" preserveAspectRatio="xMidYMid meet">
+				<defs>
+					<linearGradient id="projectionGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+						<stop offset="0%" style="stop-color: var(--amber); stop-opacity: 0.25" />
+						<stop offset="100%" style="stop-color: var(--amber); stop-opacity: 0" />
+					</linearGradient>
+				</defs>
+				{#each Array.from({ length: 5 }) as _, i (i)}
+					<line
+						x1="40"
+						y1={35 + i * 50}
+						x2="560"
+						y2={35 + i * 50}
+						stroke="var(--border)"
+						stroke-width="1"
+					/>
+				{/each}
+				<polyline
+					points={data.growthProjection
+						.map((point, i) => {
+							const x = 40 + i * 130;
+							const y = 230 - ((point.value - projectionMin) / projectionRange) * 180;
+							return `${x},${y}`;
+						})
+						.join(' ')}
+					fill="none"
+					stroke="var(--amber)"
+					stroke-width="3"
+					stroke-linecap="round"
+					stroke-linejoin="round"
 				/>
-			{/each}
-			<polyline
-				points={growthProjection
-					.map((point, i) => {
-						const x = 40 + i * 130;
-						const y = 230 - ((point.value - projectionMin) / projectionRange) * 180;
-						return `${x},${y}`;
-					})
-					.join(' ')}
-				fill="none"
-				stroke="var(--amber)"
-				stroke-width="3"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			/>
-			<polygon
-				points={`${growthProjection
-					.map((point, i) => {
-						const x = 40 + i * 130;
-						const y = 230 - ((point.value - projectionMin) / projectionRange) * 180;
-						return `${x},${y}`;
-					})
-					.join(' ')} 560,230 40,230`}
-				fill="url(#projectionGradient)"
-			/>
-			{#each growthProjection as point, i (point.period)}
-				<circle
-					cx={40 + i * 130}
-					cy={230 - ((point.value - projectionMin) / projectionRange) * 180}
-					r="4"
-					fill="var(--amber-light)"
-					stroke="rgba(255, 255, 255, 0.022)"
-					stroke-width="2"
+				<polygon
+					points={`${data.growthProjection
+						.map((point, i) => {
+							const x = 40 + i * 130;
+							const y = 230 - ((point.value - projectionMin) / projectionRange) * 180;
+							return `${x},${y}`;
+						})
+						.join(' ')} 560,230 40,230`}
+					fill="url(#projectionGradient)"
 				/>
-				<text
-					x={40 + i * 130}
-					y="260"
-					text-anchor="middle"
-					fill="rgba(236, 234, 229,0.56)"
-					font-size="12"
-				>
-					{point.period}
-				</text>
-			{/each}
-		</svg>
+				{#each data.growthProjection as point, i (point.period)}
+					<circle
+						cx={40 + i * 130}
+						cy={230 - ((point.value - projectionMin) / projectionRange) * 180}
+						r="4"
+						fill="var(--amber-light)"
+						stroke="rgba(255, 255, 255, 0.022)"
+						stroke-width="2"
+					/>
+					<text
+						x={40 + i * 130}
+						y="260"
+						text-anchor="middle"
+						fill="rgba(236, 234, 229,0.56)"
+						font-size="12"
+					>
+						{point.period}
+					</text>
+				{/each}
+			</svg>
+		{:else}
+			<div class="empty-chart">
+				<p>Proyección disponible con al menos 6 meses de historial.</p>
+			</div>
+		{/if}
 	</article>
 </section>
 
@@ -173,8 +181,9 @@
 		<article class="panel report-card">
 			<div class="badge">{report.format}</div>
 			<h2>{report.title}</h2>
-			<p class="meta">{report.period} · {report.size}</p>
-			<button class="download">Descargar</button>
+			<a href={`/dashboard/reports/download?type=${report.type}`} class="download">
+				Descargar
+			</a>
 		</article>
 	{/each}
 </section>
@@ -310,6 +319,12 @@
 		color: var(--red);
 	}
 
+	.month-cell.null-cell {
+		background: rgba(255, 255, 255, 0.022);
+		border-color: transparent;
+		color: rgba(236, 234, 229, 0.28);
+	}
+
 	.stats-card {
 		padding: 1rem;
 	}
@@ -382,6 +397,9 @@
 	}
 
 	.download {
+		display: block;
+		text-align: center;
+		text-decoration: none;
 		margin-top: 0.35rem;
 		border: 1px solid rgba(212, 145, 42, 0.25);
 		border-radius: 8px;
@@ -390,6 +408,34 @@
 		color: var(--text);
 		font-weight: 600;
 		cursor: pointer;
+	}
+
+	.empty-panel {
+		padding: 2rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		grid-column: 1 / -1;
+	}
+
+	.empty-text {
+		margin: 0;
+		font-size: 0.85rem;
+		color: rgba(236, 234, 229, 0.45);
+	}
+
+	.empty-chart {
+		padding: 3rem 2rem;
+		text-align: center;
+		color: rgba(236, 234, 229, 0.45);
+		font-size: 0.82rem;
+		border: 1px dashed var(--border);
+		border-radius: 8px;
+		line-height: 1.6;
+	}
+
+	.empty-chart p {
+		margin: 0;
 	}
 
 	@media (max-width: 1024px) {
