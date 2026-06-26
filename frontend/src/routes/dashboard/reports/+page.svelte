@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
@@ -181,7 +182,7 @@
 		<article class="panel report-card">
 			<div class="badge">{report.format}</div>
 			<h2>{report.title}</h2>
-			<a href={`/dashboard/reports/download?type=${report.type}`} class="download">
+			<a href={resolve(`/dashboard/reports/download?type=${report.type}`)} class="download">
 				Descargar
 			</a>
 		</article>
