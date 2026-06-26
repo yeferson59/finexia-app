@@ -2,14 +2,30 @@ import type { Actions, PageServerLoad } from './$types';
 import { env } from '$env/dynamic/private';
 import { redirect } from '@sveltejs/kit';
 
+interface GrowthDataPoint {
+	date: string;
+	totalValue: string;
+	totalCostBase: string;
+	gainLoss: string;
+	gainLossPct: string;
+}
+
+interface GrowthSummary {
+	firstDate: string;
+	initialValue: string;
+	currentValue: string;
+	totalGrowthPct: string;
+}
+
 export const load: PageServerLoad = async ({ cookies, fetch }) => {
 	const accessToken = cookies.get('access_token_finexia');
 	const headers = { Authorization: `Bearer ${accessToken}` };
 
-	const [transactionsRes, summaryRes, allocationRes] = await Promise.all([
+	const [transactionsRes, summaryRes, allocationRes, growthRes] = await Promise.all([
 		fetch(`${env.BASE_API}/portfolios/transactions`, { headers }).catch(() => null),
 		fetch(`${env.BASE_API}/portfolios/summary`, { headers }).catch(() => null),
-		fetch(`${env.BASE_API}/portfolios/allocation`, { headers }).catch(() => null)
+		fetch(`${env.BASE_API}/portfolios/allocation`, { headers }).catch(() => null),
+		fetch(`${env.BASE_API}/portfolios/growth`, { headers }).catch(() => null)
 	]);
 
 	let recentTransactions: unknown[] = [];
@@ -30,7 +46,16 @@ export const load: PageServerLoad = async ({ cookies, fetch }) => {
 		if (success && Array.isArray(data)) allocation = data;
 	}
 
-	return { recentTransactions, portfolioSummaries, allocation };
+	let portfolioGrowth: { points: GrowthDataPoint[]; summary: GrowthSummary } = {
+		points: [],
+		summary: { firstDate: '', initialValue: '0', currentValue: '0', totalGrowthPct: '0' }
+	};
+	if (growthRes?.ok) {
+		const { data, success } = await growthRes.json();
+		if (success && data) portfolioGrowth = data;
+	}
+
+	return { recentTransactions, portfolioSummaries, allocation, portfolioGrowth };
 };
 
 export const actions = {

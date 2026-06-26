@@ -3,6 +3,7 @@
 	import PortfolioOverview from '$components/dashboard/portfolio-overview.svelte';
 	import AssetAllocation from '$components/dashboard/asset-allocation.svelte';
 	import RecentActivity from '$components/dashboard/recent-activity.svelte';
+	import PortfolioGrowth from '$components/dashboard/portfolio-growth.svelte';
 	import PageHeader from '$components/ui/page-header.svelte';
 
 	import type { PageProps } from './$types';
@@ -27,6 +28,10 @@
 	<NetWorthCard summaries={data.portfolioSummaries} />
 </section>
 
+<section class="growth-section" aria-label="Crecimiento del portafolio">
+	<PortfolioGrowth data={data.portfolioGrowth.points} summary={data.portfolioGrowth.summary} />
+</section>
+
 <section class="content-grid" aria-label="Resumen financiero">
 	<div class="grid-item full-width">
 		<PortfolioOverview summaries={data.portfolioSummaries} />
@@ -43,7 +48,13 @@
 
 <style>
 	.net-worth-section {
-		margin-bottom: 2.5rem;
+		margin-bottom: 2rem;
+	}
+
+	.growth-section {
+		margin-bottom: 2rem;
+		animation: fade-in 0.5s ease-out both;
+		animation-delay: 0.05s;
 	}
 
 	.content-grid {
