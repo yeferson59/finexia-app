@@ -130,7 +130,6 @@
 	</div>
 </Card>
 
-
 <style>
 	.btn-add-platform {
 		display: flex;

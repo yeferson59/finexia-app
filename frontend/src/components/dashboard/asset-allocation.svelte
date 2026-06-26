@@ -89,9 +89,7 @@
 
 	const slices = $derived(buildSlices(assets));
 
-	const totalPct = $derived(
-		allocation.reduce((acc, item) => acc + item.percent, 0)
-	);
+	const totalPct = $derived(allocation.reduce((acc, item) => acc + item.percent, 0));
 </script>
 
 <div class="asset-card">
@@ -117,7 +115,13 @@
 		<div class="pie-container">
 			<svg class="pie-chart" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
 				{#each slices as slice (slice.name)}
-					<path d={slice.d} fill={slice.color} fill-opacity="0.9" stroke="#08090a" stroke-width="2" />
+					<path
+						d={slice.d}
+						fill={slice.color}
+						fill-opacity="0.9"
+						stroke="#08090a"
+						stroke-width="2"
+					/>
 				{/each}
 
 				<!-- Center circle -->

@@ -11,7 +11,6 @@
 	}
 
 	interface GrowthSummary {
-		firstDate: string;
 		initialValue: string;
 		currentValue: string;
 		totalGrowthPct: string;
@@ -19,7 +18,7 @@
 
 	const {
 		data = [],
-		summary = { firstDate: '', initialValue: '0', currentValue: '0', totalGrowthPct: '0' }
+		summary = { initialValue: '0', currentValue: '0', totalGrowthPct: '0' }
 	}: { data: GrowthDataPoint[]; summary: GrowthSummary } = $props();
 
 	type Period = '1M' | '3M' | '6M' | '1Y' | 'Todo';
@@ -29,9 +28,14 @@
 
 	function filterByPeriod(points: GrowthDataPoint[], period: Period): GrowthDataPoint[] {
 		if (period === 'Todo') return points;
-		const monthsMap: Record<Exclude<Period, 'Todo'>, number> = { '1M': 1, '3M': 3, '6M': 6, '1Y': 12 };
-		const cutoff = new Date();
-		cutoff.setMonth(cutoff.getMonth() - monthsMap[period]);
+		const monthsMap: Record<Exclude<Period, 'Todo'>, number> = {
+			'1M': 1,
+			'3M': 3,
+			'6M': 6,
+			'1Y': 12
+		};
+		const now = new Date();
+		const cutoff = new Date(now.getFullYear(), now.getMonth() - monthsMap[period], now.getDate());
 		return points.filter((d) => new Date(d.date) >= cutoff);
 	}
 
@@ -113,7 +117,10 @@
 	const isPositive = $derived(absoluteGain >= 0);
 
 	function fmt(v: number): string {
-		return new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+		return new Intl.NumberFormat('es-CO', {
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2
+		}).format(v);
 	}
 
 	function fmtAbbrev(v: number): string {
@@ -139,8 +146,8 @@
 					aria-selected={selectedPeriod === p}
 					class="period-btn"
 					class:active={selectedPeriod === p}
-					onclick={() => (selectedPeriod = p)}
-				>{p}</button>
+					onclick={() => (selectedPeriod = p)}>{p}</button
+				>
 			{/each}
 		</div>
 	</div>
@@ -164,7 +171,8 @@
 	{#if filteredData.length < 2}
 		<div class="empty-chart">
 			<p>
-				El gráfico se mostrará aquí a medida que el sistema registre capturas diarias del portafolio.
+				El gráfico se mostrará aquí a medida que el sistema registre capturas diarias del
+				portafolio.
 			</p>
 		</div>
 	{:else}
@@ -192,8 +200,8 @@
 					text-anchor="end"
 					fill="rgba(236,234,229,0.38)"
 					font-size="9"
-					font-family="var(--font-mono)"
-				>{tick.label}</text>
+					font-family="var(--font-mono)">{tick.label}</text
+				>
 			{/each}
 
 			<!-- Market value fill -->
@@ -226,7 +234,14 @@
 			{#if values.length > 0}
 				{@const lx = toX(values.length - 1, values.length)}
 				{@const ly = toY(values[values.length - 1].mv)}
-				<circle cx={lx} cy={ly} r="4" fill="var(--amber-light)" stroke="rgba(0,0,0,0.35)" stroke-width="1.5" />
+				<circle
+					cx={lx}
+					cy={ly}
+					r="4"
+					fill="var(--amber-light)"
+					stroke="rgba(0,0,0,0.35)"
+					stroke-width="1.5"
+				/>
 			{/if}
 
 			<!-- X-axis labels -->
@@ -237,8 +252,8 @@
 					text-anchor="middle"
 					fill="rgba(236,234,229,0.38)"
 					font-size="9"
-					font-family="var(--font-mono)"
-				>{fmtDate(date)}</text>
+					font-family="var(--font-mono)">{fmtDate(date)}</text
+				>
 			{/each}
 		</svg>
 

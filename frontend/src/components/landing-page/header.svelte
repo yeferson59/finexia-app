@@ -16,7 +16,8 @@
 			}
 		};
 		window.addEventListener('scroll', onScroll, { passive: true });
-		return () => window.removeEventListener('scroll', onScroll, { passive: true } as EventListenerOptions);
+		return () =>
+			window.removeEventListener('scroll', onScroll, { passive: true } as EventListenerOptions);
 	});
 </script>
 
@@ -33,7 +34,7 @@
 </header>
 
 <style>
-	header.scrolled {
+	header:global(.scrolled) {
 		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
 	}
 	header {

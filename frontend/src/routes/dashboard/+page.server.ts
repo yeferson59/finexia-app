@@ -2,6 +2,39 @@ import type { Actions, PageServerLoad } from './$types';
 import { env } from '$env/dynamic/private';
 import { redirect } from '@sveltejs/kit';
 
+interface PortfolioSummary {
+	id: string;
+	name: string;
+	type: string;
+	baseCurrency: string;
+	totalPositions: number;
+	totalCostBase: string;
+	totalMarketValue: string;
+	totalGainLoss: string;
+	totalGainLossPct: string;
+}
+
+interface AllocationItem {
+	category: string;
+	marketValue: string;
+	percent: number;
+}
+
+interface Transaction {
+	id: string;
+	entryId: string;
+	type: string;
+	quantity: string;
+	price: string;
+	currency: string;
+	fees: string;
+	transactionDate: string;
+	notes: string;
+	createdAt: string;
+	assetTicker: string;
+	assetName: string;
+}
+
 interface GrowthDataPoint {
 	date: string;
 	totalValue: string;
@@ -28,19 +61,19 @@ export const load: PageServerLoad = async ({ cookies, fetch }) => {
 		fetch(`${env.BASE_API}/portfolios/growth`, { headers }).catch(() => null)
 	]);
 
-	let recentTransactions: unknown[] = [];
+	let recentTransactions: Transaction[] = [];
 	if (transactionsRes?.ok) {
 		const { data, success } = await transactionsRes.json();
 		if (success && Array.isArray(data)) recentTransactions = data.slice(0, 5);
 	}
 
-	let portfolioSummaries: unknown[] = [];
+	let portfolioSummaries: PortfolioSummary[] = [];
 	if (summaryRes?.ok) {
 		const { data, success } = await summaryRes.json();
 		if (success && Array.isArray(data)) portfolioSummaries = data;
 	}
 
-	let allocation: unknown[] = [];
+	let allocation: AllocationItem[] = [];
 	if (allocationRes?.ok) {
 		const { data, success } = await allocationRes.json();
 		if (success && Array.isArray(data)) allocation = data;

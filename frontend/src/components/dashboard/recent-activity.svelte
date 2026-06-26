@@ -46,11 +46,7 @@
 		const date = new Date(dateString);
 		const now = new Date();
 		const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-		const startOfTarget = new Date(
-			date.getFullYear(),
-			date.getMonth(),
-			date.getDate()
-		).getTime();
+		const startOfTarget = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 		const dayDiff = Math.round((startOfTarget - startOfToday) / 86400000);
 
 		if (dayDiff === 0) return 'Hoy';

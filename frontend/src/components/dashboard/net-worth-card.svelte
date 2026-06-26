@@ -39,7 +39,10 @@
 	<div class="net-worth-content">
 		<div class="main-metric">
 			<h1 class="amount">
-				${new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(netWorth)}
+				${new Intl.NumberFormat('es-CO', {
+					minimumFractionDigits: 2,
+					maximumFractionDigits: 2
+				}).format(netWorth)}
 			</h1>
 			{#if summaries.length > 0}
 				<p class="amount-delta" class:positive={isIncreasing} class:negative={!isIncreasing}>
@@ -47,9 +50,10 @@
 						minimumFractionDigits: 2,
 						maximumFractionDigits: 2
 					}).format(Math.abs(totalGainLoss))}
-					· {new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-						Math.abs(gainLossPct)
-					)}% total
+					· {new Intl.NumberFormat('es-CO', {
+						minimumFractionDigits: 2,
+						maximumFractionDigits: 2
+					}).format(Math.abs(gainLossPct))}% total
 				</p>
 			{:else}
 				<p class="amount-delta neutral">Sin portafolios registrados</p>

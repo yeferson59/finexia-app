@@ -112,7 +112,15 @@
 
 					<!-- End dot -->
 					<circle class="chart-dot" cx="320" cy="8" r="4.5" fill="var(--amber)" />
-					<circle class="chart-dot-ring" cx="320" cy="8" r="8" fill="none" stroke="var(--amber)" stroke-width="1" />
+					<circle
+						class="chart-dot-ring"
+						cx="320"
+						cy="8"
+						r="8"
+						fill="none"
+						stroke="var(--amber)"
+						stroke-width="1"
+					/>
 
 					<defs>
 						<linearGradient id="chart-grad" x1="0" y1="0" x2="1" y2="0">

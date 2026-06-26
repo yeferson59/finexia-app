@@ -19,7 +19,11 @@ export const actions: Actions = {
 	update: async ({ request, cookies, fetch, params }) => {
 		const formData = await request.formData();
 
-		const { success, error: zodError, data } = await z
+		const {
+			success,
+			error: zodError,
+			data
+		} = await z
 			.object({
 				name: z.string().min(2),
 				description: z.string().optional().default(''),

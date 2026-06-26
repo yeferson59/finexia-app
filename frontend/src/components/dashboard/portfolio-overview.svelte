@@ -26,9 +26,7 @@
 	const totalGainLoss = $derived(
 		summaries.reduce((acc, s) => acc + parseFloat(s.totalGainLoss || '0'), 0)
 	);
-	const totalGainLossPct = $derived(
-		totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0
-	);
+	const totalGainLossPct = $derived(totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0);
 
 	function fmt(value: number): string {
 		return new Intl.NumberFormat('es-CO', {
@@ -97,15 +95,8 @@
 	{/if}
 
 	<div class="chart-stats">
-		<Stat
-			label="Total Invertido"
-			value="${fmt(totalInvested)}"
-		/>
-		<Stat
-			label="Valor Actual"
-			tone="highlight"
-			value="${fmt(totalValue)}"
-		/>
+		<Stat label="Total Invertido" value="${fmt(totalInvested)}" />
+		<Stat label="Valor Actual" tone="highlight" value="${fmt(totalValue)}" />
 		<Stat
 			label="Ganancia Total"
 			tone={totalGainLoss >= 0 ? 'positive' : 'negative'}

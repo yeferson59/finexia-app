@@ -214,9 +214,7 @@
 						}}
 					>
 						<div class="form-group">
-							<label for="name" class="form-label"
-								>Nombre <span class="required">*</span></label
-							>
+							<label for="name" class="form-label">Nombre <span class="required">*</span></label>
 							<input
 								id="name"
 								name="name"
@@ -229,19 +227,14 @@
 
 						<div class="form-group">
 							<label for="description" class="form-label">Descripción</label>
-							<textarea
-								id="description"
-								name="description"
-								class="form-textarea"
-								rows="3">{platform.description}</textarea
+							<textarea id="description" name="description" class="form-textarea" rows="3"
+								>{platform.description}</textarea
 							>
 						</div>
 
 						<div class="form-row">
 							<div class="form-group">
-								<label for="type" class="form-label"
-									>Tipo <span class="required">*</span></label
-								>
+								<label for="type" class="form-label">Tipo <span class="required">*</span></label>
 								<select id="type" name="type" class="form-select" required>
 									{#each platformTypes.entries() as [key, label] (key)}
 										<option value={key} selected={key === platform.sourceType}>{label}</option>
@@ -259,11 +252,7 @@
 						</div>
 
 						<div class="form-actions">
-							<button
-								type="button"
-								onclick={() => (isEditing = false)}
-								class="btn btn-secondary"
-							>
+							<button type="button" onclick={() => (isEditing = false)} class="btn btn-secondary">
 								Cancelar
 							</button>
 							<button type="submit" disabled={isSubmitting} class="btn btn-primary">
