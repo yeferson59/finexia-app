@@ -10,6 +10,18 @@ import (
 	"github.com/yeferson59/finexia-app/internal/entities"
 )
 
+func (r *Repository) GetAccountByUserID(ctx context.Context, userID uuid.UUID) (entities.Account, error) {
+	var account entities.Account
+	if err := r.db.QueryRow(ctx,
+		"SELECT id, user_id, account_id, provider_id, password FROM accounts WHERE user_id = $1 AND provider_id = 'local'",
+		userID.String(),
+	).Scan(&account.ID, &account.UserID, &account.AccountID, &account.ProviderID, &account.Password); err != nil {
+		return entities.Account{}, err
+	}
+
+	return account, nil
+}
+
 func (r *Repository) GetAccountByEmail(ctx context.Context, email string) (entities.User, error) {
 	var account entities.Account
 	var user entities.User

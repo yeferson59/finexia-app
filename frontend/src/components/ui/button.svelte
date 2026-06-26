@@ -8,6 +8,7 @@
 	interface Props {
 		variant?: Variant;
 		size?: Size;
+		type?: 'button' | 'submit' | 'reset';
 		disabled?: boolean;
 		loading?: boolean;
 		fullWidth?: boolean;
@@ -19,6 +20,7 @@
 	let {
 		variant = 'primary',
 		size = 'md',
+		type = 'button',
 		disabled = false,
 		loading = false,
 		fullWidth = false,
@@ -43,6 +45,7 @@
 </script>
 
 <button
+	{type}
 	{onclick}
 	disabled={disabled || loading}
 	class={cn(

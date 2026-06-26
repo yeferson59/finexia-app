@@ -95,3 +95,58 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (entities
 
 	return user, nil
 }
+
+func (r *Repository) UpdateUserProfile(ctx context.Context, id uuid.UUID, name, preferredCurrency, image string) (entities.User, error) {
+	var user entities.User
+	if err := r.db.QueryRow(ctx,
+		"UPDATE users SET name = $1, preferred_currency = $2, image = $3, updated_at = $4 WHERE id = $5 RETURNING *",
+		name, preferredCurrency, image, time.Now(), id.String(),
+	).Scan(&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID, &user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt); err != nil {
+		return entities.User{}, err
+	}
+
+	return user, nil
+}
+
+func (r *Repository) GetUserPreferences(ctx context.Context, userID uuid.UUID) (entities.UserPreferences, error) {
+	var prefs entities.UserPreferences
+	err := r.db.QueryRow(ctx,
+		"SELECT user_id, email_alerts, weekly_summary, created_at, updated_at FROM user_preferences WHERE user_id = $1",
+		userID.String(),
+	).Scan(&prefs.UserID, &prefs.EmailAlerts, &prefs.WeeklySummary, &prefs.CreatedAt, &prefs.UpdatedAt)
+	if err != nil {
+		return entities.UserPreferences{
+			UserID:        userID,
+			EmailAlerts:   true,
+			WeeklySummary: true,
+		}, nil
+	}
+
+	return prefs, nil
+}
+
+func (r *Repository) UpsertUserPreferences(ctx context.Context, userID uuid.UUID, emailAlerts, weeklySummary bool) (entities.UserPreferences, error) {
+	var prefs entities.UserPreferences
+	if err := r.db.QueryRow(ctx,
+		`INSERT INTO user_preferences (user_id, email_alerts, weekly_summary)
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (user_id) DO UPDATE
+		   SET email_alerts = EXCLUDED.email_alerts,
+		       weekly_summary = EXCLUDED.weekly_summary,
+		       updated_at = NOW()
+		 RETURNING user_id, email_alerts, weekly_summary, created_at, updated_at`,
+		userID.String(), emailAlerts, weeklySummary,
+	).Scan(&prefs.UserID, &prefs.EmailAlerts, &prefs.WeeklySummary, &prefs.CreatedAt, &prefs.UpdatedAt); err != nil {
+		return entities.UserPreferences{}, err
+	}
+
+	return prefs, nil
+}
+
+func (r *Repository) UpdateUserPassword(ctx context.Context, userID uuid.UUID, hashedPassword string) error {
+	_, err := r.db.Exec(ctx,
+		"UPDATE accounts SET password = $1, updated_at = NOW() WHERE user_id = $2 AND provider_id = 'local'",
+		hashedPassword, userID.String(),
+	)
+	return err
+}

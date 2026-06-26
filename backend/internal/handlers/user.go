@@ -98,3 +98,91 @@ func (handler *Handlers) DeleteUser(c fiber.Ctx) error {
 
 	return handler.responseSuccess(c, fiber.StatusNoContent, "", "", "")
 }
+
+func (handler *Handlers) GetMe(c fiber.Ctx) error {
+	userID, _, _, err := handler.getUserIDTokenRole(c)
+	if err != nil {
+		return handler.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	u, err := handler.services.GetCurrentUser(handler.ctx, userID)
+	if err != nil {
+		return handler.responseFromDomain(c, err, "Error retrieving user", "users:me:get")
+	}
+
+	return handler.responseStatusOk(c, "User retrieved", "User retrieved successfully", u)
+}
+
+func (handler *Handlers) UpdateMe(c fiber.Ctx) error {
+	userID, _, _, err := handler.getUserIDTokenRole(c)
+	if err != nil {
+		return handler.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	var req user.UpdateProfileDTO
+	if err := c.Bind().JSON(&req); err != nil {
+		return handler.responseBadRequest(c, "Invalid request", err.Error())
+	}
+
+	u, err := handler.services.UpdateCurrentUser(handler.ctx, userID, req.Name, req.PreferredCurrency, req.Image)
+	if err != nil {
+		return handler.responseFromDomain(c, err, "Error updating user", "users:me:update")
+	}
+
+	return handler.responseStatusOk(c, "User updated", "User updated successfully", u)
+}
+
+func (handler *Handlers) GetMyPreferences(c fiber.Ctx) error {
+	userID, _, _, err := handler.getUserIDTokenRole(c)
+	if err != nil {
+		return handler.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	prefs, err := handler.services.GetUserPreferences(handler.ctx, userID)
+	if err != nil {
+		return handler.responseFromDomain(c, err, "Error retrieving preferences", "users:me:preferences:get")
+	}
+
+	return handler.responseStatusOk(c, "Preferences retrieved", "Preferences retrieved successfully", prefs)
+}
+
+func (handler *Handlers) UpdateMyPreferences(c fiber.Ctx) error {
+	userID, _, _, err := handler.getUserIDTokenRole(c)
+	if err != nil {
+		return handler.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	var req user.UpdatePreferencesDTO
+	if err := c.Bind().JSON(&req); err != nil {
+		return handler.responseBadRequest(c, "Invalid request", err.Error())
+	}
+
+	prefs, err := handler.services.UpdateUserPreferences(handler.ctx, userID, req.EmailAlerts, req.WeeklySummary)
+	if err != nil {
+		return handler.responseFromDomain(c, err, "Error updating preferences", "users:me:preferences:update")
+	}
+
+	return handler.responseStatusOk(c, "Preferences updated", "Preferences updated successfully", prefs)
+}
+
+func (handler *Handlers) ChangeMyPassword(c fiber.Ctx) error {
+	userID, _, _, err := handler.getUserIDTokenRole(c)
+	if err != nil {
+		return handler.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	var req user.ChangePasswordDTO
+	if err := c.Bind().JSON(&req); err != nil {
+		return handler.responseBadRequest(c, "Invalid request", err.Error())
+	}
+
+	if len(req.NewPassword) < 8 {
+		return handler.responseBadRequest(c, "Invalid password", "New password must be at least 8 characters")
+	}
+
+	if err := handler.services.ChangePassword(handler.ctx, userID, req.CurrentPassword, req.NewPassword); err != nil {
+		return handler.responseFromDomain(c, err, "Error changing password", "users:me:password")
+	}
+
+	return handler.responseStatusOk(c, "Password changed", "Password changed successfully", nil)
+}
