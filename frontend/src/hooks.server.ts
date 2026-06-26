@@ -119,6 +119,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 					event.cookies.delete('access_token_finexia', { path: '/' });
 					event.cookies.delete('refresh_token', { path: '/' });
 				}
+			} else if (!valid) {
+				// Token inválido sin refresh token disponible — eliminar para evitar
+				// que acciones de formulario envíen un token expirado al backend.
+				event.cookies.delete('access_token_finexia', { path: '/' });
 			}
 		} else if (refreshToken) {
 			const newAccessToken = await refreshAccessToken(event, refreshToken);
