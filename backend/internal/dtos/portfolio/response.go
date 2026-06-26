@@ -163,6 +163,52 @@ type PortfolioDetailResponseDTO struct {
 	Holdings     []HoldingResponseDTO   `json:"holdings"`
 }
 
+type GrowthDataPointDTO struct {
+	Date          string `json:"date"`
+	TotalValue    string `json:"totalValue"`
+	TotalCostBase string `json:"totalCostBase"`
+	GainLoss      string `json:"gainLoss"`
+	GainLossPct   string `json:"gainLossPct"`
+}
+
+type GrowthSummaryDTO struct {
+	FirstDate      string `json:"firstDate"`
+	InitialValue   string `json:"initialValue"`
+	CurrentValue   string `json:"currentValue"`
+	TotalGrowthPct string `json:"totalGrowthPct"`
+}
+
+type GrowthResponseDTO struct {
+	Points  []GrowthDataPointDTO `json:"points"`
+	Summary GrowthSummaryDTO     `json:"summary"`
+}
+
+func NewGrowthResponse(points []entities.PortfolioGrowthPoint, summary entities.PortfolioGrowthSummary) GrowthResponseDTO {
+	dtos := make([]GrowthDataPointDTO, 0, len(points))
+	for _, p := range points {
+		dtos = append(dtos, GrowthDataPointDTO{
+			Date:          p.Date.Format("2006-01-02"),
+			TotalValue:    p.TotalValue,
+			TotalCostBase: p.TotalCostBase,
+			GainLoss:      p.GainLoss,
+			GainLossPct:   p.GainLossPct,
+		})
+	}
+	firstDate := ""
+	if !summary.FirstDate.IsZero() {
+		firstDate = summary.FirstDate.Format("2006-01-02")
+	}
+	return GrowthResponseDTO{
+		Points: dtos,
+		Summary: GrowthSummaryDTO{
+			FirstDate:      firstDate,
+			InitialValue:   summary.InitialValue,
+			CurrentValue:   summary.CurrentValue,
+			TotalGrowthPct: summary.TotalGrowthPct,
+		},
+	}
+}
+
 // NewPortfolioDetailResponse maps a portfolio entity (with its entries and
 // assets populated) into the detail response consumed by the frontend.
 func NewPortfolioDetailResponse(p entities.Portfolio) PortfolioDetailResponseDTO {

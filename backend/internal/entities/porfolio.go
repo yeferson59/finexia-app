@@ -340,3 +340,27 @@ type PorfolioSummary struct {
 	TotalGainLossPct money.Decimal `json:"totalGainLossPct"`
 	CreatedAt        time.Time     `json:"createdAt"`
 }
+
+type PortfolioSnapshotRow struct {
+	PortfolioID      uuid.UUID
+	BaseCurrency     string
+	TotalMarketValue string
+	TotalCostBase    string
+	TotalGainLoss    string
+	TotalGainLossPct string
+}
+
+type PortfolioGrowthPoint struct {
+	Date          time.Time
+	TotalValue    string
+	TotalCostBase string
+	GainLoss      string
+	GainLossPct   string
+}
+
+type PortfolioGrowthSummary struct {
+	FirstDate      time.Time
+	InitialValue   string
+	CurrentValue   string
+	TotalGrowthPct string
+}

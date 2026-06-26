@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"time"
 
@@ -110,4 +111,48 @@ func (s *Services) GetAssetAllocation(ctx context.Context, userID uuid.UUID) ([]
 
 func (s *Services) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error) {
 	return s.repos.CreateTransaction(ctx, userID, entryID, txnType, quantity, price, currency, fees, transactionDate, notes)
+}
+
+func (s *Services) GetPortfolioGrowth(ctx context.Context, userID uuid.UUID, period string) ([]entities.PortfolioGrowthPoint, entities.PortfolioGrowthSummary, error) {
+	hasSince, since := parsePeriod(period)
+	points, err := s.repos.GetPortfolioGrowthByUserID(ctx, userID, hasSince, since)
+	if err != nil {
+		return nil, entities.PortfolioGrowthSummary{}, err
+	}
+	return points, buildGrowthSummary(points), nil
+}
+
+func parsePeriod(period string) (bool, time.Time) {
+	now := time.Now().UTC()
+	switch period {
+	case "1M":
+		return true, now.AddDate(0, -1, 0)
+	case "3M":
+		return true, now.AddDate(0, -3, 0)
+	case "6M":
+		return true, now.AddDate(0, -6, 0)
+	case "1Y":
+		return true, now.AddDate(-1, 0, 0)
+	default:
+		return false, time.Time{}
+	}
+}
+
+func buildGrowthSummary(points []entities.PortfolioGrowthPoint) entities.PortfolioGrowthSummary {
+	if len(points) == 0 {
+		return entities.PortfolioGrowthSummary{}
+	}
+	first, last := points[0], points[len(points)-1]
+	initialVal, _ := strconv.ParseFloat(first.TotalValue, 64)
+	currentVal, _ := strconv.ParseFloat(last.TotalValue, 64)
+	var growthPct float64
+	if initialVal > 0 {
+		growthPct = ((currentVal - initialVal) / initialVal) * 100
+	}
+	return entities.PortfolioGrowthSummary{
+		FirstDate:      first.Date,
+		InitialValue:   strconv.FormatFloat(initialVal, 'f', 2, 64),
+		CurrentValue:   strconv.FormatFloat(currentVal, 'f', 2, 64),
+		TotalGrowthPct: strconv.FormatFloat(growthPct, 'f', 2, 64),
+	}
 }
