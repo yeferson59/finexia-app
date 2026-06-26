@@ -33,3 +33,11 @@ type User struct {
 	Sessions          []Session          `json:"sessions,omitempty"`
 	Accounts          []Account          `json:"accounts,omitempty"`
 }
+
+type UserPreferences struct {
+	UserID        uuid.UUID `json:"userId"`
+	EmailAlerts   bool      `json:"emailAlerts"`
+	WeeklySummary bool      `json:"weeklySummary"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+}
