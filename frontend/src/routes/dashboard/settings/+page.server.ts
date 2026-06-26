@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { z } from 'zod';
 import { env } from '$env/dynamic/private';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -108,6 +108,11 @@ export const actions = {
 
 	uploadAvatar: async ({ request, fetch, cookies }) => {
 		const accessToken = cookies.get('access_token_finexia');
+
+		if (!accessToken) {
+			return redirect(303, '/auth');
+		}
+
 		const formData = await request.formData();
 		const file = formData.get('avatar');
 
@@ -133,6 +138,9 @@ export const actions = {
 		});
 
 		if (!res.ok) {
+			if (res.status === 401) {
+				return redirect(303, '/auth');
+			}
 			const err = await res.json().catch(() => ({}));
 			return fail(res.status, {
 				action: 'uploadAvatar',
