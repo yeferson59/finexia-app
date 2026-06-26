@@ -3,7 +3,7 @@
 
 	interface Props {
 		sidebarOpen?: boolean;
-		data: { user: { name: string; email: string } };
+		data: { user: { name: string; email: string; image?: string } };
 	}
 
 	let { sidebarOpen = $bindable(false), data }: Props = $props();
@@ -85,7 +85,11 @@
 			</button>
 
 			<div class="user-profile">
-				<div class="avatar" aria-hidden="true">{data.user.name.trim().charAt(0).toUpperCase()}</div>
+				{#if data.user.image && data.user.image !== 'avatar.png'}
+					<img src={data.user.image} alt="Avatar" class="avatar avatar-img" />
+				{:else}
+					<div class="avatar" aria-hidden="true">{data.user.name.trim().charAt(0).toUpperCase()}</div>
+				{/if}
 				<div class="user-info">
 					<p class="user-name">{data.user.name}</p>
 					<p class="user-email">{data.user.email}</p>
@@ -209,6 +213,10 @@
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
+	}
+
+	.avatar-img {
+		object-fit: cover;
 	}
 
 	.user-info {

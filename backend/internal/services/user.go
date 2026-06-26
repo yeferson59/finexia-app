@@ -1,10 +1,15 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
@@ -84,6 +89,34 @@ func (s *Services) GetUserPreferences(ctx context.Context, userID uuid.UUID) (en
 
 func (s *Services) UpdateUserPreferences(ctx context.Context, userID uuid.UUID, emailAlerts, weeklySummary bool) (entities.UserPreferences, error) {
 	return s.repos.UpsertUserPreferences(ctx, userID, emailAlerts, weeklySummary)
+}
+
+func (s *Services) UploadAvatarToS3(ctx context.Context, userID uuid.UUID, file io.Reader, contentType, ext string) (entities.User, error) {
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return entities.User{}, errors.New("failed to read file")
+	}
+
+	key := fmt.Sprintf("avatars/%s/avatar%s", userID.String(), ext)
+
+	_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(s.cfg.AWSS3BucketName),
+		Key:         aws.String(key),
+		Body:        bytes.NewReader(data),
+		ContentType: aws.String(contentType),
+	})
+	if err != nil {
+		return entities.User{}, fmt.Errorf("failed to upload to S3: %w", err)
+	}
+
+	var imageURL string
+	if s.cfg.AWSEndpointURL != "" {
+		imageURL = fmt.Sprintf("%s/%s/%s", s.cfg.AWSEndpointURL, s.cfg.AWSS3BucketName, key)
+	} else {
+		imageURL = fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", s.cfg.AWSS3BucketName, s.cfg.AWSDefaultRegion, key)
+	}
+
+	return s.repos.UpdateUserImage(ctx, userID, imageURL)
 }
 
 func (s *Services) ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword, newPassword string) error {

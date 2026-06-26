@@ -108,6 +108,17 @@ func (r *Repository) UpdateUserProfile(ctx context.Context, id uuid.UUID, name, 
 	return user, nil
 }
 
+func (r *Repository) UpdateUserImage(ctx context.Context, id uuid.UUID, image string) (entities.User, error) {
+	var user entities.User
+	if err := r.db.QueryRow(ctx,
+		"UPDATE users SET image = $1, updated_at = $2 WHERE id = $3 RETURNING *",
+		image, time.Now(), id.String(),
+	).Scan(&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID, &user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt); err != nil {
+		return entities.User{}, err
+	}
+	return user, nil
+}
+
 func (r *Repository) GetUserPreferences(ctx context.Context, userID uuid.UUID) (entities.UserPreferences, error) {
 	var prefs entities.UserPreferences
 	err := r.db.QueryRow(ctx,

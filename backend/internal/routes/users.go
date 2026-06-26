@@ -11,6 +11,7 @@ func (r *Routes) Users() {
 	// Self-service routes — must be registered before /:id to avoid shadowing.
 	users.Get("/me", r.handlers.GetMe)
 	users.Patch("/me", r.handlers.UpdateMe)
+	users.Post("/me/avatar", r.handlers.UploadAvatar)
 	users.Get("/me/preferences", r.handlers.GetMyPreferences)
 	users.Patch("/me/preferences", r.handlers.UpdateMyPreferences)
 	users.Patch("/me/password", r.handlers.ChangeMyPassword)
