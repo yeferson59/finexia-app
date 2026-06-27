@@ -120,11 +120,13 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
+		min-width: 0;
 	}
 
 	.amount {
 		font-family: var(--font-mono);
-		font-size: clamp(2.25rem, 4.5vw, 3rem);
+		font-size: clamp(1.65rem, 7vw, 3rem);
+		overflow-wrap: anywhere;
 		font-weight: 600;
 		color: var(--text);
 		margin: 0;
@@ -153,7 +155,7 @@
 
 	.metric-stats {
 		display: grid;
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 1.5rem;
 	}
 
@@ -217,7 +219,7 @@
 		}
 
 		.metric-stats {
-			grid-template-columns: repeat(3, 1fr);
+			grid-template-columns: repeat(3, minmax(0, 1fr));
 		}
 	}
 
@@ -233,6 +235,12 @@
 		.action-button {
 			padding: 0.75rem 1rem;
 			font-size: 0.85rem;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.metric-stats {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
 	}
 </style>

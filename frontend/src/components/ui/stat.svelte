@@ -49,6 +49,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.4rem;
+		min-width: 0;
 	}
 
 	.stat-right {
@@ -72,12 +73,14 @@
 		display: flex;
 		align-items: baseline;
 		gap: 0.4rem;
+		min-width: 0;
 		font-family: var(--font-mono);
 		font-size: 1.15rem;
 		font-weight: 600;
 		color: var(--text);
 		margin: 0;
 		font-variant-numeric: tabular-nums;
+		overflow-wrap: anywhere;
 	}
 
 	.stat-positive {
