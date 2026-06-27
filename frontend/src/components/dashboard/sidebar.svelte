@@ -197,7 +197,7 @@
 	{/if}
 
 	<div class="sidebar-footer">
-		<form action="?/logout" method="POST" use:enhance>
+		<form action="/dashboard?/logout" method="POST" use:enhance>
 			<button class="sidebar-button secondary">
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
 					<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>

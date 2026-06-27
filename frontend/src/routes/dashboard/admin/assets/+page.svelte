@@ -57,12 +57,18 @@
 		if (!price) return '—';
 		const num = parseFloat(price.value);
 		if (isNaN(num)) return price.value;
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: price.currency || 'USD',
-			minimumFractionDigits: 2,
-			maximumFractionDigits: 4
-		}).format(num);
+		const currency = price.currency || 'USD';
+		try {
+			return new Intl.NumberFormat('en-US', {
+				style: 'currency',
+				currency,
+				currencyDisplay: 'narrowSymbol',
+				minimumFractionDigits: 2,
+				maximumFractionDigits: 4
+			}).format(num);
+		} catch {
+			return `${currency} ${num.toFixed(2)}`;
+		}
 	}
 
 	function formatDate(iso: string | null): string {
