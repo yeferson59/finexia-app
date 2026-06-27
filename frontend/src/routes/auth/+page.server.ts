@@ -2,7 +2,7 @@ import z from 'zod';
 import type { Actions } from './$types';
 import { env } from '$env/dynamic/private';
 import { dev } from '$app/environment';
-import { redirect } from '@sveltejs/kit';
+import { redirect, fail } from '@sveltejs/kit';
 
 export const actions = {
 	login: async ({ request, cookies, fetch }) => {
@@ -18,7 +18,7 @@ export const actions = {
 			});
 
 		if (!loginDto.success) {
-			return { success: false, errors: loginDto.error.issues };
+			return fail(400, { type: 'login' as const, errors: loginDto.error.issues });
 		}
 
 		const response = await fetch(`${env.BASE_API}/auth/login`, {
@@ -28,14 +28,17 @@ export const actions = {
 		});
 
 		if (!response.ok) {
-			const data = await response.json();
-			return { success: false, errors: { server: data.message || 'Login failed' } };
+			const data = await response.json().catch(() => ({}));
+			return fail(response.status, {
+				type: 'login' as const,
+				errors: { server: data.message || 'Credenciales incorrectas' }
+			});
 		}
 
 		const { data, success, message } = await response.json();
 
 		if (!success) {
-			return { success: false, errors: { server: message || 'Login failed' } };
+			return fail(400, { type: 'login' as const, errors: { server: message || 'Error al iniciar sesión' } });
 		}
 
 		cookies.set('access_token_finexia', data.accessToken, {
@@ -80,15 +83,21 @@ export const actions = {
 			});
 
 		if (!success) {
-			return { success: false, errors: error.issues };
+			return fail(400, { type: 'register' as const, errors: error.issues });
 		}
 
 		if (data.password !== data.confirmPassword) {
-			return { success: false, errors: { confirmPassword: 'Passwords do not match' } };
+			return fail(400, {
+				type: 'register' as const,
+				errors: { confirmPassword: 'Las contraseñas no coinciden' }
+			});
 		}
 
 		if (!data.terms) {
-			return { success: false, errors: { terms: 'You must accept the terms and conditions' } };
+			return fail(400, {
+				type: 'register' as const,
+				errors: { terms: 'Debes aceptar los términos y condiciones' }
+			});
 		}
 
 		const response = await fetch(`${env.BASE_API}/auth/register`, {
@@ -98,14 +107,20 @@ export const actions = {
 		});
 
 		if (!response.ok) {
-			const data = await response.json();
-			return { success: false, errors: { server: data.message || 'Registration failed' } };
+			const body = await response.json().catch(() => ({}));
+			return fail(response.status, {
+				type: 'register' as const,
+				errors: { server: body.message || 'Error al registrarse' }
+			});
 		}
 
 		const { success: registeredSuccess, message: registeredMessage } = await response.json();
 
 		if (!registeredSuccess) {
-			return { success: false, errors: { server: registeredMessage || 'Registration failed' } };
+			return fail(400, {
+				type: 'register' as const,
+				errors: { server: registeredMessage || 'Error al registrarse' }
+			});
 		}
 
 		redirect(302, '/auth');

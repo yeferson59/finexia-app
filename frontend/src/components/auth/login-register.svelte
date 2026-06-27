@@ -3,6 +3,26 @@
 	import Button from '$components/ui/button.svelte';
 	import Input from '$components/ui/input.svelte';
 	import Checkbox from '$components/ui/checkbox.svelte';
+	type FormResult = {
+		type: 'login' | 'register';
+		errors: Record<string, string> | Array<{ path: PropertyKey[]; message: string }>;
+	} | null;
+
+	let { form }: { form: FormResult } = $props();
+
+	function parseErrors(errors: unknown): Record<string, string> {
+		if (!errors) return {};
+		if (Array.isArray(errors)) {
+			const result: Record<string, string> = {};
+			for (const issue of errors) {
+				const key = issue?.path?.[0] ? String(issue.path[0]) : 'server';
+				if (!result[key]) result[key] = issue.message ?? 'Campo inválido';
+			}
+			return result;
+		}
+		if (typeof errors === 'object') return errors as Record<string, string>;
+		return {};
+	}
 
 	// Form state
 	let isLoginMode = $state(true);
@@ -23,6 +43,16 @@
 	let registerName = $state('');
 	let agreeTerms = $state(false);
 	let registerErrors: Record<string, string> = $state({});
+
+	// Sync server-side form errors into local state
+	$effect(() => {
+		if (!form) return;
+		if (form.type === 'login') {
+			loginErrors = parseErrors(form.errors);
+		} else if (form.type === 'register') {
+			registerErrors = parseErrors(form.errors);
+		}
+	});
 
 	const switchToLogin = () => {
 		if (isLoginMode) return;
@@ -197,8 +227,9 @@
 						id="login-form"
 						use:enhance={() => {
 							isSubmitting = true;
+							loginErrors = {};
 							return async ({ update }) => {
-								await update();
+								await update({ reset: false });
 								isSubmitting = false;
 							};
 						}}
@@ -251,6 +282,10 @@
 							<a href="#forgot" class="forgot-link">¿Olvidaste tu contraseña?</a>
 						</div>
 
+						{#if loginErrors['server']}
+							<p class="error-server" role="alert">{loginErrors['server']}</p>
+						{/if}
+
 						<Button variant="primary" size="lg" loading={isSubmitting} fullWidth>
 							{isSubmitting ? 'Iniciando sesión...' : 'Iniciar sesión'}
 						</Button>
@@ -271,8 +306,9 @@
 						id="register-form"
 						use:enhance={() => {
 							isSubmitting = true;
+							registerErrors = {};
 							return async ({ update }) => {
-								await update();
+								await update({ reset: false });
 								isSubmitting = false;
 							};
 						}}
@@ -373,6 +409,10 @@
 						/>
 						{#if registerErrors['terms']}
 							<span class="error-message">{registerErrors['terms']}</span>
+						{/if}
+
+						{#if registerErrors['server']}
+							<p class="error-server" role="alert">{registerErrors['server']}</p>
 						{/if}
 
 						<Button variant="primary" size="lg" loading={isSubmitting} fullWidth>
@@ -869,6 +909,19 @@
 		margin-top: -1rem;
 		letter-spacing: 0.2px;
 		font-weight: 500;
+	}
+
+	.error-server {
+		font-size: 0.85rem;
+		color: var(--error-color);
+		background: rgba(var(--red-rgb, 220, 53, 69), 0.08);
+		border: 1px solid rgba(var(--red-rgb, 220, 53, 69), 0.25);
+		border-radius: 8px;
+		padding: 0.75rem 1rem;
+		margin: 0;
+		text-align: center;
+		font-weight: 500;
+		letter-spacing: 0.2px;
 	}
 
 	/* ── Divider + Social ────────────────────────────────────── */
