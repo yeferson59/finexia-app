@@ -241,6 +241,7 @@ func (handler *Handlers) GetUserAvatar(c fiber.Ctx) error {
 
 	c.Set("Content-Type", contentType)
 	c.Set("Cache-Control", "public, max-age=86400")
+	c.Set("Cross-Origin-Resource-Policy", "cross-origin")
 	_, err = io.Copy(c.Response().BodyWriter(), body)
 	return err
 }
