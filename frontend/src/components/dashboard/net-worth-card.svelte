@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import CardHeader from '$components/ui/card-header.svelte';
 	import Badge from '$components/ui/badge.svelte';
 	import Stat from '$components/ui/stat.svelte';
@@ -75,8 +76,7 @@
 	</div>
 
 	<div class="card-footer">
-		<button class="action-button primary">Agregar fondos</button>
-		<button class="action-button secondary">Ver detalles</button>
+		<a href={resolve('/dashboard/portfolios')} class="action-button secondary">Ver portafolios</a>
 	</div>
 </div>
 
@@ -165,33 +165,18 @@
 	}
 
 	.action-button {
-		flex: 1;
 		padding: 0.75rem 1.5rem;
 		border-radius: 6px;
 		font-weight: 600;
 		font-size: 0.85rem;
 		cursor: pointer;
+		text-decoration: none;
+		display: inline-block;
 		transition:
 			background 0.2s ease,
 			border-color 0.2s ease,
-			color 0.2s ease,
-			transform 0.15s ease;
+			color 0.2s ease;
 		font-family: var(--font-body);
-	}
-
-	.action-button.primary {
-		border: none;
-		background: var(--amber);
-		color: #0d0800;
-	}
-
-	.action-button.primary:hover {
-		background: var(--amber-light);
-		transform: translateY(-1px);
-	}
-
-	.action-button.primary:active {
-		transform: none;
 	}
 
 	.action-button.secondary {
