@@ -1,5 +1,6 @@
-import { env } from '$env/dynamic/private';
 import type { LayoutServerLoad } from './$types';
+import { isRedirect } from '@sveltejs/kit';
+import { authedFetch } from '$lib/server/api';
 
 interface Asset {
 	id: string;
@@ -19,20 +20,10 @@ interface Platform {
 }
 
 export const load: LayoutServerLoad = async ({ cookies, fetch }) => {
-	const accessToken = cookies.get('access_token_finexia');
-
 	try {
 		const [platformsRes, assetsRes] = await Promise.all([
-			fetch(`${env.BASE_API}/portfolios/sources`, {
-				headers: {
-					Authorization: `Bearer ${accessToken}`
-				}
-			}),
-			fetch(`${env.BASE_API}/portfolios/assets`, {
-				headers: {
-					Authorization: `Bearer ${accessToken}`
-				}
-			})
+			authedFetch({ cookies, fetch }, '/portfolios/sources'),
+			authedFetch({ cookies, fetch }, '/portfolios/assets')
 		]);
 
 		const platformsData = await platformsRes.json();
@@ -43,6 +34,8 @@ export const load: LayoutServerLoad = async ({ cookies, fetch }) => {
 
 		return { platforms, assets };
 	} catch (error) {
+		// A 401 redirect must not be swallowed by the graceful fallback below.
+		if (isRedirect(error)) throw error;
 		console.error('Error loading platforms or assets:', error);
 		return { platforms: [], assets: [] };
 	}

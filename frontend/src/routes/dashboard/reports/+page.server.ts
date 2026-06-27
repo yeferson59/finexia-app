@@ -1,5 +1,5 @@
 import type { PageServerLoad } from './$types';
-import { env } from '$env/dynamic/private';
+import { authedFetchSafe } from '$lib/server/api';
 
 interface GrowthDataPoint {
 	date: string;
@@ -128,18 +128,13 @@ function buildGrowthProjection(
 }
 
 export const load: PageServerLoad = async ({ cookies, fetch }) => {
-	const accessToken = cookies.get('access_token_finexia');
-	const headers = { Authorization: `Bearer ${accessToken}` };
-
 	const empty = {
 		performanceCalendars: [] as PerformanceCalendar[],
 		keyStatistics: [] as KeyStat[],
 		growthProjection: [] as GrowthProjectionEntry[]
 	};
 
-	const growthRes = await fetch(`${env.BASE_API}/portfolios/growth?period=ALL`, {
-		headers
-	}).catch(() => null);
+	const growthRes = await authedFetchSafe({ cookies, fetch }, '/portfolios/growth?period=ALL');
 
 	if (!growthRes?.ok) return empty;
 

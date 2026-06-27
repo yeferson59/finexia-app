@@ -411,37 +411,6 @@
 		justify-content: flex-end;
 	}
 
-	.toggle-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0;
-	}
-
-	.toggle-row {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 0.875rem 0;
-		border-bottom: 1px solid rgba(212, 145, 42, 0.1);
-	}
-
-	.toggle-row:last-child {
-		border-bottom: none;
-	}
-
-	.toggle-label {
-		margin: 0 0 0.25rem;
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: var(--text);
-	}
-
-	.toggle-hint {
-		margin: 0;
-		font-size: 0.78rem;
-		color: rgba(236, 234, 229, 0.5);
-	}
-
 	.appearance-info {
 		display: flex;
 		flex-direction: column;

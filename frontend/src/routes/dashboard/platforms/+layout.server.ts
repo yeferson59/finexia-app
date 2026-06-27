@@ -1,14 +1,8 @@
-import { env } from '$env/dynamic/private';
 import type { LayoutServerLoad } from './$types';
+import { authedFetch } from '$lib/server/api';
 
 export const load: LayoutServerLoad = async ({ cookies, fetch }) => {
-	const accessToken = cookies.get('access_token_finexia');
-
-	const res = await fetch(`${env.BASE_API}/portfolios/sources`, {
-		headers: {
-			Authorization: `Bearer ${accessToken}`
-		}
-	});
+	const res = await authedFetch({ cookies, fetch }, '/portfolios/sources');
 
 	const { data, success } = await res.json();
 

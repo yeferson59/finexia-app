@@ -318,12 +318,16 @@ func (s *Services) RefreshToken(ctx context.Context, rawToken, ipAddress, userAg
 		if dbErr != nil {
 			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
 		}
-		// Token reuse attack: token already consumed → revoke entire family
-		if rt.UsedAt != nil {
-			_ = s.repos.RevokeRefreshTokenFamily(ctx, rt.FamilyID)
+		if rt.RevokedAt != nil {
 			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
 		}
-		if rt.RevokedAt != nil {
+		// A consumed token may be a real reuse attack or a benign concurrent
+		// refresh (e.g. link preload + click racing with the same cookie). If it
+		// was used within the grace period and the family is still alive, treat it
+		// as benign and re-issue without revoking. Outside the window, revoke the
+		// whole family.
+		if rt.UsedAt != nil && time.Since(*rt.UsedAt) > s.cfg.RefreshGracePeriod {
+			_ = s.repos.RevokeRefreshTokenFamily(ctx, rt.FamilyID)
 			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
 		}
 		if time.Now().UTC().After(rt.ExpiresAt) {

@@ -1,5 +1,6 @@
 import { env } from '$env/dynamic/private';
 import { z } from 'zod';
+import { authedFetch, authedFetchSafe } from '$lib/server/api';
 import type { PageServerLoad, Actions } from './$types';
 
 interface Entry {
@@ -33,11 +34,9 @@ export interface Transaction {
 }
 
 export const load: PageServerLoad = async ({ cookies, fetch, params }) => {
-	const accessToken = cookies.get('access_token_finexia');
+	const event = { cookies, fetch };
 
-	const response = await fetch(`${env.BASE_API}/portfolios/${params.id}`, {
-		headers: { Authorization: `Bearer ${accessToken}` }
-	});
+	const response = await authedFetch(event, `/portfolios/${params.id}`);
 
 	if (!response.ok) {
 		return { entries: [] as Entry[], transactions: [] as Transaction[], portfolioTotalValue: 0 };
@@ -61,11 +60,9 @@ export const load: PageServerLoad = async ({ cookies, fetch, params }) => {
 	// Fetch transactions for each entry in parallel
 	const txnResponses = await Promise.all(
 		entries.map((entry) =>
-			fetch(`${env.BASE_API}/portfolios/entries/${entry.id}/transactions`, {
-				headers: { Authorization: `Bearer ${accessToken}` }
-			})
-				.then((r) => r.json())
-				.catch(() => ({ success: false, data: [] }))
+			authedFetchSafe(event, `/portfolios/entries/${entry.id}/transactions`).then((r) =>
+				r ? r.json() : { success: false, data: [] }
+			)
 		)
 	);
 

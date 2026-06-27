@@ -45,10 +45,20 @@ function needsSession(pathname: string): boolean {
 	return PRIVATE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-async function refreshAccessToken(
+type RefreshResult = { accessToken: string; refreshToken: string | null };
+
+// Single-flight: concurrent requests carrying the same refresh token (e.g. link
+// preload racing with the click navigation) must not each POST /auth/refresh.
+// The backend rotates the refresh token on every call, so two concurrent calls
+// with the same token would trip reuse detection and revoke the whole family.
+// We dedupe by sharing the in-flight promise keyed by the refresh token; each
+// request then sets its own cookies from the shared result.
+const inFlightRefreshes = new Map<string, Promise<RefreshResult | null>>();
+
+async function performRefresh(
 	event: Parameters<Handle>[0]['event'],
 	refreshToken: string
-): Promise<string | null> {
+): Promise<RefreshResult | null> {
 	const res = await event.fetch(`${env.BASE_API}/auth/refresh`, {
 		method: 'POST',
 		headers: { Cookie: `refresh_token=${refreshToken}` }
@@ -59,9 +69,29 @@ async function refreshAccessToken(
 	const { data, success } = await res.json();
 	if (!success || !data?.accessToken) return null;
 
-	const newRefreshToken = res.headers.get('set-cookie')?.match(/refresh_token=([^;]+)/)?.[1];
-	if (newRefreshToken) {
-		event.cookies.set('refresh_token', newRefreshToken, {
+	const newRefreshToken =
+		res.headers.get('set-cookie')?.match(/refresh_token=([^;]+)/)?.[1] ?? null;
+
+	return { accessToken: data.accessToken as string, refreshToken: newRefreshToken };
+}
+
+async function refreshAccessToken(
+	event: Parameters<Handle>[0]['event'],
+	refreshToken: string
+): Promise<string | null> {
+	let pending = inFlightRefreshes.get(refreshToken);
+	if (!pending) {
+		pending = performRefresh(event, refreshToken).finally(() => {
+			inFlightRefreshes.delete(refreshToken);
+		});
+		inFlightRefreshes.set(refreshToken, pending);
+	}
+
+	const result = await pending;
+	if (!result) return null;
+
+	if (result.refreshToken) {
+		event.cookies.set('refresh_token', result.refreshToken, {
 			path: '/',
 			httpOnly: true,
 			secure: !dev,
@@ -70,7 +100,7 @@ async function refreshAccessToken(
 		});
 	}
 
-	return data.accessToken as string;
+	return result.accessToken;
 }
 
 async function resolveSession(

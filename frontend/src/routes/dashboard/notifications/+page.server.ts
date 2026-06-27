@@ -2,6 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { z } from 'zod';
 import { env } from '$env/dynamic/private';
 import { fail } from '@sveltejs/kit';
+import { authedFetchSafe } from '$lib/server/api';
 
 interface UserPreferences {
 	userId: string;
@@ -10,12 +11,7 @@ interface UserPreferences {
 }
 
 export const load: PageServerLoad = async ({ cookies, fetch }) => {
-	const accessToken = cookies.get('access_token_finexia');
-	const headers = { Authorization: `Bearer ${accessToken}` };
-
-	const prefsRes = await fetch(`${env.BASE_API}/users/me/preferences`, { headers }).catch(
-		() => null
-	);
+	const prefsRes = await authedFetchSafe({ cookies, fetch }, '/users/me/preferences');
 
 	let preferences: UserPreferences = { userId: '', emailAlerts: true, weeklySummary: true };
 	if (prefsRes?.ok) {

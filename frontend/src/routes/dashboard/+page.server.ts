@@ -1,6 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { env } from '$env/dynamic/private';
 import { redirect } from '@sveltejs/kit';
+import { authedFetchSafe } from '$lib/server/api';
 
 interface PortfolioSummary {
 	id: string;
@@ -51,14 +52,13 @@ interface GrowthSummary {
 }
 
 export const load: PageServerLoad = async ({ cookies, fetch }) => {
-	const accessToken = cookies.get('access_token_finexia');
-	const headers = { Authorization: `Bearer ${accessToken}` };
+	const event = { cookies, fetch };
 
 	const [transactionsRes, summaryRes, allocationRes, growthRes] = await Promise.all([
-		fetch(`${env.BASE_API}/portfolios/transactions`, { headers }).catch(() => null),
-		fetch(`${env.BASE_API}/portfolios/summary`, { headers }).catch(() => null),
-		fetch(`${env.BASE_API}/portfolios/allocation`, { headers }).catch(() => null),
-		fetch(`${env.BASE_API}/portfolios/growth`, { headers }).catch(() => null)
+		authedFetchSafe(event, '/portfolios/transactions'),
+		authedFetchSafe(event, '/portfolios/summary'),
+		authedFetchSafe(event, '/portfolios/allocation'),
+		authedFetchSafe(event, '/portfolios/growth')
 	]);
 
 	let recentTransactions: Transaction[] = [];

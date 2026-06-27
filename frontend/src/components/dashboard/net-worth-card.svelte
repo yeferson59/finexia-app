@@ -191,12 +191,6 @@
 		color: var(--amber-light);
 	}
 
-	@media (prefers-reduced-motion: reduce) {
-		.action-button.primary:hover {
-			transform: none;
-		}
-	}
-
 	@media (max-width: 1024px) {
 		.net-worth-content {
 			grid-template-columns: 1fr;

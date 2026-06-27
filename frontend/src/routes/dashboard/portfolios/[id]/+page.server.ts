@@ -1,6 +1,7 @@
 import z from 'zod';
 import { error, fail } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
+import { authedFetch } from '$lib/server/api';
 import type { Actions, PageServerLoad } from './$types';
 
 interface Holding {
@@ -51,18 +52,10 @@ interface TopTransaction {
 }
 
 export const load: PageServerLoad = async ({ cookies, fetch, params }) => {
-	const accessToken = cookies.get('access_token_finexia');
-
 	const [portfolioRes, risksRes, topTxRes] = await Promise.all([
-		fetch(`${env.BASE_API}/portfolios/${params.id}`, {
-			headers: { Authorization: `Bearer ${accessToken}` }
-		}),
-		fetch(`${env.BASE_API}/portfolios/risks`, {
-			headers: { Authorization: `Bearer ${accessToken}` }
-		}),
-		fetch(`${env.BASE_API}/portfolios/${params.id}/top-transaction`, {
-			headers: { Authorization: `Bearer ${accessToken}` }
-		})
+		authedFetch({ cookies, fetch }, `/portfolios/${params.id}`),
+		authedFetch({ cookies, fetch }, '/portfolios/risks'),
+		authedFetch({ cookies, fetch }, `/portfolios/${params.id}/top-transaction`)
 	]);
 
 	if (!portfolioRes.ok) {

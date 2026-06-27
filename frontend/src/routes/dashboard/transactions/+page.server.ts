@@ -1,5 +1,5 @@
-import { env } from '$env/dynamic/private';
 import type { PageServerLoad } from './$types';
+import { authedFetchSafe } from '$lib/server/api';
 
 export interface UserTransaction {
 	id: string;
@@ -17,11 +17,7 @@ export interface UserTransaction {
 }
 
 export const load: PageServerLoad = async ({ cookies, fetch }) => {
-	const accessToken = cookies.get('access_token_finexia');
-
-	const response = await fetch(`${env.BASE_API}/portfolios/transactions`, {
-		headers: { Authorization: `Bearer ${accessToken}` }
-	}).catch(() => null);
+	const response = await authedFetchSafe({ cookies, fetch }, '/portfolios/transactions');
 
 	if (!response?.ok) {
 		return { transactions: [] as UserTransaction[] };
