@@ -29,6 +29,7 @@ type Env struct {
 	ResendAPIKey       string
 	EmailFrom          string
 	AlphaVantageAPIKey string
+	FinnhubAPIKey      string
 	PublicURL          string
 }
 
@@ -55,6 +56,7 @@ func (c *Config) LoadEnvs() *Env {
 		ResendAPIKey:       c.getString("RESEND_API_KEY", ""),
 		EmailFrom:          c.getString("EMAIL_FROM", "Finexia <noreply@finexia.me>"),
 		AlphaVantageAPIKey: c.getString("ALPHA_VANTAGE_API_KEY", ""),
+		FinnhubAPIKey:      c.getString("FINNHUB_API_KEY", ""),
 		PublicURL:          c.getString("PUBLIC_URL", "http://localhost:8080"),
 	}
 }

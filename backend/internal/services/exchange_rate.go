@@ -6,7 +6,6 @@ import (
 
 	"github.com/yeferson59/gofinance/money"
 
-	"github.com/yeferson59/finexia-app/internal/alphavantage"
 	"github.com/yeferson59/finexia-app/internal/entities"
 	"github.com/yeferson59/finexia-app/internal/logger"
 )
@@ -29,13 +28,12 @@ var defaultPairs = []CurrencyPair{
 
 func (s *Services) SyncExchangeRates(ctx context.Context) ([]entities.ExchangeRate, []error) {
 	log := s.log.With(logger.Str("job", "exchange_rate_sync"))
-	client := alphavantage.New(s.cfg.AlphaVantageAPIKey)
 
 	results := make([]entities.ExchangeRate, 0, len(defaultPairs))
 	var errs []error
 
 	for i, pair := range defaultPairs {
-		result, err := client.FetchExchangeRate(ctx, pair.From, pair.To)
+		result, err := s.priceProvider.FetchExchangeRate(ctx, pair.From, pair.To)
 		if err != nil {
 			log.Error("fetch failed", logger.Err(err), logger.Str("pair", pair.From+"/"+pair.To))
 			errs = append(errs, err)
