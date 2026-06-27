@@ -115,7 +115,17 @@ func (r *Repository) GetSessionByUserIDToken(ctx context.Context, userID uuid.UU
 	var user entities.User
 	var session entities.Session
 
-	if err := r.db.QueryRow(ctx, "SELECT u.*, r.name, s.* FROM users u JOIN sessions s ON s.user_id = u.id JOIN roles r ON r.id = u.role_id WHERE s.user_id = $1 AND s.token = $2", userID.String(), token).Scan(
+	if err := r.db.QueryRow(ctx,
+		`SELECT u.id, u.name, u.email, u.email_verified, u.image, u.role_id, u.preferred_currency,
+		        u.created_at, u.updated_at, u.deleted_at, u.banned_at,
+		        r.name,
+		        s.id, s.user_id, s.token, s.expires_at, s.ip_address, s.user_agent, s.created_at, s.updated_at
+		 FROM users u
+		 JOIN sessions s ON s.user_id = u.id
+		 JOIN roles r ON r.id = u.role_id
+		 WHERE s.user_id = $1 AND s.token = $2`,
+		userID.String(), token,
+	).Scan(
 		&user.ID,
 		&user.Name,
 		&user.Email,
@@ -126,6 +136,7 @@ func (r *Repository) GetSessionByUserIDToken(ctx context.Context, userID uuid.UU
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.DeletedAt,
+		&user.BannedAt,
 		&user.Role.Name,
 		&session.ID,
 		&session.UserID,
