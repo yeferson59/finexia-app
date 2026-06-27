@@ -161,3 +161,26 @@ func (r *Repository) UpdateUserPassword(ctx context.Context, userID uuid.UUID, h
 	)
 	return err
 }
+
+func (r *Repository) GetUsersWithWeeklySummary(ctx context.Context) ([]entities.User, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT u.id, u.name, u.email
+		FROM users u
+		JOIN user_preferences up ON up.user_id = u.id
+		WHERE up.weekly_summary = true AND u.deleted_at IS NULL
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []entities.User
+	for rows.Next() {
+		var u entities.User
+		if err := rows.Scan(&u.ID, &u.Name, &u.Email); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}

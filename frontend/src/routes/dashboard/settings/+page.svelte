@@ -5,7 +5,6 @@
 	import Card from '$components/ui/card.svelte';
 	import Input from '$components/ui/input.svelte';
 	import Button from '$components/ui/button.svelte';
-	import Checkbox from '$components/ui/checkbox.svelte';
 
 	import type { PageProps } from './$types';
 
@@ -21,11 +20,6 @@
 	let avatarFile = $state<File | null>(null);
 	let avatarLoading = $state(false);
 	let avatarFileInput = $state<HTMLInputElement | null>(null);
-
-	// Notifications section — seeded from server once
-	let emailAlerts = $state(untrack(() => data.preferences.emailAlerts));
-	let weeklySummary = $state(untrack(() => data.preferences.weeklySummary));
-	let prefsLoading = $state(false);
 
 	// Security section
 	let currentPassword = $state('');
@@ -45,12 +39,6 @@
 	);
 	const avatarError = $derived(
 		form?.action === 'uploadAvatar' ? ((form as { error?: string })?.error ?? '') : ''
-	);
-	const prefsSuccess = $derived(
-		form?.action === 'updatePreferences' && (form as { success?: boolean })?.success
-	);
-	const prefsError = $derived(
-		form?.action === 'updatePreferences' ? ((form as { error?: string })?.error ?? '') : ''
 	);
 	const passwordSuccess = $derived(
 		form?.action === 'changePassword' && (form as { success?: boolean })?.success
@@ -235,50 +223,6 @@
 				{/if}
 				<div class="form-actions">
 					<Button type="submit" loading={profileLoading}>Guardar perfil</Button>
-				</div>
-			</form>
-		</div>
-	</Card>
-
-	<!-- Notifications -->
-	<Card variant="elevated" padding="none">
-		<div class="section">
-			<h2 class="section-title">Notificaciones</h2>
-			<form
-				method="POST"
-				action="?/updatePreferences"
-				use:enhance={() => {
-					prefsLoading = true;
-					return async ({ update }) => {
-						await update();
-						prefsLoading = false;
-					};
-				}}
-			>
-				<div class="toggle-list">
-					<div class="toggle-row">
-						<div>
-							<p class="toggle-label">Alertas por correo</p>
-							<p class="toggle-hint">Recibe notificaciones de actividad importante</p>
-						</div>
-						<Checkbox name="emailAlerts" bind:checked={emailAlerts} />
-					</div>
-					<div class="toggle-row">
-						<div>
-							<p class="toggle-label">Resumen semanal</p>
-							<p class="toggle-hint">Un resumen de tu portafolio cada semana</p>
-						</div>
-						<Checkbox name="weeklySummary" bind:checked={weeklySummary} />
-					</div>
-				</div>
-				{#if prefsError}
-					<p class="feedback error">{prefsError}</p>
-				{/if}
-				{#if prefsSuccess}
-					<p class="feedback success">Preferencias guardadas.</p>
-				{/if}
-				<div class="form-actions">
-					<Button type="submit" loading={prefsLoading}>Guardar preferencias</Button>
 				</div>
 			</form>
 		</div>

@@ -63,5 +63,8 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	snapshotSched := scheduler.NewPortfolioSnapshotScheduler(services, 15, 120*time.Second, rootLog) // 15:00 UTC, 120s startup delay
 	go snapshotSched.Start(ctx)
 
+	weeklySched := scheduler.NewWeeklySummaryScheduler(services, 9, rootLog) // Mondays 09:00 UTC
+	go weeklySched.Start(ctx)
+
 	return nil
 }

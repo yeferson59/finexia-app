@@ -5,27 +5,8 @@ import { fail, redirect } from '@sveltejs/kit';
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-interface UserPreferences {
-	userId: string;
-	emailAlerts: boolean;
-	weeklySummary: boolean;
-}
-
-export const load: PageServerLoad = async ({ locals, cookies, fetch }) => {
-	const accessToken = cookies.get('access_token_finexia');
-	const headers = { Authorization: `Bearer ${accessToken}` };
-
-	const prefsRes = await fetch(`${env.BASE_API}/users/me/preferences`, { headers }).catch(
-		() => null
-	);
-
-	let preferences: UserPreferences = { userId: '', emailAlerts: true, weeklySummary: true };
-	if (prefsRes?.ok) {
-		const { data, success } = await prefsRes.json();
-		if (success && data) preferences = data;
-	}
-
-	return { user: locals.user, preferences };
+export const load: PageServerLoad = async ({ locals }) => {
+	return { user: locals.user };
 };
 
 export const actions = {
@@ -67,43 +48,6 @@ export const actions = {
 		}
 
 		return { action: 'updateProfile', success: true };
-	},
-
-	updatePreferences: async ({ request, fetch, cookies }) => {
-		const accessToken = cookies.get('access_token_finexia');
-		const formData = await request.formData();
-
-		const schema = z.object({
-			emailAlerts: z.coerce.boolean(),
-			weeklySummary: z.coerce.boolean()
-		});
-
-		const parsed = schema.safeParse({
-			emailAlerts: formData.get('emailAlerts'),
-			weeklySummary: formData.get('weeklySummary')
-		});
-
-		if (!parsed.success) {
-			return fail(400, {
-				action: 'updatePreferences',
-				error: parsed.error.issues[0].message
-			});
-		}
-
-		const res = await fetch(`${env.BASE_API}/users/me/preferences`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-			body: JSON.stringify(parsed.data)
-		});
-
-		if (!res.ok) {
-			return fail(res.status, {
-				action: 'updatePreferences',
-				error: 'Error al guardar las preferencias'
-			});
-		}
-
-		return { action: 'updatePreferences', success: true };
 	},
 
 	uploadAvatar: async ({ request, fetch, cookies }) => {

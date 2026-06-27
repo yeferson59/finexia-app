@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 
 	portfoliodto "github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/mail"
 )
 
 func (s *Services) GetPortfoliosRisks(ctx context.Context) ([]entities.Risk, error) {
@@ -119,7 +121,126 @@ func (s *Services) GetAssetAllocation(ctx context.Context, userID uuid.UUID) ([]
 }
 
 func (s *Services) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error) {
-	return s.repos.CreateTransaction(ctx, userID, entryID, txnType, quantity, price, currency, fees, transactionDate, notes)
+	txn, err := s.repos.CreateTransaction(ctx, userID, entryID, txnType, quantity, price, currency, fees, transactionDate, notes)
+	if err != nil {
+		return entities.Transaction{}, err
+	}
+
+	go s.sendTransactionAlert(userID, entryID, txn)
+
+	return txn, nil
+}
+
+func (s *Services) sendTransactionAlert(userID, entryID uuid.UUID, txn entities.Transaction) {
+	ctx := context.Background()
+
+	prefs, err := s.repos.GetUserPreferences(ctx, userID)
+	if err != nil || !prefs.EmailAlerts {
+		return
+	}
+
+	user, err := s.repos.GetUserByID(ctx, userID)
+	if err != nil {
+		return
+	}
+
+	entry, err := s.repos.GetEntryWithAsset(ctx, entryID)
+	if err != nil {
+		return
+	}
+
+	qty := txn.Quantity.String()
+	priceStr := txn.Price.String()
+	totalStr := fmt.Sprintf("%.2f", txn.Quantity.InexactFloat64()*txn.Price.InexactFloat64())
+
+	data := mail.ActivityAlertData{
+		UserName:        user.Name,
+		AssetTicker:     entry.Asset.Ticker,
+		AssetName:       entry.Asset.Name,
+		TransactionType: string(txn.Type),
+		Quantity:        qty,
+		Price:           priceStr,
+		Total:           totalStr,
+		Currency:        txn.Currency,
+		TransactionDate: txn.TransactionDate.Format("02 Jan 2006"),
+		DashboardURL:    s.cfg.PublicURL + "/dashboard/portfolios",
+	}
+
+	_ = s.mail.SendActivityAlert(user.Email, data)
+}
+
+func (s *Services) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
+	users, err := s.repos.GetUsersWithWeeklySummary(ctx)
+	if err != nil {
+		return 0, []error{err}
+	}
+
+	now := time.Now()
+	year, week := now.ISOWeek()
+	weekLabel := fmt.Sprintf("Semana %d — %d", week, year)
+
+	var errs []error
+	sent := 0
+
+	for _, u := range users {
+		summaries, err := s.repos.GetPortfoliosSummaryByUserID(ctx, u.ID)
+		if err != nil || len(summaries) == 0 {
+			continue
+		}
+
+		var totalValue, totalGain, totalGainPct float64
+		portfolios := make([]mail.WeeklySummaryPortfolio, 0, len(summaries))
+
+		for _, p := range summaries {
+			mv, _ := strconv.ParseFloat(p.TotalMarketValue, 64)
+			gl, _ := strconv.ParseFloat(p.TotalGainLoss, 64)
+			glp, _ := strconv.ParseFloat(p.TotalGainLossPct, 64)
+			totalValue += mv
+			totalGain += gl
+
+			color := "#22c97e"
+			if glp < 0 {
+				color = "#e05a5a"
+			}
+
+			portfolios = append(portfolios, mail.WeeklySummaryPortfolio{
+				Name:             p.Name,
+				Type:             string(p.Type),
+				TotalMarketValue: fmt.Sprintf("%.2f %s", mv, p.BaseCurrency),
+				TotalGainLoss:    fmt.Sprintf("%.2f", gl),
+				TotalGainLossPct: fmt.Sprintf("%.2f", glp),
+				GainLossColor:    color,
+			})
+		}
+
+		if totalValue > 0 {
+			totalGainPct = (totalGain / (totalValue - totalGain)) * 100
+		}
+
+		gainColor := "#22c97e"
+		if totalGain < 0 {
+			gainColor = "#e05a5a"
+		}
+
+		data := mail.WeeklySummaryData{
+			UserName:         u.Name,
+			TotalValue:       fmt.Sprintf("%.2f", totalValue),
+			TotalGainLoss:    fmt.Sprintf("%.2f", totalGain),
+			TotalGainLossPct: fmt.Sprintf("%.2f", totalGainPct),
+			GainLossColor:    gainColor,
+			Portfolios:       portfolios,
+			DashboardURL:     s.cfg.PublicURL + "/dashboard",
+			WeekLabel:        weekLabel,
+		}
+
+		if err := s.mail.SendWeeklySummary(u.Email, data); err != nil {
+			errs = append(errs, fmt.Errorf("user %s: %w", u.ID, err))
+			continue
+		}
+		sent++
+	}
+
+	return sent, errs
 }
 
 func (s *Services) GetPortfolioGrowth(ctx context.Context, userID uuid.UUID, period string) ([]entities.PortfolioGrowthPoint, entities.PortfolioGrowthSummary, error) {

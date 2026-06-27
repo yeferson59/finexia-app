@@ -731,6 +731,27 @@ func (r *Repository) CreateTransaction(ctx context.Context, userID, entryID uuid
 	return txn, nil
 }
 
+func (r *Repository) GetEntryWithAsset(ctx context.Context, entryID uuid.UUID) (entities.PortfolioEntry, error) {
+	var entry entities.PortfolioEntry
+	err := r.db.QueryRow(ctx, `
+		SELECT pe.id, pe.portfolio_id, pe.asset_id,
+		       a.ticker, a.name
+		FROM portfolio_entries pe
+		JOIN assets a ON a.id = pe.asset_id
+		WHERE pe.id = $1
+	`, entryID).Scan(
+		&entry.ID,
+		&entry.PortfolioID,
+		&entry.AssetID,
+		&entry.Asset.Ticker,
+		&entry.Asset.Name,
+	)
+	if err != nil {
+		return entities.PortfolioEntry{}, err
+	}
+	return entry, nil
+}
+
 func (r *Repository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, costCurrency string, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) (entities.PortfolioEntry, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
