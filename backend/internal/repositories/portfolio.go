@@ -147,6 +147,24 @@ func (r *Repository) GetPortfolioByID(ctx context.Context, portfolioID, userID u
 	return portfolio, nil
 }
 
+// scanAssetCurrentPrice populates asset.CurrentPrice from a nullable numeric string
+// using the asset's own currency. money.Money.Scan only stores the value and leaves
+// the currency at the zero value (XXX), which serializes to "¤" in the browser.
+func scanAssetCurrentPrice(asset *entities.Asset, priceStr *string) {
+	if priceStr == nil {
+		return
+	}
+	cur, err := money.CurrencyFromISOCode(asset.Currency)
+	if err != nil {
+		return
+	}
+	m, err := money.NewMoneyFromString(*priceStr, cur)
+	if err != nil {
+		return
+	}
+	asset.CurrentPrice = &m
+}
+
 func (r *Repository) GetEntriesByPortfolioID(ctx context.Context, portfolioID uuid.UUID) ([]entities.PortfolioEntry, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT pe.id, pe.portfolio_id, pe.asset_id, pe.source_id, pe.quantity, pe.price, pe.cost_currency, pe.category, pe.entry_date, COALESCE(pe.notes, ''), pe.created_at, pe.updated_at,
@@ -167,6 +185,7 @@ func (r *Repository) GetEntriesByPortfolioID(ctx context.Context, portfolioID uu
 		var quantity string
 		var price string
 		var sourceID pgtype.UUID
+		var assetPriceStr *string
 
 		if err := rows.Scan(
 			&entry.ID,
@@ -187,13 +206,15 @@ func (r *Repository) GetEntriesByPortfolioID(ctx context.Context, portfolioID uu
 			&entry.Asset.AssetType,
 			&entry.Asset.Exchange,
 			&entry.Asset.Currency,
-			&entry.Asset.CurrentPrice,
+			&assetPriceStr,
 			&entry.Asset.PriceUpdatedAt,
 			&entry.Asset.CreatedAt,
 			&entry.Asset.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
+
+		scanAssetCurrentPrice(&entry.Asset, assetPriceStr)
 
 		if sourceID.Valid {
 			entry.SourceID = uuid.UUID(sourceID.Bytes)
@@ -476,12 +497,13 @@ func (r *Repository) GetPortfolioEntries(ctx context.Context, sourceID uuid.UUID
 
 func (r *Repository) GetAssetByID(ctx context.Context, assetID uuid.UUID) (entities.Asset, error) {
 	var asset entities.Asset
+	var priceStr *string
 	err := r.db.QueryRow(ctx, `
 		SELECT id, ticker, name, asset_type, COALESCE(exchange, ''), currency, current_price, price_updated_at, created_at, updated_at
 		FROM assets WHERE id = $1
 	`, assetID).Scan(
 		&asset.ID, &asset.Ticker, &asset.Name, &asset.AssetType, &asset.Exchange,
-		&asset.Currency, &asset.CurrentPrice, &asset.PriceUpdatedAt, &asset.CreatedAt, &asset.UpdatedAt,
+		&asset.Currency, &priceStr, &asset.PriceUpdatedAt, &asset.CreatedAt, &asset.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -489,6 +511,7 @@ func (r *Repository) GetAssetByID(ctx context.Context, assetID uuid.UUID) (entit
 		}
 		return entities.Asset{}, err
 	}
+	scanAssetCurrentPrice(&asset, priceStr)
 	return asset, nil
 }
 
@@ -508,6 +531,7 @@ func (r *Repository) GetAssets(ctx context.Context, offset, limit uint) ([]entit
 
 	for rows.Next() {
 		var asset entities.Asset
+		var priceStr *string
 
 		if err := rows.Scan(
 			&asset.ID,
@@ -516,7 +540,7 @@ func (r *Repository) GetAssets(ctx context.Context, offset, limit uint) ([]entit
 			&asset.AssetType,
 			&asset.Exchange,
 			&asset.Currency,
-			&asset.CurrentPrice,
+			&priceStr,
 			&asset.PriceUpdatedAt,
 			&asset.CreatedAt,
 			&asset.UpdatedAt,
@@ -524,6 +548,7 @@ func (r *Repository) GetAssets(ctx context.Context, offset, limit uint) ([]entit
 			return nil, err
 		}
 
+		scanAssetCurrentPrice(&asset, priceStr)
 		assets = append(assets, asset)
 	}
 
@@ -532,6 +557,7 @@ func (r *Repository) GetAssets(ctx context.Context, offset, limit uint) ([]entit
 
 func (r *Repository) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, price money.Money) (entities.Asset, error) {
 	var asset entities.Asset
+	var priceStr *string
 
 	err := r.db.QueryRow(ctx, `
 		UPDATE assets
@@ -545,7 +571,7 @@ func (r *Repository) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, pr
 		&asset.AssetType,
 		&asset.Exchange,
 		&asset.Currency,
-		&asset.CurrentPrice,
+		&priceStr,
 		&asset.PriceUpdatedAt,
 		&asset.CreatedAt,
 		&asset.UpdatedAt,
@@ -557,11 +583,13 @@ func (r *Repository) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, pr
 		return entities.Asset{}, err
 	}
 
+	scanAssetCurrentPrice(&asset, priceStr)
 	return asset, nil
 }
 
 func (r *Repository) UpsertAsset(ctx context.Context, ticker, name string, assetType entities.AssetType, exchange, currency string) (entities.Asset, error) {
 	var asset entities.Asset
+	var priceStr *string
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO assets (ticker, name, asset_type, exchange, currency, created_at, updated_at)
 		VALUES ($1, $2, $3::asset_type, NULLIF($4, ''), $5, NOW(), NOW())
@@ -575,12 +603,16 @@ func (r *Repository) UpsertAsset(ctx context.Context, ticker, name string, asset
 		&asset.AssetType,
 		&asset.Exchange,
 		&asset.Currency,
-		&asset.CurrentPrice,
+		&priceStr,
 		&asset.PriceUpdatedAt,
 		&asset.CreatedAt,
 		&asset.UpdatedAt,
 	)
-	return asset, err
+	if err != nil {
+		return asset, err
+	}
+	scanAssetCurrentPrice(&asset, priceStr)
+	return asset, nil
 }
 
 func (r *Repository) GetRecentTransactionsByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]entities.Transaction, error) {

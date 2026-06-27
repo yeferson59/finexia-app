@@ -53,11 +53,15 @@
 		}
 	});
 
-	function formatPrice(price: { value: string; currency: string } | null): string {
+	function formatPrice(
+		price: { value: string; currency: string } | null,
+		assetCurrency?: string
+	): string {
 		if (!price) return '—';
 		const num = parseFloat(price.value);
 		if (isNaN(num)) return price.value;
-		const currency = price.currency || 'USD';
+		const currency =
+			price.currency && price.currency !== 'XXX' ? price.currency : (assetCurrency || 'USD');
 		try {
 			return new Intl.NumberFormat('en-US', {
 				style: 'currency',
@@ -211,7 +215,7 @@
 							<td>
 								<Badge tone="neutral">{asset.assetType}</Badge>
 							</td>
-							<td class="cell-price">{formatPrice(asset.currentPrice)}</td>
+							<td class="cell-price">{formatPrice(asset.currentPrice, asset.currency)}</td>
 							<td class="cell-date">{formatDate(asset.priceUpdatedAt)}</td>
 							<td class="cell-update">
 								<form
