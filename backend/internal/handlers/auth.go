@@ -21,7 +21,7 @@ func (handler *Handlers) Login(c fiber.Ctx) error {
 	c.Cookie(&fiber.Cookie{
 		Name:     "refresh_token",
 		Value:    result.RawRefreshToken,
-		Path:     "/auth",
+		Path:     "/",
 		HTTPOnly: true,
 		Secure:   handler.cfg.Environment == "production",
 		SameSite: "Strict",
@@ -61,7 +61,7 @@ func (handler *Handlers) Refresh(c fiber.Ctx) error {
 	c.Cookie(&fiber.Cookie{
 		Name:     "refresh_token",
 		Value:    result.RawRefreshToken,
-		Path:     "/auth",
+		Path:     "/",
 		HTTPOnly: true,
 		Secure:   handler.cfg.Environment == "production",
 		SameSite: "Strict",
@@ -101,6 +101,7 @@ func (handler *Handlers) Logout(c fiber.Ctx) error {
 	c.Cookie(&fiber.Cookie{
 		Name:   "refresh_token",
 		Value:  "",
+		Path:   "/",
 		MaxAge: -1,
 	})
 

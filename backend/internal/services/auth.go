@@ -165,10 +165,7 @@ func (s *Services) GetSession(ctx context.Context, userID uuid.UUID, token strin
 func (s *Services) ValidateToken(ctx context.Context, token string) (string, error) {
 	cacheKey := "validateToken" + "-" + token
 
-	data, err := s.storage.GetWithContext(ctx, cacheKey)
-	if err != nil {
-		return "", err
-	}
+	data, _ := s.storage.GetWithContext(ctx, cacheKey)
 
 	if len(data) > 0 {
 		isValidToken, err := strconv.ParseBool(string(data))
@@ -263,9 +260,7 @@ func (s *Services) ValidateToken(ctx context.Context, token string) (string, err
 	cacheTTL := expTime.Sub(now)
 	cacheTTL = min(cacheTTL, 24*time.Hour)
 	if cacheTTL > 0 {
-		if err := s.storage.SetWithContext(ctx, cacheKey, []byte("true"), cacheTTL); err != nil {
-			return "", err
-		}
+		_ = s.storage.SetWithContext(ctx, cacheKey, []byte("true"), cacheTTL)
 	}
 
 	return token, nil
@@ -286,10 +281,7 @@ func (s *Services) RefreshToken(ctx context.Context, rawToken, ipAddress, userAg
 		sessionID uuid.UUID
 	)
 
-	cached, err := s.storage.GetWithContext(ctx, oldCacheKey)
-	if err != nil {
-		return auth.LoginInternalDTO{}, err
-	}
+	cached, _ := s.storage.GetWithContext(ctx, oldCacheKey)
 
 	if len(cached) > 0 {
 		// format: tokenID|userID|role|familyID|sessionID|expiresUnix
