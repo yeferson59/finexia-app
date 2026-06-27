@@ -54,7 +54,7 @@
 		</a>
 
 		<div class="header-actions">
-			<button class="icon-button" aria-label="Notificaciones">
+			<a href={resolve('/dashboard/notifications')} class="icon-button" aria-label="Notificaciones">
 				<svg
 					width="20"
 					height="20"
@@ -67,7 +67,7 @@
 					<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
 				</svg>
 				<span class="notification-badge"></span>
-			</button>
+			</a>
 
 			<button class="icon-button" aria-label="Configuración">
 				<svg
@@ -177,6 +177,7 @@
 		justify-content: center;
 		transition: color 0.2s ease;
 		position: relative;
+		text-decoration: none;
 	}
 
 	.icon-button:hover {
