@@ -8,6 +8,7 @@ interface UserItem {
 	email: string;
 	emailVerified: boolean;
 	createdAt: string;
+	bannedAt: string | null;
 	role: { name: string };
 }
 
@@ -60,5 +61,29 @@ export const actions = {
 		}
 
 		return { success: true };
+	},
+
+	banUser: async ({ request, cookies, fetch }) => {
+		const fd = await request.formData();
+		const id = fd.get('id') as string;
+		const ban = fd.get('ban') === 'true';
+		if (!id) return fail(400, { banError: 'ID requerido', banId: '' });
+
+		const res = await authedFetch(
+			{ cookies, fetch },
+			`/users/${id}/ban`,
+			{
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ban })
+			}
+		);
+
+		if (!res.ok) {
+			const body = await res.json().catch(() => ({}));
+			return fail(res.status, { banError: body.details ?? 'No se pudo actualizar el estado', banId: id });
+		}
+
+		return { banSuccess: true, banId: id, banned: ban };
 	}
 } satisfies Actions;

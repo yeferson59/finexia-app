@@ -5,7 +5,6 @@
 	import Badge from '$components/ui/badge.svelte';
 	import Button from '$components/ui/button.svelte';
 	import Input from '$components/ui/input.svelte';
-	import { resolve } from '$app/paths';
 
 	import type { PageProps } from './$types';
 
@@ -16,6 +15,7 @@
 	let createEmail = $state('');
 	let creating = $state(false);
 	let deleting = $state<string | null>(null);
+	let banning = $state<string | null>(null);
 
 	function formatDate(iso: string): string {
 		return new Intl.DateTimeFormat('es', { dateStyle: 'medium' }).format(new Date(iso));
@@ -88,6 +88,7 @@
 						<th>Nombre</th>
 						<th>Correo</th>
 						<th>Rol</th>
+						<th>Estado</th>
 						<th>Verificado</th>
 						<th>Miembro desde</th>
 						<th></th>
@@ -95,13 +96,22 @@
 				</thead>
 				<tbody>
 					{#each data.users as user (user.id)}
-						<tr>
+						{@const isAdmin = user.role?.name === 'admin'}
+						{@const isBanned = !!user.bannedAt}
+						<tr class:row-banned={isBanned} class:row-admin={isAdmin}>
 							<td class="cell-name">{user.name}</td>
 							<td class="cell-email">{user.email}</td>
 							<td>
-								<Badge tone={user.role?.name === 'admin' ? 'amber' : 'neutral'}>
+								<Badge tone={isAdmin ? 'amber' : 'neutral'}>
 									{user.role?.name ?? '—'}
 								</Badge>
+							</td>
+							<td>
+								{#if isBanned}
+									<Badge tone="danger">Baneado</Badge>
+								{:else}
+									<Badge tone="success">Activo</Badge>
+								{/if}
 							</td>
 							<td>
 								<span class="verified-dot" class:verified={user.emailVerified}>
@@ -109,28 +119,60 @@
 								</span>
 							</td>
 							<td class="cell-date">{formatDate(user.createdAt)}</td>
-							<td class="cell-action">
-								<form
-									method="POST"
-									action="?/deleteUser"
-									use:enhance={() => {
-										deleting = user.id;
-										return async ({ update }) => {
-											deleting = null;
-											await update();
-										};
-									}}
-								>
-									<input type="hidden" name="id" value={user.id} />
-									<Button
-										variant="ghost"
-										size="sm"
-										type="submit"
-										loading={deleting === user.id}
-									>
-										Eliminar
-									</Button>
-								</form>
+							<td class="cell-actions">
+								{#if !isAdmin}
+									<div class="action-row">
+										<!-- Ban / Unban -->
+										<form
+											method="POST"
+											action="?/banUser"
+											use:enhance={() => {
+												banning = user.id;
+												return async ({ update }) => {
+													banning = null;
+													await update({ reset: false });
+												};
+											}}
+										>
+											<input type="hidden" name="id" value={user.id} />
+											<input type="hidden" name="ban" value={isBanned ? 'false' : 'true'} />
+											<Button
+												variant={isBanned ? 'secondary' : 'ghost'}
+												size="sm"
+												type="submit"
+												loading={banning === user.id}
+											>
+												{isBanned ? 'Desbanear' : 'Banear'}
+											</Button>
+										</form>
+
+										<!-- Delete -->
+										<form
+											method="POST"
+											action="?/deleteUser"
+											use:enhance={() => {
+												deleting = user.id;
+												return async ({ update }) => {
+													deleting = null;
+													await update();
+												};
+											}}
+										>
+											<input type="hidden" name="id" value={user.id} />
+											<Button
+												variant="ghost"
+												size="sm"
+												type="submit"
+												loading={deleting === user.id}
+											>
+												<span class="delete-label">Eliminar</span>
+											</Button>
+										</form>
+									</div>
+									{#if form?.banError && form?.banId === user.id}
+										<p class="row-error">{form.banError}</p>
+									{/if}
+								{/if}
 							</td>
 						</tr>
 					{/each}
@@ -206,7 +248,7 @@
 	}
 
 	.users-table td {
-		padding: 0.875rem 1.25rem;
+		padding: 0.75rem 1.25rem;
 		color: var(--text-muted);
 		border-bottom: 1px solid var(--border);
 		vertical-align: middle;
@@ -218,6 +260,15 @@
 
 	.users-table tbody tr:hover td {
 		background: var(--surface-2);
+	}
+
+	.row-banned td {
+		background: rgba(239, 68, 68, 0.04) !important;
+		opacity: 0.75;
+	}
+
+	.row-admin .cell-name {
+		color: var(--amber-light) !important;
 	}
 
 	.cell-name {
@@ -237,7 +288,26 @@
 		font-size: 0.8rem;
 	}
 
-	.cell-action {
+	.cell-actions {
+		text-align: right;
+		white-space: nowrap;
+	}
+
+	.action-row {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 0.25rem;
+	}
+
+	.delete-label {
+		color: var(--red);
+	}
+
+	.row-error {
+		font-size: 0.75rem;
+		color: var(--red);
+		margin: 0.25rem 0 0;
 		text-align: right;
 	}
 

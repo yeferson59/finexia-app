@@ -60,6 +60,10 @@ func (s *Services) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	return s.repos.DeleteUser(ctx, id)
 }
 
+func (s *Services) BanUser(ctx context.Context, id uuid.UUID, ban bool) error {
+	return s.repos.BanUser(ctx, id, ban)
+}
+
 func (s *Services) GetCurrentUser(ctx context.Context, userID uuid.UUID) (entities.User, error) {
 	return s.repos.GetUserByID(ctx, userID)
 }

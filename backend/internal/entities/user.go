@@ -27,6 +27,7 @@ type User struct {
 	CreatedAt         time.Time          `json:"createdAt"`
 	UpdatedAt         time.Time          `json:"updatedAt"`
 	DeletedAt         *time.Time         `json:"-"`
+	BannedAt          *time.Time         `json:"bannedAt,omitempty"`
 	Sources           []InvestmentSource `json:"sources"`
 	Portfolios        []Portfolio        `json:"portfolios"`
 	Role              Role               `json:"role,omitzero"`

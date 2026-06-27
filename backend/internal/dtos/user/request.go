@@ -26,3 +26,7 @@ type ChangePasswordDTO struct {
 	CurrentPassword string `json:"currentPassword" validate:"required,min=8"`
 	NewPassword     string `json:"newPassword"     validate:"required,min=8"`
 }
+
+type BanUserDTO struct {
+	Ban bool `json:"ban"`
+}

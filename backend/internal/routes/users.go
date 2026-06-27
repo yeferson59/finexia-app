@@ -18,5 +18,6 @@ func (r *Routes) Users() {
 
 	users.Get("/:id", r.middlewares.RequireAdmin(), r.handlers.GetUserByID)
 	users.Patch("/:id", r.middlewares.RequireAdmin(), r.handlers.UpdateUser)
+	users.Patch("/:id/ban", r.middlewares.RequireAdmin(), r.handlers.BanUser)
 	users.Delete("/:id", r.middlewares.RequireAdmin(), r.handlers.DeleteUser)
 }

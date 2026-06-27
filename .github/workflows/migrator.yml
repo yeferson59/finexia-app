@@ -5,21 +5,32 @@ on:
     branches: [main]
     paths:
       - backend/internal/migrator/**
-      - backend/internal/entities/**
       - backend/internal/migrations/**
-  pull_request:
-    branches: [main]
-    paths:
-      - backend/internal/migrator/**
-      - backend/internal/entities/**
-      - backend/internal/migrations/**
+
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Command to run"
+        required: true
+        default: "up"
+        type: choice
+        options:
+          - up
+          - down
+          - version
+      steps:
+        description: "Steps to roll back (only used when command=down)"
+        required: false
+        default: "1"
 
 permissions:
   contents: read
 
 jobs:
-  run:
+  migrate:
     runs-on: ubuntu-latest
+    environment: staging
+
     steps:
       - uses: actions/checkout@v6
 
@@ -28,10 +39,25 @@ jobs:
           go-version: "1.26.4"
           cache-dependency-path: "backend/go.sum"
 
-      - run: go mod download
+      - name: Download dependencies
+        run: go mod download
         working-directory: backend
 
-      - run: go run internal/migrator/main.go
+      - name: Determine command
+        id: args
+        run: |
+          CMD="${{ github.event.inputs.command || 'up' }}"
+          STEPS="${{ github.event.inputs.steps || '1' }}"
+          if [ "$CMD" = "down" ]; then
+            echo "flags=-cmd down -steps $STEPS" >> "$GITHUB_OUTPUT"
+          elif [ "$CMD" = "version" ]; then
+            echo "flags=-cmd version" >> "$GITHUB_OUTPUT"
+          else
+            echo "flags=-cmd up" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run migrations (${{ github.event.inputs.command || 'up' }})
+        run: go run internal/migrator/main.go ${{ steps.args.outputs.flags }}
         working-directory: backend
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

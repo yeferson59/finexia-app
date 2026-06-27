@@ -104,6 +104,28 @@ func (handler *Handlers) DeleteUser(c fiber.Ctx) error {
 	return handler.responseSuccess(c, fiber.StatusNoContent, "", "", "")
 }
 
+func (handler *Handlers) BanUser(c fiber.Ctx) error {
+	userID, err := handler.getParamUUID(c, "id")
+	if err != nil {
+		return handler.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	var req user.BanUserDTO
+	if err := c.Bind().JSON(&req); err != nil {
+		return handler.responseBadRequest(c, "Invalid request", err.Error())
+	}
+
+	if err := handler.services.BanUser(handler.ctx, userID, req.Ban); err != nil {
+		return handler.responseFromDomain(c, err, "Error updating ban status", "users:ban")
+	}
+
+	msg := "User banned"
+	if !req.Ban {
+		msg = "User unbanned"
+	}
+	return handler.responseStatusOk(c, msg, msg, nil)
+}
+
 func (handler *Handlers) GetMe(c fiber.Ctx) error {
 	userID, _, _, err := handler.getUserIDTokenRole(c)
 	if err != nil {
