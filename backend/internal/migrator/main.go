@@ -19,12 +19,20 @@ func main() {
 	steps := flag.Int("steps", 1, "Number of steps for 'down' (default 1)")
 	flag.Parse()
 
+	if err := runMigration(*cmd, *steps); err != nil {
+		log.Fatalf("migration failed: %v", err)
+	}
+}
+
+// runMigration opens the migrate instance, defers its close, then delegates to run.
+// Keeping the defer here (no log.Fatal/os.Exit in this function) satisfies gocritic.
+func runMigration(cmd string, steps int) error {
 	c := config.New()
 	cfg := c.LoadEnvs()
 
 	m, err := migrate.New(cfg.PathMigration, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("migrate.New: %v", err)
+		return fmt.Errorf("migrate.New: %w", err)
 	}
 	defer func() {
 		srcErr, dbErr := m.Close()
@@ -36,34 +44,38 @@ func main() {
 		}
 	}()
 
-	switch *cmd {
+	return run(m, cmd, steps)
+}
+
+func run(m *migrate.Migrate, cmd string, steps int) error {
+	switch cmd {
 	case "up":
 		if err := m.Up(); err != nil {
 			if errors.Is(err, migrate.ErrNoChange) {
 				log.Println("No pending migrations.")
-				return
+				return nil
 			}
-			log.Fatalf("migrate up: %v", err)
+			return fmt.Errorf("migrate up: %w", err)
 		}
 		v, dirty, _ := m.Version()
 		log.Printf("Migration up complete — version %d (dirty=%v)", v, dirty)
 
 	case "down":
-		if *steps < 1 {
-			log.Fatal("-steps must be >= 1")
+		if steps < 1 {
+			return fmt.Errorf("-steps must be >= 1")
 		}
-		if err := m.Steps(-(*steps)); err != nil {
+		if err := m.Steps(-steps); err != nil {
 			if errors.Is(err, migrate.ErrNoChange) {
 				log.Println("Nothing to roll back.")
-				return
+				return nil
 			}
-			log.Fatalf("migrate down %d steps: %v", *steps, err)
+			return fmt.Errorf("migrate down %d steps: %w", steps, err)
 		}
 		v, dirty, verErr := m.Version()
 		if verErr != nil && !errors.Is(verErr, migrate.ErrNilVersion) {
-			log.Printf("rolled back %d step(s) — no remaining version", *steps)
+			log.Printf("Rolled back %d step(s) — no remaining version", steps)
 		} else {
-			log.Printf("Rolled back %d step(s) — now at version %d (dirty=%v)", *steps, v, dirty)
+			log.Printf("Rolled back %d step(s) — now at version %d (dirty=%v)", steps, v, dirty)
 		}
 
 	case "version":
@@ -71,13 +83,15 @@ func main() {
 		if err != nil {
 			if errors.Is(err, migrate.ErrNilVersion) {
 				fmt.Println("No migrations applied yet (version: nil)")
-				return
+				return nil
 			}
-			log.Fatalf("version: %v", err)
+			return fmt.Errorf("version: %w", err)
 		}
 		fmt.Printf("Current version: %s  dirty: %s\n", strconv.Itoa(int(v)), strconv.FormatBool(dirty))
 
 	default:
-		log.Fatalf("Unknown command %q — use: up | down | version", *cmd)
+		return fmt.Errorf("unknown command %q — use: up | down | version", cmd)
 	}
+
+	return nil
 }

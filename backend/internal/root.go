@@ -12,16 +12,16 @@ import (
 	"github.com/yeferson59/finexia-app/internal/alphavantage"
 	"github.com/yeferson59/finexia-app/internal/config"
 	"github.com/yeferson59/finexia-app/internal/finnhub"
-	"github.com/yeferson59/finexia-app/internal/prices"
-	"github.com/yeferson59/finexia-app/internal/yahoo"
 	"github.com/yeferson59/finexia-app/internal/handlers"
 	"github.com/yeferson59/finexia-app/internal/logger"
 	"github.com/yeferson59/finexia-app/internal/mail"
 	"github.com/yeferson59/finexia-app/internal/middlewares"
+	"github.com/yeferson59/finexia-app/internal/prices"
 	"github.com/yeferson59/finexia-app/internal/repositories"
 	"github.com/yeferson59/finexia-app/internal/routes"
 	"github.com/yeferson59/finexia-app/internal/scheduler"
 	"github.com/yeferson59/finexia-app/internal/services"
+	"github.com/yeferson59/finexia-app/internal/yahoo"
 )
 
 type Bootstrap struct {
