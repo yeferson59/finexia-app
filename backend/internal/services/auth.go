@@ -47,17 +47,14 @@ func refreshCacheKey(hash string) string {
 func (s *Services) Login(ctx context.Context, email, password string) (auth.LoginInternalDTO, error) {
 	user, err := s.repos.GetAccountByEmail(ctx, email)
 	if err != nil {
-		fmt.Println(err.Error())
-		return auth.LoginInternalDTO{}, err
+		return auth.LoginInternalDTO{}, errors.New("invalid credentials")
 	}
 
 	if !user.EmailVerified {
-		fmt.Println("email not verified")
 		return auth.LoginInternalDTO{}, errors.New("invalid account")
 	}
 
 	if err := user.Accounts[0].ComparePassword(password); err != nil {
-		fmt.Println("invalid credentials", err.Error())
 		return auth.LoginInternalDTO{}, errors.New("invalid credentials")
 	}
 
@@ -65,19 +62,16 @@ func (s *Services) Login(ctx context.Context, email, password string) (auth.Logi
 
 	jwToken, err := s.CreateJWToken(user.ID, user.Role.Name, accessExpiresAt)
 	if err != nil {
-		fmt.Println("create jwt token failed", err.Error())
 		return auth.LoginInternalDTO{}, err
 	}
 
 	sessionID, err := s.repos.CreateSession(ctx, user.ID, jwToken, accessExpiresAt)
 	if err != nil {
-		fmt.Println("create session failed", err.Error())
 		return auth.LoginInternalDTO{}, err
 	}
 
 	rawRefresh, refreshHash, err := generateRefreshToken()
 	if err != nil {
-		fmt.Println("generate refresh token failed", err.Error())
 		return auth.LoginInternalDTO{}, err
 	}
 
@@ -86,7 +80,6 @@ func (s *Services) Login(ctx context.Context, email, password string) (auth.Logi
 
 	rtID, err := s.repos.CreateRefreshToken(ctx, user.ID, refreshHash, familyID, sessionID, nil, nil, refreshExpiresAt)
 	if err != nil {
-		fmt.Println("create refresh token failed", err.Error())
 		return auth.LoginInternalDTO{}, err
 	}
 
