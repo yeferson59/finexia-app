@@ -34,14 +34,30 @@
 	let passwordLoading = $state(false);
 
 	// Form action feedback
-	const profileSuccess = $derived(form?.action === 'updateProfile' && (form as { success?: boolean })?.success);
-	const profileError = $derived(form?.action === 'updateProfile' ? (form as { error?: string })?.error ?? '' : '');
-	const avatarSuccess = $derived(form?.action === 'uploadAvatar' && (form as { success?: boolean })?.success);
-	const avatarError = $derived(form?.action === 'uploadAvatar' ? (form as { error?: string })?.error ?? '' : '');
-	const prefsSuccess = $derived(form?.action === 'updatePreferences' && (form as { success?: boolean })?.success);
-	const prefsError = $derived(form?.action === 'updatePreferences' ? (form as { error?: string })?.error ?? '' : '');
-	const passwordSuccess = $derived(form?.action === 'changePassword' && (form as { success?: boolean })?.success);
-	const passwordError = $derived(form?.action === 'changePassword' ? (form as { error?: string })?.error ?? '' : '');
+	const profileSuccess = $derived(
+		form?.action === 'updateProfile' && (form as { success?: boolean })?.success
+	);
+	const profileError = $derived(
+		form?.action === 'updateProfile' ? ((form as { error?: string })?.error ?? '') : ''
+	);
+	const avatarSuccess = $derived(
+		form?.action === 'uploadAvatar' && (form as { success?: boolean })?.success
+	);
+	const avatarError = $derived(
+		form?.action === 'uploadAvatar' ? ((form as { error?: string })?.error ?? '') : ''
+	);
+	const prefsSuccess = $derived(
+		form?.action === 'updatePreferences' && (form as { success?: boolean })?.success
+	);
+	const prefsError = $derived(
+		form?.action === 'updatePreferences' ? ((form as { error?: string })?.error ?? '') : ''
+	);
+	const passwordSuccess = $derived(
+		form?.action === 'changePassword' && (form as { success?: boolean })?.success
+	);
+	const passwordError = $derived(
+		form?.action === 'changePassword' ? ((form as { error?: string })?.error ?? '') : ''
+	);
 
 	// Avatar URL: prefer the uploaded URL returned by the server action, then the stored image
 	const savedAvatarUrl = $derived(
@@ -71,13 +87,52 @@
 		}
 	});
 
-	function onFileChange(event: Event) {
+	function compressImageForAvatar(file: File): Promise<File> {
+		const MAX = 512;
+		const QUALITY = 0.85;
+		const outputType = file.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
+
+		return new Promise((resolve) => {
+			const img = new Image();
+			const url = URL.createObjectURL(file);
+			img.onload = () => {
+				URL.revokeObjectURL(url);
+				let { width, height } = img;
+				if (width > MAX || height > MAX) {
+					const ratio = Math.min(MAX / width, MAX / height);
+					width = Math.round(width * ratio);
+					height = Math.round(height * ratio);
+				}
+				const canvas = document.createElement('canvas');
+				canvas.width = width;
+				canvas.height = height;
+				canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+				canvas.toBlob(
+					(blob) => {
+						if (!blob) return resolve(file);
+						const ext = outputType === 'image/webp' ? '.webp' : '.jpg';
+						resolve(new File([blob], 'avatar' + ext, { type: outputType }));
+					},
+					outputType,
+					QUALITY
+				);
+			};
+			img.onerror = () => {
+				URL.revokeObjectURL(url);
+				resolve(file);
+			};
+			img.src = url;
+		});
+	}
+
+	async function onFileChange(event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
 		if (!file) return;
 		if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-		avatarFile = file;
-		avatarPreview = URL.createObjectURL(file);
+		const compressed = await compressImageForAvatar(file);
+		avatarFile = compressed;
+		avatarPreview = URL.createObjectURL(compressed);
 	}
 </script>
 
@@ -127,11 +182,7 @@
 							class="file-input-hidden"
 							onchange={onFileChange}
 						/>
-						<button
-							type="button"
-							class="btn-pick-file"
-							onclick={() => avatarFileInput?.click()}
-						>
+						<button type="button" class="btn-pick-file" onclick={() => avatarFileInput?.click()}>
 							Cambiar foto
 						</button>
 						{#if avatarFile}
@@ -140,7 +191,7 @@
 							</Button>
 						{/if}
 					</form>
-					<p class="avatar-hint">JPEG, PNG o WebP · máx. 5 MB</p>
+					<p class="avatar-hint">JPEG, PNG o WebP · se optimiza automáticamente</p>
 					{#if avatarError}
 						<p class="feedback error">{avatarError}</p>
 					{/if}
@@ -164,12 +215,7 @@
 			>
 				<div class="form-fields">
 					<Input label="Nombre" name="name" bind:value={profileName} required />
-					<Input
-						label="Correo electrónico"
-						name="email"
-						value={data.user?.email ?? ''}
-						disabled
-					/>
+					<Input label="Correo electrónico" name="email" value={data.user?.email ?? ''} disabled />
 					<Input
 						label="Moneda preferida"
 						name="preferredCurrency"
