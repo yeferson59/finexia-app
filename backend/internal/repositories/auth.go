@@ -117,7 +117,7 @@ func (r *Repository) GetSessionByUserIDToken(ctx context.Context, userID uuid.UU
 
 	if err := r.db.QueryRow(ctx,
 		`SELECT u.id, u.name, u.email, u.email_verified, u.image, u.role_id, u.preferred_currency,
-		        u.created_at, u.updated_at, u.deleted_at, u.banned_at,
+		        u.created_at, u.updated_at, u.deleted_at,
 		        r.name,
 		        s.id, s.user_id, s.token, s.expires_at, s.ip_address, s.user_agent, s.created_at, s.updated_at
 		 FROM users u
@@ -136,7 +136,6 @@ func (r *Repository) GetSessionByUserIDToken(ctx context.Context, userID uuid.UU
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.DeletedAt,
-		&user.BannedAt,
 		&user.Role.Name,
 		&session.ID,
 		&session.UserID,
