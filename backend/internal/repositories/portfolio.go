@@ -11,6 +11,7 @@ import (
 
 	"github.com/yeferson59/gofinance/money"
 
+	"github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"
 )
 
@@ -205,6 +206,80 @@ func (r *Repository) GetEntriesByPortfolioID(ctx context.Context, portfolioID uu
 	}
 
 	return entries, nil
+}
+
+func (r *Repository) GetTopTransactionByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID) (portfolio.PortfolioTopTransactionDTO, error) {
+	var dto portfolio.PortfolioTopTransactionDTO
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			(t.quantity::numeric * t.price::numeric)::text,
+			t.type,
+			t.currency,
+			t.transaction_date,
+			a.ticker,
+			a.name
+		FROM transactions t
+		JOIN portfolio_entries pe ON pe.id = t.entry_id
+		JOIN assets a ON a.id = pe.asset_id
+		JOIN portfolios p ON p.id = pe.portfolio_id
+		WHERE pe.portfolio_id = $1 AND p.user_id = $2
+		ORDER BY t.quantity::numeric * t.price::numeric DESC
+		LIMIT 1
+	`, portfolioID, userID).Scan(
+		&dto.Value,
+		&dto.Type,
+		&dto.Currency,
+		&dto.TransactionDate,
+		&dto.AssetTicker,
+		&dto.AssetName,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return portfolio.PortfolioTopTransactionDTO{}, nil
+		}
+		return portfolio.PortfolioTopTransactionDTO{}, err
+	}
+	return dto, nil
+}
+
+func (r *Repository) UpdatePortfolio(ctx context.Context, userID, portfolioID uuid.UUID, name, description string, portfolioType entities.PortfolioType, riskID uuid.UUID, isDefault bool) (entities.Portfolio, error) {
+	var portfolio entities.Portfolio
+	err := r.db.QueryRow(ctx, `
+		UPDATE portfolios
+		SET name = $1, description = $2, type = $3, risk_id = $4, is_default = $5, updated_at = NOW()
+		WHERE id = $6 AND user_id = $7
+		RETURNING id, user_id, name, COALESCE(description, ''), type, risk_id, base_currency, is_default, price_value, created_at, updated_at
+	`, name, description, portfolioType, riskID, isDefault, portfolioID, userID).Scan(
+		&portfolio.ID,
+		&portfolio.UserID,
+		&portfolio.Name,
+		&portfolio.Description,
+		&portfolio.Type,
+		&portfolio.RiskID,
+		&portfolio.BaseCurrency,
+		&portfolio.IsDefault,
+		&portfolio.PriceValue,
+		&portfolio.CreatedAt,
+		&portfolio.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entities.Portfolio{}, errors.New("portfolio not found")
+		}
+		return entities.Portfolio{}, err
+	}
+
+	if err := r.db.QueryRow(ctx, "SELECT id, name, COALESCE(description, ''), created_at, updated_at FROM risks WHERE id = $1", riskID).Scan(
+		&portfolio.Risk.ID,
+		&portfolio.Risk.Name,
+		&portfolio.Risk.Description,
+		&portfolio.Risk.CreatedAt,
+		&portfolio.Risk.UpdatedAt,
+	); err != nil {
+		return entities.Portfolio{}, err
+	}
+
+	return portfolio, nil
 }
 
 func (r *Repository) GetPortfoliosRisks(ctx context.Context) ([]entities.Risk, error) {

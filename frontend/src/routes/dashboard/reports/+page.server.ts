@@ -55,7 +55,7 @@ function buildPerformanceCalendars(points: GrowthDataPoint[]): PerformanceCalend
 			const prevVal = parseFloat(monthEntries[i - 1][1].totalValue);
 			const currVal = parseFloat(monthEntries[i][1].totalValue);
 			byYear.get(year)![monthIndex] =
-				prevVal > 0 ? parseFloat((((currVal / prevVal) - 1) * 100).toFixed(2)) : null;
+				prevVal > 0 ? parseFloat(((currVal / prevVal - 1) * 100).toFixed(2)) : null;
 		}
 	}
 
@@ -86,7 +86,7 @@ function buildKeyStatistics(points: GrowthDataPoint[]): KeyStat[] {
 	for (let i = 1; i < monthEntries.length; i++) {
 		const prev = parseFloat(monthEntries[i - 1][1].totalValue);
 		const curr = parseFloat(monthEntries[i][1].totalValue);
-		if (prev > 0) returns.push(((curr / prev) - 1) * 100);
+		if (prev > 0) returns.push((curr / prev - 1) * 100);
 	}
 
 	let volatilityStr = 'N/A';

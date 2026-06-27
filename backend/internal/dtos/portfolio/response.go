@@ -209,6 +209,15 @@ func NewGrowthResponse(points []entities.PortfolioGrowthPoint, summary entities.
 	}
 }
 
+type PortfolioTopTransactionDTO struct {
+	Value           string    `json:"value"`
+	Type            string    `json:"type"`
+	Currency        string    `json:"currency"`
+	AssetTicker     string    `json:"assetTicker"`
+	AssetName       string    `json:"assetName"`
+	TransactionDate time.Time `json:"transactionDate"`
+}
+
 // NewPortfolioDetailResponse maps a portfolio entity (with its entries and
 // assets populated) into the detail response consumed by the frontend.
 func NewPortfolioDetailResponse(p entities.Portfolio) PortfolioDetailResponseDTO {

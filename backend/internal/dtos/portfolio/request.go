@@ -56,3 +56,11 @@ type CreateTransactionRequestDTO struct {
 	TransactionDate time.Time     `json:"transactionDate" validate:"required"`
 	Notes           string        `json:"notes"`
 }
+
+type UpdatePortfolioRequestDTO struct {
+	Name        string `json:"name,omitzero"`
+	Description string `json:"description,omitzero"`
+	Type        string `json:"type,omitzero"`
+	RiskID      string `json:"riskId,omitzero"`
+	IsDefault   bool   `json:"isDefault"`
+}

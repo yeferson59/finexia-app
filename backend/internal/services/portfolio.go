@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yeferson59/gofinance/money"
 
+	portfoliodto "github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"
 )
 
@@ -57,6 +58,14 @@ func (s *Services) CreatePortfolio(ctx context.Context, userID uuid.UUID, name s
 	}
 
 	return portfolio, nil
+}
+
+func (s *Services) GetPortfolioTopTransaction(ctx context.Context, userID, portfolioID uuid.UUID) (portfoliodto.PortfolioTopTransactionDTO, error) {
+	return s.repos.GetTopTransactionByPortfolioID(ctx, userID, portfolioID)
+}
+
+func (s *Services) UpdatePortfolio(ctx context.Context, userID, portfolioID uuid.UUID, name, description string, portfolioType entities.PortfolioType, riskID uuid.UUID, isDefault bool) (entities.Portfolio, error) {
+	return s.repos.UpdatePortfolio(ctx, userID, portfolioID, name, description, portfolioType, riskID, isDefault)
 }
 
 func (s *Services) CreatePlatform(ctx context.Context, userID uuid.UUID, sourceType entities.SourceType, name, description string) (entities.InvestmentSource, error) {

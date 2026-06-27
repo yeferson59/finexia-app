@@ -121,7 +121,10 @@ export const actions = {
 		}
 
 		if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-			return fail(400, { action: 'uploadAvatar', error: 'Solo se permiten imágenes JPEG, PNG o WebP' });
+			return fail(400, {
+				action: 'uploadAvatar',
+				error: 'Solo se permiten imágenes JPEG, PNG o WebP'
+			});
 		}
 
 		if (file.size > 5 * 1024 * 1024) {

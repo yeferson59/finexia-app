@@ -1,12 +1,64 @@
 <script lang="ts">
-	import type { PageProps } from './$types';
+	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { untrack } from 'svelte';
 	import Card from '$components/ui/card.svelte';
+	import type { PageProps } from './$types';
+
+	interface TopTransactionData {
+		value: string;
+		type: string;
+		currency: string;
+		assetTicker: string;
+		assetName: string;
+		transactionDate: string;
+	}
 
 	const { params, data }: PageProps = $props();
 
 	const portfolio = $derived(data.portfolio);
+	const risks = $derived(
+		(data as unknown as { risks: { id: string; name: string }[] }).risks ?? []
+	);
+	const topTransaction = $derived(
+		(data as unknown as { topTransaction: TopTransactionData | null }).topTransaction
+	);
+
+	let isEditing = $state(false);
+	let isSubmitting = $state(false);
+	let submitSuccess = $state(false);
+	let submitError = $state('');
+
+	let editName = $state('');
+	let editDescription = $state('');
+	let editType = $state('');
+	let editRiskId = $state('');
+	let editIsDefault = $state(false);
+
+	$effect(() => {
+		if (portfolio) {
+			untrack(() => {
+				editName = portfolio.name;
+				editDescription = portfolio.description ?? '';
+				editType = portfolio.type;
+				editRiskId = (portfolio as unknown as { riskId: string }).riskId ?? '';
+				editIsDefault = portfolio.isDefault;
+			});
+		}
+	});
+
+	const portfolioTypes = [
+		{ value: 'stocks_etfs', label: 'Acciones y ETF' },
+		{ value: 'stocks', label: 'Solo Acciones' },
+		{ value: 'etfs', label: 'Solo ETFs' },
+		{ value: 'cryptos', label: 'Criptomonedas' },
+		{ value: 'bonds', label: 'Bonos y Renta Fija' },
+		{ value: 'diversified', label: 'Portafolio Diverso' },
+		{ value: 'forex', label: 'Divisas y Forex' },
+		{ value: 'commodities', label: 'Commodities' },
+		{ value: 'cash', label: 'Efectivo' }
+	];
 
 	interface HoldingView {
 		symbol: string;
@@ -68,6 +120,12 @@
 	const totalGainLoss = $derived(totalValue - totalCost);
 	const totalGainLossPct = $derived(totalCost > 0 ? (totalGainLoss / totalCost) * 100 : 0);
 	const baseCurrency = $derived(portfolio?.baseCurrency?.trim() || 'USD');
+
+	const capitalPct = $derived(totalValue > 0 ? (totalCost / totalValue) * 100 : 0);
+	const gainPct = $derived(totalValue > 0 ? (totalGainLoss / totalValue) * 100 : 0);
+	const bestHolding = $derived(
+		holdings.length > 0 ? holdings.reduce((a, b) => (a.gainLossPct > b.gainLossPct ? a : b)) : null
+	);
 
 	function formatPct(value: number): string {
 		return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
@@ -164,21 +222,135 @@
 				{portfolio?.description || 'Visión detallada de posiciones y asignación.'}
 			</p>
 		</div>
-		<button onclick={addAsset} class="btn-add-asset">
-			<svg
-				width="18"
-				height="18"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
+		<div class="header-actions">
+			<button
+				onclick={() => (isEditing = !isEditing)}
+				class="btn-edit"
+				aria-label="Editar portafolio"
 			>
-				<path d="M12 5v14M5 12h14" />
-			</svg>
-			Agregar Activo
-		</button>
+				<svg
+					width="16"
+					height="16"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
+					<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+					<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+				</svg>
+				Editar
+			</button>
+			<button onclick={addAsset} class="btn-add-asset">
+				<svg
+					width="18"
+					height="18"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
+					<path d="M12 5v14M5 12h14" />
+				</svg>
+				Agregar Activo
+			</button>
+		</div>
 	</div>
 </header>
+
+{#if submitSuccess}
+	<div class="alert alert-success">Portafolio actualizado correctamente.</div>
+{/if}
+
+{#if submitError}
+	<div class="alert alert-error">{submitError}</div>
+{/if}
+
+{#if isEditing}
+	<Card variant="elevated" padding="sm">
+		<form
+			method="POST"
+			action="?/updatePortfolio"
+			class="edit-form"
+			use:enhance={() => {
+				isSubmitting = true;
+				submitError = '';
+				return async ({ result, update }) => {
+					if (result.type === 'success') {
+						submitSuccess = true;
+						isEditing = false;
+						setTimeout(() => (submitSuccess = false), 3000);
+					} else if (result.type === 'failure') {
+						submitError =
+							(result.data as { error?: string })?.error ?? 'Error al actualizar el portafolio.';
+					}
+					await update({ reset: false });
+					isSubmitting = false;
+				};
+			}}
+		>
+			<h3 class="edit-title">Editar portafolio</h3>
+
+			<div class="form-group">
+				<label for="edit-name">Nombre</label>
+				<input
+					id="edit-name"
+					name="name"
+					type="text"
+					bind:value={editName}
+					required
+					minlength="2"
+				/>
+			</div>
+
+			<div class="form-group">
+				<label for="edit-description">Descripción</label>
+				<textarea id="edit-description" name="description" rows="2" bind:value={editDescription}
+				></textarea>
+			</div>
+
+			<div class="form-row">
+				<div class="form-group">
+					<label for="edit-type">Tipo</label>
+					<select id="edit-type" name="type" bind:value={editType}>
+						{#each portfolioTypes as pt (pt.value)}
+							<option value={pt.value}>{pt.label}</option>
+						{/each}
+					</select>
+				</div>
+
+				<div class="form-group">
+					<label for="edit-risk">Nivel de riesgo</label>
+					<select id="edit-risk" name="riskId" bind:value={editRiskId}>
+						{#each risks as risk (risk.id)}
+							<option value={risk.id}>{risk.name}</option>
+						{/each}
+					</select>
+				</div>
+			</div>
+
+			<div class="form-check">
+				<input
+					id="edit-default"
+					name="isDefault"
+					type="checkbox"
+					bind:checked={editIsDefault}
+					value="true"
+				/>
+				<label for="edit-default">Portafolio por defecto</label>
+			</div>
+
+			<div class="form-actions">
+				<button type="button" class="btn-cancel" onclick={() => (isEditing = false)}
+					>Cancelar</button
+				>
+				<button type="submit" class="btn-save" disabled={isSubmitting}>
+					{isSubmitting ? 'Guardando…' : 'Guardar cambios'}
+				</button>
+			</div>
+		</form>
+	</Card>
+{/if}
 
 <section class="cards-grid">
 	<Card variant="elevated" padding="sm">
@@ -204,6 +376,81 @@
 			{holdings.length}
 			{holdings.length === 1 ? 'activo' : 'activos'}
 		</p>
+	</Card>
+</section>
+
+<section class="stats-grid">
+	<Card variant="elevated" padding="sm">
+		<p class="eyebrow">Capital invertido</p>
+		<h2 class="hero-value">{formatCurrency(totalCost)}</h2>
+		<div class="progress-track">
+			<div
+				class="progress-fill"
+				style="width: {totalValue > 0 ? Math.min((totalCost / totalValue) * 100, 100) : 0}%"
+			></div>
+		</div>
+		<p class="hero-delta">Valor actual: {formatCurrency(totalValue)}</p>
+	</Card>
+
+	<Card variant="elevated" padding="sm">
+		<p class="eyebrow">Composición del portafolio</p>
+		{#if totalValue > 0}
+			<div class="composition-bar">
+				<div
+					class="comp-segment comp-capital"
+					style="width: {Math.max(capitalPct, 0)}%"
+					title="Capital: {capitalPct.toFixed(1)}%"
+				></div>
+				<div
+					class="comp-segment {gainPct >= 0 ? 'comp-gain' : 'comp-loss'}"
+					style="width: {Math.abs(gainPct)}%"
+					title="Ganancia: {gainPct.toFixed(1)}%"
+				></div>
+			</div>
+			<p class="comp-labels">
+				<span class="comp-label-capital">{capitalPct.toFixed(1)}% capital</span>
+				<span class="comp-sep">·</span>
+				<span class={gainPct >= 0 ? 'comp-label-gain' : 'comp-label-loss'}
+					>{gainPct >= 0 ? '+' : ''}{gainPct.toFixed(1)}% {gainPct >= 0
+						? 'ganancia'
+						: 'pérdida'}</span
+				>
+			</p>
+		{:else}
+			<h2 class="hero-value">—</h2>
+			<p class="hero-delta">Sin datos suficientes</p>
+		{/if}
+	</Card>
+
+	<Card variant="elevated" padding="sm">
+		<p class="eyebrow">Mejor activo</p>
+		{#if bestHolding}
+			<h2 class="hero-value">{bestHolding.symbol}</h2>
+			<p class="hero-delta {bestHolding.gainLossPct >= 0 ? 'positive' : 'negative'}">
+				{formatPct(bestHolding.gainLossPct)} · {bestHolding.name}
+			</p>
+		{:else}
+			<h2 class="hero-value">—</h2>
+			<p class="hero-delta">Sin activos</p>
+		{/if}
+	</Card>
+
+	<Card variant="elevated" padding="sm">
+		<p class="eyebrow">Transacción más alta</p>
+		{#if topTransaction}
+			<h2 class="hero-value">{formatCurrency(parseFloat(topTransaction.value))}</h2>
+			<p class="hero-delta">
+				{topTransaction.assetTicker} · {topTransaction.type} ·
+				{new Date(topTransaction.transactionDate).toLocaleDateString('es-CO', {
+					year: 'numeric',
+					month: 'short',
+					day: 'numeric'
+				})}
+			</p>
+		{:else}
+			<h2 class="hero-value">—</h2>
+			<p class="hero-delta">Sin transacciones</p>
+		{/if}
 	</Card>
 </section>
 
@@ -409,6 +656,85 @@
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 1rem;
 		margin-bottom: 1.5rem;
+	}
+
+	.stats-grid {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 1rem;
+		margin-bottom: 1.5rem;
+	}
+
+	.progress-track {
+		height: 6px;
+		border-radius: 999px;
+		background: rgba(236, 234, 229, 0.1);
+		overflow: hidden;
+		margin: 0.6rem 0 0.5rem;
+	}
+
+	.progress-fill {
+		height: 100%;
+		border-radius: inherit;
+		background: var(--amber);
+		transition: width 0.4s ease;
+	}
+
+	.composition-bar {
+		display: flex;
+		height: 10px;
+		border-radius: 999px;
+		overflow: hidden;
+		background: rgba(236, 234, 229, 0.1);
+		gap: 2px;
+		margin: 0.6rem 0 0.5rem;
+	}
+
+	.comp-segment {
+		height: 100%;
+		border-radius: 999px;
+		min-width: 2px;
+		transition: width 0.4s ease;
+	}
+
+	.comp-capital {
+		background: var(--amber);
+	}
+
+	.comp-gain {
+		background: var(--green);
+	}
+
+	.comp-loss {
+		background: var(--red);
+	}
+
+	.comp-labels {
+		margin: 0;
+		font-size: 0.78rem;
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		flex-wrap: wrap;
+	}
+
+	.comp-sep {
+		color: rgba(236, 234, 229, 0.3);
+	}
+
+	.comp-label-capital {
+		color: var(--amber);
+		font-weight: 600;
+	}
+
+	.comp-label-gain {
+		color: var(--green);
+		font-weight: 600;
+	}
+
+	.comp-label-loss {
+		color: var(--red);
+		font-weight: 600;
 	}
 
 	.eyebrow {
@@ -631,13 +957,195 @@
 		transform: translateX(2px);
 	}
 
+	.header-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+	}
+
+	.btn-edit {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1.25rem;
+		border: 1px solid rgba(212, 145, 42, 0.4);
+		border-radius: 10px;
+		background: transparent;
+		color: var(--amber);
+		font-weight: 600;
+		font-family: var(--font-body);
+		font-size: 0.9rem;
+		cursor: pointer;
+		transition: all 0.3s ease;
+		white-space: nowrap;
+	}
+
+	.btn-edit:hover {
+		background: rgba(212, 145, 42, 0.12);
+		border-color: rgba(212, 145, 42, 0.7);
+	}
+
+	.alert {
+		margin-bottom: 1.25rem;
+		padding: 0.85rem 1.25rem;
+		border-radius: 10px;
+		font-size: 0.9rem;
+	}
+
+	.alert-success {
+		background: rgba(34, 197, 94, 0.12);
+		border: 1px solid rgba(34, 197, 94, 0.3);
+		color: var(--green);
+	}
+
+	.alert-error {
+		background: rgba(239, 68, 68, 0.12);
+		border: 1px solid rgba(239, 68, 68, 0.3);
+		color: var(--red);
+	}
+
+	.edit-form {
+		display: flex;
+		flex-direction: column;
+		gap: 1.25rem;
+	}
+
+	.edit-title {
+		margin: 0 0 0.25rem;
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--text);
+	}
+
+	.form-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.form-group label {
+		font-size: 0.8rem;
+		font-weight: 600;
+		letter-spacing: 0.4px;
+		text-transform: uppercase;
+		color: rgba(236, 234, 229, 0.55);
+	}
+
+	.form-group input,
+	.form-group textarea,
+	.form-group select {
+		padding: 0.7rem 0.9rem;
+		border: 1px solid rgba(212, 145, 42, 0.25);
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.04);
+		color: var(--text);
+		font-family: var(--font-body);
+		font-size: 0.9rem;
+		transition: border-color 0.2s ease;
+	}
+
+	.form-group input:focus,
+	.form-group textarea:focus,
+	.form-group select:focus {
+		outline: none;
+		border-color: rgba(212, 145, 42, 0.6);
+	}
+
+	.form-group textarea {
+		resize: vertical;
+	}
+
+	.form-group select option {
+		background: #1a1209;
+	}
+
+	.form-row {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem;
+	}
+
+	.form-check {
+		display: flex;
+		align-items: center;
+		gap: 0.65rem;
+	}
+
+	.form-check input[type='checkbox'] {
+		width: 16px;
+		height: 16px;
+		cursor: pointer;
+		accent-color: var(--amber);
+	}
+
+	.form-check label {
+		font-size: 0.9rem;
+		color: var(--text);
+		cursor: pointer;
+	}
+
+	.form-actions {
+		display: flex;
+		gap: 0.75rem;
+		justify-content: flex-end;
+		padding-top: 0.25rem;
+	}
+
+	.btn-cancel {
+		padding: 0.7rem 1.25rem;
+		border: 1px solid rgba(236, 234, 229, 0.2);
+		border-radius: 8px;
+		background: transparent;
+		color: rgba(236, 234, 229, 0.7);
+		font-family: var(--font-body);
+		font-size: 0.9rem;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.btn-cancel:hover {
+		border-color: rgba(236, 234, 229, 0.4);
+		color: var(--text);
+	}
+
+	.btn-save {
+		padding: 0.7rem 1.5rem;
+		border: none;
+		border-radius: 8px;
+		background: var(--amber);
+		color: #0d0800;
+		font-family: var(--font-body);
+		font-weight: 700;
+		font-size: 0.9rem;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.btn-save:hover:not(:disabled) {
+		box-shadow: 0 6px 18px rgba(212, 145, 42, 0.3);
+	}
+
+	.btn-save:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
 	@media (max-width: 1024px) {
 		.cards-grid {
 			grid-template-columns: 1fr;
 		}
+
+		.stats-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
 	}
 
 	@media (max-width: 768px) {
+		.stats-grid {
+			grid-template-columns: 1fr;
+		}
+
 		.page-title {
 			font-size: 1.85rem;
 		}

@@ -94,6 +94,59 @@ func (h *Handlers) CreatePortfolio(c fiber.Ctx) error {
 	return h.responseStatusOk(c, "Portfolio created", "Portfolio created successfully", portfolio)
 }
 
+func (h *Handlers) GetPortfolioTopTransaction(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	portfolioID, err := h.getParamUUID(c, "id")
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid portfolio ID", err.Error())
+	}
+
+	dto, err := h.services.GetPortfolioTopTransaction(h.ctx, userID, portfolioID)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error retrieving top transaction", "Could not retrieve top transaction")
+	}
+
+	return h.responseStatusOk(c, "Top transaction retrieved", "Top transaction retrieved successfully", dto)
+}
+
+func (h *Handlers) UpdatePortfolio(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	portfolioID, err := h.getParamUUID(c, "id")
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid portfolio ID", err.Error())
+	}
+
+	var req portfolio.UpdatePortfolioRequestDTO
+	if err := c.Bind().JSON(&req); err != nil {
+		return h.responseBadRequest(c, "Invalid request", err.Error())
+	}
+
+	portfolioType := entities.PortfolioType(req.Type)
+	if req.Type != "" && !portfolioType.IsValid() {
+		return h.responseBadRequest(c, "Invalid portfolio type", "Portfolio type must be one of the supported values")
+	}
+
+	riskID, err := uuid.Parse(req.RiskID)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid risk ID", err.Error())
+	}
+
+	updated, err := h.services.UpdatePortfolio(h.ctx, userID, portfolioID, req.Name, req.Description, portfolioType, riskID, req.IsDefault)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error updating portfolio", "Could not update portfolio")
+	}
+
+	return h.responseStatusOk(c, "Portfolio updated", "Portfolio updated successfully", updated)
+}
+
 func (h *Handlers) CreatePlatform(c fiber.Ctx) error {
 	userID, _, _, err := h.getUserIDTokenRole(c)
 	if err != nil {

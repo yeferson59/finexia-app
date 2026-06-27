@@ -159,12 +159,11 @@ func (handler *Handlers) UploadAvatar(c fiber.Ctx) error {
 		"image/png":  ".png",
 		"image/webp": ".webp",
 	}
-	ext, ok := allowed[strings.ToLower(contentType)]
+	_, ok := allowed[strings.ToLower(contentType)]
 	if !ok {
-		ext = strings.ToLower(filepath.Ext(fileHeader.Filename))
+		ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
 		switch ext {
 		case ".jpg", ".jpeg":
-			ext = ".jpg"
 			contentType = "image/jpeg"
 		case ".png":
 			contentType = "image/png"
@@ -179,7 +178,7 @@ func (handler *Handlers) UploadAvatar(c fiber.Ctx) error {
 	if err != nil {
 		return handler.responseInternalServerError(c, "File open error", err.Error())
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var buf bytes.Buffer
 	if _, err := buf.ReadFrom(f); err != nil {
@@ -237,7 +236,7 @@ func (handler *Handlers) GetUserAvatar(c fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).SendString("avatar not found")
 	}
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 
 	c.Set("Content-Type", contentType)
 	c.Set("Cache-Control", "public, max-age=86400")

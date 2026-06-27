@@ -38,7 +38,10 @@ export const actions = {
 		const { data, success, message } = await response.json();
 
 		if (!success) {
-			return fail(400, { type: 'login' as const, errors: { server: message || 'Error al iniciar sesión' } });
+			return fail(400, {
+				type: 'login' as const,
+				errors: { server: message || 'Error al iniciar sesión' }
+			});
 		}
 
 		cookies.set('access_token_finexia', data.accessToken, {

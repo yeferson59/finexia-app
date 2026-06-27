@@ -24,6 +24,8 @@ func (r *Routes) Portfolios() {
 	portfolios.Get("/export/summary", r.handlers.ExportSummary)
 	portfolios.Get("/export/transactions", r.handlers.ExportTransactions)
 	portfolios.Get("/export/risk", r.handlers.ExportRiskMetrics)
-	// Parametric route registered last so it doesn't shadow the static ones above.
+	// Parametric routes registered last so they don't shadow the static ones above.
+	portfolios.Patch("/:id", r.handlers.UpdatePortfolio)
+	portfolios.Get("/:id/top-transaction", r.handlers.GetPortfolioTopTransaction)
 	portfolios.Get("/:id", r.handlers.GetPortfolio)
 }
