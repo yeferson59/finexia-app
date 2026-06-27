@@ -95,6 +95,10 @@ func (s *Services) GetAssets(ctx context.Context, offset, limit uint) ([]entitie
 	return s.repos.GetAssets(ctx, offset, limit)
 }
 
+func (s *Services) CreateAsset(ctx context.Context, ticker, name string, assetType entities.AssetType, exchange, currency string) (entities.Asset, error) {
+	return s.repos.UpsertAsset(ctx, ticker, name, assetType, exchange, currency)
+}
+
 func (s *Services) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, price money.Money) (entities.Asset, error) {
 	return s.repos.UpdateAssetPrice(ctx, assetID, price)
 }

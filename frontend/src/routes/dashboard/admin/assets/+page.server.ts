@@ -24,6 +24,36 @@ export const load: PageServerLoad = async ({ cookies, fetch }) => {
 };
 
 export const actions = {
+	createAsset: async ({ request, cookies, fetch }) => {
+		const fd = await request.formData();
+		const ticker = (fd.get('ticker') as string | null)?.trim().toUpperCase();
+		const name = (fd.get('name') as string | null)?.trim();
+		const assetType = fd.get('assetType') as string | null;
+		const exchange = (fd.get('exchange') as string | null)?.trim() ?? '';
+		const currency = (fd.get('currency') as string | null)?.trim().toUpperCase();
+
+		if (!ticker || !name || !assetType || !currency) {
+			return fail(400, { createError: 'Ticker, nombre, tipo y moneda son requeridos' });
+		}
+
+		const res = await authedFetch(
+			{ cookies, fetch },
+			'/assets',
+			{
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ticker, name, assetType, exchange, currency })
+			}
+		);
+
+		if (!res.ok) {
+			const body = await res.json().catch(() => ({}));
+			return fail(res.status, { createError: body.details ?? 'No se pudo crear el activo' });
+		}
+
+		return { createSuccess: true };
+	},
+
 	syncPrices: async ({ cookies, fetch }) => {
 		const res = await authedFetch({ cookies, fetch }, '/assets/sync', { method: 'POST' });
 		if (!res.ok) {

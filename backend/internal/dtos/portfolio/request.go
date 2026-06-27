@@ -34,6 +34,14 @@ type UpdateAssetPriceRequestDTO struct {
 	Price money.Money `json:"price" validate:"required"`
 }
 
+type CreateAssetRequestDTO struct {
+	Ticker    string `json:"ticker"    validate:"required"`
+	Name      string `json:"name"      validate:"required"`
+	AssetType string `json:"assetType" validate:"required"`
+	Exchange  string `json:"exchange"`
+	Currency  string `json:"currency"  validate:"required"`
+}
+
 type CreatePortfolioEntryRequestDTO struct {
 	PortfolioID     uuid.UUID     `json:"portfolioId" validate:"required"`
 	AssetID         uuid.UUID     `json:"assetId" validate:"required"`
