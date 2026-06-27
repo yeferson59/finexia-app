@@ -32,6 +32,7 @@
 		position: relative;
 		display: flex;
 		min-height: 100dvh;
+		overflow-x: hidden;
 		background:
 			radial-gradient(ellipse 80% 50% at 70% -10%, rgba(212, 145, 42, 0.06), transparent 60%),
 			var(--bg);

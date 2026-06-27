@@ -59,7 +59,7 @@
 
 	.content-grid {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 		gap: 2rem;
 	}
 
@@ -103,7 +103,7 @@
 
 	@media (max-width: 1024px) {
 		.content-grid {
-			grid-template-columns: 1fr;
+			grid-template-columns: minmax(0, 1fr);
 		}
 	}
 </style>

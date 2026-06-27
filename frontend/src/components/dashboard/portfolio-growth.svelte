@@ -330,7 +330,7 @@
 
 	.metrics-row {
 		display: grid;
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 1.5rem;
 		margin-bottom: 1.5rem;
 		padding-bottom: 1.5rem;
@@ -383,7 +383,7 @@
 
 	@media (max-width: 600px) {
 		.metrics-row {
-			grid-template-columns: repeat(2, 1fr);
+			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
 
 		.card-top {
