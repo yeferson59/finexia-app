@@ -20,7 +20,7 @@
 	let {
 		variant = 'primary',
 		size = 'md',
-		type = 'button',
+		type = 'submit',
 		disabled = false,
 		loading = false,
 		fullWidth = false,

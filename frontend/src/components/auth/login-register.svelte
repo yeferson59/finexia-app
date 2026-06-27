@@ -286,7 +286,7 @@
 							<p class="error-server" role="alert">{loginErrors['server']}</p>
 						{/if}
 
-						<Button variant="primary" size="lg" loading={isSubmitting} fullWidth>
+						<Button type="submit" variant="primary" size="lg" loading={isSubmitting} fullWidth>
 							{isSubmitting ? 'Iniciando sesión...' : 'Iniciar sesión'}
 						</Button>
 
@@ -415,7 +415,7 @@
 							<p class="error-server" role="alert">{registerErrors['server']}</p>
 						{/if}
 
-						<Button variant="primary" size="lg" loading={isSubmitting} fullWidth>
+						<Button type="submit" variant="primary" size="lg" loading={isSubmitting} fullWidth>
 							{isSubmitting ? 'Creando cuenta...' : 'Crear cuenta'}
 						</Button>
 
