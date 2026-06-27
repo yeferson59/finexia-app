@@ -91,13 +91,13 @@ func (s *Services) UpdateUserPreferences(ctx context.Context, userID uuid.UUID, 
 	return s.repos.UpsertUserPreferences(ctx, userID, emailAlerts, weeklySummary)
 }
 
-func (s *Services) UploadAvatarToS3(ctx context.Context, userID uuid.UUID, file io.Reader, contentType, ext string) (entities.User, error) {
+func (s *Services) UploadAvatarToS3(ctx context.Context, userID uuid.UUID, file io.Reader, contentType string) (entities.User, error) {
 	data, err := io.ReadAll(file)
 	if err != nil {
 		return entities.User{}, errors.New("failed to read file")
 	}
 
-	key := fmt.Sprintf("avatars/%s/avatar%s", userID.String(), ext)
+	key := fmt.Sprintf("avatars/%s/avatar", userID.String())
 
 	_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(s.cfg.AWSS3BucketName),
@@ -109,14 +109,23 @@ func (s *Services) UploadAvatarToS3(ctx context.Context, userID uuid.UUID, file 
 		return entities.User{}, fmt.Errorf("failed to upload to S3: %w", err)
 	}
 
-	var imageURL string
-	if s.cfg.AWSEndpointURL != "" {
-		imageURL = fmt.Sprintf("%s/%s/%s", s.cfg.AWSEndpointURL, s.cfg.AWSS3BucketName, key)
-	} else {
-		imageURL = fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", s.cfg.AWSS3BucketName, s.cfg.AWSDefaultRegion, key)
-	}
+	imageURL := fmt.Sprintf("%s/users/%s/avatar", s.cfg.PublicURL, userID.String())
 
 	return s.repos.UpdateUserImage(ctx, userID, imageURL)
+}
+
+func (s *Services) GetAvatarFromS3(ctx context.Context, userID uuid.UUID) (io.ReadCloser, string, error) {
+	key := fmt.Sprintf("avatars/%s/avatar", userID.String())
+
+	result, err := s.s3Client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.cfg.AWSS3BucketName),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
+	return result.Body, aws.ToString(result.ContentType), nil
 }
 
 func (s *Services) ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword, newPassword string) error {

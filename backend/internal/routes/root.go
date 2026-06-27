@@ -36,6 +36,7 @@ func (r *Routes) Init() {
 	r.Health()
 	r.Auth()
 	r.Marketing()
+	r.app.Get("/users/:id/avatar", r.handlers.GetUserAvatar)
 
 	r.router = r.app.Use(r.middlewares.Session(), r.middlewares.JWT(), r.middlewares.UserLimiter())
 	r.Users()

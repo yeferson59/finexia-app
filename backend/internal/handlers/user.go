@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"io"
 	"path/filepath"
 	"strings"
 
@@ -185,7 +186,7 @@ func (handler *Handlers) UploadAvatar(c fiber.Ctx) error {
 		return handler.responseInternalServerError(c, "File read error", err.Error())
 	}
 
-	u, err := handler.services.UploadAvatarToS3(handler.ctx, userID, &buf, contentType, ext)
+	u, err := handler.services.UploadAvatarToS3(handler.ctx, userID, &buf, contentType)
 	if err != nil {
 		return handler.responseInternalServerError(c, "Upload failed", err.Error())
 	}
@@ -224,6 +225,24 @@ func (handler *Handlers) UpdateMyPreferences(c fiber.Ctx) error {
 	}
 
 	return handler.responseStatusOk(c, "Preferences updated", "Preferences updated successfully", prefs)
+}
+
+func (handler *Handlers) GetUserAvatar(c fiber.Ctx) error {
+	userID, err := handler.getParamUUID(c, "id")
+	if err != nil {
+		return handler.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	body, contentType, err := handler.services.GetAvatarFromS3(handler.ctx, userID)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).SendString("avatar not found")
+	}
+	defer body.Close()
+
+	c.Set("Content-Type", contentType)
+	c.Set("Cache-Control", "public, max-age=86400")
+	_, err = io.Copy(c.Response().BodyWriter(), body)
+	return err
 }
 
 func (handler *Handlers) ChangeMyPassword(c fiber.Ctx) error {
