@@ -22,6 +22,7 @@
 
 	let syncing = $state(false);
 	let updatingId = $state<string | null>(null);
+	let syncingAssetId = $state<string | null>(null);
 	let creating = $state(false);
 	let showCreateForm = $state(false);
 	let syncMessage = $state<string | null>(null);
@@ -45,6 +46,10 @@
 			showCreateForm = false;
 			createMessage = 'Activo creado correctamente.';
 			setTimeout(() => (createMessage = null), 4000);
+		}
+		if (form?.syncAssetSuccess) {
+			syncMessage = `Precio de activo actualizado.`;
+			setTimeout(() => (syncMessage = null), 4000);
 		}
 	});
 
@@ -184,6 +189,7 @@
 						<th>Precio actual</th>
 						<th>Actualizado</th>
 						<th>Nuevo precio</th>
+						<th></th>
 					</tr>
 				</thead>
 				<tbody>
@@ -191,7 +197,9 @@
 						{@const isUpdating = updatingId === asset.id}
 						{@const hasUpdateError = form?.updateError && form?.errorId === asset.id}
 						{@const hasUpdateSuccess = form?.updateSuccess && form?.updatedId === asset.id}
-						<tr class:row-success={hasUpdateSuccess}>
+						{@const hasSyncError = form?.syncAssetError && form?.syncAssetId === asset.id}
+						{@const isSyncingThis = syncingAssetId === asset.id}
+						<tr class:row-success={hasUpdateSuccess || (form?.syncAssetSuccess && form?.syncAssetId === asset.id)}>
 							<td class="cell-ticker">{asset.ticker}</td>
 							<td class="cell-name">{asset.name}</td>
 							<td>
@@ -231,6 +239,32 @@
 									</div>
 									{#if hasUpdateError}
 										<p class="row-error">{form.updateError}</p>
+									{/if}
+								</form>
+							</td>
+							<td class="cell-sync">
+								<form
+									method="POST"
+									action="?/syncAsset"
+									use:enhance={() => {
+										syncingAssetId = asset.id;
+										return async ({ update }) => {
+											syncingAssetId = null;
+											await update({ reset: false });
+										};
+									}}
+								>
+									<input type="hidden" name="id" value={asset.id} />
+									<Button type="submit" size="sm" variant="ghost" loading={isSyncingThis}>
+										<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+											<polyline points="23 4 23 10 17 10"></polyline>
+											<polyline points="1 20 1 14 7 14"></polyline>
+											<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+										</svg>
+										Sync
+									</Button>
+									{#if hasSyncError}
+										<p class="row-error">{form.syncAssetError}</p>
 									{/if}
 								</form>
 							</td>
@@ -329,6 +363,10 @@
 
 	.cell-update {
 		min-width: 160px;
+	}
+
+	.cell-sync {
+		white-space: nowrap;
 	}
 
 	.update-row {

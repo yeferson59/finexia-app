@@ -19,6 +19,20 @@ func (h *Handlers) SyncAssetPrices(c fiber.Ctx) error {
 	return h.responseStatusOk(c, "Asset prices synced", "", assets)
 }
 
+func (h *Handlers) SyncSingleAsset(c fiber.Ctx) error {
+	assetID, err := h.getParamUUID(c, "id")
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid asset ID", err.Error())
+	}
+
+	asset, err := h.services.SyncAssetByID(h.ctx, assetID)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Asset sync failed", err.Error())
+	}
+
+	return h.responseStatusOk(c, "Asset price synced", "", asset)
+}
+
 func (h *Handlers) CreateAsset(c fiber.Ctx) error {
 	var req portfolio.CreateAssetRequestDTO
 	if err := c.Bind().JSON(&req); err != nil {

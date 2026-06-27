@@ -474,6 +474,24 @@ func (r *Repository) GetPortfolioEntries(ctx context.Context, sourceID uuid.UUID
 	return portfolioEntries, nil
 }
 
+func (r *Repository) GetAssetByID(ctx context.Context, assetID uuid.UUID) (entities.Asset, error) {
+	var asset entities.Asset
+	err := r.db.QueryRow(ctx, `
+		SELECT id, ticker, name, asset_type, COALESCE(exchange, ''), currency, current_price, price_updated_at, created_at, updated_at
+		FROM assets WHERE id = $1
+	`, assetID).Scan(
+		&asset.ID, &asset.Ticker, &asset.Name, &asset.AssetType, &asset.Exchange,
+		&asset.Currency, &asset.CurrentPrice, &asset.PriceUpdatedAt, &asset.CreatedAt, &asset.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entities.Asset{}, errors.New("asset not found")
+		}
+		return entities.Asset{}, err
+	}
+	return asset, nil
+}
+
 func (r *Repository) GetAssets(ctx context.Context, offset, limit uint) ([]entities.Asset, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, ticker, name, asset_type, COALESCE(exchange, ''), currency, current_price, price_updated_at, created_at, updated_at
