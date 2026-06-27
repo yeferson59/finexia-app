@@ -8,7 +8,6 @@ import (
 
 	"github.com/yeferson59/gofinance/money"
 
-	"github.com/yeferson59/finexia-app/internal/alphavantage"
 	"github.com/yeferson59/finexia-app/internal/entities"
 	"github.com/yeferson59/finexia-app/internal/logger"
 )
@@ -40,7 +39,6 @@ var defaultAssets = []defaultAsset{
 
 func (s *Services) SyncAssetPrices(ctx context.Context) ([]entities.Asset, []error) {
 	log := s.log.With(logger.Str("job", "asset_price_sync"))
-	client := alphavantage.New(s.cfg.AlphaVantageAPIKey)
 
 	var errs []error
 
@@ -72,7 +70,7 @@ func (s *Services) SyncAssetPrices(ctx context.Context) ([]entities.Asset, []err
 				}
 			}
 
-			result, err := client.FetchGlobalQuote(ctx, asset.Ticker)
+			result, err := s.priceProvider.FetchQuote(ctx, asset.Ticker)
 			apiCallMade = true
 			if err != nil {
 				log.Error("fetch global quote failed", logger.Err(err), logger.Str("ticker", asset.Ticker))
@@ -98,7 +96,7 @@ func (s *Services) SyncAssetPrices(ctx context.Context) ([]entities.Asset, []err
 				}
 			}
 
-			result, err := client.FetchExchangeRate(ctx, parts[0], parts[1])
+			result, err := s.priceProvider.FetchExchangeRate(ctx, parts[0], parts[1])
 			apiCallMade = true
 			if err != nil {
 				log.Error("fetch exchange rate failed", logger.Err(err), logger.Str("ticker", asset.Ticker))

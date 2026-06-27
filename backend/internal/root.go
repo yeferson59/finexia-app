@@ -9,6 +9,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/yeferson59/finexia-app/internal/alphavantage"
 	"github.com/yeferson59/finexia-app/internal/config"
 	"github.com/yeferson59/finexia-app/internal/handlers"
 	"github.com/yeferson59/finexia-app/internal/logger"
@@ -48,7 +49,8 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	})
 
 	repos := repositories.New(b.db)
-	services := services.New(repos, b.envs, b.s3Client, b.storage, b.mailService, rootLog)
+	priceProvider := alphavantage.New(b.envs.AlphaVantageAPIKey)
+	services := services.New(repos, b.envs, b.s3Client, b.storage, b.mailService, rootLog, priceProvider)
 	handlers, middlewares := handlers.New(ctx, services, b.envs), middlewares.New(ctx, b.envs, b.storage, services)
 	routes := routes.New(b.app, middlewares, handlers)
 

@@ -7,25 +7,28 @@ import (
 	"github.com/yeferson59/finexia-app/internal/config"
 	"github.com/yeferson59/finexia-app/internal/logger"
 	"github.com/yeferson59/finexia-app/internal/mail"
+	"github.com/yeferson59/finexia-app/internal/prices"
 	"github.com/yeferson59/finexia-app/internal/repositories"
 )
 
 type Services struct {
-	repos    repositories.Repository
-	cfg      *config.Env
-	s3Client *s3.Client
-	storage  fiber.Storage
-	mail     *mail.Service
-	log      logger.Logger
+	repos         repositories.Repository
+	cfg           *config.Env
+	s3Client      *s3.Client
+	storage       fiber.Storage
+	mail          *mail.Service
+	log           logger.Logger
+	priceProvider prices.Provider
 }
 
-func New(repos repositories.Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.Storage, mailService *mail.Service, log logger.Logger) Services {
+func New(repos repositories.Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.Storage, mailService *mail.Service, log logger.Logger, priceProvider prices.Provider) Services {
 	return Services{
-		repos:    repos,
-		cfg:      cfg,
-		s3Client: s3Client,
-		storage:  storage,
-		mail:     mailService,
-		log:      log,
+		repos:         repos,
+		cfg:           cfg,
+		s3Client:      s3Client,
+		storage:       storage,
+		mail:          mailService,
+		log:           log,
+		priceProvider: priceProvider,
 	}
 }
