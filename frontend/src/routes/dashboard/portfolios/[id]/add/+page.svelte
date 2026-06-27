@@ -215,6 +215,7 @@
 							placeholder="1000"
 							class="form-input"
 							min="0"
+							step="any"
 							required
 						/>
 					</div>
