@@ -11,6 +11,9 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal/alphavantage"
 	"github.com/yeferson59/finexia-app/internal/config"
+	"github.com/yeferson59/finexia-app/internal/finnhub"
+	"github.com/yeferson59/finexia-app/internal/prices"
+	"github.com/yeferson59/finexia-app/internal/yahoo"
 	"github.com/yeferson59/finexia-app/internal/handlers"
 	"github.com/yeferson59/finexia-app/internal/logger"
 	"github.com/yeferson59/finexia-app/internal/mail"
@@ -49,7 +52,11 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	})
 
 	repos := repositories.New(b.db)
-	priceProvider := alphavantage.New(b.envs.AlphaVantageAPIKey)
+	priceProvider := prices.NewFallback(
+		alphavantage.New(b.envs.AlphaVantageAPIKey),
+		finnhub.New(b.envs.FinnhubAPIKey),
+		yahoo.New(),
+	)
 	services := services.New(repos, b.envs, b.s3Client, b.storage, b.mailService, rootLog, priceProvider)
 	handlers, middlewares := handlers.New(ctx, services, b.envs), middlewares.New(ctx, b.envs, b.storage, services)
 	routes := routes.New(b.app, middlewares, handlers)
