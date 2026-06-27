@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import { features } from '$/config/features';
 
 	interface Props {
 		sidebarOpen?: boolean;
@@ -12,7 +13,10 @@
 	const menuItems = [
 		{ label: 'Dashboard', icon: 'dashboard', href: resolve('/dashboard') },
 		{ label: 'Portafolios', icon: 'briefcase', href: resolve('/dashboard/portfolios') },
-		{ label: 'Inversiones', icon: 'trending-up', href: resolve('/dashboard/investments') },
+		// "Inversiones" is hidden until the investments feature flag is enabled.
+		...(features.investments
+			? [{ label: 'Inversiones', icon: 'trending-up', href: resolve('/dashboard/investments') }]
+			: []),
 		{ label: 'Plataformas', icon: 'layers', href: resolve('/dashboard/platforms') },
 		{ label: 'Transacciones', icon: 'exchange', href: resolve('/dashboard/transactions') },
 		{ label: 'Reportes', icon: 'bar-chart', href: resolve('/dashboard/reports') },
