@@ -131,6 +131,10 @@
 		if (!file) return;
 		if (avatarPreview) URL.revokeObjectURL(avatarPreview);
 		const compressed = await compressImageForAvatar(file);
+		// Replace input.files so the form submission sends the compressed file
+		const dt = new DataTransfer();
+		dt.items.add(compressed);
+		input.files = dt.files;
 		avatarFile = compressed;
 		avatarPreview = URL.createObjectURL(compressed);
 	}
