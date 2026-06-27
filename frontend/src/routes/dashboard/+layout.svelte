@@ -11,7 +11,7 @@
 <div class="dashboard-container">
 	<div class="dashboard-scanlines" aria-hidden="true"></div>
 	<DashboardHeader bind:sidebarOpen {data} />
-	<Sidebar {sidebarOpen} />
+	<Sidebar {sidebarOpen} user={data.user} />
 	{#if sidebarOpen}
 		<button
 			class="sidebar-backdrop"

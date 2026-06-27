@@ -5,8 +5,8 @@ import "github.com/gofiber/fiber/v3/middleware/paginate"
 func (r *Routes) Users() {
 	users := r.router.Group("/users")
 
-	users.Get("", paginate.New(), r.handlers.GetListUsers)
-	users.Post("", r.handlers.CreateUser)
+	users.Get("", r.middlewares.RequireAdmin(), paginate.New(), r.handlers.GetListUsers)
+	users.Post("", r.middlewares.RequireAdmin(), r.handlers.CreateUser)
 
 	// Self-service routes — must be registered before /:id to avoid shadowing.
 	users.Get("/me", r.handlers.GetMe)
@@ -16,7 +16,7 @@ func (r *Routes) Users() {
 	users.Patch("/me/preferences", r.handlers.UpdateMyPreferences)
 	users.Patch("/me/password", r.handlers.ChangeMyPassword)
 
-	users.Get("/:id", r.handlers.GetUserByID)
-	users.Patch("/:id", r.handlers.UpdateUser)
-	users.Delete("/:id", r.handlers.DeleteUser)
+	users.Get("/:id", r.middlewares.RequireAdmin(), r.handlers.GetUserByID)
+	users.Patch("/:id", r.middlewares.RequireAdmin(), r.handlers.UpdateUser)
+	users.Delete("/:id", r.middlewares.RequireAdmin(), r.handlers.DeleteUser)
 }

@@ -6,9 +6,10 @@
 
 	interface Props {
 		sidebarOpen?: boolean;
+		user?: { role: string } | null;
 	}
 
-	let { sidebarOpen = false }: Props = $props();
+	let { sidebarOpen = false, user }: Props = $props();
 
 	const menuItems = [
 		{ label: 'Dashboard', icon: 'dashboard', href: resolve('/dashboard') },
@@ -24,8 +25,19 @@
 		{ label: 'Configuración', icon: 'settings', href: resolve('/dashboard/settings') }
 	];
 
+	const adminItems = $derived(
+		user?.role === 'admin'
+			? [
+					{ label: 'Panel Admin', icon: 'shield', href: resolve('/dashboard/admin') },
+					{ label: 'Usuarios', icon: 'users', href: resolve('/dashboard/admin/users') },
+					{ label: 'Activos', icon: 'database', href: resolve('/dashboard/admin/assets') }
+				]
+			: []
+	);
+
 	function isActive(href: string): boolean {
-		return href === '/dashboard' ? page.url.pathname === href : page.url.pathname.startsWith(href);
+		if (href === resolve('/dashboard')) return page.url.pathname === href;
+		return page.url.pathname.startsWith(href);
 	}
 </script>
 
@@ -149,6 +161,41 @@
 		</ul>
 	</nav>
 
+	{#if adminItems.length > 0}
+		<nav class="sidebar-nav admin-nav" aria-label="Administración">
+			<h3 class="nav-title">Administración</h3>
+			<ul class="nav-list">
+				{#each adminItems as item (item.href)}
+					<li>
+						<a href={item.href} class="nav-link" class:active={isActive(item.href)}>
+							<span class="nav-icon">
+								{#if item.icon === 'shield'}
+									<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+										<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+									</svg>
+								{:else if item.icon === 'users'}
+									<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+										<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+										<circle cx="9" cy="7" r="4"></circle>
+										<path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+										<path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+									</svg>
+								{:else}
+									<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+										<ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+										<path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+										<path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+									</svg>
+								{/if}
+							</span>
+							<span class="nav-label">{item.label}</span>
+						</a>
+					</li>
+				{/each}
+			</ul>
+		</nav>
+	{/if}
+
 	<div class="sidebar-footer">
 		<form action="?/logout" method="POST" use:enhance>
 			<button class="sidebar-button secondary">
@@ -262,6 +309,12 @@
 
 	.nav-label {
 		flex: 1;
+	}
+
+	.admin-nav {
+		border-top: 1px solid var(--border);
+		padding-top: 1.25rem;
+		margin-top: 0.5rem;
 	}
 
 	.sidebar-footer {
