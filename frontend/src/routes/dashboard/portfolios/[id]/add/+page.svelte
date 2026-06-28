@@ -252,9 +252,23 @@
 									class:selected={asset.id === formData.assetId}
 									onmousedown={() => selectAsset(asset)}
 								>
-									<span class="option-ticker">{asset.ticker}</span>
-									<span class="option-name">{asset.name}</span>
-									<span class="option-type">{asset.assetType}</span>
+									<div class="option-left">
+										<span class="option-ticker">{asset.ticker}</span>
+										<span class="option-type">{asset.assetType}</span>
+									</div>
+									<div class="option-right">
+										<span class="option-name">{asset.name}</span>
+										{#if asset.exchange || asset.currency}
+											<span class="option-meta">
+												{[asset.exchange, asset.currency].filter(Boolean).join(' · ')}
+											</span>
+										{/if}
+									</div>
+									{#if asset.currentPrice}
+										<span class="option-price">
+											{new Intl.NumberFormat('en-US', { style: 'currency', currency: asset.currency && asset.currency !== 'XXX' ? asset.currency : 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(parseFloat(asset.currentPrice.value))}
+										</span>
+									{/if}
 								</li>
 							{/each}
 						</ul>
@@ -914,10 +928,11 @@
 	}
 
 	.combobox-option {
-		display: flex;
-		align-items: baseline;
-		gap: 0.6rem;
-		padding: 0.6rem 1rem;
+		display: grid;
+		grid-template-columns: 100px 1fr auto;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.65rem 1rem;
 		cursor: pointer;
 		transition: background 0.15s ease;
 	}
@@ -927,28 +942,60 @@
 		background: rgba(212, 145, 42, 0.1);
 	}
 
+	.option-left {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		min-width: 0;
+	}
+
 	.option-ticker {
 		font-family: var(--font-mono);
 		font-weight: 700;
-		font-size: 0.9rem;
+		font-size: 0.92rem;
 		color: var(--amber);
-		min-width: 70px;
-	}
-
-	.option-name {
-		font-size: 0.88rem;
-		color: var(--text);
-		flex: 1;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 
 	.option-type {
-		font-size: 0.75rem;
+		font-size: 0.68rem;
 		color: rgba(236, 234, 229, 0.4);
 		text-transform: uppercase;
-		letter-spacing: 0.3px;
+		letter-spacing: 0.5px;
+		font-weight: 600;
+	}
+
+	.option-right {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		min-width: 0;
+	}
+
+	.option-name {
+		font-size: 0.88rem;
+		color: var(--text);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.option-meta {
+		font-size: 0.75rem;
+		color: rgba(236, 234, 229, 0.4);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.option-price {
+		font-family: var(--font-mono);
+		font-size: 0.82rem;
+		color: rgba(212, 145, 42, 0.7);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
 		flex-shrink: 0;
 	}
 
