@@ -105,7 +105,7 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 const txnSchema = z.object({
 	type: z.string().min(1),
 	quantity: z.coerce.number().positive(),
-	price: z.coerce.number().positive(),
+	price: z.coerce.number().min(0),
 	currency: z.string().default('USD'),
 	fees: z.coerce.number().min(0).default(0),
 	transactionDate: z.coerce.date(),
@@ -182,7 +182,7 @@ export const actions: Actions = {
 			});
 
 		if (!success) {
-			return { success: false, error: error.message };
+			return { success: false, edited: true, error: error.message };
 		}
 
 		const response = await fetch(`${env.BASE_API}/portfolios/transactions/${data.txnId}`, {
@@ -203,7 +203,7 @@ export const actions: Actions = {
 		});
 
 		if (!response.ok) {
-			return { success: false };
+			return { success: false, edited: true };
 		}
 
 		const json = await response.json();

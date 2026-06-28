@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { enhance } from '$app/forms';
 	import DatePicker from '$components/ui/date-picker.svelte';
@@ -19,7 +19,7 @@
 	let formError = $derived(form?.success === false);
 
 	$effect(() => {
-		if (form?.success === true) {
+		if (form?.success === true && !form?.edited) {
 			showAddForm = false;
 			sellFromTxn = null;
 			goto(
@@ -112,6 +112,7 @@
 	$effect(() => {
 		if (form?.edited === true && form?.success === true && editingTxn !== null) {
 			editingTxn = null;
+			invalidateAll();
 		}
 		if (form?.edited === true && form?.success === false && editingTxn !== null) {
 			editError = true;
