@@ -462,3 +462,48 @@ func (h *Handlers) GetPortfolioGrowth(c fiber.Ctx) error {
 	return h.responseStatusOk(c, "Portfolio growth retrieved", "Portfolio growth retrieved successfully",
 		portfolio.NewGrowthResponse(points, summary))
 }
+
+func (h *Handlers) GetAssetTransactions(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	portfolioID, err := h.getParamUUID(c, "id")
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid portfolio ID", err.Error())
+	}
+
+	ticker := strings.TrimSpace(c.Params("symbol"))
+	if ticker == "" {
+		return h.responseBadRequest(c, "Invalid symbol", "symbol path parameter is required")
+	}
+
+	paginateInfo, ok := paginate.FromContext(c)
+	if !ok {
+		return h.responseInternalServerError(c, "", "paginate info not found")
+	}
+
+	page := paginateInfo.Page
+	limit := paginateInfo.Limit
+
+	txns, total, err := h.services.GetAssetTransactionsPaginated(h.ctx, userID, portfolioID, ticker, page, limit)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error retrieving asset transactions", "Could not retrieve asset transactions")
+	}
+
+	totalPages := 0
+	if total > 0 {
+		totalPages = (total + limit - 1) / limit
+	}
+
+	return h.responseStatusOk(c, "Asset transactions retrieved", "Asset transactions retrieved successfully",
+		portfolio.PaginatedTransactionsDTO{
+			Data:       portfolio.NewTransactionListResponse(txns),
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: totalPages,
+		},
+	)
+}

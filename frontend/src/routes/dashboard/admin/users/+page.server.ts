@@ -45,15 +45,11 @@ export const actions = {
 
 		if (!name || !email) return fail(400, { error: 'Nombre y correo son requeridos' });
 
-		const res = await authedFetch(
-			{ cookies, fetch },
-			'/users',
-			{
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name, email })
-			}
-		);
+		const res = await authedFetch({ cookies, fetch }, '/users', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name, email })
+		});
 
 		if (!res.ok) {
 			const body = await res.json().catch(() => ({}));
@@ -69,19 +65,18 @@ export const actions = {
 		const ban = fd.get('ban') === 'true';
 		if (!id) return fail(400, { banError: 'ID requerido', banId: '' });
 
-		const res = await authedFetch(
-			{ cookies, fetch },
-			`/users/${id}/ban`,
-			{
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ban })
-			}
-		);
+		const res = await authedFetch({ cookies, fetch }, `/users/${id}/ban`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ ban })
+		});
 
 		if (!res.ok) {
 			const body = await res.json().catch(() => ({}));
-			return fail(res.status, { banError: body.details ?? 'No se pudo actualizar el estado', banId: id });
+			return fail(res.status, {
+				banError: body.details ?? 'No se pudo actualizar el estado',
+				banId: id
+			});
 		}
 
 		return { banSuccess: true, banId: id, banned: ban };

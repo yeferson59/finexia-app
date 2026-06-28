@@ -36,15 +36,11 @@ export const actions = {
 			return fail(400, { createError: 'Ticker, nombre, tipo y moneda son requeridos' });
 		}
 
-		const res = await authedFetch(
-			{ cookies, fetch },
-			'/assets',
-			{
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ticker, name, assetType, exchange, currency })
-			}
-		);
+		const res = await authedFetch({ cookies, fetch }, '/assets', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ ticker, name, assetType, exchange, currency })
+		});
 
 		if (!res.ok) {
 			const body = await res.json().catch(() => ({}));
@@ -62,7 +58,10 @@ export const actions = {
 		const res = await authedFetch({ cookies, fetch }, `/assets/${id}/sync`, { method: 'POST' });
 		if (!res.ok) {
 			const body = await res.json().catch(() => ({}));
-			return fail(res.status, { syncAssetError: body.details ?? body.message ?? 'Sincronización fallida', syncAssetId: id });
+			return fail(res.status, {
+				syncAssetError: body.details ?? body.message ?? 'Sincronización fallida',
+				syncAssetId: id
+			});
 		}
 		return { syncAssetSuccess: true, syncAssetId: id };
 	},
@@ -90,19 +89,18 @@ export const actions = {
 			return fail(400, { updateError: 'Precio inválido', errorId: id });
 		}
 
-		const res = await authedFetch(
-			{ cookies, fetch },
-			`/portfolios/assets/${id}/price`,
-			{
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ price: { value: priceStr, currency } })
-			}
-		);
+		const res = await authedFetch({ cookies, fetch }, `/portfolios/assets/${id}/price`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ price: { value: priceStr, currency } })
+		});
 
 		if (!res.ok) {
 			const body = await res.json().catch(() => ({}));
-			return fail(res.status, { updateError: body.details ?? 'No se pudo actualizar el precio', errorId: id });
+			return fail(res.status, {
+				updateError: body.details ?? 'No se pudo actualizar el precio',
+				errorId: id
+			});
 		}
 
 		return { updateSuccess: true, updatedId: id };

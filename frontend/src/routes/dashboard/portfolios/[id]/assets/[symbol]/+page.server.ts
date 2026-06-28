@@ -33,19 +33,44 @@ export interface Transaction {
 	createdAt: string;
 }
 
-export const load: PageServerLoad = async ({ cookies, fetch, params }) => {
+export interface TxnMeta {
+	total: number;
+	page: number;
+	limit: number;
+	totalPages: number;
+}
+
+const DEFAULT_META: TxnMeta = { total: 0, page: 1, limit: 20, totalPages: 0 };
+
+export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 	const event = { cookies, fetch };
+
+	const page = Math.max(1, parseInt(url.searchParams.get('page') ?? '1', 10) || 1);
+	const limit = (() => {
+		const raw = parseInt(url.searchParams.get('limit') ?? '20', 10) || 20;
+		return raw >= 1 && raw <= 100 ? raw : 20;
+	})();
 
 	const response = await authedFetch(event, `/portfolios/${params.id}`);
 
 	if (!response.ok) {
-		return { entries: [] as Entry[], transactions: [] as Transaction[], portfolioTotalValue: 0 };
+		return {
+			entries: [] as Entry[],
+			transactions: [] as Transaction[],
+			portfolioTotalValue: 0,
+			txnMeta: DEFAULT_META
+		};
 	}
 
 	const { data, success } = await response.json();
 
 	if (!success || !data) {
-		return { entries: [] as Entry[], transactions: [] as Transaction[], portfolioTotalValue: 0 };
+		return {
+			entries: [] as Entry[],
+			transactions: [] as Transaction[],
+			portfolioTotalValue: 0,
+			txnMeta: DEFAULT_META
+		};
 	}
 
 	const allHoldings: Entry[] = data.holdings ?? [];
@@ -57,20 +82,24 @@ export const load: PageServerLoad = async ({ cookies, fetch, params }) => {
 		return sum + qty * mp;
 	}, 0);
 
-	// Fetch transactions for each entry in parallel
-	const txnResponses = await Promise.all(
-		entries.map((entry) =>
-			authedFetchSafe(event, `/portfolios/entries/${entry.id}/transactions`).then((r) =>
-				r ? r.json() : { success: false, data: [] }
-			)
-		)
+	const txnRes = await authedFetchSafe(
+		event,
+		`/portfolios/${params.id}/assets/${params.symbol}/transactions?page=${page}&limit=${limit}`
 	);
+	const txnJson = txnRes ? await txnRes.json() : null;
+	const paged = txnJson?.success ? txnJson.data : null;
 
-	const transactions: Transaction[] = txnResponses
-		.filter((r) => r.success)
-		.flatMap((r) => r.data ?? []);
+	const transactions: Transaction[] = paged?.data ?? [];
+	const txnMeta: TxnMeta = paged
+		? {
+				total: paged.total ?? 0,
+				page: paged.page ?? page,
+				limit: paged.limit ?? limit,
+				totalPages: paged.totalPages ?? 0
+			}
+		: DEFAULT_META;
 
-	return { entries, transactions, portfolioTotalValue };
+	return { entries, transactions, portfolioTotalValue, txnMeta };
 };
 
 const txnSchema = z.object({

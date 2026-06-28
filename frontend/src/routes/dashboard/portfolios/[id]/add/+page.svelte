@@ -90,9 +90,15 @@
 	}
 
 	function clickOutside(node: HTMLElement, handler: (e: MouseEvent) => void) {
-		function listener(e: MouseEvent) { handler(e); }
+		function listener(e: MouseEvent) {
+			handler(e);
+		}
 		document.addEventListener('mousedown', listener);
-		return { destroy() { document.removeEventListener('mousedown', listener); } };
+		return {
+			destroy() {
+				document.removeEventListener('mousedown', listener);
+			}
+		};
 	}
 
 	$effect(() => {
@@ -238,8 +244,8 @@
 									formData.assetId = '';
 									assetSearch = '';
 									showSuggestions = false;
-								}}
-							>✕</button>
+								}}>✕</button
+							>
 						{/if}
 					</div>
 
@@ -267,7 +273,13 @@
 									</div>
 									{#if asset.currentPrice}
 										<span class="option-price">
-											{new Intl.NumberFormat('en-US', { style: 'currency', currency: asset.currency && asset.currency !== 'XXX' ? asset.currency : 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(parseFloat(asset.currentPrice.value))}
+											{new Intl.NumberFormat('en-US', {
+												style: 'currency',
+												currency:
+													asset.currency && asset.currency !== 'XXX' ? asset.currency : 'USD',
+												minimumFractionDigits: 2,
+												maximumFractionDigits: 4
+											}).format(parseFloat(asset.currentPrice.value))}
 										</span>
 									{/if}
 								</li>
@@ -360,7 +372,7 @@
 
 			<div class="form-row">
 				<div class="form-group">
-					<label class="form-label">Fecha de Compra</label>
+					<span class="form-label">Fecha de Compra</span>
 					<DatePicker name="purchaseDate" bind:value={formData.purchaseDate} required />
 				</div>
 
@@ -523,29 +535,11 @@
 		font-weight: 600;
 	}
 
-	.empty-assets {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 2rem 1.5rem;
-		border-radius: 10px;
-		background: rgba(224, 90, 90, 0.05);
-		border: 1px dashed rgba(224, 90, 90, 0.2);
-		text-align: center;
-	}
-
 	.empty-text {
 		margin: 0;
 		font-size: 0.95rem;
 		color: rgba(236, 234, 229, 0.7);
 		font-weight: 500;
-	}
-
-	.empty-hint {
-		margin: 0;
-		font-size: 0.85rem;
-		color: rgba(236, 234, 229, 0.5);
 	}
 
 	.form-group {

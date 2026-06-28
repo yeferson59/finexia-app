@@ -28,5 +28,6 @@ func (r *Routes) Portfolios() {
 	// Parametric routes registered last so they don't shadow the static ones above.
 	portfolios.Patch("/:id", r.handlers.UpdatePortfolio)
 	portfolios.Get("/:id/top-transaction", r.handlers.GetPortfolioTopTransaction)
+	portfolios.Get("/:id/assets/:symbol/transactions", paginate.New(), r.handlers.GetAssetTransactions)
 	portfolios.Get("/:id", r.handlers.GetPortfolio)
 }

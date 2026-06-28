@@ -61,7 +61,7 @@
 		const num = parseFloat(price.value);
 		if (isNaN(num)) return price.value;
 		const currency =
-			price.currency && price.currency !== 'XXX' ? price.currency : (assetCurrency || 'USD');
+			price.currency && price.currency !== 'XXX' ? price.currency : assetCurrency || 'USD';
 		try {
 			return new Intl.NumberFormat('en-US', {
 				style: 'currency',
@@ -88,7 +88,11 @@
 	<title>Activos — Admin — FINEXIA</title>
 </svelte:head>
 
-<PageHeader eyebrow="Administración" title="Activos" subtitle="Gestiona precios y sincronización de activos.">
+<PageHeader
+	eyebrow="Administración"
+	title="Activos"
+	subtitle="Gestiona precios y sincronización de activos."
+>
 	{#snippet actions()}
 		<div class="header-actions">
 			{#if syncMessage}
@@ -120,7 +124,14 @@
 				}}
 			>
 				<Button type="submit" loading={syncing} size="sm">
-					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
 						<polyline points="23 4 23 10 17 10"></polyline>
 						<polyline points="1 20 1 14 7 14"></polyline>
 						<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
@@ -160,17 +171,26 @@
 						<label class="field-label" for="assetType">Tipo <span class="required">*</span></label>
 						<select id="assetType" name="assetType" class="field-input field-select" required>
 							<option value="" disabled selected>Seleccionar tipo</option>
-							{#each ASSET_TYPES as t}
+							{#each ASSET_TYPES as t (t.value)}
 								<option value={t.value}>{t.label}</option>
 							{/each}
 						</select>
 					</div>
 					<div class="form-field">
 						<label class="field-label" for="currency">Moneda <span class="required">*</span></label>
-						<input id="currency" name="currency" class="field-input" placeholder="USD" maxlength="3" required />
+						<input
+							id="currency"
+							name="currency"
+							class="field-input"
+							placeholder="USD"
+							maxlength="3"
+							required
+						/>
 					</div>
 					<div class="form-field">
-						<label class="field-label" for="exchange">Exchange <span class="optional">(opcional)</span></label>
+						<label class="field-label" for="exchange"
+							>Exchange <span class="optional">(opcional)</span></label
+						>
 						<input id="exchange" name="exchange" class="field-input" placeholder="NASDAQ" />
 					</div>
 				</div>
@@ -209,7 +229,10 @@
 						{@const hasUpdateSuccess = form?.updateSuccess && form?.updatedId === asset.id}
 						{@const hasSyncError = form?.syncAssetError && form?.syncAssetId === asset.id}
 						{@const isSyncingThis = syncingAssetId === asset.id}
-						<tr class:row-success={hasUpdateSuccess || (form?.syncAssetSuccess && form?.syncAssetId === asset.id)}>
+						<tr
+							class:row-success={hasUpdateSuccess ||
+								(form?.syncAssetSuccess && form?.syncAssetId === asset.id)}
+						>
 							<td class="cell-ticker">{asset.ticker}</td>
 							<td class="cell-name">{asset.name}</td>
 							<td>
@@ -230,7 +253,11 @@
 									}}
 								>
 									<input type="hidden" name="id" value={asset.id} />
-									<input type="hidden" name="currency" value={asset.currentPrice?.currency ?? asset.currency ?? 'USD'} />
+									<input
+										type="hidden"
+										name="currency"
+										value={asset.currentPrice?.currency ?? asset.currency ?? 'USD'}
+									/>
 									<div class="update-row">
 										<input
 											type="number"
@@ -266,10 +293,18 @@
 								>
 									<input type="hidden" name="id" value={asset.id} />
 									<Button type="submit" size="sm" variant="ghost" loading={isSyncingThis}>
-										<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+										<svg
+											width="13"
+											height="13"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
 											<polyline points="23 4 23 10 17 10"></polyline>
 											<polyline points="1 20 1 14 7 14"></polyline>
-											<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+											<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+											></path>
 										</svg>
 										Sync
 									</Button>

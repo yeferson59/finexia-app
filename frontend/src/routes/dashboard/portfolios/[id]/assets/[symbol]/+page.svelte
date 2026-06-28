@@ -10,6 +10,9 @@
 	const entries = $derived(data.entries);
 	const transactions = $derived(data.transactions ?? []);
 	const portfolioTotalValue = $derived(data.portfolioTotalValue);
+	const txnMeta = $derived(data.txnMeta);
+	const currentPage = $derived(txnMeta.page);
+	const totalPages = $derived(txnMeta.totalPages);
 
 	let showAddForm = $state(false);
 	let isSubmitting = $state(false);
@@ -19,6 +22,12 @@
 		if (form?.success === true) {
 			showAddForm = false;
 			sellFromTxn = null;
+			goto(
+				resolve('/dashboard/portfolios/[id]/assets/[symbol]', {
+					id: params.id,
+					symbol: params.symbol
+				})
+			);
 		}
 	});
 
@@ -178,41 +187,19 @@
 			: 'Precio unitario'
 	);
 
-	// Aggregate position metrics — transactions are the source of truth;
-	// fall back to trigger-maintained entry aggregates only when no transactions exist.
+	// Position metrics from trigger-maintained entry aggregates (accurate regardless of pagination).
 	const position = $derived.by(() => {
 		if (entries.length === 0) return null;
 
 		const first = entries[0];
 
-		let totalQty: number, averageCost: number, totalCost: number;
-
-		if (transactions.length > 0) {
-			const buyTxns = transactions.filter((t) => ['buy', 'transfer_in'].includes(t.type));
-			const sellTxns = transactions.filter((t) => ['sell', 'transfer_out'].includes(t.type));
-			const splitTxns = transactions.filter((t) => t.type === 'split');
-
-			const buyQty = buyTxns.reduce((s, t) => s + (parseFloat(t.quantity) || 0), 0);
-			const sellQty = sellTxns.reduce((s, t) => s + (parseFloat(t.quantity) || 0), 0);
-			const splitQty = splitTxns.reduce((s, t) => s + (parseFloat(t.quantity) || 0), 0);
-			totalQty = Math.max(0, buyQty - sellQty + splitQty);
-
-			const buyCost = buyTxns.reduce(
-				(s, t) => s + (parseFloat(t.quantity) || 0) * (parseFloat(t.price) || 0),
-				0
-			);
-			averageCost = buyQty > 0 ? buyCost / buyQty : 0;
-			totalCost = totalQty * averageCost;
-		} else {
-			// Fallback: use trigger-maintained aggregates from portfolio_entries
-			totalQty = entries.reduce((s, e) => s + (parseFloat(e.quantity) || 0), 0);
-			const rawCost = entries.reduce(
-				(s, e) => s + (parseFloat(e.quantity) || 0) * (parseFloat(e.price) || 0),
-				0
-			);
-			averageCost = totalQty > 0 ? rawCost / totalQty : 0;
-			totalCost = rawCost;
-		}
+		const totalQty = entries.reduce((s, e) => s + (parseFloat(e.quantity) || 0), 0);
+		const rawCost = entries.reduce(
+			(s, e) => s + (parseFloat(e.quantity) || 0) * (parseFloat(e.price) || 0),
+			0
+		);
+		const averageCost = totalQty > 0 ? rawCost / totalQty : 0;
+		const totalCost = rawCost;
 
 		const marketPrice = parseFloat(first.marketPrice) || averageCost;
 		const totalValue = totalQty * marketPrice;
@@ -384,10 +371,8 @@
 				</article>
 
 				<article class="perf-card">
-					<h3>Compras</h3>
-					<p class="perf-value">
-						{transactions.filter((t) => ['buy', 'transfer_in'].includes(t.type)).length}
-					</p>
+					<h3>Transacciones</h3>
+					<p class="perf-value">{txnMeta.total}</p>
 				</article>
 
 				<article class="perf-card">
@@ -404,10 +389,13 @@
 			<header class="panel-header">
 				<h2>Historial de Transacciones</h2>
 				<div class="header-actions">
-					<span
-						>{transactions.length}
-						{transactions.length === 1 ? 'transacción' : 'transacciones'}</span
-					>
+					<span>
+						{txnMeta.total}
+						{txnMeta.total === 1 ? 'transacción' : 'transacciones'}
+						{#if totalPages > 1}
+							· página {currentPage} de {totalPages}
+						{/if}
+					</span>
 					<button class="btn-add" onclick={() => (showAddForm = !showAddForm)}>
 						{#if showAddForm}
 							Cancelar
@@ -426,7 +414,7 @@
 					use:enhance={() => {
 						isSubmitting = true;
 						return async ({ update }) => {
-							await update();
+							await update({ reset: false });
 							isSubmitting = false;
 						};
 					}}
@@ -646,7 +634,7 @@
 						use:enhance={() => {
 							isSellSubmitting = true;
 							return async ({ update }) => {
-								await update();
+								await update({ reset: false });
 								isSellSubmitting = false;
 							};
 						}}
@@ -790,7 +778,14 @@
 									onclick={() => startEdit(txn)}
 									aria-label="Editar transacción"
 								>
-									<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+									<svg
+										width="13"
+										height="13"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2.5"
+									>
 										<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
 										<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
 									</svg>
@@ -809,6 +804,39 @@
 						</div>
 					{/each}
 				</div>
+
+				{#if totalPages > 1}
+					<form class="pagination" method="GET">
+						<input type="hidden" name="limit" value={txnMeta.limit} />
+						<button
+							type="submit"
+							name="page"
+							value={currentPage - 1}
+							class="pg-btn"
+							disabled={currentPage === 1}
+						>
+							‹ Anterior
+						</button>
+						{#each Array.from({ length: totalPages }, (_, i) => i + 1) as p (p)}
+							<button
+								type="submit"
+								name="page"
+								value={p}
+								class="pg-btn pg-num"
+								class:pg-active={p === currentPage}>{p}</button
+							>
+						{/each}
+						<button
+							type="submit"
+							name="page"
+							value={currentPage + 1}
+							class="pg-btn"
+							disabled={currentPage === totalPages}
+						>
+							Siguiente ›
+						</button>
+					</form>
+				{/if}
 			{/if}
 		</section>
 	{/if}
@@ -816,8 +844,14 @@
 
 <!-- Edit transaction modal -->
 {#if editingTxn}
-	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-	<div class="modal-backdrop" onclick={() => (editingTxn = null)}></div>
+	<div
+		class="modal-backdrop"
+		role="button"
+		tabindex="0"
+		aria-label="Cerrar modal"
+		onclick={() => (editingTxn = null)}
+		onkeydown={(e) => e.key === 'Enter' && (editingTxn = null)}
+	></div>
 	<div class="modal" role="dialog" aria-modal="true" aria-label="Editar transacción">
 		<header class="modal-header">
 			<span>Editar transacción</span>
@@ -843,14 +877,20 @@
 			<div class="form-row">
 				<div class="form-group">
 					<label class="form-label" for="edit-type">Tipo <span class="required">*</span></label>
-					<select id="edit-type" class="form-select" name="type" bind:value={editForm.type} required>
+					<select
+						id="edit-type"
+						class="form-select"
+						name="type"
+						bind:value={editForm.type}
+						required
+					>
 						{#each TRANSACTION_TYPES as t (t.value)}
 							<option value={t.value}>{t.label}</option>
 						{/each}
 					</select>
 				</div>
 				<div class="form-group">
-					<label class="form-label">Fecha <span class="required">*</span></label>
+					<span class="form-label">Fecha <span class="required">*</span></span>
 					<DatePicker name="transactionDate" bind:value={editForm.transactionDate} required />
 				</div>
 			</div>
@@ -858,16 +898,48 @@
 			{#if editTxnMode === 'trade'}
 				<div class="form-row">
 					<div class="form-group">
-						<label class="form-label" for="edit-qty">Cantidad <span class="required">*</span></label>
-						<input id="edit-qty" type="number" class="form-input" name="quantity" bind:value={editForm.quantity} placeholder="100" min="0" step="any" required />
+						<label class="form-label" for="edit-qty">Cantidad <span class="required">*</span></label
+						>
+						<input
+							id="edit-qty"
+							type="number"
+							class="form-input"
+							name="quantity"
+							bind:value={editForm.quantity}
+							placeholder="100"
+							min="0"
+							step="any"
+							required
+						/>
 					</div>
 					<div class="form-group">
-						<label class="form-label" for="edit-price">{editPriceLabel} <span class="required">*</span></label>
-						<input id="edit-price" type="number" class="form-input" name="price" bind:value={editForm.price} placeholder="150.50" min="0" step="0.01" required />
+						<label class="form-label" for="edit-price"
+							>{editPriceLabel} <span class="required">*</span></label
+						>
+						<input
+							id="edit-price"
+							type="number"
+							class="form-input"
+							name="price"
+							bind:value={editForm.price}
+							placeholder="150.50"
+							min="0"
+							step="0.01"
+							required
+						/>
 					</div>
 					<div class="form-group">
 						<label class="form-label" for="edit-fees">Comisión</label>
-						<input id="edit-fees" type="number" class="form-input" name="fees" bind:value={editForm.fees} placeholder="0" min="0" step="0.01" />
+						<input
+							id="edit-fees"
+							type="number"
+							class="form-input"
+							name="fees"
+							bind:value={editForm.fees}
+							placeholder="0"
+							min="0"
+							step="0.01"
+						/>
 					</div>
 				</div>
 			{:else if editTxnMode === 'amount'}
@@ -875,8 +947,20 @@
 				<input type="hidden" name="fees" value="0" />
 				<div class="form-row">
 					<div class="form-group">
-						<label class="form-label" for="edit-amount">{editPriceLabel} <span class="required">*</span></label>
-						<input id="edit-amount" type="number" class="form-input" name="price" bind:value={editForm.price} placeholder="0.00" min="0" step="0.01" required />
+						<label class="form-label" for="edit-amount"
+							>{editPriceLabel} <span class="required">*</span></label
+						>
+						<input
+							id="edit-amount"
+							type="number"
+							class="form-input"
+							name="price"
+							bind:value={editForm.price}
+							placeholder="0.00"
+							min="0"
+							step="0.01"
+							required
+						/>
 					</div>
 				</div>
 			{:else}
@@ -884,15 +968,34 @@
 				<input type="hidden" name="fees" value="0" />
 				<div class="form-row">
 					<div class="form-group">
-						<label class="form-label" for="edit-split-qty">Nuevas acciones recibidas <span class="required">*</span></label>
-						<input id="edit-split-qty" type="number" class="form-input" name="quantity" bind:value={editForm.quantity} placeholder="100" min="0" step="0.00000001" required />
+						<label class="form-label" for="edit-split-qty"
+							>Nuevas acciones recibidas <span class="required">*</span></label
+						>
+						<input
+							id="edit-split-qty"
+							type="number"
+							class="form-input"
+							name="quantity"
+							bind:value={editForm.quantity}
+							placeholder="100"
+							min="0"
+							step="0.00000001"
+							required
+						/>
 					</div>
 				</div>
 			{/if}
 
 			<div class="form-group">
 				<label class="form-label" for="edit-notes">Notas</label>
-				<input id="edit-notes" type="text" class="form-input" name="notes" bind:value={editForm.notes} placeholder="Observaciones opcionales..." />
+				<input
+					id="edit-notes"
+					type="text"
+					class="form-input"
+					name="notes"
+					bind:value={editForm.notes}
+					placeholder="Observaciones opcionales..."
+				/>
 			</div>
 
 			{#if editError}
@@ -900,7 +1003,9 @@
 			{/if}
 
 			<div class="form-actions">
-				<button type="button" class="btn-cancel" onclick={() => (editingTxn = null)}>Cancelar</button>
+				<button type="button" class="btn-cancel" onclick={() => (editingTxn = null)}
+					>Cancelar</button
+				>
 				<button type="submit" class="btn-submit" disabled={isEditSubmitting}>
 					{isEditSubmitting ? 'Guardando…' : 'Guardar cambios'}
 				</button>
@@ -1739,5 +1844,49 @@
 		gap: 1rem;
 		max-height: 80vh;
 		overflow-y: auto;
+	}
+
+	/* Pagination */
+	.pagination {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.35rem;
+		padding: 1rem 0 0.25rem;
+		flex-wrap: wrap;
+	}
+
+	.pg-btn {
+		padding: 0.35rem 0.75rem;
+		border: 1.5px solid rgba(212, 145, 42, 0.25);
+		border-radius: 6px;
+		background: transparent;
+		color: rgba(236, 234, 229, 0.6);
+		font-size: 0.82rem;
+		font-weight: 600;
+		cursor: pointer;
+		font-family: var(--font-body);
+		transition: all 0.2s ease;
+	}
+
+	.pg-btn:hover:not(:disabled) {
+		border-color: var(--amber);
+		color: var(--amber);
+		background: rgba(212, 145, 42, 0.08);
+	}
+
+	.pg-btn:disabled {
+		opacity: 0.3;
+		cursor: default;
+	}
+
+	.pg-num {
+		min-width: 2rem;
+	}
+
+	.pg-active {
+		background: rgba(212, 145, 42, 0.15);
+		border-color: var(--amber);
+		color: var(--amber);
 	}
 </style>

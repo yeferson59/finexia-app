@@ -2,7 +2,6 @@
 	import PageHeader from '$components/ui/page-header.svelte';
 	import Card from '$components/ui/card.svelte';
 	import Stat from '$components/ui/stat.svelte';
-	import Button from '$components/ui/button.svelte';
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
 
@@ -23,7 +22,11 @@
 	<title>Admin — FINEXIA</title>
 </svelte:head>
 
-<PageHeader eyebrow="Administración" title="Panel de Control" subtitle="Gestión y estado del sistema." />
+<PageHeader
+	eyebrow="Administración"
+	title="Panel de Control"
+	subtitle="Gestión y estado del sistema."
+/>
 
 <section class="stats-grid">
 	<Card padding="md">
@@ -42,7 +45,14 @@
 	<div class="shortcut-grid">
 		<Card padding="md" hover onclick={() => goto(resolve('/dashboard/admin/users'))}>
 			<div class="shortcut-card">
-				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+				<svg
+					width="24"
+					height="24"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+				>
 					<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
 					<circle cx="9" cy="7" r="4"></circle>
 					<path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
@@ -56,7 +66,14 @@
 		</Card>
 		<Card padding="md" hover onclick={() => goto(resolve('/dashboard/admin/assets'))}>
 			<div class="shortcut-card">
-				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+				<svg
+					width="24"
+					height="24"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+				>
 					<ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
 					<path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
 					<path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>

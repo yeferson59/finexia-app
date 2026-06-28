@@ -769,6 +769,63 @@ func (r *Repository) GetTransactionsByEntryID(ctx context.Context, userID, entry
 	return txns, nil
 }
 
+func (r *Repository) CountAssetTransactions(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error) {
+	var total int
+	err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM transactions t
+		JOIN portfolio_entries pe ON pe.id = t.entry_id
+		JOIN assets a ON a.id = pe.asset_id
+		JOIN portfolios p ON p.id = pe.portfolio_id
+		WHERE p.id = $1 AND a.ticker = $2 AND p.user_id = $3
+	`, portfolioID, ticker, userID).Scan(&total)
+	return total, err
+}
+
+func (r *Repository) GetAssetTransactionsPaginated(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, limit, offset int) ([]entities.Transaction, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fees,
+		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at
+		FROM transactions t
+		JOIN portfolio_entries pe ON pe.id = t.entry_id
+		JOIN assets a ON a.id = pe.asset_id
+		JOIN portfolios p ON p.id = pe.portfolio_id
+		WHERE p.id = $1 AND a.ticker = $2 AND p.user_id = $3
+		ORDER BY t.transaction_date DESC, t.created_at DESC
+		LIMIT $4 OFFSET $5
+	`, portfolioID, ticker, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	txns := make([]entities.Transaction, 0)
+	for rows.Next() {
+		var txn entities.Transaction
+		var quantity, price, fees string
+		if err := rows.Scan(
+			&txn.ID,
+			&txn.EntryID,
+			&txn.Type,
+			&quantity,
+			&price,
+			&txn.Currency,
+			&fees,
+			&txn.TransactionDate,
+			&txn.Notes,
+			&txn.CreatedAt,
+			&txn.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		txn.Quantity = money.MustFromString(quantity)
+		txn.Price = money.MustMoneyFromString(price, money.USD)
+		txn.Fees = money.MustMoneyFromString(fees, money.USD)
+		txns = append(txns, txn)
+	}
+	return txns, nil
+}
+
 func (r *Repository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error) {
 	var owned bool
 	if err := r.db.QueryRow(ctx, `

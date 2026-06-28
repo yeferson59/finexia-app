@@ -6,11 +6,26 @@
 		class?: string;
 	}
 
-	let { name, value = $bindable(new Date().toISOString().split('T')[0]), required = false, class: cls = '' }: Props = $props();
+	let {
+		name,
+		value = $bindable(new Date().toISOString().split('T')[0]),
+		required: _required = false,
+		class: cls = ''
+	}: Props = $props();
 
 	const MONTHS = [
-		'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-		'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+		'Enero',
+		'Febrero',
+		'Marzo',
+		'Abril',
+		'Mayo',
+		'Junio',
+		'Julio',
+		'Agosto',
+		'Septiembre',
+		'Octubre',
+		'Noviembre',
+		'Diciembre'
 	];
 
 	const currentYear = new Date().getFullYear();

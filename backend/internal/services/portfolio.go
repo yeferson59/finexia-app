@@ -120,6 +120,16 @@ func (s *Services) GetTransactionsByEntry(ctx context.Context, userID, entryID u
 	return s.repos.GetTransactionsByEntryID(ctx, userID, entryID)
 }
 
+func (s *Services) GetAssetTransactionsPaginated(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, page, limit int) ([]entities.Transaction, int, error) {
+	offset := (page - 1) * limit
+	total, err := s.repos.CountAssetTransactions(ctx, userID, portfolioID, ticker)
+	if err != nil {
+		return nil, 0, err
+	}
+	txns, err := s.repos.GetAssetTransactionsPaginated(ctx, userID, portfolioID, ticker, limit, offset)
+	return txns, total, err
+}
+
 func (s *Services) GetRecentUserTransactions(ctx context.Context, userID uuid.UUID, limit int) ([]entities.Transaction, error) {
 	return s.repos.GetRecentTransactionsByUserID(ctx, userID, limit)
 }

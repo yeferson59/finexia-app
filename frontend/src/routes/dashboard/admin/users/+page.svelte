@@ -49,31 +49,37 @@
 
 {#if showCreateForm}
 	<div class="create-form-card">
-	<Card padding="md">
-		<h2 class="form-title">Nuevo usuario</h2>
-		<form
-			method="POST"
-			action="?/createUser"
-			use:enhance={() => {
-				creating = true;
-				return async ({ update }) => {
-					creating = false;
-					await update();
-				};
-			}}
-		>
-			<div class="form-row">
-				<Input label="Nombre" name="name" bind:value={createName} required />
-				<Input label="Correo electrónico" name="email" type="email" bind:value={createEmail} required />
-			</div>
-			{#if form?.error}
-				<p class="form-error">{form.error}</p>
-			{/if}
-			<div class="form-actions">
-				<Button type="submit" loading={creating}>Crear usuario</Button>
-			</div>
-		</form>
-	</Card>
+		<Card padding="md">
+			<h2 class="form-title">Nuevo usuario</h2>
+			<form
+				method="POST"
+				action="?/createUser"
+				use:enhance={() => {
+					creating = true;
+					return async ({ update }) => {
+						creating = false;
+						await update();
+					};
+				}}
+			>
+				<div class="form-row">
+					<Input label="Nombre" name="name" bind:value={createName} required />
+					<Input
+						label="Correo electrónico"
+						name="email"
+						type="email"
+						bind:value={createEmail}
+						required
+					/>
+				</div>
+				{#if form?.error}
+					<p class="form-error">{form.error}</p>
+				{/if}
+				<div class="form-actions">
+					<Button type="submit" loading={creating}>Crear usuario</Button>
+				</div>
+			</form>
+		</Card>
 	</div>
 {/if}
 
@@ -181,15 +187,19 @@
 		</div>
 
 		{#if data.meta.totalPages > 1}
-			<div class="pagination">
+			<form class="pagination" method="GET">
 				{#if data.meta.previous}
-					<a href={`?page=${data.meta.currentPage - 1}`} class="page-btn">← Anterior</a>
+					<button type="submit" name="page" value={data.meta.currentPage - 1} class="page-btn"
+						>← Anterior</button
+					>
 				{/if}
 				<span class="page-info">Página {data.meta.currentPage} de {data.meta.totalPages}</span>
 				{#if data.meta.next}
-					<a href={`?page=${data.meta.currentPage + 1}`} class="page-btn">Siguiente →</a>
+					<button type="submit" name="page" value={data.meta.currentPage + 1} class="page-btn"
+						>Siguiente →</button
+					>
 				{/if}
-			</div>
+			</form>
 		{/if}
 	{/if}
 </Card>
