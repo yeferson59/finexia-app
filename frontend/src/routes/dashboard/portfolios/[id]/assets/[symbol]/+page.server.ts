@@ -73,22 +73,24 @@ export const load: PageServerLoad = async ({ cookies, fetch, params }) => {
 	return { entries, transactions, portfolioTotalValue };
 };
 
+const txnSchema = z.object({
+	type: z.string().min(1),
+	quantity: z.coerce.number().positive(),
+	price: z.coerce.number().positive(),
+	currency: z.string().default('USD'),
+	fees: z.coerce.number().min(0).default(0),
+	transactionDate: z.coerce.date(),
+	notes: z.string().optional()
+});
+
 export const actions: Actions = {
 	default: async ({ request, fetch, cookies }) => {
 		const accessToken = cookies.get('access_token_finexia');
 		const formData = await request.formData();
 
 		const { success, error, data } = await z
-			.object({
-				entryId: z.uuid(),
-				type: z.string().min(1),
-				quantity: z.coerce.number().positive(),
-				price: z.coerce.number().positive(),
-				currency: z.string().default('USD'),
-				fees: z.coerce.number().min(0).default(0),
-				transactionDate: z.coerce.date(),
-				notes: z.string().optional()
-			})
+			.object({ entryId: z.uuid() })
+			.merge(txnSchema)
 			.safeParseAsync({
 				entryId: formData.get('entryId'),
 				type: formData.get('type'),
@@ -130,5 +132,52 @@ export const actions: Actions = {
 
 		const json = await response.json();
 		return { success: json.success ?? false };
+	},
+
+	editTransaction: async ({ request, fetch, cookies }) => {
+		const accessToken = cookies.get('access_token_finexia');
+		const formData = await request.formData();
+
+		const { success, error, data } = await z
+			.object({ txnId: z.uuid() })
+			.merge(txnSchema)
+			.safeParseAsync({
+				txnId: formData.get('txnId'),
+				type: formData.get('type'),
+				quantity: formData.get('quantity'),
+				price: formData.get('price'),
+				currency: formData.get('currency') || 'USD',
+				fees: formData.get('fees') || 0,
+				transactionDate: formData.get('transactionDate'),
+				notes: formData.get('notes')
+			});
+
+		if (!success) {
+			return { success: false, error: error.message };
+		}
+
+		const response = await fetch(`${env.BASE_API}/portfolios/transactions/${data.txnId}`, {
+			method: 'PUT',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${accessToken}`
+			},
+			body: JSON.stringify({
+				type: data.type,
+				quantity: data.quantity,
+				price: data.price,
+				currency: data.currency,
+				fees: data.fees,
+				transactionDate: data.transactionDate,
+				notes: data.notes ?? ''
+			})
+		});
+
+		if (!response.ok) {
+			return { success: false };
+		}
+
+		const json = await response.json();
+		return { success: json.success ?? false, edited: true };
 	}
 };

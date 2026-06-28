@@ -65,6 +65,16 @@ type CreateTransactionRequestDTO struct {
 	Notes           string        `json:"notes"`
 }
 
+type UpdateTransactionRequestDTO struct {
+	Type            string        `json:"type"`
+	Quantity        money.Decimal `json:"quantity"`
+	Price           money.Money   `json:"price"`
+	Currency        string        `json:"currency"`
+	Fees            money.Money   `json:"fees"`
+	TransactionDate time.Time     `json:"transactionDate"`
+	Notes           string        `json:"notes"`
+}
+
 type UpdatePortfolioRequestDTO struct {
 	Name        string `json:"name,omitzero"`
 	Description string `json:"description,omitzero"`

@@ -15,6 +15,7 @@ func (r *Routes) Portfolios() {
 	portfolios.Post("/entries", r.handlers.CreatePortfolioEntry)
 	portfolios.Get("/entries/:entryId/transactions", r.handlers.GetTransactions)
 	portfolios.Post("/entries/:entryId/transactions", r.handlers.CreateTransaction)
+	portfolios.Put("/transactions/:txnId", r.handlers.UpdateTransaction)
 	portfolios.Get("/sources", r.handlers.GetPlatforms)
 	portfolios.Patch("/sources/:id", r.handlers.UpdatePlatform)
 	portfolios.Delete("/sources/:id", r.handlers.DeletePlatform)

@@ -394,6 +394,35 @@ func (h *Handlers) CreateTransaction(c fiber.Ctx) error {
 	return h.responseStatusOk(c, "Transaction created", "Transaction created successfully", portfolio.NewTransactionResponse(txn))
 }
 
+func (h *Handlers) UpdateTransaction(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	txnID, err := h.getParamUUID(c, "txnId")
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid transaction ID", err.Error())
+	}
+
+	var req portfolio.UpdateTransactionRequestDTO
+	if err := c.Bind().JSON(&req); err != nil {
+		return h.responseBadRequest(c, "Invalid request", err.Error())
+	}
+
+	txnType := entities.TransactionType(req.Type)
+	if !txnType.IsValid() {
+		return h.responseBadRequest(c, "Invalid transaction type", "Type must be one of: buy, sell, dividend, split, transfer_in, transfer_out, fee, interest")
+	}
+
+	txn, err := h.services.UpdateTransaction(h.ctx, userID, txnID, txnType, req.Quantity, req.Price, req.Currency, req.Fees, req.TransactionDate, req.Notes)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error updating transaction", "Could not update transaction")
+	}
+
+	return h.responseStatusOk(c, "Transaction updated", "Transaction updated successfully", portfolio.NewTransactionResponse(txn))
+}
+
 func (h *Handlers) GetAssets(c fiber.Ctx) error {
 	paginateInfo, ok := paginate.FromContext(c)
 	if !ok {

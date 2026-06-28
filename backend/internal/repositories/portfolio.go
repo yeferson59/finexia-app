@@ -812,6 +812,48 @@ func (r *Repository) CreateTransaction(ctx context.Context, userID, entryID uuid
 	return txn, nil
 }
 
+func (r *Repository) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error) {
+	var txn entities.Transaction
+	var quantityValue, priceValue, feesValue string
+	err := r.db.QueryRow(ctx, `
+		UPDATE transactions SET
+			type             = $1::transaction_type,
+			quantity         = $2::numeric,
+			price            = $3::numeric,
+			currency         = $4::char(3),
+			fees             = $5::numeric,
+			transaction_date = $6::date,
+			notes            = $7,
+			updated_at       = NOW()
+		WHERE id = $8
+		  AND entry_id IN (
+			SELECT pe.id FROM portfolio_entries pe
+			JOIN portfolios p ON p.id = pe.portfolio_id
+			WHERE p.user_id = $9
+		  )
+		RETURNING id, entry_id, type, quantity, price, currency, fees, transaction_date, COALESCE(notes, ''), created_at, updated_at
+	`, txnType, quantity.String(), price.String(), currency, fees.String(), transactionDate, notes, txnID, userID).Scan(
+		&txn.ID,
+		&txn.EntryID,
+		&txn.Type,
+		&quantityValue,
+		&priceValue,
+		&txn.Currency,
+		&feesValue,
+		&txn.TransactionDate,
+		&txn.Notes,
+		&txn.CreatedAt,
+		&txn.UpdatedAt,
+	)
+	if err != nil {
+		return entities.Transaction{}, err
+	}
+	txn.Quantity = money.MustFromString(quantityValue)
+	txn.Price = money.MustMoneyFromString(priceValue, money.USD)
+	txn.Fees = money.MustMoneyFromString(feesValue, money.USD)
+	return txn, nil
+}
+
 func (r *Repository) GetEntryWithAsset(ctx context.Context, entryID uuid.UUID) (entities.PortfolioEntry, error) {
 	var entry entities.PortfolioEntry
 	err := r.db.QueryRow(ctx, `

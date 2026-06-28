@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import PageHeader from '$components/ui/page-header.svelte';
+	import DatePicker from '$components/ui/date-picker.svelte';
 
 	const { params, data, form }: PageProps = $props();
 
@@ -359,15 +360,8 @@
 
 			<div class="form-row">
 				<div class="form-group">
-					<label for="purchaseDate" class="form-label">Fecha de Compra</label>
-					<input
-						id="purchaseDate"
-						type="date"
-						name="purchaseDate"
-						bind:value={formData.purchaseDate}
-						class="form-input"
-						required
-					/>
+					<label class="form-label">Fecha de Compra</label>
+					<DatePicker name="purchaseDate" bind:value={formData.purchaseDate} required />
 				</div>
 
 				<div class="form-group">
@@ -597,7 +591,7 @@
 
 	.form-input::placeholder,
 	.form-textarea::placeholder {
-		color: rgba(236, 234, 229, 0.4);
+		color: rgba(236, 234, 229, 0.55);
 	}
 
 	.form-input:focus,

@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { enhance } from '$app/forms';
+	import DatePicker from '$components/ui/date-picker.svelte';
 
 	const { params, data, form }: PageProps = $props();
 
@@ -71,6 +72,43 @@
 		txnForm.currency = entries[0]?.costCurrency ?? 'USD';
 	});
 
+	// Edit transaction state
+	let editingTxn = $state<(typeof transactions)[0] | null>(null);
+	let editForm = $state({
+		type: 'buy',
+		quantity: '',
+		price: '',
+		currency: 'USD',
+		fees: '',
+		transactionDate: new Date().toISOString().split('T')[0],
+		notes: ''
+	});
+	let isEditSubmitting = $state(false);
+	let editError = $state(false);
+
+	function startEdit(txn: (typeof transactions)[0]) {
+		editingTxn = txn;
+		editForm = {
+			type: txn.type,
+			quantity: txn.quantity,
+			price: txn.price,
+			currency: txn.currency,
+			fees: txn.fees,
+			transactionDate: txn.transactionDate.split('T')[0],
+			notes: txn.notes
+		};
+		editError = false;
+	}
+
+	$effect(() => {
+		if (form?.success === true && editingTxn !== null) {
+			editingTxn = null;
+		}
+		if (form?.success === false && editingTxn !== null) {
+			editError = true;
+		}
+	});
+
 	// Quick-sell state: sell directly from a buy lot
 	let sellFromTxn = $state<(typeof transactions)[0] | null>(null);
 	let sellMode = $state<'full' | 'partial'>('full');
@@ -110,6 +148,24 @@
 			: ['fee', 'dividend', 'interest'].includes(txnForm.type)
 				? 'amount'
 				: 'trade'
+	);
+
+	const editTxnMode = $derived(
+		editForm.type === 'split'
+			? 'split'
+			: ['fee', 'dividend', 'interest'].includes(editForm.type)
+				? 'amount'
+				: 'trade'
+	);
+
+	const editPriceLabel = $derived(
+		editTxnMode === 'amount'
+			? editForm.type === 'dividend'
+				? 'Monto del dividendo'
+				: editForm.type === 'interest'
+					? 'Monto del interés'
+					: 'Monto de la comisión'
+			: 'Precio unitario'
 	);
 
 	const priceLabel = $derived(
@@ -418,14 +474,7 @@
 						</div>
 						<div class="form-group">
 							<label class="form-label" for="txn-date">Fecha <span class="required">*</span></label>
-							<input
-								id="txn-date"
-								type="date"
-								class="form-input"
-								name="transactionDate"
-								bind:value={txnForm.transactionDate}
-								required
-							/>
+							<DatePicker name="transactionDate" bind:value={txnForm.transactionDate} required />
 						</div>
 					</div>
 
@@ -664,14 +713,7 @@
 								<label class="form-label" for="sell-date"
 									>Fecha <span class="required">*</span></label
 								>
-								<input
-									id="sell-date"
-									type="date"
-									class="form-input"
-									name="transactionDate"
-									bind:value={sellDate}
-									required
-								/>
+								<DatePicker name="transactionDate" bind:value={sellDate} required />
 							</div>
 						</div>
 
@@ -719,7 +761,7 @@
 						<p>Comisión</p>
 						<p>Total</p>
 						<p>Notas</p>
-						<p></p>
+						<p>Acciones</p>
 					</div>
 
 					{#each transactions as txn (txn.id)}
@@ -742,6 +784,17 @@
 							<p class="total">{fmt(total, 0)}</p>
 							<p class="notes">{txn.notes || '—'}</p>
 							<p class="cell-action">
+								<button
+									type="button"
+									class="btn-edit-row"
+									onclick={() => startEdit(txn)}
+									aria-label="Editar transacción"
+								>
+									<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+										<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+										<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+									</svg>
+								</button>
 								{#if isBuyLot}
 									<button
 										type="button"
@@ -760,6 +813,101 @@
 		</section>
 	{/if}
 </div>
+
+<!-- Edit transaction modal -->
+{#if editingTxn}
+	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+	<div class="modal-backdrop" onclick={() => (editingTxn = null)}></div>
+	<div class="modal" role="dialog" aria-modal="true" aria-label="Editar transacción">
+		<header class="modal-header">
+			<span>Editar transacción</span>
+			<button class="modal-close" type="button" onclick={() => (editingTxn = null)}>✕</button>
+		</header>
+
+		<form
+			method="POST"
+			action="?/editTransaction"
+			class="modal-form"
+			use:enhance={() => {
+				isEditSubmitting = true;
+				editError = false;
+				return async ({ update }) => {
+					await update();
+					isEditSubmitting = false;
+				};
+			}}
+		>
+			<input type="hidden" name="txnId" value={editingTxn.id} />
+			<input type="hidden" name="currency" value={editForm.currency} />
+
+			<div class="form-row">
+				<div class="form-group">
+					<label class="form-label" for="edit-type">Tipo <span class="required">*</span></label>
+					<select id="edit-type" class="form-select" name="type" bind:value={editForm.type} required>
+						{#each TRANSACTION_TYPES as t (t.value)}
+							<option value={t.value}>{t.label}</option>
+						{/each}
+					</select>
+				</div>
+				<div class="form-group">
+					<label class="form-label">Fecha <span class="required">*</span></label>
+					<DatePicker name="transactionDate" bind:value={editForm.transactionDate} required />
+				</div>
+			</div>
+
+			{#if editTxnMode === 'trade'}
+				<div class="form-row">
+					<div class="form-group">
+						<label class="form-label" for="edit-qty">Cantidad <span class="required">*</span></label>
+						<input id="edit-qty" type="number" class="form-input" name="quantity" bind:value={editForm.quantity} placeholder="100" min="0" step="any" required />
+					</div>
+					<div class="form-group">
+						<label class="form-label" for="edit-price">{editPriceLabel} <span class="required">*</span></label>
+						<input id="edit-price" type="number" class="form-input" name="price" bind:value={editForm.price} placeholder="150.50" min="0" step="0.01" required />
+					</div>
+					<div class="form-group">
+						<label class="form-label" for="edit-fees">Comisión</label>
+						<input id="edit-fees" type="number" class="form-input" name="fees" bind:value={editForm.fees} placeholder="0" min="0" step="0.01" />
+					</div>
+				</div>
+			{:else if editTxnMode === 'amount'}
+				<input type="hidden" name="quantity" value="1" />
+				<input type="hidden" name="fees" value="0" />
+				<div class="form-row">
+					<div class="form-group">
+						<label class="form-label" for="edit-amount">{editPriceLabel} <span class="required">*</span></label>
+						<input id="edit-amount" type="number" class="form-input" name="price" bind:value={editForm.price} placeholder="0.00" min="0" step="0.01" required />
+					</div>
+				</div>
+			{:else}
+				<input type="hidden" name="price" value="0" />
+				<input type="hidden" name="fees" value="0" />
+				<div class="form-row">
+					<div class="form-group">
+						<label class="form-label" for="edit-split-qty">Nuevas acciones recibidas <span class="required">*</span></label>
+						<input id="edit-split-qty" type="number" class="form-input" name="quantity" bind:value={editForm.quantity} placeholder="100" min="0" step="0.00000001" required />
+					</div>
+				</div>
+			{/if}
+
+			<div class="form-group">
+				<label class="form-label" for="edit-notes">Notas</label>
+				<input id="edit-notes" type="text" class="form-input" name="notes" bind:value={editForm.notes} placeholder="Observaciones opcionales..." />
+			</div>
+
+			{#if editError}
+				<p class="form-error-msg">No se pudo actualizar la transacción. Verifica los datos.</p>
+			{/if}
+
+			<div class="form-actions">
+				<button type="button" class="btn-cancel" onclick={() => (editingTxn = null)}>Cancelar</button>
+				<button type="submit" class="btn-submit" disabled={isEditSubmitting}>
+					{isEditSubmitting ? 'Guardando…' : 'Guardar cambios'}
+				</button>
+			</div>
+		</form>
+	</div>
+{/if}
 
 <style>
 	.container {
@@ -1183,7 +1331,7 @@
 
 	.table-header {
 		display: grid;
-		grid-template-columns: 110px 100px 1fr 1fr 1fr 1fr 1fr 80px;
+		grid-template-columns: 110px 100px 1fr 1fr 1fr 1fr 1fr 120px;
 		gap: 1rem;
 		padding: 0.75rem 1rem;
 		background: rgba(0, 0, 0, 0.2);
@@ -1198,7 +1346,7 @@
 
 	.table-row {
 		display: grid;
-		grid-template-columns: 110px 100px 1fr 1fr 1fr 1fr 1fr 80px;
+		grid-template-columns: 110px 100px 1fr 1fr 1fr 1fr 1fr 120px;
 		gap: 1rem;
 		padding: 1rem;
 		border-bottom: 1px solid var(--border);
@@ -1512,5 +1660,84 @@
 		.notes {
 			display: none;
 		}
+	}
+
+	.btn-edit-row {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.28rem 0.5rem;
+		border: 1.5px solid rgba(212, 145, 42, 0.3);
+		border-radius: 6px;
+		background: transparent;
+		color: rgba(212, 145, 42, 0.6);
+		cursor: pointer;
+		transition: all 0.2s ease;
+		flex-shrink: 0;
+	}
+
+	.btn-edit-row:hover {
+		background: rgba(212, 145, 42, 0.1);
+		border-color: var(--amber);
+		color: var(--amber);
+	}
+
+	/* Modal */
+	.modal-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.65);
+		z-index: 100;
+	}
+
+	.modal {
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		z-index: 101;
+		width: min(540px, 92vw);
+		background: var(--surface);
+		border: 1.5px solid rgba(212, 145, 42, 0.35);
+		border-radius: 16px;
+		box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+		backdrop-filter: blur(16px);
+		overflow: hidden;
+	}
+
+	.modal-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 1rem 1.25rem;
+		border-bottom: 1px solid var(--border);
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: var(--amber);
+	}
+
+	.modal-close {
+		background: transparent;
+		border: none;
+		color: rgba(236, 234, 229, 0.4);
+		font-size: 1rem;
+		cursor: pointer;
+		padding: 0.2rem 0.4rem;
+		border-radius: 4px;
+		transition: color 0.2s ease;
+		line-height: 1;
+	}
+
+	.modal-close:hover {
+		color: var(--text);
+	}
+
+	.modal-form {
+		padding: 1.25rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		max-height: 80vh;
+		overflow-y: auto;
 	}
 </style>
