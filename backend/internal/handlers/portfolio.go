@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"strings"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/google/uuid"
@@ -398,12 +400,21 @@ func (h *Handlers) GetAssets(c fiber.Ctx) error {
 		return h.responseInternalServerError(c, "", "paginate info not found")
 	}
 
-	assests, err := h.services.GetAssets(h.ctx, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
+	search := strings.TrimSpace(c.Query("search"))
+
+	var assets []entities.Asset
+	var err error
+	if search != "" {
+		assets, err = h.services.SearchAssets(h.ctx, search, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
+	} else {
+		assets, err = h.services.GetAssets(h.ctx, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
+	}
+
 	if err != nil {
 		return h.responseFromDomain(c, err, "", "")
 	}
 
-	return h.responseStatusOk(c, "", "", assests)
+	return h.responseStatusOk(c, "", "", assets)
 }
 
 func (h *Handlers) GetPortfolioGrowth(c fiber.Ctx) error {

@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -585,6 +586,36 @@ func (r *Repository) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, pr
 
 	scanAssetCurrentPrice(&asset, priceStr)
 	return asset, nil
+}
+
+func (r *Repository) SearchAssets(ctx context.Context, search string, offset, limit uint) ([]entities.Asset, error) {
+	pattern := "%" + strings.ToUpper(strings.TrimSpace(search)) + "%"
+	rows, err := r.db.Query(ctx, `
+		SELECT id, ticker, name, asset_type, COALESCE(exchange, ''), currency, current_price, price_updated_at, created_at, updated_at
+		FROM assets
+		WHERE UPPER(ticker) LIKE $1 OR UPPER(name) LIKE $1
+		ORDER BY ticker
+		LIMIT $2 OFFSET $3
+	`, pattern, limit, offset)
+	if err != nil {
+		return []entities.Asset{}, err
+	}
+	defer rows.Close()
+
+	assets := make([]entities.Asset, 0)
+	for rows.Next() {
+		var asset entities.Asset
+		var priceStr *string
+		if err := rows.Scan(
+			&asset.ID, &asset.Ticker, &asset.Name, &asset.AssetType, &asset.Exchange,
+			&asset.Currency, &priceStr, &asset.PriceUpdatedAt, &asset.CreatedAt, &asset.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		scanAssetCurrentPrice(&asset, priceStr)
+		assets = append(assets, asset)
+	}
+	return assets, nil
 }
 
 func (r *Repository) UpsertAsset(ctx context.Context, ticker, name string, assetType entities.AssetType, exchange, currency string) (entities.Asset, error) {

@@ -32,8 +32,67 @@
 	let submitError = $derived(form?.success === false);
 
 	const platforms = $derived(data?.platforms || []);
-	const assets = $derived(data?.assets || []);
-	const selectedAsset = $derived(assets.find((a) => a.id === formData.assetId));
+
+	// Asset combobox state — server-side search
+	interface AssetSuggestion {
+		id: string;
+		ticker: string;
+		name: string;
+		assetType: string;
+		exchange: string;
+		currency: string;
+		currentPrice: { value: string; currency: string } | null;
+	}
+
+	let assetSearch = $state('');
+	let showSuggestions = $state(false);
+	let suggestions = $state<AssetSuggestion[]>([]);
+	let selectedAsset = $state<AssetSuggestion | null>(null);
+	let isSearching = $state(false);
+	let comboboxEl = $state<HTMLDivElement | null>(null);
+	let debounceTimer: ReturnType<typeof setTimeout>;
+
+	function selectAsset(asset: AssetSuggestion) {
+		selectedAsset = asset;
+		formData.assetId = asset.id;
+		assetSearch = asset.ticker;
+		showSuggestions = false;
+	}
+
+	async function fetchSuggestions(q: string) {
+		isSearching = true;
+		try {
+			const url = q.trim()
+				? `/api/assets?search=${encodeURIComponent(q.trim())}&limit=10`
+				: `/api/assets?limit=10`;
+			const res = await fetch(url);
+			const json = await res.json();
+			suggestions = json.success ? (json.data ?? []) : [];
+		} catch {
+			suggestions = [];
+		} finally {
+			isSearching = false;
+		}
+	}
+
+	function onSearchInput() {
+		selectedAsset = null;
+		formData.assetId = '';
+		showSuggestions = true;
+		clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(() => fetchSuggestions(assetSearch), 300);
+	}
+
+	function onSearchFocus() {
+		showSuggestions = true;
+		if (suggestions.length === 0 && !assetSearch) fetchSuggestions('');
+	}
+
+	function clickOutside(node: HTMLElement, handler: (e: MouseEvent) => void) {
+		function listener(e: MouseEvent) { handler(e); }
+		document.addEventListener('mousedown', listener);
+		return { destroy() { document.removeEventListener('mousedown', listener); } };
+	}
 
 	$effect(() => {
 		const qty = parseFloat(formData.quantity) || 0;
@@ -141,59 +200,99 @@
 		<section class="form-section">
 			<h2 class="section-title">Seleccionar Activo</h2>
 			<div class="form-group">
-				<label for="assetId" class="form-label"
-					>Elige un Activo <span class="required">*</span></label
+				<label for="asset-search" class="form-label"
+					>Buscar Activo por Ticker o Nombre <span class="required">*</span></label
 				>
-				{#if assets.length > 0}
-					<select
-						id="assetId"
-						bind:value={formData.assetId}
-						name="assetId"
-						class="form-select"
-						required
-					>
-						<option value="">-- Selecciona un activo --</option>
-						{#each assets as asset (asset.id)}
-							<option value={asset.id}>
-								{asset.ticker} - {asset.name} ({asset.assetType})
-							</option>
-						{/each}
-					</select>
-					<input type="hidden" name="category" value={selectedAsset?.assetType ?? ''} />
-					<p class="field-hint">Selecciona de la lista de activos disponibles</p>
 
-					{#if selectedAsset}
-						<div class="asset-preview">
-							<div class="preview-item">
-								<span class="preview-label">Ticker</span>
-								<span class="preview-value">{selectedAsset.ticker}</span>
-							</div>
-							<div class="preview-item">
-								<span class="preview-label">Nombre</span>
-								<span class="preview-value">{selectedAsset.name}</span>
-							</div>
-							<div class="preview-item">
-								<span class="preview-label">Tipo</span>
-								<span class="preview-value">{selectedAsset.assetType}</span>
-							</div>
-							<div class="preview-item">
-								<span class="preview-label">Exchange</span>
-								<span class="preview-value">{selectedAsset.exchange}</span>
-							</div>
-							{#if selectedAsset.currentPrice}
-								<div class="preview-item">
-									<span class="preview-label">Precio de mercado</span>
-									<span class="preview-value"
-										>{formatCurrency(parseFloat(selectedAsset.currentPrice.value))}</span
-									>
-								</div>
-							{/if}
+				<input type="hidden" name="assetId" value={formData.assetId} />
+				<input type="hidden" name="category" value={selectedAsset?.assetType ?? ''} />
+
+				<div
+					class="combobox"
+					bind:this={comboboxEl}
+					use:clickOutside={(e) => {
+						if (comboboxEl && !comboboxEl.contains(e.target as Node)) showSuggestions = false;
+					}}
+				>
+					<div class="combobox-input-wrap">
+						<input
+							id="asset-search"
+							type="text"
+							class="form-input combobox-input"
+							placeholder="Escribe el ticker o nombre, ej: AAPL, Bitcoin…"
+							autocomplete="off"
+							bind:value={assetSearch}
+							oninput={onSearchInput}
+							onfocus={onSearchFocus}
+						/>
+						{#if isSearching}
+							<span class="combobox-spinner"></span>
+						{:else if selectedAsset}
+							<button
+								type="button"
+								class="combobox-clear"
+								aria-label="Limpiar selección"
+								onclick={() => {
+									selectedAsset = null;
+									formData.assetId = '';
+									assetSearch = '';
+									showSuggestions = false;
+								}}
+							>✕</button>
+						{/if}
+					</div>
+
+					{#if showSuggestions && suggestions.length > 0}
+						<ul class="combobox-list" role="listbox">
+							{#each suggestions as asset (asset.id)}
+								<li
+									role="option"
+									aria-selected={asset.id === formData.assetId}
+									class="combobox-option"
+									class:selected={asset.id === formData.assetId}
+									onmousedown={() => selectAsset(asset)}
+								>
+									<span class="option-ticker">{asset.ticker}</span>
+									<span class="option-name">{asset.name}</span>
+									<span class="option-type">{asset.assetType}</span>
+								</li>
+							{/each}
+						</ul>
+					{:else if showSuggestions && !isSearching && assetSearch.trim().length > 0}
+						<div class="combobox-empty">
+							No se encontró ningún activo con "<strong>{assetSearch}</strong>"
 						</div>
 					{/if}
-				{:else}
-					<div class="empty-assets">
-						<p class="empty-text">No hay activos disponibles en el sistema</p>
-						<p class="empty-hint">Contacta al administrador para agregar nuevos activos</p>
+				</div>
+
+				<p class="field-hint">Búsqueda en tiempo real · escribe el ticker o nombre del activo</p>
+
+				{#if selectedAsset}
+					<div class="asset-preview">
+						<div class="preview-item">
+							<span class="preview-label">Ticker</span>
+							<span class="preview-value">{selectedAsset.ticker}</span>
+						</div>
+						<div class="preview-item">
+							<span class="preview-label">Nombre</span>
+							<span class="preview-value">{selectedAsset.name}</span>
+						</div>
+						<div class="preview-item">
+							<span class="preview-label">Tipo</span>
+							<span class="preview-value">{selectedAsset.assetType}</span>
+						</div>
+						<div class="preview-item">
+							<span class="preview-label">Exchange</span>
+							<span class="preview-value">{selectedAsset.exchange}</span>
+						</div>
+						{#if selectedAsset.currentPrice}
+							<div class="preview-item">
+								<span class="preview-label">Precio de mercado</span>
+								<span class="preview-value"
+									>{formatCurrency(parseFloat(selectedAsset.currentPrice.value))}</span
+								>
+							</div>
+						{/if}
 					</div>
 				{/if}
 			</div>
@@ -761,5 +860,101 @@
 		.btn {
 			width: 100%;
 		}
+	}
+
+	/* Combobox */
+	.combobox {
+		position: relative;
+	}
+
+	.combobox-input-wrap {
+		position: relative;
+		display: flex;
+		align-items: center;
+	}
+
+	.combobox-input {
+		width: 100%;
+		padding-right: 2.5rem;
+	}
+
+	.combobox-clear {
+		position: absolute;
+		right: 0.75rem;
+		background: transparent;
+		border: none;
+		color: rgba(236, 234, 229, 0.4);
+		font-size: 0.85rem;
+		cursor: pointer;
+		padding: 0.2rem 0.3rem;
+		border-radius: 4px;
+		transition: color 0.2s ease;
+		line-height: 1;
+	}
+
+	.combobox-clear:hover {
+		color: var(--text);
+	}
+
+	.combobox-list {
+		position: absolute;
+		top: calc(100% + 4px);
+		left: 0;
+		right: 0;
+		z-index: 50;
+		list-style: none;
+		margin: 0;
+		padding: 0.35rem 0;
+		background: var(--surface);
+		border: 1.5px solid rgba(212, 145, 42, 0.35);
+		border-radius: 10px;
+		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+		max-height: 280px;
+		overflow-y: auto;
+	}
+
+	.combobox-option {
+		display: flex;
+		align-items: baseline;
+		gap: 0.6rem;
+		padding: 0.6rem 1rem;
+		cursor: pointer;
+		transition: background 0.15s ease;
+	}
+
+	.combobox-option:hover,
+	.combobox-option.selected {
+		background: rgba(212, 145, 42, 0.1);
+	}
+
+	.option-ticker {
+		font-family: var(--font-mono);
+		font-weight: 700;
+		font-size: 0.9rem;
+		color: var(--amber);
+		min-width: 70px;
+	}
+
+	.option-name {
+		font-size: 0.88rem;
+		color: var(--text);
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.option-type {
+		font-size: 0.75rem;
+		color: rgba(236, 234, 229, 0.4);
+		text-transform: uppercase;
+		letter-spacing: 0.3px;
+		flex-shrink: 0;
+	}
+
+	.combobox-empty {
+		padding: 0.75rem 1rem;
+		font-size: 0.85rem;
+		color: rgba(236, 234, 229, 0.5);
 	}
 </style>
