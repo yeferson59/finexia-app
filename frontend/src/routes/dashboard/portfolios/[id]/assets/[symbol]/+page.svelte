@@ -444,7 +444,7 @@
 									bind:value={txnForm.quantity}
 									placeholder="100"
 									min="0"
-									step="0.00000001"
+									step="any"
 									required
 								/>
 							</div>
@@ -560,12 +560,16 @@
 						<div class="sell-panel-info">
 							<span class="sell-panel-title">Vender desde compra</span>
 							<span class="sell-panel-lot">
-								Lote: {parseFloat(sellFromTxn.quantity).toLocaleString('es-CO', { maximumFractionDigits: 8 })}
+								Lote: {parseFloat(sellFromTxn.quantity).toLocaleString('es-CO', {
+									maximumFractionDigits: 8
+								})}
 								unidades @ {fmt(parseFloat(sellFromTxn.price))} ·
 								{fmtDate(sellFromTxn.transactionDate)}
 							</span>
 						</div>
-						<button class="sell-panel-close" type="button" onclick={() => (sellFromTxn = null)}>✕</button>
+						<button class="sell-panel-close" type="button" onclick={() => (sellFromTxn = null)}
+							>✕</button
+						>
 					</div>
 
 					<div class="sell-mode-toggle">
@@ -600,7 +604,12 @@
 					>
 						<input type="hidden" name="entryId" value={sellFromTxn.entryId} />
 						<input type="hidden" name="type" value="sell" />
-						<input type="hidden" name="currency" value={entries.find((e) => e.id === sellFromTxn?.entryId)?.costCurrency ?? txnForm.currency} />
+						<input
+							type="hidden"
+							name="currency"
+							value={entries.find((e) => e.id === sellFromTxn?.entryId)?.costCurrency ??
+								txnForm.currency}
+						/>
 
 						<div class="form-row">
 							<div class="form-group">
@@ -624,7 +633,9 @@
 								/>
 							</div>
 							<div class="form-group">
-								<label class="form-label" for="sell-price">Precio unitario <span class="required">*</span></label>
+								<label class="form-label" for="sell-price"
+									>Precio unitario <span class="required">*</span></label
+								>
 								<input
 									id="sell-price"
 									type="number"
@@ -650,7 +661,9 @@
 								/>
 							</div>
 							<div class="form-group">
-								<label class="form-label" for="sell-date">Fecha <span class="required">*</span></label>
+								<label class="form-label" for="sell-date"
+									>Fecha <span class="required">*</span></label
+								>
 								<input
 									id="sell-date"
 									type="date"
