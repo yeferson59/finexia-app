@@ -110,10 +110,10 @@
 	}
 
 	$effect(() => {
-		if (form?.success === true && editingTxn !== null) {
+		if (form?.edited === true && form?.success === true && editingTxn !== null) {
 			editingTxn = null;
 		}
-		if (form?.success === false && editingTxn !== null) {
+		if (form?.edited === true && form?.success === false && editingTxn !== null) {
 			editError = true;
 		}
 	});
@@ -866,7 +866,7 @@
 				isEditSubmitting = true;
 				editError = false;
 				return async ({ update }) => {
-					await update();
+					await update({ reset: false });
 					isEditSubmitting = false;
 				};
 			}}
