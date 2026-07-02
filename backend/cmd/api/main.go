@@ -29,12 +29,30 @@ func main() {
 }
 
 func run() error {
-	app, cfg := fiber.New(fiber.Config{
+	cfg := config.New()
+	envs, ctx := cfg.LoadEnvs(), context.Background()
+
+	// The API runs behind the SvelteKit SSR server (and possibly a load
+	// balancer), so without trusting X-Forwarded-For every rate limiter would
+	// key all end users under the proxy's single IP. Only loopback/link-local/
+	// private peers (plus TRUSTED_PROXIES) are trusted, so a directly-connected
+	// public client cannot spoof its IP.
+	app := fiber.New(fiber.Config{
 		JSONEncoder:     sonic.ConfigFastest.Marshal,
 		JSONDecoder:     sonic.ConfigFastest.Unmarshal,
 		StructValidator: new(structValidator{validate: validator.New()}),
-	}), config.New()
-	envs, ctx := cfg.LoadEnvs(), context.Background()
+		ProxyHeader:     fiber.HeaderXForwardedFor,
+		TrustProxy:      envs.TrustProxy,
+		// Without validation, a trusted peer that omits X-Forwarded-For would
+		// yield an empty c.IP(); with it, Fiber falls back to the remote IP.
+		EnableIPValidation: true,
+		TrustProxyConfig: fiber.TrustProxyConfig{
+			Loopback:  true,
+			LinkLocal: true,
+			Private:   true,
+			Proxies:   envs.TrustedProxies,
+		},
+	})
 	dbPool, err := cfg.ConnectionDB(ctx, envs.DatabaseURL)
 	if err != nil {
 		return errors.New("failed to connect to database: " + err.Error())

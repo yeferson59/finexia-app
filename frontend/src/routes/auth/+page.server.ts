@@ -1,8 +1,8 @@
 import z from 'zod';
 import type { Actions } from './$types';
 import { env } from '$env/dynamic/private';
-import { dev } from '$app/environment';
 import { redirect, fail } from '@sveltejs/kit';
+import { parseRefreshSetCookie, setAccessCookie, setRefreshCookie } from '$lib/server/session';
 
 export const actions = {
 	login: async ({ request, cookies, fetch }) => {
@@ -44,24 +44,11 @@ export const actions = {
 			});
 		}
 
-		cookies.set('access_token_finexia', data.accessToken, {
-			path: '/',
-			httpOnly: true,
-			secure: !dev,
-			maxAge: 60 * 60 * 24 * 7,
-			expires: new Date(Date.now() + 60 * 60 * 24 * 7 * 1000),
-			sameSite: 'lax'
-		});
+		setAccessCookie(cookies, data.accessToken);
 
-		const rawRefreshToken = response.headers.get('set-cookie')?.match(/refresh_token=([^;]+)/)?.[1];
-		if (rawRefreshToken) {
-			cookies.set('refresh_token', rawRefreshToken, {
-				path: '/',
-				httpOnly: true,
-				secure: !dev,
-				maxAge: 60 * 60 * 24 * 30,
-				sameSite: 'lax'
-			});
+		const rotatedRefresh = parseRefreshSetCookie(response);
+		if (rotatedRefresh) {
+			setRefreshCookie(cookies, rotatedRefresh.value, rotatedRefresh.maxAge);
 		}
 
 		return redirect(302, '/dashboard');

@@ -75,5 +75,8 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	weeklySched := scheduler.NewWeeklySummaryScheduler(services, 9, rootLog) // Mondays 09:00 UTC
 	go weeklySched.Start(ctx)
 
+	authCleanupSched := scheduler.NewAuthCleanupScheduler(services, 3, rootLog) // 03:00 UTC daily
+	go authCleanupSched.Start(ctx)
+
 	return nil
 }

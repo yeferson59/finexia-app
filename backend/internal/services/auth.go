@@ -17,6 +17,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/yeferson59/finexia-app/internal/dtos/auth"
+	"github.com/yeferson59/finexia-app/internal/repositories"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
 )
 
@@ -42,6 +43,30 @@ func hashRefreshToken(raw string) (string, error) {
 
 func refreshCacheKey(hash string) string {
 	return "refresh:" + hash
+}
+
+func validateTokenCacheKey(token string) string {
+	return "validateToken-" + token
+}
+
+// revokedFamilyCacheKey marks a whole refresh-token family as revoked in cache.
+// The per-token cache entries skip the database, so without this marker a
+// revoked family's newest token would keep refreshing from cache until its TTL
+// ran out.
+func revokedFamilyCacheKey(familyID uuid.UUID) string {
+	return "revoked_family:" + familyID.String()
+}
+
+// revokeRefreshFamily revokes the family in the database and purges every
+// cached token entry, then sets the revocation marker as a backstop in case a
+// cache delete fails or races with a concurrent refresh.
+func (s *Services) revokeRefreshFamily(ctx context.Context, familyID uuid.UUID) {
+	if hashes, err := s.repos.RevokeRefreshTokenFamily(ctx, familyID); err == nil {
+		for _, hash := range hashes {
+			_ = s.storage.DeleteWithContext(ctx, refreshCacheKey(hash))
+		}
+	}
+	_ = s.storage.SetWithContext(ctx, revokedFamilyCacheKey(familyID), []byte("1"), s.cfg.JWTRefreshDuration)
 }
 
 func (s *Services) Login(ctx context.Context, email, password string) (auth.LoginInternalDTO, error) {
@@ -163,7 +188,7 @@ func (s *Services) GetSession(ctx context.Context, userID uuid.UUID, token strin
 }
 
 func (s *Services) ValidateToken(ctx context.Context, token string) (string, error) {
-	cacheKey := "validateToken" + "-" + token
+	cacheKey := validateTokenCacheKey(token)
 
 	data, _ := s.storage.GetWithContext(ctx, cacheKey)
 
@@ -313,6 +338,11 @@ func (s *Services) RefreshToken(ctx context.Context, rawToken, ipAddress, userAg
 		if time.Now().UTC().After(time.Unix(expiresUnix, 0).UTC()) {
 			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
 		}
+		// The cache entry knows nothing about revocations done through the
+		// database, so a revoked family must be rejected here explicitly.
+		if revoked, _ := s.storage.GetWithContext(ctx, revokedFamilyCacheKey(familyID)); len(revoked) > 0 {
+			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
+		}
 	} else {
 		rt, dbErr := s.repos.GetRefreshTokenByHash(ctx, oldHash)
 		if dbErr != nil {
@@ -327,7 +357,7 @@ func (s *Services) RefreshToken(ctx context.Context, rawToken, ipAddress, userAg
 		// as benign and re-issue without revoking. Outside the window, revoke the
 		// whole family.
 		if rt.UsedAt != nil && time.Since(*rt.UsedAt) > s.cfg.RefreshGracePeriod {
-			_ = s.repos.RevokeRefreshTokenFamily(ctx, rt.FamilyID)
+			s.revokeRefreshFamily(ctx, rt.FamilyID)
 			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
 		}
 		if time.Now().UTC().After(rt.ExpiresAt) {
@@ -353,9 +383,22 @@ func (s *Services) RefreshToken(ctx context.Context, rawToken, ipAddress, userAg
 		return auth.LoginInternalDTO{}, err
 	}
 
-	// Update session with new access token
-	if err := s.repos.UpdateSessionToken(ctx, sessionID, newJWT, newAccessExpiresAt); err != nil {
+	// Update session with new access token. If the session row is gone (the
+	// user logged out), this refresh token family is orphaned: revoke it so the
+	// cookie can't keep rotating tokens forever.
+	oldSessionToken, err := s.repos.UpdateSessionToken(ctx, sessionID, newJWT, newAccessExpiresAt)
+	if err != nil {
+		if errors.Is(err, repositories.ErrSessionNotFound) {
+			s.revokeRefreshFamily(ctx, familyID)
+			return auth.LoginInternalDTO{}, errors.New("invalid refresh token")
+		}
 		return auth.LoginInternalDTO{}, err
+	}
+
+	// The replaced access token may still be cached as valid; drop it so it
+	// stops being accepted the moment it is rotated out.
+	if oldSessionToken != "" && oldSessionToken != newJWT {
+		_ = s.storage.DeleteWithContext(ctx, validateTokenCacheKey(oldSessionToken))
 	}
 
 	// Generate new refresh token (same family)
@@ -394,13 +437,31 @@ func (s *Services) RefreshToken(ctx context.Context, rawToken, ipAddress, userAg
 }
 
 func (s *Services) Logout(ctx context.Context, userID uuid.UUID, accessToken, rawRefreshToken string) error {
-	if err := s.storage.DeleteWithContext(ctx, "validateToken"+"-"+accessToken); err != nil {
-		return err
-	}
+	// Cache invalidation is best-effort: a cache hiccup must not leave the user
+	// unable to log out, and the markers below close the remaining windows.
+	_ = s.storage.DeleteWithContext(ctx, validateTokenCacheKey(accessToken))
 
 	if rawRefreshToken != "" {
 		if hash, err := hashRefreshToken(rawRefreshToken); err == nil {
 			_ = s.storage.DeleteWithContext(ctx, refreshCacheKey(hash))
+		}
+	}
+
+	// Purge every cached refresh token tied to this session and mark its
+	// families revoked BEFORE deleting the session: the delete cascades to the
+	// refresh_tokens rows, but the cache entries would otherwise keep the
+	// refresh cookie working long after logout.
+	if hashes, familyIDs, err := s.repos.GetRefreshTokenFamiliesBySession(ctx, userID, accessToken); err == nil {
+		for _, hash := range hashes {
+			_ = s.storage.DeleteWithContext(ctx, refreshCacheKey(hash))
+		}
+		seen := make(map[uuid.UUID]struct{}, len(familyIDs))
+		for _, familyID := range familyIDs {
+			if _, ok := seen[familyID]; ok {
+				continue
+			}
+			seen[familyID] = struct{}{}
+			_ = s.storage.SetWithContext(ctx, revokedFamilyCacheKey(familyID), []byte("1"), s.cfg.JWTRefreshDuration)
 		}
 	}
 
@@ -409,4 +470,21 @@ func (s *Services) Logout(ctx context.Context, userID uuid.UUID, accessToken, ra
 	}
 
 	return nil
+}
+
+// CleanupExpiredAuth prunes refresh tokens that can no longer be redeemed and
+// sessions that expired with no live refresh token left. Without this, both
+// tables grow unboundedly: rows are only ever deleted on explicit logout.
+func (s *Services) CleanupExpiredAuth(ctx context.Context) (sessions, refreshTokens int64, err error) {
+	refreshTokens, err = s.repos.DeleteExpiredRefreshTokens(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	sessions, err = s.repos.DeleteExpiredSessions(ctx)
+	if err != nil {
+		return 0, refreshTokens, err
+	}
+
+	return sessions, refreshTokens, nil
 }

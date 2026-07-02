@@ -13,7 +13,7 @@ func (handler *Handlers) Login(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:login")
 	}
 
-	result, err := handler.services.Login(handler.ctx, loginDto.Email, loginDto.Password)
+	result, err := handler.services.Login(c.Context(), loginDto.Email, loginDto.Password)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "failed to login", "auth:login")
 	}
@@ -39,7 +39,7 @@ func (handler *Handlers) Register(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:register")
 	}
 
-	user, err := handler.services.Register(handler.ctx, registerDto.Name, registerDto.Email, registerDto.Password)
+	user, err := handler.services.Register(c.Context(), registerDto.Name, registerDto.Email, registerDto.Password)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "failed to register", "auth:register")
 	}
@@ -53,7 +53,7 @@ func (handler *Handlers) Refresh(c fiber.Ctx) error {
 		return handler.responseUnauthorized(c, "missing refresh token", "auth:refresh")
 	}
 
-	result, err := handler.services.RefreshToken(handler.ctx, rawToken, c.IP(), c.Get("User-Agent"))
+	result, err := handler.services.RefreshToken(c.Context(), rawToken, c.IP(), c.Get("User-Agent"))
 	if err != nil {
 		return handler.responseUnauthorized(c, "invalid refresh token", "auth:refresh")
 	}
@@ -78,7 +78,7 @@ func (handler *Handlers) GetSession(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid user id", "auth:getSession")
 	}
 
-	userSession, err := handler.services.GetSession(handler.ctx, userID, jwtoken)
+	userSession, err := handler.services.GetSession(c.Context(), userID, jwtoken)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "failed to get session", "auth:getSession")
 	}
@@ -94,7 +94,7 @@ func (handler *Handlers) Logout(c fiber.Ctx) error {
 
 	rawRefreshToken := c.Cookies("refresh_token")
 
-	if err := handler.services.Logout(handler.ctx, userID, jwtoken, rawRefreshToken); err != nil {
+	if err := handler.services.Logout(c.Context(), userID, jwtoken, rawRefreshToken); err != nil {
 		return handler.responseFromDomain(c, err, "failed to logout", "auth:logout")
 	}
 

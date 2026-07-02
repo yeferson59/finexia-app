@@ -19,6 +19,8 @@ type Env struct {
 	JWTAccessDuration  time.Duration
 	JWTRefreshDuration time.Duration
 	RefreshGracePeriod time.Duration
+	TrustProxy         bool
+	TrustedProxies     []string
 	CORSEnabled        bool
 	CORSOrigin         []string
 	AWSAccessKeyID     string
@@ -46,6 +48,8 @@ func (c *Config) LoadEnvs() *Env {
 		JWTAccessDuration:  c.getDuration("JWT_ACCESS_DURATION", 15*time.Minute),
 		JWTRefreshDuration: c.getDuration("JWT_REFRESH_DURATION", 30*24*time.Hour),
 		RefreshGracePeriod: c.getDuration("JWT_REFRESH_GRACE_PERIOD", 30*time.Second),
+		TrustProxy:         c.getBool("TRUST_PROXY", true),
+		TrustedProxies:     c.getSlice("TRUSTED_PROXIES"),
 		CORSEnabled:        c.getBool("CORS_ENABLED", true),
 		CORSOrigin:         c.getSlice("CORS_ORIGIN", "http://localhost:5173"),
 		AWSAccessKeyID:     c.getString("AWS_ACCESS_KEY_ID", ""),
