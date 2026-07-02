@@ -281,6 +281,7 @@
 
 	.card-top {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: flex-start;
 		justify-content: space-between;
 		gap: 1rem;
@@ -379,6 +380,12 @@
 		border: 1px dashed var(--border);
 		border-radius: 8px;
 		line-height: 1.6;
+	}
+
+	@media (max-width: 768px) {
+		.growth-card {
+			padding: 1.5rem;
+		}
 	}
 
 	@media (max-width: 600px) {
