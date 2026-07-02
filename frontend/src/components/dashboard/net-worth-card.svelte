@@ -110,7 +110,7 @@
 
 	.net-worth-content {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 		gap: 3rem;
 		margin-bottom: 2rem;
 		align-items: end;
@@ -157,6 +157,7 @@
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 1.5rem;
+		min-width: 0;
 	}
 
 	.card-footer {

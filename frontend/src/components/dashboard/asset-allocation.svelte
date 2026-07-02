@@ -215,8 +215,8 @@
 	}
 
 	.pie-chart {
-		width: 150px;
-		height: 150px;
+		width: clamp(80px, 20vw, 150px);
+		height: clamp(80px, 20vw, 150px);
 		flex-shrink: 0;
 		filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
 	}
@@ -305,11 +305,6 @@
 			gap: 1.5rem;
 		}
 
-		.pie-chart {
-			width: 120px;
-			height: 120px;
-		}
-
 		.pie-legend {
 			gap: 0.5rem;
 		}
@@ -326,11 +321,6 @@
 
 		.pie-container {
 			gap: 1rem;
-		}
-
-		.pie-chart {
-			width: 100px;
-			height: 100px;
 		}
 
 		.legend-item {
