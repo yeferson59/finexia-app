@@ -903,6 +903,9 @@ func (r *Repository) UpdateTransaction(ctx context.Context, userID, txnID uuid.U
 		&txn.UpdatedAt,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entities.Transaction{}, errors.New("transaction not found")
+		}
 		return entities.Transaction{}, err
 	}
 	txn.Quantity = money.MustFromString(quantityValue)

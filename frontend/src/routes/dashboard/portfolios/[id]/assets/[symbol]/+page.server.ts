@@ -203,7 +203,8 @@ export const actions: Actions = {
 		});
 
 		if (!response.ok) {
-			return { success: false, edited: true };
+			const errorJson = await response.json().catch(() => null);
+			return { success: false, edited: true, error: errorJson?.message ?? errorJson?.action };
 		}
 
 		const json = await response.json();
