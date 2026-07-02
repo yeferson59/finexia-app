@@ -57,7 +57,7 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 		finnhub.New(b.envs.FinnhubAPIKey),
 		yahoo.New(),
 	)
-	services := services.New(repos, b.envs, b.s3Client, b.storage, b.mailService, rootLog, priceProvider)
+	services := services.New(&repos, b.envs, b.s3Client, b.storage, b.mailService, rootLog, priceProvider)
 	handlers, middlewares := handlers.New(services, b.envs), middlewares.New(ctx, b.envs, b.storage, services)
 	routes := routes.New(b.app, middlewares, handlers)
 
