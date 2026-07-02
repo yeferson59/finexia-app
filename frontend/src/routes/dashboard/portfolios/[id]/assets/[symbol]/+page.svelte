@@ -109,16 +109,6 @@
 		editError = false;
 	}
 
-	$effect(() => {
-		if (form?.edited === true && form?.success === true && editingTxn !== null) {
-			editingTxn = null;
-			invalidateAll();
-		}
-		if (form?.edited === true && form?.success === false && editingTxn !== null) {
-			editError = true;
-		}
-	});
-
 	// Quick-sell state: sell directly from a buy lot
 	let sellFromTxn = $state<(typeof transactions)[0] | null>(null);
 	let sellMode = $state<'full' | 'partial'>('full');
@@ -866,9 +856,19 @@
 			use:enhance={() => {
 				isEditSubmitting = true;
 				editError = false;
-				return async ({ update }) => {
+				return async ({ result, update }) => {
 					await update({ reset: false });
 					isEditSubmitting = false;
+					const data =
+						result.type === 'success'
+							? (result.data as { success?: boolean } | undefined)
+							: undefined;
+					if (data?.success) {
+						editingTxn = null;
+						await invalidateAll();
+					} else {
+						editError = true;
+					}
 				};
 			}}
 		>
