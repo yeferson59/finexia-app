@@ -10,7 +10,7 @@ import (
 )
 
 func (h *Handlers) SyncAssetPrices(c fiber.Ctx) error {
-	assets, errs := h.services.SyncAssetPrices(h.ctx)
+	assets, errs := h.services.SyncAssetPrices(c.Context())
 
 	if len(errs) > 0 && len(assets) == 0 {
 		return h.responseInternalServerError(c, "Asset price sync failed", errs[0].Error())
@@ -25,7 +25,7 @@ func (h *Handlers) SyncSingleAsset(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid asset ID", err.Error())
 	}
 
-	asset, err := h.services.SyncAssetByID(h.ctx, assetID)
+	asset, err := h.services.SyncAssetByID(c.Context(), assetID)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Asset sync failed", err.Error())
 	}
@@ -42,7 +42,7 @@ func (h *Handlers) CreateAsset(c fiber.Ctx) error {
 	req.Ticker = strings.ToUpper(strings.TrimSpace(req.Ticker))
 	req.Currency = strings.ToUpper(strings.TrimSpace(req.Currency))
 
-	asset, err := h.services.CreateAsset(h.ctx, req.Ticker, req.Name, entities.AssetType(req.AssetType), req.Exchange, req.Currency)
+	asset, err := h.services.CreateAsset(c.Context(), req.Ticker, req.Name, entities.AssetType(req.AssetType), req.Exchange, req.Currency)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error creating asset", "Could not create asset")
 	}

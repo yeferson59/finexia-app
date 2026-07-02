@@ -1,8 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { z } from 'zod';
-import { env } from '$env/dynamic/private';
 import { fail } from '@sveltejs/kit';
-import { authedFetchSafe } from '$lib/server/api';
+import { authedFetch, authedFetchSafe } from '$lib/server/api';
 
 interface UserPreferences {
 	userId: string;
@@ -24,7 +23,6 @@ export const load: PageServerLoad = async ({ cookies, fetch }) => {
 
 export const actions = {
 	updatePreferences: async ({ request, fetch, cookies }) => {
-		const accessToken = cookies.get('access_token_finexia');
 		const formData = await request.formData();
 
 		const schema = z.object({
@@ -44,9 +42,9 @@ export const actions = {
 			});
 		}
 
-		const res = await fetch(`${env.BASE_API}/users/me/preferences`, {
+		const res = await authedFetch({ cookies, fetch }, '/users/me/preferences', {
 			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(parsed.data)
 		});
 

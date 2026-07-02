@@ -1,12 +1,10 @@
 import type { Actions } from './$types';
 import { z } from 'zod';
-import { env } from '$env/dynamic/private';
 import { redirect } from '@sveltejs/kit';
+import { authedFetch } from '$lib/server/api';
 
 export const actions = {
 	default: async ({ request, fetch, cookies }) => {
-		const accessToken = cookies.get('access_token_finexia');
-
 		const dataRequest = await request.formData();
 
 		const { success, data, error } = await z
@@ -33,12 +31,9 @@ export const actions = {
 			return { success, error: error.message };
 		}
 
-		const response = await fetch(`${env.BASE_API}/portfolios`, {
+		const response = await authedFetch({ cookies, fetch }, '/portfolios', {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${accessToken}`
-			},
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(data)
 		});
 

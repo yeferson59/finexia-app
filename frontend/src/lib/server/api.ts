@@ -41,7 +41,18 @@ export async function authedFetch(
 	path: string,
 	init: RequestInit = {}
 ): Promise<Response> {
-	const accessToken = event.cookies.get(ACCESS_COOKIE);
+	let accessToken = event.cookies.get(ACCESS_COOKIE);
+
+	// Without an access token the backend answers 400 (missing JWT), not 401,
+	// so resolve the session up front: refresh if possible, bail out otherwise.
+	if (!accessToken) {
+		const refreshToken = event.cookies.get(REFRESH_COOKIE);
+		accessToken = (refreshToken && (await refreshAccessToken(event, refreshToken))) || undefined;
+		if (!accessToken) {
+			clearSessionCookies(event.cookies);
+			redirect(302, '/auth');
+		}
+	}
 
 	let res = await doFetch(event, path, init, accessToken);
 

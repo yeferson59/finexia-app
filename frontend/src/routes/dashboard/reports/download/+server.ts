@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
+import { authedFetchSafe } from '$lib/server/api';
 
 const REPORTS: Record<string, { path: string; filename: string }> = {
 	summary: { path: '/portfolios/export/summary', filename: 'resumen-mensual.xlsx' },
@@ -7,17 +7,12 @@ const REPORTS: Record<string, { path: string; filename: string }> = {
 	risk: { path: '/portfolios/export/risk', filename: 'riesgo-volatilidad.xlsx' }
 };
 
-export const GET: RequestHandler = async ({ url, cookies }) => {
+export const GET: RequestHandler = async ({ url, cookies, fetch }) => {
 	const type = url.searchParams.get('type') ?? '';
 	const report = REPORTS[type];
 	if (!report) return new Response('Not found', { status: 404 });
 
-	const accessToken = cookies.get('access_token_finexia');
-	if (!accessToken) return new Response('Unauthorized', { status: 401 });
-
-	const res = await fetch(`${env.BASE_API}${report.path}`, {
-		headers: { Authorization: `Bearer ${accessToken}` }
-	}).catch(() => null);
+	const res = await authedFetchSafe({ cookies, fetch }, report.path);
 
 	if (!res?.ok) return new Response('Error al generar el reporte', { status: res?.status ?? 502 });
 
