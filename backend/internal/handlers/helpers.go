@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/session"
 	"github.com/google/uuid"
+
+	"github.com/yeferson59/finexia-app/internal/middlewares"
 )
 
 func (handler *Handlers) getParamUUID(c fiber.Ctx, paramName string) (uuid.UUID, error) {
@@ -109,14 +111,17 @@ func (handler *Handlers) responseUnauthorized(c fiber.Ctx, message, details stri
 }
 
 func (handler *Handlers) getUserIDTokenRole(c fiber.Ctx) (uuid.UUID, string, string, error) {
-	sess := session.FromContext(c)
-	userID, err := uuid.Parse(sess.Get("userID").(string))
+	userIDStr, _ := c.Locals(middlewares.LocalUserID).(string)
+	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		return uuid.Nil, "", "", err
 	}
 
-	role := sess.Get("role").(string)
-	token := sess.Get("token").(string)
+	token, _ := c.Locals(middlewares.LocalToken).(string)
+	role, _ := c.Locals(middlewares.LocalRole).(string)
+	if token == "" || role == "" {
+		return uuid.Nil, "", "", errors.New("missing authenticated identity")
+	}
 
 	return userID, token, role, nil
 }

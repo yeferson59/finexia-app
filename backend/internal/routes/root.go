@@ -38,7 +38,7 @@ func (r *Routes) Init() {
 	r.Marketing()
 	r.app.Get("/users/:id/avatar", r.handlers.GetUserAvatar)
 
-	r.router = r.app.Use(r.middlewares.Session(), r.middlewares.JWT(), r.middlewares.UserLimiter())
+	r.router = r.app.Use(r.middlewares.JWT(), r.middlewares.UserLimiter())
 	r.Users()
 	r.Portfolios()
 	r.ExchangeRates()

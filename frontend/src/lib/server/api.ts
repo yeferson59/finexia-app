@@ -1,39 +1,71 @@
 import { env } from '$env/dynamic/private';
 import { isRedirect, redirect } from '@sveltejs/kit';
-import type { Cookies } from '@sveltejs/kit';
+import {
+	ACCESS_COOKIE,
+	REFRESH_COOKIE,
+	clearSessionCookies,
+	refreshAccessToken,
+	type SessionEvent
+} from '$lib/server/session';
 
-type AuthedEvent = {
-	cookies: Cookies;
-	fetch: typeof fetch;
-};
+type AuthedEvent = SessionEvent;
 
-/**
- * Server-side fetch to the backend API with the access token attached.
- *
- * On a 401 the session cookies are cleared and the request is redirected to
- * `/auth`, so loaders never silently render with empty data when the session has
- * expired (which previously left users staring at a blank dashboard). The token
- * refresh itself still happens in `hooks.server.ts` before loaders run; this is
- * the safety net for the rare case where the token expires in between.
- */
-export async function authedFetch(
+function doFetch(
 	event: AuthedEvent,
 	path: string,
-	init: RequestInit = {}
+	init: RequestInit,
+	accessToken: string | undefined
 ): Promise<Response> {
-	const accessToken = event.cookies.get('access_token_finexia');
-
-	const res = await event.fetch(`${env.BASE_API}${path}`, {
+	return event.fetch(`${env.BASE_API}${path}`, {
 		...init,
 		headers: {
 			...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
 			...init.headers
 		}
 	});
+}
+
+/**
+ * Server-side fetch to the backend API with the access token attached.
+ *
+ * On a 401 the access token is refreshed (single-flight, shared with
+ * `hooks.server.ts`) and the request retried once, covering the window where
+ * the token expires between the hook and the loader. Only when the refresh
+ * token itself is rejected are the session cookies cleared and the request
+ * redirected to `/auth`, so loaders never silently render with empty data when
+ * the session has expired — and a still-valid refresh token is never discarded
+ * over a transient 401.
+ */
+export async function authedFetch(
+	event: AuthedEvent,
+	path: string,
+	init: RequestInit = {}
+): Promise<Response> {
+	let accessToken = event.cookies.get(ACCESS_COOKIE);
+
+	// Without an access token the backend answers 400 (missing JWT), not 401,
+	// so resolve the session up front: refresh if possible, bail out otherwise.
+	if (!accessToken) {
+		const refreshToken = event.cookies.get(REFRESH_COOKIE);
+		accessToken = (refreshToken && (await refreshAccessToken(event, refreshToken))) || undefined;
+		if (!accessToken) {
+			clearSessionCookies(event.cookies);
+			redirect(302, '/auth');
+		}
+	}
+
+	let res = await doFetch(event, path, init, accessToken);
 
 	if (res.status === 401) {
-		event.cookies.delete('access_token_finexia', { path: '/' });
-		event.cookies.delete('refresh_token', { path: '/' });
+		const refreshToken = event.cookies.get(REFRESH_COOKIE);
+		const newAccessToken = refreshToken ? await refreshAccessToken(event, refreshToken) : null;
+
+		if (newAccessToken) {
+			res = await doFetch(event, path, init, newAccessToken);
+			if (res.status !== 401) return res;
+		}
+
+		clearSessionCookies(event.cookies);
 		redirect(302, '/auth');
 	}
 

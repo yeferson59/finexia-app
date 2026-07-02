@@ -2,6 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { env } from '$env/dynamic/private';
 import { redirect } from '@sveltejs/kit';
 import { authedFetchSafe } from '$lib/server/api';
+import { ACCESS_COOKIE, REFRESH_COOKIE, clearSessionCookies } from '$lib/server/session';
 
 interface PortfolioSummary {
 	id: string;
@@ -93,23 +94,22 @@ export const load: PageServerLoad = async ({ cookies, fetch }) => {
 
 export const actions = {
 	logout: async ({ cookies, fetch }) => {
-		const token = cookies.get('access_token_finexia');
+		const token = cookies.get(ACCESS_COOKIE);
 
 		if (!token) return { success: false };
 
-		const refreshToken = cookies.get('refresh_token');
+		const refreshToken = cookies.get(REFRESH_COOKIE);
 
 		await fetch(`${env.BASE_API}/auth/logout`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
 				Authorization: `Bearer ${token}`,
-				...(refreshToken ? { Cookie: `refresh_token=${refreshToken}` } : {})
+				...(refreshToken ? { Cookie: `${REFRESH_COOKIE}=${refreshToken}` } : {})
 			}
 		});
 
-		cookies.delete('access_token_finexia', { path: '/' });
-		cookies.delete('refresh_token', { path: '/' });
+		clearSessionCookies(cookies);
 
 		return redirect(302, '/auth');
 	}

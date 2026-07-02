@@ -1,6 +1,11 @@
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, HandleFetch } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { dev } from '$app/environment';
+import {
+	ACCESS_COOKIE,
+	REFRESH_COOKIE,
+	clearSessionCookies,
+	refreshAccessToken
+} from '$lib/server/session';
 
 type SessionResponse = {
 	data: {
@@ -45,64 +50,6 @@ function needsSession(pathname: string): boolean {
 	return PRIVATE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-type RefreshResult = { accessToken: string; refreshToken: string | null };
-
-// Single-flight: concurrent requests carrying the same refresh token (e.g. link
-// preload racing with the click navigation) must not each POST /auth/refresh.
-// The backend rotates the refresh token on every call, so two concurrent calls
-// with the same token would trip reuse detection and revoke the whole family.
-// We dedupe by sharing the in-flight promise keyed by the refresh token; each
-// request then sets its own cookies from the shared result.
-const inFlightRefreshes = new Map<string, Promise<RefreshResult | null>>();
-
-async function performRefresh(
-	event: Parameters<Handle>[0]['event'],
-	refreshToken: string
-): Promise<RefreshResult | null> {
-	const res = await event.fetch(`${env.BASE_API}/auth/refresh`, {
-		method: 'POST',
-		headers: { Cookie: `refresh_token=${refreshToken}` }
-	});
-
-	if (!res.ok) return null;
-
-	const { data, success } = await res.json();
-	if (!success || !data?.accessToken) return null;
-
-	const newRefreshToken =
-		res.headers.get('set-cookie')?.match(/refresh_token=([^;]+)/)?.[1] ?? null;
-
-	return { accessToken: data.accessToken as string, refreshToken: newRefreshToken };
-}
-
-async function refreshAccessToken(
-	event: Parameters<Handle>[0]['event'],
-	refreshToken: string
-): Promise<string | null> {
-	let pending = inFlightRefreshes.get(refreshToken);
-	if (!pending) {
-		pending = performRefresh(event, refreshToken).finally(() => {
-			inFlightRefreshes.delete(refreshToken);
-		});
-		inFlightRefreshes.set(refreshToken, pending);
-	}
-
-	const result = await pending;
-	if (!result) return null;
-
-	if (result.refreshToken) {
-		event.cookies.set('refresh_token', result.refreshToken, {
-			path: '/',
-			httpOnly: true,
-			secure: !dev,
-			maxAge: 60 * 60 * 24 * 30,
-			sameSite: 'lax'
-		});
-	}
-
-	return result.accessToken;
-}
-
 async function resolveSession(
 	event: Parameters<Handle>[0]['event'],
 	accessToken: string
@@ -127,8 +74,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.session = null;
 
 	if (needsSession(event.url.pathname)) {
-		const accessToken = event.cookies.get('access_token_finexia');
-		const refreshToken = event.cookies.get('refresh_token');
+		const accessToken = event.cookies.get(ACCESS_COOKIE);
+		const refreshToken = event.cookies.get(REFRESH_COOKIE);
 
 		if (accessToken) {
 			const valid = await resolveSession(event, accessToken);
@@ -137,37 +84,22 @@ export const handle: Handle = async ({ event, resolve }) => {
 				const newAccessToken = await refreshAccessToken(event, refreshToken);
 
 				if (newAccessToken) {
-					event.cookies.set('access_token_finexia', newAccessToken, {
-						path: '/',
-						httpOnly: true,
-						secure: !dev,
-						maxAge: 60 * 60 * 24 * 7,
-						sameSite: 'lax'
-					});
 					await resolveSession(event, newAccessToken);
 				} else {
-					event.cookies.delete('access_token_finexia', { path: '/' });
-					event.cookies.delete('refresh_token', { path: '/' });
+					clearSessionCookies(event.cookies);
 				}
 			} else if (!valid) {
 				// Token inválido sin refresh token disponible — eliminar para evitar
 				// que acciones de formulario envíen un token expirado al backend.
-				event.cookies.delete('access_token_finexia', { path: '/' });
+				event.cookies.delete(ACCESS_COOKIE, { path: '/' });
 			}
 		} else if (refreshToken) {
 			const newAccessToken = await refreshAccessToken(event, refreshToken);
 
 			if (newAccessToken) {
-				event.cookies.set('access_token_finexia', newAccessToken, {
-					path: '/',
-					httpOnly: true,
-					secure: !dev,
-					maxAge: 60 * 60 * 24 * 7,
-					sameSite: 'lax'
-				});
 				await resolveSession(event, newAccessToken);
 			} else {
-				event.cookies.delete('refresh_token', { path: '/' });
+				event.cookies.delete(REFRESH_COOKIE, { path: '/' });
 			}
 		}
 	}
@@ -175,4 +107,20 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const response = await resolve(event);
 
 	return withRobots(event, response);
+};
+
+// Forward the real client IP on every server-side call to the backend. The
+// backend keys its rate limiters by IP; without this header every user would
+// share the SSR server's single IP and collide on the same limit buckets.
+export const handleFetch: HandleFetch = async ({ event, request, fetch }) => {
+	if (env.BASE_API && request.url.startsWith(env.BASE_API)) {
+		try {
+			request.headers.set('X-Forwarded-For', event.getClientAddress());
+		} catch {
+			// getClientAddress() throws when the address is unavailable (e.g.
+			// prerendering); the backend then falls back to the direct peer IP.
+		}
+	}
+
+	return fetch(request);
 };

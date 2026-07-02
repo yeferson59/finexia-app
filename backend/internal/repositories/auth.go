@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/yeferson59/finexia-app/internal/entities"
 )
@@ -54,9 +55,28 @@ func (r *Repository) CreateSession(ctx context.Context, userID uuid.UUID, token 
 	return id, nil
 }
 
-func (r *Repository) UpdateSessionToken(ctx context.Context, sessionID uuid.UUID, newToken string, expiresAt time.Time) error {
-	_, err := r.db.Exec(ctx, "UPDATE sessions SET token=$1, expires_at=$2, updated_at=NOW() WHERE id=$3", newToken, expiresAt, sessionID)
-	return err
+// ErrSessionNotFound indicates the session row no longer exists (e.g. the user
+// logged out), so any refresh token still pointing at it must be rejected.
+var ErrSessionNotFound = errors.New("session not found")
+
+// UpdateSessionToken swaps the session's access token and returns the previous
+// one so callers can invalidate its cache entry.
+func (r *Repository) UpdateSessionToken(ctx context.Context, sessionID uuid.UUID, newToken string, expiresAt time.Time) (string, error) {
+	var oldToken string
+	err := r.db.QueryRow(ctx,
+		`UPDATE sessions s SET token=$1, expires_at=$2, updated_at=NOW()
+		 FROM sessions old
+		 WHERE s.id=$3 AND old.id=s.id
+		 RETURNING old.token`,
+		newToken, expiresAt, sessionID,
+	).Scan(&oldToken)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrSessionNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	return oldToken, nil
 }
 
 func (r *Repository) CreateRefreshToken(ctx context.Context, userID uuid.UUID, tokenHash string, familyID, sessionID uuid.UUID, ip, ua *string, expiresAt time.Time) (uuid.UUID, error) {
@@ -92,9 +112,59 @@ func (r *Repository) MarkRefreshTokenUsed(ctx context.Context, id uuid.UUID) err
 	return err
 }
 
-func (r *Repository) RevokeRefreshTokenFamily(ctx context.Context, familyID uuid.UUID) error {
-	_, err := r.db.Exec(ctx, "UPDATE refresh_tokens SET revoked_at=NOW() WHERE family_id=$1 AND revoked_at IS NULL", familyID)
-	return err
+// RevokeRefreshTokenFamily revokes every live token in the family and returns
+// their hashes so callers can purge the corresponding cache entries.
+func (r *Repository) RevokeRefreshTokenFamily(ctx context.Context, familyID uuid.UUID) ([]string, error) {
+	rows, err := r.db.Query(ctx, "UPDATE refresh_tokens SET revoked_at=NOW() WHERE family_id=$1 AND revoked_at IS NULL RETURNING token_hash", familyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var hashes []string
+	for rows.Next() {
+		var hash string
+		if err := rows.Scan(&hash); err != nil {
+			return nil, err
+		}
+		hashes = append(hashes, hash)
+	}
+	return hashes, rows.Err()
+}
+
+// GetRefreshTokenFamiliesBySession returns hashes and family IDs of the live
+// refresh tokens tied to a session, so logout can purge cache entries and mark
+// the families revoked before the session row (and, via ON DELETE CASCADE, the
+// token rows) disappears.
+func (r *Repository) GetRefreshTokenFamiliesBySession(ctx context.Context, userID uuid.UUID, sessionToken string) ([]string, []uuid.UUID, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT rt.token_hash, rt.family_id
+		 FROM refresh_tokens rt
+		 JOIN sessions s ON s.id = rt.session_id
+		 WHERE s.user_id = $1 AND s.token = $2 AND rt.revoked_at IS NULL`,
+		userID.String(), sessionToken,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	var (
+		hashes    []string
+		familyIDs []uuid.UUID
+	)
+	for rows.Next() {
+		var (
+			hash     string
+			familyID uuid.UUID
+		)
+		if err := rows.Scan(&hash, &familyID); err != nil {
+			return nil, nil, err
+		}
+		hashes = append(hashes, hash)
+		familyIDs = append(familyIDs, familyID)
+	}
+	return hashes, familyIDs, rows.Err()
 }
 
 func (r *Repository) Register(ctx context.Context, name, email, password string) (entities.User, error) {
@@ -177,4 +247,34 @@ func (r *Repository) DeleteSessionByUserIDToken(ctx context.Context, userID uuid
 	_, err := r.db.Exec(ctx, "DELETE FROM sessions WHERE user_id = $1 AND token = $2", userID.String(), token)
 
 	return err
+}
+
+// DeleteExpiredRefreshTokens removes tokens that can never be redeemed again:
+// past their expiry, revoked, or consumed long ago by rotation.
+func (r *Repository) DeleteExpiredRefreshTokens(ctx context.Context) (int64, error) {
+	tag, err := r.db.Exec(ctx,
+		`DELETE FROM refresh_tokens
+		 WHERE expires_at < NOW()
+		    OR revoked_at < NOW() - INTERVAL '7 days'
+		    OR (used_at IS NOT NULL AND used_at < NOW() - INTERVAL '7 days')`,
+	)
+	return tag.RowsAffected(), err
+}
+
+// DeleteExpiredSessions removes sessions whose access token expired and that
+// have no live refresh token left. Sessions with a live refresh token must be
+// kept even if expires_at is in the past: refresh_tokens.session_id cascades on
+// delete, so removing the session would silently log the user out.
+func (r *Repository) DeleteExpiredSessions(ctx context.Context) (int64, error) {
+	tag, err := r.db.Exec(ctx,
+		`DELETE FROM sessions s
+		 WHERE s.expires_at < NOW()
+		   AND NOT EXISTS (
+		     SELECT 1 FROM refresh_tokens rt
+		     WHERE rt.session_id = s.id
+		       AND rt.revoked_at IS NULL
+		       AND rt.expires_at > NOW()
+		   )`,
+	)
+	return tag.RowsAffected(), err
 }

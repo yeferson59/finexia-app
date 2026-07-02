@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { z } from 'zod';
-import { env } from '$env/dynamic/private';
-import { fail, redirect } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
+import { authedFetch } from '$lib/server/api';
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -11,7 +11,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions = {
 	updateProfile: async ({ request, fetch, cookies }) => {
-		const accessToken = cookies.get('access_token_finexia');
 		const formData = await request.formData();
 
 		const schema = z.object({
@@ -33,9 +32,9 @@ export const actions = {
 			return fail(400, { action: 'updateProfile', error: parsed.error.issues[0].message });
 		}
 
-		const res = await fetch(`${env.BASE_API}/users/me`, {
+		const res = await authedFetch({ cookies, fetch }, '/users/me', {
 			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(parsed.data)
 		});
 
@@ -51,12 +50,6 @@ export const actions = {
 	},
 
 	uploadAvatar: async ({ request, fetch, cookies }) => {
-		const accessToken = cookies.get('access_token_finexia');
-
-		if (!accessToken) {
-			return redirect(303, '/auth');
-		}
-
 		const formData = await request.formData();
 		const file = formData.get('avatar');
 
@@ -78,16 +71,12 @@ export const actions = {
 		const body = new FormData();
 		body.append('avatar', file);
 
-		const res = await fetch(`${env.BASE_API}/users/me/avatar`, {
+		const res = await authedFetch({ cookies, fetch }, '/users/me/avatar', {
 			method: 'POST',
-			headers: { Authorization: `Bearer ${accessToken}` },
 			body
 		});
 
 		if (!res.ok) {
-			if (res.status === 401) {
-				return redirect(303, '/auth');
-			}
 			const err = await res.json().catch(() => ({}));
 			return fail(res.status, {
 				action: 'uploadAvatar',
@@ -100,7 +89,6 @@ export const actions = {
 	},
 
 	changePassword: async ({ request, fetch, cookies }) => {
-		const accessToken = cookies.get('access_token_finexia');
 		const formData = await request.formData();
 
 		const schema = z
@@ -124,9 +112,9 @@ export const actions = {
 			return fail(400, { action: 'changePassword', error: parsed.error.issues[0].message });
 		}
 
-		const res = await fetch(`${env.BASE_API}/users/me/password`, {
+		const res = await authedFetch({ cookies, fetch }, '/users/me/password', {
 			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				currentPassword: parsed.data.currentPassword,
 				newPassword: parsed.data.newPassword

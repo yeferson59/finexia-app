@@ -17,7 +17,7 @@ func (h *Handlers) GetPortfolios(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	portfolios, err := h.services.GetPortfolios(h.ctx, userID)
+	portfolios, err := h.services.GetPortfolios(c.Context(), userID)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error retrieving portfolios", "Could not retrieve portfolios")
 	}
@@ -31,7 +31,7 @@ func (h *Handlers) GetPortfoliosSummary(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	summaries, err := h.services.GetPortfoliosSummary(h.ctx, userID)
+	summaries, err := h.services.GetPortfoliosSummary(c.Context(), userID)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error retrieving portfolio summaries", "Could not retrieve portfolio summaries")
 	}
@@ -50,7 +50,7 @@ func (h *Handlers) GetPortfolio(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid portfolio ID", err.Error())
 	}
 
-	portfolioDetail, err := h.services.GetPortfolio(h.ctx, userID, portfolioID)
+	portfolioDetail, err := h.services.GetPortfolio(c.Context(), userID, portfolioID)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error retrieving portfolio", "Could not retrieve portfolio")
 	}
@@ -59,7 +59,7 @@ func (h *Handlers) GetPortfolio(c fiber.Ctx) error {
 }
 
 func (h *Handlers) GetPortfoliosRisks(c fiber.Ctx) error {
-	risks, err := h.services.GetPortfoliosRisks(h.ctx)
+	risks, err := h.services.GetPortfoliosRisks(c.Context())
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error retrieving portfolio risks", "Could not retrieve portfolio risks")
 	}
@@ -88,7 +88,7 @@ func (h *Handlers) CreatePortfolio(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid risk", "A valid risk level is required")
 	}
 
-	portfolio, err := h.services.CreatePortfolio(h.ctx, userID, req.Name, req.Description, req.Currency, req.RiskID, portfolioType, req.PriceValue, req.IsDefault)
+	portfolio, err := h.services.CreatePortfolio(c.Context(), userID, req.Name, req.Description, req.Currency, req.RiskID, portfolioType, req.PriceValue, req.IsDefault)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error creating portfolio", "Could not create portfolio")
 	}
@@ -107,7 +107,7 @@ func (h *Handlers) GetPortfolioTopTransaction(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid portfolio ID", err.Error())
 	}
 
-	dto, err := h.services.GetPortfolioTopTransaction(h.ctx, userID, portfolioID)
+	dto, err := h.services.GetPortfolioTopTransaction(c.Context(), userID, portfolioID)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error retrieving top transaction", "Could not retrieve top transaction")
 	}
@@ -141,7 +141,7 @@ func (h *Handlers) UpdatePortfolio(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid risk ID", err.Error())
 	}
 
-	updated, err := h.services.UpdatePortfolio(h.ctx, userID, portfolioID, req.Name, req.Description, portfolioType, riskID, req.IsDefault)
+	updated, err := h.services.UpdatePortfolio(c.Context(), userID, portfolioID, req.Name, req.Description, portfolioType, riskID, req.IsDefault)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error updating portfolio", "Could not update portfolio")
 	}
@@ -166,7 +166,7 @@ func (h *Handlers) CreatePlatform(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid source type", "Source type must be one of: broker, bank, tradingPlatform, neobank, defi, cryptoWallet, mutualFunds, brokerageHouse, other")
 	}
 
-	platform, err := h.services.CreatePlatform(h.ctx, userID, sourceType, req.Name, req.Description)
+	platform, err := h.services.CreatePlatform(c.Context(), userID, sourceType, req.Name, req.Description)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error creating platform", "Could not create platform")
 	}
@@ -180,7 +180,7 @@ func (h *Handlers) GetPlatforms(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	platforms, err := h.services.GetPlatforms(h.ctx, userID)
+	platforms, err := h.services.GetPlatforms(c.Context(), userID)
 	if err != nil {
 		return h.responseFromDomain(c, err, "", "")
 	}
@@ -224,7 +224,7 @@ func (h *Handlers) UpdatePlatform(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid source type", "Source type must be one of: broker, investment_bank, trading_platform, neobank, de_fi, crypto_wallet, mutual_funds, brokerage_house, other")
 	}
 
-	p, err := h.services.UpdatePlatform(h.ctx, userID, sourceID, req.Name, req.Description, sourceType, req.IsActive)
+	p, err := h.services.UpdatePlatform(c.Context(), userID, sourceID, req.Name, req.Description, sourceType, req.IsActive)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error updating platform", "Could not update platform")
 	}
@@ -253,7 +253,7 @@ func (h *Handlers) DeletePlatform(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid platform ID", err.Error())
 	}
 
-	if err := h.services.DeletePlatform(h.ctx, userID, sourceID); err != nil {
+	if err := h.services.DeletePlatform(c.Context(), userID, sourceID); err != nil {
 		return h.responseFromDomain(c, err, "Error deleting platform", "Could not delete platform")
 	}
 
@@ -286,7 +286,7 @@ func (h *Handlers) CreatePortfolioEntry(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid transaction type", "Type must be one of: buy, sell, dividend, split, transfer_in, transfer_out, fee, interest")
 	}
 
-	entry, err := h.services.CreatePortfolioEntry(h.ctx, userID, req.PortfolioID, req.AssetID, req.SourceID, txnType, req.Quantity, req.Price, req.CostCurrency, category, req.EntryDate, req.Notes)
+	entry, err := h.services.CreatePortfolioEntry(c.Context(), userID, req.PortfolioID, req.AssetID, req.SourceID, txnType, req.Quantity, req.Price, req.CostCurrency, category, req.EntryDate, req.Notes)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error creating portfolio entry", "Could not create portfolio entry")
 	}
@@ -310,7 +310,7 @@ func (h *Handlers) UpdateAssetPrice(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid request", err.Error())
 	}
 
-	asset, err := h.services.UpdateAssetPrice(h.ctx, assetID, req.Price)
+	asset, err := h.services.UpdateAssetPrice(c.Context(), assetID, req.Price)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error updating asset price", "Could not update asset price")
 	}
@@ -324,7 +324,7 @@ func (h *Handlers) GetAssetAllocation(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	items, err := h.services.GetAssetAllocation(h.ctx, userID)
+	items, err := h.services.GetAssetAllocation(c.Context(), userID)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error retrieving asset allocation", "Could not retrieve asset allocation")
 	}
@@ -338,7 +338,7 @@ func (h *Handlers) GetUserTransactions(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	txns, err := h.services.GetRecentUserTransactions(h.ctx, userID, 50)
+	txns, err := h.services.GetRecentUserTransactions(c.Context(), userID, 50)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error retrieving transactions", "Could not retrieve transactions")
 	}
@@ -357,7 +357,7 @@ func (h *Handlers) GetTransactions(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid entry ID", err.Error())
 	}
 
-	txns, err := h.services.GetTransactionsByEntry(h.ctx, userID, entryID)
+	txns, err := h.services.GetTransactionsByEntry(c.Context(), userID, entryID)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error retrieving transactions", "Could not retrieve transactions")
 	}
@@ -386,7 +386,7 @@ func (h *Handlers) CreateTransaction(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid transaction type", "Type must be one of: buy, sell, dividend, split, transfer_in, transfer_out, fee, interest")
 	}
 
-	txn, err := h.services.CreateTransaction(h.ctx, userID, entryID, txnType, req.Quantity, req.Price, req.Currency, req.Fees, req.TransactionDate, req.Notes)
+	txn, err := h.services.CreateTransaction(c.Context(), userID, entryID, txnType, req.Quantity, req.Price, req.Currency, req.Fees, req.TransactionDate, req.Notes)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error creating transaction", "Could not create transaction")
 	}
@@ -415,7 +415,7 @@ func (h *Handlers) UpdateTransaction(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid transaction type", "Type must be one of: buy, sell, dividend, split, transfer_in, transfer_out, fee, interest")
 	}
 
-	txn, err := h.services.UpdateTransaction(h.ctx, userID, txnID, txnType, req.Quantity, req.Price, req.Currency, req.Fees, req.TransactionDate, req.Notes)
+	txn, err := h.services.UpdateTransaction(c.Context(), userID, txnID, txnType, req.Quantity, req.Price, req.Currency, req.Fees, req.TransactionDate, req.Notes)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error updating transaction", "Could not update transaction")
 	}
@@ -434,9 +434,9 @@ func (h *Handlers) GetAssets(c fiber.Ctx) error {
 	var assets []entities.Asset
 	var err error
 	if search != "" {
-		assets, err = h.services.SearchAssets(h.ctx, search, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
+		assets, err = h.services.SearchAssets(c.Context(), search, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
 	} else {
-		assets, err = h.services.GetAssets(h.ctx, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
+		assets, err = h.services.GetAssets(c.Context(), uint(paginateInfo.Offset), uint(paginateInfo.Limit))
 	}
 
 	if err != nil {
@@ -454,7 +454,7 @@ func (h *Handlers) GetPortfolioGrowth(c fiber.Ctx) error {
 
 	period := c.Query("period", "ALL")
 
-	points, summary, err := h.services.GetPortfolioGrowth(h.ctx, userID, period)
+	points, summary, err := h.services.GetPortfolioGrowth(c.Context(), userID, period)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error retrieving portfolio growth", "Could not retrieve portfolio growth data")
 	}
@@ -487,7 +487,7 @@ func (h *Handlers) GetAssetTransactions(c fiber.Ctx) error {
 	page := paginateInfo.Page
 	limit := paginateInfo.Limit
 
-	txns, total, err := h.services.GetAssetTransactionsPaginated(h.ctx, userID, portfolioID, ticker, page, limit)
+	txns, total, err := h.services.GetAssetTransactionsPaginated(c.Context(), userID, portfolioID, ticker, page, limit)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error retrieving asset transactions", "Could not retrieve asset transactions")
 	}

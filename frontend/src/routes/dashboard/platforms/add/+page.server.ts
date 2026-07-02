@@ -1,7 +1,7 @@
 import z from 'zod';
 import type { Actions } from './$types';
-import { env } from '$env/dynamic/private';
 import { redirect } from '@sveltejs/kit';
+import { authedFetch } from '$lib/server/api';
 
 export const actions = {
 	default: async ({ request, cookies, fetch }) => {
@@ -23,18 +23,9 @@ export const actions = {
 			return { error: error.message };
 		}
 
-		const accessToken = cookies.get('access_token_finexia');
-
-		if (!accessToken) {
-			return { error: 'No access token found' };
-		}
-
-		const res = await fetch(`${env.BASE_API}/portfolios/sources`, {
+		const res = await authedFetch({ cookies, fetch }, '/portfolios/sources', {
 			method: 'POST',
-			headers: {
-				Authorization: `Bearer ${accessToken}`,
-				'Content-Type': 'application/json'
-			},
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(data)
 		});
 

@@ -1,4 +1,3 @@
-import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 import { authedFetch, authedFetchSafe } from '$lib/server/api';
 import type { PageServerLoad, Actions } from './$types';
@@ -114,7 +113,6 @@ const txnSchema = z.object({
 
 export const actions: Actions = {
 	default: async ({ request, fetch, cookies }) => {
-		const accessToken = cookies.get('access_token_finexia');
 		const formData = await request.formData();
 
 		const { success, error, data } = await z
@@ -135,14 +133,12 @@ export const actions: Actions = {
 			return { success: false, error: error.message };
 		}
 
-		const response = await fetch(
-			`${env.BASE_API}/portfolios/entries/${data.entryId}/transactions`,
+		const response = await authedFetch(
+			{ cookies, fetch },
+			`/portfolios/entries/${data.entryId}/transactions`,
 			{
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${accessToken}`
-				},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					type: data.type,
 					quantity: data.quantity,
@@ -164,7 +160,6 @@ export const actions: Actions = {
 	},
 
 	editTransaction: async ({ request, fetch, cookies }) => {
-		const accessToken = cookies.get('access_token_finexia');
 		const formData = await request.formData();
 
 		const { success, error, data } = await z
@@ -185,22 +180,23 @@ export const actions: Actions = {
 			return { success: false, edited: true, error: error.message };
 		}
 
-		const response = await fetch(`${env.BASE_API}/portfolios/transactions/${data.txnId}`, {
-			method: 'PUT',
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${accessToken}`
-			},
-			body: JSON.stringify({
-				type: data.type,
-				quantity: data.quantity,
-				price: data.price,
-				currency: data.currency,
-				fees: data.fees,
-				transactionDate: data.transactionDate,
-				notes: data.notes ?? ''
-			})
-		});
+		const response = await authedFetch(
+			{ cookies, fetch },
+			`/portfolios/transactions/${data.txnId}`,
+			{
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					type: data.type,
+					quantity: data.quantity,
+					price: data.price,
+					currency: data.currency,
+					fees: data.fees,
+					transactionDate: data.transactionDate,
+					notes: data.notes ?? ''
+				})
+			}
+		);
 
 		if (!response.ok) {
 			const errorJson = await response.json().catch(() => null);

@@ -1,7 +1,7 @@
 import z from 'zod';
 import { error, redirect } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
 import type { Actions, PageServerLoad } from './$types';
+import { authedFetch } from '$lib/server/api';
 
 export const load: PageServerLoad = async ({ params, parent }) => {
 	const { platforms } = await parent();
@@ -41,15 +41,9 @@ export const actions: Actions = {
 			return { success: false, error: zodError.message };
 		}
 
-		const accessToken = cookies.get('access_token_finexia');
-		if (!accessToken) return { success: false, error: 'No access token' };
-
-		const res = await fetch(`${env.BASE_API}/portfolios/sources/${params.id}`, {
+		const res = await authedFetch({ cookies, fetch }, `/portfolios/sources/${params.id}`, {
 			method: 'PATCH',
-			headers: {
-				Authorization: `Bearer ${accessToken}`,
-				'Content-Type': 'application/json'
-			},
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(data)
 		});
 
@@ -60,12 +54,8 @@ export const actions: Actions = {
 	},
 
 	delete: async ({ cookies, fetch, params }) => {
-		const accessToken = cookies.get('access_token_finexia');
-		if (!accessToken) return { success: false, error: 'No access token' };
-
-		const res = await fetch(`${env.BASE_API}/portfolios/sources/${params.id}`, {
-			method: 'DELETE',
-			headers: { Authorization: `Bearer ${accessToken}` }
+		const res = await authedFetch({ cookies, fetch }, `/portfolios/sources/${params.id}`, {
+			method: 'DELETE'
 		});
 
 		if (!res.ok) return { success: false, error: 'Error al eliminar la plataforma' };

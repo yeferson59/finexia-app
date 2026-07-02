@@ -1,6 +1,5 @@
 import z from 'zod';
 import { error, fail } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
 import { authedFetch } from '$lib/server/api';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -115,17 +114,9 @@ export const actions: Actions = {
 			return fail(400, { action: 'updatePortfolio', success: false, error: zodError.message });
 		}
 
-		const accessToken = cookies.get('access_token_finexia');
-		if (!accessToken) {
-			return fail(401, { action: 'updatePortfolio', success: false, error: 'No access token' });
-		}
-
-		const res = await fetch(`${env.BASE_API}/portfolios/${params.id}`, {
+		const res = await authedFetch({ cookies, fetch }, `/portfolios/${params.id}`, {
 			method: 'PATCH',
-			headers: {
-				Authorization: `Bearer ${accessToken}`,
-				'Content-Type': 'application/json'
-			},
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(data)
 		});
 

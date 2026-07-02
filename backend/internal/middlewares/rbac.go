@@ -4,15 +4,13 @@ import (
 	"slices"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/session"
 )
 
-// RequireRole allows only requests whose session role matches one of the given roles.
-// Must be placed after the Session and JWT middlewares in the handler chain.
+// RequireRole allows only requests whose authenticated role matches one of the
+// given roles. Must be placed after the JWT middleware in the handler chain.
 func (m *Middlewares) RequireRole(roles ...string) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		sess := session.FromContext(c)
-		role, _ := sess.Get("role").(string)
+		role, _ := c.Locals(LocalRole).(string)
 
 		if slices.Contains(roles, role) {
 			return c.Next()
