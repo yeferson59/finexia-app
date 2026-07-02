@@ -94,6 +94,7 @@
 	});
 	let isEditSubmitting = $state(false);
 	let editError = $state(false);
+	let editErrorMessage = $state('');
 
 	function startEdit(txn: (typeof transactions)[0]) {
 		editingTxn = txn;
@@ -107,6 +108,7 @@
 			notes: txn.notes
 		};
 		editError = false;
+		editErrorMessage = '';
 	}
 
 	// Quick-sell state: sell directly from a buy lot
@@ -856,18 +858,20 @@
 			use:enhance={() => {
 				isEditSubmitting = true;
 				editError = false;
+				editErrorMessage = '';
 				return async ({ result, update }) => {
 					await update({ reset: false });
 					isEditSubmitting = false;
 					const data =
 						result.type === 'success'
-							? (result.data as { success?: boolean } | undefined)
+							? (result.data as { success?: boolean; error?: string } | undefined)
 							: undefined;
 					if (data?.success) {
 						editingTxn = null;
 						await invalidateAll();
 					} else {
 						editError = true;
+						editErrorMessage = data?.error ?? '';
 					}
 				};
 			}}
@@ -1000,7 +1004,9 @@
 			</div>
 
 			{#if editError}
-				<p class="form-error-msg">No se pudo actualizar la transacción. Verifica los datos.</p>
+				<p class="form-error-msg">
+					{editErrorMessage || 'No se pudo actualizar la transacción. Verifica los datos.'}
+				</p>
 			{/if}
 
 			<div class="form-actions">
