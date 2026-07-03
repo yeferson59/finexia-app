@@ -94,7 +94,12 @@ export const actions = {
 		const schema = z
 			.object({
 				currentPassword: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
-				newPassword: z.string().min(8, 'La nueva contraseña debe tener al menos 8 caracteres'),
+				// El login exige max 20; sin este límite el usuario podría fijar una
+				// contraseña con la que luego no puede iniciar sesión.
+				newPassword: z
+					.string()
+					.min(8, 'La nueva contraseña debe tener al menos 8 caracteres')
+					.max(20, 'La nueva contraseña no puede superar 20 caracteres'),
 				confirmPassword: z.string()
 			})
 			.refine((d) => d.newPassword === d.confirmPassword, {

@@ -34,11 +34,13 @@
 	const portfolioTypes = [
 		{ value: 'stocks_etfs', label: 'Acciones y ETF', icon: '📈' },
 		{ value: 'stocks', label: 'Solo Acciones', icon: '🏛️' },
+		{ value: 'etfs', label: 'Solo ETFs', icon: '🧺' },
 		{ value: 'cryptos', label: 'Criptomonedas', icon: '₿' },
 		{ value: 'bonds', label: 'Bonos y Renta Fija', icon: '📊' },
 		{ value: 'diversified', label: 'Portafolio Diverso', icon: '🎯' },
 		{ value: 'forex', label: 'Divisas y Forex', icon: '💱' },
-		{ value: 'commodities', label: 'Commodities', icon: '⛏️' }
+		{ value: 'commodities', label: 'Commodities', icon: '⛏️' },
+		{ value: 'cash', label: 'Efectivo', icon: '💵' }
 	];
 
 	const currencies = ['USD', 'COP', 'EUR', 'MXN', 'ARS'];

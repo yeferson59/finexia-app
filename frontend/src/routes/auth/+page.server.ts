@@ -10,7 +10,8 @@ export const actions = {
 		const loginDto = await z
 			.object({
 				email: z.email().min(2),
-				password: z.string().min(8)
+				// El backend (LoginRequestDTO) valida min=8,max=20.
+				password: z.string().min(8).max(20)
 			})
 			.safeParseAsync({
 				email: formData.get('email'),
@@ -60,8 +61,9 @@ export const actions = {
 			.object({
 				name: z.string().min(2),
 				email: z.email().min(2),
-				password: z.string().min(8),
-				confirmPassword: z.string().min(8).max(18),
+				// El backend (RegisterRequestDTO) valida min=8,max=20.
+				password: z.string().min(8).max(20),
+				confirmPassword: z.string().min(8).max(20),
 				terms: z.coerce.boolean()
 			})
 			.safeParseAsync({

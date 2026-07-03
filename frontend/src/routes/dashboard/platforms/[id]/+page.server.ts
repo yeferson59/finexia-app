@@ -28,7 +28,9 @@ export const actions: Actions = {
 				name: z.string().min(2),
 				description: z.string().optional().default(''),
 				type: z.string().min(2),
-				isActive: z.coerce.boolean()
+				// El <select> envía "true"/"false" como string; z.coerce.boolean()
+				// convertiría "false" en true, así que se compara explícitamente.
+				isActive: z.enum(['true', 'false']).transform((v) => v === 'true')
 			})
 			.safeParseAsync({
 				name: formData.get('name'),

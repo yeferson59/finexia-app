@@ -282,6 +282,12 @@ func (handler *Handlers) ChangeMyPassword(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "Invalid password", "New password must be at least 8 characters")
 	}
 
+	// Same upper bound as register/login validation; without it the user could
+	// set a password that the login endpoint would later reject.
+	if len(req.NewPassword) > 20 {
+		return handler.responseBadRequest(c, "Invalid password", "New password must be at most 20 characters")
+	}
+
 	if err := handler.services.ChangePassword(c.Context(), userID, req.CurrentPassword, req.NewPassword); err != nil {
 		return handler.responseFromDomain(c, err, "Error changing password", "users:me:password")
 	}

@@ -20,6 +20,15 @@ const (
 	Other      AssetType = "other"
 )
 
+func (a AssetType) IsValid() bool {
+	switch a {
+	case Stock, ETF, Crypto, Bond, Cash, RealEstate, Commodity, Other:
+		return true
+	default:
+		return false
+	}
+}
+
 func (a AssetType) Transform() PortfolioEntryCategory {
 	switch a {
 	case Stock:

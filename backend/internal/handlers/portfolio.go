@@ -163,7 +163,7 @@ func (h *Handlers) CreatePlatform(c fiber.Ctx) error {
 
 	sourceType := entities.SourceType(req.Type)
 	if !sourceType.IsValid() {
-		return h.responseBadRequest(c, "Invalid source type", "Source type must be one of: broker, bank, tradingPlatform, neobank, defi, cryptoWallet, mutualFunds, brokerageHouse, other")
+		return h.responseBadRequest(c, "Invalid source type", "Source type must be one of: broker, investment_bank, trading_platform, neobank, de_fi, crypto_wallet, mutual_funds, brokerage_house, other")
 	}
 
 	platform, err := h.services.CreatePlatform(c.Context(), userID, sourceType, req.Name, req.Description)
