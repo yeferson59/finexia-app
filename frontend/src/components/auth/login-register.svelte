@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
 	import Button from '$components/ui/button.svelte';
 	import Input from '$components/ui/input.svelte';
-	import Checkbox from '$components/ui/checkbox.svelte';
 	type FormResult = {
 		type: 'login' | 'register';
 		errors: Record<string, string> | Array<{ path: PropertyKey[]; message: string }>;
@@ -401,12 +401,25 @@
 							</button>
 						</div>
 
-						<Checkbox
-							id="terms"
-							name="terms"
-							label="Acepto los términos y condiciones"
-							bind:checked={agreeTerms}
-						/>
+						<div class="consent">
+							<input
+								type="checkbox"
+								id="terms"
+								name="terms"
+								class="consent-input"
+								bind:checked={agreeTerms}
+							/>
+							<label for="terms" class="consent-label">
+								Autorizo el tratamiento de mis datos personales según la
+								<a href={resolve('/privacidad')} target="_blank" rel="noopener"
+									>Política de Privacidad</a
+								>
+								y acepto los
+								<a href={resolve('/terminos')} target="_blank" rel="noopener"
+									>Términos y Condiciones</a
+								>.
+							</label>
+						</div>
 						{#if registerErrors['terms']}
 							<span class="error-message">{registerErrors['terms']}</span>
 						{/if}
@@ -901,6 +914,72 @@
 	.switch-link:hover {
 		color: var(--gold-light);
 		text-decoration: underline;
+	}
+
+	/* ── Consent (Habeas Data / Ley 1581 de 2012) ───────────── */
+	.consent {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.75rem;
+	}
+
+	.consent-input {
+		appearance: none;
+		width: 20px;
+		height: 20px;
+		margin-top: 1px;
+		border: 1.5px solid rgba(212, 145, 42, 0.3);
+		border-radius: 6px;
+		background: rgba(255, 255, 255, 0.03);
+		cursor: pointer;
+		transition: all 0.25s ease;
+		position: relative;
+		flex-shrink: 0;
+	}
+
+	.consent-input:hover {
+		border-color: rgba(212, 145, 42, 0.5);
+	}
+
+	.consent-input:checked {
+		background: var(--amber);
+		border-color: var(--amber);
+	}
+
+	.consent-input:checked::after {
+		content: '✓';
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		color: #0d0800;
+		font-size: 0.875rem;
+		font-weight: 700;
+	}
+
+	.consent-input:focus-visible {
+		outline: 2px solid var(--amber);
+		outline-offset: 2px;
+	}
+
+	.consent-label {
+		font-size: 0.8rem;
+		line-height: 1.5;
+		color: var(--text-secondary);
+		cursor: pointer;
+		letter-spacing: 0.2px;
+		font-weight: 500;
+	}
+
+	.consent-label a {
+		color: var(--gold-primary);
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		font-weight: 600;
+	}
+
+	.consent-label a:hover {
+		color: var(--gold-light);
 	}
 
 	.error-message {

@@ -4,7 +4,10 @@ import type { RequestHandler } from './$types';
 // Only public, indexable URLs belong here. The dashboard and auth areas are
 // private and excluded (also blocked via robots.txt and X-Robots-Tag).
 const pages: { path: string; changefreq: string; priority: string }[] = [
-	{ path: '/', changefreq: 'daily', priority: '1.0' }
+	{ path: '/', changefreq: 'daily', priority: '1.0' },
+	{ path: '/privacidad', changefreq: 'yearly', priority: '0.3' },
+	{ path: '/terminos', changefreq: 'yearly', priority: '0.3' },
+	{ path: '/cookies', changefreq: 'yearly', priority: '0.3' }
 ];
 
 export const GET: RequestHandler = () => {
