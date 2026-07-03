@@ -34,7 +34,7 @@ type SessionResponse = {
 };
 
 // Private areas must never be indexed even if a URL leaks past robots.txt.
-const PRIVATE_PREFIXES = ['/dashboard', '/auth', '/demo'];
+const PRIVATE_PREFIXES = ['/dashboard', '/auth'];
 
 function withRobots(event: Parameters<Handle>[0]['event'], response: Response): Response {
 	if (PRIVATE_PREFIXES.some((prefix) => event.url.pathname.startsWith(prefix))) {
