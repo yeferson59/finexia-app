@@ -4,6 +4,10 @@
 export const SITE_URL = 'https://finexia.me';
 export const SITE_NAME = 'Finexia';
 
+// Contact channel for exercising data-subject rights under Ley 1581 de 2012
+// (Habeas Data). Update this if the responsible party's email changes.
+export const CONTACT_EMAIL = 'soporte@finexia.me';
+
 export const DEFAULT_TITLE = 'Finexia — Tu patrimonio en un solo mapa';
 export const DEFAULT_DESCRIPTION =
 	'Registra manualmente dónde tienes tus activos y agrúpalos en los portafolios que tú imaginas, aunque estén en distintas plataformas. Sin conectar cuentas. Lanzamiento 1 oct 2026.';
