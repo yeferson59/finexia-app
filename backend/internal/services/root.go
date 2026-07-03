@@ -10,17 +10,27 @@ import (
 	"github.com/yeferson59/finexia-app/internal/prices"
 )
 
+// Mailer abstracts the outbound email service so tests can replace the
+// Resend-backed implementation with a fake.
+type Mailer interface {
+	SendWaitlistConfirmation(email string) error
+	SendActivityAlert(email string, data mail.ActivityAlertData) error
+	SendWeeklySummary(email string, data mail.WeeklySummaryData) error
+}
+
+var _ Mailer = (*mail.Service)(nil)
+
 type Services struct {
 	repos         Repository
 	cfg           *config.Env
 	s3Client      *s3.Client
 	storage       fiber.Storage
-	mail          *mail.Service
+	mail          Mailer
 	log           logger.Logger
 	priceProvider prices.Provider
 }
 
-func New(repos Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.Storage, mailService *mail.Service, log logger.Logger, priceProvider prices.Provider) Services {
+func New(repos Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.Storage, mailService Mailer, log logger.Logger, priceProvider prices.Provider) Services {
 	return Services{
 		repos:         repos,
 		cfg:           cfg,
