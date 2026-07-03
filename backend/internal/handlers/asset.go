@@ -42,7 +42,12 @@ func (h *Handlers) CreateAsset(c fiber.Ctx) error {
 	req.Ticker = strings.ToUpper(strings.TrimSpace(req.Ticker))
 	req.Currency = strings.ToUpper(strings.TrimSpace(req.Currency))
 
-	asset, err := h.services.CreateAsset(c.Context(), req.Ticker, req.Name, entities.AssetType(req.AssetType), req.Exchange, req.Currency)
+	assetType := entities.AssetType(req.AssetType)
+	if !assetType.IsValid() {
+		return h.responseBadRequest(c, "Invalid asset type", "Asset type must be one of: stock, etf, crypto, bond, cash, real_estate, commodity, other")
+	}
+
+	asset, err := h.services.CreateAsset(c.Context(), req.Ticker, req.Name, assetType, req.Exchange, req.Currency)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error creating asset", "Could not create asset")
 	}

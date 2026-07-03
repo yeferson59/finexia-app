@@ -23,8 +23,10 @@ type UpdatePreferencesDTO struct {
 }
 
 type ChangePasswordDTO struct {
+	// NewPassword keeps the same bounds as RegisterRequestDTO/LoginRequestDTO
+	// (min=8,max=20); otherwise a user could set a password login would reject.
 	CurrentPassword string `json:"currentPassword" validate:"required,min=8"`
-	NewPassword     string `json:"newPassword"     validate:"required,min=8"`
+	NewPassword     string `json:"newPassword"     validate:"required,min=8,max=20"`
 }
 
 type BanUserDTO struct {
