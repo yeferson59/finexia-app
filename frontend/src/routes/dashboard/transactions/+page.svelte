@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import PageHeader from '$components/ui/page-header.svelte';
 	import Card from '$components/ui/card.svelte';
 	import type { PageProps } from './$types';
@@ -49,7 +50,13 @@
 <PageHeader
 	title="Transacciones"
 	subtitle="Monitorea en tiempo real todos los movimientos de tu cuenta."
-/>
+>
+	{#snippet actions()}
+		<a class="import-btn" href={resolve('/dashboard/transactions/import')}>
+			Importar desde Excel
+		</a>
+	{/snippet}
+</PageHeader>
 
 <Card variant="elevated" padding="sm">
 	{#if data.transactions.length === 0}
@@ -77,6 +84,25 @@
 </Card>
 
 <style>
+	.import-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.7rem 1.2rem;
+		border-radius: 10px;
+		background: var(--amber);
+		color: #0d0800;
+		font-weight: 700;
+		font-size: 0.88rem;
+		text-decoration: none;
+		transition: all 0.25s ease;
+	}
+
+	.import-btn:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 10px 25px rgba(212, 145, 42, 0.25);
+	}
+
 	.empty-state {
 		font-size: 0.875rem;
 		color: var(--text-muted);

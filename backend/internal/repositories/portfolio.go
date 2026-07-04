@@ -937,6 +937,83 @@ func (r *Repository) CreatePortfolioEntry(ctx context.Context, userID, portfolio
 	return entry, nil
 }
 
+// ImportEntryTransactions persists a batch of validated spreadsheet rows in a
+// single database transaction: each row resolves (or creates) its asset,
+// upserts the portfolio position and inserts the transaction, so a mid-batch
+// failure never leaves a half-imported file behind.
+func (r *Repository) ImportEntryTransactions(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []entities.ImportTransactionRow) (int, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var owned bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM portfolios WHERE id = $1 AND user_id = $2)
+		   AND EXISTS (SELECT 1 FROM investment_sources WHERE id = $3 AND user_id = $2)
+	`, portfolioID, userID, sourceID).Scan(&owned); err != nil {
+		return 0, err
+	}
+	if !owned {
+		return 0, errors.New("portfolio or source not found")
+	}
+
+	// Cache asset lookups: classic spreadsheets repeat the same ticker on
+	// many rows.
+	assetIDs := make(map[string]uuid.UUID)
+	imported := 0
+	for _, row := range rows {
+		assetID, ok := assetIDs[row.Ticker]
+		if !ok {
+			// Reuse an existing asset for the ticker (regardless of exchange)
+			// before creating a new one, so imports never clobber curated
+			// asset data the way an upsert would.
+			err := tx.QueryRow(ctx, `
+				SELECT id FROM assets WHERE UPPER(ticker) = $1 ORDER BY created_at LIMIT 1
+			`, row.Ticker).Scan(&assetID)
+			if errors.Is(err, pgx.ErrNoRows) {
+				err = tx.QueryRow(ctx, `
+					INSERT INTO assets (ticker, name, asset_type, exchange, currency, created_at, updated_at)
+					VALUES ($1, $2, $3::asset_type, NULL, $4, NOW(), NOW())
+					ON CONFLICT (ticker, COALESCE(exchange, '')) DO UPDATE SET updated_at = NOW()
+					RETURNING id
+				`, row.Ticker, row.AssetName, row.AssetType, row.Currency).Scan(&assetID)
+			}
+			if err != nil {
+				return 0, err
+			}
+			assetIDs[row.Ticker] = assetID
+		}
+
+		var entryID uuid.UUID
+		if err := tx.QueryRow(ctx, `
+			INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, category, entry_date, notes)
+			VALUES ($1::uuid, $2::uuid, $3::uuid, 0, $4::numeric, $5::char(3), $6::portfolio_entry_category, $7::date, $8)
+			ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, ''))
+			DO UPDATE SET updated_at = NOW()
+			RETURNING id
+		`, portfolioID, assetID, sourceID, row.Price.String(), row.Currency, row.Category, row.Date, row.Notes).Scan(&entryID); err != nil {
+			return 0, err
+		}
+
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO transactions (entry_id, type, quantity, price, currency, fees, transaction_date, notes)
+			VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::date, $8)
+		`, entryID, row.Type, row.Quantity.String(), row.Price.String(), row.Currency, row.Fees.String(), row.Date, row.Notes); err != nil {
+			return 0, err
+		}
+		imported++
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return imported, nil
+}
+
 func (r *Repository) GetAllPortfolioSummaryRows(ctx context.Context) ([]entities.PortfolioSnapshotRow, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT

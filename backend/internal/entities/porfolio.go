@@ -277,6 +277,23 @@ type Transaction struct {
 	Entry           PortfolioEntry  `json:"entry,omitzero"`
 }
 
+// ImportTransactionRow is one validated spreadsheet row, ready to be
+// persisted as an asset + portfolio entry + transaction.
+type ImportTransactionRow struct {
+	RowNumber int
+	Ticker    string
+	AssetName string
+	AssetType AssetType
+	Category  PortfolioEntryCategory
+	Type      TransactionType
+	Quantity  money.Decimal
+	Price     money.Money
+	Fees      money.Money
+	Currency  string
+	Date      time.Time
+	Notes     string
+}
+
 type ExchangeRate struct {
 	ID           uuid.UUID     `json:"id"`
 	FromCurrency string        `json:"fromCurrency"`

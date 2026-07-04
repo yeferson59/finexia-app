@@ -9,6 +9,8 @@ func (r *Routes) Portfolios() {
 	portfolios.Get("/id", r.handlers.GetPortfolios)
 	portfolios.Get("/summary", r.handlers.GetPortfoliosSummary)
 	portfolios.Get("/transactions", r.handlers.GetUserTransactions)
+	portfolios.Post("/transactions/import/preview", r.handlers.PreviewTransactionsImport)
+	portfolios.Post("/transactions/import", r.handlers.ImportTransactions)
 	portfolios.Get("/allocation", r.handlers.GetAssetAllocation)
 	portfolios.Post("", r.handlers.CreatePortfolio)
 	portfolios.Post("/sources", r.handlers.CreatePlatform)
