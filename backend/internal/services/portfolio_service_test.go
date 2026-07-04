@@ -82,6 +82,55 @@ func TestGetPortfoliosRisks(t *testing.T) {
 			t.Errorf("expected empty non-nil slice, got %+v", got)
 		}
 	})
+
+	t.Run("second call is served from the cache", func(t *testing.T) {
+		calls := 0
+		repo := &fakeRepository{
+			getPortfoliosRisks: func(context.Context) ([]entities.Risk, error) {
+				calls++
+				return []entities.Risk{{ID: uuid.New(), Name: "moderate"}}, nil
+			},
+		}
+		svc := newTestServices(repo, newMemStorage())
+
+		for range 2 {
+			got, err := svc.GetPortfoliosRisks(context.Background())
+			if err != nil {
+				t.Fatalf("GetPortfoliosRisks: %v", err)
+			}
+			if len(got) != 1 || got[0].Name != "moderate" {
+				t.Errorf("risks = %+v", got)
+			}
+		}
+		if calls != 1 {
+			t.Errorf("repository calls = %d, want 1 (cached)", calls)
+		}
+	})
+
+	t.Run("errors are not cached", func(t *testing.T) {
+		calls := 0
+		repo := &fakeRepository{
+			getPortfoliosRisks: func(context.Context) ([]entities.Risk, error) {
+				calls++
+				if calls == 1 {
+					return nil, errors.New("db down")
+				}
+				return []entities.Risk{{ID: uuid.New(), Name: "aggressive"}}, nil
+			},
+		}
+		svc := newTestServices(repo, newMemStorage())
+
+		if _, err := svc.GetPortfoliosRisks(context.Background()); err == nil {
+			t.Fatal("expected error on first call")
+		}
+		got, err := svc.GetPortfoliosRisks(context.Background())
+		if err != nil {
+			t.Fatalf("GetPortfoliosRisks after error: %v", err)
+		}
+		if len(got) != 1 || got[0].Name != "aggressive" {
+			t.Errorf("risks = %+v", got)
+		}
+	})
 }
 
 func TestGetPortfolios(t *testing.T) {
@@ -173,20 +222,25 @@ func TestGetPortfolio(t *testing.T) {
 		}
 	})
 
-	t.Run("portfolio lookup error stops early", func(t *testing.T) {
+	// Both lookups run concurrently, so a failed portfolio lookup must return
+	// its error and discard whatever the entries query produced.
+	t.Run("portfolio lookup error discards fetched entries", func(t *testing.T) {
 		repo := &fakeRepository{
 			getPortfolioByID: func(context.Context, uuid.UUID, uuid.UUID) (entities.Portfolio, error) {
 				return entities.Portfolio{}, errors.New("portfolio not found")
 			},
 			getEntriesByPortfolioID: func(context.Context, uuid.UUID) ([]entities.PortfolioEntry, error) {
-				t.Error("entries must not be fetched when the portfolio lookup fails")
-				return nil, nil
+				return []entities.PortfolioEntry{{ID: uuid.New()}}, nil
 			},
 		}
 		svc := newTestServices(repo, newMemStorage())
 
-		if _, err := svc.GetPortfolio(context.Background(), userID, portfolioID); err == nil {
+		got, err := svc.GetPortfolio(context.Background(), userID, portfolioID)
+		if err == nil {
 			t.Fatal("expected error")
+		}
+		if len(got.PortfolioEntries) != 0 {
+			t.Errorf("entries must not leak on error, got %+v", got.PortfolioEntries)
 		}
 	})
 

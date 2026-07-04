@@ -28,6 +28,9 @@ type Services struct {
 	mail          Mailer
 	log           logger.Logger
 	priceProvider prices.Provider
+	// Pointer so every copy of Services shares the same cache (Services is
+	// passed around by value).
+	risksCache *risksCache
 }
 
 func New(repos Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.Storage, mailService Mailer, log logger.Logger, priceProvider prices.Provider) Services {
@@ -39,5 +42,6 @@ func New(repos Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.S
 		mail:          mailService,
 		log:           log,
 		priceProvider: priceProvider,
+		risksCache:    &risksCache{},
 	}
 }

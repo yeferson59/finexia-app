@@ -5,20 +5,48 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/yeferson59/gofinance/money"
+	"golang.org/x/sync/errgroup"
 
 	portfoliodto "github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"
 	"github.com/yeferson59/finexia-app/internal/mail"
 )
 
+// risksCache memoizes the risk catalog: it is seed data shared by every user
+// and requested on each portfolio page, so a short TTL avoids one DB
+// round-trip per page view without risking staleness for long.
+type risksCache struct {
+	mu        sync.RWMutex
+	risks     []entities.Risk
+	expiresAt time.Time
+}
+
+const risksCacheTTL = 10 * time.Minute
+
 func (s *Services) GetPortfoliosRisks(ctx context.Context) ([]entities.Risk, error) {
+	if c := s.risksCache; c != nil {
+		c.mu.RLock()
+		risks, fresh := c.risks, time.Now().Before(c.expiresAt)
+		c.mu.RUnlock()
+		if fresh {
+			return risks, nil
+		}
+	}
+
 	risks, err := s.repos.GetPortfoliosRisks(ctx)
 	if err != nil {
 		return []entities.Risk{}, err
+	}
+
+	if c := s.risksCache; c != nil {
+		c.mu.Lock()
+		c.risks, c.expiresAt = risks, time.Now().Add(risksCacheTTL)
+		c.mu.Unlock()
 	}
 
 	return risks, nil
@@ -38,13 +66,27 @@ func (s *Services) GetPortfoliosSummary(ctx context.Context, userID uuid.UUID) (
 }
 
 func (s *Services) GetPortfolio(ctx context.Context, userID, portfolioID uuid.UUID) (entities.Portfolio, error) {
-	portfolio, err := s.repos.GetPortfolioByID(ctx, portfolioID, userID)
-	if err != nil {
-		return entities.Portfolio{}, err
-	}
+	// The portfolio header and its entries are independent queries; running
+	// them concurrently halves the latency of the portfolio detail endpoint.
+	// The ownership check in GetPortfolioByID still gates the response: if it
+	// fails, the fetched entries are discarded with the error.
+	var (
+		portfolio entities.Portfolio
+		entries   []entities.PortfolioEntry
+	)
 
-	entries, err := s.repos.GetEntriesByPortfolioID(ctx, portfolioID)
-	if err != nil {
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		var err error
+		portfolio, err = s.repos.GetPortfolioByID(gctx, portfolioID, userID)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		entries, err = s.repos.GetEntriesByPortfolioID(gctx, portfolioID)
+		return err
+	})
+	if err := g.Wait(); err != nil {
 		return entities.Portfolio{}, err
 	}
 
@@ -122,12 +164,30 @@ func (s *Services) GetTransactionsByEntry(ctx context.Context, userID, entryID u
 
 func (s *Services) GetAssetTransactionsPaginated(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, page, limit int) ([]entities.Transaction, int, error) {
 	offset := (page - 1) * limit
-	total, err := s.repos.CountAssetTransactions(ctx, userID, portfolioID, ticker)
-	if err != nil {
+
+	// The count and the page are independent reads; overlap them instead of
+	// paying two sequential DB round-trips.
+	var (
+		total int
+		txns  []entities.Transaction
+	)
+
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		var err error
+		total, err = s.repos.CountAssetTransactions(gctx, userID, portfolioID, ticker)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		txns, err = s.repos.GetAssetTransactionsPaginated(gctx, userID, portfolioID, ticker, limit, offset)
+		return err
+	})
+	if err := g.Wait(); err != nil {
 		return nil, 0, err
 	}
-	txns, err := s.repos.GetAssetTransactionsPaginated(ctx, userID, portfolioID, ticker, limit, offset)
-	return txns, total, err
+
+	return txns, total, nil
 }
 
 func (s *Services) GetRecentUserTransactions(ctx context.Context, userID uuid.UUID, limit int) ([]entities.Transaction, error) {
