@@ -258,6 +258,7 @@
 		font-weight: 500;
 		color: var(--text);
 		margin: 0;
+		overflow-wrap: anywhere;
 	}
 
 	.legend-value {

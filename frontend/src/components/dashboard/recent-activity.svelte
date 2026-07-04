@@ -161,6 +161,9 @@
 		gap: 1rem;
 		margin-bottom: 1.5rem;
 		overflow-y: auto;
+		/* overflow-y: auto forces overflow-x to compute to auto; pin it hidden so a
+		   long asset name or ticker can never surface a horizontal scrollbar here. */
+		overflow-x: hidden;
 		max-height: 400px;
 	}
 
@@ -226,12 +229,14 @@
 		font-weight: 500;
 		color: var(--text);
 		margin: 0 0 0.2rem 0;
+		overflow-wrap: anywhere;
 	}
 
 	.activity-description {
 		font-size: 0.775rem;
 		color: var(--text-muted);
 		margin: 0;
+		overflow-wrap: anywhere;
 	}
 
 	.activity-details {
