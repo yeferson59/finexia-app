@@ -46,6 +46,10 @@ func run() error {
 		// Without validation, a trusted peer that omits X-Forwarded-For would
 		// yield an empty c.IP(); with it, Fiber falls back to the remote IP.
 		EnableIPValidation: true,
+		// Spreadsheet imports upload the workbook itself; Fiber's 4 MiB
+		// default rejects them with an opaque 413 before the handler can
+		// answer with a useful error.
+		BodyLimit: 10 * 1024 * 1024,
 		TrustProxyConfig: fiber.TrustProxyConfig{
 			Loopback:  true,
 			LinkLocal: true,
