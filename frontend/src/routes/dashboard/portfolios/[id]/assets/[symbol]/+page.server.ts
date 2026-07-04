@@ -50,7 +50,16 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 		return raw >= 1 && raw <= 100 ? raw : 20;
 	})();
 
-	const response = await authedFetch(event, `/portfolios/${params.id}`);
+	// The portfolio detail and the asset's transactions page are independent
+	// requests; fetching them in parallel removes a full backend round-trip
+	// from this page's load.
+	const [response, txnRes] = await Promise.all([
+		authedFetch(event, `/portfolios/${params.id}`),
+		authedFetchSafe(
+			event,
+			`/portfolios/${params.id}/assets/${params.symbol}/transactions?page=${page}&limit=${limit}`
+		)
+	]);
 
 	if (!response.ok) {
 		return {
@@ -81,10 +90,6 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 		return sum + qty * mp;
 	}, 0);
 
-	const txnRes = await authedFetchSafe(
-		event,
-		`/portfolios/${params.id}/assets/${params.symbol}/transactions?page=${page}&limit=${limit}`
-	);
 	const txnJson = txnRes ? await txnRes.json() : null;
 	const paged = txnJson?.success ? txnJson.data : null;
 
