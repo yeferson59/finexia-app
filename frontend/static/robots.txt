@@ -5,6 +5,5 @@ Allow: /
 # Private application areas — not for indexing
 Disallow: /dashboard/
 Disallow: /auth/
-Disallow: /demo/
 
 Sitemap: https://finexia.me/sitemap.xml
