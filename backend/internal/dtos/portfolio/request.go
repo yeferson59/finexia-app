@@ -42,6 +42,16 @@ type CreateAssetRequestDTO struct {
 	Currency  string `json:"currency"  validate:"required"`
 }
 
+type CreateExchangeRateRequestDTO struct {
+	FromCurrency string        `json:"fromCurrency" validate:"required"`
+	ToCurrency   string        `json:"toCurrency"   validate:"required"`
+	Rate         money.Decimal `json:"rate"         validate:"required"`
+}
+
+type UpdateExchangeRateRequestDTO struct {
+	Rate money.Decimal `json:"rate" validate:"required"`
+}
+
 type CreatePortfolioEntryRequestDTO struct {
 	PortfolioID     uuid.UUID     `json:"portfolioId" validate:"required"`
 	AssetID         uuid.UUID     `json:"assetId" validate:"required"`

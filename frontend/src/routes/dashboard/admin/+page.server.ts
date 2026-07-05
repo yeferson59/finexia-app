@@ -9,12 +9,22 @@ interface Asset {
 	priceUpdatedAt: string | null;
 }
 
+interface ExchangeRate {
+	id: string;
+	fromCurrency: string;
+	toCurrency: string;
+	rate: string;
+	rateDate: string;
+	createdAt: string;
+}
+
 export const load: PageServerLoad = async ({ cookies, fetch }) => {
 	const event = { cookies, fetch };
 
-	const [usersRes, assetsRes] = await Promise.all([
+	const [usersRes, assetsRes, ratesRes] = await Promise.all([
 		authedFetchSafe(event, '/users?page=1&limit=1'),
-		authedFetchSafe(event, '/portfolios/assets?page=1&limit=100')
+		authedFetchSafe(event, '/portfolios/assets?page=1&limit=100'),
+		authedFetchSafe(event, '/exchange-rates?page=1&limit=100')
 	]);
 
 	let totalUsers = 0;
@@ -29,11 +39,17 @@ export const load: PageServerLoad = async ({ cookies, fetch }) => {
 		if (success && Array.isArray(data)) assets = data;
 	}
 
+	let rates: ExchangeRate[] = [];
+	if (ratesRes?.ok) {
+		const { data, success } = await ratesRes.json();
+		if (success && Array.isArray(data)) rates = data;
+	}
+
 	const lastSync = assets.reduce<string | null>((latest, a) => {
 		if (!a.priceUpdatedAt) return latest;
 		if (!latest || a.priceUpdatedAt > latest) return a.priceUpdatedAt;
 		return latest;
 	}, null);
 
-	return { totalUsers, totalAssets: assets.length, lastSync };
+	return { totalUsers, totalAssets: assets.length, totalRates: rates.length, lastSync };
 };

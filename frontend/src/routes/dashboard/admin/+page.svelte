@@ -36,6 +36,9 @@
 		<Stat label="Activos en sistema" value={data.totalAssets} />
 	</Card>
 	<Card padding="md">
+		<Stat label="Tasas de cambio" value={data.totalRates} />
+	</Card>
+	<Card padding="md">
 		<Stat label="Última sincronización" value={formatDate(data.lastSync)} />
 	</Card>
 </section>
@@ -81,6 +84,27 @@
 				<div>
 					<p class="shortcut-title">Gestionar Activos</p>
 					<p class="shortcut-desc">Sincronizar y actualizar precios de activos</p>
+				</div>
+			</div>
+		</Card>
+		<Card padding="md" hover onclick={() => goto(resolve('/dashboard/admin/exchange-rates'))}>
+			<div class="shortcut-card">
+				<svg
+					width="24"
+					height="24"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+				>
+					<polyline points="17 1 21 5 17 9"></polyline>
+					<path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+					<polyline points="7 23 3 19 7 15"></polyline>
+					<path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+				</svg>
+				<div>
+					<p class="shortcut-title">Gestionar Tasas de Cambio</p>
+					<p class="shortcut-desc">Sincronizar y actualizar tasas de cambio de divisas</p>
 				</div>
 			</div>
 		</Card>
