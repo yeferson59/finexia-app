@@ -27,6 +27,16 @@ import (
 // resend-verification flow instead of a generic credentials error.
 var ErrAccountUnverified = errors.New("invalid account")
 
+// ErrEmailAlreadyExists signals a registration attempt with an email that is
+// already tied to an account. Unlike password reset / email verification
+// requests (which never confirm whether an address exists), registration is
+// already an oracle by nature: the caller is asserting they own the address
+// and attempting to create an account with it, so returning a precise
+// message here reveals nothing an attacker couldn't already infer from the
+// request itself, and the endpoint stays behind the same rate limiter as
+// login.
+var ErrEmailAlreadyExists = errors.New("email already exists")
+
 func generateRefreshToken() (raw, hash string, err error) {
 	b := make([]byte, 32)
 	if _, err = rand.Read(b); err != nil {
@@ -253,7 +263,7 @@ func (s *Services) CreateJWToken(userID uuid.UUID, role string, expiresAt time.T
 func (s *Services) Register(ctx context.Context, name, email, password string) (auth.RegisterResponseDTO, error) {
 	_, err := s.repos.GetUserByEmail(ctx, email)
 	if err == nil {
-		return auth.RegisterResponseDTO{}, errors.New("user existing")
+		return auth.RegisterResponseDTO{}, ErrEmailAlreadyExists
 	}
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

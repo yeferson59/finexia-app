@@ -210,8 +210,8 @@ func TestRegister(t *testing.T) {
 		svc := newTestServices(repo, newMemStorage())
 
 		_, err := svc.Register(context.Background(), "Any Name", "taken@example.com", "password")
-		if err == nil || err.Error() != "user existing" {
-			t.Fatalf("Register error = %v, want %q", err, "user existing")
+		if !errors.Is(err, ErrEmailAlreadyExists) {
+			t.Fatalf("Register error = %v, want %v", err, ErrEmailAlreadyExists)
 		}
 	})
 

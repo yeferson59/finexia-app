@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import LoginRegister from '$components/auth/login-register.svelte';
-	import type { ActionData } from './$types';
+	import type { ActionData, PageData } from './$types';
 
-	let { form }: { form: ActionData } = $props();
+	let { form, data }: { form: ActionData; data: PageData } = $props();
 
 	const notice = $derived(
 		page.url.searchParams.has('registered')
@@ -23,7 +23,7 @@
 	<p class="auth-notice" role="status">{notice}</p>
 {/if}
 
-<LoginRegister {form} />
+<LoginRegister {form} selfRegistrationEnabled={data.selfRegistrationEnabled} />
 
 <style>
 	.auth-notice {
