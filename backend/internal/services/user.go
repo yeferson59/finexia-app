@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -14,6 +15,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/logger"
+	"github.com/yeferson59/finexia-app/internal/mail"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
 )
 
@@ -132,7 +135,7 @@ func (s *Services) GetAvatarFromS3(ctx context.Context, userID uuid.UUID) (io.Re
 	return result.Body, aws.ToString(result.ContentType), nil
 }
 
-func (s *Services) ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword, newPassword string) error {
+func (s *Services) ChangePassword(ctx context.Context, userID uuid.UUID, currentToken, currentPassword, newPassword string) error {
 	account, err := s.repos.GetAccountByUserID(ctx, userID)
 	if err != nil {
 		return errors.New("not found account")
@@ -151,5 +154,44 @@ func (s *Services) ChangePassword(ctx context.Context, userID uuid.UUID, current
 		return err
 	}
 
-	return s.repos.UpdateUserPassword(ctx, userID, string(hashed))
+	if err := s.repos.UpdateUserPassword(ctx, userID, string(hashed)); err != nil {
+		return err
+	}
+
+	// Whoever else holds a session (a stolen token, a forgotten shared
+	// computer) must not survive a password change: only the session that
+	// performed the change stays alive.
+	if _, err := s.RevokeOtherSessions(ctx, userID, currentToken); err != nil {
+		s.log.Error("change password: failed to revoke other sessions", logger.Err(err))
+	}
+
+	go s.sendPasswordChangedAlert(userID)
+
+	return nil
+}
+
+// sendPasswordChangedAlert notifies the user their password changed. Like the
+// login alert, it bypasses email preferences: if the change wasn't theirs,
+// this email is their only chance to react. Best-effort.
+func (s *Services) sendPasswordChangedAlert(userID uuid.UUID) {
+	if s.mail == nil {
+		return
+	}
+
+	ctx := context.Background()
+
+	user, err := s.repos.GetUserByID(ctx, userID)
+	if err != nil {
+		return
+	}
+
+	_ = s.mail.SendSecurityAlert(user.Email, mail.SecurityAlertData{
+		UserName:    user.Name,
+		Event:       "cambio de contraseña",
+		Detail:      "La contraseña de tu cuenta fue cambiada y se cerraron las demás sesiones activas.",
+		IPAddress:   "—",
+		UserAgent:   "—",
+		When:        time.Now().UTC().Format("02 Jan 2006 15:04 UTC"),
+		SecurityURL: s.cfg.PublicURL + "/dashboard/settings",
+	})
 }

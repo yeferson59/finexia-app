@@ -1,12 +1,29 @@
 import type { Actions, PageServerLoad } from './$types';
 import { z } from 'zod';
 import { fail } from '@sveltejs/kit';
-import { authedFetch } from '$lib/server/api';
+import { authedFetch, authedFetchSafe } from '$lib/server/api';
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-export const load: PageServerLoad = async ({ locals }) => {
-	return { user: locals.user };
+export interface ActiveSession {
+	id: string;
+	ipAddress: string | null;
+	userAgent: string | null;
+	createdAt: string;
+	lastActiveAt: string;
+	expiresAt: string;
+	current: boolean;
+}
+
+export const load: PageServerLoad = async ({ locals, fetch, cookies }) => {
+	let sessions: ActiveSession[] = [];
+	const res = await authedFetchSafe({ cookies, fetch }, '/auth/sessions');
+	if (res?.ok) {
+		const body = await res.json().catch(() => null);
+		sessions = body?.data ?? [];
+	}
+
+	return { user: locals.user, sessions };
 };
 
 export const actions = {
@@ -133,5 +150,48 @@ export const actions = {
 		}
 
 		return { action: 'changePassword', success: true };
+	},
+
+	revokeSession: async ({ request, fetch, cookies }) => {
+		const formData = await request.formData();
+		const sessionId = formData.get('sessionId');
+
+		const parsed = z.uuid().safeParse(sessionId);
+		if (!parsed.success) {
+			return fail(400, { action: 'revokeSession', error: 'Sesión inválida' });
+		}
+
+		const res = await authedFetch({ cookies, fetch }, `/auth/sessions/${parsed.data}`, {
+			method: 'DELETE'
+		});
+
+		if (!res.ok) {
+			return fail(res.status, {
+				action: 'revokeSession',
+				error: 'No se pudo cerrar la sesión. Inténtalo de nuevo.'
+			});
+		}
+
+		return { action: 'revokeSession', success: true };
+	},
+
+	revokeOtherSessions: async ({ fetch, cookies }) => {
+		const res = await authedFetch({ cookies, fetch }, '/auth/sessions/revoke-others', {
+			method: 'POST'
+		});
+
+		if (!res.ok) {
+			return fail(res.status, {
+				action: 'revokeOtherSessions',
+				error: 'No se pudieron cerrar las demás sesiones. Inténtalo de nuevo.'
+			});
+		}
+
+		const body = await res.json().catch(() => null);
+		return {
+			action: 'revokeOtherSessions',
+			success: true,
+			revoked: body?.data?.revoked ?? 0
+		};
 	}
 } satisfies Actions;

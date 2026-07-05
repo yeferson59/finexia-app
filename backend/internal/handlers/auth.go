@@ -13,7 +13,7 @@ func (handler *Handlers) Login(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:login")
 	}
 
-	result, err := handler.services.Login(c.Context(), loginDto.Email, loginDto.Password)
+	result, err := handler.services.Login(c.Context(), loginDto.Email, loginDto.Password, c.IP(), c.Get("User-Agent"))
 	if err != nil {
 		return handler.responseFromDomain(c, err, "failed to login", "auth:login")
 	}
@@ -84,6 +84,54 @@ func (handler *Handlers) GetSession(c fiber.Ctx) error {
 	}
 
 	return handler.responseStatusOk(c, "successfully retrieved session", "valid access token", userSession)
+}
+
+func (handler *Handlers) ListSessions(c fiber.Ctx) error {
+	userID, jwtoken, _, err := handler.getUserIDTokenRole(c)
+	if err != nil {
+		return handler.responseBadRequest(c, "invalid user id", "auth:sessions:list")
+	}
+
+	sessions, err := handler.services.ListSessions(c.Context(), userID, jwtoken)
+	if err != nil {
+		return handler.responseFromDomain(c, err, "failed to list sessions", "auth:sessions:list")
+	}
+
+	return handler.responseStatusOk(c, "active sessions retrieved", "valid access token", sessions)
+}
+
+func (handler *Handlers) RevokeSession(c fiber.Ctx) error {
+	userID, jwtoken, _, err := handler.getUserIDTokenRole(c)
+	if err != nil {
+		return handler.responseBadRequest(c, "invalid user id", "auth:sessions:revoke")
+	}
+
+	sessionID, err := handler.getParamUUID(c, "id")
+	if err != nil {
+		return handler.responseBadRequest(c, "invalid session id", "auth:sessions:revoke")
+	}
+
+	if err := handler.services.RevokeSession(c.Context(), userID, sessionID, jwtoken); err != nil {
+		return handler.responseFromDomain(c, err, "failed to revoke session", "auth:sessions:revoke")
+	}
+
+	return handler.responseStatusOk(c, "session revoked", "session revoked successfully", nil)
+}
+
+func (handler *Handlers) RevokeOtherSessions(c fiber.Ctx) error {
+	userID, jwtoken, _, err := handler.getUserIDTokenRole(c)
+	if err != nil {
+		return handler.responseBadRequest(c, "invalid user id", "auth:sessions:revokeOthers")
+	}
+
+	revoked, err := handler.services.RevokeOtherSessions(c.Context(), userID, jwtoken)
+	if err != nil {
+		return handler.responseFromDomain(c, err, "failed to revoke sessions", "auth:sessions:revokeOthers")
+	}
+
+	return handler.responseStatusOk(c, "sessions revoked", "other sessions revoked successfully", fiber.Map{
+		"revoked": revoked,
+	})
 }
 
 func (handler *Handlers) Logout(c fiber.Ctx) error {

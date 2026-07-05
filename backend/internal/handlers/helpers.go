@@ -66,6 +66,15 @@ func (handler *Handlers) responseInternalServerError(c fiber.Ctx, message, detai
 }
 
 func (handler *Handlers) responseFromDomain(c fiber.Ctx, err error, message, action string) error {
+	if strings.Contains(err.Error(), "too many") {
+		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+			"success":   false,
+			"message":   message,
+			"action":    action,
+			"timestamp": time.Now(),
+		})
+	}
+
 	if strings.Contains(err.Error(), "failed") || strings.Contains(err.Error(), "invalid") {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"success":   false,

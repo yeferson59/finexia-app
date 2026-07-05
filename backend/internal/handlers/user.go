@@ -268,7 +268,7 @@ func (handler *Handlers) GetUserAvatar(c fiber.Ctx) error {
 }
 
 func (handler *Handlers) ChangeMyPassword(c fiber.Ctx) error {
-	userID, _, _, err := handler.getUserIDTokenRole(c)
+	userID, jwtoken, _, err := handler.getUserIDTokenRole(c)
 	if err != nil {
 		return handler.responseBadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -288,7 +288,7 @@ func (handler *Handlers) ChangeMyPassword(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "Invalid password", "New password must be at most 20 characters")
 	}
 
-	if err := handler.services.ChangePassword(c.Context(), userID, req.CurrentPassword, req.NewPassword); err != nil {
+	if err := handler.services.ChangePassword(c.Context(), userID, jwtoken, req.CurrentPassword, req.NewPassword); err != nil {
 		return handler.responseFromDomain(c, err, "Error changing password", "users:me:password")
 	}
 

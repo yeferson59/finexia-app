@@ -17,6 +17,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/yeferson59/finexia-app/internal/dtos/auth"
+	"github.com/yeferson59/finexia-app/internal/mail"
 	"github.com/yeferson59/finexia-app/internal/repositories"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
 )
@@ -49,6 +50,55 @@ func validateTokenCacheKey(token string) string {
 	return "validateToken-" + token
 }
 
+// truncate keeps a string within the column limits (ip VARCHAR(45),
+// user_agent VARCHAR(255)) so an oversized header can never fail the insert.
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen]
+}
+
+// loginAttemptsCacheKey tracks consecutive failed logins per email. The email
+// is hashed so raw addresses never appear as cache keys.
+func loginAttemptsCacheKey(email string) string {
+	sum := sha256.Sum256([]byte(strings.ToLower(strings.TrimSpace(email))))
+	return "login_fail:" + hex.EncodeToString(sum[:])
+}
+
+// isLoginLocked reports whether the account accumulated too many failed
+// attempts. It counts by email regardless of whether the account exists, so
+// the lockout response never leaks which emails are registered.
+func (s *Services) isLoginLocked(ctx context.Context, email string) bool {
+	if s.cfg.MaxLoginAttempts <= 0 {
+		return false
+	}
+	data, _ := s.storage.GetWithContext(ctx, loginAttemptsCacheKey(email))
+	if len(data) == 0 {
+		return false
+	}
+	count, err := strconv.Atoi(string(data))
+	return err == nil && count >= s.cfg.MaxLoginAttempts
+}
+
+// recordLoginFailure increments the failure counter. Each failure renews the
+// TTL, so an ongoing brute-force attempt keeps the lock alive.
+func (s *Services) recordLoginFailure(ctx context.Context, email string) {
+	if s.cfg.MaxLoginAttempts <= 0 {
+		return
+	}
+	key := loginAttemptsCacheKey(email)
+	count := 0
+	if data, _ := s.storage.GetWithContext(ctx, key); len(data) > 0 {
+		count, _ = strconv.Atoi(string(data))
+	}
+	_ = s.storage.SetWithContext(ctx, key, []byte(strconv.Itoa(count+1)), s.cfg.LoginLockout)
+}
+
+func (s *Services) clearLoginFailures(ctx context.Context, email string) {
+	_ = s.storage.DeleteWithContext(ctx, loginAttemptsCacheKey(email))
+}
+
 // revokedFamilyCacheKey marks a whole refresh-token family as revoked in cache.
 // The per-token cache entries skip the database, so without this marker a
 // revoked family's newest token would keep refreshing from cache until its TTL
@@ -69,9 +119,17 @@ func (s *Services) revokeRefreshFamily(ctx context.Context, familyID uuid.UUID) 
 	_ = s.storage.SetWithContext(ctx, revokedFamilyCacheKey(familyID), []byte("1"), s.cfg.JWTRefreshDuration)
 }
 
-func (s *Services) Login(ctx context.Context, email, password string) (auth.LoginInternalDTO, error) {
+func (s *Services) Login(ctx context.Context, email, password, ipAddress, userAgent string) (auth.LoginInternalDTO, error) {
+	ipAddress = truncate(ipAddress, 45)
+	userAgent = truncate(userAgent, 255)
+
+	if s.isLoginLocked(ctx, email) {
+		return auth.LoginInternalDTO{}, errors.New("too many failed login attempts")
+	}
+
 	user, err := s.repos.GetAccountByEmail(ctx, email)
 	if err != nil {
+		s.recordLoginFailure(ctx, email)
 		return auth.LoginInternalDTO{}, errors.New("invalid credentials")
 	}
 
@@ -80,7 +138,20 @@ func (s *Services) Login(ctx context.Context, email, password string) (auth.Logi
 	}
 
 	if err := user.Accounts[0].ComparePassword(password); err != nil {
+		s.recordLoginFailure(ctx, email)
 		return auth.LoginInternalDTO{}, errors.New("invalid credentials")
+	}
+
+	s.clearLoginFailures(ctx, email)
+
+	// Decide whether this login comes from a device the user has used before.
+	// Must run before CreateSession records this login's IP, and a lookup
+	// failure must not block the login nor trigger a false alarm.
+	knownIP := true
+	if ipAddress != "" {
+		if known, ipErr := s.repos.HasSessionFromIP(ctx, user.ID, ipAddress); ipErr == nil {
+			knownIP = known
+		}
 	}
 
 	accessExpiresAt := time.Now().UTC().Add(s.cfg.JWTAccessDuration)
@@ -90,9 +161,21 @@ func (s *Services) Login(ctx context.Context, email, password string) (auth.Logi
 		return auth.LoginInternalDTO{}, err
 	}
 
-	sessionID, err := s.repos.CreateSession(ctx, user.ID, jwToken, accessExpiresAt)
+	var ip, ua *string
+	if ipAddress != "" {
+		ip = &ipAddress
+	}
+	if userAgent != "" {
+		ua = &userAgent
+	}
+
+	sessionID, err := s.repos.CreateSession(ctx, user.ID, jwToken, ip, ua, accessExpiresAt)
 	if err != nil {
 		return auth.LoginInternalDTO{}, err
+	}
+
+	if !knownIP {
+		go s.sendLoginAlert(user.Name, user.Email, ipAddress, userAgent)
 	}
 
 	rawRefresh, refreshHash, err := generateRefreshToken()
@@ -103,7 +186,7 @@ func (s *Services) Login(ctx context.Context, email, password string) (auth.Logi
 	familyID := uuid.New()
 	refreshExpiresAt := time.Now().UTC().Add(s.cfg.JWTRefreshDuration)
 
-	rtID, err := s.repos.CreateRefreshToken(ctx, user.ID, refreshHash, familyID, sessionID, nil, nil, refreshExpiresAt)
+	rtID, err := s.repos.CreateRefreshToken(ctx, user.ID, refreshHash, familyID, sessionID, ip, ua, refreshExpiresAt)
 	if err != nil {
 		return auth.LoginInternalDTO{}, err
 	}
@@ -122,6 +205,32 @@ func (s *Services) Login(ctx context.Context, email, password string) (auth.Logi
 		RawRefreshToken:  rawRefresh,
 		RefreshExpiresAt: refreshExpiresAt,
 	}, nil
+}
+
+// sendLoginAlert emails the user that their account was accessed from an IP
+// with no prior session. Security notices are sent regardless of the marketing
+// email preferences: knowing about an unexpected login protects the account
+// itself. Best-effort — a mail failure never affects the login.
+func (s *Services) sendLoginAlert(userName, email, ipAddress, userAgent string) {
+	if s.mail == nil {
+		return
+	}
+	if ipAddress == "" {
+		ipAddress = "desconocida"
+	}
+	if userAgent == "" {
+		userAgent = "desconocido"
+	}
+
+	_ = s.mail.SendSecurityAlert(email, mail.SecurityAlertData{
+		UserName:    userName,
+		Event:       "nuevo inicio de sesión",
+		Detail:      "Se inició sesión en tu cuenta desde una dirección que no habíamos visto antes.",
+		IPAddress:   ipAddress,
+		UserAgent:   userAgent,
+		When:        time.Now().UTC().Format("02 Jan 2006 15:04 UTC"),
+		SecurityURL: s.cfg.PublicURL + "/dashboard/settings",
+	})
 }
 
 func (s *Services) CreateJWToken(userID uuid.UUID, role string, expiresAt time.Time) (string, error) {
@@ -292,6 +401,9 @@ func (s *Services) ValidateToken(ctx context.Context, token string) (string, err
 }
 
 func (s *Services) RefreshToken(ctx context.Context, rawToken, ipAddress, userAgent string) (auth.LoginInternalDTO, error) {
+	ipAddress = truncate(ipAddress, 45)
+	userAgent = truncate(userAgent, 255)
+
 	oldHash, err := hashRefreshToken(rawToken)
 	if err != nil {
 		return auth.LoginInternalDTO{}, errors.New("invalid refresh token")

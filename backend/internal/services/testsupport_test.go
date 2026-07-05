@@ -23,8 +23,12 @@ type fakeRepository struct {
 
 	getAccountByEmail                func(ctx context.Context, email string) (entities.User, error)
 	getAccountByUserID               func(ctx context.Context, userID uuid.UUID) (entities.Account, error)
-	createSession                    func(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) (uuid.UUID, error)
+	createSession                    func(ctx context.Context, userID uuid.UUID, token string, ip, ua *string, expiresAt time.Time) (uuid.UUID, error)
 	updateSessionToken               func(ctx context.Context, sessionID uuid.UUID, newToken string, expiresAt time.Time) (string, error)
+	listSessionsByUserID             func(ctx context.Context, userID uuid.UUID) ([]entities.Session, error)
+	getRefreshTokensBySessionIDs     func(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) ([]string, []uuid.UUID, error)
+	deleteSessionsByIDs              func(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) (int64, error)
+	hasSessionFromIP                 func(ctx context.Context, userID uuid.UUID, ip string) (bool, error)
 	createRefreshToken               func(ctx context.Context, userID uuid.UUID, tokenHash string, familyID, sessionID uuid.UUID, ip, ua *string, expiresAt time.Time) (uuid.UUID, error)
 	getRefreshTokenByHash            func(ctx context.Context, tokenHash string) (entities.RefreshToken, error)
 	markRefreshTokenUsed             func(ctx context.Context, id uuid.UUID) error
@@ -89,8 +93,24 @@ func (f *fakeRepository) GetAccountByUserID(ctx context.Context, userID uuid.UUI
 	return f.getAccountByUserID(ctx, userID)
 }
 
-func (f *fakeRepository) CreateSession(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) (uuid.UUID, error) {
-	return f.createSession(ctx, userID, token, expiresAt)
+func (f *fakeRepository) CreateSession(ctx context.Context, userID uuid.UUID, token string, ip, ua *string, expiresAt time.Time) (uuid.UUID, error) {
+	return f.createSession(ctx, userID, token, ip, ua, expiresAt)
+}
+
+func (f *fakeRepository) ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]entities.Session, error) {
+	return f.listSessionsByUserID(ctx, userID)
+}
+
+func (f *fakeRepository) GetRefreshTokensBySessionIDs(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) ([]string, []uuid.UUID, error) {
+	return f.getRefreshTokensBySessionIDs(ctx, userID, sessionIDs)
+}
+
+func (f *fakeRepository) DeleteSessionsByIDs(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) (int64, error) {
+	return f.deleteSessionsByIDs(ctx, userID, sessionIDs)
+}
+
+func (f *fakeRepository) HasSessionFromIP(ctx context.Context, userID uuid.UUID, ip string) (bool, error) {
+	return f.hasSessionFromIP(ctx, userID, ip)
 }
 
 func (f *fakeRepository) UpdateSessionToken(ctx context.Context, sessionID uuid.UUID, newToken string, expiresAt time.Time) (string, error) {
@@ -296,12 +316,17 @@ type fakeMailer struct {
 
 	waitlistErr error
 	activityErr error
+	securityErr error
 	weeklyErr   error
 
 	waitlistTo []string
 	activity   []struct {
 		To   string
 		Data mail.ActivityAlertData
+	}
+	security []struct {
+		To   string
+		Data mail.SecurityAlertData
 	}
 	weekly []struct {
 		To   string
@@ -328,6 +353,19 @@ func (m *fakeMailer) SendActivityAlert(email string, data mail.ActivityAlertData
 	m.activity = append(m.activity, struct {
 		To   string
 		Data mail.ActivityAlertData
+	}{email, data})
+	return nil
+}
+
+func (m *fakeMailer) SendSecurityAlert(email string, data mail.SecurityAlertData) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.securityErr != nil {
+		return m.securityErr
+	}
+	m.security = append(m.security, struct {
+		To   string
+		Data mail.SecurityAlertData
 	}{email, data})
 	return nil
 }
