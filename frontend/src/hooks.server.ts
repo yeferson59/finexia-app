@@ -109,9 +109,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 	return withRobots(event, response);
 };
 
-// Forward the real client IP on every server-side call to the backend. The
-// backend keys its rate limiters by IP; without this header every user would
-// share the SSR server's single IP and collide on the same limit buckets.
+// Forward the real client IP and User-Agent on every server-side call to the
+// backend. The backend keys its rate limiters by IP (without this header
+// every user would share the SSR server's single IP and collide on the same
+// limit buckets) and stamps sessions with both fields so users can recognize
+// their devices under /dashboard/settings; without forwarding, every session
+// would record the SSR server's own request instead of the browser's.
 export const handleFetch: HandleFetch = async ({ event, request, fetch }) => {
 	if (env.BASE_API && request.url.startsWith(env.BASE_API)) {
 		try {
@@ -119,6 +122,11 @@ export const handleFetch: HandleFetch = async ({ event, request, fetch }) => {
 		} catch {
 			// getClientAddress() throws when the address is unavailable (e.g.
 			// prerendering); the backend then falls back to the direct peer IP.
+		}
+
+		const userAgent = event.request.headers.get('user-agent');
+		if (userAgent) {
+			request.headers.set('User-Agent', userAgent);
 		}
 	}
 

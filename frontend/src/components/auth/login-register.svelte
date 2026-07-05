@@ -917,7 +917,7 @@
 
 	.password-toggle:hover {
 		color: var(--gold-primary);
-		transform: translateY(calc(-50% + 1.125rem)) scale(1.1);
+		transform: translateY(-50%) scale(1.1);
 	}
 
 	.password-toggle svg {
