@@ -279,7 +279,9 @@
 						</div>
 
 						<div class="form-footer">
-							<a href="#forgot" class="forgot-link">¿Olvidaste tu contraseña?</a>
+							<a href={resolve('/auth/forgot-password')} class="forgot-link"
+								>¿Olvidaste tu contraseña?</a
+							>
 						</div>
 
 						{#if loginErrors['server']}

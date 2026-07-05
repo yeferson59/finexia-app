@@ -12,6 +12,13 @@ func (r *Routes) Auth() {
 	auth.Get("/invitations", r.middlewares.AuthLimiter(), r.handlers.ValidateInvitation)
 	auth.Post("/invitations/accept", r.middlewares.AuthLimiter(), r.handlers.AcceptInvitation)
 
+	// Public password recovery flow: request a reset link, validate its
+	// token, then confirm with a new password. Rate-limited to blunt both
+	// mail-bombing an address and token guessing.
+	auth.Post("/password-reset", r.middlewares.AuthLimiter(), r.handlers.RequestPasswordReset)
+	auth.Get("/password-reset", r.middlewares.AuthLimiter(), r.handlers.ValidatePasswordReset)
+	auth.Post("/password-reset/confirm", r.middlewares.AuthLimiter(), r.handlers.ConfirmPasswordReset)
+
 	auth.Use(r.middlewares.JWT())
 	auth.Get("/session", r.handlers.GetSession)
 	auth.Get("/sessions", r.handlers.ListSessions)

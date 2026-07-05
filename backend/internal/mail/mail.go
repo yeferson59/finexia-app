@@ -52,6 +52,12 @@ type InvitationData struct {
 	ExpiresIn string
 }
 
+type PasswordResetData struct {
+	UserName  string
+	ResetURL  string
+	ExpiresIn string
+}
+
 type WeeklySummaryPortfolio struct {
 	Name             string
 	Type             string
@@ -161,6 +167,26 @@ func (s *Service) SendInvitation(email string, data InvitationData) error {
 
 	if _, err := s.client.Emails.Send(params); err != nil {
 		return fmt.Errorf("mail: send invitation to %s: %w", email, err)
+	}
+
+	return nil
+}
+
+func (s *Service) SendPasswordReset(email string, data PasswordResetData) error {
+	var body bytes.Buffer
+	if err := s.tmpl.ExecuteTemplate(&body, "password_reset.html", data); err != nil {
+		return fmt.Errorf("mail: render password_reset template: %w", err)
+	}
+
+	params := &resend.SendEmailRequest{
+		From:    s.from,
+		To:      []string{email},
+		Subject: "Restablece tu contraseña — Finexia",
+		Html:    body.String(),
+	}
+
+	if _, err := s.client.Emails.Send(params); err != nil {
+		return fmt.Errorf("mail: send password reset to %s: %w", email, err)
 	}
 
 	return nil
