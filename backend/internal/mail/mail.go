@@ -46,6 +46,12 @@ type SecurityAlertData struct {
 	SecurityURL string
 }
 
+type InvitationData struct {
+	UserName  string
+	InviteURL string
+	ExpiresIn string
+}
+
 type WeeklySummaryPortfolio struct {
 	Name             string
 	Type             string
@@ -135,6 +141,26 @@ func (s *Service) SendSecurityAlert(email string, data SecurityAlertData) error 
 
 	if _, err := s.client.Emails.Send(params); err != nil {
 		return fmt.Errorf("mail: send security alert to %s: %w", email, err)
+	}
+
+	return nil
+}
+
+func (s *Service) SendInvitation(email string, data InvitationData) error {
+	var body bytes.Buffer
+	if err := s.tmpl.ExecuteTemplate(&body, "invitation.html", data); err != nil {
+		return fmt.Errorf("mail: render invitation template: %w", err)
+	}
+
+	params := &resend.SendEmailRequest{
+		From:    s.from,
+		To:      []string{email},
+		Subject: "Tu invitación a Finexia",
+		Html:    body.String(),
+	}
+
+	if _, err := s.client.Emails.Send(params); err != nil {
+		return fmt.Errorf("mail: send invitation to %s: %w", email, err)
 	}
 
 	return nil

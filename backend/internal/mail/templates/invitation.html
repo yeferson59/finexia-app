@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="x-apple-disable-message-reformatting" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="supported-color-schemes" content="dark" />
+  <title>Finexia — Tu invitación</title>
+  <!--[if mso]>
+  <noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
+  <![endif]-->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,500&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root { color-scheme: dark; }
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { border: 0; outline: none; text-decoration: none; }
+    body { margin: 0 !important; padding: 0 !important; background-color: #08090a; font-family: 'Outfit', Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    @media only screen and (max-width: 600px) {
+      .email-container { width: 100% !important; }
+      .wrap-pad { padding-left: 22px !important; padding-right: 22px !important; }
+      .hero-title { font-size: 26px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#08090a;">
+
+  <!-- Preheader -->
+  <div style="display:none;font-size:1px;color:#08090a;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+    Te invitaron a Finexia. Crea tu contraseña y entra.&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌
+  </div>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#08090a;">
+    <tr>
+      <td align="center">
+
+        <table role="presentation" class="email-container" cellspacing="0" cellpadding="0" border="0" width="560" style="margin:0 auto;">
+
+          <!-- Amber accent top line -->
+          <tr>
+            <td style="height:3px;background:linear-gradient(90deg,#d4912a,rgba(212,145,42,0.2),transparent);font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+
+          <!-- ══ HEADER ══ -->
+          <tr>
+            <td class="wrap-pad" style="padding:22px 32px 20px;border-bottom:1px solid #15181a;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td valign="middle" style="padding-right:9px;">
+                    <svg width="26" height="26" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="30" height="30" rx="7" fill="#d4912a"/>
+                      <path d="M7 22L12.5 14.5L16.5 18.5L23 9" stroke="#0c0a06" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </td>
+                  <td valign="middle">
+                    <span style="font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:18px;letter-spacing:0.1em;color:#eceae5;">FINEXIA</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ══ HERO ══ -->
+          <tr>
+            <td class="wrap-pad" style="padding:40px 32px 12px;">
+              <p style="font-family:'JetBrains Mono',Courier New,monospace;font-size:9.5px;font-weight:500;letter-spacing:0.22em;text-transform:uppercase;color:#d4912a;margin:0 0 16px 0;">Invitación</p>
+              <h1 class="hero-title" style="font-family:'Fraunces',Georgia,serif;font-weight:300;font-size:30px;line-height:1.1;letter-spacing:-0.02em;color:#eceae5;margin:0 0 14px 0;">
+                Hola {{.UserName}},<br /><em style="font-style:italic;font-weight:500;color:#e8a535;">te damos acceso a Finexia.</em>
+              </h1>
+              <p style="font-family:'Outfit',Arial,sans-serif;font-size:14px;font-weight:300;color:#8a8780;line-height:1.68;margin:0;">
+                Un administrador te ha invitado a unirte. Para activar tu cuenta, crea tu contraseña con el botón de abajo. Por tu seguridad, este enlace es de un solo uso y caduca en {{.ExpiresIn}}.
+              </p>
+            </td>
+          </tr>
+
+          <!-- ══ CTA ══ -->
+          <tr>
+            <td class="wrap-pad" style="padding:28px 32px 8px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td align="center" bgcolor="#d4912a" style="border-radius:8px;">
+                    <a href="{{.InviteURL}}" target="_blank" style="display:inline-block;padding:13px 28px;font-family:'Outfit',Arial,sans-serif;font-size:14px;font-weight:500;color:#0c0a06;text-decoration:none;border-radius:8px;letter-spacing:0.01em;">
+                      Crear mi contraseña
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="wrap-pad" style="padding:16px 32px 8px;">
+              <p style="font-family:'Outfit',Arial,sans-serif;font-size:12px;font-weight:300;color:#555250;line-height:1.6;margin:0;">
+                Si el botón no funciona, copia y pega este enlace en tu navegador:
+              </p>
+              <p style="font-family:'JetBrains Mono',Courier New,monospace;font-size:11px;color:#8a8780;line-height:1.5;margin:6px 0 0 0;word-break:break-all;">{{.InviteURL}}</p>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td class="wrap-pad" style="padding:20px 32px 0;">
+              <div style="height:1px;background:linear-gradient(90deg,transparent,#1e2023 30%,#1e2023 70%,transparent);"></div>
+            </td>
+          </tr>
+
+          <!-- ══ SECURITY NOTE ══ -->
+          <tr>
+            <td class="wrap-pad" style="padding:18px 32px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td valign="top" style="padding-right:10px;padding-top:1px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <rect x="3" y="11" width="18" height="11" rx="2" stroke="#2a2e33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="#2a2e33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </td>
+                  <td valign="top">
+                    <p style="font-family:'Outfit',Arial,sans-serif;font-size:12px;font-weight:300;color:#555250;line-height:1.55;margin:0;">Si no esperabas esta invitación, puedes ignorar este correo — sin la contraseña, nadie puede entrar con tu dirección.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ══ FOOTER ══ -->
+          <tr>
+            <td style="background-color:#0a0b0c;border-top:1px solid #15181a;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td class="wrap-pad" style="padding:20px 32px 22px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td valign="middle" style="padding-right:7px;">
+                          <svg width="18" height="18" viewBox="0 0 30 30" fill="none">
+                            <rect width="30" height="30" rx="7" fill="#d4912a"/>
+                            <path d="M7 22L12.5 14.5L16.5 18.5L23 9" stroke="#0c0a06" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+                          </svg>
+                        </td>
+                        <td valign="middle">
+                          <span style="font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:14px;letter-spacing:0.1em;color:#555250;">FINEXIA</span>
+                        </td>
+                      </tr>
+                    </table>
+                    <div style="height:1px;background-color:#15181a;margin:14px 0 12px 0;"></div>
+                    <p style="font-family:'JetBrains Mono',Courier New,monospace;font-size:10px;color:#2a2e33;margin:0;">© 2026 Finexia. Todos los derechos reservados.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Bottom padding -->
+          <tr><td style="height:32px;background-color:#08090a;"></td></tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

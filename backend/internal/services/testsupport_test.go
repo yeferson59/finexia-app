@@ -79,6 +79,32 @@ type fakeRepository struct {
 	upsertExchangeRate            func(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (entities.ExchangeRate, error)
 	saveWaitlistEmail             func(ctx context.Context, email string) error
 	importEntryTransactions       func(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []entities.ImportTransactionRow) (int, error)
+
+	createInvitation    func(ctx context.Context, email, name, role, tokenHash string, invitedBy *uuid.UUID, expiresAt time.Time) (entities.Invitation, error)
+	getInvitationByHash func(ctx context.Context, tokenHash string) (entities.Invitation, error)
+	getInvitationByID   func(ctx context.Context, id uuid.UUID) (entities.Invitation, error)
+	acceptInvitation    func(ctx context.Context, invitationID uuid.UUID, name, email, role, passwordHash string) (entities.User, error)
+	setWaitlistInvited  func(ctx context.Context, email string) error
+}
+
+func (f *fakeRepository) CreateInvitation(ctx context.Context, email, name, role, tokenHash string, invitedBy *uuid.UUID, expiresAt time.Time) (entities.Invitation, error) {
+	return f.createInvitation(ctx, email, name, role, tokenHash, invitedBy, expiresAt)
+}
+
+func (f *fakeRepository) GetInvitationByHash(ctx context.Context, tokenHash string) (entities.Invitation, error) {
+	return f.getInvitationByHash(ctx, tokenHash)
+}
+
+func (f *fakeRepository) GetInvitationByID(ctx context.Context, id uuid.UUID) (entities.Invitation, error) {
+	return f.getInvitationByID(ctx, id)
+}
+
+func (f *fakeRepository) AcceptInvitation(ctx context.Context, invitationID uuid.UUID, name, email, role, passwordHash string) (entities.User, error) {
+	return f.acceptInvitation(ctx, invitationID, name, email, role, passwordHash)
+}
+
+func (f *fakeRepository) SetWaitlistInvited(ctx context.Context, email string) error {
+	return f.setWaitlistInvited(ctx, email)
 }
 
 func (f *fakeRepository) ImportEntryTransactions(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []entities.ImportTransactionRow) (int, error) {
@@ -314,13 +340,18 @@ func (f *fakeRepository) SaveWaitlistEmail(ctx context.Context, email string) er
 type fakeMailer struct {
 	mu sync.Mutex
 
-	waitlistErr error
-	activityErr error
-	securityErr error
-	weeklyErr   error
+	waitlistErr   error
+	activityErr   error
+	securityErr   error
+	weeklyErr     error
+	invitationErr error
 
-	waitlistTo []string
-	activity   []struct {
+	waitlistTo   []string
+	invitationTo []struct {
+		To   string
+		Data mail.InvitationData
+	}
+	activity []struct {
 		To   string
 		Data mail.ActivityAlertData
 	}
@@ -368,6 +399,25 @@ func (m *fakeMailer) SendSecurityAlert(email string, data mail.SecurityAlertData
 		Data mail.SecurityAlertData
 	}{email, data})
 	return nil
+}
+
+func (m *fakeMailer) SendInvitation(email string, data mail.InvitationData) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.invitationErr != nil {
+		return m.invitationErr
+	}
+	m.invitationTo = append(m.invitationTo, struct {
+		To   string
+		Data mail.InvitationData
+	}{email, data})
+	return nil
+}
+
+func (m *fakeMailer) invitationCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.invitationTo)
 }
 
 func (m *fakeMailer) SendWeeklySummary(email string, data mail.WeeklySummaryData) error {
