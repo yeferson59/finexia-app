@@ -7,6 +7,7 @@
 		type: 'login' | 'register';
 		errors: Record<string, string> | Array<{ path: PropertyKey[]; message: string }>;
 		unverified?: boolean;
+		duplicateEmail?: boolean;
 	} | null;
 
 	let { form }: { form: FormResult } = $props();
@@ -435,6 +436,15 @@
 
 						{#if registerErrors['server']}
 							<p class="error-server" role="alert">{registerErrors['server']}</p>
+						{/if}
+
+						{#if form?.type === 'register' && form.duplicateEmail}
+							<button type="button" onclick={switchToLogin} class="resend-link">
+								Iniciar sesión con este correo
+							</button>
+							<a href={resolve('/auth/forgot-password')} class="resend-link">
+								¿Olvidaste tu contraseña?
+							</a>
 						{/if}
 
 						<Button type="submit" variant="primary" size="lg" loading={isSubmitting} fullWidth>
@@ -1014,12 +1024,18 @@
 
 	.resend-link {
 		display: block;
+		width: 100%;
 		text-align: center;
 		font-size: 0.85rem;
 		color: var(--gold-primary);
 		text-decoration: none;
 		font-weight: 600;
 		margin-top: -0.75rem;
+		background: none;
+		border: none;
+		padding: 0;
+		font-family: inherit;
+		cursor: pointer;
 	}
 
 	.resend-link:hover {

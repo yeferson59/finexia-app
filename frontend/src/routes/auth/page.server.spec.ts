@@ -203,6 +203,24 @@ describe('register action', () => {
 		expect(result?.data.errors).toEqual({ server: 'No válido' });
 	});
 
+	it('flags a duplicate email with a friendly message instead of the raw backend one', async () => {
+		const fetch = vi.fn().mockResolvedValue(
+			jsonResponse(
+				{ message: 'email already registered', action: 'auth:register:duplicate' },
+				{ status: 409 }
+			)
+		);
+
+		const result = await actions.register(buildEvent(validRegister, fetch) as RegisterEvent);
+		const data = result?.data as { duplicateEmail?: boolean; errors?: Record<string, string> };
+
+		expect(result?.status).toBe(409);
+		expect(data.duplicateEmail).toBe(true);
+		expect(data.errors).toEqual({
+			server: 'Ya existe una cuenta con este correo. Inicia sesión o recupera tu contraseña.'
+		});
+	});
+
 	it('redirects to /auth?registered=1 after a successful registration', async () => {
 		const fetch = vi
 			.fn()

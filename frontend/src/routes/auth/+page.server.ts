@@ -107,6 +107,15 @@ export const actions = {
 
 		if (!response.ok) {
 			const body = await response.json().catch(() => ({}));
+			if (body.action === 'auth:register:duplicate') {
+				return fail(response.status, {
+					type: 'register' as const,
+					errors: {
+						server: 'Ya existe una cuenta con este correo. Inicia sesión o recupera tu contraseña.'
+					},
+					duplicateEmail: true as const
+				});
+			}
 			return fail(response.status, {
 				type: 'register' as const,
 				errors: { server: body.message || 'Error al registrarse' }

@@ -52,6 +52,14 @@ func (handler *Handlers) Register(c fiber.Ctx) error {
 
 	user, err := handler.services.Register(c.Context(), registerDto.Name, registerDto.Email, registerDto.Password)
 	if err != nil {
+		if errors.Is(err, services.ErrEmailAlreadyExists) {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"success": false,
+				"message": "email already registered",
+				"details": "an account with this email already exists",
+				"action":  "auth:register:duplicate",
+			})
+		}
 		return handler.responseFromDomain(c, err, "failed to register", "auth:register")
 	}
 
