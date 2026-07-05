@@ -192,6 +192,6 @@ func (s *Services) sendPasswordChangedAlert(userID uuid.UUID) {
 		IPAddress:   "—",
 		UserAgent:   "—",
 		When:        time.Now().UTC().Format("02 Jan 2006 15:04 UTC"),
-		SecurityURL: s.cfg.PublicURL + "/dashboard/settings",
+		SecurityURL: s.cfg.FrontendURL + "/dashboard/settings",
 	})
 }

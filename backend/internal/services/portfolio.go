@@ -245,7 +245,7 @@ func (s *Services) sendTransactionAlert(userID, entryID uuid.UUID, txn entities.
 		Total:           totalStr,
 		Currency:        txn.Currency,
 		TransactionDate: txn.TransactionDate.Format("02 Jan 2006"),
-		DashboardURL:    s.cfg.PublicURL + "/dashboard/portfolios",
+		DashboardURL:    s.cfg.FrontendURL + "/dashboard/portfolios",
 	}
 
 	_ = s.mail.SendActivityAlert(user.Email, data)
