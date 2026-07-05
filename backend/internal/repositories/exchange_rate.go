@@ -24,8 +24,8 @@ func (r *Repository) UpsertExchangeRate(
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO exchange_rates (from_currency, to_currency, rate, rate_date, fetched_at)
 		VALUES ($1, $2, $3::numeric, $4::date, NOW())
-		ON CONFLICT (from_currency, to_currency, rate_date)
-		DO UPDATE SET rate = EXCLUDED.rate, fetched_at = NOW()
+		ON CONFLICT (from_currency, to_currency)
+		DO UPDATE SET rate = EXCLUDED.rate, rate_date = EXCLUDED.rate_date, fetched_at = NOW()
 		RETURNING id, from_currency, to_currency, rate::text, rate_date, fetched_at
 	`, from, to, rate.String(), rateDate).Scan(
 		&er.ID,
