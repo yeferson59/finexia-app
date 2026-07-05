@@ -35,6 +35,8 @@ type Env struct {
 	AlphaVantageAPIKey string
 	FinnhubAPIKey      string
 	PublicURL          string
+	FrontendURL        string
+	InvitationExpiry   time.Duration
 }
 
 func (c *Config) LoadEnvs() *Env {
@@ -66,6 +68,8 @@ func (c *Config) LoadEnvs() *Env {
 		AlphaVantageAPIKey: c.getString("ALPHA_VANTAGE_API_KEY", ""),
 		FinnhubAPIKey:      c.getString("FINNHUB_API_KEY", ""),
 		PublicURL:          c.getString("PUBLIC_URL", "http://localhost:8080"),
+		FrontendURL:        c.getString("FRONTEND_URL", "http://localhost:5173"),
+		InvitationExpiry:   c.getDuration("INVITATION_EXPIRY", 72*time.Hour),
 	}
 }
 

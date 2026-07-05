@@ -8,6 +8,15 @@ func (r *Routes) Users() {
 	users.Get("", r.middlewares.RequireAdmin(), paginate.New(), r.handlers.GetListUsers)
 	users.Post("", r.middlewares.RequireAdmin(), r.handlers.CreateUser)
 
+	// Invitations (admin). Static "/invitations" segment is registered before the
+	// "/:id" routes so it is never captured as a user id.
+	users.Get("/invitations", r.middlewares.RequireAdmin(), paginate.New(), r.handlers.ListInvitations)
+	users.Post("/invitations", r.middlewares.RequireAdmin(), r.handlers.CreateInvitation)
+	users.Post("/invitations/:id/resend", r.middlewares.RequireAdmin(), r.handlers.ResendInvitation)
+	users.Delete("/invitations/:id", r.middlewares.RequireAdmin(), r.handlers.RevokeInvitation)
+
+	users.Get("/waitlist", r.middlewares.RequireAdmin(), paginate.New(), r.handlers.ListWaitlist)
+
 	// Self-service routes — must be registered before /:id to avoid shadowing.
 	users.Get("/me", r.handlers.GetMe)
 	users.Patch("/me", r.handlers.UpdateMe)

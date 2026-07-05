@@ -96,6 +96,16 @@ type Repository interface {
 	GetExchangeRateByID(ctx context.Context, id uuid.UUID) (entities.ExchangeRate, error)
 	UpdateExchangeRateByID(ctx context.Context, id uuid.UUID, rate money.Decimal) (entities.ExchangeRate, error)
 	SaveWaitlistEmail(ctx context.Context, email string) error
+	ListWaitlist(ctx context.Context, offset, limit uint) ([]entities.Waitlist, uint, error)
+	SetWaitlistInvited(ctx context.Context, email string) error
+
+	// Invitations
+	CreateInvitation(ctx context.Context, email, name, role, tokenHash string, invitedBy *uuid.UUID, expiresAt time.Time) (entities.Invitation, error)
+	GetInvitationByHash(ctx context.Context, tokenHash string) (entities.Invitation, error)
+	GetInvitationByID(ctx context.Context, id uuid.UUID) (entities.Invitation, error)
+	ListInvitations(ctx context.Context, offset, limit uint) ([]entities.Invitation, uint, error)
+	RevokeInvitation(ctx context.Context, id uuid.UUID) error
+	AcceptInvitation(ctx context.Context, invitationID uuid.UUID, name, email, role, passwordHash string) (entities.User, error)
 }
 
 // Ensure the concrete repository keeps satisfying the interface.
