@@ -81,7 +81,7 @@ func TestLoginSuccess(t *testing.T) {
 			}
 			return user, nil
 		},
-		createSession: func(_ context.Context, userID uuid.UUID, token string, _ time.Time) (uuid.UUID, error) {
+		createSession: func(_ context.Context, userID uuid.UUID, token string, _, _ *string, _ time.Time) (uuid.UUID, error) {
 			if userID != user.ID {
 				t.Errorf("CreateSession userID = %s, want %s", userID, user.ID)
 			}
@@ -104,7 +104,7 @@ func TestLoginSuccess(t *testing.T) {
 	storage := newMemStorage()
 	svc := newTestServices(repo, storage)
 
-	result, err := svc.Login(context.Background(), user.Email, password)
+	result, err := svc.Login(context.Background(), user.Email, password, "", "")
 	if err != nil {
 		t.Fatalf("Login: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestLoginFailures(t *testing.T) {
 			}
 			svc := newTestServices(repo, newMemStorage())
 
-			_, err := svc.Login(context.Background(), tc.email, tc.password)
+			_, err := svc.Login(context.Background(), tc.email, tc.password, "", "")
 			if err == nil || err.Error() != tc.wantErr {
 				t.Fatalf("Login error = %v, want %q", err, tc.wantErr)
 			}

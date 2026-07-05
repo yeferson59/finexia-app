@@ -45,14 +45,105 @@ func (r *Repository) GetAccountByEmail(ctx context.Context, email string) (entit
 	return user, nil
 }
 
-func (r *Repository) CreateSession(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) (uuid.UUID, error) {
+func (r *Repository) CreateSession(ctx context.Context, userID uuid.UUID, token string, ip, ua *string, expiresAt time.Time) (uuid.UUID, error) {
 	var id uuid.UUID
-	err := r.db.QueryRow(ctx, "INSERT INTO sessions(user_id, token, expires_at) VALUES($1, $2, $3) RETURNING id", userID.String(), token, expiresAt).Scan(&id)
+	err := r.db.QueryRow(ctx,
+		"INSERT INTO sessions(user_id, token, ip_address, user_agent, expires_at) VALUES($1, $2, $3, $4, $5) RETURNING id",
+		userID.String(), token, ip, ua, expiresAt,
+	).Scan(&id)
 	if err != nil {
 		return uuid.Nil, err
 	}
 
 	return id, nil
+}
+
+// ListSessionsByUserID returns the user's live sessions: those whose access
+// token has not expired, or that still hold a redeemable refresh token (the
+// cleanup job uses the same liveness rule before deleting a session).
+func (r *Repository) ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]entities.Session, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT s.id, s.user_id, s.token, s.expires_at, s.ip_address, s.user_agent, s.created_at, s.updated_at
+		 FROM sessions s
+		 WHERE s.user_id = $1
+		   AND (s.expires_at > NOW() OR EXISTS (
+		     SELECT 1 FROM refresh_tokens rt
+		     WHERE rt.session_id = s.id
+		       AND rt.revoked_at IS NULL
+		       AND rt.expires_at > NOW()
+		   ))
+		 ORDER BY s.updated_at DESC`,
+		userID.String(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []entities.Session
+	for rows.Next() {
+		var s entities.Session
+		if err := rows.Scan(&s.ID, &s.UserID, &s.Token, &s.ExpiresAt, &s.IPAddress, &s.UserAgent, &s.CreatedAt, &s.UpdatedAt); err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, s)
+	}
+	return sessions, rows.Err()
+}
+
+// GetRefreshTokensBySessionIDs returns the hashes and family IDs of the live
+// refresh tokens tied to the given sessions, so callers can purge cache
+// entries and mark the families revoked before deleting the session rows.
+func (r *Repository) GetRefreshTokensBySessionIDs(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) ([]string, []uuid.UUID, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT rt.token_hash, rt.family_id
+		 FROM refresh_tokens rt
+		 JOIN sessions s ON s.id = rt.session_id
+		 WHERE s.user_id = $1 AND rt.session_id = ANY($2) AND rt.revoked_at IS NULL`,
+		userID.String(), sessionIDs,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	var (
+		hashes    []string
+		familyIDs []uuid.UUID
+	)
+	for rows.Next() {
+		var (
+			hash     string
+			familyID uuid.UUID
+		)
+		if err := rows.Scan(&hash, &familyID); err != nil {
+			return nil, nil, err
+		}
+		hashes = append(hashes, hash)
+		familyIDs = append(familyIDs, familyID)
+	}
+	return hashes, familyIDs, rows.Err()
+}
+
+// DeleteSessionsByIDs deletes the given sessions, scoped to the owner so a
+// user can never revoke another user's session. Refresh tokens cascade.
+func (r *Repository) DeleteSessionsByIDs(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) (int64, error) {
+	tag, err := r.db.Exec(ctx,
+		"DELETE FROM sessions WHERE user_id = $1 AND id = ANY($2)",
+		userID.String(), sessionIDs,
+	)
+	return tag.RowsAffected(), err
+}
+
+// HasSessionFromIP reports whether the user already has a session recorded
+// from the given IP; used to decide if a login looks like a new device.
+func (r *Repository) HasSessionFromIP(ctx context.Context, userID uuid.UUID, ip string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx,
+		"SELECT EXISTS(SELECT 1 FROM sessions WHERE user_id = $1 AND ip_address = $2)",
+		userID.String(), ip,
+	).Scan(&exists)
+	return exists, err
 }
 
 // ErrSessionNotFound indicates the session row no longer exists (e.g. the user

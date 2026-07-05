@@ -19,6 +19,8 @@ type Env struct {
 	JWTAccessDuration  time.Duration
 	JWTRefreshDuration time.Duration
 	RefreshGracePeriod time.Duration
+	MaxLoginAttempts   int
+	LoginLockout       time.Duration
 	TrustProxy         bool
 	TrustedProxies     []string
 	CORSEnabled        bool
@@ -48,6 +50,8 @@ func (c *Config) LoadEnvs() *Env {
 		JWTAccessDuration:  c.getDuration("JWT_ACCESS_DURATION", 15*time.Minute),
 		JWTRefreshDuration: c.getDuration("JWT_REFRESH_DURATION", 30*24*time.Hour),
 		RefreshGracePeriod: c.getDuration("JWT_REFRESH_GRACE_PERIOD", 30*time.Second),
+		MaxLoginAttempts:   c.getInt("MAX_LOGIN_ATTEMPTS", 5),
+		LoginLockout:       c.getDuration("LOGIN_LOCKOUT_DURATION", 15*time.Minute),
 		TrustProxy:         c.getBool("TRUST_PROXY", true),
 		TrustedProxies:     c.getSlice("TRUSTED_PROXIES"),
 		CORSEnabled:        c.getBool("CORS_ENABLED", true),
@@ -123,21 +127,19 @@ func (Config) getDuration(key string, defaultValue time.Duration) time.Duration 
 	return time.Hour * 24 * time.Duration(int64Value)
 }
 
-/*
- * func (Config) getInt(key string, defaultValue int) int {
+func (Config) getInt(key string, defaultValue int) int {
 	value := strings.TrimSpace(os.Getenv(strings.ToUpper(key)))
 	if value == "" {
 		return defaultValue
 	}
 
-	IntValue, err := strconv.Atoi(value)
+	intValue, err := strconv.Atoi(value)
 	if err != nil {
 		return defaultValue
 	}
 
-	return IntValue
- }
-*/
+	return intValue
+}
 
 /*
  * func (Config) getInt64(key string, defaultValue int64) int64 {

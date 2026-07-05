@@ -37,6 +37,18 @@ type SessionResponseDTO struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
+// ActiveSessionDTO describes a live session for the "active devices" list.
+// It deliberately excludes the session token.
+type ActiveSessionDTO struct {
+	ID           uuid.UUID `json:"id"`
+	IPAddress    *string   `json:"ipAddress"`
+	UserAgent    *string   `json:"userAgent"`
+	CreatedAt    time.Time `json:"createdAt"`
+	LastActiveAt time.Time `json:"lastActiveAt"`
+	ExpiresAt    time.Time `json:"expiresAt"`
+	Current      bool      `json:"current"`
+}
+
 type UserSessionResponseDTO struct {
 	User    UserResponseDTO    `json:"user"`
 	Session SessionResponseDTO `json:"session"`

@@ -15,6 +15,7 @@ import (
 type Mailer interface {
 	SendWaitlistConfirmation(email string) error
 	SendActivityAlert(email string, data mail.ActivityAlertData) error
+	SendSecurityAlert(email string, data mail.SecurityAlertData) error
 	SendWeeklySummary(email string, data mail.WeeklySummaryData) error
 }
 
