@@ -8,11 +8,20 @@
 
 	const { data, form }: PageProps = $props();
 
+	interface ImportResult {
+		totalRows: number;
+		imported: number;
+		skipped: number;
+		errors: { row: number; message: string }[];
+	}
+
 	let syncing = $state(false);
 	let updatingId = $state<string | null>(null);
 	let syncingRateId = $state<string | null>(null);
 	let creating = $state(false);
+	let importing = $state(false);
 	let showCreateForm = $state(false);
+	let showImportForm = $state(false);
 	let syncMessage = $state<string | null>(null);
 	let createMessage = $state<string | null>(null);
 	let rateInputs = $state<Record<string, string>>({});
@@ -39,7 +48,12 @@
 			syncMessage = `Tasa de cambio actualizada.`;
 			setTimeout(() => (syncMessage = null), 4000);
 		}
+		if (form?.importSuccess) {
+			showImportForm = false;
+		}
 	});
+
+	const importResult = $derived((form?.importResult ?? null) as ImportResult | null);
 
 	function formatRate(rate: string): string {
 		const num = parseFloat(rate);
@@ -83,6 +97,14 @@
 				onclick={() => (showCreateForm = !showCreateForm)}
 			>
 				{showCreateForm ? 'Cancelar' : '+ Nueva Tasa'}
+			</Button>
+			<Button
+				variant="secondary"
+				size="sm"
+				type="button"
+				onclick={() => (showImportForm = !showImportForm)}
+			>
+				{showImportForm ? 'Cancelar' : 'Importar CSV/Excel'}
 			</Button>
 			<form
 				method="POST"
@@ -178,6 +200,56 @@
 					<Button type="submit" loading={creating}>Crear tasa</Button>
 				</div>
 			</form>
+		</Card>
+	</div>
+{/if}
+
+{#if showImportForm}
+	<div class="create-form-wrap">
+		<Card padding="md">
+			<h2 class="form-title">Importar tasas desde CSV/Excel</h2>
+			<p class="import-hint">
+				El archivo debe tener columnas <code>fromCurrency</code>, <code>toCurrency</code> y
+				<code>rate</code>. Se admite .csv, .xlsx y .xls.
+			</p>
+			<form
+				method="POST"
+				action="?/importRates"
+				enctype="multipart/form-data"
+				use:enhance={() => {
+					importing = true;
+					return async ({ update }) => {
+						importing = false;
+						await update();
+					};
+				}}
+			>
+				<div class="import-row">
+					<input type="file" name="file" accept=".csv,.xlsx,.xls" class="field-input" required />
+					<Button type="submit" loading={importing}>Importar</Button>
+				</div>
+				{#if form?.importError}
+					<p class="form-error">{form.importError}</p>
+				{/if}
+			</form>
+			{#if importResult}
+				<div class="import-result">
+					<p class="import-summary">
+						{importResult.imported} de {importResult.totalRows} fila{importResult.totalRows === 1
+							? ''
+							: 's'} importada{importResult.imported === 1 ? '' : 's'}{importResult.skipped > 0
+							? `, ${importResult.skipped} omitida${importResult.skipped === 1 ? '' : 's'}`
+							: ''}.
+					</p>
+					{#if importResult.errors.length > 0}
+						<ul class="import-errors">
+							{#each importResult.errors as e (e.row)}
+								<li>Fila {e.row}: {e.message}</li>
+							{/each}
+						</ul>
+					{/if}
+				</div>
+			{/if}
 		</Card>
 	</div>
 {/if}
@@ -484,5 +556,52 @@
 		padding: 3rem;
 		color: var(--text-dim);
 		font-size: 0.9rem;
+	}
+
+	.import-hint {
+		font-size: 0.82rem;
+		color: var(--text-muted);
+		margin: 0 0 1rem 0;
+	}
+
+	.import-hint code {
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		color: var(--amber-light);
+	}
+
+	.import-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.import-row .field-input {
+		flex: 1;
+	}
+
+	.import-result {
+		margin-top: 1rem;
+		padding-top: 1rem;
+		border-top: 1px solid var(--border);
+	}
+
+	.import-summary {
+		font-size: 0.85rem;
+		color: var(--text);
+		margin: 0;
+	}
+
+	.import-errors {
+		margin: 0.6rem 0 0 0;
+		padding-left: 1.1rem;
+		font-size: 0.78rem;
+		color: var(--red);
+		max-height: 200px;
+		overflow-y: auto;
+	}
+
+	.import-errors li {
+		margin-bottom: 0.25rem;
 	}
 </style>

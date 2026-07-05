@@ -74,6 +74,20 @@ func (h *Handlers) UpdateExchangeRate(c fiber.Ctx) error {
 	return h.responseStatusOk(c, "Exchange rate updated", "Exchange rate updated successfully", rate)
 }
 
+func (h *Handlers) ImportExchangeRates(c fiber.Ctx) error {
+	data, filename, err := readImportFile(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid file", err.Error())
+	}
+
+	result, err := h.services.ImportExchangeRatesFromFile(c.Context(), data, filename, c.FormValue("sheet"))
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error importing exchange rates", "Could not import the uploaded exchange rates")
+	}
+
+	return h.responseStatusOk(c, "Exchange rates imported", "Spreadsheet imported successfully", result)
+}
+
 func (h *Handlers) SyncSingleExchangeRate(c fiber.Ctx) error {
 	id, err := h.getParamUUID(c, "id")
 	if err != nil {

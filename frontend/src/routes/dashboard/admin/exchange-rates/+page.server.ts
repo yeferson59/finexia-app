@@ -49,6 +49,26 @@ export const actions = {
 		return { createSuccess: true };
 	},
 
+	importRates: async ({ request, cookies, fetch }) => {
+		const fd = await request.formData();
+		const file = fd.get('file');
+		if (!(file instanceof File) || file.size === 0) {
+			return fail(400, { importError: 'Selecciona un archivo CSV o Excel' });
+		}
+
+		const res = await authedFetch({ cookies, fetch }, '/exchange-rates/import', {
+			method: 'POST',
+			body: fd
+		});
+
+		const body = await res.json().catch(() => ({}));
+		if (!res.ok) {
+			return fail(res.status, { importError: body.details ?? 'No se pudo importar el archivo' });
+		}
+
+		return { importSuccess: true, importResult: body.data };
+	},
+
 	syncRate: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
 		const id = fd.get('id') as string;
