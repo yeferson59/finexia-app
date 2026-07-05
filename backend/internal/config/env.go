@@ -40,6 +40,7 @@ type Env struct {
 	PasswordResetExpiry     time.Duration
 	EmailVerificationExpiry time.Duration
 	SelfRegistrationEnabled bool
+	TwoFactorPendingExpiry  time.Duration
 }
 
 func (c *Config) LoadEnvs() *Env {
@@ -78,6 +79,9 @@ func (c *Config) LoadEnvs() *Env {
 		// Off by default: the product is invite-only during the beta, so
 		// public self-registration must be explicitly opted into.
 		SelfRegistrationEnabled: c.getBool("SELF_REGISTRATION_ENABLED", false),
+		// How long a password-validated login may wait for its TOTP code
+		// before the user must start over.
+		TwoFactorPendingExpiry: c.getDuration("TWO_FACTOR_PENDING_EXPIRY", 5*time.Minute),
 	}
 }
 

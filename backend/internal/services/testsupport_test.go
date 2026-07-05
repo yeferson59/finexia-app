@@ -14,6 +14,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/logger"
 	"github.com/yeferson59/finexia-app/internal/mail"
 	"github.com/yeferson59/finexia-app/internal/prices"
+	"github.com/yeferson59/finexia-app/internal/repositories"
 )
 
 // fakeRepository embeds the Repository interface so tests only override the
@@ -93,6 +94,45 @@ type fakeRepository struct {
 	createEmailVerification    func(ctx context.Context, email, tokenHash string, expiresAt time.Time) (entities.Verification, error)
 	getEmailVerificationByHash func(ctx context.Context, tokenHash string) (entities.Verification, error)
 	consumeEmailVerification   func(ctx context.Context, id uuid.UUID, email string) error
+
+	getTwoFactor                      func(ctx context.Context, userID uuid.UUID) (entities.TwoFactor, error)
+	upsertTwoFactorSecret             func(ctx context.Context, userID uuid.UUID, secret string) error
+	enableTwoFactor                   func(ctx context.Context, userID uuid.UUID) error
+	deleteTwoFactor                   func(ctx context.Context, userID uuid.UUID) error
+	replaceTwoFactorRecoveryCodes     func(ctx context.Context, userID uuid.UUID, codeHashes []string) error
+	consumeTwoFactorRecoveryCode      func(ctx context.Context, userID uuid.UUID, codeHash string) error
+	countUnusedTwoFactorRecoveryCodes func(ctx context.Context, userID uuid.UUID) (int, error)
+}
+
+func (f *fakeRepository) GetTwoFactor(ctx context.Context, userID uuid.UUID) (entities.TwoFactor, error) {
+	if f.getTwoFactor == nil {
+		return entities.TwoFactor{}, repositories.ErrTwoFactorNotFound
+	}
+	return f.getTwoFactor(ctx, userID)
+}
+
+func (f *fakeRepository) UpsertTwoFactorSecret(ctx context.Context, userID uuid.UUID, secret string) error {
+	return f.upsertTwoFactorSecret(ctx, userID, secret)
+}
+
+func (f *fakeRepository) EnableTwoFactor(ctx context.Context, userID uuid.UUID) error {
+	return f.enableTwoFactor(ctx, userID)
+}
+
+func (f *fakeRepository) DeleteTwoFactor(ctx context.Context, userID uuid.UUID) error {
+	return f.deleteTwoFactor(ctx, userID)
+}
+
+func (f *fakeRepository) ReplaceTwoFactorRecoveryCodes(ctx context.Context, userID uuid.UUID, codeHashes []string) error {
+	return f.replaceTwoFactorRecoveryCodes(ctx, userID, codeHashes)
+}
+
+func (f *fakeRepository) ConsumeTwoFactorRecoveryCode(ctx context.Context, userID uuid.UUID, codeHash string) error {
+	return f.consumeTwoFactorRecoveryCode(ctx, userID, codeHash)
+}
+
+func (f *fakeRepository) CountUnusedTwoFactorRecoveryCodes(ctx context.Context, userID uuid.UUID) (int, error) {
+	return f.countUnusedTwoFactorRecoveryCodes(ctx, userID)
 }
 
 func (f *fakeRepository) CreatePasswordReset(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) (entities.PasswordReset, error) {
@@ -607,11 +647,12 @@ func (s *memStorage) has(key string) bool {
 
 func testConfig() *config.Env {
 	return &config.Env{
-		JWTSecret:          "test-secret",
-		JWTAccessDuration:  15 * time.Minute,
-		JWTRefreshDuration: 30 * 24 * time.Hour,
-		RefreshGracePeriod: 30 * time.Second,
-		PublicURL:          "http://localhost:8080",
+		JWTSecret:              "test-secret",
+		JWTAccessDuration:      15 * time.Minute,
+		JWTRefreshDuration:     30 * 24 * time.Hour,
+		RefreshGracePeriod:     30 * time.Second,
+		PublicURL:              "http://localhost:8080",
+		TwoFactorPendingExpiry: 5 * time.Minute,
 	}
 }
 

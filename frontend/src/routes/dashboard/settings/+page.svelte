@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { untrack } from 'svelte';
+	import { renderSVG } from 'uqr';
 	import PageHeader from '$components/ui/page-header.svelte';
 	import Card from '$components/ui/card.svelte';
 	import Input from '$components/ui/input.svelte';
@@ -27,6 +28,20 @@
 	let confirmPassword = $state('');
 	let passwordLoading = $state(false);
 
+	// Two-factor authentication section
+	let twoFaPassword = $state('');
+	let twoFaSetupLoading = $state(false);
+	let twoFaConfirmCode = $state('');
+	let twoFaConfirmLoading = $state(false);
+	let twoFaDisablePassword = $state('');
+	let twoFaDisableCode = $state('');
+	let twoFaDisableLoading = $state(false);
+	let twoFaShowDisable = $state(false);
+	let twoFaRegenPassword = $state('');
+	let twoFaRegenCode = $state('');
+	let twoFaRegenLoading = $state(false);
+	let twoFaShowRegen = $state(false);
+
 	// Sessions section
 	let revokingSessionId = $state<string | null>(null);
 	let revokeOthersLoading = $state(false);
@@ -50,6 +65,38 @@
 	const passwordError = $derived(
 		form?.action === 'changePassword' ? ((form as { error?: string })?.error ?? '') : ''
 	);
+	const twoFaSetupError = $derived(
+		form?.action === 'setup2fa' ? ((form as { error?: string })?.error ?? '') : ''
+	);
+	const twoFaSetupData = $derived(
+		form?.action === 'setup2fa' && (form as { success?: boolean })?.success
+			? (form as { secret?: string; otpauthUrl?: string })
+			: null
+	);
+	const twoFaEnableError = $derived(
+		form?.action === 'enable2fa' ? ((form as { error?: string })?.error ?? '') : ''
+	);
+	const twoFaRecoveryCodes = $derived(
+		(form?.action === 'enable2fa' || form?.action === 'regenerate2faCodes') &&
+			(form as { success?: boolean })?.success
+			? ((form as { recoveryCodes?: string[] })?.recoveryCodes ?? [])
+			: []
+	);
+	const twoFaDisableError = $derived(
+		form?.action === 'disable2fa' ? ((form as { error?: string })?.error ?? '') : ''
+	);
+	const twoFaDisableSuccess = $derived(
+		form?.action === 'disable2fa' && (form as { success?: boolean })?.success
+	);
+	const twoFaRegenError = $derived(
+		form?.action === 'regenerate2faCodes' ? ((form as { error?: string })?.error ?? '') : ''
+	);
+	// The QR is rendered locally from the otpauth URL; the secret never
+	// touches a third-party service.
+	const twoFaQrSvg = $derived(
+		twoFaSetupData?.otpauthUrl ? renderSVG(twoFaSetupData.otpauthUrl) : ''
+	);
+
 	const sessionsError = $derived(
 		form?.action === 'revokeSession' || form?.action === 'revokeOtherSessions'
 			? ((form as { error?: string })?.error ?? '')
@@ -120,6 +167,26 @@
 		if (avatarSuccess) {
 			avatarPreview = null;
 			avatarFile = null;
+		}
+	});
+
+	// Never leave credentials sitting in the 2FA forms after they succeed.
+	$effect(() => {
+		if (twoFaSetupData) twoFaPassword = '';
+	});
+	$effect(() => {
+		if (twoFaRecoveryCodes.length > 0) {
+			twoFaConfirmCode = '';
+			twoFaRegenPassword = '';
+			twoFaRegenCode = '';
+			twoFaShowRegen = false;
+		}
+	});
+	$effect(() => {
+		if (twoFaDisableSuccess) {
+			twoFaDisablePassword = '';
+			twoFaDisableCode = '';
+			twoFaShowDisable = false;
 		}
 	});
 
@@ -344,6 +411,231 @@
 					<Button type="submit" loading={passwordLoading}>Cambiar contraseña</Button>
 				</div>
 			</form>
+		</div>
+	</Card>
+
+	<!-- Two-factor authentication -->
+	<Card variant="elevated" padding="none">
+		<div class="section">
+			<h2 class="section-title">Verificación en dos pasos (2FA)</h2>
+
+			{#if twoFaRecoveryCodes.length > 0}
+				<div class="twofa-recovery" role="status">
+					<p class="twofa-recovery-title">Guarda tus códigos de recuperación</p>
+					<p class="hint">
+						Cada código funciona una sola vez y te permitirá entrar si pierdes acceso a tu
+						aplicación de autenticación. No volverán a mostrarse.
+					</p>
+					<ul class="twofa-code-list">
+						{#each twoFaRecoveryCodes as code (code)}
+							<li class="twofa-code">{code}</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
+
+			{#if twoFaSetupData}
+				<!-- Step 2: scan the QR and confirm the first code -->
+				<p class="hint twofa-intro">
+					Escanea este código QR con tu aplicación de autenticación (Google Authenticator, Authy,
+					1Password…) o ingresa la clave manualmente. Luego confirma con el código de 6 dígitos. La
+					verificación no quedará activa hasta que confirmes.
+				</p>
+				<div class="twofa-setup">
+					<div class="twofa-qr" aria-label="Código QR para la aplicación de autenticación">
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -- SVG generated locally by uqr from the otpauth URL -->
+						{@html twoFaQrSvg}
+					</div>
+					<div class="twofa-setup-info">
+						<p class="twofa-secret-label">Clave para ingreso manual</p>
+						<code class="twofa-secret">{twoFaSetupData.secret}</code>
+						<form
+							method="POST"
+							action="?/enable2fa"
+							use:enhance={() => {
+								twoFaConfirmLoading = true;
+								return async ({ update }) => {
+									await update({ reset: false });
+									twoFaConfirmLoading = false;
+								};
+							}}
+						>
+							<div class="form-fields">
+								<Input
+									label="Código de verificación"
+									name="code"
+									placeholder="123456"
+									autocomplete="one-time-code"
+									bind:value={twoFaConfirmCode}
+									required
+								/>
+							</div>
+							{#if twoFaEnableError}
+								<p class="feedback error">{twoFaEnableError}</p>
+							{/if}
+							<div class="form-actions">
+								<Button type="submit" loading={twoFaConfirmLoading}>Confirmar y activar</Button>
+							</div>
+						</form>
+					</div>
+				</div>
+			{:else if data.twoFactor?.enabled}
+				<div class="twofa-status">
+					<span class="twofa-badge enabled">Activada</span>
+					<p class="hint">
+						Tu cuenta pide un código del autenticador en cada inicio de sesión. Te quedan
+						{data.twoFactor.recoveryCodesLeft} códigos de recuperación sin usar.
+					</p>
+				</div>
+
+				{#if twoFaDisableSuccess}
+					<p class="feedback success">La verificación en dos pasos fue desactivada.</p>
+				{/if}
+
+				<div class="twofa-actions">
+					<button
+						type="button"
+						class="twofa-toggle"
+						onclick={() => (twoFaShowRegen = !twoFaShowRegen)}
+					>
+						Regenerar códigos de recuperación
+					</button>
+					<button
+						type="button"
+						class="twofa-toggle danger"
+						onclick={() => (twoFaShowDisable = !twoFaShowDisable)}
+					>
+						Desactivar 2FA
+					</button>
+				</div>
+
+				{#if twoFaShowRegen}
+					<form
+						method="POST"
+						action="?/regenerate2faCodes"
+						class="twofa-subform"
+						use:enhance={() => {
+							twoFaRegenLoading = true;
+							return async ({ update }) => {
+								await update({ reset: false });
+								twoFaRegenLoading = false;
+							};
+						}}
+					>
+						<div class="form-fields">
+							<Input
+								label="Contraseña actual"
+								type="password"
+								name="password"
+								bind:value={twoFaRegenPassword}
+								required
+							/>
+							<Input
+								label="Código del autenticador o de recuperación"
+								name="code"
+								placeholder="123456"
+								autocomplete="one-time-code"
+								bind:value={twoFaRegenCode}
+								required
+							/>
+						</div>
+						{#if twoFaRegenError}
+							<p class="feedback error">{twoFaRegenError}</p>
+						{/if}
+						<div class="form-actions">
+							<Button type="submit" variant="secondary" loading={twoFaRegenLoading}>
+								Regenerar códigos
+							</Button>
+						</div>
+					</form>
+				{/if}
+
+				{#if twoFaShowDisable}
+					<form
+						method="POST"
+						action="?/disable2fa"
+						class="twofa-subform"
+						use:enhance={() => {
+							twoFaDisableLoading = true;
+							return async ({ update }) => {
+								await update({ reset: false });
+								twoFaDisableLoading = false;
+							};
+						}}
+					>
+						<p class="hint">
+							Para desactivar la verificación en dos pasos confirma tu contraseña y un código
+							vigente del autenticador (o un código de recuperación).
+						</p>
+						<div class="form-fields">
+							<Input
+								label="Contraseña actual"
+								type="password"
+								name="password"
+								bind:value={twoFaDisablePassword}
+								required
+							/>
+							<Input
+								label="Código del autenticador o de recuperación"
+								name="code"
+								placeholder="123456"
+								autocomplete="one-time-code"
+								bind:value={twoFaDisableCode}
+								required
+							/>
+						</div>
+						{#if twoFaDisableError}
+							<p class="feedback error">{twoFaDisableError}</p>
+						{/if}
+						<div class="form-actions">
+							<Button type="submit" variant="secondary" loading={twoFaDisableLoading}>
+								Desactivar 2FA
+							</Button>
+						</div>
+					</form>
+				{/if}
+			{:else}
+				<div class="twofa-status">
+					<span class="twofa-badge">Desactivada</span>
+					<p class="hint">
+						Añade una segunda barrera a tu cuenta: además de tu contraseña, se pedirá un código
+						temporal de una aplicación de autenticación al iniciar sesión. Es opcional y puedes
+						desactivarla cuando quieras.
+					</p>
+				</div>
+
+				{#if twoFaDisableSuccess}
+					<p class="feedback success">La verificación en dos pasos fue desactivada.</p>
+				{/if}
+
+				<form
+					method="POST"
+					action="?/setup2fa"
+					use:enhance={() => {
+						twoFaSetupLoading = true;
+						return async ({ update }) => {
+							await update({ reset: false });
+							twoFaSetupLoading = false;
+						};
+					}}
+				>
+					<div class="form-fields">
+						<Input
+							label="Contraseña actual"
+							type="password"
+							name="password"
+							bind:value={twoFaPassword}
+							required
+						/>
+					</div>
+					{#if twoFaSetupError}
+						<p class="feedback error">{twoFaSetupError}</p>
+					{/if}
+					<div class="form-actions">
+						<Button type="submit" loading={twoFaSetupLoading}>Activar 2FA</Button>
+					</div>
+				</form>
+			{/if}
 		</div>
 	</Card>
 
@@ -578,6 +870,166 @@
 		font-size: 0.8rem;
 		color: rgba(236, 234, 229, 0.5);
 		line-height: 1.65;
+	}
+
+	/* Two-factor authentication */
+	.twofa-status {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin-bottom: 1.25rem;
+	}
+
+	.twofa-badge {
+		width: fit-content;
+		font-size: 0.675rem;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: rgba(236, 234, 229, 0.55);
+		background: rgba(236, 234, 229, 0.06);
+		border: 1px solid rgba(236, 234, 229, 0.2);
+		border-radius: 20px;
+		padding: 0.2rem 0.65rem;
+	}
+
+	.twofa-badge.enabled {
+		color: #4ade80;
+		background: rgba(74, 222, 128, 0.08);
+		border-color: rgba(74, 222, 128, 0.3);
+	}
+
+	.twofa-intro {
+		margin-bottom: 1.25rem;
+	}
+
+	.twofa-setup {
+		display: flex;
+		gap: 1.25rem;
+		align-items: flex-start;
+		flex-wrap: wrap;
+	}
+
+	.twofa-qr {
+		flex-shrink: 0;
+		width: 148px;
+		height: 148px;
+		padding: 8px;
+		background: #fff;
+		border-radius: 8px;
+	}
+
+	.twofa-qr :global(svg) {
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+
+	.twofa-setup-info {
+		flex: 1;
+		min-width: 220px;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.twofa-secret-label {
+		margin: 0;
+		font-size: 0.75rem;
+		color: rgba(236, 234, 229, 0.45);
+	}
+
+	.twofa-secret {
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		color: var(--amber);
+		background: rgba(212, 145, 42, 0.08);
+		border: 1px solid rgba(212, 145, 42, 0.25);
+		border-radius: 6px;
+		padding: 0.5rem 0.75rem;
+		overflow-wrap: anywhere;
+	}
+
+	.twofa-recovery {
+		margin-bottom: 1.5rem;
+		padding: 1rem;
+		border: 1px solid rgba(212, 145, 42, 0.35);
+		border-radius: 8px;
+		background: rgba(212, 145, 42, 0.06);
+	}
+
+	.twofa-recovery-title {
+		margin: 0 0 0.5rem;
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: var(--amber);
+	}
+
+	.twofa-code-list {
+		list-style: none;
+		margin: 0.875rem 0 0;
+		padding: 0;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+		gap: 0.5rem;
+	}
+
+	.twofa-code {
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		color: var(--text);
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid rgba(212, 145, 42, 0.15);
+		border-radius: 6px;
+		padding: 0.4rem 0.6rem;
+		text-align: center;
+	}
+
+	.twofa-actions {
+		display: flex;
+		gap: 0.625rem;
+		flex-wrap: wrap;
+		margin-top: 0.5rem;
+	}
+
+	.twofa-toggle {
+		padding: 0.45rem 1rem;
+		border-radius: 6px;
+		border: 1px solid rgba(212, 145, 42, 0.4);
+		background: rgba(212, 145, 42, 0.08);
+		color: var(--amber);
+		font-size: 0.825rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition:
+			background 0.2s ease,
+			border-color 0.2s ease;
+	}
+
+	.twofa-toggle:hover {
+		background: rgba(212, 145, 42, 0.15);
+		border-color: rgba(212, 145, 42, 0.65);
+	}
+
+	.twofa-toggle.danger {
+		border-color: rgba(224, 90, 90, 0.35);
+		background: rgba(224, 90, 90, 0.06);
+		color: var(--red, #e05a5a);
+	}
+
+	.twofa-toggle.danger:hover {
+		background: rgba(224, 90, 90, 0.14);
+		border-color: rgba(224, 90, 90, 0.6);
+	}
+
+	.twofa-subform {
+		margin-top: 1.25rem;
+		padding-top: 1.25rem;
+		border-top: 1px solid rgba(212, 145, 42, 0.1);
+	}
+
+	.twofa-subform .hint {
+		margin-bottom: 1rem;
 	}
 
 	/* Sessions */

@@ -18,6 +18,20 @@ func (handler *Handlers) Login(c fiber.Ctx) error {
 
 	result, err := handler.services.Login(c.Context(), loginDto.Email, loginDto.Password, c.IP(), c.Get("User-Agent"))
 	if err != nil {
+		if errors.Is(err, services.ErrTwoFactorRequired) {
+			// Password accepted, but the account opted into 2FA: no session
+			// yet — the client must present a TOTP code at /auth/2fa/login
+			// within the pending token's lifetime.
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{
+				"success": true,
+				"message": "two-factor authentication required",
+				"details": "enter the code from your authenticator app",
+				"action":  "auth:login:2fa",
+				"data": fiber.Map{
+					"twoFactorToken": result.TwoFactorToken,
+				},
+			})
+		}
 		if errors.Is(err, services.ErrAccountUnverified) {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 				"success": false,

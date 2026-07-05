@@ -159,19 +159,43 @@ func (s *Services) Login(ctx context.Context, email, password, ipAddress, userAg
 
 	s.clearLoginFailures(ctx, email)
 
+	// Two-factor gate: with a confirmed 2FA enrollment the password alone
+	// must never yield a session. A lookup failure fails closed — silently
+	// skipping the check on a database hiccup would be a 2FA bypass.
+	tf, tfFound, err := s.getTwoFactor(ctx, user.ID)
+	if err != nil {
+		return auth.LoginInternalDTO{}, err
+	}
+	if tfFound && tf.Enabled {
+		pendingToken, err := s.createTwoFactorPending(ctx, user.ID)
+		if err != nil {
+			return auth.LoginInternalDTO{}, err
+		}
+		return auth.LoginInternalDTO{ID: user.ID, TwoFactorToken: pendingToken}, ErrTwoFactorRequired
+	}
+
+	// GetAccountByEmail does not select u.email; the login email is the same
+	// address, so pass it through for the new-device alert.
+	return s.issueSession(ctx, user.ID, user.Role.Name, user.Name, email, ipAddress, userAgent)
+}
+
+// issueSession creates the access token, session row, refresh token, and
+// new-device alert for a fully authenticated user. Shared by password-only
+// logins and logins completed through the two-factor step.
+func (s *Services) issueSession(ctx context.Context, userID uuid.UUID, roleName, userName, userEmail, ipAddress, userAgent string) (auth.LoginInternalDTO, error) {
 	// Decide whether this login comes from a device the user has used before.
 	// Must run before CreateSession records this login's IP, and a lookup
 	// failure must not block the login nor trigger a false alarm.
 	knownIP := true
 	if ipAddress != "" {
-		if known, ipErr := s.repos.HasSessionFromIP(ctx, user.ID, ipAddress); ipErr == nil {
+		if known, ipErr := s.repos.HasSessionFromIP(ctx, userID, ipAddress); ipErr == nil {
 			knownIP = known
 		}
 	}
 
 	accessExpiresAt := time.Now().UTC().Add(s.cfg.JWTAccessDuration)
 
-	jwToken, err := s.CreateJWToken(user.ID, user.Role.Name, accessExpiresAt)
+	jwToken, err := s.CreateJWToken(userID, roleName, accessExpiresAt)
 	if err != nil {
 		return auth.LoginInternalDTO{}, err
 	}
@@ -184,13 +208,13 @@ func (s *Services) Login(ctx context.Context, email, password, ipAddress, userAg
 		ua = &userAgent
 	}
 
-	sessionID, err := s.repos.CreateSession(ctx, user.ID, jwToken, ip, ua, accessExpiresAt)
+	sessionID, err := s.repos.CreateSession(ctx, userID, jwToken, ip, ua, accessExpiresAt)
 	if err != nil {
 		return auth.LoginInternalDTO{}, err
 	}
 
 	if !knownIP {
-		go s.sendLoginAlert(user.Name, user.Email, ipAddress, userAgent)
+		go s.sendLoginAlert(userName, userEmail, ipAddress, userAgent)
 	}
 
 	rawRefresh, refreshHash, err := generateRefreshToken()
@@ -201,13 +225,13 @@ func (s *Services) Login(ctx context.Context, email, password, ipAddress, userAg
 	familyID := uuid.New()
 	refreshExpiresAt := time.Now().UTC().Add(s.cfg.JWTRefreshDuration)
 
-	rtID, err := s.repos.CreateRefreshToken(ctx, user.ID, refreshHash, familyID, sessionID, ip, ua, refreshExpiresAt)
+	rtID, err := s.repos.CreateRefreshToken(ctx, userID, refreshHash, familyID, sessionID, ip, ua, refreshExpiresAt)
 	if err != nil {
 		return auth.LoginInternalDTO{}, err
 	}
 
 	cacheValue := fmt.Sprintf("%s|%s|%s|%s|%s|%d",
-		rtID, user.ID, user.Role.Name, familyID, sessionID, refreshExpiresAt.Unix(),
+		rtID, userID, roleName, familyID, sessionID, refreshExpiresAt.Unix(),
 	)
 	cacheTTL := time.Until(refreshExpiresAt)
 	if cacheTTL > 0 {
@@ -215,7 +239,7 @@ func (s *Services) Login(ctx context.Context, email, password, ipAddress, userAg
 	}
 
 	return auth.LoginInternalDTO{
-		ID:               user.ID,
+		ID:               userID,
 		AccessToken:      jwToken,
 		RawRefreshToken:  rawRefresh,
 		RefreshExpiresAt: refreshExpiresAt,

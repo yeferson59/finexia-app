@@ -48,8 +48,85 @@ export const actions = {
 			});
 		}
 
-		const { data, success, message } = await response.json();
+		const body = await response.json();
+		const { data, success, message } = body;
 
+		if (!success) {
+			return fail(400, {
+				type: 'login' as const,
+				errors: { server: message || 'Error al iniciar sesión' }
+			});
+		}
+
+		// Password accepted but the account has 2FA enabled: no session yet.
+		// Hand the short-lived pending token to the client so it can submit
+		// the authenticator code as a second step.
+		if (body.action === 'auth:login:2fa') {
+			return {
+				type: 'login' as const,
+				twoFactorRequired: true as const,
+				twoFactorToken: (data?.twoFactorToken as string) ?? '',
+				errors: {}
+			};
+		}
+
+		setAccessCookie(cookies, data.accessToken);
+
+		const rotatedRefresh = parseRefreshSetCookie(response);
+		if (rotatedRefresh) {
+			setRefreshCookie(cookies, rotatedRefresh.value, rotatedRefresh.maxAge);
+		}
+
+		return redirect(302, '/dashboard');
+	},
+	twoFactor: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+		const parsed = await z
+			.object({
+				token: z.string().min(1),
+				// 6 dígitos TOTP o un código de recuperación XXXXX-XXXXX.
+				code: z.string().trim().min(6).max(20)
+			})
+			.safeParseAsync({
+				token: formData.get('token'),
+				code: formData.get('code')
+			});
+
+		if (!parsed.success) {
+			return fail(400, {
+				type: 'login' as const,
+				twoFactorRequired: true as const,
+				twoFactorToken: String(formData.get('token') ?? ''),
+				errors: { code: 'Ingresa el código de 6 dígitos o un código de recuperación.' }
+			});
+		}
+
+		const response = await fetch(`${env.BASE_API}/auth/2fa/login`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ token: parsed.data.token, code: parsed.data.code })
+		});
+
+		if (!response.ok) {
+			const body = await response.json().catch(() => ({}));
+			// Pending token expired or burned its attempts: back to square one.
+			if (body.action === 'auth:2fa:expired') {
+				return fail(response.status, {
+					type: 'login' as const,
+					errors: {
+						server: 'La verificación expiró. Vuelve a iniciar sesión con tu contraseña.'
+					}
+				});
+			}
+			return fail(response.status, {
+				type: 'login' as const,
+				twoFactorRequired: true as const,
+				twoFactorToken: parsed.data.token,
+				errors: { code: 'Código incorrecto o ya utilizado. Inténtalo de nuevo.' }
+			});
+		}
+
+		const { data, success, message } = await response.json();
 		if (!success) {
 			return fail(400, {
 				type: 'login' as const,
@@ -116,7 +193,8 @@ export const actions = {
 				return fail(response.status, {
 					type: 'register' as const,
 					errors: {
-						server: 'El registro está cerrado durante la beta. Únete a la lista de espera y te invitaremos.'
+						server:
+							'El registro está cerrado durante la beta. Únete a la lista de espera y te invitaremos.'
 					},
 					disabled: true as const
 				});

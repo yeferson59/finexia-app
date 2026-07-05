@@ -15,15 +15,33 @@ export interface ActiveSession {
 	current: boolean;
 }
 
+export interface TwoFactorStatus {
+	enabled: boolean;
+	pendingSetup: boolean;
+	recoveryCodesLeft: number;
+}
+
 export const load: PageServerLoad = async ({ locals, fetch, cookies }) => {
 	let sessions: ActiveSession[] = [];
-	const res = await authedFetchSafe({ cookies, fetch }, '/auth/sessions');
-	if (res?.ok) {
-		const body = await res.json().catch(() => null);
+	// 2FA is off by default; the null fallback just hides the section's state
+	// details if the backend can't be reached.
+	let twoFactor: TwoFactorStatus = { enabled: false, pendingSetup: false, recoveryCodesLeft: 0 };
+
+	const [sessionsRes, twoFactorRes] = await Promise.all([
+		authedFetchSafe({ cookies, fetch }, '/auth/sessions'),
+		authedFetchSafe({ cookies, fetch }, '/auth/2fa')
+	]);
+
+	if (sessionsRes?.ok) {
+		const body = await sessionsRes.json().catch(() => null);
 		sessions = body?.data ?? [];
 	}
+	if (twoFactorRes?.ok) {
+		const body = await twoFactorRes.json().catch(() => null);
+		if (body?.data) twoFactor = body.data;
+	}
 
-	return { user: locals.user, sessions };
+	return { user: locals.user, sessions, twoFactor };
 };
 
 export const actions = {
@@ -173,6 +191,145 @@ export const actions = {
 		}
 
 		return { action: 'revokeSession', success: true };
+	},
+
+	setup2fa: async ({ request, fetch, cookies }) => {
+		const formData = await request.formData();
+		const parsed = z
+			.string()
+			.min(8, 'Ingresa tu contraseña actual')
+			.max(20)
+			.safeParse(formData.get('password'));
+
+		if (!parsed.success) {
+			return fail(400, { action: 'setup2fa', error: parsed.error.issues[0].message });
+		}
+
+		const res = await authedFetch({ cookies, fetch }, '/auth/2fa/setup', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ password: parsed.data })
+		});
+
+		if (!res.ok) {
+			const body = await res.json().catch(() => ({}));
+			const error =
+				body.action === 'auth:2fa:already-enabled'
+					? 'La verificación en dos pasos ya está activada.'
+					: 'Contraseña incorrecta';
+			return fail(res.status, { action: 'setup2fa', error });
+		}
+
+		const body = await res.json().catch(() => null);
+		return {
+			action: 'setup2fa',
+			success: true,
+			secret: (body?.data?.secret as string) ?? '',
+			otpauthUrl: (body?.data?.otpauthUrl as string) ?? ''
+		};
+	},
+
+	enable2fa: async ({ request, fetch, cookies }) => {
+		const formData = await request.formData();
+		const parsed = z
+			.string()
+			.trim()
+			.min(6, 'Ingresa el código de 6 dígitos')
+			.max(20)
+			.safeParse(formData.get('code'));
+
+		if (!parsed.success) {
+			return fail(400, { action: 'enable2fa', error: parsed.error.issues[0].message });
+		}
+
+		const res = await authedFetch({ cookies, fetch }, '/auth/2fa/enable', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ code: parsed.data })
+		});
+
+		if (!res.ok) {
+			return fail(res.status, {
+				action: 'enable2fa',
+				error: 'Código incorrecto. Comprueba tu aplicación de autenticación e inténtalo de nuevo.'
+			});
+		}
+
+		const body = await res.json().catch(() => null);
+		return {
+			action: 'enable2fa',
+			success: true,
+			recoveryCodes: (body?.data?.recoveryCodes as string[]) ?? []
+		};
+	},
+
+	disable2fa: async ({ request, fetch, cookies }) => {
+		const formData = await request.formData();
+		const parsed = z
+			.object({
+				password: z.string().min(8, 'Ingresa tu contraseña actual').max(20),
+				code: z.string().trim().min(6, 'Ingresa un código válido').max(20)
+			})
+			.safeParse({
+				password: formData.get('password'),
+				code: formData.get('code')
+			});
+
+		if (!parsed.success) {
+			return fail(400, { action: 'disable2fa', error: parsed.error.issues[0].message });
+		}
+
+		const res = await authedFetch({ cookies, fetch }, '/auth/2fa/disable', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(parsed.data)
+		});
+
+		if (!res.ok) {
+			return fail(res.status, {
+				action: 'disable2fa',
+				error: 'Contraseña o código incorrecto.'
+			});
+		}
+
+		return { action: 'disable2fa', success: true };
+	},
+
+	regenerate2faCodes: async ({ request, fetch, cookies }) => {
+		const formData = await request.formData();
+		const parsed = z
+			.object({
+				password: z.string().min(8, 'Ingresa tu contraseña actual').max(20),
+				code: z.string().trim().min(6, 'Ingresa un código válido').max(20)
+			})
+			.safeParse({
+				password: formData.get('password'),
+				code: formData.get('code')
+			});
+
+		if (!parsed.success) {
+			return fail(400, { action: 'regenerate2faCodes', error: parsed.error.issues[0].message });
+		}
+
+		const res = await authedFetch({ cookies, fetch }, '/auth/2fa/recovery-codes', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(parsed.data)
+		});
+
+		if (!res.ok) {
+			return fail(res.status, {
+				action: 'regenerate2faCodes',
+				error: 'Contraseña o código incorrecto.'
+			});
+		}
+
+		const body = await res.json().catch(() => null);
+		return {
+			action: 'regenerate2faCodes',
+			success: true,
+			recoveryCodes: (body?.data?.recoveryCodes as string[]) ?? []
+		};
 	},
 
 	revokeOtherSessions: async ({ fetch, cookies }) => {
