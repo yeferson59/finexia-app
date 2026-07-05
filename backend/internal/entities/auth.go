@@ -58,6 +58,28 @@ type PasswordReset struct {
 	CreatedAt time.Time  `json:"createdAt"`
 }
 
+// TwoFactor holds a user's TOTP enrollment. A row with Enabled=false is a
+// pending setup: the secret was issued but the user has not yet confirmed a
+// code, so login is NOT gated until the enrollment is confirmed.
+type TwoFactor struct {
+	UserID      uuid.UUID  `json:"userId"`
+	Secret      string     `json:"-"`
+	Enabled     bool       `json:"enabled"`
+	ConfirmedAt *time.Time `json:"confirmedAt,omitempty"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	UpdatedAt   time.Time  `json:"updatedAt"`
+}
+
+// TwoFactorRecoveryCode is a single-use fallback credential; only its SHA-256
+// hash is ever persisted.
+type TwoFactorRecoveryCode struct {
+	ID        uuid.UUID  `json:"id"`
+	UserID    uuid.UUID  `json:"-"`
+	CodeHash  string     `json:"-"`
+	UsedAt    *time.Time `json:"usedAt,omitempty"`
+	CreatedAt time.Time  `json:"createdAt"`
+}
+
 type RefreshToken struct {
 	ID        uuid.UUID  `json:"id"`
 	UserID    uuid.UUID  `json:"-"`

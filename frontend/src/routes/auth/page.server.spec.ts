@@ -9,6 +9,16 @@ vi.mock('$/config/features', () => ({ features: { selfRegistration: false } }));
 
 type LoginEvent = Parameters<typeof actions.login>[0];
 type RegisterEvent = Parameters<typeof actions.register>[0];
+type TwoFactorEvent = Parameters<typeof actions.twoFactor>[0];
+
+/**
+ * Narrows an action result to the ActionFailure shape. The login action can
+ * now also return a plain success object (the 2FA-required step), so the
+ * failure fields need an explicit cast in tests that expect a fail().
+ */
+function asFail(result: unknown): { status: number; data: Record<string, unknown> } {
+	return result as { status: number; data: Record<string, unknown> };
+}
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -54,23 +64,27 @@ describe('load', () => {
 describe('login action', () => {
 	it('fails validation for a bad email without hitting the backend', async () => {
 		const fetch = vi.fn();
-		const result = await actions.login(
-			buildEvent({ email: 'nope', password: 'supersecret' }, fetch) as LoginEvent
+		const result = asFail(
+			await actions.login(
+				buildEvent({ email: 'nope', password: 'supersecret' }, fetch) as LoginEvent
+			)
 		);
 
-		expect(result?.status).toBe(400);
-		expect(result?.data.type).toBe('login');
-		expect(Array.isArray(result?.data.errors)).toBe(true);
+		expect(result.status).toBe(400);
+		expect(result.data.type).toBe('login');
+		expect(Array.isArray(result.data.errors)).toBe(true);
 		expect(fetch).not.toHaveBeenCalled();
 	});
 
 	it('fails validation for a short password', async () => {
 		const fetch = vi.fn();
-		const result = await actions.login(
-			buildEvent({ email: 'user@finexia.me', password: 'short' }, fetch) as LoginEvent
+		const result = asFail(
+			await actions.login(
+				buildEvent({ email: 'user@finexia.me', password: 'short' }, fetch) as LoginEvent
+			)
 		);
 
-		expect(result?.status).toBe(400);
+		expect(result.status).toBe(400);
 		expect(fetch).not.toHaveBeenCalled();
 	});
 
@@ -79,11 +93,11 @@ describe('login action', () => {
 			.fn()
 			.mockResolvedValue(jsonResponse({ message: 'Credenciales incorrectas' }, { status: 401 }));
 
-		const result = await actions.login(buildEvent(validLogin, fetch) as LoginEvent);
+		const result = asFail(await actions.login(buildEvent(validLogin, fetch) as LoginEvent));
 
-		expect(result?.status).toBe(401);
-		expect(result?.data.type).toBe('login');
-		expect(result?.data.errors).toEqual({ server: 'Credenciales incorrectas' });
+		expect(result.status).toBe(401);
+		expect(result.data.type).toBe('login');
+		expect(result.data.errors).toEqual({ server: 'Credenciales incorrectas' });
 	});
 
 	it('fails when the backend responds ok but success is false', async () => {
@@ -91,24 +105,26 @@ describe('login action', () => {
 			.fn()
 			.mockResolvedValue(jsonResponse({ success: false, message: 'Cuenta bloqueada' }));
 
-		const result = await actions.login(buildEvent(validLogin, fetch) as LoginEvent);
+		const result = asFail(await actions.login(buildEvent(validLogin, fetch) as LoginEvent));
 
-		expect(result?.status).toBe(400);
-		expect(result?.data.errors).toEqual({ server: 'Cuenta bloqueada' });
+		expect(result.status).toBe(400);
+		expect(result.data.errors).toEqual({ server: 'Cuenta bloqueada' });
 	});
 
 	it('flags an unverified account so the UI can offer to resend the link', async () => {
-		const fetch = vi.fn().mockResolvedValue(
-			jsonResponse(
-				{ message: 'email not verified', action: 'auth:login:unverified' },
-				{ status: 403 }
-			)
-		);
+		const fetch = vi
+			.fn()
+			.mockResolvedValue(
+				jsonResponse(
+					{ message: 'email not verified', action: 'auth:login:unverified' },
+					{ status: 403 }
+				)
+			);
 
-		const result = await actions.login(buildEvent(validLogin, fetch) as LoginEvent);
-		const data = result?.data as { unverified?: boolean; errors?: Record<string, string> };
+		const result = asFail(await actions.login(buildEvent(validLogin, fetch) as LoginEvent));
+		const data = result.data as { unverified?: boolean; errors?: Record<string, string> };
 
-		expect(result?.status).toBe(403);
+		expect(result.status).toBe(403);
 		expect(data.unverified).toBe(true);
 		expect(data.errors).toEqual({
 			server: 'Debes verificar tu correo antes de iniciar sesión.'
@@ -156,6 +172,105 @@ describe('login action', () => {
 		expect(isRedirect(thrown)).toBe(true);
 		expect(cookies.get(ACCESS_COOKIE)).toBe('access-token');
 		expect(cookies.get(REFRESH_COOKIE)).toBeUndefined();
+	});
+});
+
+describe('login action with 2FA', () => {
+	it('returns the two-factor step instead of a session when the backend asks for a code', async () => {
+		const cookies = createMockCookies();
+		const fetch = vi.fn().mockResolvedValue(
+			jsonResponse({
+				success: true,
+				action: 'auth:login:2fa',
+				data: { twoFactorToken: 'pending-token' }
+			})
+		);
+
+		const result = await actions.login(buildEvent(validLogin, fetch, cookies) as LoginEvent);
+
+		expect(result).toEqual({
+			type: 'login',
+			twoFactorRequired: true,
+			twoFactorToken: 'pending-token',
+			errors: {}
+		});
+		// No session cookie may exist before the code step.
+		expect(cookies.get(ACCESS_COOKIE)).toBeUndefined();
+	});
+});
+
+describe('twoFactor action', () => {
+	it('sets session cookies and redirects to /dashboard on a valid code', async () => {
+		const cookies = createMockCookies();
+		const fetch = vi
+			.fn()
+			.mockResolvedValue(
+				jsonResponse(
+					{ success: true, data: { accessToken: 'access-token' } },
+					{ setCookie: 'refresh_token=refresh-token; Max-Age=2592000; Path=/; HttpOnly' }
+				)
+			);
+
+		let thrown: unknown;
+		try {
+			await actions.twoFactor(
+				buildEvent({ token: 'pending-token', code: '123456' }, fetch, cookies) as TwoFactorEvent
+			);
+		} catch (e) {
+			thrown = e;
+		}
+
+		expect(isRedirect(thrown)).toBe(true);
+		expect((thrown as { location: string }).location).toBe('/dashboard');
+		expect(cookies.get(ACCESS_COOKIE)).toBe('access-token');
+		expect(cookies.get(REFRESH_COOKIE)).toBe('refresh-token');
+	});
+
+	it('keeps the two-factor step alive when the code is wrong', async () => {
+		const fetch = vi
+			.fn()
+			.mockResolvedValue(jsonResponse({ action: 'auth:2fa:invalid-code' }, { status: 401 }));
+
+		const result = asFail(
+			await actions.twoFactor(
+				buildEvent({ token: 'pending-token', code: '000000' }, fetch) as TwoFactorEvent
+			)
+		);
+
+		expect(result.status).toBe(401);
+		expect(result.data.twoFactorRequired).toBe(true);
+		expect(result.data.twoFactorToken).toBe('pending-token');
+	});
+
+	it('sends the user back to the password step when the pending session expired', async () => {
+		const fetch = vi
+			.fn()
+			.mockResolvedValue(jsonResponse({ action: 'auth:2fa:expired' }, { status: 401 }));
+
+		const result = asFail(
+			await actions.twoFactor(
+				buildEvent({ token: 'pending-token', code: '123456' }, fetch) as TwoFactorEvent
+			)
+		);
+
+		expect(result.status).toBe(401);
+		expect(result.data.twoFactorRequired).toBeUndefined();
+		expect(result.data.errors).toEqual({
+			server: 'La verificación expiró. Vuelve a iniciar sesión con tu contraseña.'
+		});
+	});
+
+	it('fails validation for a short code without hitting the backend', async () => {
+		const fetch = vi.fn();
+		const result = asFail(
+			await actions.twoFactor(
+				buildEvent({ token: 'pending-token', code: '12' }, fetch) as TwoFactorEvent
+			)
+		);
+
+		expect(result.status).toBe(400);
+		expect(result.data.twoFactorRequired).toBe(true);
+		expect(fetch).not.toHaveBeenCalled();
 	});
 });
 
@@ -215,12 +330,14 @@ describe('register action', () => {
 	});
 
 	it('flags a duplicate email with a friendly message instead of the raw backend one', async () => {
-		const fetch = vi.fn().mockResolvedValue(
-			jsonResponse(
-				{ message: 'email already registered', action: 'auth:register:duplicate' },
-				{ status: 409 }
-			)
-		);
+		const fetch = vi
+			.fn()
+			.mockResolvedValue(
+				jsonResponse(
+					{ message: 'email already registered', action: 'auth:register:duplicate' },
+					{ status: 409 }
+				)
+			);
 
 		const result = await actions.register(buildEvent(validRegister, fetch) as RegisterEvent);
 		const data = result?.data as { duplicateEmail?: boolean; errors?: Record<string, string> };
@@ -233,12 +350,14 @@ describe('register action', () => {
 	});
 
 	it('flags a disabled registration with a friendly message instead of the raw backend one', async () => {
-		const fetch = vi.fn().mockResolvedValue(
-			jsonResponse(
-				{ message: 'self-registration is disabled', action: 'auth:register:disabled' },
-				{ status: 403 }
-			)
-		);
+		const fetch = vi
+			.fn()
+			.mockResolvedValue(
+				jsonResponse(
+					{ message: 'self-registration is disabled', action: 'auth:register:disabled' },
+					{ status: 403 }
+				)
+			);
 
 		const result = await actions.register(buildEvent(validRegister, fetch) as RegisterEvent);
 		const data = result?.data as { disabled?: boolean; errors?: Record<string, string> };
@@ -246,7 +365,8 @@ describe('register action', () => {
 		expect(result?.status).toBe(403);
 		expect(data.disabled).toBe(true);
 		expect(data.errors).toEqual({
-			server: 'El registro está cerrado durante la beta. Únete a la lista de espera y te invitaremos.'
+			server:
+				'El registro está cerrado durante la beta. Únete a la lista de espera y te invitaremos.'
 		});
 	});
 

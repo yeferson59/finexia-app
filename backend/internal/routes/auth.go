@@ -7,6 +7,11 @@ func (r *Routes) Auth() {
 	auth.Post("/login", r.middlewares.AuthLimiter(), r.handlers.Login)
 	auth.Post("/refresh", r.middlewares.AuthLimiter(), r.handlers.Refresh)
 
+	// Public second step of a 2FA login: exchanges the short-lived pending
+	// token plus a TOTP/recovery code for a session. Rate-limited to blunt
+	// code guessing on top of the per-token attempt counter.
+	auth.Post("/2fa/login", r.middlewares.AuthLimiter(), r.handlers.TwoFactorLogin)
+
 	// Public invitation flow: validate a token, then accept it by setting a
 	// password. Rate-limited to blunt token guessing.
 	auth.Get("/invitations", r.middlewares.AuthLimiter(), r.handlers.ValidateInvitation)
@@ -27,6 +32,15 @@ func (r *Routes) Auth() {
 	auth.Post("/verify-email/confirm", r.middlewares.AuthLimiter(), r.handlers.ConfirmEmailVerification)
 
 	auth.Use(r.middlewares.JWT())
+
+	// Two-factor management, always behind a live session. 2FA is off by
+	// default; these endpoints let the user opt in, confirm, and opt out.
+	auth.Get("/2fa", r.handlers.TwoFactorStatus)
+	auth.Post("/2fa/setup", r.handlers.TwoFactorSetup)
+	auth.Post("/2fa/enable", r.handlers.TwoFactorEnable)
+	auth.Post("/2fa/disable", r.handlers.TwoFactorDisable)
+	auth.Post("/2fa/recovery-codes", r.handlers.TwoFactorRecoveryCodes)
+
 	auth.Get("/session", r.handlers.GetSession)
 	auth.Get("/sessions", r.handlers.ListSessions)
 	auth.Delete("/sessions/:id", r.handlers.RevokeSession)

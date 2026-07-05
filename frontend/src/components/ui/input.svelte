@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
+	import type { HTMLInputAttributes } from 'svelte/elements';
 
 	interface Props {
 		type?: string;
@@ -11,6 +12,7 @@
 		id?: string;
 		name?: string;
 		required?: boolean;
+		autocomplete?: HTMLInputAttributes['autocomplete'];
 		onchange?: (event: Event) => void;
 		onfocus?: (event: Event) => void;
 		class?: string;

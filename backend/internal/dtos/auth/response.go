@@ -60,4 +60,28 @@ type LoginInternalDTO struct {
 	AccessToken      string
 	RawRefreshToken  string
 	RefreshExpiresAt time.Time
+	// TwoFactorToken is set (with everything else empty) when the password
+	// was correct but the account still needs its TOTP code.
+	TwoFactorToken string
+}
+
+// TwoFactorStatusResponseDTO describes the account's 2FA state; everything
+// defaults to off until the user completes a setup.
+type TwoFactorStatusResponseDTO struct {
+	Enabled           bool `json:"enabled"`
+	PendingSetup      bool `json:"pendingSetup"`
+	RecoveryCodesLeft int  `json:"recoveryCodesLeft"`
+}
+
+// TwoFactorSetupResponseDTO carries the freshly issued secret so the client
+// can render a QR code and offer manual entry.
+type TwoFactorSetupResponseDTO struct {
+	Secret     string `json:"secret"`
+	OtpauthURL string `json:"otpauthUrl"`
+}
+
+// TwoFactorEnableResponseDTO returns the single-use recovery codes; they are
+// shown exactly once and never retrievable again.
+type TwoFactorEnableResponseDTO struct {
+	RecoveryCodes []string `json:"recoveryCodes"`
 }

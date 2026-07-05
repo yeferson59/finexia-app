@@ -9,6 +9,8 @@
 		unverified?: boolean;
 		duplicateEmail?: boolean;
 		disabled?: boolean;
+		twoFactorRequired?: boolean;
+		twoFactorToken?: string;
 	} | null;
 
 	// Resolved server-side from the `selfRegistration` feature flag so the
@@ -46,6 +48,16 @@
 	let loginEmail = $state('');
 	let loginPassword = $state('');
 	let loginErrors: Record<string, string> = $state({});
+
+	// Two-factor step: the server validated the password and handed back a
+	// short-lived token; the session only exists after a valid TOTP code.
+	let twoFactorCode = $state('');
+	const twoFactorRequired = $derived(
+		form?.type === 'login' && form.twoFactorRequired === true && !!form.twoFactorToken
+	);
+	const twoFactorToken = $derived(
+		form?.type === 'login' && form.twoFactorToken ? form.twoFactorToken : ''
+	);
 
 	// Register form
 	let registerEmail = $state('');
@@ -232,7 +244,50 @@
 
 			<!-- Forms Section -->
 			<section class="forms-container">
-				{#if isLoginMode}
+				{#if isLoginMode && twoFactorRequired}
+					<form
+						method="POST"
+						action="?/twoFactor"
+						class="form-content"
+						id="two-factor-form"
+						use:enhance={() => {
+							isSubmitting = true;
+							loginErrors = {};
+							return async ({ update }) => {
+								await update({ reset: false });
+								isSubmitting = false;
+							};
+						}}
+					>
+						<p class="two-factor-title">Verificación en dos pasos</p>
+						<p class="two-factor-copy">
+							Ingresa el código de 6 dígitos de tu aplicación de autenticación o uno de tus códigos
+							de recuperación.
+						</p>
+
+						<input type="hidden" name="token" value={twoFactorToken} />
+
+						<Input
+							label="Código de verificación"
+							id="two-factor-code"
+							name="code"
+							type="text"
+							placeholder="123456"
+							autocomplete="one-time-code"
+							bind:value={twoFactorCode}
+							error={loginErrors['code']}
+							required
+						/>
+
+						{#if loginErrors['server']}
+							<p class="error-server" role="alert">{loginErrors['server']}</p>
+						{/if}
+
+						<Button type="submit" variant="primary" size="lg" loading={isSubmitting} fullWidth>
+							{isSubmitting ? 'Verificando...' : 'Verificar'}
+						</Button>
+					</form>
+				{:else if isLoginMode}
 					<form
 						method="POST"
 						action="?/login"
@@ -1091,6 +1146,20 @@
 
 	.invite-only {
 		text-align: center;
+	}
+
+	.two-factor-title {
+		font-size: 1.1rem;
+		font-weight: 700;
+		color: var(--text-primary);
+		margin: 0;
+	}
+
+	.two-factor-copy {
+		font-size: 0.9rem;
+		line-height: 1.6;
+		color: var(--text-secondary);
+		margin: 0;
 	}
 
 	.invite-only-title {

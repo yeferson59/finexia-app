@@ -37,6 +37,15 @@ type Repository interface {
 	DeleteExpiredRefreshTokens(ctx context.Context) (int64, error)
 	DeleteExpiredSessions(ctx context.Context) (int64, error)
 
+	// Two-factor authentication
+	GetTwoFactor(ctx context.Context, userID uuid.UUID) (entities.TwoFactor, error)
+	UpsertTwoFactorSecret(ctx context.Context, userID uuid.UUID, secret string) error
+	EnableTwoFactor(ctx context.Context, userID uuid.UUID) error
+	DeleteTwoFactor(ctx context.Context, userID uuid.UUID) error
+	ReplaceTwoFactorRecoveryCodes(ctx context.Context, userID uuid.UUID, codeHashes []string) error
+	ConsumeTwoFactorRecoveryCode(ctx context.Context, userID uuid.UUID, codeHash string) error
+	CountUnusedTwoFactorRecoveryCodes(ctx context.Context, userID uuid.UUID) (int, error)
+
 	// Users
 	ListUsers(ctx context.Context, offset, limit uint) ([]entities.User, uint, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (entities.User, error)
