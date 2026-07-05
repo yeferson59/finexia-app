@@ -8,9 +8,18 @@
 		errors: Record<string, string> | Array<{ path: PropertyKey[]; message: string }>;
 		unverified?: boolean;
 		duplicateEmail?: boolean;
+		disabled?: boolean;
 	} | null;
 
-	let { form }: { form: FormResult } = $props();
+	// Resolved server-side from the `selfRegistration` feature flag so the
+	// component never needs `$env/dynamic/public` itself — that module is only
+	// populated once a real SvelteKit page has hydrated, which breaks
+	// isolated component tests. Defaults closed: Finexia is invite-only during
+	// the beta, so an omitted prop should fail toward "registration closed".
+	let {
+		form,
+		selfRegistrationEnabled = false
+	}: { form: FormResult; selfRegistrationEnabled?: boolean } = $props();
 
 	function parseErrors(errors: unknown): Record<string, string> {
 		if (!errors) return {};
@@ -215,6 +224,9 @@
 					aria-controls="register-form"
 				>
 					Crear cuenta
+					{#if !selfRegistrationEnabled}
+						<span class="beta-badge">Invitación</span>
+					{/if}
 				</button>
 			</div>
 
@@ -307,6 +319,29 @@
 							</button>
 						</div>
 					</form>
+				{:else if !selfRegistrationEnabled}
+					<div
+						class="form-content invite-only"
+						class:slide-left={slideDirection === 'left'}
+						id="register-form"
+					>
+						<p class="invite-only-title">Registro por invitación</p>
+						<p class="invite-only-copy">
+							FINEXIA está en fase beta y el acceso es solo por invitación. Únete a la lista de
+							espera y te avisaremos en cuanto tengas un cupo.
+						</p>
+
+						<a href="{resolve('/')}#waitlist" class="invite-only-cta">
+							Unirme a la lista de espera
+						</a>
+
+						<div class="form-switch">
+							¿Ya tienes cuenta?
+							<button type="button" onclick={switchToLogin} class="switch-link">
+								Inicia sesión
+							</button>
+						</div>
+					</div>
 				{:else}
 					<form
 						method="POST"
@@ -1036,6 +1071,62 @@
 		padding: 0;
 		font-family: inherit;
 		cursor: pointer;
+	}
+
+	/* ── Invite-only register panel (beta) ──────────────────── */
+	.beta-badge {
+		display: inline-block;
+		margin-left: 0.4rem;
+		padding: 0.1rem 0.45rem;
+		border-radius: 999px;
+		background: rgba(212, 145, 42, 0.15);
+		border: 1px solid rgba(212, 145, 42, 0.35);
+		color: var(--gold-primary);
+		font-size: 0.6rem;
+		font-weight: 700;
+		letter-spacing: 0.4px;
+		text-transform: uppercase;
+		vertical-align: middle;
+	}
+
+	.invite-only {
+		text-align: center;
+	}
+
+	.invite-only-title {
+		font-size: 1.1rem;
+		font-weight: 700;
+		color: var(--text-primary);
+		margin: 0;
+	}
+
+	.invite-only-copy {
+		font-size: 0.9rem;
+		line-height: 1.6;
+		color: var(--text-secondary);
+		margin: 0;
+	}
+
+	.invite-only-cta {
+		display: block;
+		width: 100%;
+		padding: 1rem 2rem;
+		border-radius: 8px;
+		background: var(--amber);
+		color: #0d0800;
+		font-weight: 600;
+		font-size: 0.95rem;
+		text-align: center;
+		text-decoration: none;
+		letter-spacing: 0.5px;
+		box-shadow: 0 4px 16px rgba(212, 145, 42, 0.2);
+		transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	.invite-only-cta:hover {
+		background: var(--amber-light);
+		transform: translateY(-2px);
+		box-shadow: 0 6px 24px rgba(212, 145, 42, 0.35);
 	}
 
 	.resend-link:hover {

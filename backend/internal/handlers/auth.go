@@ -44,6 +44,15 @@ func (handler *Handlers) Login(c fiber.Ctx) error {
 }
 
 func (handler *Handlers) Register(c fiber.Ctx) error {
+	if !handler.cfg.SelfRegistrationEnabled {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"success": false,
+			"message": "self-registration is disabled",
+			"details": "Finexia is invite-only during the beta; ask an existing member for an invitation",
+			"action":  "auth:register:disabled",
+		})
+	}
+
 	var registerDto auth.RegisterRequestDTO
 
 	if err := c.Bind().Body(&registerDto); err != nil {

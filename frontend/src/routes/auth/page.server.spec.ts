@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { isRedirect } from '@sveltejs/kit';
-import { actions } from './+page.server';
+import { actions, load } from './+page.server';
 import { ACCESS_COOKIE, REFRESH_COOKIE } from '$lib/server/session';
 import { createMockCookies, jsonResponse, type MockCookies } from '$lib/server/testing';
+import { features } from '$/config/features';
+
+vi.mock('$/config/features', () => ({ features: { selfRegistration: false } }));
 
 type LoginEvent = Parameters<typeof actions.login>[0];
 type RegisterEvent = Parameters<typeof actions.register>[0];
@@ -39,6 +42,14 @@ const validRegister = {
 	confirmPassword: 'supersecret',
 	terms: 'on'
 };
+
+describe('load', () => {
+	it('exposes the selfRegistration feature flag to the page', () => {
+		expect(load({} as Parameters<typeof load>[0])).toEqual({
+			selfRegistrationEnabled: features.selfRegistration
+		});
+	});
+});
 
 describe('login action', () => {
 	it('fails validation for a bad email without hitting the backend', async () => {
@@ -218,6 +229,24 @@ describe('register action', () => {
 		expect(data.duplicateEmail).toBe(true);
 		expect(data.errors).toEqual({
 			server: 'Ya existe una cuenta con este correo. Inicia sesión o recupera tu contraseña.'
+		});
+	});
+
+	it('flags a disabled registration with a friendly message instead of the raw backend one', async () => {
+		const fetch = vi.fn().mockResolvedValue(
+			jsonResponse(
+				{ message: 'self-registration is disabled', action: 'auth:register:disabled' },
+				{ status: 403 }
+			)
+		);
+
+		const result = await actions.register(buildEvent(validRegister, fetch) as RegisterEvent);
+		const data = result?.data as { disabled?: boolean; errors?: Record<string, string> };
+
+		expect(result?.status).toBe(403);
+		expect(data.disabled).toBe(true);
+		expect(data.errors).toEqual({
+			server: 'El registro está cerrado durante la beta. Únete a la lista de espera y te invitaremos.'
 		});
 	});
 

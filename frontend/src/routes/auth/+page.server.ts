@@ -1,8 +1,13 @@
 import z from 'zod';
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import { env } from '$env/dynamic/private';
 import { redirect, fail } from '@sveltejs/kit';
 import { parseRefreshSetCookie, setAccessCookie, setRefreshCookie } from '$lib/server/session';
+import { features } from '$/config/features';
+
+export const load: PageServerLoad = () => {
+	return { selfRegistrationEnabled: features.selfRegistration };
+};
 
 export const actions = {
 	login: async ({ request, cookies, fetch }) => {
@@ -107,6 +112,15 @@ export const actions = {
 
 		if (!response.ok) {
 			const body = await response.json().catch(() => ({}));
+			if (body.action === 'auth:register:disabled') {
+				return fail(response.status, {
+					type: 'register' as const,
+					errors: {
+						server: 'El registro está cerrado durante la beta. Únete a la lista de espera y te invitaremos.'
+					},
+					disabled: true as const
+				});
+			}
 			if (body.action === 'auth:register:duplicate') {
 				return fail(response.status, {
 					type: 'register' as const,

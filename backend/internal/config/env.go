@@ -39,6 +39,7 @@ type Env struct {
 	InvitationExpiry        time.Duration
 	PasswordResetExpiry     time.Duration
 	EmailVerificationExpiry time.Duration
+	SelfRegistrationEnabled bool
 }
 
 func (c *Config) LoadEnvs() *Env {
@@ -74,6 +75,9 @@ func (c *Config) LoadEnvs() *Env {
 		InvitationExpiry:        c.getDuration("INVITATION_EXPIRY", 72*time.Hour),
 		PasswordResetExpiry:     c.getDuration("PASSWORD_RESET_EXPIRY", 1*time.Hour),
 		EmailVerificationExpiry: c.getDuration("EMAIL_VERIFICATION_EXPIRY", 24*time.Hour),
+		// Off by default: the product is invite-only during the beta, so
+		// public self-registration must be explicitly opted into.
+		SelfRegistrationEnabled: c.getBool("SELF_REGISTRATION_ENABLED", false),
 	}
 }
 
