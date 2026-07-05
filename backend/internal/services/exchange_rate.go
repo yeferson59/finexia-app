@@ -2,8 +2,10 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/yeferson59/gofinance/money"
 
 	"github.com/yeferson59/finexia-app/internal/entities"
@@ -69,4 +71,44 @@ func (s *Services) SyncExchangeRates(ctx context.Context) ([]entities.ExchangeRa
 
 	_ = s.storage.Set(rateSyncCacheKey, []byte(time.Now().UTC().Format(time.RFC3339)), rateSyncTTL)
 	return results, errs
+}
+
+func (s *Services) GetExchangeRates(ctx context.Context, offset, limit uint) ([]entities.ExchangeRate, error) {
+	return s.repos.GetExchangeRates(ctx, offset, limit)
+}
+
+func (s *Services) CreateExchangeRate(ctx context.Context, from, to string, rate money.Decimal) (entities.ExchangeRate, error) {
+	return s.repos.UpsertExchangeRate(ctx, from, to, rate, time.Now())
+}
+
+func (s *Services) UpdateExchangeRate(ctx context.Context, id uuid.UUID, rate money.Decimal) (entities.ExchangeRate, error) {
+	return s.repos.UpdateExchangeRateByID(ctx, id, rate)
+}
+
+// SyncExchangeRateByID fetches and updates the rate for a single currency pair by ID.
+func (s *Services) SyncExchangeRateByID(ctx context.Context, id uuid.UUID) (entities.ExchangeRate, error) {
+	log := s.log.With(logger.Str("job", "exchange_rate_sync_single"), logger.Str("id", id.String()))
+
+	existing, err := s.repos.GetExchangeRateByID(ctx, id)
+	if err != nil {
+		return entities.ExchangeRate{}, err
+	}
+
+	result, err := s.priceProvider.FetchExchangeRate(ctx, existing.FromCurrency, existing.ToCurrency)
+	if err != nil {
+		return entities.ExchangeRate{}, fmt.Errorf("fetch exchange rate %q/%q: %w", existing.FromCurrency, existing.ToCurrency, err)
+	}
+
+	rate, err := money.NewFromString(result.Rate)
+	if err != nil {
+		return entities.ExchangeRate{}, fmt.Errorf("parse rate %q for %q/%q: %w", result.Rate, existing.FromCurrency, existing.ToCurrency, err)
+	}
+
+	updated, err := s.repos.UpsertExchangeRate(ctx, existing.FromCurrency, existing.ToCurrency, rate, result.FetchedAt)
+	if err != nil {
+		return entities.ExchangeRate{}, err
+	}
+
+	log.Info("rate synced", logger.Str("pair", existing.FromCurrency+"/"+existing.ToCurrency), logger.Str("rate", updated.Rate.String()))
+	return updated, nil
 }

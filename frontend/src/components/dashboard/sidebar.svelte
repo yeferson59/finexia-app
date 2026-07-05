@@ -30,7 +30,12 @@
 			? [
 					{ label: 'Panel Admin', icon: 'shield', href: resolve('/dashboard/admin') },
 					{ label: 'Usuarios', icon: 'users', href: resolve('/dashboard/admin/users') },
-					{ label: 'Activos', icon: 'database', href: resolve('/dashboard/admin/assets') }
+					{ label: 'Activos', icon: 'database', href: resolve('/dashboard/admin/assets') },
+					{
+						label: 'Tasas de Cambio',
+						icon: 'currency',
+						href: resolve('/dashboard/admin/exchange-rates')
+					}
 				]
 			: []
 	);
@@ -194,7 +199,7 @@
 										<path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
 										<path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
 									</svg>
-								{:else}
+								{:else if item.icon === 'database'}
 									<svg
 										width="18"
 										height="18"
@@ -206,6 +211,20 @@
 										<ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
 										<path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
 										<path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+									</svg>
+								{:else}
+									<svg
+										width="18"
+										height="18"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<polyline points="17 1 21 5 17 9"></polyline>
+										<path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+										<polyline points="7 23 3 19 7 15"></polyline>
+										<path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
 									</svg>
 								{/if}
 							</span>

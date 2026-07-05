@@ -76,6 +76,26 @@ export const actions = {
 		return { syncSuccess: true, synced: Array.isArray(data) ? data.length : 0 };
 	},
 
+	importAssets: async ({ request, cookies, fetch }) => {
+		const fd = await request.formData();
+		const file = fd.get('file');
+		if (!(file instanceof File) || file.size === 0) {
+			return fail(400, { importError: 'Selecciona un archivo CSV o Excel' });
+		}
+
+		const res = await authedFetch({ cookies, fetch }, '/assets/import', {
+			method: 'POST',
+			body: fd
+		});
+
+		const body = await res.json().catch(() => ({}));
+		if (!res.ok) {
+			return fail(res.status, { importError: body.details ?? 'No se pudo importar el archivo' });
+		}
+
+		return { importSuccess: true, importResult: body.data };
+	},
+
 	updatePrice: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
 		const id = fd.get('id') as string;

@@ -2,23 +2,11 @@
 	import { enhance } from '$app/forms';
 	import PageHeader from '$components/ui/page-header.svelte';
 	import Card from '$components/ui/card.svelte';
-	import Badge from '$components/ui/badge.svelte';
 	import Button from '$components/ui/button.svelte';
 
 	import type { PageProps } from './$types';
 
 	const { data, form }: PageProps = $props();
-
-	const ASSET_TYPES = [
-		{ value: 'stock', label: 'Acción (Stock)' },
-		{ value: 'etf', label: 'ETF' },
-		{ value: 'crypto', label: 'Cripto' },
-		{ value: 'bond', label: 'Bono' },
-		{ value: 'real_estate', label: 'Bienes raíces' },
-		{ value: 'commodity', label: 'Commodities' },
-		{ value: 'cash', label: 'Efectivo' },
-		{ value: 'other', label: 'Otro' }
-	];
 
 	interface ImportResult {
 		totalRows: number;
@@ -29,35 +17,35 @@
 
 	let syncing = $state(false);
 	let updatingId = $state<string | null>(null);
-	let syncingAssetId = $state<string | null>(null);
+	let syncingRateId = $state<string | null>(null);
 	let creating = $state(false);
 	let importing = $state(false);
 	let showCreateForm = $state(false);
 	let showImportForm = $state(false);
 	let syncMessage = $state<string | null>(null);
 	let createMessage = $state<string | null>(null);
-	let priceInputs = $state<Record<string, string>>({});
+	let rateInputs = $state<Record<string, string>>({});
 
 	$effect(() => {
-		for (const asset of data.assets) {
-			if (!(asset.id in priceInputs)) {
-				priceInputs[asset.id] = asset.currentPrice?.value ?? '';
+		for (const rate of data.rates) {
+			if (!(rate.id in rateInputs)) {
+				rateInputs[rate.id] = rate.rate ?? '';
 			}
 		}
 	});
 
 	$effect(() => {
 		if (form?.syncSuccess) {
-			syncMessage = `${form.synced} activo${form.synced === 1 ? '' : 's'} sincronizado${form.synced === 1 ? '' : 's'}.`;
+			syncMessage = `${form.synced} tasa${form.synced === 1 ? '' : 's'} sincronizada${form.synced === 1 ? '' : 's'}.`;
 			setTimeout(() => (syncMessage = null), 4000);
 		}
 		if (form?.createSuccess) {
 			showCreateForm = false;
-			createMessage = 'Activo creado correctamente.';
+			createMessage = 'Tasa de cambio creada correctamente.';
 			setTimeout(() => (createMessage = null), 4000);
 		}
-		if (form?.syncAssetSuccess) {
-			syncMessage = `Precio de activo actualizado.`;
+		if (form?.syncRateSuccess) {
+			syncMessage = `Tasa de cambio actualizada.`;
 			setTimeout(() => (syncMessage = null), 4000);
 		}
 		if (form?.importSuccess) {
@@ -67,26 +55,10 @@
 
 	const importResult = $derived((form?.importResult ?? null) as ImportResult | null);
 
-	function formatPrice(
-		price: { value: string; currency: string } | null,
-		assetCurrency: string | undefined = undefined
-	): string {
-		if (!price) return '—';
-		const num = parseFloat(price.value);
-		if (isNaN(num)) return price.value;
-		const currency =
-			price.currency && price.currency !== 'XXX' ? price.currency : assetCurrency || 'USD';
-		try {
-			return new Intl.NumberFormat('en-US', {
-				style: 'currency',
-				currency,
-				currencyDisplay: 'narrowSymbol',
-				minimumFractionDigits: 2,
-				maximumFractionDigits: 4
-			}).format(num);
-		} catch {
-			return `${currency} ${num.toFixed(2)}`;
-		}
+	function formatRate(rate: string): string {
+		const num = parseFloat(rate);
+		if (isNaN(num)) return rate;
+		return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 	}
 
 	function formatDate(iso: string | null): string {
@@ -99,13 +71,13 @@
 </script>
 
 <svelte:head>
-	<title>Activos — Admin — FINEXIA</title>
+	<title>Tasas de Cambio — Admin — FINEXIA</title>
 </svelte:head>
 
 <PageHeader
 	eyebrow="Administración"
-	title="Activos"
-	subtitle="Gestiona precios y sincronización de activos."
+	title="Tasas de Cambio"
+	subtitle="Gestiona pares de divisas y sincronización de tasas."
 >
 	{#snippet actions()}
 		<div class="header-actions">
@@ -124,7 +96,7 @@
 				type="button"
 				onclick={() => (showCreateForm = !showCreateForm)}
 			>
-				{showCreateForm ? 'Cancelar' : '+ Nuevo Activo'}
+				{showCreateForm ? 'Cancelar' : '+ Nueva Tasa'}
 			</Button>
 			<Button
 				variant="secondary"
@@ -136,7 +108,7 @@
 			</Button>
 			<form
 				method="POST"
-				action="?/syncPrices"
+				action="?/syncRates"
 				use:enhance={() => {
 					syncing = true;
 					return async ({ update }) => {
@@ -158,7 +130,7 @@
 						<polyline points="1 20 1 14 7 14"></polyline>
 						<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
 					</svg>
-					Sincronizar Precios
+					Sincronizar Tasas
 				</Button>
 			</form>
 		</div>
@@ -168,10 +140,10 @@
 {#if showCreateForm}
 	<div class="create-form-wrap">
 		<Card padding="md">
-			<h2 class="form-title">Nuevo activo</h2>
+			<h2 class="form-title">Nueva tasa de cambio</h2>
 			<form
 				method="POST"
-				action="?/createAsset"
+				action="?/createRate"
 				use:enhance={() => {
 					creating = true;
 					return async ({ update }) => {
@@ -182,27 +154,12 @@
 			>
 				<div class="form-grid">
 					<div class="form-field">
-						<label class="field-label" for="ticker">Ticker <span class="required">*</span></label>
-						<input id="ticker" name="ticker" class="field-input" placeholder="AAPL" required />
-					</div>
-					<div class="form-field">
-						<label class="field-label" for="name">Nombre <span class="required">*</span></label>
-						<input id="name" name="name" class="field-input" placeholder="Apple Inc." required />
-					</div>
-					<div class="form-field">
-						<label class="field-label" for="assetType">Tipo <span class="required">*</span></label>
-						<select id="assetType" name="assetType" class="field-input field-select" required>
-							<option value="" disabled selected>Seleccionar tipo</option>
-							{#each ASSET_TYPES as t (t.value)}
-								<option value={t.value}>{t.label}</option>
-							{/each}
-						</select>
-					</div>
-					<div class="form-field">
-						<label class="field-label" for="currency">Moneda <span class="required">*</span></label>
+						<label class="field-label" for="fromCurrency"
+							>Moneda origen <span class="required">*</span></label
+						>
 						<input
-							id="currency"
-							name="currency"
+							id="fromCurrency"
+							name="fromCurrency"
 							class="field-input"
 							placeholder="USD"
 							maxlength="3"
@@ -210,17 +167,37 @@
 						/>
 					</div>
 					<div class="form-field">
-						<label class="field-label" for="exchange"
-							>Exchange <span class="optional">(opcional)</span></label
+						<label class="field-label" for="toCurrency"
+							>Moneda destino <span class="required">*</span></label
 						>
-						<input id="exchange" name="exchange" class="field-input" placeholder="NASDAQ" />
+						<input
+							id="toCurrency"
+							name="toCurrency"
+							class="field-input"
+							placeholder="COP"
+							maxlength="3"
+							required
+						/>
+					</div>
+					<div class="form-field">
+						<label class="field-label" for="rate">Tasa <span class="required">*</span></label>
+						<input
+							id="rate"
+							name="rate"
+							type="number"
+							class="field-input"
+							placeholder="4000.00"
+							min="0.00000001"
+							step="any"
+							required
+						/>
 					</div>
 				</div>
 				{#if form?.createError}
 					<p class="form-error">{form.createError}</p>
 				{/if}
 				<div class="form-actions">
-					<Button type="submit" loading={creating}>Crear activo</Button>
+					<Button type="submit" loading={creating}>Crear tasa</Button>
 				</div>
 			</form>
 		</Card>
@@ -230,15 +207,14 @@
 {#if showImportForm}
 	<div class="create-form-wrap">
 		<Card padding="md">
-			<h2 class="form-title">Importar activos desde CSV/Excel</h2>
+			<h2 class="form-title">Importar tasas desde CSV/Excel</h2>
 			<p class="import-hint">
-				El archivo debe tener columnas <code>ticker</code>, <code>name</code>,
-				<code>assetType</code> y <code>currency</code> (opcional: <code>exchange</code>). Se admite
-				.csv, .xlsx y .xls.
+				El archivo debe tener columnas <code>fromCurrency</code>, <code>toCurrency</code> y
+				<code>rate</code>. Se admite .csv, .xlsx y .xls.
 			</p>
 			<form
 				method="POST"
-				action="?/importAssets"
+				action="?/importRates"
 				enctype="multipart/form-data"
 				use:enhance={() => {
 					importing = true;
@@ -279,66 +255,59 @@
 {/if}
 
 <Card padding="none">
-	{#if data.assets.length === 0}
-		<p class="empty-state">No hay activos en el sistema.</p>
+	{#if data.rates.length === 0}
+		<p class="empty-state">No hay tasas de cambio en el sistema.</p>
 	{:else}
 		<div class="table-wrapper">
 			<table class="assets-table">
 				<thead>
 					<tr>
-						<th>Ticker</th>
-						<th>Nombre</th>
-						<th>Tipo</th>
-						<th>Precio actual</th>
+						<th>Par</th>
+						<th>Tasa actual</th>
+						<th>Fecha de tasa</th>
 						<th>Actualizado</th>
-						<th>Nuevo precio</th>
+						<th>Nueva tasa</th>
 						<th></th>
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.assets as asset (asset.id)}
-						{@const isUpdating = updatingId === asset.id}
-						{@const hasUpdateError = form?.updateError && form?.errorId === asset.id}
-						{@const hasUpdateSuccess = form?.updateSuccess && form?.updatedId === asset.id}
-						{@const hasSyncError = form?.syncAssetError && form?.syncAssetId === asset.id}
-						{@const isSyncingThis = syncingAssetId === asset.id}
+					{#each data.rates as rate (rate.id)}
+						{@const isUpdating = updatingId === rate.id}
+						{@const hasUpdateError = form?.updateError && form?.errorId === rate.id}
+						{@const hasUpdateSuccess = form?.updateSuccess && form?.updatedId === rate.id}
+						{@const hasSyncError = form?.syncRateError && form?.syncRateId === rate.id}
+						{@const isSyncingThis = syncingRateId === rate.id}
 						<tr
 							class:row-success={hasUpdateSuccess ||
-								(form?.syncAssetSuccess && form?.syncAssetId === asset.id)}
+								(form?.syncRateSuccess && form?.syncRateId === rate.id)}
 						>
-							<td class="cell-ticker">{asset.ticker}</td>
-							<td class="cell-name">{asset.name}</td>
-							<td>
-								<Badge tone="neutral">{asset.assetType}</Badge>
+							<td class="cell-ticker">
+								{rate.fromCurrency}/{rate.toCurrency}
 							</td>
-							<td class="cell-price">{formatPrice(asset.currentPrice, asset.currency)}</td>
-							<td class="cell-date">{formatDate(asset.priceUpdatedAt)}</td>
+							<td class="cell-price">{formatRate(rate.rate)}</td>
+							<td class="cell-date">{formatDate(rate.rateDate)}</td>
+							<td class="cell-date">{formatDate(rate.createdAt)}</td>
 							<td class="cell-update">
 								<form
 									method="POST"
-									action="?/updatePrice"
+									action="?/updateRate"
 									use:enhance={() => {
-										updatingId = asset.id;
+										updatingId = rate.id;
 										return async ({ update }) => {
 											updatingId = null;
 											await update({ reset: false });
 										};
 									}}
 								>
-									<input type="hidden" name="id" value={asset.id} />
-									<input
-										type="hidden"
-										name="currency"
-										value={asset.currentPrice?.currency ?? asset.currency ?? 'USD'}
-									/>
+									<input type="hidden" name="id" value={rate.id} />
 									<div class="update-row">
 										<input
 											type="number"
-											name="price"
+											name="rate"
 											class="price-input"
 											class:input-error={hasUpdateError}
-											bind:value={priceInputs[asset.id]}
-											min="0.0001"
+											bind:value={rateInputs[rate.id]}
+											min="0.00000001"
 											step="any"
 											placeholder="0.00"
 											required
@@ -355,16 +324,16 @@
 							<td class="cell-sync">
 								<form
 									method="POST"
-									action="?/syncAsset"
+									action="?/syncRate"
 									use:enhance={() => {
-										syncingAssetId = asset.id;
+										syncingRateId = rate.id;
 										return async ({ update }) => {
-											syncingAssetId = null;
+											syncingRateId = null;
 											await update({ reset: false });
 										};
 									}}
 								>
-									<input type="hidden" name="id" value={asset.id} />
+									<input type="hidden" name="id" value={rate.id} />
 									<Button type="submit" size="sm" variant="ghost" loading={isSyncingThis}>
 										<svg
 											width="13"
@@ -382,7 +351,7 @@
 										Sync
 									</Button>
 									{#if hasSyncError}
-										<p class="row-error">{form.syncAssetError}</p>
+										<p class="row-error">{form.syncRateError}</p>
 									{/if}
 								</form>
 							</td>
@@ -459,11 +428,9 @@
 		font-weight: 600;
 		color: var(--amber-light) !important;
 		font-size: 0.85rem;
-	}
-
-	.cell-name {
-		color: var(--text) !important;
-		font-weight: 500;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
 	}
 
 	.cell-price {
@@ -557,11 +524,6 @@
 		color: var(--red);
 	}
 
-	.optional {
-		color: var(--text-dim);
-		font-weight: 400;
-	}
-
 	.field-input {
 		padding: 0.55rem 0.75rem;
 		background: var(--surface-2);
@@ -576,20 +538,6 @@
 	.field-input:focus {
 		outline: none;
 		border-color: var(--amber);
-	}
-
-	.field-select {
-		cursor: pointer;
-		appearance: none;
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-		background-repeat: no-repeat;
-		background-position: right 0.6rem center;
-		padding-right: 2rem;
-	}
-
-	.field-select option {
-		background: var(--bg);
-		color: var(--text);
 	}
 
 	.form-error {

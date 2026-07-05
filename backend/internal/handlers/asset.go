@@ -33,6 +33,20 @@ func (h *Handlers) SyncSingleAsset(c fiber.Ctx) error {
 	return h.responseStatusOk(c, "Asset price synced", "", asset)
 }
 
+func (h *Handlers) ImportAssets(c fiber.Ctx) error {
+	data, filename, err := readImportFile(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid file", err.Error())
+	}
+
+	result, err := h.services.ImportAssetsFromFile(c.Context(), data, filename, c.FormValue("sheet"))
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error importing assets", "Could not import the uploaded assets")
+	}
+
+	return h.responseStatusOk(c, "Assets imported", "Spreadsheet imported successfully", result)
+}
+
 func (h *Handlers) CreateAsset(c fiber.Ctx) error {
 	var req portfolio.CreateAssetRequestDTO
 	if err := c.Bind().JSON(&req); err != nil {
