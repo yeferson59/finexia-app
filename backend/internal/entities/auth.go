@@ -49,6 +49,15 @@ type Verification struct {
 	UpdatedAt  time.Time `json:"updatedAt"`
 }
 
+type PasswordReset struct {
+	ID        uuid.UUID  `json:"id"`
+	UserID    uuid.UUID  `json:"userId"`
+	TokenHash string     `json:"-"`
+	ExpiresAt time.Time  `json:"expiresAt"`
+	UsedAt    *time.Time `json:"usedAt,omitempty"`
+	CreatedAt time.Time  `json:"createdAt"`
+}
+
 type RefreshToken struct {
 	ID        uuid.UUID  `json:"id"`
 	UserID    uuid.UUID  `json:"-"`
