@@ -22,6 +22,11 @@ import (
 	"github.com/yeferson59/finexia-app/pkg/helpers"
 )
 
+// ErrAccountUnverified signals a login attempt against an account whose email
+// has not been verified yet, letting the handler point the client at the
+// resend-verification flow instead of a generic credentials error.
+var ErrAccountUnverified = errors.New("invalid account")
+
 func generateRefreshToken() (raw, hash string, err error) {
 	b := make([]byte, 32)
 	if _, err = rand.Read(b); err != nil {
@@ -134,7 +139,7 @@ func (s *Services) Login(ctx context.Context, email, password, ipAddress, userAg
 	}
 
 	if !user.EmailVerified {
-		return auth.LoginInternalDTO{}, errors.New("invalid account")
+		return auth.LoginInternalDTO{}, ErrAccountUnverified
 	}
 
 	if err := user.Accounts[0].ComparePassword(password); err != nil {
@@ -260,6 +265,8 @@ func (s *Services) Register(ctx context.Context, name, email, password string) (
 	if err != nil {
 		return auth.RegisterResponseDTO{}, err
 	}
+
+	s.issueEmailVerification(ctx, user.Name, user.Email)
 
 	return auth.RegisterResponseDTO{
 		Name:  user.Name,

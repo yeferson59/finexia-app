@@ -86,6 +86,24 @@ describe('login action', () => {
 		expect(result?.data.errors).toEqual({ server: 'Cuenta bloqueada' });
 	});
 
+	it('flags an unverified account so the UI can offer to resend the link', async () => {
+		const fetch = vi.fn().mockResolvedValue(
+			jsonResponse(
+				{ message: 'email not verified', action: 'auth:login:unverified' },
+				{ status: 403 }
+			)
+		);
+
+		const result = await actions.login(buildEvent(validLogin, fetch) as LoginEvent);
+		const data = result?.data as { unverified?: boolean; errors?: Record<string, string> };
+
+		expect(result?.status).toBe(403);
+		expect(data.unverified).toBe(true);
+		expect(data.errors).toEqual({
+			server: 'Debes verificar tu correo antes de iniciar sesión.'
+		});
+	});
+
 	it('sets session cookies and redirects to /dashboard on success', async () => {
 		const cookies = createMockCookies();
 		const fetch = vi
@@ -185,7 +203,7 @@ describe('register action', () => {
 		expect(result?.data.errors).toEqual({ server: 'No válido' });
 	});
 
-	it('redirects to /auth after a successful registration', async () => {
+	it('redirects to /auth?registered=1 after a successful registration', async () => {
 		const fetch = vi
 			.fn()
 			.mockResolvedValue(jsonResponse({ success: true, message: 'Cuenta creada' }));
@@ -199,6 +217,6 @@ describe('register action', () => {
 
 		expect(isRedirect(thrown)).toBe(true);
 		expect((thrown as { status: number }).status).toBe(302);
-		expect((thrown as { location: string }).location).toBe('/auth');
+		expect((thrown as { location: string }).location).toBe('/auth?registered=1');
 	});
 });

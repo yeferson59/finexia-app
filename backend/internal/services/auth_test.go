@@ -233,6 +233,9 @@ func TestRegister(t *testing.T) {
 				}
 				return entities.User{Name: name, Email: email}, nil
 			},
+			createEmailVerification: func(_ context.Context, email, tokenHash string, expiresAt time.Time) (entities.Verification, error) {
+				return entities.Verification{ID: uuid.New(), Identifier: email, Value: tokenHash, ExpiresAt: expiresAt}, nil
+			},
 		}
 		svc := newTestServices(repo, newMemStorage())
 

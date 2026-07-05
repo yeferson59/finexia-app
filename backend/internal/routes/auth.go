@@ -19,6 +19,13 @@ func (r *Routes) Auth() {
 	auth.Get("/password-reset", r.middlewares.AuthLimiter(), r.handlers.ValidatePasswordReset)
 	auth.Post("/password-reset/confirm", r.middlewares.AuthLimiter(), r.handlers.ConfirmPasswordReset)
 
+	// Public email verification flow: (re)send a link, validate its token,
+	// then confirm to mark the email verified. Rate-limited to blunt both
+	// mail-bombing an address and token guessing.
+	auth.Post("/verify-email", r.middlewares.AuthLimiter(), r.handlers.RequestEmailVerification)
+	auth.Get("/verify-email", r.middlewares.AuthLimiter(), r.handlers.ValidateEmailVerification)
+	auth.Post("/verify-email/confirm", r.middlewares.AuthLimiter(), r.handlers.ConfirmEmailVerification)
+
 	auth.Use(r.middlewares.JWT())
 	auth.Get("/session", r.handlers.GetSession)
 	auth.Get("/sessions", r.handlers.ListSessions)

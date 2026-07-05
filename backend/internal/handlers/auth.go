@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"errors"
+
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yeferson59/finexia-app/internal/dtos/auth"
+	"github.com/yeferson59/finexia-app/internal/services"
 )
 
 func (handler *Handlers) Login(c fiber.Ctx) error {
@@ -15,6 +18,14 @@ func (handler *Handlers) Login(c fiber.Ctx) error {
 
 	result, err := handler.services.Login(c.Context(), loginDto.Email, loginDto.Password, c.IP(), c.Get("User-Agent"))
 	if err != nil {
+		if errors.Is(err, services.ErrAccountUnverified) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"success": false,
+				"message": "email not verified",
+				"details": "verify your email before logging in",
+				"action":  "auth:login:unverified",
+			})
+		}
 		return handler.responseFromDomain(c, err, "failed to login", "auth:login")
 	}
 

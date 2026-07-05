@@ -6,6 +6,7 @@
 	type FormResult = {
 		type: 'login' | 'register';
 		errors: Record<string, string> | Array<{ path: PropertyKey[]; message: string }>;
+		unverified?: boolean;
 	} | null;
 
 	let { form }: { form: FormResult } = $props();
@@ -286,6 +287,12 @@
 
 						{#if loginErrors['server']}
 							<p class="error-server" role="alert">{loginErrors['server']}</p>
+						{/if}
+
+						{#if form?.type === 'login' && form.unverified}
+							<a href={resolve('/auth/verify-email')} class="resend-link">
+								Reenviar enlace de verificación
+							</a>
 						{/if}
 
 						<Button type="submit" variant="primary" size="lg" loading={isSubmitting} fullWidth>
@@ -1003,6 +1010,20 @@
 		text-align: center;
 		font-weight: 500;
 		letter-spacing: 0.2px;
+	}
+
+	.resend-link {
+		display: block;
+		text-align: center;
+		font-size: 0.85rem;
+		color: var(--gold-primary);
+		text-decoration: none;
+		font-weight: 600;
+		margin-top: -0.75rem;
+	}
+
+	.resend-link:hover {
+		text-decoration: underline;
 	}
 
 	/* ── Divider + Social ────────────────────────────────────── */

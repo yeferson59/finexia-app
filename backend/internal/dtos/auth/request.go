@@ -23,3 +23,15 @@ type ConfirmPasswordResetDTO struct {
 	Token    string `json:"token"    validate:"required"`
 	Password string `json:"password" validate:"required,min=8,max=20"`
 }
+
+// RequestEmailVerificationDTO is the public payload to (re)send a
+// verification link.
+type RequestEmailVerificationDTO struct {
+	Email string `json:"email" validate:"required,email,max=254"`
+}
+
+// ConfirmEmailVerificationDTO is the public payload that consumes a
+// verification token and marks the email as verified.
+type ConfirmEmailVerificationDTO struct {
+	Token string `json:"token" validate:"required"`
+}

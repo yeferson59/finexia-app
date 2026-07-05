@@ -111,6 +111,11 @@ type Repository interface {
 	CreatePasswordReset(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) (entities.PasswordReset, error)
 	GetPasswordResetByHash(ctx context.Context, tokenHash string) (entities.PasswordReset, error)
 	ConsumePasswordReset(ctx context.Context, resetID, userID uuid.UUID, hashedPassword string) error
+
+	// Email verification
+	CreateEmailVerification(ctx context.Context, email, tokenHash string, expiresAt time.Time) (entities.Verification, error)
+	GetEmailVerificationByHash(ctx context.Context, tokenHash string) (entities.Verification, error)
+	ConsumeEmailVerification(ctx context.Context, id uuid.UUID, email string) error
 }
 
 // Ensure the concrete repository keeps satisfying the interface.
