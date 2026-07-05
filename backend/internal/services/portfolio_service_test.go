@@ -693,6 +693,7 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 
 		mailer := &fakeMailer{}
 		svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
+		svc.cfg.FrontendURL = "https://app.finexia.me"
 
 		txn, err := svc.CreateTransaction(context.Background(), userID, entryID, entities.Buy, qty, price, "USD", fees, date, "note")
 		if err != nil {
@@ -722,7 +723,7 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 		if sent.Data.Total != "300.50" {
 			t.Errorf("total = %q, want 300.50 (2 x 150.25)", sent.Data.Total)
 		}
-		if sent.Data.DashboardURL != "http://localhost:8080/dashboard/portfolios" {
+		if sent.Data.DashboardURL != "https://app.finexia.me/dashboard/portfolios" {
 			t.Errorf("dashboard URL = %q", sent.Data.DashboardURL)
 		}
 	})
