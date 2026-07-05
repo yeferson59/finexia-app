@@ -58,6 +58,12 @@ type PasswordResetData struct {
 	ExpiresIn string
 }
 
+type EmailVerificationData struct {
+	UserName  string
+	VerifyURL string
+	ExpiresIn string
+}
+
 type WeeklySummaryPortfolio struct {
 	Name             string
 	Type             string
@@ -187,6 +193,26 @@ func (s *Service) SendPasswordReset(email string, data PasswordResetData) error 
 
 	if _, err := s.client.Emails.Send(params); err != nil {
 		return fmt.Errorf("mail: send password reset to %s: %w", email, err)
+	}
+
+	return nil
+}
+
+func (s *Service) SendEmailVerification(email string, data EmailVerificationData) error {
+	var body bytes.Buffer
+	if err := s.tmpl.ExecuteTemplate(&body, "email_verification.html", data); err != nil {
+		return fmt.Errorf("mail: render email_verification template: %w", err)
+	}
+
+	params := &resend.SendEmailRequest{
+		From:    s.from,
+		To:      []string{email},
+		Subject: "Verifica tu correo — Finexia",
+		Html:    body.String(),
+	}
+
+	if _, err := s.client.Emails.Send(params); err != nil {
+		return fmt.Errorf("mail: send email verification to %s: %w", email, err)
 	}
 
 	return nil

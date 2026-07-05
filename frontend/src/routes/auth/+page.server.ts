@@ -30,6 +30,13 @@ export const actions = {
 
 		if (!response.ok) {
 			const data = await response.json().catch(() => ({}));
+			if (data.action === 'auth:login:unverified') {
+				return fail(response.status, {
+					type: 'login' as const,
+					errors: { server: 'Debes verificar tu correo antes de iniciar sesión.' },
+					unverified: true as const
+				});
+			}
 			return fail(response.status, {
 				type: 'login' as const,
 				errors: { server: data.message || 'Credenciales incorrectas' }
@@ -115,6 +122,6 @@ export const actions = {
 			});
 		}
 
-		redirect(302, '/auth');
+		redirect(302, '/auth?registered=1');
 	}
 } satisfies Actions;

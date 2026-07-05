@@ -10,68 +10,70 @@ import (
 )
 
 type Env struct {
-	Environment         string
-	Port                string
-	PathMigration       string
-	DatabaseURL         string
-	CacheURL            string
-	JWTSecret           string
-	JWTAccessDuration   time.Duration
-	JWTRefreshDuration  time.Duration
-	RefreshGracePeriod  time.Duration
-	MaxLoginAttempts    int
-	LoginLockout        time.Duration
-	TrustProxy          bool
-	TrustedProxies      []string
-	CORSEnabled         bool
-	CORSOrigin          []string
-	AWSAccessKeyID      string
-	AWSDefaultRegion    string
-	AWSEndpointURL      string
-	AWSS3BucketName     string
-	AWSSecretAccessKey  string
-	ResendAPIKey        string
-	EmailFrom           string
-	AlphaVantageAPIKey  string
-	FinnhubAPIKey       string
-	PublicURL           string
-	FrontendURL         string
-	InvitationExpiry    time.Duration
-	PasswordResetExpiry time.Duration
+	Environment             string
+	Port                    string
+	PathMigration           string
+	DatabaseURL             string
+	CacheURL                string
+	JWTSecret               string
+	JWTAccessDuration       time.Duration
+	JWTRefreshDuration      time.Duration
+	RefreshGracePeriod      time.Duration
+	MaxLoginAttempts        int
+	LoginLockout            time.Duration
+	TrustProxy              bool
+	TrustedProxies          []string
+	CORSEnabled             bool
+	CORSOrigin              []string
+	AWSAccessKeyID          string
+	AWSDefaultRegion        string
+	AWSEndpointURL          string
+	AWSS3BucketName         string
+	AWSSecretAccessKey      string
+	ResendAPIKey            string
+	EmailFrom               string
+	AlphaVantageAPIKey      string
+	FinnhubAPIKey           string
+	PublicURL               string
+	FrontendURL             string
+	InvitationExpiry        time.Duration
+	PasswordResetExpiry     time.Duration
+	EmailVerificationExpiry time.Duration
 }
 
 func (c *Config) LoadEnvs() *Env {
 	_ = godotenv.Load()
 
 	return &Env{
-		Environment:         c.getString("ENVIRONMENT", "development"),
-		Port:                c.getString("PORT", "8080"),
-		PathMigration:       c.getString("PATH_MIGRATION", "file://internal/migrations"),
-		DatabaseURL:         c.getString("DATABASE_URL", ""),
-		CacheURL:            c.getString("CACHE_URL", ""),
-		JWTSecret:           c.getString("JWT_SECRET", "secret"),
-		JWTAccessDuration:   c.getDuration("JWT_ACCESS_DURATION", 15*time.Minute),
-		JWTRefreshDuration:  c.getDuration("JWT_REFRESH_DURATION", 30*24*time.Hour),
-		RefreshGracePeriod:  c.getDuration("JWT_REFRESH_GRACE_PERIOD", 30*time.Second),
-		MaxLoginAttempts:    c.getInt("MAX_LOGIN_ATTEMPTS", 5),
-		LoginLockout:        c.getDuration("LOGIN_LOCKOUT_DURATION", 15*time.Minute),
-		TrustProxy:          c.getBool("TRUST_PROXY", true),
-		TrustedProxies:      c.getSlice("TRUSTED_PROXIES"),
-		CORSEnabled:         c.getBool("CORS_ENABLED", true),
-		CORSOrigin:          c.getSlice("CORS_ORIGIN", "http://localhost:5173"),
-		AWSAccessKeyID:      c.getString("AWS_ACCESS_KEY_ID", ""),
-		AWSDefaultRegion:    c.getString("AWS_DEFAULT_REGION", ""),
-		AWSEndpointURL:      c.getString("AWS_ENDPOINT_URL", ""),
-		AWSS3BucketName:     c.getString("AWS_S3_BUCKET_NAME", ""),
-		AWSSecretAccessKey:  c.getString("AWS_SECRET_ACCESS_KEY", ""),
-		ResendAPIKey:        c.getString("RESEND_API_KEY", ""),
-		EmailFrom:           c.getString("EMAIL_FROM", "Finexia <noreply@finexia.me>"),
-		AlphaVantageAPIKey:  c.getString("ALPHA_VANTAGE_API_KEY", ""),
-		FinnhubAPIKey:       c.getString("FINNHUB_API_KEY", ""),
-		PublicURL:           c.getString("PUBLIC_URL", "http://localhost:8080"),
-		FrontendURL:         c.getString("FRONTEND_URL", "http://localhost:5173"),
-		InvitationExpiry:    c.getDuration("INVITATION_EXPIRY", 72*time.Hour),
-		PasswordResetExpiry: c.getDuration("PASSWORD_RESET_EXPIRY", 1*time.Hour),
+		Environment:             c.getString("ENVIRONMENT", "development"),
+		Port:                    c.getString("PORT", "8080"),
+		PathMigration:           c.getString("PATH_MIGRATION", "file://internal/migrations"),
+		DatabaseURL:             c.getString("DATABASE_URL", ""),
+		CacheURL:                c.getString("CACHE_URL", ""),
+		JWTSecret:               c.getString("JWT_SECRET", "secret"),
+		JWTAccessDuration:       c.getDuration("JWT_ACCESS_DURATION", 15*time.Minute),
+		JWTRefreshDuration:      c.getDuration("JWT_REFRESH_DURATION", 30*24*time.Hour),
+		RefreshGracePeriod:      c.getDuration("JWT_REFRESH_GRACE_PERIOD", 30*time.Second),
+		MaxLoginAttempts:        c.getInt("MAX_LOGIN_ATTEMPTS", 5),
+		LoginLockout:            c.getDuration("LOGIN_LOCKOUT_DURATION", 15*time.Minute),
+		TrustProxy:              c.getBool("TRUST_PROXY", true),
+		TrustedProxies:          c.getSlice("TRUSTED_PROXIES"),
+		CORSEnabled:             c.getBool("CORS_ENABLED", true),
+		CORSOrigin:              c.getSlice("CORS_ORIGIN", "http://localhost:5173"),
+		AWSAccessKeyID:          c.getString("AWS_ACCESS_KEY_ID", ""),
+		AWSDefaultRegion:        c.getString("AWS_DEFAULT_REGION", ""),
+		AWSEndpointURL:          c.getString("AWS_ENDPOINT_URL", ""),
+		AWSS3BucketName:         c.getString("AWS_S3_BUCKET_NAME", ""),
+		AWSSecretAccessKey:      c.getString("AWS_SECRET_ACCESS_KEY", ""),
+		ResendAPIKey:            c.getString("RESEND_API_KEY", ""),
+		EmailFrom:               c.getString("EMAIL_FROM", "Finexia <noreply@finexia.me>"),
+		AlphaVantageAPIKey:      c.getString("ALPHA_VANTAGE_API_KEY", ""),
+		FinnhubAPIKey:           c.getString("FINNHUB_API_KEY", ""),
+		PublicURL:               c.getString("PUBLIC_URL", "http://localhost:8080"),
+		FrontendURL:             c.getString("FRONTEND_URL", "http://localhost:5173"),
+		InvitationExpiry:        c.getDuration("INVITATION_EXPIRY", 72*time.Hour),
+		PasswordResetExpiry:     c.getDuration("PASSWORD_RESET_EXPIRY", 1*time.Hour),
+		EmailVerificationExpiry: c.getDuration("EMAIL_VERIFICATION_EXPIRY", 24*time.Hour),
 	}
 }
 

@@ -89,6 +89,10 @@ type fakeRepository struct {
 	createPasswordReset    func(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) (entities.PasswordReset, error)
 	getPasswordResetByHash func(ctx context.Context, tokenHash string) (entities.PasswordReset, error)
 	consumePasswordReset   func(ctx context.Context, resetID, userID uuid.UUID, hashedPassword string) error
+
+	createEmailVerification    func(ctx context.Context, email, tokenHash string, expiresAt time.Time) (entities.Verification, error)
+	getEmailVerificationByHash func(ctx context.Context, tokenHash string) (entities.Verification, error)
+	consumeEmailVerification   func(ctx context.Context, id uuid.UUID, email string) error
 }
 
 func (f *fakeRepository) CreatePasswordReset(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) (entities.PasswordReset, error) {
@@ -101,6 +105,18 @@ func (f *fakeRepository) GetPasswordResetByHash(ctx context.Context, tokenHash s
 
 func (f *fakeRepository) ConsumePasswordReset(ctx context.Context, resetID, userID uuid.UUID, hashedPassword string) error {
 	return f.consumePasswordReset(ctx, resetID, userID, hashedPassword)
+}
+
+func (f *fakeRepository) CreateEmailVerification(ctx context.Context, email, tokenHash string, expiresAt time.Time) (entities.Verification, error) {
+	return f.createEmailVerification(ctx, email, tokenHash, expiresAt)
+}
+
+func (f *fakeRepository) GetEmailVerificationByHash(ctx context.Context, tokenHash string) (entities.Verification, error) {
+	return f.getEmailVerificationByHash(ctx, tokenHash)
+}
+
+func (f *fakeRepository) ConsumeEmailVerification(ctx context.Context, id uuid.UUID, email string) error {
+	return f.consumeEmailVerification(ctx, id, email)
 }
 
 func (f *fakeRepository) CreateInvitation(ctx context.Context, email, name, role, tokenHash string, invitedBy *uuid.UUID, expiresAt time.Time) (entities.Invitation, error) {
@@ -356,12 +372,13 @@ func (f *fakeRepository) SaveWaitlistEmail(ctx context.Context, email string) er
 type fakeMailer struct {
 	mu sync.Mutex
 
-	waitlistErr      error
-	activityErr      error
-	securityErr      error
-	weeklyErr        error
-	invitationErr    error
-	passwordResetErr error
+	waitlistErr          error
+	activityErr          error
+	securityErr          error
+	weeklyErr            error
+	invitationErr        error
+	passwordResetErr     error
+	emailVerificationErr error
 
 	waitlistTo   []string
 	invitationTo []struct {
@@ -371,6 +388,10 @@ type fakeMailer struct {
 	passwordResetTo []struct {
 		To   string
 		Data mail.PasswordResetData
+	}
+	emailVerificationTo []struct {
+		To   string
+		Data mail.EmailVerificationData
 	}
 	activity []struct {
 		To   string
@@ -458,6 +479,25 @@ func (m *fakeMailer) passwordResetCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return len(m.passwordResetTo)
+}
+
+func (m *fakeMailer) SendEmailVerification(email string, data mail.EmailVerificationData) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.emailVerificationErr != nil {
+		return m.emailVerificationErr
+	}
+	m.emailVerificationTo = append(m.emailVerificationTo, struct {
+		To   string
+		Data mail.EmailVerificationData
+	}{email, data})
+	return nil
+}
+
+func (m *fakeMailer) emailVerificationCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.emailVerificationTo)
 }
 
 func (m *fakeMailer) SendWeeklySummary(email string, data mail.WeeklySummaryData) error {
