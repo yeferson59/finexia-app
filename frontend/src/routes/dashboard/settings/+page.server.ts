@@ -9,6 +9,7 @@ export interface ActiveSession {
 	id: string;
 	ipAddress: string | null;
 	userAgent: string | null;
+	location: string | null;
 	createdAt: string;
 	lastActiveAt: string;
 	expiresAt: string;

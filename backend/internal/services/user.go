@@ -135,7 +135,7 @@ func (s *Services) GetAvatarFromS3(ctx context.Context, userID uuid.UUID) (io.Re
 	return result.Body, aws.ToString(result.ContentType), nil
 }
 
-func (s *Services) ChangePassword(ctx context.Context, userID uuid.UUID, currentToken, currentPassword, newPassword string) error {
+func (s *Services) ChangePassword(ctx context.Context, userID uuid.UUID, currentToken, currentPassword, newPassword, ipAddress, userAgent string) error {
 	account, err := s.repos.GetAccountByUserID(ctx, userID)
 	if err != nil {
 		return errors.New("not found account")
@@ -165,7 +165,7 @@ func (s *Services) ChangePassword(ctx context.Context, userID uuid.UUID, current
 		s.log.Error("change password: failed to revoke other sessions", logger.Err(err))
 	}
 
-	go s.sendPasswordChangedAlert(userID)
+	go s.sendPasswordChangedAlert(userID, ipAddress, userAgent)
 
 	return nil
 }
@@ -173,7 +173,7 @@ func (s *Services) ChangePassword(ctx context.Context, userID uuid.UUID, current
 // sendPasswordChangedAlert notifies the user their password changed. Like the
 // login alert, it bypasses email preferences: if the change wasn't theirs,
 // this email is their only chance to react. Best-effort.
-func (s *Services) sendPasswordChangedAlert(userID uuid.UUID) {
+func (s *Services) sendPasswordChangedAlert(userID uuid.UUID, ipAddress, userAgent string) {
 	if s.mail == nil {
 		return
 	}
@@ -185,12 +185,24 @@ func (s *Services) sendPasswordChangedAlert(userID uuid.UUID) {
 		return
 	}
 
+	location := s.locateIP(ipAddress)
+	if location == "" {
+		location = "desconocida"
+	}
+	if ipAddress == "" {
+		ipAddress = "desconocida"
+	}
+	if userAgent == "" {
+		userAgent = "desconocido"
+	}
+
 	_ = s.mail.SendSecurityAlert(user.Email, mail.SecurityAlertData{
 		UserName:    user.Name,
 		Event:       "cambio de contraseña",
 		Detail:      "La contraseña de tu cuenta fue cambiada y se cerraron las demás sesiones activas.",
-		IPAddress:   "—",
-		UserAgent:   "—",
+		IPAddress:   truncate(ipAddress, 45),
+		UserAgent:   truncate(userAgent, 255),
+		Location:    location,
 		When:        time.Now().UTC().Format("02 Jan 2006 15:04 UTC"),
 		SecurityURL: s.cfg.FrontendURL + "/dashboard/settings",
 	})

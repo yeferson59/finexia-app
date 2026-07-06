@@ -17,6 +17,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/yeferson59/finexia-app/internal/dtos/auth"
+	"github.com/yeferson59/finexia-app/internal/logger"
 	"github.com/yeferson59/finexia-app/internal/mail"
 	"github.com/yeferson59/finexia-app/internal/repositories"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
@@ -213,6 +214,9 @@ func (s *Services) issueSession(ctx context.Context, userID uuid.UUID, roleName,
 		return auth.LoginInternalDTO{}, err
 	}
 
+	// Resolved after the fact so the login never waits on the geo lookup.
+	go s.recordSessionLocation(sessionID, ipAddress)
+
 	if !knownIP {
 		go s.sendLoginAlert(userName, userEmail, ipAddress, userAgent)
 	}
@@ -246,6 +250,18 @@ func (s *Services) issueSession(ctx context.Context, userID uuid.UUID, roleName,
 	}, nil
 }
 
+// recordSessionLocation stamps the session row with the approximate location
+// of its IP. Best-effort: an unknown location just leaves the column empty.
+func (s *Services) recordSessionLocation(sessionID uuid.UUID, ipAddress string) {
+	location := s.locateIP(ipAddress)
+	if location == "" {
+		return
+	}
+	if err := s.repos.UpdateSessionLocation(context.Background(), sessionID, truncate(location, 120)); err != nil {
+		s.log.Error("failed to record session location", logger.Err(err))
+	}
+}
+
 // sendLoginAlert emails the user that their account was accessed from an IP
 // with no prior session. Security notices are sent regardless of the marketing
 // email preferences: knowing about an unexpected login protects the account
@@ -253,6 +269,10 @@ func (s *Services) issueSession(ctx context.Context, userID uuid.UUID, roleName,
 func (s *Services) sendLoginAlert(userName, email, ipAddress, userAgent string) {
 	if s.mail == nil {
 		return
+	}
+	location := s.locateIP(ipAddress)
+	if location == "" {
+		location = "desconocida"
 	}
 	if ipAddress == "" {
 		ipAddress = "desconocida"
@@ -267,6 +287,7 @@ func (s *Services) sendLoginAlert(userName, email, ipAddress, userAgent string) 
 		Detail:      "Se inició sesión en tu cuenta desde una dirección que no habíamos visto antes.",
 		IPAddress:   ipAddress,
 		UserAgent:   userAgent,
+		Location:    location,
 		When:        time.Now().UTC().Format("02 Jan 2006 15:04 UTC"),
 		SecurityURL: s.cfg.FrontendURL + "/dashboard/settings",
 	})

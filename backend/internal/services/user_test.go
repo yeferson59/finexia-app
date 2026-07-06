@@ -41,7 +41,7 @@ func TestChangePassword(t *testing.T) {
 		repo, storedHash := newRepo(t)
 		svc := newTestServices(repo, newMemStorage())
 
-		if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, "new-password"); err != nil {
+		if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, "new-password", "203.0.113.9", "test-agent"); err != nil {
 			t.Fatalf("ChangePassword: %v", err)
 		}
 		if *storedHash == "" {
@@ -56,7 +56,7 @@ func TestChangePassword(t *testing.T) {
 		repo, storedHash := newRepo(t)
 		svc := newTestServices(repo, newMemStorage())
 
-		err := svc.ChangePassword(context.Background(), userID, "current-token", "not-the-password", "new-password")
+		err := svc.ChangePassword(context.Background(), userID, "current-token", "not-the-password", "new-password", "203.0.113.9", "test-agent")
 		if err == nil || err.Error() != "invalid current password" {
 			t.Fatalf("error = %v, want %q", err, "invalid current password")
 		}
@@ -69,7 +69,7 @@ func TestChangePassword(t *testing.T) {
 		repo, storedHash := newRepo(t)
 		svc := newTestServices(repo, newMemStorage())
 
-		if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, currentPassword); err == nil {
+		if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, currentPassword, "203.0.113.9", "test-agent"); err == nil {
 			t.Fatal("expected reusing the current password to be rejected")
 		}
 		if *storedHash != "" {
@@ -85,7 +85,7 @@ func TestChangePassword(t *testing.T) {
 		}
 		svc := newTestServices(repo, newMemStorage())
 
-		if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, "new-password"); err == nil {
+		if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, "new-password", "203.0.113.9", "test-agent"); err == nil {
 			t.Fatal("expected error when the account does not exist")
 		}
 	})

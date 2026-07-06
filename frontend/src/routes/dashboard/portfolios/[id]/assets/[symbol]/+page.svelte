@@ -4,6 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { enhance } from '$app/forms';
 	import DatePicker from '$components/ui/date-picker.svelte';
+	import { privacy } from '$lib/stores/privacy.svelte';
 
 	const { params, data, form }: PageProps = $props();
 
@@ -219,13 +220,15 @@
 	});
 
 	function fmt(value: number, decimals = 2): string {
-		return new Intl.NumberFormat('es-CO', {
-			style: 'currency',
-			currency: position?.costCurrency || 'USD',
-			currencyDisplay: 'narrowSymbol',
-			minimumFractionDigits: decimals,
-			maximumFractionDigits: decimals
-		}).format(value);
+		return privacy.money(
+			new Intl.NumberFormat('es-CO', {
+				style: 'currency',
+				currency: position?.costCurrency || 'USD',
+				currencyDisplay: 'narrowSymbol',
+				minimumFractionDigits: decimals,
+				maximumFractionDigits: decimals
+			}).format(value)
+		);
 	}
 
 	function fmtPct(value: number): string {

@@ -68,8 +68,8 @@
 			<p class="eyebrow">Enlace enviado</p>
 			<h1 class="title">Revisa tu correo</h1>
 			<p class="subtitle">
-				Si <strong>{email}</strong> tiene una cuenta sin verificar, te enviamos un nuevo enlace de
-				verificación. El enlace caduca pronto, así que úsalo cuanto antes.
+				Si <strong>{email}</strong> tiene una cuenta sin verificar, te enviamos un nuevo enlace de verificación.
+				El enlace caduca pronto, así que úsalo cuanto antes.
 			</p>
 			<a class="back-link" href={authHref}>Volver a iniciar sesión</a>
 		{:else}

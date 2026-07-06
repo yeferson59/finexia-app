@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import Card from '$components/ui/card.svelte';
+	import { privacy } from '$lib/stores/privacy.svelte';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
@@ -46,10 +47,13 @@
 	}
 
 	function formatCurrency(value: string): string {
-		return new Intl.NumberFormat('es-CO', {
-			minimumFractionDigits: 2,
-			maximumFractionDigits: 2
-		}).format(parseFloat(value) || 0);
+		return privacy.money(
+			'$' +
+				new Intl.NumberFormat('es-CO', {
+					minimumFractionDigits: 2,
+					maximumFractionDigits: 2
+				}).format(parseFloat(value) || 0)
+		);
 	}
 
 	let isEditing = $state(false);
@@ -184,7 +188,7 @@
 							</div>
 							<div class="stat-content">
 								<span class="stat-label">Total Invertido</span>
-								<span class="stat-value">${formatCurrency(platform.totalValue)}</span>
+								<span class="stat-value">{formatCurrency(platform.totalValue)}</span>
 							</div>
 						</div>
 					</div>

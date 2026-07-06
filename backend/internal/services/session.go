@@ -24,6 +24,7 @@ func (s *Services) ListSessions(ctx context.Context, userID uuid.UUID, currentTo
 			ID:           sess.ID,
 			IPAddress:    sess.IPAddress,
 			UserAgent:    sess.UserAgent,
+			Location:     sess.Location,
 			CreatedAt:    sess.CreatedAt,
 			LastActiveAt: sess.UpdatedAt,
 			ExpiresAt:    sess.ExpiresAt,

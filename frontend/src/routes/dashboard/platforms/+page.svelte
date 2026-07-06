@@ -3,9 +3,20 @@
 	import { resolve } from '$app/paths';
 	import PageHeader from '$components/ui/page-header.svelte';
 	import Card from '$components/ui/card.svelte';
+	import { privacy } from '$lib/stores/privacy.svelte';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
+
+	function fmtMoney(value: string): string {
+		return privacy.money(
+			'$' +
+				new Intl.NumberFormat('es-CO', {
+					minimumFractionDigits: 2,
+					maximumFractionDigits: 2
+				}).format(parseFloat(value) || 0)
+		);
+	}
 
 	function viewDetails(id: string) {
 		goto(resolve('/dashboard/platforms/[id]', { id }));
@@ -94,12 +105,7 @@
 							</div>
 							<div class="stat-item">
 								<span class="stat-label">Invertido</span>
-								<span class="stat-value"
-									>${new Intl.NumberFormat('es-CO', {
-										minimumFractionDigits: 2,
-										maximumFractionDigits: 2
-									}).format(parseFloat(platform.totalValue) || 0)}</span
-								>
+								<span class="stat-value">{fmtMoney(platform.totalValue)}</span>
 							</div>
 						</div>
 

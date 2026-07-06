@@ -2,6 +2,7 @@
 	import Card from '$components/ui/card.svelte';
 	import CardHeader from '$components/ui/card-header.svelte';
 	import Stat from '$components/ui/stat.svelte';
+	import { privacy } from '$lib/stores/privacy.svelte';
 
 	interface PortfolioSummary {
 		id: string;
@@ -33,6 +34,10 @@
 			minimumFractionDigits: 2,
 			maximumFractionDigits: 2
 		}).format(value);
+	}
+
+	function fmtMoney(value: number): string {
+		return privacy.money('$' + fmt(value));
 	}
 
 	function fmtPct(value: number): string {
@@ -83,10 +88,10 @@
 						<span class="currency">{s.baseCurrency}</span>
 					</div>
 					<span class="type-badge">{s.type}</span>
-					<span class="align-right mono">${fmt(marketValue)}</span>
-					<span class="align-right mono dim">${fmt(costBase)}</span>
+					<span class="align-right mono">{fmtMoney(marketValue)}</span>
+					<span class="align-right mono dim">{fmtMoney(costBase)}</span>
 					<div class="align-right gain-cell" class:positive={isUp} class:negative={!isUp}>
-						<span class="mono">{isUp ? '+' : '−'}${fmt(Math.abs(gainLoss))}</span>
+						<span class="mono">{isUp ? '+' : '−'}{fmtMoney(Math.abs(gainLoss))}</span>
 						<span class="pct">{isUp ? '+' : ''}{fmtPct(pct)}%</span>
 					</div>
 				</div>
@@ -95,8 +100,8 @@
 	{/if}
 
 	<div class="chart-stats">
-		<Stat label="Total Invertido" value="${fmt(totalInvested)}" />
-		<Stat label="Valor Actual" tone="highlight" value="${fmt(totalValue)}" />
+		<Stat label="Total Invertido" value={fmtMoney(totalInvested)} />
+		<Stat label="Valor Actual" tone="highlight" value={fmtMoney(totalValue)} />
 		<Stat
 			label="Ganancia Total"
 			tone={totalGainLoss >= 0 ? 'positive' : 'negative'}

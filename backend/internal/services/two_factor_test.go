@@ -119,7 +119,7 @@ func TestTwoFactorSetupAndEnableFlow(t *testing.T) {
 	}
 
 	// A wrong code cannot confirm the setup.
-	if _, err := svc.ConfirmTwoFactorSetup(ctx, user.ID, "000000"); !errors.Is(err, ErrTwoFactorInvalidCode) {
+	if _, err := svc.ConfirmTwoFactorSetup(ctx, user.ID, "000000", "203.0.113.9", "test-agent"); !errors.Is(err, ErrTwoFactorInvalidCode) {
 		t.Fatalf("ConfirmTwoFactorSetup(wrong code) err = %v, want ErrTwoFactorInvalidCode", err)
 	}
 
@@ -127,7 +127,7 @@ func TestTwoFactorSetupAndEnableFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TOTPCode: %v", err)
 	}
-	enabled, err := svc.ConfirmTwoFactorSetup(ctx, user.ID, code)
+	enabled, err := svc.ConfirmTwoFactorSetup(ctx, user.ID, code, "203.0.113.9", "test-agent")
 	if err != nil {
 		t.Fatalf("ConfirmTwoFactorSetup: %v", err)
 	}
@@ -333,15 +333,15 @@ func TestDisableTwoFactor(t *testing.T) {
 	svc := newTestServices(repo, newMemStorage())
 	ctx := context.Background()
 
-	if err := svc.DisableTwoFactor(ctx, user.ID, "wrong-password", "whatever"); err == nil {
+	if err := svc.DisableTwoFactor(ctx, user.ID, "wrong-password", "whatever", "203.0.113.9", "test-agent"); err == nil {
 		t.Fatal("expected DisableTwoFactor to reject a wrong password")
 	}
-	if err := svc.DisableTwoFactor(ctx, user.ID, password, "000000"); !errors.Is(err, ErrTwoFactorInvalidCode) {
+	if err := svc.DisableTwoFactor(ctx, user.ID, password, "000000", "203.0.113.9", "test-agent"); !errors.Is(err, ErrTwoFactorInvalidCode) {
 		t.Fatalf("DisableTwoFactor(wrong code) err = %v, want ErrTwoFactorInvalidCode", err)
 	}
 
 	code, _ := helpers.TOTPCode(secret, time.Now().UTC())
-	if err := svc.DisableTwoFactor(ctx, user.ID, password, code); err != nil {
+	if err := svc.DisableTwoFactor(ctx, user.ID, password, code, "203.0.113.9", "test-agent"); err != nil {
 		t.Fatalf("DisableTwoFactor: %v", err)
 	}
 	if state.row != nil {

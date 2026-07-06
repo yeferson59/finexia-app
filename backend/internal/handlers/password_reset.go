@@ -46,7 +46,7 @@ func (handler *Handlers) ConfirmPasswordReset(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:passwordReset:confirm")
 	}
 
-	if err := handler.services.ResetPassword(c.Context(), req.Token, req.Password); err != nil {
+	if err := handler.services.ResetPassword(c.Context(), req.Token, req.Password, c.IP(), c.Get("User-Agent")); err != nil {
 		return handler.passwordResetError(c, err, "auth:passwordReset:confirm")
 	}
 

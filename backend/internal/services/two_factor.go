@@ -167,7 +167,7 @@ func (s *Services) BeginTwoFactorSetup(ctx context.Context, userID uuid.UUID, pa
 // ConfirmTwoFactorSetup verifies the first code from the authenticator app,
 // switches 2FA on, and hands back the single-use recovery codes. The raw
 // codes exist only in this response; the database keeps hashes.
-func (s *Services) ConfirmTwoFactorSetup(ctx context.Context, userID uuid.UUID, code string) (auth.TwoFactorEnableResponseDTO, error) {
+func (s *Services) ConfirmTwoFactorSetup(ctx context.Context, userID uuid.UUID, code, ipAddress, userAgent string) (auth.TwoFactorEnableResponseDTO, error) {
 	tf, found, err := s.getTwoFactor(ctx, userID)
 	if err != nil {
 		return auth.TwoFactorEnableResponseDTO{}, err
@@ -196,7 +196,8 @@ func (s *Services) ConfirmTwoFactorSetup(ctx context.Context, userID uuid.UUID, 
 	}
 
 	go s.sendTwoFactorAlert(userID, "autenticación en dos pasos activada",
-		"La verificación en dos pasos (2FA) fue activada en tu cuenta. A partir de ahora se pedirá un código del autenticador al iniciar sesión.")
+		"La verificación en dos pasos (2FA) fue activada en tu cuenta. A partir de ahora se pedirá un código del autenticador al iniciar sesión.",
+		ipAddress, userAgent)
 
 	return auth.TwoFactorEnableResponseDTO{RecoveryCodes: raws}, nil
 }
@@ -204,7 +205,7 @@ func (s *Services) ConfirmTwoFactorSetup(ctx context.Context, userID uuid.UUID, 
 // DisableTwoFactor turns 2FA back off. It demands the password AND a valid
 // code (TOTP or recovery), so neither a stolen session nor a stolen password
 // alone is enough to strip the protection.
-func (s *Services) DisableTwoFactor(ctx context.Context, userID uuid.UUID, password, code string) error {
+func (s *Services) DisableTwoFactor(ctx context.Context, userID uuid.UUID, password, code, ipAddress, userAgent string) error {
 	if err := s.verifyCurrentPassword(ctx, userID, password); err != nil {
 		return err
 	}
@@ -229,7 +230,8 @@ func (s *Services) DisableTwoFactor(ctx context.Context, userID uuid.UUID, passw
 
 	if tf.Enabled {
 		go s.sendTwoFactorAlert(userID, "autenticación en dos pasos desactivada",
-			"La verificación en dos pasos (2FA) fue desactivada en tu cuenta. Si no fuiste tú, cambia tu contraseña de inmediato.")
+			"La verificación en dos pasos (2FA) fue desactivada en tu cuenta. Si no fuiste tú, cambia tu contraseña de inmediato.",
+			ipAddress, userAgent)
 	}
 
 	return nil
@@ -375,7 +377,7 @@ func (s *Services) verifyTOTPWithReplayGuard(ctx context.Context, userID uuid.UU
 
 // sendTwoFactorAlert notifies the user of 2FA state changes. Like other
 // security notices it ignores marketing preferences and is best-effort.
-func (s *Services) sendTwoFactorAlert(userID uuid.UUID, event, detail string) {
+func (s *Services) sendTwoFactorAlert(userID uuid.UUID, event, detail, ipAddress, userAgent string) {
 	if s.mail == nil {
 		return
 	}
@@ -386,12 +388,24 @@ func (s *Services) sendTwoFactorAlert(userID uuid.UUID, event, detail string) {
 		return
 	}
 
+	location := s.locateIP(ipAddress)
+	if location == "" {
+		location = "desconocida"
+	}
+	if ipAddress == "" {
+		ipAddress = "desconocida"
+	}
+	if userAgent == "" {
+		userAgent = "desconocido"
+	}
+
 	_ = s.mail.SendSecurityAlert(user.Email, mail.SecurityAlertData{
 		UserName:    user.Name,
 		Event:       event,
 		Detail:      detail,
-		IPAddress:   "—",
-		UserAgent:   "—",
+		IPAddress:   truncate(ipAddress, 45),
+		UserAgent:   truncate(userAgent, 255),
+		Location:    location,
 		When:        time.Now().UTC().Format("02 Jan 2006 15:04 UTC"),
 		SecurityURL: s.cfg.FrontendURL + "/dashboard/settings",
 	})

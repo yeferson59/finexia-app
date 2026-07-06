@@ -42,6 +42,7 @@ type SecurityAlertData struct {
 	Detail      string
 	IPAddress   string
 	UserAgent   string
+	Location    string
 	When        string
 	SecurityURL string
 }

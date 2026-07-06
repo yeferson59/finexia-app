@@ -288,7 +288,7 @@ func (handler *Handlers) ChangeMyPassword(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "Invalid password", "New password must be at most 20 characters")
 	}
 
-	if err := handler.services.ChangePassword(c.Context(), userID, jwtoken, req.CurrentPassword, req.NewPassword); err != nil {
+	if err := handler.services.ChangePassword(c.Context(), userID, jwtoken, req.CurrentPassword, req.NewPassword, c.IP(), c.Get("User-Agent")); err != nil {
 		return handler.responseFromDomain(c, err, "Error changing password", "users:me:password")
 	}
 

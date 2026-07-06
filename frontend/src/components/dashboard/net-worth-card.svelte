@@ -3,6 +3,17 @@
 	import CardHeader from '$components/ui/card-header.svelte';
 	import Badge from '$components/ui/badge.svelte';
 	import Stat from '$components/ui/stat.svelte';
+	import { privacy } from '$lib/stores/privacy.svelte';
+
+	function fmtMoney(value: number): string {
+		return privacy.money(
+			'$' +
+				new Intl.NumberFormat('es-CO', {
+					minimumFractionDigits: 2,
+					maximumFractionDigits: 2
+				}).format(value)
+		);
+	}
 
 	interface PortfolioSummary {
 		id: string;
@@ -40,17 +51,11 @@
 	<div class="net-worth-content">
 		<div class="main-metric">
 			<h1 class="amount">
-				${new Intl.NumberFormat('es-CO', {
-					minimumFractionDigits: 2,
-					maximumFractionDigits: 2
-				}).format(netWorth)}
+				{fmtMoney(netWorth)}
 			</h1>
 			{#if summaries.length > 0}
 				<p class="amount-delta" class:positive={isIncreasing} class:negative={!isIncreasing}>
-					{isIncreasing ? '+' : '−'}${new Intl.NumberFormat('es-CO', {
-						minimumFractionDigits: 2,
-						maximumFractionDigits: 2
-					}).format(Math.abs(totalGainLoss))}
+					{isIncreasing ? '+' : '−'}{fmtMoney(Math.abs(totalGainLoss))}
 					· {new Intl.NumberFormat('es-CO', {
 						minimumFractionDigits: 2,
 						maximumFractionDigits: 2

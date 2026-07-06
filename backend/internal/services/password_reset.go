@@ -64,7 +64,7 @@ func (s *Services) ValidatePasswordResetToken(ctx context.Context, rawToken stri
 // ResetPassword consumes a valid reset token and sets the new password. Every
 // existing session is revoked afterward: proving control of the inbox is not
 // the same as proving control of any device that was already logged in.
-func (s *Services) ResetPassword(ctx context.Context, rawToken, newPassword string) error {
+func (s *Services) ResetPassword(ctx context.Context, rawToken, newPassword, ipAddress, userAgent string) error {
 	pr, err := s.lookupPasswordReset(ctx, rawToken)
 	if err != nil {
 		return err
@@ -83,7 +83,7 @@ func (s *Services) ResetPassword(ctx context.Context, rawToken, newPassword stri
 		s.log.Error("reset password: failed to revoke sessions", logger.Err(err))
 	}
 
-	go s.sendPasswordChangedAlert(pr.UserID)
+	go s.sendPasswordChangedAlert(pr.UserID, ipAddress, userAgent)
 
 	return nil
 }

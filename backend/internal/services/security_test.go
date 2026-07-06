@@ -18,7 +18,7 @@ func newLockoutServices(repo Repository, storage *memStorage, maxAttempts int) *
 	cfg := testConfig()
 	cfg.MaxLoginAttempts = maxAttempts
 	cfg.LoginLockout = time.Minute
-	svc := New(repo, cfg, nil, storage, nil, logger.Noop(), nil)
+	svc := New(repo, cfg, nil, storage, nil, nil, logger.Noop(), nil)
 	return &svc
 }
 
@@ -376,7 +376,7 @@ func TestChangePasswordRevokesOtherSessionsAndAlerts(t *testing.T) {
 	mailer := &fakeMailer{}
 	svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
 
-	if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, "brand-new-pass"); err != nil {
+	if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, "brand-new-pass", "203.0.113.9", "test-agent"); err != nil {
 		t.Fatalf("ChangePassword: %v", err)
 	}
 

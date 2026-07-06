@@ -4,6 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { untrack } from 'svelte';
 	import Card from '$components/ui/card.svelte';
+	import { privacy } from '$lib/stores/privacy.svelte';
 	import type { PageProps } from './$types';
 
 	interface TopTransactionData {
@@ -132,11 +133,13 @@
 	}
 
 	function formatCurrency(value: number): string {
-		return new Intl.NumberFormat('es-CO', {
-			style: 'currency',
-			currency: baseCurrency,
-			minimumFractionDigits: 2
-		}).format(value);
+		return privacy.money(
+			new Intl.NumberFormat('es-CO', {
+				style: 'currency',
+				currency: baseCurrency,
+				minimumFractionDigits: 2
+			}).format(value)
+		);
 	}
 
 	const ASSET_TYPE_LABELS: Record<string, string> = {
