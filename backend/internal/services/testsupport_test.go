@@ -657,13 +657,13 @@ func testConfig() *config.Env {
 }
 
 func newTestServices(repo Repository, storage *memStorage) *Services {
-	svc := New(repo, testConfig(), nil, storage, nil, logger.Noop(), nil)
+	svc := New(repo, testConfig(), nil, storage, nil, nil, logger.Noop(), nil)
 	return &svc
 }
 
 // newTestServicesFull wires a fake mailer and price provider in addition to
 // the repository, for flows that send email or hit market data.
 func newTestServicesFull(repo Repository, storage *memStorage, mailer Mailer, provider prices.Provider) *Services {
-	svc := New(repo, testConfig(), nil, storage, mailer, logger.Noop(), provider)
+	svc := New(repo, testConfig(), nil, storage, mailer, nil, logger.Noop(), provider)
 	return &svc
 }

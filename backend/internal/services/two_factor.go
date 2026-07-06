@@ -388,6 +388,10 @@ func (s *Services) sendTwoFactorAlert(userID uuid.UUID, event, detail, ipAddress
 		return
 	}
 
+	location := s.locateIP(ipAddress)
+	if location == "" {
+		location = "desconocida"
+	}
 	if ipAddress == "" {
 		ipAddress = "desconocida"
 	}
@@ -401,6 +405,7 @@ func (s *Services) sendTwoFactorAlert(userID uuid.UUID, event, detail, ipAddress
 		Detail:      detail,
 		IPAddress:   truncate(ipAddress, 45),
 		UserAgent:   truncate(userAgent, 255),
+		Location:    location,
 		When:        time.Now().UTC().Format("02 Jan 2006 15:04 UTC"),
 		SecurityURL: s.cfg.FrontendURL + "/dashboard/settings",
 	})

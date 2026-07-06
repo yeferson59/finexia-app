@@ -100,7 +100,7 @@ func (s *stubRepository) GetPortfoliosSummaryByUserID(ctx context.Context, userI
 
 func newTestHandlers(repo services.Repository) *Handlers {
 	cfg := &config.Env{PublicURL: "http://localhost:8080"}
-	svc := services.New(repo, cfg, nil, nil, nil, logger.Noop(), nil)
+	svc := services.New(repo, cfg, nil, nil, nil, nil, logger.Noop(), nil)
 	h := New(svc, cfg)
 	return &h
 }

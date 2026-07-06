@@ -254,6 +254,10 @@ func (s *Services) sendLoginAlert(userName, email, ipAddress, userAgent string) 
 	if s.mail == nil {
 		return
 	}
+	location := s.locateIP(ipAddress)
+	if location == "" {
+		location = "desconocida"
+	}
 	if ipAddress == "" {
 		ipAddress = "desconocida"
 	}
@@ -267,6 +271,7 @@ func (s *Services) sendLoginAlert(userName, email, ipAddress, userAgent string) 
 		Detail:      "Se inició sesión en tu cuenta desde una dirección que no habíamos visto antes.",
 		IPAddress:   ipAddress,
 		UserAgent:   userAgent,
+		Location:    location,
 		When:        time.Now().UTC().Format("02 Jan 2006 15:04 UTC"),
 		SecurityURL: s.cfg.FrontendURL + "/dashboard/settings",
 	})

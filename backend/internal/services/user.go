@@ -185,6 +185,10 @@ func (s *Services) sendPasswordChangedAlert(userID uuid.UUID, ipAddress, userAge
 		return
 	}
 
+	location := s.locateIP(ipAddress)
+	if location == "" {
+		location = "desconocida"
+	}
 	if ipAddress == "" {
 		ipAddress = "desconocida"
 	}
@@ -198,6 +202,7 @@ func (s *Services) sendPasswordChangedAlert(userID uuid.UUID, ipAddress, userAge
 		Detail:      "La contraseña de tu cuenta fue cambiada y se cerraron las demás sesiones activas.",
 		IPAddress:   truncate(ipAddress, 45),
 		UserAgent:   truncate(userAgent, 255),
+		Location:    location,
 		When:        time.Now().UTC().Format("02 Jan 2006 15:04 UTC"),
 		SecurityURL: s.cfg.FrontendURL + "/dashboard/settings",
 	})
