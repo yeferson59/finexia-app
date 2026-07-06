@@ -268,7 +268,7 @@ func (s *Services) sendLoginAlert(userName, email, ipAddress, userAgent string) 
 		IPAddress:   ipAddress,
 		UserAgent:   userAgent,
 		When:        time.Now().UTC().Format("02 Jan 2006 15:04 UTC"),
-		SecurityURL: s.cfg.PublicURL + "/dashboard/settings",
+		SecurityURL: s.cfg.FrontendURL + "/dashboard/settings",
 	})
 }
 
