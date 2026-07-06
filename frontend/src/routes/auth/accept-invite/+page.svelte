@@ -8,7 +8,7 @@
 	const { data, form }: PageProps = $props();
 
 	const authHref = resolve('/auth');
-	let name = $state(data.valid ? data.name : '');
+	let name = $derived(data.valid ? data.name : '');
 	let password = $state('');
 	let confirmPassword = $state('');
 	let submitting = $state(false);
