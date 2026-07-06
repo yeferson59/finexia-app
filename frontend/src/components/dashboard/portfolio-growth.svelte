@@ -1,6 +1,7 @@
 <script lang="ts">
 	import CardHeader from '$components/ui/card-header.svelte';
 	import Stat from '$components/ui/stat.svelte';
+	import { privacy } from '$lib/stores/privacy.svelte';
 
 	interface GrowthDataPoint {
 		date: string;
@@ -123,11 +124,15 @@
 		}).format(v);
 	}
 
+	function fmtMoney(v: number): string {
+		return privacy.money('$' + fmt(v));
+	}
+
 	function fmtAbbrev(v: number): string {
 		const abs = Math.abs(v);
-		if (abs >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-		if (abs >= 1_000) return `$${(v / 1_000).toFixed(0)}k`;
-		return `$${v.toFixed(0)}`;
+		if (abs >= 1_000_000) return privacy.money(`$${(v / 1_000_000).toFixed(1)}M`);
+		if (abs >= 1_000) return privacy.money(`$${(v / 1_000).toFixed(0)}k`);
+		return privacy.money(`$${v.toFixed(0)}`);
 	}
 
 	function fmtDate(iso: string): string {
@@ -158,14 +163,14 @@
 		<Stat
 			label="Total ganancia"
 			tone={isPositive ? 'positive' : 'negative'}
-			value="{isPositive ? '+' : '−'}${fmt(Math.abs(absoluteGain))}"
+			value="{isPositive ? '+' : '−'}{fmtMoney(Math.abs(absoluteGain))}"
 		/>
 		<Stat
 			label="Desde creación"
 			tone={isPositive ? 'positive' : 'negative'}
 			value="{isPositive ? '+' : ''}{fmt(totalGrowthPct)}%"
 		/>
-		<Stat label="Valor actual" tone="highlight" value="${fmt(currentVal)}" />
+		<Stat label="Valor actual" tone="highlight" value={fmtMoney(currentVal)} />
 	</div>
 
 	{#if filteredData.length < 2}

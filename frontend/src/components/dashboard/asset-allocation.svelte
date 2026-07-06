@@ -1,5 +1,16 @@
 <script lang="ts">
 	import CardHeader from '$components/ui/card-header.svelte';
+	import { privacy } from '$lib/stores/privacy.svelte';
+
+	function fmtMoney(value: number): string {
+		return privacy.money(
+			'$' +
+				new Intl.NumberFormat('es-CO', {
+					minimumFractionDigits: 2,
+					maximumFractionDigits: 2
+				}).format(value)
+		);
+	}
 
 	interface AllocationItem {
 		category: string;
@@ -157,10 +168,7 @@
 						<div class="legend-text">
 							<p class="legend-label">{asset.name}</p>
 							<p class="legend-value">
-								${new Intl.NumberFormat('es-CO', {
-									minimumFractionDigits: 2,
-									maximumFractionDigits: 2
-								}).format(asset.value)} ({new Intl.NumberFormat('es-CO', {
+								{fmtMoney(asset.value)} ({new Intl.NumberFormat('es-CO', {
 									minimumFractionDigits: 2,
 									maximumFractionDigits: 2
 								}).format(asset.percent)}%)

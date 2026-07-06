@@ -1,6 +1,17 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import CardHeader from '$components/ui/card-header.svelte';
+	import { privacy } from '$lib/stores/privacy.svelte';
+
+	function fmtMoney(value: number): string {
+		return privacy.money(
+			'$' +
+				new Intl.NumberFormat('es-CO', {
+					minimumFractionDigits: 2,
+					maximumFractionDigits: 2
+				}).format(value)
+		);
+	}
 
 	interface Transaction {
 		id: string;
@@ -110,10 +121,7 @@
 
 					<div class="activity-details">
 						<p class="activity-amount" class:positive>
-							{positive ? '+' : '-'}${new Intl.NumberFormat('es-CO', {
-								minimumFractionDigits: 2,
-								maximumFractionDigits: 2
-							}).format(total)}
+							{positive ? '+' : '-'}{fmtMoney(total)}
 						</p>
 						<time class="activity-date" datetime={tx.transactionDate}
 							>{formatDate(tx.transactionDate)}</time

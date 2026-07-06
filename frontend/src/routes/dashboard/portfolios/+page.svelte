@@ -4,6 +4,7 @@
 	import PageHeader from '$components/ui/page-header.svelte';
 	import Badge from '$components/ui/badge.svelte';
 	import ProgressBar from '$components/ui/progress-bar.svelte';
+	import { privacy } from '$lib/stores/privacy.svelte';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
@@ -21,12 +22,14 @@
 	const totalGainLossPct = $derived(totalCostBase > 0 ? (totalGainLoss / totalCostBase) * 100 : 0);
 
 	function fmt(value: number, currency = 'USD'): string {
-		return new Intl.NumberFormat('es-CO', {
-			style: 'currency',
-			currency,
-			minimumFractionDigits: 0,
-			maximumFractionDigits: 0
-		}).format(value);
+		return privacy.money(
+			new Intl.NumberFormat('es-CO', {
+				style: 'currency',
+				currency,
+				minimumFractionDigits: 0,
+				maximumFractionDigits: 0
+			}).format(value)
+		);
 	}
 
 	function fmtPct(value: number): string {

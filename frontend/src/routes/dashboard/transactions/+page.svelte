@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import PageHeader from '$components/ui/page-header.svelte';
 	import Card from '$components/ui/card.svelte';
+	import { privacy } from '$lib/stores/privacy.svelte';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
@@ -23,10 +24,12 @@
 
 	function formatAmount(quantity: string, price: string, currency: string): string {
 		const total = (parseFloat(quantity) || 0) * (parseFloat(price) || 0);
-		return `${currency} ${new Intl.NumberFormat('es-CO', {
-			minimumFractionDigits: 2,
-			maximumFractionDigits: 2
-		}).format(total)}`;
+		return privacy.money(
+			`${currency} ${new Intl.NumberFormat('es-CO', {
+				minimumFractionDigits: 2,
+				maximumFractionDigits: 2
+			}).format(total)}`
+		);
 	}
 
 	function formatDate(dateString: string): string {
