@@ -115,7 +115,10 @@
 	// Quick-sell state: sell directly from a buy lot
 	let sellFromTxn = $state<(typeof transactions)[0] | null>(null);
 	let sellMode = $state<'full' | 'partial'>('full');
+	// Within a partial sale, choose whether to enter the number of shares or the total value to sell
+	let sellBasis = $state<'quantity' | 'value'>('quantity');
 	let sellQty = $state('');
+	let sellValue = $state('');
 	let sellPrice = $state('');
 	let sellFees = $state('');
 	let sellDate = $state(new Date().toISOString().split('T')[0]);
@@ -126,7 +129,9 @@
 	$effect(() => {
 		if (sellFromTxn) {
 			sellMode = 'full';
+			sellBasis = 'quantity';
 			sellQty = sellFromTxn.quantity;
+			sellValue = '';
 			sellPrice = position?.marketPrice ? position.marketPrice.toFixed(2) : sellFromTxn.price;
 			sellFees = '';
 			sellNotes = '';
@@ -137,9 +142,27 @@
 
 	$effect(() => {
 		if (sellMode === 'full' && sellFromTxn) {
+			sellBasis = 'quantity';
 			sellQty = sellFromTxn.quantity;
 		}
 	});
+
+	const sellLotMaxQty = $derived(sellFromTxn ? parseFloat(sellFromTxn.quantity) || 0 : 0);
+
+	// Quantity actually submitted: the full lot, the typed quantity, or one derived from the entered value
+	const sellEffectiveQty = $derived.by(() => {
+		if (sellMode === 'full') return sellLotMaxQty;
+		if (sellBasis === 'value') {
+			const val = parseFloat(sellValue) || 0;
+			const price = parseFloat(sellPrice) || 0;
+			return price > 0 ? val / price : 0;
+		}
+		return parseFloat(sellQty) || 0;
+	});
+
+	const sellExceedsLot = $derived(
+		sellMode === 'partial' && sellEffectiveQty > sellLotMaxQty + 1e-8
+	);
 
 	// Classify how each type renders the form
 	// 'trade'   → cantidad + precio unitario + comisión  (buy, sell, transfer_in, transfer_out)
@@ -628,6 +651,7 @@
 					<form
 						method="POST"
 						class="sell-form"
+						action="?/createTransaction"
 						use:enhance={() => {
 							isSellSubmitting = true;
 							return async ({ update }) => {
@@ -644,28 +668,70 @@
 							value={entries.find((e) => e.id === sellFromTxn?.entryId)?.costCurrency ??
 								txnForm.currency}
 						/>
+						<input type="hidden" name="quantity" value={sellEffectiveQty} />
+
+						{#if sellMode === 'partial'}
+							<div class="sell-basis-toggle">
+								<button
+									type="button"
+									class="sell-basis-btn"
+									class:active={sellBasis === 'quantity'}
+									onclick={() => (sellBasis = 'quantity')}
+								>
+									Por número de acciones
+								</button>
+								<button
+									type="button"
+									class="sell-basis-btn"
+									class:active={sellBasis === 'value'}
+									onclick={() => (sellBasis = 'value')}
+								>
+									Por valor de la venta
+								</button>
+							</div>
+						{/if}
 
 						<div class="form-row">
-							<div class="form-group">
-								<label class="form-label" for="sell-qty">
-									Cantidad <span class="required">*</span>
-									{#if sellMode === 'full'}
-										<span class="sell-label-hint">(lote completo)</span>
-									{/if}
-								</label>
-								<input
-									id="sell-qty"
-									type="number"
-									class="form-input"
-									name="quantity"
-									bind:value={sellQty}
-									disabled={sellMode === 'full'}
-									min="0.00000001"
-									max={parseFloat(sellFromTxn.quantity)}
-									step="0.00000001"
-									required
-								/>
-							</div>
+							{#if sellMode === 'full' || sellBasis === 'quantity'}
+								<div class="form-group">
+									<label class="form-label" for="sell-qty">
+										Cantidad <span class="required">*</span>
+										{#if sellMode === 'full'}
+											<span class="sell-label-hint">(lote completo)</span>
+										{/if}
+									</label>
+									<input
+										id="sell-qty"
+										type="number"
+										class="form-input"
+										bind:value={sellQty}
+										disabled={sellMode === 'full'}
+										min="0.00000001"
+										max={sellLotMaxQty}
+										step="0.00000001"
+										required
+									/>
+								</div>
+							{:else}
+								<div class="form-group">
+									<label class="form-label" for="sell-value"
+										>Valor total de la venta <span class="required">*</span></label
+									>
+									<input
+										id="sell-value"
+										type="number"
+										class="form-input"
+										bind:value={sellValue}
+										placeholder="0.00"
+										min="0"
+										step="0.01"
+										required
+									/>
+									<span class="sell-computed-hint">
+										≈ {sellEffectiveQty.toLocaleString('es-CO', { maximumFractionDigits: 8 })} unidades
+									</span>
+								</div>
+							{/if}
 							<div class="form-group">
 								<label class="form-label" for="sell-price"
 									>Precio unitario <span class="required">*</span></label
@@ -702,6 +768,14 @@
 							</div>
 						</div>
 
+						{#if sellExceedsLot}
+							<p class="form-error-msg">
+								La cantidad supera el lote disponible ({sellLotMaxQty.toLocaleString('es-CO', {
+									maximumFractionDigits: 8
+								})} unidades).
+							</p>
+						{/if}
+
 						<div class="form-group">
 							<label class="form-label" for="sell-notes">Notas</label>
 							<input
@@ -722,7 +796,11 @@
 							<button type="button" class="btn-cancel" onclick={() => (sellFromTxn = null)}>
 								Cancelar
 							</button>
-							<button type="submit" class="btn-sell-submit" disabled={isSellSubmitting}>
+							<button
+								type="submit"
+								class="btn-sell-submit"
+								disabled={isSellSubmitting || sellExceedsLot || sellEffectiveQty <= 0}
+							>
 								{isSellSubmitting
 									? 'Guardando…'
 									: sellMode === 'full'
@@ -1582,6 +1660,41 @@
 		background: rgba(224, 90, 90, 0.15);
 		border-color: var(--red);
 		color: var(--red);
+	}
+
+	.sell-basis-toggle {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.sell-basis-btn {
+		padding: 0.35rem 0.85rem;
+		border: 1.5px solid rgba(212, 145, 42, 0.25);
+		border-radius: 6px;
+		background: transparent;
+		color: rgba(236, 234, 229, 0.55);
+		font-size: 0.8rem;
+		font-weight: 600;
+		cursor: pointer;
+		font-family: var(--font-body);
+		transition: all 0.2s ease;
+	}
+
+	.sell-basis-btn:hover {
+		border-color: rgba(212, 145, 42, 0.5);
+		color: var(--text);
+	}
+
+	.sell-basis-btn.active {
+		background: rgba(212, 145, 42, 0.15);
+		border-color: var(--amber);
+		color: var(--amber);
+	}
+
+	.sell-computed-hint {
+		font-size: 0.78rem;
+		color: rgba(236, 234, 229, 0.5);
+		font-family: var(--font-mono);
 	}
 
 	.sell-form {
