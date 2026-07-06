@@ -662,9 +662,9 @@
 									{/if}
 								</div>
 								<p class="session-meta">
-									{session.ipAddress ?? 'IP desconocida'} · Última actividad: {formatSessionDate(
-										session.lastActiveAt
-									)}
+									{session.ipAddress ?? 'IP desconocida'}{session.location
+										? ` · ${session.location}`
+										: ''} · Última actividad: {formatSessionDate(session.lastActiveAt)}
 								</p>
 							</div>
 							{#if !session.current}

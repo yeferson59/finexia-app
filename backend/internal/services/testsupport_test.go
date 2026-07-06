@@ -26,6 +26,7 @@ type fakeRepository struct {
 	getAccountByUserID               func(ctx context.Context, userID uuid.UUID) (entities.Account, error)
 	createSession                    func(ctx context.Context, userID uuid.UUID, token string, ip, ua *string, expiresAt time.Time) (uuid.UUID, error)
 	updateSessionToken               func(ctx context.Context, sessionID uuid.UUID, newToken string, expiresAt time.Time) (string, error)
+	updateSessionLocation            func(ctx context.Context, sessionID uuid.UUID, location string) error
 	listSessionsByUserID             func(ctx context.Context, userID uuid.UUID) ([]entities.Session, error)
 	getRefreshTokensBySessionIDs     func(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) ([]string, []uuid.UUID, error)
 	deleteSessionsByIDs              func(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) (int64, error)
@@ -213,6 +214,15 @@ func (f *fakeRepository) HasSessionFromIP(ctx context.Context, userID uuid.UUID,
 
 func (f *fakeRepository) UpdateSessionToken(ctx context.Context, sessionID uuid.UUID, newToken string, expiresAt time.Time) (string, error) {
 	return f.updateSessionToken(ctx, sessionID, newToken, expiresAt)
+}
+
+// UpdateSessionLocation runs in a fire-and-forget goroutine, so a nil hook
+// must be a no-op instead of a panic that would kill the test process.
+func (f *fakeRepository) UpdateSessionLocation(ctx context.Context, sessionID uuid.UUID, location string) error {
+	if f.updateSessionLocation == nil {
+		return nil
+	}
+	return f.updateSessionLocation(ctx, sessionID, location)
 }
 
 func (f *fakeRepository) CreateRefreshToken(ctx context.Context, userID uuid.UUID, tokenHash string, familyID, sessionID uuid.UUID, ip, ua *string, expiresAt time.Time) (uuid.UUID, error) {

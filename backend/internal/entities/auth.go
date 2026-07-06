@@ -14,6 +14,7 @@ type Session struct {
 	ExpiresAt time.Time `json:"expiresAt"`
 	IPAddress *string   `json:"ipAddress"`
 	UserAgent *string   `json:"userAgent"`
+	Location  *string   `json:"location"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 	User      User      `json:"user,omitzero"`

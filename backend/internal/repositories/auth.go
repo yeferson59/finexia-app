@@ -58,12 +58,23 @@ func (r *Repository) CreateSession(ctx context.Context, userID uuid.UUID, token 
 	return id, nil
 }
 
+// UpdateSessionLocation stamps the approximate location resolved from the
+// session's IP. Runs after session creation (the lookup is asynchronous), so
+// a missing row — session already revoked — is not an error.
+func (r *Repository) UpdateSessionLocation(ctx context.Context, sessionID uuid.UUID, location string) error {
+	_, err := r.db.Exec(ctx,
+		"UPDATE sessions SET location = $1 WHERE id = $2",
+		location, sessionID.String(),
+	)
+	return err
+}
+
 // ListSessionsByUserID returns the user's live sessions: those whose access
 // token has not expired, or that still hold a redeemable refresh token (the
 // cleanup job uses the same liveness rule before deleting a session).
 func (r *Repository) ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]entities.Session, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT s.id, s.user_id, s.token, s.expires_at, s.ip_address, s.user_agent, s.created_at, s.updated_at
+		`SELECT s.id, s.user_id, s.token, s.expires_at, s.ip_address, s.user_agent, s.location, s.created_at, s.updated_at
 		 FROM sessions s
 		 WHERE s.user_id = $1
 		   AND (s.expires_at > NOW() OR EXISTS (
@@ -83,7 +94,7 @@ func (r *Repository) ListSessionsByUserID(ctx context.Context, userID uuid.UUID)
 	var sessions []entities.Session
 	for rows.Next() {
 		var s entities.Session
-		if err := rows.Scan(&s.ID, &s.UserID, &s.Token, &s.ExpiresAt, &s.IPAddress, &s.UserAgent, &s.CreatedAt, &s.UpdatedAt); err != nil {
+		if err := rows.Scan(&s.ID, &s.UserID, &s.Token, &s.ExpiresAt, &s.IPAddress, &s.UserAgent, &s.Location, &s.CreatedAt, &s.UpdatedAt); err != nil {
 			return nil, err
 		}
 		sessions = append(sessions, s)

@@ -21,6 +21,7 @@ type Repository interface {
 	GetAccountByEmail(ctx context.Context, email string) (entities.User, error)
 	CreateSession(ctx context.Context, userID uuid.UUID, token string, ip, ua *string, expiresAt time.Time) (uuid.UUID, error)
 	UpdateSessionToken(ctx context.Context, sessionID uuid.UUID, newToken string, expiresAt time.Time) (string, error)
+	UpdateSessionLocation(ctx context.Context, sessionID uuid.UUID, location string) error
 	ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]entities.Session, error)
 	GetRefreshTokensBySessionIDs(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) ([]string, []uuid.UUID, error)
 	DeleteSessionsByIDs(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) (int64, error)

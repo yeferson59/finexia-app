@@ -43,6 +43,7 @@ type ActiveSessionDTO struct {
 	ID           uuid.UUID `json:"id"`
 	IPAddress    *string   `json:"ipAddress"`
 	UserAgent    *string   `json:"userAgent"`
+	Location     *string   `json:"location"`
 	CreatedAt    time.Time `json:"createdAt"`
 	LastActiveAt time.Time `json:"lastActiveAt"`
 	ExpiresAt    time.Time `json:"expiresAt"`
