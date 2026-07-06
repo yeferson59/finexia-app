@@ -110,7 +110,7 @@ func (handler *Handlers) TwoFactorEnable(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:2fa:enable")
 	}
 
-	result, err := handler.services.ConfirmTwoFactorSetup(c.Context(), userID, req.Code)
+	result, err := handler.services.ConfirmTwoFactorSetup(c.Context(), userID, req.Code, c.IP(), c.Get("User-Agent"))
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrTwoFactorInvalidCode):
@@ -138,7 +138,7 @@ func (handler *Handlers) TwoFactorDisable(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:2fa:disable")
 	}
 
-	if err := handler.services.DisableTwoFactor(c.Context(), userID, req.Password, req.Code); err != nil {
+	if err := handler.services.DisableTwoFactor(c.Context(), userID, req.Password, req.Code, c.IP(), c.Get("User-Agent")); err != nil {
 		switch {
 		case errors.Is(err, services.ErrTwoFactorInvalidCode):
 			return handler.responseBadRequest(c, "invalid two-factor code", "auth:2fa:disable")

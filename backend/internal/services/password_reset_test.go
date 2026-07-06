@@ -97,7 +97,7 @@ func TestResetPassword_Success(t *testing.T) {
 	}
 	svc := newTestServices(repo, newMemStorage())
 
-	if err := svc.ResetPassword(context.Background(), raw, "s3cretpass"); err != nil {
+	if err := svc.ResetPassword(context.Background(), raw, "s3cretpass", "203.0.113.9", "test-agent"); err != nil {
 		t.Fatalf("ResetPassword: %v", err)
 	}
 	if consumedResetID != resetID {
@@ -123,7 +123,7 @@ func TestResetPassword_Expired(t *testing.T) {
 	}
 	svc := newTestServices(repo, newMemStorage())
 
-	err := svc.ResetPassword(context.Background(), raw, "s3cretpass")
+	err := svc.ResetPassword(context.Background(), raw, "s3cretpass", "203.0.113.9", "test-agent")
 	if !errors.Is(err, ErrPasswordResetExpired) {
 		t.Fatalf("expected ErrPasswordResetExpired, got %v", err)
 	}
@@ -142,7 +142,7 @@ func TestResetPassword_AlreadyUsed(t *testing.T) {
 	}
 	svc := newTestServices(repo, newMemStorage())
 
-	err := svc.ResetPassword(context.Background(), raw, "s3cretpass")
+	err := svc.ResetPassword(context.Background(), raw, "s3cretpass", "203.0.113.9", "test-agent")
 	if !errors.Is(err, ErrPasswordResetInvalid) {
 		t.Fatalf("expected ErrPasswordResetInvalid, got %v", err)
 	}
@@ -157,7 +157,7 @@ func TestResetPassword_InvalidToken(t *testing.T) {
 	}
 	svc := newTestServices(repo, newMemStorage())
 
-	err := svc.ResetPassword(context.Background(), raw, "s3cretpass")
+	err := svc.ResetPassword(context.Background(), raw, "s3cretpass", "203.0.113.9", "test-agent")
 	if !errors.Is(err, ErrPasswordResetInvalid) {
 		t.Fatalf("expected ErrPasswordResetInvalid, got %v", err)
 	}
@@ -166,7 +166,7 @@ func TestResetPassword_InvalidToken(t *testing.T) {
 func TestResetPassword_EmptyToken(t *testing.T) {
 	svc := newTestServices(&fakeRepository{}, newMemStorage())
 
-	err := svc.ResetPassword(context.Background(), "", "s3cretpass")
+	err := svc.ResetPassword(context.Background(), "", "s3cretpass", "203.0.113.9", "test-agent")
 	if !errors.Is(err, ErrPasswordResetInvalid) {
 		t.Fatalf("expected ErrPasswordResetInvalid, got %v", err)
 	}
