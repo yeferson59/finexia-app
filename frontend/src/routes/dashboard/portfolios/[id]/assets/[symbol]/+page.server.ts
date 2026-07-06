@@ -50,9 +50,6 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 		return raw >= 1 && raw <= 100 ? raw : 20;
 	})();
 
-	// The portfolio detail and the asset's transactions page are independent
-	// requests; fetching them in parallel removes a full backend round-trip
-	// from this page's load.
 	const [response, txnRes] = await Promise.all([
 		authedFetch(event, `/portfolios/${params.id}`),
 		authedFetchSafe(
@@ -117,22 +114,19 @@ const txnSchema = z.object({
 });
 
 export const actions: Actions = {
-	default: async ({ request, fetch, cookies }) => {
+	createTransaction: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 
-		const { success, error, data } = await z
-			.object({ entryId: z.uuid() })
-			.merge(txnSchema)
-			.safeParseAsync({
-				entryId: formData.get('entryId'),
-				type: formData.get('type'),
-				quantity: formData.get('quantity'),
-				price: formData.get('price'),
-				currency: formData.get('currency') || 'USD',
-				fees: formData.get('fees') || 0,
-				transactionDate: formData.get('transactionDate'),
-				notes: formData.get('notes')
-			});
+		const { success, error, data } = await txnSchema.extend({ entryId: z.uuid() }).safeParseAsync({
+			entryId: formData.get('entryId'),
+			type: formData.get('type'),
+			quantity: formData.get('quantity'),
+			price: formData.get('price'),
+			currency: formData.get('currency') ?? 'USD',
+			fees: formData.get('fees') ?? 0,
+			transactionDate: formData.get('transactionDate'),
+			notes: formData.get('notes')
+		});
 
 		if (!success) {
 			return { success: false, error: error.message };
@@ -167,19 +161,16 @@ export const actions: Actions = {
 	editTransaction: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 
-		const { success, error, data } = await z
-			.object({ txnId: z.uuid() })
-			.merge(txnSchema)
-			.safeParseAsync({
-				txnId: formData.get('txnId'),
-				type: formData.get('type'),
-				quantity: formData.get('quantity'),
-				price: formData.get('price'),
-				currency: formData.get('currency') || 'USD',
-				fees: formData.get('fees') || 0,
-				transactionDate: formData.get('transactionDate'),
-				notes: formData.get('notes')
-			});
+		const { success, error, data } = await txnSchema.extend({ txnId: z.uuid() }).safeParseAsync({
+			txnId: formData.get('txnId'),
+			type: formData.get('type'),
+			quantity: formData.get('quantity'),
+			price: formData.get('price'),
+			currency: formData.get('currency') ?? 'USD',
+			fees: formData.get('fees') ?? 0,
+			transactionDate: formData.get('transactionDate'),
+			notes: formData.get('notes')
+		});
 
 		if (!success) {
 			return { success: false, edited: true, error: error.message };

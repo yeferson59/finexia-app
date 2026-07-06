@@ -404,6 +404,7 @@
 				<form
 					method="POST"
 					class="add-txn-form"
+					action="?/createTransaction"
 					use:enhance={() => {
 						isSubmitting = true;
 						return async ({ update }) => {
