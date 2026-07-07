@@ -4,12 +4,17 @@
 	import PageHeader from '$components/ui/page-header.svelte';
 	import Badge from '$components/ui/badge.svelte';
 	import ProgressBar from '$components/ui/progress-bar.svelte';
+	import Pagination from '$components/ui/pagination.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
 
 	const portfolios = $derived(data.portfolios ?? []);
+
+	const PER_PAGE = 9;
+	let page = $state(1);
+	const pagedPortfolios = $derived(portfolios.slice((page - 1) * PER_PAGE, page * PER_PAGE));
 
 	// Aggregate totals across all portfolios
 	const totalMarketValue = $derived(
@@ -159,7 +164,7 @@
 	<h2 class="section-title">Tus Portafolios</h2>
 
 	<div class="portfolios-grid">
-		{#each portfolios as portfolio (portfolio.id)}
+		{#each pagedPortfolios as portfolio (portfolio.id)}
 			{@const marketValue = parseFloat(portfolio.totalMarketValue) || 0}
 			{@const gainLoss = parseFloat(portfolio.totalGainLoss) || 0}
 			{@const gainLossPct = parseFloat(portfolio.totalGainLossPct) || 0}
@@ -215,6 +220,8 @@
 			</button>
 		{/each}
 	</div>
+
+	<Pagination bind:page total={portfolios.length} perPage={PER_PAGE} label="portafolios" />
 </section>
 
 <style>

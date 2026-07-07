@@ -4,10 +4,15 @@
 	import Card from '$components/ui/card.svelte';
 	import Badge from '$components/ui/badge.svelte';
 	import Button from '$components/ui/button.svelte';
+	import Pagination from '$components/ui/pagination.svelte';
 
 	import type { PageProps } from './$types';
 
 	const { data, form }: PageProps = $props();
+
+	const PER_PAGE = 20;
+	let page = $state(1);
+	const pagedAssets = $derived(data.assets.slice((page - 1) * PER_PAGE, page * PER_PAGE));
 
 	const ASSET_TYPES = [
 		{ value: 'stock', label: 'Acción (Stock)' },
@@ -296,7 +301,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.assets as asset (asset.id)}
+					{#each pagedAssets as asset (asset.id)}
 						{@const isUpdating = updatingId === asset.id}
 						{@const hasUpdateError = form?.updateError && form?.errorId === asset.id}
 						{@const hasUpdateSuccess = form?.updateSuccess && form?.updatedId === asset.id}
@@ -391,6 +396,9 @@
 				</tbody>
 			</table>
 		</div>
+		<div class="pagination-wrap">
+			<Pagination bind:page total={data.assets.length} perPage={PER_PAGE} label="activos" />
+		</div>
 	{/if}
 </Card>
 
@@ -414,6 +422,10 @@
 
 	.table-wrapper {
 		overflow-x: auto;
+	}
+
+	.pagination-wrap {
+		padding: 0 1.25rem 0.5rem;
 	}
 
 	.assets-table {

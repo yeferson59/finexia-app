@@ -3,10 +3,15 @@
 	import { resolve } from '$app/paths';
 	import PageHeader from '$components/ui/page-header.svelte';
 	import Card from '$components/ui/card.svelte';
+	import Pagination from '$components/ui/pagination.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
+
+	const PER_PAGE = 9;
+	let page = $state(1);
+	const pagedPlatforms = $derived(data.platforms.slice((page - 1) * PER_PAGE, page * PER_PAGE));
 
 	function fmtMoney(value: string): string {
 		return privacy.money(
@@ -86,7 +91,7 @@
 			</div>
 		{:else}
 			<div class="platforms-grid">
-				{#each data.platforms as platform (platform.id)}
+				{#each pagedPlatforms as platform (platform.id)}
 					<div class="platform-card">
 						<div class="card-header">
 							<div class="card-title-section">
@@ -132,6 +137,7 @@
 					</div>
 				{/each}
 			</div>
+			<Pagination bind:page total={data.platforms.length} perPage={PER_PAGE} label="plataformas" />
 		{/if}
 	</div>
 </Card>

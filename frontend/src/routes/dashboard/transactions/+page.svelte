@@ -2,11 +2,18 @@
 	import { resolve } from '$app/paths';
 	import PageHeader from '$components/ui/page-header.svelte';
 	import Card from '$components/ui/card.svelte';
+	import Pagination from '$components/ui/pagination.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
 	import { formatCalendarDate } from '$lib/utils';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
+
+	const PER_PAGE = 15;
+	let page = $state(1);
+	const pagedTransactions = $derived(
+		data.transactions.slice((page - 1) * PER_PAGE, page * PER_PAGE)
+	);
 
 	const typeLabels: Record<string, string> = {
 		buy: 'Compra',
@@ -70,7 +77,7 @@
 				<span>Monto</span>
 				<span>Fecha</span>
 			</div>
-			{#each data.transactions as tx (tx.id)}
+			{#each pagedTransactions as tx (tx.id)}
 				<div class="row">
 					<span class="mono">{shortId(tx.id)}</span>
 					<span>{formatType(tx.type)}</span>
@@ -80,6 +87,12 @@
 				</div>
 			{/each}
 		</div>
+		<Pagination
+			bind:page
+			total={data.transactions.length}
+			perPage={PER_PAGE}
+			label="transacciones"
+		/>
 	{/if}
 </Card>
 
