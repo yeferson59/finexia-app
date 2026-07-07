@@ -99,6 +99,7 @@ type Repository interface {
 	GetAllPortfolioSummaryRows(ctx context.Context) ([]entities.PortfolioSnapshotRow, error)
 	UpsertPortfolioSnapshot(ctx context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, currency, totalGainLoss, totalGainLossPct string) error
 	GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error)
+	GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error)
 
 	// Exchange rates & marketing
 	UpsertExchangeRate(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (entities.ExchangeRate, error)

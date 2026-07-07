@@ -463,6 +463,28 @@ func (h *Handlers) GetPortfolioGrowth(c fiber.Ctx) error {
 		portfolio.NewGrowthResponse(points, summary))
 }
 
+func (h *Handlers) GetPortfolioGrowthByID(c fiber.Ctx) error {
+	userID, _, _, err := h.getUserIDTokenRole(c)
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	portfolioID, err := h.getParamUUID(c, "id")
+	if err != nil {
+		return h.responseBadRequest(c, "Invalid portfolio ID", err.Error())
+	}
+
+	period := c.Query("period", "ALL")
+
+	points, summary, err := h.services.GetPortfolioGrowthByID(c.Context(), userID, portfolioID, period)
+	if err != nil {
+		return h.responseFromDomain(c, err, "Error retrieving portfolio growth", "Could not retrieve portfolio growth data")
+	}
+
+	return h.responseStatusOk(c, "Portfolio growth retrieved", "Portfolio growth retrieved successfully",
+		portfolio.NewGrowthResponse(points, summary))
+}
+
 func (h *Handlers) GetAssetTransactions(c fiber.Ctx) error {
 	userID, _, _, err := h.getUserIDTokenRole(c)
 	if err != nil {

@@ -50,24 +50,40 @@ interface TopTransaction {
 	transactionDate: string;
 }
 
+interface GrowthDataPoint {
+	date: string;
+	totalValue: string;
+	totalCostBase: string;
+	gainLoss: string;
+	gainLossPct: string;
+}
+
+interface GrowthSummary {
+	firstDate: string;
+	initialValue: string;
+	currentValue: string;
+	totalGrowthPct: string;
+}
+
 export const load: PageServerLoad = async ({ cookies, fetch, params }) => {
-	const [portfolioRes, risksRes, topTxRes] = await Promise.all([
+	const [portfolioRes, risksRes, topTxRes, growthRes] = await Promise.all([
 		authedFetch({ cookies, fetch }, `/portfolios/${params.id}`),
 		authedFetch({ cookies, fetch }, '/portfolios/risks'),
-		authedFetch({ cookies, fetch }, `/portfolios/${params.id}/top-transaction`)
+		authedFetch({ cookies, fetch }, `/portfolios/${params.id}/top-transaction`),
+		authedFetch({ cookies, fetch }, `/portfolios/${params.id}/growth`)
 	]);
 
 	if (!portfolioRes.ok) {
 		if (portfolioRes.status === 404) {
 			error(404, 'Portafolio no encontrado');
 		}
-		return { portfolio: null, risks: [], topTransaction: null };
+		return { portfolio: null, risks: [], topTransaction: null, growth: null };
 	}
 
 	const { data, success } = await portfolioRes.json();
 
 	if (!success || !data) {
-		return { portfolio: null, risks: [], topTransaction: null };
+		return { portfolio: null, risks: [], topTransaction: null, growth: null };
 	}
 
 	let risks: Risk[] = [];
@@ -83,7 +99,13 @@ export const load: PageServerLoad = async ({ cookies, fetch, params }) => {
 		topTransaction = tx?.assetTicker ? tx : null;
 	}
 
-	return { portfolio: data as PortfolioDetail, risks, topTransaction };
+	let growth: { points: GrowthDataPoint[]; summary: GrowthSummary } | null = null;
+	if (growthRes.ok) {
+		const growthJson = await growthRes.json();
+		if (growthJson.success && growthJson.data) growth = growthJson.data;
+	}
+
+	return { portfolio: data as PortfolioDetail, risks, topTransaction, growth };
 };
 
 export const actions: Actions = {

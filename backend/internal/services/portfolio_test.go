@@ -162,3 +162,38 @@ func TestGetPortfolioGrowthUsesPeriodFilter(t *testing.T) {
 		t.Errorf("TotalGrowthPct = %q, want 10.00", summary.TotalGrowthPct)
 	}
 }
+
+func TestGetPortfolioGrowthByIDScopesToPortfolio(t *testing.T) {
+	userID := uuid.New()
+	portfolioID := uuid.New()
+	var gotUserID, gotPortfolioID uuid.UUID
+	var gotHasSince bool
+
+	repo := &fakeRepository{
+		getPortfolioGrowthByPortfolioID: func(_ context.Context, uid, pid uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error) {
+			gotUserID, gotPortfolioID, gotHasSince = uid, pid, hasSince
+			return []entities.PortfolioGrowthPoint{
+				{TotalValue: "200.00"},
+				{TotalValue: "220.00"},
+			}, nil
+		},
+	}
+	svc := newTestServices(repo, newMemStorage())
+
+	points, summary, err := svc.GetPortfolioGrowthByID(context.Background(), userID, portfolioID, "ALL")
+	if err != nil {
+		t.Fatalf("GetPortfolioGrowthByID: %v", err)
+	}
+	if gotUserID != userID || gotPortfolioID != portfolioID {
+		t.Errorf("userID/portfolioID = %s/%s, want %s/%s", gotUserID, gotPortfolioID, userID, portfolioID)
+	}
+	if gotHasSince {
+		t.Error("expected ALL period to disable the since filter")
+	}
+	if len(points) != 2 {
+		t.Errorf("len(points) = %d, want 2", len(points))
+	}
+	if summary.TotalGrowthPct != "10.00" {
+		t.Errorf("TotalGrowthPct = %q, want 10.00", summary.TotalGrowthPct)
+	}
+}

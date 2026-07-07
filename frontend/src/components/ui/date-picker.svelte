@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { todayLocalDateString } from '$lib/utils';
+
 	interface Props {
 		name: string;
 		value?: string;
@@ -8,7 +10,7 @@
 
 	let {
 		name,
-		value = $bindable(new Date().toISOString().split('T')[0]),
+		value = $bindable(todayLocalDateString()),
 		required: _required = false,
 		class: cls = ''
 	}: Props = $props();

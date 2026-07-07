@@ -3,6 +3,7 @@
 	import PageHeader from '$components/ui/page-header.svelte';
 	import Card from '$components/ui/card.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
+	import { formatCalendarDate } from '$lib/utils';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
@@ -33,11 +34,7 @@
 	}
 
 	function formatDate(dateString: string): string {
-		return new Date(dateString).toLocaleDateString('es-CO', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
+		return formatCalendarDate(dateString, { year: 'numeric', month: 'short', day: 'numeric' });
 	}
 
 	function shortId(id: string): string {

@@ -26,20 +26,21 @@ import (
 type stubRepository struct {
 	services.Repository
 
-	getPortfoliosByUserID        func(ctx context.Context, userID uuid.UUID) ([]entities.Portfolio, error)
-	getPortfolioByID             func(ctx context.Context, portfolioID, userID uuid.UUID) (entities.Portfolio, error)
-	getEntriesByPortfolioID      func(ctx context.Context, portfolioID uuid.UUID) ([]entities.PortfolioEntry, error)
-	createPortfolio              func(ctx context.Context, userID uuid.UUID, name, description, baseCurrency string, riskID uuid.UUID, typePortfolio entities.PortfolioType, priceValue money.Money, isDefault bool) (entities.Portfolio, error)
-	updatePortfolio              func(ctx context.Context, userID, portfolioID uuid.UUID, name, description string, portfolioType entities.PortfolioType, riskID uuid.UUID, isDefault bool) (entities.Portfolio, error)
-	createPlatform               func(ctx context.Context, userID uuid.UUID, sourceType entities.SourceType, name, description string) (entities.InvestmentSource, error)
-	createPortfolioEntry         func(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, costCurrency string, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) (entities.PortfolioEntry, error)
-	createTransaction            func(ctx context.Context, userID, entryID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error)
-	updateTransaction            func(ctx context.Context, userID, txnID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error)
-	getUserPreferences           func(ctx context.Context, userID uuid.UUID) (entities.UserPreferences, error)
-	getPortfolioGrowthByUserID   func(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error)
-	getRecentTransactionsByUser  func(ctx context.Context, userID uuid.UUID, limit int) ([]entities.Transaction, error)
-	getAssetAllocationByUserID   func(ctx context.Context, userID uuid.UUID) ([]entities.AllocationItem, error)
-	getPortfoliosSummaryByUserID func(ctx context.Context, userID uuid.UUID) ([]entities.PortfolioSummaryView, error)
+	getPortfoliosByUserID           func(ctx context.Context, userID uuid.UUID) ([]entities.Portfolio, error)
+	getPortfolioByID                func(ctx context.Context, portfolioID, userID uuid.UUID) (entities.Portfolio, error)
+	getEntriesByPortfolioID         func(ctx context.Context, portfolioID uuid.UUID) ([]entities.PortfolioEntry, error)
+	createPortfolio                 func(ctx context.Context, userID uuid.UUID, name, description, baseCurrency string, riskID uuid.UUID, typePortfolio entities.PortfolioType, priceValue money.Money, isDefault bool) (entities.Portfolio, error)
+	updatePortfolio                 func(ctx context.Context, userID, portfolioID uuid.UUID, name, description string, portfolioType entities.PortfolioType, riskID uuid.UUID, isDefault bool) (entities.Portfolio, error)
+	createPlatform                  func(ctx context.Context, userID uuid.UUID, sourceType entities.SourceType, name, description string) (entities.InvestmentSource, error)
+	createPortfolioEntry            func(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, costCurrency string, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) (entities.PortfolioEntry, error)
+	createTransaction               func(ctx context.Context, userID, entryID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error)
+	updateTransaction               func(ctx context.Context, userID, txnID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error)
+	getUserPreferences              func(ctx context.Context, userID uuid.UUID) (entities.UserPreferences, error)
+	getPortfolioGrowthByUserID      func(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error)
+	getPortfolioGrowthByPortfolioID func(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error)
+	getRecentTransactionsByUser     func(ctx context.Context, userID uuid.UUID, limit int) ([]entities.Transaction, error)
+	getAssetAllocationByUserID      func(ctx context.Context, userID uuid.UUID) ([]entities.AllocationItem, error)
+	getPortfoliosSummaryByUserID    func(ctx context.Context, userID uuid.UUID) ([]entities.PortfolioSummaryView, error)
 }
 
 func (s *stubRepository) GetPortfoliosByUserID(ctx context.Context, userID uuid.UUID) ([]entities.Portfolio, error) {
@@ -84,6 +85,10 @@ func (s *stubRepository) GetUserPreferences(ctx context.Context, userID uuid.UUI
 
 func (s *stubRepository) GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error) {
 	return s.getPortfolioGrowthByUserID(ctx, userID, hasSince, since)
+}
+
+func (s *stubRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error) {
+	return s.getPortfolioGrowthByPortfolioID(ctx, userID, portfolioID, hasSince, since)
 }
 
 func (s *stubRepository) GetRecentTransactionsByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]entities.Transaction, error) {
@@ -600,6 +605,39 @@ func TestGetPortfolioGrowthHandler(t *testing.T) {
 			t.Error("the default ALL period must not filter by date")
 		}
 	})
+}
+
+func TestGetPortfolioGrowthByIDHandler(t *testing.T) {
+	userID := uuid.New()
+	portfolioID := uuid.New()
+
+	var gotPortfolioID uuid.UUID
+	repo := &stubRepository{
+		getPortfolioGrowthByPortfolioID: func(_ context.Context, _ uuid.UUID, pid uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error) {
+			gotPortfolioID = pid
+			return []entities.PortfolioGrowthPoint{
+				{Date: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC), TotalValue: "100.00"},
+				{Date: time.Date(2026, 6, 30, 0, 0, 0, 0, time.UTC), TotalValue: "150.00"},
+			}, nil
+		},
+	}
+	h := newTestHandlers(repo)
+	app := fiber.New()
+	app.Use(authed(userID))
+	app.Get("/:id/growth", h.GetPortfolioGrowthByID)
+
+	_, status, payload := doJSON(t, app, "GET", "/"+portfolioID.String()+"/growth", "")
+	if status != fiber.StatusOK {
+		t.Fatalf("status = %d, want 200", status)
+	}
+	if gotPortfolioID != portfolioID {
+		t.Errorf("portfolioID = %s, want %s", gotPortfolioID, portfolioID)
+	}
+	data, _ := payload["data"].(map[string]any)
+	summary, _ := data["summary"].(map[string]any)
+	if summary["totalGrowthPct"] != "50.00" {
+		t.Errorf("totalGrowthPct = %v, want 50.00", summary["totalGrowthPct"])
+	}
 }
 
 func TestGetUserTransactionsHandler(t *testing.T) {

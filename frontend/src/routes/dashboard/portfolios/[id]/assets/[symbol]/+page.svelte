@@ -5,6 +5,7 @@
 	import { enhance } from '$app/forms';
 	import DatePicker from '$components/ui/date-picker.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
+	import { formatCalendarDate, todayLocalDateString } from '$lib/utils';
 
 	const { params, data, form }: PageProps = $props();
 
@@ -73,7 +74,7 @@
 		price: '',
 		currency: 'USD',
 		fees: '',
-		transactionDate: new Date().toISOString().split('T')[0],
+		transactionDate: todayLocalDateString(),
 		notes: ''
 	});
 
@@ -90,7 +91,7 @@
 		price: '',
 		currency: 'USD',
 		fees: '',
-		transactionDate: new Date().toISOString().split('T')[0],
+		transactionDate: todayLocalDateString(),
 		notes: ''
 	});
 	let isEditSubmitting = $state(false);
@@ -121,7 +122,7 @@
 	let sellValue = $state('');
 	let sellPrice = $state('');
 	let sellFees = $state('');
-	let sellDate = $state(new Date().toISOString().split('T')[0]);
+	let sellDate = $state(todayLocalDateString());
 	let sellNotes = $state('');
 	let isSellSubmitting = $state(false);
 	let sellPanelEl = $state<HTMLElement | null>(null);
@@ -135,7 +136,7 @@
 			sellPrice = position?.marketPrice ? position.marketPrice.toFixed(2) : sellFromTxn.price;
 			sellFees = '';
 			sellNotes = '';
-			sellDate = new Date().toISOString().split('T')[0];
+			sellDate = todayLocalDateString();
 			setTimeout(() => sellPanelEl?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
 		}
 	});
@@ -259,11 +260,7 @@
 	}
 
 	function fmtDate(iso: string): string {
-		return new Date(iso).toLocaleDateString('es-CO', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
+		return formatCalendarDate(iso, { year: 'numeric', month: 'short', day: 'numeric' });
 	}
 
 	function goBack() {
@@ -454,10 +451,11 @@
 								>
 									{#each entries as entry (entry.id)}
 										<option value={entry.id}>
-											{entry.costCurrency} · {new Date(entry.entryDate).toLocaleDateString(
-												'es-CO',
-												{ year: 'numeric', month: 'short', day: 'numeric' }
-											)}
+											{entry.costCurrency} · {formatCalendarDate(entry.entryDate, {
+												year: 'numeric',
+												month: 'short',
+												day: 'numeric'
+											})}
 										</option>
 									{/each}
 								</select>
