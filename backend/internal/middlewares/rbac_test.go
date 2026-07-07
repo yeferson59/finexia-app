@@ -45,7 +45,7 @@ func TestRequireRole(t *testing.T) {
 			if err != nil {
 				t.Fatalf("app.Test: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode != tc.wantStatus {
 				t.Errorf("status = %d, want %d", resp.StatusCode, tc.wantStatus)
@@ -63,7 +63,7 @@ func TestRequireAdmin(t *testing.T) {
 		if err != nil {
 			t.Fatalf("app.Test: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != fiber.StatusOK {
 			t.Errorf("status = %d, want 200", resp.StatusCode)
 		}
@@ -75,7 +75,7 @@ func TestRequireAdmin(t *testing.T) {
 		if err != nil {
 			t.Fatalf("app.Test: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != fiber.StatusForbidden {
 			t.Errorf("status = %d, want 403", resp.StatusCode)
 		}

@@ -40,7 +40,7 @@ func TestResponseFromDomain(t *testing.T) {
 			if err != nil {
 				t.Fatalf("app.Test: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode != tc.wantStatus {
 				t.Errorf("status = %d, want %d", resp.StatusCode, tc.wantStatus)
@@ -72,7 +72,7 @@ func TestResponseStatusOk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("app.Test: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != fiber.StatusOK {
 		t.Fatalf("status = %d, want 200", resp.StatusCode)

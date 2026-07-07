@@ -66,10 +66,5 @@ func (h *Handlers) CreateAsset(c fiber.Ctx) error {
 		return h.responseFromDomain(c, err, "Error creating asset", "Could not create asset")
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"success": true,
-		"message": "Asset created",
-		"details": "Asset created successfully",
-		"data":    asset,
-	})
+	return h.responseSuccess(c, fiber.StatusCreated, "Asset created", "Asset created successfully", asset)
 }

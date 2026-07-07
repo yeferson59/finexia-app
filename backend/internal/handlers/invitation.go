@@ -10,7 +10,6 @@ import (
 	"github.com/yeferson59/finexia-app/internal/entities"
 	"github.com/yeferson59/finexia-app/internal/services"
 	"github.com/yeferson59/finexia-app/pkg/dtos"
-	"github.com/yeferson59/finexia-app/pkg/helpers"
 )
 
 // CreateInvitation (admin) issues an invitation and emails the recipient a
@@ -46,19 +45,9 @@ func (handler *Handlers) ListInvitations(c fiber.Ctx) error {
 		return handler.responseFromDomain(c, err, "failed to list invitations", "invitations:list")
 	}
 
-	totalPages := helpers.CalculateTotalPages(count, uint(paginateInfo.Limit))
-
 	return handler.responseStatusOk(c, "invitations", "invitations retrieved successfully", dtos.FilterPagination[[]entities.Invitation, fiber.Map]{
-		Items: invitations,
-		MetaData: fiber.Map{
-			"currentPage": paginateInfo.Page,
-			"limit":       paginateInfo.Limit,
-			"offset":      paginateInfo.Offset,
-			"total":       count,
-			"totalPages":  totalPages,
-			"previous":    paginateInfo.Page > 1,
-			"next":        paginateInfo.Page < int(totalPages),
-		},
+		Items:    invitations,
+		MetaData: paginationMetadata(paginateInfo, count, "limit", "total"),
 	})
 }
 
@@ -108,19 +97,9 @@ func (handler *Handlers) ListWaitlist(c fiber.Ctx) error {
 		return handler.responseFromDomain(c, err, "failed to list waitlist", "waitlist:list")
 	}
 
-	totalPages := helpers.CalculateTotalPages(count, uint(paginateInfo.Limit))
-
 	return handler.responseStatusOk(c, "waitlist", "waitlist retrieved successfully", dtos.FilterPagination[[]entities.Waitlist, fiber.Map]{
-		Items: waitlist,
-		MetaData: fiber.Map{
-			"currentPage": paginateInfo.Page,
-			"limit":       paginateInfo.Limit,
-			"offset":      paginateInfo.Offset,
-			"total":       count,
-			"totalPages":  totalPages,
-			"previous":    paginateInfo.Page > 1,
-			"next":        paginateInfo.Page < int(totalPages),
-		},
+		Items:    waitlist,
+		MetaData: paginationMetadata(paginateInfo, count, "limit", "total"),
 	})
 }
 
@@ -166,12 +145,7 @@ func (handler *Handlers) AcceptInvitation(c fiber.Ctx) error {
 func (handler *Handlers) invitationError(c fiber.Ctx, err error, action string) error {
 	switch {
 	case errors.Is(err, services.ErrInvitationExpired):
-		return c.Status(fiber.StatusGone).JSON(fiber.Map{
-			"success": false,
-			"message": "invitation expired",
-			"details": "the invitation link has expired; ask an admin to resend it",
-			"action":  action,
-		})
+		return handler.responseErrorAction(c, fiber.StatusGone, "invitation expired", "the invitation link has expired; ask an admin to resend it", action)
 	case errors.Is(err, services.ErrInvitationInvalid):
 		return handler.responseBadRequest(c, "invalid invitation", "the invitation link is invalid or has already been used")
 	default:

@@ -353,10 +353,7 @@ func parseDecimal(raw string) (money.Decimal, error) {
 	}
 
 	s = decimalCleanRe.ReplaceAllString(s, "")
-	negative := false
-	if strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") {
-		negative = true
-	}
+	negative := strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")")
 	s = strings.Trim(s, "()")
 	if strings.HasPrefix(s, "-") {
 		negative = !negative

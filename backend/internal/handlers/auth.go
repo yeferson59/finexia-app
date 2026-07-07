@@ -19,27 +19,15 @@ func (handler *Handlers) Login(c fiber.Ctx) error {
 	result, err := handler.services.Login(c, loginDto.Email, loginDto.Password, c.IP(), c.Get("User-Agent"))
 	if err != nil {
 		if errors.Is(err, services.ErrTwoFactorRequired) {
-			// Password accepted, but the account opted into 2FA: no session
-			// yet — the client must present a TOTP code at /auth/2fa/login
-			// within the pending token's lifetime.
-			return c.Status(fiber.StatusOK).JSON(fiber.Map{
-				"success": true,
-				"message": "two-factor authentication required",
-				"details": "enter the code from your authenticator app",
-				"action":  "auth:login:2fa",
-				"data": fiber.Map{
-					"twoFactorToken": result.TwoFactorToken,
-				},
+			return handler.responseSuccessAction(c, fiber.StatusOK, "two-factor authentication required", "enter the code from your authenticator app", "auth:login:2fa", fiber.Map{
+				"twoFactorToken": result.TwoFactorToken,
 			})
 		}
+
 		if errors.Is(err, services.ErrAccountUnverified) {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"success": false,
-				"message": "email not verified",
-				"details": "verify your email before logging in",
-				"action":  "auth:login:unverified",
-			})
+			return handler.responseErrorAction(c, fiber.StatusForbidden, "email not verified", "verify your email before logging in", "auth:login:unverified")
 		}
+
 		return handler.responseFromDomain(c, err, "failed to login", "auth:login")
 	}
 
@@ -59,12 +47,8 @@ func (handler *Handlers) Login(c fiber.Ctx) error {
 
 func (handler *Handlers) Register(c fiber.Ctx) error {
 	if !handler.cfg.SelfRegistrationEnabled {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"success": false,
-			"message": "self-registration is disabled",
-			"details": "Finexia is invite-only during the beta; ask an existing member for an invitation",
-			"action":  "auth:register:disabled",
-		})
+		return handler.responseErrorAction(c, fiber.StatusForbidden, "self-registration is disabled",
+			"Finexia is invite-only during the beta; ask an existing member for an invitation", "auth:register:disabled")
 	}
 
 	var registerDto auth.RegisterRequestDTO
@@ -76,12 +60,7 @@ func (handler *Handlers) Register(c fiber.Ctx) error {
 	user, err := handler.services.Register(c, registerDto.Name, registerDto.Email, registerDto.Password)
 	if err != nil {
 		if errors.Is(err, services.ErrEmailAlreadyExists) {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-				"success": false,
-				"message": "email already registered",
-				"details": "an account with this email already exists",
-				"action":  "auth:register:duplicate",
-			})
+			return handler.responseErrorAction(c, fiber.StatusConflict, "email already registered", "an account with this email already exists", "auth:register:duplicate")
 		}
 		return handler.responseFromDomain(c, err, "failed to register", "auth:register")
 	}

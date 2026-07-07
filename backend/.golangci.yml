@@ -26,6 +26,16 @@ linters:
     dupl:
       threshold: 150
 
+    misspell:
+      ignore-rules:
+        - descripcion
+        - transaccion
+        - comision
+        - observacion
+        - dividendos
+        - materias
+        - producto
+
     gocritic:
       disabled-checks: []
 

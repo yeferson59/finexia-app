@@ -47,12 +47,7 @@ func (h *Handlers) CreateExchangeRate(c fiber.Ctx) error {
 		return h.responseFromDomain(c, err, "Error creating exchange rate", "Could not create exchange rate")
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"success": true,
-		"message": "Exchange rate created",
-		"details": "Exchange rate created successfully",
-		"data":    rate,
-	})
+	return h.responseSuccess(c, fiber.StatusCreated, "Exchange rate created", "Exchange rate created successfully", rate)
 }
 
 func (h *Handlers) UpdateExchangeRate(c fiber.Ctx) error {

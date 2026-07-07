@@ -20,23 +20,13 @@ func (handler *Handlers) TwoFactorLogin(c fiber.Ctx) error {
 	result, err := handler.services.CompleteTwoFactorLogin(c, req.Token, req.Code, c.IP(), c.Get("User-Agent"))
 	if err != nil {
 		if errors.Is(err, services.ErrTwoFactorPendingInvalid) {
-			// The pending login expired or burned its attempts: the client
-			// must restart from the password step.
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"success": false,
-				"message": "two-factor session expired",
-				"details": "log in with your password again",
-				"action":  "auth:2fa:expired",
-			})
+			return handler.responseErrorAction(c, fiber.StatusUnauthorized, "two-factor session expired", "log in with your password again", "auth:2fa:expired")
 		}
+
 		if errors.Is(err, services.ErrTwoFactorInvalidCode) {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"success": false,
-				"message": "invalid two-factor code",
-				"details": "the code is incorrect or was already used",
-				"action":  "auth:2fa:invalid-code",
-			})
+			return handler.responseErrorAction(c, fiber.StatusUnauthorized, "invalid two-factor code", "the code is incorrect or was already used", "auth:2fa:invalid-code")
 		}
+
 		return handler.responseFromDomain(c, err, "failed to verify two-factor code", "auth:2fa:login")
 	}
 
@@ -85,13 +75,9 @@ func (handler *Handlers) TwoFactorSetup(c fiber.Ctx) error {
 	setup, err := handler.services.BeginTwoFactorSetup(c, userID, req.Password)
 	if err != nil {
 		if errors.Is(err, services.ErrTwoFactorAlreadyEnabled) {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-				"success": false,
-				"message": "two-factor already enabled",
-				"details": "disable it first to enroll a new authenticator",
-				"action":  "auth:2fa:already-enabled",
-			})
+			return handler.responseErrorAction(c, fiber.StatusConflict, "two-factor already enabled", "disable it first to enroll a new authenticator", "auth:2fa:already-enabled")
 		}
+
 		return handler.responseFromDomain(c, err, "failed to start two-factor setup", "auth:2fa:setup")
 	}
 
@@ -120,6 +106,7 @@ func (handler *Handlers) TwoFactorEnable(c fiber.Ctx) error {
 		case errors.Is(err, services.ErrTwoFactorAlreadyEnabled):
 			return handler.responseBadRequest(c, "two-factor already enabled", "auth:2fa:enable")
 		}
+
 		return handler.responseFromDomain(c, err, "failed to enable two-factor", "auth:2fa:enable")
 	}
 
@@ -145,6 +132,7 @@ func (handler *Handlers) TwoFactorDisable(c fiber.Ctx) error {
 		case errors.Is(err, services.ErrTwoFactorNotEnabled):
 			return handler.responseBadRequest(c, "two-factor not enabled", "auth:2fa:disable")
 		}
+
 		return handler.responseFromDomain(c, err, "failed to disable two-factor", "auth:2fa:disable")
 	}
 
@@ -171,6 +159,7 @@ func (handler *Handlers) TwoFactorRecoveryCodes(c fiber.Ctx) error {
 		case errors.Is(err, services.ErrTwoFactorNotEnabled):
 			return handler.responseBadRequest(c, "two-factor not enabled", "auth:2fa:recovery")
 		}
+
 		return handler.responseFromDomain(c, err, "failed to regenerate recovery codes", "auth:2fa:recovery")
 	}
 

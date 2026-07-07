@@ -12,7 +12,6 @@ import (
 	"github.com/yeferson59/finexia-app/internal/dtos/user"
 	"github.com/yeferson59/finexia-app/internal/entities"
 	"github.com/yeferson59/finexia-app/pkg/dtos"
-	"github.com/yeferson59/finexia-app/pkg/helpers"
 )
 
 func (handler *Handlers) GetListUsers(c fiber.Ctx) error {
@@ -26,19 +25,9 @@ func (handler *Handlers) GetListUsers(c fiber.Ctx) error {
 		return handler.responseFromDomain(c, err, "get product pagination", "users:list")
 	}
 
-	totalPages := helpers.CalculateTotalPages(count, uint(paginateInfo.Limit))
-
 	return handler.responseStatusOk(c, "product pagination", "get products successfully", dtos.FilterPagination[[]entities.User, fiber.Map]{
-		Items: users,
-		MetaData: fiber.Map{
-			"currentPage":  paginateInfo.Page,
-			"usersForPage": paginateInfo.Limit,
-			"offset":       paginateInfo.Offset,
-			"totalUsers":   count,
-			"totalPages":   totalPages,
-			"previous":     paginateInfo.Page > 1,
-			"next":         paginateInfo.Page < int(totalPages),
-		},
+		Items:    users,
+		MetaData: paginationMetadata(paginateInfo, count, "usersForPage", "totalUsers"),
 	})
 }
 

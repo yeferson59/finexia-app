@@ -59,12 +59,7 @@ func (handler *Handlers) ConfirmEmailVerification(c fiber.Ctx) error {
 func (handler *Handlers) emailVerificationError(c fiber.Ctx, err error, action string) error {
 	switch {
 	case errors.Is(err, services.ErrEmailVerificationExpired):
-		return c.Status(fiber.StatusGone).JSON(fiber.Map{
-			"success": false,
-			"message": "email verification link expired",
-			"details": "the link has expired; request a new one",
-			"action":  action,
-		})
+		return handler.responseErrorAction(c, fiber.StatusGone, "email verification link expired", "the link has expired; request a new one", action)
 	case errors.Is(err, services.ErrEmailVerificationInvalid):
 		return handler.responseBadRequest(c, "invalid email verification link", "the link is invalid or has already been used")
 	default:

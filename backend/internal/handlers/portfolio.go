@@ -365,12 +365,31 @@ func (h *Handlers) GetTransactions(c fiber.Ctx) error {
 	return h.responseStatusOk(c, "Transactions retrieved", "Transactions retrieved successfully", portfolio.NewTransactionListResponse(txns))
 }
 
-func (h *Handlers) CreateTransaction(c fiber.Ctx) error {
+// upsertTransaction resolves the caller's user ID, validates the transaction
+// type, invokes the caller-supplied service call, and formats the response.
+// CreateTransaction and UpdateTransaction only differ in which ID path param
+// they read, which request DTO they bind, and which service method they
+// call, so those are the only parts left in each of them.
+func (h *Handlers) upsertTransaction(c fiber.Ctx, rawType string, call func(userID uuid.UUID, txnType entities.TransactionType) (entities.Transaction, error), failMessage, failDetails, okMessage, okDetails string) error {
 	userID, _, _, err := h.getUserIDTokenRole(c)
 	if err != nil {
 		return h.responseBadRequest(c, "Invalid user ID", err.Error())
 	}
 
+	txnType := entities.TransactionType(rawType)
+	if !txnType.IsValid() {
+		return h.responseBadRequest(c, "Invalid transaction type", "Type must be one of: buy, sell, dividend, split, transfer_in, transfer_out, fee, interest")
+	}
+
+	txn, err := call(userID, txnType)
+	if err != nil {
+		return h.responseFromDomain(c, err, failMessage, failDetails)
+	}
+
+	return h.responseStatusOk(c, okMessage, okDetails, portfolio.NewTransactionResponse(txn))
+}
+
+func (h *Handlers) CreateTransaction(c fiber.Ctx) error {
 	entryID, err := h.getParamUUID(c, "entryId")
 	if err != nil {
 		return h.responseBadRequest(c, "Invalid entry ID", err.Error())
@@ -381,25 +400,12 @@ func (h *Handlers) CreateTransaction(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid request", err.Error())
 	}
 
-	txnType := entities.TransactionType(req.Type)
-	if !txnType.IsValid() {
-		return h.responseBadRequest(c, "Invalid transaction type", "Type must be one of: buy, sell, dividend, split, transfer_in, transfer_out, fee, interest")
-	}
-
-	txn, err := h.services.CreateTransaction(c, userID, entryID, txnType, req.Quantity, req.Price, req.Currency, req.Fees, req.TransactionDate, req.Notes)
-	if err != nil {
-		return h.responseFromDomain(c, err, "Error creating transaction", "Could not create transaction")
-	}
-
-	return h.responseStatusOk(c, "Transaction created", "Transaction created successfully", portfolio.NewTransactionResponse(txn))
+	return h.upsertTransaction(c, req.Type, func(userID uuid.UUID, txnType entities.TransactionType) (entities.Transaction, error) {
+		return h.services.CreateTransaction(c, userID, entryID, txnType, req.Quantity, req.Price, req.Currency, req.Fees, req.TransactionDate, req.Notes)
+	}, "Error creating transaction", "Could not create transaction", "Transaction created", "Transaction created successfully")
 }
 
 func (h *Handlers) UpdateTransaction(c fiber.Ctx) error {
-	userID, _, _, err := h.getUserIDTokenRole(c)
-	if err != nil {
-		return h.responseBadRequest(c, "Invalid user ID", err.Error())
-	}
-
 	txnID, err := h.getParamUUID(c, "txnId")
 	if err != nil {
 		return h.responseBadRequest(c, "Invalid transaction ID", err.Error())
@@ -410,17 +416,9 @@ func (h *Handlers) UpdateTransaction(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid request", err.Error())
 	}
 
-	txnType := entities.TransactionType(req.Type)
-	if !txnType.IsValid() {
-		return h.responseBadRequest(c, "Invalid transaction type", "Type must be one of: buy, sell, dividend, split, transfer_in, transfer_out, fee, interest")
-	}
-
-	txn, err := h.services.UpdateTransaction(c, userID, txnID, txnType, req.Quantity, req.Price, req.Currency, req.Fees, req.TransactionDate, req.Notes)
-	if err != nil {
-		return h.responseFromDomain(c, err, "Error updating transaction", "Could not update transaction")
-	}
-
-	return h.responseStatusOk(c, "Transaction updated", "Transaction updated successfully", portfolio.NewTransactionResponse(txn))
+	return h.upsertTransaction(c, req.Type, func(userID uuid.UUID, txnType entities.TransactionType) (entities.Transaction, error) {
+		return h.services.UpdateTransaction(c, userID, txnID, txnType, req.Quantity, req.Price, req.Currency, req.Fees, req.TransactionDate, req.Notes)
+	}, "Error updating transaction", "Could not update transaction", "Transaction updated", "Transaction updated successfully")
 }
 
 func (h *Handlers) GetAssets(c fiber.Ctx) error {

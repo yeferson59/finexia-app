@@ -278,10 +278,10 @@ func TestValidateToken(t *testing.T) {
 
 	t.Run("valid token passes and is cached", func(t *testing.T) {
 		sessionUser := user
-		svc, storage, calls := newSvc(sessionUser, nil)
+		svc, _, _ := newSvc(sessionUser, nil)
 		token := signToken(t, svc, time.Now().UTC().Add(10*time.Minute))
 		sessionUser.Sessions = []entities.Session{{Token: token}}
-		svc, storage, calls = newSvc(sessionUser, nil)
+		svc, storage, calls := newSvc(sessionUser, nil)
 
 		got, err := svc.ValidateToken(context.Background(), token)
 		if err != nil {
@@ -305,7 +305,7 @@ func TestValidateToken(t *testing.T) {
 
 	t.Run("cached negative result is rejected", func(t *testing.T) {
 		svc, storage, _ := newSvc(entities.User{}, errors.New("must not be called"))
-		storage.Set(validateTokenCacheKey("some-token"), []byte("false"), time.Minute)
+		_ = storage.Set(validateTokenCacheKey("some-token"), []byte("false"), time.Minute)
 
 		if _, err := svc.ValidateToken(context.Background(), "some-token"); err == nil {
 			t.Fatal("expected cached invalid token to be rejected")
@@ -522,7 +522,7 @@ func TestRefreshTokenRejectsMalformedAndExpired(t *testing.T) {
 	t.Run("revoked family marker blocks cached token", func(t *testing.T) {
 		f := newRefreshFixture(t)
 		f.primeCache(t, time.Now().UTC().Add(time.Hour))
-		f.storage.Set(revokedFamilyCacheKey(f.familyID), []byte("1"), time.Hour)
+		_ = f.storage.Set(revokedFamilyCacheKey(f.familyID), []byte("1"), time.Hour)
 
 		if _, err := f.svc.RefreshToken(context.Background(), f.raw, "", ""); err == nil {
 			t.Fatal("expected token of a revoked family to be rejected")
@@ -654,8 +654,8 @@ func TestLogout(t *testing.T) {
 		},
 	}
 	storage := newMemStorage()
-	storage.Set(validateTokenCacheKey(accessToken), []byte("true"), time.Hour)
-	storage.Set(refreshCacheKey(hash), []byte("cached"), time.Hour)
+	_ = storage.Set(validateTokenCacheKey(accessToken), []byte("true"), time.Hour)
+	_ = storage.Set(refreshCacheKey(hash), []byte("cached"), time.Hour)
 	svc := newTestServices(repo, storage)
 
 	if err := svc.Logout(context.Background(), userID, accessToken, raw); err != nil {

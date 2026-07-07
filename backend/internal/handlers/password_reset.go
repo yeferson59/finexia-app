@@ -58,12 +58,7 @@ func (handler *Handlers) ConfirmPasswordReset(c fiber.Ctx) error {
 func (handler *Handlers) passwordResetError(c fiber.Ctx, err error, action string) error {
 	switch {
 	case errors.Is(err, services.ErrPasswordResetExpired):
-		return c.Status(fiber.StatusGone).JSON(fiber.Map{
-			"success": false,
-			"message": "password reset link expired",
-			"details": "the link has expired; request a new one",
-			"action":  action,
-		})
+		return handler.responseErrorAction(c, fiber.StatusGone, "password reset link expired", "the link has expired; request a new one", action)
 	case errors.Is(err, services.ErrPasswordResetInvalid):
 		return handler.responseBadRequest(c, "invalid password reset link", "the link is invalid or has already been used")
 	default:

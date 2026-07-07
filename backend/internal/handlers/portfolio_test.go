@@ -134,7 +134,7 @@ func doJSON(t *testing.T, app *fiber.App, method, target, body string) (*fiber.A
 	if err != nil {
 		t.Fatalf("app.Test: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	raw, _ := io.ReadAll(resp.Body)
 	var payload map[string]any
