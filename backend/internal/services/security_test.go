@@ -114,7 +114,7 @@ func TestLoginRecordsIPAndAlertsOnUnknownIP(t *testing.T) {
 		getAccountByEmail: func(context.Context, string) (entities.User, error) {
 			return user, nil
 		},
-		hasSessionFromIP: func(_ context.Context, _ uuid.UUID, ip string) (bool, error) {
+		hasKnownLoginIP: func(_ context.Context, _ uuid.UUID, ip string) (bool, error) {
 			return false, nil
 		},
 		createSession: func(_ context.Context, _ uuid.UUID, _ string, ip, ua *string, _ time.Time) (uuid.UUID, error) {
@@ -167,7 +167,7 @@ func TestLoginDoesNotAlertOnKnownIP(t *testing.T) {
 		getAccountByEmail: func(context.Context, string) (entities.User, error) {
 			return user, nil
 		},
-		hasSessionFromIP: func(context.Context, uuid.UUID, string) (bool, error) {
+		hasKnownLoginIP: func(context.Context, uuid.UUID, string) (bool, error) {
 			return true, nil
 		},
 		createSession: func(context.Context, uuid.UUID, string, *string, *string, time.Time) (uuid.UUID, error) {
