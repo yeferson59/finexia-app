@@ -5,6 +5,7 @@
 	import { resolve } from '$app/paths';
 	import PageHeader from '$components/ui/page-header.svelte';
 	import DatePicker from '$components/ui/date-picker.svelte';
+	import { todayLocalDateString } from '$lib/utils';
 
 	const { params, data, form }: PageProps = $props();
 
@@ -23,7 +24,7 @@
 		assetId: '',
 		quantity: '',
 		purchasePrice: '',
-		purchaseDate: new Date().toISOString().split('T')[0],
+		purchaseDate: todayLocalDateString(),
 		totalValue: 0,
 		notes: ''
 	});

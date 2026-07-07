@@ -6,6 +6,7 @@
 	import Card from '$components/ui/card.svelte';
 	import PortfolioGrowth from '$components/dashboard/portfolio-growth.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
+	import { formatCalendarDate } from '$lib/utils';
 	import type { PageProps } from './$types';
 
 	interface TopTransactionData {
@@ -521,7 +522,7 @@
 			<h2 class="hero-value">{formatCurrency(parseFloat(topTransaction.value))}</h2>
 			<p class="hero-delta">
 				{topTransaction.assetTicker} · {topTransaction.type} ·
-				{new Date(topTransaction.transactionDate).toLocaleDateString('es-CO', {
+				{formatCalendarDate(topTransaction.transactionDate, {
 					year: 'numeric',
 					month: 'short',
 					day: 'numeric'

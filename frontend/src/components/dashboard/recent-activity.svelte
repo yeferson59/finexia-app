@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import CardHeader from '$components/ui/card-header.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
+	import { formatCalendarDate } from '$lib/utils';
 
 	function fmtMoney(value: number): string {
 		return privacy.money(
@@ -54,15 +55,15 @@
 	}
 
 	function formatDate(dateString: string): string {
-		const date = new Date(dateString);
+		const [year, month, day] = dateString.split('T')[0].split('-').map(Number);
+		const target = Date.UTC(year, month - 1, day);
 		const now = new Date();
-		const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-		const startOfTarget = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-		const dayDiff = Math.round((startOfTarget - startOfToday) / 86400000);
+		const startOfToday = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+		const dayDiff = Math.round((target - startOfToday) / 86400000);
 
 		if (dayDiff === 0) return 'Hoy';
 		if (dayDiff === -1) return 'Ayer';
-		return date.toLocaleDateString('es-CO', { month: 'short', day: 'numeric' });
+		return formatCalendarDate(dateString, { month: 'short', day: 'numeric' });
 	}
 </script>
 
