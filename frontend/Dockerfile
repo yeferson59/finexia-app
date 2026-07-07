@@ -29,6 +29,15 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV BASE_API=http://localhost:8080
 
+# adapter-node otherwise trusts nothing and reads event.getClientAddress()
+# straight off the TCP socket -- which, behind this platform's internal
+# proxy, is that proxy's own address, not the visitor's. ADDRESS_HEADER
+# tells it to read X-Forwarded-For instead, and XFF_DEPTH=1 says there is
+# exactly one trusted hop (this platform's proxy) prepending to it, so the
+# rightmost address in the header is trusted as the real client IP.
+ENV ADDRESS_HEADER=X-Forwarded-For
+ENV XFF_DEPTH=1
+
 # Copy production dependencies from dependencies stage
 COPY --from=dependencies /app/node_modules ./node_modules
 
