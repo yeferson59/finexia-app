@@ -19,7 +19,7 @@ func (handler *Handlers) RequestEmailVerification(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:emailVerification:request")
 	}
 
-	if err := handler.services.RequestEmailVerification(c.Context(), req.Email); err != nil {
+	if err := handler.services.RequestEmailVerification(c, req.Email); err != nil {
 		return handler.responseFromDomain(c, err, "failed to process request", "auth:emailVerification:request")
 	}
 
@@ -32,7 +32,7 @@ func (handler *Handlers) RequestEmailVerification(c fiber.Ctx) error {
 func (handler *Handlers) ValidateEmailVerification(c fiber.Ctx) error {
 	token := c.Query("token")
 
-	if err := handler.services.ValidateEmailVerification(c.Context(), token); err != nil {
+	if err := handler.services.ValidateEmailVerification(c, token); err != nil {
 		return handler.emailVerificationError(c, err, "auth:emailVerification:validate")
 	}
 
@@ -47,7 +47,7 @@ func (handler *Handlers) ConfirmEmailVerification(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:emailVerification:confirm")
 	}
 
-	if err := handler.services.VerifyEmail(c.Context(), req.Token); err != nil {
+	if err := handler.services.VerifyEmail(c, req.Token); err != nil {
 		return handler.emailVerificationError(c, err, "auth:emailVerification:confirm")
 	}
 

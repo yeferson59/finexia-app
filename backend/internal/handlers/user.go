@@ -21,7 +21,7 @@ func (handler *Handlers) GetListUsers(c fiber.Ctx) error {
 		return handler.responseInternalServerError(c, "", "paginate info not found")
 	}
 
-	users, count, err := handler.services.GetListUsers(c.Context(), uint(paginateInfo.Offset), uint(paginateInfo.Limit))
+	users, count, err := handler.services.GetListUsers(c, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
 	if err != nil {
 		return handler.responseFromDomain(c, err, "get product pagination", "users:list")
 	}
@@ -48,7 +48,7 @@ func (handler *Handlers) GetUserByID(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "validate id", "invalid user id")
 	}
 
-	user, err := handler.services.GetUserByID(c.Context(), userID)
+	user, err := handler.services.GetUserByID(c, userID)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "get user by id", "users:id")
 	}
@@ -63,7 +63,7 @@ func (handler *Handlers) CreateUser(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "", err.Error())
 	}
 
-	user, err := handler.services.CreateUser(c.Context(), createUserDto.Name, createUserDto.Email)
+	user, err := handler.services.CreateUser(c, createUserDto.Name, createUserDto.Email)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "", "users:create")
 	}
@@ -83,7 +83,7 @@ func (handler *Handlers) UpdateUser(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "", err.Error())
 	}
 
-	user, err := handler.services.UpdateUser(c.Context(), userID, updateUser.Name, updateUser.Email, updateUser.Image)
+	user, err := handler.services.UpdateUser(c, userID, updateUser.Name, updateUser.Email, updateUser.Image)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "", "users:update")
 	}
@@ -97,7 +97,7 @@ func (handler *Handlers) DeleteUser(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "", err.Error())
 	}
 
-	if err := handler.services.DeleteUser(c.Context(), userID); err != nil {
+	if err := handler.services.DeleteUser(c, userID); err != nil {
 		return handler.responseFromDomain(c, err, "", "users:delete")
 	}
 
@@ -115,7 +115,7 @@ func (handler *Handlers) BanUser(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "Invalid request", err.Error())
 	}
 
-	if err := handler.services.BanUser(c.Context(), userID, req.Ban); err != nil {
+	if err := handler.services.BanUser(c, userID, req.Ban); err != nil {
 		return handler.responseFromDomain(c, err, "Error updating ban status", "users:ban")
 	}
 
@@ -132,7 +132,7 @@ func (handler *Handlers) GetMe(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	u, err := handler.services.GetCurrentUser(c.Context(), userID)
+	u, err := handler.services.GetCurrentUser(c, userID)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "Error retrieving user", "users:me:get")
 	}
@@ -151,7 +151,7 @@ func (handler *Handlers) UpdateMe(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "Invalid request", err.Error())
 	}
 
-	u, err := handler.services.UpdateCurrentUser(c.Context(), userID, req.Name, req.PreferredCurrency, req.Image)
+	u, err := handler.services.UpdateCurrentUser(c, userID, req.Name, req.PreferredCurrency, req.Image)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "Error updating user", "users:me:update")
 	}
@@ -207,7 +207,7 @@ func (handler *Handlers) UploadAvatar(c fiber.Ctx) error {
 		return handler.responseInternalServerError(c, "File read error", err.Error())
 	}
 
-	u, err := handler.services.UploadAvatarToS3(c.Context(), userID, &buf, contentType)
+	u, err := handler.services.UploadAvatarToS3(c, userID, &buf, contentType)
 	if err != nil {
 		return handler.responseInternalServerError(c, "Upload failed", err.Error())
 	}
@@ -221,7 +221,7 @@ func (handler *Handlers) GetMyPreferences(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	prefs, err := handler.services.GetUserPreferences(c.Context(), userID)
+	prefs, err := handler.services.GetUserPreferences(c, userID)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "Error retrieving preferences", "users:me:preferences:get")
 	}
@@ -240,7 +240,7 @@ func (handler *Handlers) UpdateMyPreferences(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "Invalid request", err.Error())
 	}
 
-	prefs, err := handler.services.UpdateUserPreferences(c.Context(), userID, req.EmailAlerts, req.WeeklySummary)
+	prefs, err := handler.services.UpdateUserPreferences(c, userID, req.EmailAlerts, req.WeeklySummary)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "Error updating preferences", "users:me:preferences:update")
 	}
@@ -254,7 +254,7 @@ func (handler *Handlers) GetUserAvatar(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	body, contentType, err := handler.services.GetAvatarFromS3(c.Context(), userID)
+	body, contentType, err := handler.services.GetAvatarFromS3(c, userID)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).SendString("avatar not found")
 	}
@@ -288,7 +288,7 @@ func (handler *Handlers) ChangeMyPassword(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "Invalid password", "New password must be at most 20 characters")
 	}
 
-	if err := handler.services.ChangePassword(c.Context(), userID, jwtoken, req.CurrentPassword, req.NewPassword, c.IP(), c.Get("User-Agent")); err != nil {
+	if err := handler.services.ChangePassword(c, userID, jwtoken, req.CurrentPassword, req.NewPassword, c.IP(), c.Get("User-Agent")); err != nil {
 		return handler.responseFromDomain(c, err, "Error changing password", "users:me:password")
 	}
 

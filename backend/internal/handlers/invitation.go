@@ -26,7 +26,7 @@ func (handler *Handlers) CreateInvitation(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid user id", err.Error())
 	}
 
-	inv, err := handler.services.CreateInvitation(c.Context(), req.Email, req.Name, req.Role, invitedBy)
+	inv, err := handler.services.CreateInvitation(c, req.Email, req.Name, req.Role, invitedBy)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "failed to create invitation", "invitations:create")
 	}
@@ -41,7 +41,7 @@ func (handler *Handlers) ListInvitations(c fiber.Ctx) error {
 		return handler.responseInternalServerError(c, "", "paginate info not found")
 	}
 
-	invitations, count, err := handler.services.ListInvitations(c.Context(), uint(paginateInfo.Offset), uint(paginateInfo.Limit))
+	invitations, count, err := handler.services.ListInvitations(c, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
 	if err != nil {
 		return handler.responseFromDomain(c, err, "failed to list invitations", "invitations:list")
 	}
@@ -74,7 +74,7 @@ func (handler *Handlers) ResendInvitation(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid user id", err.Error())
 	}
 
-	inv, err := handler.services.ResendInvitation(c.Context(), id, invitedBy)
+	inv, err := handler.services.ResendInvitation(c, id, invitedBy)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "failed to resend invitation", "invitations:resend")
 	}
@@ -89,7 +89,7 @@ func (handler *Handlers) RevokeInvitation(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid invitation id", err.Error())
 	}
 
-	if err := handler.services.RevokeInvitation(c.Context(), id); err != nil {
+	if err := handler.services.RevokeInvitation(c, id); err != nil {
 		return handler.responseFromDomain(c, err, "failed to revoke invitation", "invitations:revoke")
 	}
 
@@ -103,7 +103,7 @@ func (handler *Handlers) ListWaitlist(c fiber.Ctx) error {
 		return handler.responseInternalServerError(c, "", "paginate info not found")
 	}
 
-	waitlist, count, err := handler.services.ListWaitlist(c.Context(), uint(paginateInfo.Offset), uint(paginateInfo.Limit))
+	waitlist, count, err := handler.services.ListWaitlist(c, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
 	if err != nil {
 		return handler.responseFromDomain(c, err, "failed to list waitlist", "waitlist:list")
 	}
@@ -129,7 +129,7 @@ func (handler *Handlers) ListWaitlist(c fiber.Ctx) error {
 func (handler *Handlers) ValidateInvitation(c fiber.Ctx) error {
 	token := c.Query("token")
 
-	inv, err := handler.services.ValidateInvitation(c.Context(), token)
+	inv, err := handler.services.ValidateInvitation(c, token)
 	if err != nil {
 		return handler.invitationError(c, err, "invitations:validate")
 	}
@@ -149,7 +149,7 @@ func (handler *Handlers) AcceptInvitation(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", err.Error())
 	}
 
-	u, err := handler.services.AcceptInvitation(c.Context(), req.Token, req.Name, req.Password)
+	u, err := handler.services.AcceptInvitation(c, req.Token, req.Name, req.Password)
 	if err != nil {
 		return handler.invitationError(c, err, "invitations:accept")
 	}

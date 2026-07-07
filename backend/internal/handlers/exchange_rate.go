@@ -10,7 +10,7 @@ import (
 )
 
 func (h *Handlers) SyncExchangeRates(c fiber.Ctx) error {
-	rates, errs := h.services.SyncExchangeRates(c.Context())
+	rates, errs := h.services.SyncExchangeRates(c)
 
 	if len(errs) > 0 && len(rates) == 0 {
 		return h.responseInternalServerError(c, "Exchange rate sync failed", errs[0].Error())
@@ -25,7 +25,7 @@ func (h *Handlers) GetExchangeRates(c fiber.Ctx) error {
 		return h.responseInternalServerError(c, "", "paginate info not found")
 	}
 
-	rates, err := h.services.GetExchangeRates(c.Context(), uint(paginateInfo.Offset), uint(paginateInfo.Limit))
+	rates, err := h.services.GetExchangeRates(c, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
 	if err != nil {
 		return h.responseFromDomain(c, err, "", "")
 	}
@@ -42,7 +42,7 @@ func (h *Handlers) CreateExchangeRate(c fiber.Ctx) error {
 	from := strings.ToUpper(strings.TrimSpace(req.FromCurrency))
 	to := strings.ToUpper(strings.TrimSpace(req.ToCurrency))
 
-	rate, err := h.services.CreateExchangeRate(c.Context(), from, to, req.Rate)
+	rate, err := h.services.CreateExchangeRate(c, from, to, req.Rate)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error creating exchange rate", "Could not create exchange rate")
 	}
@@ -66,7 +66,7 @@ func (h *Handlers) UpdateExchangeRate(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid request", err.Error())
 	}
 
-	rate, err := h.services.UpdateExchangeRate(c.Context(), id, req.Rate)
+	rate, err := h.services.UpdateExchangeRate(c, id, req.Rate)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error updating exchange rate", "Could not update exchange rate")
 	}
@@ -80,7 +80,7 @@ func (h *Handlers) ImportExchangeRates(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid file", err.Error())
 	}
 
-	result, err := h.services.ImportExchangeRatesFromFile(c.Context(), data, filename, c.FormValue("sheet"))
+	result, err := h.services.ImportExchangeRatesFromFile(c, data, filename, c.FormValue("sheet"))
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error importing exchange rates", "Could not import the uploaded exchange rates")
 	}
@@ -94,7 +94,7 @@ func (h *Handlers) SyncSingleExchangeRate(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid exchange rate ID", err.Error())
 	}
 
-	rate, err := h.services.SyncExchangeRateByID(c.Context(), id)
+	rate, err := h.services.SyncExchangeRateByID(c, id)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Exchange rate sync failed", err.Error())
 	}

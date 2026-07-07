@@ -13,7 +13,7 @@ func (h *Handlers) CreateWaitlistMarketing(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "invalid email", "email is required and must be a valid email address")
 	}
 
-	if err := h.services.SaveWaitlistEmail(c.Context(), waitlist.Email); err != nil {
+	if err := h.services.SaveWaitlistEmail(c, waitlist.Email); err != nil {
 		return h.responseFromDomain(c, err, "error saving waitlist email", err.Error())
 	}
 

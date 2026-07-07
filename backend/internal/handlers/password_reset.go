@@ -18,7 +18,7 @@ func (handler *Handlers) RequestPasswordReset(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:passwordReset:request")
 	}
 
-	if err := handler.services.RequestPasswordReset(c.Context(), req.Email); err != nil {
+	if err := handler.services.RequestPasswordReset(c, req.Email); err != nil {
 		return handler.responseFromDomain(c, err, "failed to process request", "auth:passwordReset:request")
 	}
 
@@ -31,7 +31,7 @@ func (handler *Handlers) RequestPasswordReset(c fiber.Ctx) error {
 func (handler *Handlers) ValidatePasswordReset(c fiber.Ctx) error {
 	token := c.Query("token")
 
-	if err := handler.services.ValidatePasswordResetToken(c.Context(), token); err != nil {
+	if err := handler.services.ValidatePasswordResetToken(c, token); err != nil {
 		return handler.passwordResetError(c, err, "auth:passwordReset:validate")
 	}
 
@@ -46,7 +46,7 @@ func (handler *Handlers) ConfirmPasswordReset(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:passwordReset:confirm")
 	}
 
-	if err := handler.services.ResetPassword(c.Context(), req.Token, req.Password, c.IP(), c.Get("User-Agent")); err != nil {
+	if err := handler.services.ResetPassword(c, req.Token, req.Password, c.IP(), c.Get("User-Agent")); err != nil {
 		return handler.passwordResetError(c, err, "auth:passwordReset:confirm")
 	}
 

@@ -17,7 +17,7 @@ func (handler *Handlers) TwoFactorLogin(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:2fa:login")
 	}
 
-	result, err := handler.services.CompleteTwoFactorLogin(c.Context(), req.Token, req.Code, c.IP(), c.Get("User-Agent"))
+	result, err := handler.services.CompleteTwoFactorLogin(c, req.Token, req.Code, c.IP(), c.Get("User-Agent"))
 	if err != nil {
 		if errors.Is(err, services.ErrTwoFactorPendingInvalid) {
 			// The pending login expired or burned its attempts: the client
@@ -61,7 +61,7 @@ func (handler *Handlers) TwoFactorStatus(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid user id", "auth:2fa:status")
 	}
 
-	status, err := handler.services.TwoFactorStatus(c.Context(), userID)
+	status, err := handler.services.TwoFactorStatus(c, userID)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "failed to get two-factor status", "auth:2fa:status")
 	}
@@ -82,7 +82,7 @@ func (handler *Handlers) TwoFactorSetup(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:2fa:setup")
 	}
 
-	setup, err := handler.services.BeginTwoFactorSetup(c.Context(), userID, req.Password)
+	setup, err := handler.services.BeginTwoFactorSetup(c, userID, req.Password)
 	if err != nil {
 		if errors.Is(err, services.ErrTwoFactorAlreadyEnabled) {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
@@ -110,7 +110,7 @@ func (handler *Handlers) TwoFactorEnable(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:2fa:enable")
 	}
 
-	result, err := handler.services.ConfirmTwoFactorSetup(c.Context(), userID, req.Code, c.IP(), c.Get("User-Agent"))
+	result, err := handler.services.ConfirmTwoFactorSetup(c, userID, req.Code, c.IP(), c.Get("User-Agent"))
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrTwoFactorInvalidCode):
@@ -138,7 +138,7 @@ func (handler *Handlers) TwoFactorDisable(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:2fa:disable")
 	}
 
-	if err := handler.services.DisableTwoFactor(c.Context(), userID, req.Password, req.Code, c.IP(), c.Get("User-Agent")); err != nil {
+	if err := handler.services.DisableTwoFactor(c, userID, req.Password, req.Code, c.IP(), c.Get("User-Agent")); err != nil {
 		switch {
 		case errors.Is(err, services.ErrTwoFactorInvalidCode):
 			return handler.responseBadRequest(c, "invalid two-factor code", "auth:2fa:disable")
@@ -163,7 +163,7 @@ func (handler *Handlers) TwoFactorRecoveryCodes(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:2fa:recovery")
 	}
 
-	result, err := handler.services.RegenerateTwoFactorRecoveryCodes(c.Context(), userID, req.Password, req.Code)
+	result, err := handler.services.RegenerateTwoFactorRecoveryCodes(c, userID, req.Password, req.Code)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrTwoFactorInvalidCode):

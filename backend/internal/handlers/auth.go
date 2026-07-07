@@ -16,7 +16,7 @@ func (handler *Handlers) Login(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:login")
 	}
 
-	result, err := handler.services.Login(c.Context(), loginDto.Email, loginDto.Password, c.IP(), c.Get("User-Agent"))
+	result, err := handler.services.Login(c, loginDto.Email, loginDto.Password, c.IP(), c.Get("User-Agent"))
 	if err != nil {
 		if errors.Is(err, services.ErrTwoFactorRequired) {
 			// Password accepted, but the account opted into 2FA: no session
@@ -73,7 +73,7 @@ func (handler *Handlers) Register(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid request body", "auth:register")
 	}
 
-	user, err := handler.services.Register(c.Context(), registerDto.Name, registerDto.Email, registerDto.Password)
+	user, err := handler.services.Register(c, registerDto.Name, registerDto.Email, registerDto.Password)
 	if err != nil {
 		if errors.Is(err, services.ErrEmailAlreadyExists) {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
@@ -95,7 +95,7 @@ func (handler *Handlers) Refresh(c fiber.Ctx) error {
 		return handler.responseUnauthorized(c, "missing refresh token", "auth:refresh")
 	}
 
-	result, err := handler.services.RefreshToken(c.Context(), rawToken, c.IP(), c.Get("User-Agent"))
+	result, err := handler.services.RefreshToken(c, rawToken, c.IP(), c.Get("User-Agent"))
 	if err != nil {
 		return handler.responseUnauthorized(c, "invalid refresh token", "auth:refresh")
 	}
@@ -120,7 +120,7 @@ func (handler *Handlers) GetSession(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid user id", "auth:getSession")
 	}
 
-	userSession, err := handler.services.GetSession(c.Context(), userID, jwtoken)
+	userSession, err := handler.services.GetSession(c, userID, jwtoken)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "failed to get session", "auth:getSession")
 	}
@@ -134,7 +134,7 @@ func (handler *Handlers) ListSessions(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid user id", "auth:sessions:list")
 	}
 
-	sessions, err := handler.services.ListSessions(c.Context(), userID, jwtoken)
+	sessions, err := handler.services.ListSessions(c, userID, jwtoken)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "failed to list sessions", "auth:sessions:list")
 	}
@@ -153,7 +153,7 @@ func (handler *Handlers) RevokeSession(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid session id", "auth:sessions:revoke")
 	}
 
-	if err := handler.services.RevokeSession(c.Context(), userID, sessionID, jwtoken); err != nil {
+	if err := handler.services.RevokeSession(c, userID, sessionID, jwtoken); err != nil {
 		return handler.responseFromDomain(c, err, "failed to revoke session", "auth:sessions:revoke")
 	}
 
@@ -166,7 +166,7 @@ func (handler *Handlers) RevokeOtherSessions(c fiber.Ctx) error {
 		return handler.responseBadRequest(c, "invalid user id", "auth:sessions:revokeOthers")
 	}
 
-	revoked, err := handler.services.RevokeOtherSessions(c.Context(), userID, jwtoken)
+	revoked, err := handler.services.RevokeOtherSessions(c, userID, jwtoken)
 	if err != nil {
 		return handler.responseFromDomain(c, err, "failed to revoke sessions", "auth:sessions:revokeOthers")
 	}
@@ -184,7 +184,7 @@ func (handler *Handlers) Logout(c fiber.Ctx) error {
 
 	rawRefreshToken := c.Cookies("refresh_token")
 
-	if err := handler.services.Logout(c.Context(), userID, jwtoken, rawRefreshToken); err != nil {
+	if err := handler.services.Logout(c, userID, jwtoken, rawRefreshToken); err != nil {
 		return handler.responseFromDomain(c, err, "failed to logout", "auth:logout")
 	}
 

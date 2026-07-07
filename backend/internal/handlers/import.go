@@ -115,7 +115,7 @@ func (h *Handlers) ImportTransactions(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid request", "mapping is required to import transactions")
 	}
 
-	result, err := h.services.ImportTransactionsFromFile(c.Context(), userID, portfolioID, sourceID, data, filename, c.FormValue("sheet"), *mapping, defaults)
+	result, err := h.services.ImportTransactionsFromFile(c, userID, portfolioID, sourceID, data, filename, c.FormValue("sheet"), *mapping, defaults)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error importing transactions", "Could not import the uploaded transactions")
 	}

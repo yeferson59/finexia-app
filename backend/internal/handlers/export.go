@@ -15,12 +15,12 @@ func (h *Handlers) ExportSummary(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	summaries, err := h.services.GetPortfoliosSummary(c.Context(), userID)
+	summaries, err := h.services.GetPortfoliosSummary(c, userID)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error generating report", "Could not retrieve portfolio data")
 	}
 
-	allocationItems, err := h.services.GetAssetAllocation(c.Context(), userID)
+	allocationItems, err := h.services.GetAssetAllocation(c, userID)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error generating report", "Could not retrieve allocation data")
 	}
@@ -84,7 +84,7 @@ func (h *Handlers) ExportTransactions(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	txns, err := h.services.GetRecentUserTransactions(c.Context(), userID, 10000)
+	txns, err := h.services.GetRecentUserTransactions(c, userID, 10000)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error generating report", "Could not retrieve transactions")
 	}
@@ -129,7 +129,7 @@ func (h *Handlers) ExportRiskMetrics(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	points, _, err := h.services.GetPortfolioGrowth(c.Context(), userID, "ALL")
+	points, _, err := h.services.GetPortfolioGrowth(c, userID, "ALL")
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error generating report", "Could not retrieve growth data")
 	}

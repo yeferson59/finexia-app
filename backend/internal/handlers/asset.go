@@ -10,7 +10,7 @@ import (
 )
 
 func (h *Handlers) SyncAssetPrices(c fiber.Ctx) error {
-	assets, errs := h.services.SyncAssetPrices(c.Context())
+	assets, errs := h.services.SyncAssetPrices(c)
 
 	if len(errs) > 0 && len(assets) == 0 {
 		return h.responseInternalServerError(c, "Asset price sync failed", errs[0].Error())
@@ -25,7 +25,7 @@ func (h *Handlers) SyncSingleAsset(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid asset ID", err.Error())
 	}
 
-	asset, err := h.services.SyncAssetByID(c.Context(), assetID)
+	asset, err := h.services.SyncAssetByID(c, assetID)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Asset sync failed", err.Error())
 	}
@@ -39,7 +39,7 @@ func (h *Handlers) ImportAssets(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid file", err.Error())
 	}
 
-	result, err := h.services.ImportAssetsFromFile(c.Context(), data, filename, c.FormValue("sheet"))
+	result, err := h.services.ImportAssetsFromFile(c, data, filename, c.FormValue("sheet"))
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error importing assets", "Could not import the uploaded assets")
 	}
@@ -61,7 +61,7 @@ func (h *Handlers) CreateAsset(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid asset type", "Asset type must be one of: stock, etf, crypto, bond, cash, real_estate, commodity, other")
 	}
 
-	asset, err := h.services.CreateAsset(c.Context(), req.Ticker, req.Name, assetType, req.Exchange, req.Currency)
+	asset, err := h.services.CreateAsset(c, req.Ticker, req.Name, assetType, req.Exchange, req.Currency)
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error creating asset", "Could not create asset")
 	}
