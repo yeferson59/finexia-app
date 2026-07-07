@@ -1119,3 +1119,47 @@ func (r *Repository) GetPortfolioGrowthByUserID(
 	}
 	return result, nil
 }
+
+func (r *Repository) GetPortfolioGrowthByPortfolioID(
+	ctx context.Context,
+	userID, portfolioID uuid.UUID,
+	hasSince bool,
+	since time.Time,
+) ([]entities.PortfolioGrowthPoint, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			ps.snapshot_date,
+			ps.total_value::text,
+			(ps.total_value - ps.total_gain_loss)::text,
+			ps.total_gain_loss::text,
+			ps.total_gain_loss_pct::text
+		FROM portfolio_snapshots ps
+		JOIN portfolios p ON p.id = ps.portfolio_id
+		WHERE ps.portfolio_id = $1 AND p.user_id = $2
+		  AND ($3::boolean = FALSE OR ps.snapshot_date >= $4::date)
+		ORDER BY ps.snapshot_date ASC
+	`, portfolioID, userID, hasSince, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]entities.PortfolioGrowthPoint, 0)
+	for rows.Next() {
+		var point entities.PortfolioGrowthPoint
+		if err := rows.Scan(
+			&point.Date,
+			&point.TotalValue,
+			&point.TotalCostBase,
+			&point.GainLoss,
+			&point.GainLossPct,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, point)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}

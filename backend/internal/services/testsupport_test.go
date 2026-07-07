@@ -49,6 +49,7 @@ type fakeRepository struct {
 	countAssetTransactions           func(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error)
 	getAssetTransactionsPaginated    func(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, limit, offset int) ([]entities.Transaction, error)
 	getPortfolioGrowthByUserID       func(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error)
+	getPortfolioGrowthByPortfolioID  func(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error)
 
 	getPortfoliosRisks            func(ctx context.Context) ([]entities.Risk, error)
 	getPortfoliosByUserID         func(ctx context.Context, userID uuid.UUID) ([]entities.Portfolio, error)
@@ -295,6 +296,10 @@ func (f *fakeRepository) GetAssetTransactionsPaginated(ctx context.Context, user
 
 func (f *fakeRepository) GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error) {
 	return f.getPortfolioGrowthByUserID(ctx, userID, hasSince, since)
+}
+
+func (f *fakeRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error) {
+	return f.getPortfolioGrowthByPortfolioID(ctx, userID, portfolioID, hasSince, since)
 }
 
 func (f *fakeRepository) GetPortfoliosRisks(ctx context.Context) ([]entities.Risk, error) {

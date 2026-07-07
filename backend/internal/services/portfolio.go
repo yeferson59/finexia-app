@@ -334,6 +334,15 @@ func (s *Services) GetPortfolioGrowth(ctx context.Context, userID uuid.UUID, per
 	return points, buildGrowthSummary(points), nil
 }
 
+func (s *Services) GetPortfolioGrowthByID(ctx context.Context, userID, portfolioID uuid.UUID, period string) ([]entities.PortfolioGrowthPoint, entities.PortfolioGrowthSummary, error) {
+	hasSince, since := parsePeriod(period)
+	points, err := s.repos.GetPortfolioGrowthByPortfolioID(ctx, userID, portfolioID, hasSince, since)
+	if err != nil {
+		return nil, entities.PortfolioGrowthSummary{}, err
+	}
+	return points, buildGrowthSummary(points), nil
+}
+
 func parsePeriod(period string) (bool, time.Time) {
 	now := time.Now().UTC()
 	switch period {

@@ -4,6 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { untrack } from 'svelte';
 	import Card from '$components/ui/card.svelte';
+	import PortfolioGrowth from '$components/dashboard/portfolio-growth.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
 	import type { PageProps } from './$types';
 
@@ -16,6 +17,20 @@
 		transactionDate: string;
 	}
 
+	interface GrowthDataPoint {
+		date: string;
+		totalValue: string;
+		totalCostBase: string;
+		gainLoss: string;
+		gainLossPct: string;
+	}
+
+	interface GrowthSummary {
+		initialValue: string;
+		currentValue: string;
+		totalGrowthPct: string;
+	}
+
 	const { params, data }: PageProps = $props();
 
 	const portfolio = $derived(data.portfolio);
@@ -24,6 +39,10 @@
 	);
 	const topTransaction = $derived(
 		(data as unknown as { topTransaction: TopTransactionData | null }).topTransaction
+	);
+	const growth = $derived(
+		(data as unknown as { growth: { points: GrowthDataPoint[]; summary: GrowthSummary } | null })
+			.growth
 	);
 
 	let isEditing = $state(false);
@@ -127,6 +146,12 @@
 	const bestHolding = $derived(
 		holdings.length > 0 ? holdings.reduce((a, b) => (a.gainLossPct > b.gainLossPct ? a : b)) : null
 	);
+	const worstHolding = $derived(
+		holdings.length > 0 ? holdings.reduce((a, b) => (a.gainLossPct < b.gainLossPct ? a : b)) : null
+	);
+	const topConcentration = $derived(
+		holdings.length > 0 ? holdings.reduce((a, b) => (a.allocation > b.allocation ? a : b)) : null
+	);
 
 	function formatPct(value: number): string {
 		return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
@@ -185,6 +210,26 @@
 				pct: total > 0 ? (data.value / total) * 100 : 0
 			}))
 			.sort((a, b) => b.value - a.value);
+	});
+
+	const DONUT_RADIUS = 60;
+	const DONUT_CIRCUMFERENCE = 2 * Math.PI * DONUT_RADIUS;
+	const DONUT_GAP = 3;
+
+	const donutSegments = $derived.by(() => {
+		const gap = typeBreakdown.length > 1 ? DONUT_GAP : 0;
+		let acc = 0;
+		return typeBreakdown.map((slice) => {
+			const sliceLen = (slice.pct / 100) * DONUT_CIRCUMFERENCE;
+			const dash = Math.max(sliceLen - gap, 0);
+			const segment = {
+				...slice,
+				dasharray: `${dash} ${DONUT_CIRCUMFERENCE - dash}`,
+				dashoffset: -acc
+			};
+			acc += sliceLen;
+			return segment;
+		});
 	});
 
 	function goBack() {
@@ -382,6 +427,12 @@
 	</Card>
 </section>
 
+{#if growth}
+	<section class="growth-section" aria-label="Crecimiento del portafolio">
+		<PortfolioGrowth data={growth.points} summary={growth.summary} />
+	</section>
+{/if}
+
 <section class="stats-grid">
 	<Card variant="elevated" padding="sm">
 		<p class="eyebrow">Capital invertido</p>
@@ -439,6 +490,32 @@
 	</Card>
 
 	<Card variant="elevated" padding="sm">
+		<p class="eyebrow">Peor activo</p>
+		{#if worstHolding}
+			<h2 class="hero-value">{worstHolding.symbol}</h2>
+			<p class="hero-delta {worstHolding.gainLossPct >= 0 ? 'positive' : 'negative'}">
+				{formatPct(worstHolding.gainLossPct)} · {worstHolding.name}
+			</p>
+		{:else}
+			<h2 class="hero-value">—</h2>
+			<p class="hero-delta">Sin activos</p>
+		{/if}
+	</Card>
+
+	<Card variant="elevated" padding="sm">
+		<p class="eyebrow">Concentración</p>
+		{#if topConcentration}
+			<h2 class="hero-value">{topConcentration.allocation.toFixed(1)}%</h2>
+			<p class="hero-delta">
+				{topConcentration.symbol} · {topConcentration.name}
+			</p>
+		{:else}
+			<h2 class="hero-value">—</h2>
+			<p class="hero-delta">Sin activos</p>
+		{/if}
+	</Card>
+
+	<Card variant="elevated" padding="sm">
 		<p class="eyebrow">Transacción más alta</p>
 		{#if topTransaction}
 			<h2 class="hero-value">{formatCurrency(parseFloat(topTransaction.value))}</h2>
@@ -465,25 +542,69 @@
 				<span>{typeBreakdown.length} {typeBreakdown.length === 1 ? 'tipo' : 'tipos'}</span>
 			</header>
 
-			<div class="stacked-bar">
-				{#each typeBreakdown as slice (slice.type)}
-					<div
-						class="stack-segment"
-						style="width: {slice.pct}%; background: {slice.color};"
-						title="{slice.label}: {slice.pct.toFixed(1)}%"
-					></div>
-				{/each}
-			</div>
+			<div class="distribution-body">
+				<div class="donut-wrap">
+					<svg
+						class="donut"
+						viewBox="0 0 160 160"
+						role="img"
+						aria-label="Distribución por tipo de activo"
+					>
+						<circle
+							cx="80"
+							cy="80"
+							r={DONUT_RADIUS}
+							fill="none"
+							stroke="rgba(236, 234, 229, 0.08)"
+							stroke-width="22"
+						/>
+						<g transform="rotate(-90 80 80)">
+							{#each donutSegments as slice (slice.type)}
+								<circle
+									cx="80"
+									cy="80"
+									r={DONUT_RADIUS}
+									fill="none"
+									stroke={slice.color}
+									stroke-width="22"
+									stroke-linecap="round"
+									stroke-dasharray={slice.dasharray}
+									stroke-dashoffset={slice.dashoffset}
+								>
+									<title>{slice.label}: {slice.pct.toFixed(1)}%</title>
+								</circle>
+							{/each}
+						</g>
+						<text
+							x="80"
+							y="76"
+							text-anchor="middle"
+							fill="var(--text)"
+							font-size="15"
+							font-family="var(--font-mono)"
+							font-weight="700">{formatCurrency(totalValue)}</text
+						>
+						<text
+							x="80"
+							y="94"
+							text-anchor="middle"
+							fill="rgba(236, 234, 229, 0.5)"
+							font-size="9"
+							font-family="var(--font-mono)">Valor total</text
+						>
+					</svg>
+				</div>
 
-			<div class="type-legend">
-				{#each typeBreakdown as slice (slice.type)}
-					<div class="legend-item">
-						<span class="legend-dot" style="background: {slice.color};"></span>
-						<span class="legend-label">{slice.label}</span>
-						<span class="legend-pct">{slice.pct.toFixed(1)}%</span>
-						<span class="legend-value">{formatCurrency(slice.value)}</span>
-					</div>
-				{/each}
+				<div class="type-legend">
+					{#each typeBreakdown as slice (slice.type)}
+						<div class="legend-item">
+							<span class="legend-dot" style="background: {slice.color};"></span>
+							<span class="legend-label">{slice.label}</span>
+							<span class="legend-pct">{slice.pct.toFixed(1)}%</span>
+							<span class="legend-value">{formatCurrency(slice.value)}</span>
+						</div>
+					{/each}
+				</div>
 			</div>
 		</div>
 	</Card>
@@ -661,9 +782,13 @@
 		margin-bottom: 1.5rem;
 	}
 
+	.growth-section {
+		margin-bottom: 1.5rem;
+	}
+
 	.stats-grid {
 		display: grid;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 		gap: 1rem;
 		margin-bottom: 1.5rem;
 	}
@@ -766,28 +891,37 @@
 		padding: 1.5rem;
 	}
 
-	.stacked-bar {
+	.distribution-body {
 		display: flex;
-		height: 12px;
-		border-radius: 999px;
-		overflow: hidden;
-		background: rgba(236, 234, 229, 0.08);
-		gap: 2px;
-		margin-bottom: 1.25rem;
+		align-items: center;
+		gap: 2rem;
+		flex-wrap: wrap;
 	}
 
-	.stack-segment {
-		height: 100%;
-		border-radius: 999px;
-		transition: opacity 0.2s ease;
-		min-width: 4px;
+	.donut-wrap {
+		flex-shrink: 0;
+		width: 160px;
 	}
 
-	.stack-segment:hover {
-		opacity: 0.8;
+	.donut {
+		width: 100%;
+		height: auto;
+		display: block;
+	}
+
+	.donut circle {
+		transition:
+			stroke-dasharray 0.4s ease,
+			opacity 0.2s ease;
+	}
+
+	.donut circle:hover {
+		opacity: 0.85;
 	}
 
 	.type-legend {
+		flex: 1;
+		min-width: 220px;
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 		gap: 0.55rem;
