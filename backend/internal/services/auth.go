@@ -185,11 +185,13 @@ func (s *Services) Login(ctx context.Context, email, password, ipAddress, userAg
 // logins and logins completed through the two-factor step.
 func (s *Services) issueSession(ctx context.Context, userID uuid.UUID, roleName, userName, userEmail, ipAddress, userAgent string) (auth.LoginInternalDTO, error) {
 	// Decide whether this login comes from a device the user has used before.
-	// Must run before CreateSession records this login's IP, and a lookup
-	// failure must not block the login nor trigger a false alarm.
+	// Checked against known_login_ips (not the sessions table) because a
+	// session is deleted on logout and swept on expiry, while this history
+	// must survive both so a returning IP is never re-flagged as new. A
+	// lookup failure must not block the login nor trigger a false alarm.
 	knownIP := true
 	if ipAddress != "" {
-		if known, ipErr := s.repos.HasSessionFromIP(ctx, userID, ipAddress); ipErr == nil {
+		if known, ipErr := s.repos.HasKnownLoginIP(ctx, userID, ipAddress); ipErr == nil {
 			knownIP = known
 		}
 	}
@@ -219,6 +221,16 @@ func (s *Services) issueSession(ctx context.Context, userID uuid.UUID, roleName,
 
 	if !knownIP {
 		go s.sendLoginAlert(userName, userEmail, ipAddress, userAgent)
+	}
+
+	// Remembered regardless of knownIP so the next login from this address —
+	// even after this session is logged out or expires — is recognized.
+	if ipAddress != "" {
+		go func() {
+			if err := s.repos.RecordKnownLoginIP(context.Background(), userID, ipAddress); err != nil {
+				s.log.Error("failed to record known login ip", logger.Err(err))
+			}
+		}()
 	}
 
 	rawRefresh, refreshHash, err := generateRefreshToken()

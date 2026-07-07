@@ -25,7 +25,8 @@ type Repository interface {
 	ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]entities.Session, error)
 	GetRefreshTokensBySessionIDs(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) ([]string, []uuid.UUID, error)
 	DeleteSessionsByIDs(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) (int64, error)
-	HasSessionFromIP(ctx context.Context, userID uuid.UUID, ip string) (bool, error)
+	HasKnownLoginIP(ctx context.Context, userID uuid.UUID, ip string) (bool, error)
+	RecordKnownLoginIP(ctx context.Context, userID uuid.UUID, ip string) error
 	CreateRefreshToken(ctx context.Context, userID uuid.UUID, tokenHash string, familyID, sessionID uuid.UUID, ip, ua *string, expiresAt time.Time) (uuid.UUID, error)
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (entities.RefreshToken, error)
 	MarkRefreshTokenUsed(ctx context.Context, id uuid.UUID) error

@@ -146,15 +146,28 @@ func (r *Repository) DeleteSessionsByIDs(ctx context.Context, userID uuid.UUID, 
 	return tag.RowsAffected(), err
 }
 
-// HasSessionFromIP reports whether the user already has a session recorded
-// from the given IP; used to decide if a login looks like a new device.
-func (r *Repository) HasSessionFromIP(ctx context.Context, userID uuid.UUID, ip string) (bool, error) {
+// HasKnownLoginIP reports whether the user has ever logged in from the given
+// IP. Backed by known_login_ips rather than sessions: sessions are deleted on
+// logout and swept on expiry, so that table can't answer "have we seen this
+// device before" once the session that recorded it is gone.
+func (r *Repository) HasKnownLoginIP(ctx context.Context, userID uuid.UUID, ip string) (bool, error) {
 	var exists bool
 	err := r.db.QueryRow(ctx,
-		"SELECT EXISTS(SELECT 1 FROM sessions WHERE user_id = $1 AND ip_address = $2)",
+		"SELECT EXISTS(SELECT 1 FROM known_login_ips WHERE user_id = $1 AND ip_address = $2)",
 		userID.String(), ip,
 	).Scan(&exists)
 	return exists, err
+}
+
+// RecordKnownLoginIP remembers that the user has logged in from ip, so a
+// later login from the same address is not flagged as a new device even
+// after this session is logged out or expires.
+func (r *Repository) RecordKnownLoginIP(ctx context.Context, userID uuid.UUID, ip string) error {
+	_, err := r.db.Exec(ctx,
+		"INSERT INTO known_login_ips(user_id, ip_address) VALUES ($1, $2) ON CONFLICT (user_id, ip_address) DO NOTHING",
+		userID.String(), ip,
+	)
+	return err
 }
 
 // ErrSessionNotFound indicates the session row no longer exists (e.g. the user

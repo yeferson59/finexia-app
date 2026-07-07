@@ -30,7 +30,8 @@ type fakeRepository struct {
 	listSessionsByUserID             func(ctx context.Context, userID uuid.UUID) ([]entities.Session, error)
 	getRefreshTokensBySessionIDs     func(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) ([]string, []uuid.UUID, error)
 	deleteSessionsByIDs              func(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) (int64, error)
-	hasSessionFromIP                 func(ctx context.Context, userID uuid.UUID, ip string) (bool, error)
+	hasKnownLoginIP                  func(ctx context.Context, userID uuid.UUID, ip string) (bool, error)
+	recordKnownLoginIP               func(ctx context.Context, userID uuid.UUID, ip string) error
 	createRefreshToken               func(ctx context.Context, userID uuid.UUID, tokenHash string, familyID, sessionID uuid.UUID, ip, ua *string, expiresAt time.Time) (uuid.UUID, error)
 	getRefreshTokenByHash            func(ctx context.Context, tokenHash string) (entities.RefreshToken, error)
 	markRefreshTokenUsed             func(ctx context.Context, id uuid.UUID) error
@@ -209,8 +210,17 @@ func (f *fakeRepository) DeleteSessionsByIDs(ctx context.Context, userID uuid.UU
 	return f.deleteSessionsByIDs(ctx, userID, sessionIDs)
 }
 
-func (f *fakeRepository) HasSessionFromIP(ctx context.Context, userID uuid.UUID, ip string) (bool, error) {
-	return f.hasSessionFromIP(ctx, userID, ip)
+func (f *fakeRepository) HasKnownLoginIP(ctx context.Context, userID uuid.UUID, ip string) (bool, error) {
+	return f.hasKnownLoginIP(ctx, userID, ip)
+}
+
+// RecordKnownLoginIP runs in a fire-and-forget goroutine, so a nil hook must
+// be a no-op instead of a panic that would kill the test process.
+func (f *fakeRepository) RecordKnownLoginIP(ctx context.Context, userID uuid.UUID, ip string) error {
+	if f.recordKnownLoginIP == nil {
+		return nil
+	}
+	return f.recordKnownLoginIP(ctx, userID, ip)
 }
 
 func (f *fakeRepository) UpdateSessionToken(ctx context.Context, sessionID uuid.UUID, newToken string, expiresAt time.Time) (string, error) {
