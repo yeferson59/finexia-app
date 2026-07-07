@@ -185,6 +185,7 @@ func (s *Services) sendPasswordChangedAlert(userID uuid.UUID, ipAddress, userAge
 		return
 	}
 
+	ipAddress = sanitizeIP(ipAddress)
 	location := s.locateIP(ipAddress)
 	if location == "" {
 		location = "desconocida"

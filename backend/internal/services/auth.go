@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -75,6 +76,17 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen]
 }
 
+// sanitizeIP discards anything that isn't a real IP literal. c.IP() is
+// fed by a client-influenced header (X-Forwarded-For); a malformed or
+// spoofed value must never be persisted as a "known" login IP or shown back
+// to the user in a security alert as if it were their real address.
+func sanitizeIP(ipAddress string) string {
+	if net.ParseIP(strings.TrimSpace(ipAddress)) == nil {
+		return ""
+	}
+	return ipAddress
+}
+
 // loginAttemptsCacheKey tracks consecutive failed logins per email. The email
 // is hashed so raw addresses never appear as cache keys.
 func loginAttemptsCacheKey(email string) string {
@@ -136,7 +148,7 @@ func (s *Services) revokeRefreshFamily(ctx context.Context, familyID uuid.UUID) 
 }
 
 func (s *Services) Login(ctx context.Context, email, password, ipAddress, userAgent string) (auth.LoginInternalDTO, error) {
-	ipAddress = truncate(ipAddress, 45)
+	ipAddress = sanitizeIP(truncate(ipAddress, 45))
 	userAgent = truncate(userAgent, 255)
 
 	if s.isLoginLocked(ctx, email) {
@@ -475,7 +487,7 @@ func (s *Services) ValidateToken(ctx context.Context, token string) (string, err
 }
 
 func (s *Services) RefreshToken(ctx context.Context, rawToken, ipAddress, userAgent string) (auth.LoginInternalDTO, error) {
-	ipAddress = truncate(ipAddress, 45)
+	ipAddress = sanitizeIP(truncate(ipAddress, 45))
 	userAgent = truncate(userAgent, 255)
 
 	oldHash, err := hashRefreshToken(rawToken)
