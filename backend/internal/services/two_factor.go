@@ -285,7 +285,7 @@ func (s *Services) createTwoFactorPending(ctx context.Context, userID uuid.UUID)
 // recovery code for a real session. Attempts are counted per pending token;
 // too many failures kill the token and force a fresh password login.
 func (s *Services) CompleteTwoFactorLogin(ctx context.Context, rawToken, code, ipAddress, userAgent string) (auth.LoginInternalDTO, error) {
-	ipAddress = truncate(ipAddress, 45)
+	ipAddress = sanitizeIP(truncate(ipAddress, 45))
 	userAgent = truncate(userAgent, 255)
 
 	hash, err := hashRefreshToken(rawToken)
@@ -388,6 +388,7 @@ func (s *Services) sendTwoFactorAlert(userID uuid.UUID, event, detail, ipAddress
 		return
 	}
 
+	ipAddress = sanitizeIP(ipAddress)
 	location := s.locateIP(ipAddress)
 	if location == "" {
 		location = "desconocida"
