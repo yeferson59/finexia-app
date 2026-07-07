@@ -31,13 +31,11 @@ func New() *Client {
 // leave the process: they resolve to "" immediately, as does any API failure.
 func (c *Client) Locate(ctx context.Context, ip string) string {
 	parsed := net.ParseIP(strings.TrimSpace(ip))
-	if parsed == nil || parsed.IsLoopback() || parsed.IsPrivate() ||
-		parsed.IsUnspecified() || parsed.IsLinkLocalUnicast() || parsed.IsLinkLocalMulticast() {
+	if parsed == nil || parsed.IsLoopback() || parsed.IsPrivate() || parsed.IsUnspecified() || parsed.IsLinkLocalUnicast() || parsed.IsLinkLocalMulticast() {
 		return ""
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		c.baseURL+"/"+parsed.String()+"?fields=success,city,region,country", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/"+parsed.String()+"?fields=success,city,region,country", nil)
 	if err != nil {
 		return ""
 	}
@@ -58,6 +56,7 @@ func (c *Client) Locate(ctx context.Context, ip string) string {
 		Region  string `json:"region"`
 		Country string `json:"country"`
 	}
+
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil || !body.Success {
 		return ""
 	}
