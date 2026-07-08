@@ -53,7 +53,6 @@ func run() error {
 	defer dbPool.Close()
 
 	storageCache := cfg.ConnectionCache(envs.CacheURL)
-
 	defer func() {
 		if err := storageCache.Close(); err != nil {
 			log.Fatal("failed to close cache store: " + err.Error())
