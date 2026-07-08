@@ -31,25 +31,14 @@ func main() {
 func run() error {
 	cfg := config.New()
 	envs, ctx := cfg.LoadEnvs(), context.Background()
-
-	// The API runs behind the SvelteKit SSR server (and possibly a load
-	// balancer), so without trusting X-Forwarded-For every rate limiter would
-	// key all end users under the proxy's single IP. Only loopback/link-local/
-	// private peers (plus TRUSTED_PROXIES) are trusted, so a directly-connected
-	// public client cannot spoof its IP.
 	app := fiber.New(fiber.Config{
-		JSONEncoder:     sonic.ConfigFastest.Marshal,
-		JSONDecoder:     sonic.ConfigFastest.Unmarshal,
-		StructValidator: new(structValidator{validate: validator.New()}),
-		ProxyHeader:     fiber.HeaderXForwardedFor,
-		TrustProxy:      envs.TrustProxy,
-		// Without validation, a trusted peer that omits X-Forwarded-For would
-		// yield an empty c.IP(); with it, Fiber falls back to the remote IP.
+		JSONEncoder:        sonic.ConfigFastest.Marshal,
+		JSONDecoder:        sonic.ConfigFastest.Unmarshal,
+		StructValidator:    new(structValidator{validate: validator.New()}),
+		ProxyHeader:        fiber.HeaderXForwardedFor,
+		TrustProxy:         envs.TrustProxy,
 		EnableIPValidation: true,
-		// Spreadsheet imports upload the workbook itself; Fiber's 4 MiB
-		// default rejects them with an opaque 413 before the handler can
-		// answer with a useful error.
-		BodyLimit: 10 * 1024 * 1024,
+		BodyLimit:          10 * 1024 * 1024,
 		TrustProxyConfig: fiber.TrustProxyConfig{
 			Loopback:  true,
 			LinkLocal: true,
