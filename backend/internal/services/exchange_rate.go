@@ -57,26 +57,26 @@ func (s *Services) SyncExchangeRates(ctx context.Context) ([]entities.ExchangeRa
 	for i, pair := range defaultPairs {
 		result, err := s.priceProvider.FetchExchangeRate(ctx, pair.From, pair.To)
 		if err != nil {
-			log.Error("fetch failed", logger.Err(err), logger.Str("pair", pair.From+"/"+pair.To))
+			log.Error(ctx, "fetch failed", logger.Err(err), logger.Str("pair", pair.From+"/"+pair.To))
 			errs = append(errs, err)
 			continue
 		}
 
 		rate, err := money.NewFromString(result.Rate)
 		if err != nil {
-			log.Error("parse rate failed", logger.Err(err), logger.Str("pair", pair.From+"/"+pair.To), logger.Str("raw", result.Rate))
+			log.Error(ctx, "parse rate failed", logger.Err(err), logger.Str("pair", pair.From+"/"+pair.To), logger.Str("raw", result.Rate))
 			errs = append(errs, err)
 			continue
 		}
 
 		er, err := s.repos.UpsertExchangeRate(ctx, pair.From, pair.To, rate, result.FetchedAt)
 		if err != nil {
-			log.Error("upsert failed", logger.Err(err), logger.Str("pair", pair.From+"/"+pair.To))
+			log.Error(ctx, "upsert failed", logger.Err(err), logger.Str("pair", pair.From+"/"+pair.To))
 			errs = append(errs, err)
 			continue
 		}
 
-		log.Info("rate upserted", logger.Str("pair", pair.From+"/"+pair.To), logger.Str("rate", er.Rate.String()))
+		log.Info(ctx, "rate upserted", logger.Str("pair", pair.From+"/"+pair.To), logger.Str("rate", er.Rate.String()))
 		results = append(results, er)
 
 		// Alpha Vantage free tier allows 5 req/min; sleep between pairs to avoid hitting the limit
@@ -129,7 +129,7 @@ func (s *Services) SyncExchangeRateByID(ctx context.Context, id uuid.UUID) (enti
 		return entities.ExchangeRate{}, err
 	}
 
-	log.Info("rate synced", logger.Str("pair", existing.FromCurrency+"/"+existing.ToCurrency), logger.Str("rate", updated.Rate.String()))
+	log.Info(ctx, "rate synced", logger.Str("pair", existing.FromCurrency+"/"+existing.ToCurrency), logger.Str("rate", updated.Rate.String()))
 	return updated, nil
 }
 

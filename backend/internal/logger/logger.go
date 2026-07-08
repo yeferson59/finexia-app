@@ -1,6 +1,9 @@
 package logger
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type fieldKind uint8
 
@@ -72,12 +75,12 @@ func Any(key string, val any) Field {
 
 // Logger is the injectable interface used by all application components.
 type Logger interface {
-	Debug(msg string, fields ...Field)
-	Info(msg string, fields ...Field)
-	Warn(msg string, fields ...Field)
-	Error(msg string, fields ...Field)
+	Debug(ctx context.Context, msg string, fields ...Field)
+	Info(ctx context.Context, msg string, fields ...Field)
+	Warn(ctx context.Context, msg string, fields ...Field)
+	Error(ctx context.Context, msg string, fields ...Field)
 	// Fatal logs at fatal level then calls os.Exit(1) (in the zerolog implementation).
-	Fatal(msg string, fields ...Field)
+	Fatal(ctx context.Context, msg string, fields ...Field)
 	// With returns a child Logger with the given fields attached to every subsequent entry.
 	With(fields ...Field) Logger
 }

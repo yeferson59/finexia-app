@@ -25,14 +25,15 @@ func NewWeeklySummaryScheduler(svc services.Services, targetHourUTC int, log log
 func (s *WeeklySummaryScheduler) Start(ctx context.Context) {
 	for {
 		next := weeklyNextRunTime(s.targetHour)
-		s.log.Info("next weekly summary scheduled", logger.Time("next_run", next))
+		s.log.Info(ctx, "next weekly summary scheduled", logger.Time("next_run", next))
 
 		select {
 		case <-ctx.Done():
-			s.log.Info("weekly summary scheduler stopped")
+			s.log.Info(ctx, "weekly summary scheduler stopped")
+
 			return
 		case <-time.After(time.Until(next)):
-			s.log.Info("running weekly summary emails")
+			s.log.Info(ctx, "running weekly summary emails")
 			s.runOnce(ctx)
 		}
 	}
@@ -41,12 +42,9 @@ func (s *WeeklySummaryScheduler) Start(ctx context.Context) {
 func (s *WeeklySummaryScheduler) runOnce(ctx context.Context) {
 	sent, errs := s.svc.SendWeeklySummaryEmails(ctx)
 	if len(errs) > 0 {
-		s.log.Error("weekly summary completed with errors",
-			logger.Int("sent", sent),
-			logger.Int("errors", len(errs)),
-		)
+		s.log.Error(ctx, "weekly summary completed with errors", logger.Int("sent", sent), logger.Int("errors", len(errs)))
 	} else {
-		s.log.Info("weekly summary sent", logger.Int("sent", sent))
+		s.log.Info(ctx, "weekly summary sent", logger.Int("sent", sent))
 	}
 }
 
@@ -59,8 +57,11 @@ func weeklyNextRunTime(targetHour int) time.Time {
 		if candidate.After(now) {
 			return candidate
 		}
+
 		daysUntilMonday = 7
 	}
+
 	next := time.Date(now.Year(), now.Month(), now.Day()+daysUntilMonday, targetHour, 0, 0, 0, time.UTC)
+
 	return next
 }

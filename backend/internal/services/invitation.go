@@ -80,10 +80,10 @@ func (s *Services) CreateInvitation(ctx context.Context, email, name, role strin
 	// Advance the waitlist funnel (pending -> invited) if the person was on the
 	// list; a miss is fine, so failures never block the invitation.
 	if err := s.repos.SetWaitlistInvited(ctx, email); err != nil {
-		s.log.Error("create invitation: failed to update waitlist", logger.Err(err))
+		s.log.Error(ctx, "create invitation: failed to update waitlist", logger.Err(err))
 	}
 
-	s.sendInvitationEmail(inv, raw)
+	s.sendInvitationEmail(ctx, inv, raw)
 
 	return inv, nil
 }
@@ -186,7 +186,7 @@ func (s *Services) lookupPendingInvitation(ctx context.Context, rawToken string)
 // sendInvitationEmail delivers the invitation link. Best-effort and async: a
 // mail hiccup must not fail the admin's request, and the invitation can always
 // be resent.
-func (s *Services) sendInvitationEmail(inv entities.Invitation, rawToken string) {
+func (s *Services) sendInvitationEmail(ctx context.Context, inv entities.Invitation, rawToken string) {
 	if s.mail == nil {
 		return
 	}
@@ -202,7 +202,7 @@ func (s *Services) sendInvitationEmail(inv entities.Invitation, rawToken string)
 
 	go func() {
 		if err := s.mail.SendInvitation(inv.Email, data); err != nil {
-			s.log.Error("failed to send invitation email", logger.Err(err))
+			s.log.Error(ctx, "failed to send invitation email", logger.Err(err))
 		}
 	}()
 }

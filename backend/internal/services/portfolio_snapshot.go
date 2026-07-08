@@ -37,20 +37,16 @@ func (s *Services) SyncPortfolioSnapshots(ctx context.Context) (int, []error) {
 			row.TotalGainLoss,
 			row.TotalGainLossPct,
 		); err != nil {
-			log.Error("upsert snapshot failed",
-				logger.Err(err),
-				logger.Str("portfolioId", row.PortfolioID.String()),
-			)
+			log.Error(ctx, "upsert snapshot failed", logger.Err(err), logger.Str("portfolioId", row.PortfolioID.String()))
 			errs = append(errs, err)
+
 			continue
 		}
 		count++
 	}
 
 	_ = s.storage.Set(snapshotSyncCacheKey, []byte(time.Now().UTC().Format(time.RFC3339)), snapshotSyncTTL)
-	log.Info("portfolio snapshot sync completed",
-		logger.Int("snapshotted", count),
-		logger.Int("errors", len(errs)),
-	)
+	log.Info(ctx, "portfolio snapshot sync completed", logger.Int("snapshotted", count), logger.Int("errors", len(errs)))
+
 	return count, errs
 }

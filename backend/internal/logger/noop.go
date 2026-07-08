@@ -1,5 +1,7 @@
 package logger
 
+import "context"
+
 type noopLogger struct{}
 
 // Noop returns a Logger that discards all output.
@@ -7,9 +9,9 @@ type noopLogger struct{}
 // Fatal does NOT call os.Exit — safe to use in tests.
 func Noop() Logger { return &noopLogger{} }
 
-func (n *noopLogger) Debug(_ string, _ ...Field) {}
-func (n *noopLogger) Info(_ string, _ ...Field)  {}
-func (n *noopLogger) Warn(_ string, _ ...Field)  {}
-func (n *noopLogger) Error(_ string, _ ...Field) {}
-func (n *noopLogger) Fatal(_ string, _ ...Field) {}
-func (n *noopLogger) With(_ ...Field) Logger     { return n }
+func (n *noopLogger) Debug(_ context.Context, _ string, _ ...Field) {}
+func (n *noopLogger) Info(_ context.Context, _ string, _ ...Field)  {}
+func (n *noopLogger) Warn(_ context.Context, _ string, _ ...Field)  {}
+func (n *noopLogger) Error(_ context.Context, _ string, _ ...Field) {}
+func (n *noopLogger) Fatal(_ context.Context, _ string, _ ...Field) {}
+func (n *noopLogger) With(_ ...Field) Logger                        { return n }

@@ -27,7 +27,7 @@ var (
 func (s *Services) issueEmailVerification(ctx context.Context, name, email string) {
 	raw, hash, err := generateRefreshToken()
 	if err != nil {
-		s.log.Error("email verification: failed to generate token", logger.Err(err))
+		s.log.Error(ctx, "email verification: failed to generate token", logger.Err(err))
 		return
 	}
 
@@ -35,11 +35,11 @@ func (s *Services) issueEmailVerification(ctx context.Context, name, email strin
 
 	v, err := s.repos.CreateEmailVerification(ctx, email, hash, expiresAt)
 	if err != nil {
-		s.log.Error("email verification: failed to create token", logger.Err(err))
+		s.log.Error(ctx, "email verification: failed to create token", logger.Err(err))
 		return
 	}
 
-	s.sendEmailVerificationMail(name, email, raw, v.ExpiresAt)
+	s.sendEmailVerificationMail(ctx, name, email, raw, v.ExpiresAt)
 }
 
 // RequestEmailVerification (re)issues a verification link for an email that
@@ -113,7 +113,7 @@ func (s *Services) lookupEmailVerification(ctx context.Context, rawToken string)
 // sendEmailVerificationMail delivers the verification link. Best-effort and
 // async: a mail hiccup must not fail the caller, and a new link can always be
 // requested.
-func (s *Services) sendEmailVerificationMail(userName, email, rawToken string, expiresAt time.Time) {
+func (s *Services) sendEmailVerificationMail(ctx context.Context, userName, email, rawToken string, expiresAt time.Time) {
 	if s.mail == nil {
 		return
 	}
@@ -129,7 +129,7 @@ func (s *Services) sendEmailVerificationMail(userName, email, rawToken string, e
 
 	go func() {
 		if err := s.mail.SendEmailVerification(email, data); err != nil {
-			s.log.Error("failed to send email verification", logger.Err(err))
+			s.log.Error(ctx, "failed to send email verification", logger.Err(err))
 		}
 	}()
 }

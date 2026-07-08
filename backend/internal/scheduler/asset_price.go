@@ -35,22 +35,22 @@ func (s *AssetPriceScheduler) Start(ctx context.Context) {
 	}
 
 	if s.svc.WasAssetPriceSyncedRecently() {
-		s.log.Info("skipping initial asset price sync — last run within 24h")
+		s.log.Info(ctx, "skipping initial asset price sync — last run within 24h")
 	} else {
-		s.log.Info("running initial asset price sync")
+		s.log.Info(ctx, "running initial asset price sync")
 		s.runOnce(ctx)
 	}
 
 	for {
 		next := assetNextRunTime(s.targetHourUTC)
-		s.log.Info("next asset price sync scheduled", logger.Time("next_run", next))
+		s.log.Info(ctx, "next asset price sync scheduled", logger.Time("next_run", next))
 
 		select {
 		case <-ctx.Done():
-			s.log.Info("asset price scheduler stopped")
+			s.log.Info(ctx, "asset price scheduler stopped")
 			return
 		case <-time.After(time.Until(next)):
-			s.log.Info("running scheduled asset price sync")
+			s.log.Info(ctx, "running scheduled asset price sync")
 			s.runOnce(ctx)
 		}
 	}
@@ -59,9 +59,9 @@ func (s *AssetPriceScheduler) Start(ctx context.Context) {
 func (s *AssetPriceScheduler) runOnce(ctx context.Context) {
 	_, errs := s.svc.SyncAssetPrices(ctx)
 	if len(errs) > 0 {
-		s.log.Error("asset price sync completed with errors", logger.Int("failed_assets", len(errs)))
+		s.log.Error(ctx, "asset price sync completed with errors", logger.Int("failed_assets", len(errs)))
 	} else {
-		s.log.Info("asset price sync completed successfully")
+		s.log.Info(ctx, "asset price sync completed successfully")
 	}
 }
 

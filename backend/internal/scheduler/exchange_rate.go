@@ -27,22 +27,22 @@ func NewExchangeRateScheduler(svc services.Services, targetHourUTC int, log logg
 // Exits cleanly when ctx is cancelled.
 func (s *ExchangeRateScheduler) Start(ctx context.Context) {
 	if s.svc.WasExchangeRateSyncedRecently() {
-		s.log.Info("skipping initial exchange rate sync — last run within 24h")
+		s.log.Info(ctx, "skipping initial exchange rate sync — last run within 24h")
 	} else {
-		s.log.Info("running initial exchange rate sync")
+		s.log.Info(ctx, "running initial exchange rate sync")
 		s.runOnce(ctx)
 	}
 
 	for {
 		next := nextRunTime(s.targetHourUTC)
-		s.log.Info("next exchange rate sync scheduled", logger.Time("next_run", next))
+		s.log.Info(ctx, "next exchange rate sync scheduled", logger.Time("next_run", next))
 
 		select {
 		case <-ctx.Done():
-			s.log.Info("exchange rate scheduler stopped")
+			s.log.Info(ctx, "exchange rate scheduler stopped")
 			return
 		case <-time.After(time.Until(next)):
-			s.log.Info("running scheduled exchange rate sync")
+			s.log.Info(ctx, "running scheduled exchange rate sync")
 			s.runOnce(ctx)
 		}
 	}
@@ -51,9 +51,9 @@ func (s *ExchangeRateScheduler) Start(ctx context.Context) {
 func (s *ExchangeRateScheduler) runOnce(ctx context.Context) {
 	_, errs := s.svc.SyncExchangeRates(ctx)
 	if len(errs) > 0 {
-		s.log.Error("exchange rate sync completed with errors", logger.Int("failed_pairs", len(errs)))
+		s.log.Error(ctx, "exchange rate sync completed with errors", logger.Int("failed_pairs", len(errs)))
 	} else {
-		s.log.Info("exchange rate sync completed successfully")
+		s.log.Info(ctx, "exchange rate sync completed successfully")
 	}
 }
 

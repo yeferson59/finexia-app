@@ -9,8 +9,7 @@ import (
 
 // rfc6238Secret is the ASCII seed "12345678901234567890" from RFC 6238
 // Appendix B, encoded the way our helpers expect it.
-var rfc6238Secret = base32.StdEncoding.WithPadding(base32.NoPadding).
-	EncodeToString([]byte("12345678901234567890"))
+var rfc6238Secret = base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte("12345678901234567890"))
 
 // TestTOTPCodeRFC6238Vectors checks the SHA-1 test vectors from RFC 6238
 // Appendix B (truncated to our 6 digits from the published 8).

@@ -32,22 +32,22 @@ func (s *PortfolioSnapshotScheduler) Start(ctx context.Context) {
 	}
 
 	if s.svc.WasPortfolioSnapshotCreatedToday() {
-		s.log.Info("skipping initial portfolio snapshot — already run today")
+		s.log.Info(ctx, "skipping initial portfolio snapshot — already run today")
 	} else {
-		s.log.Info("running initial portfolio snapshot sync")
+		s.log.Info(ctx, "running initial portfolio snapshot sync")
 		s.runOnce(ctx)
 	}
 
 	for {
 		next := snapshotNextRunTime(s.targetHourUTC)
-		s.log.Info("next portfolio snapshot scheduled", logger.Time("next_run", next))
+		s.log.Info(ctx, "next portfolio snapshot scheduled", logger.Time("next_run", next))
 
 		select {
 		case <-ctx.Done():
-			s.log.Info("portfolio snapshot scheduler stopped")
+			s.log.Info(ctx, "portfolio snapshot scheduler stopped")
 			return
 		case <-time.After(time.Until(next)):
-			s.log.Info("running scheduled portfolio snapshot sync")
+			s.log.Info(ctx, "running scheduled portfolio snapshot sync")
 			s.runOnce(ctx)
 		}
 	}
@@ -56,12 +56,9 @@ func (s *PortfolioSnapshotScheduler) Start(ctx context.Context) {
 func (s *PortfolioSnapshotScheduler) runOnce(ctx context.Context) {
 	n, errs := s.svc.SyncPortfolioSnapshots(ctx)
 	if len(errs) > 0 {
-		s.log.Error("portfolio snapshot sync completed with errors",
-			logger.Int("succeeded", n),
-			logger.Int("failed", len(errs)),
-		)
+		s.log.Error(ctx, "portfolio snapshot sync completed with errors", logger.Int("succeeded", n), logger.Int("failed", len(errs)))
 	} else {
-		s.log.Info("portfolio snapshot sync completed", logger.Int("snapshotted", n))
+		s.log.Info(ctx, "portfolio snapshot sync completed", logger.Int("snapshotted", n))
 	}
 }
 
@@ -71,5 +68,6 @@ func snapshotNextRunTime(targetHour int) time.Time {
 	if !next.After(now) {
 		next = next.Add(24 * time.Hour)
 	}
+
 	return next
 }

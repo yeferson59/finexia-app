@@ -3,14 +3,15 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
 
 	"github.com/bytedance/sonic"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/log"
 
 	"github.com/yeferson59/finexia-app/internal"
 	"github.com/yeferson59/finexia-app/internal/config"
+	"github.com/yeferson59/finexia-app/internal/logger"
 	"github.com/yeferson59/finexia-app/internal/mail"
 )
 
@@ -23,14 +24,21 @@ func (v *structValidator) Validate(out any) error {
 }
 
 func main() {
-	if err := run(); err != nil {
-		log.Fatalf("application error: %v", err)
+	cfg := config.New()
+	envs := cfg.LoadEnvs()
+	log := logger.New(logger.Config{
+		Level:       logger.LevelInfo,
+		Output:      os.Stderr,
+		Environment: envs.Environment,
+	})
+	ctx := context.Background()
+
+	if err := run(ctx, envs, cfg); err != nil {
+		log.With(logger.Str("cmd", "main")).Fatal(ctx, "application error: "+err.Error())
 	}
 }
 
-func run() error {
-	cfg := config.New()
-	envs, ctx := cfg.LoadEnvs(), context.Background()
+func run(ctx context.Context, envs *config.Env, cfg config.Config) error {
 	app := fiber.New(fiber.Config{
 		JSONEncoder:        sonic.ConfigFastest.Marshal,
 		JSONDecoder:        sonic.ConfigFastest.Unmarshal,
@@ -46,6 +54,11 @@ func run() error {
 			Proxies:   envs.TrustedProxies,
 		},
 	})
+	log := logger.New(logger.Config{
+		Level:       logger.LevelInfo,
+		Output:      os.Stderr,
+		Environment: envs.Environment,
+	})
 	dbPool, err := cfg.ConnectionDB(ctx, envs.DatabaseURL)
 	if err != nil {
 		return errors.New("failed to connect to database: " + err.Error())
@@ -55,7 +68,7 @@ func run() error {
 	storageCache := cfg.ConnectionCache(envs.CacheURL)
 	defer func() {
 		if err := storageCache.Close(); err != nil {
-			log.Fatal("failed to close cache store: " + err.Error())
+			log.With(logger.Str("cmd", "run")).Fatal(ctx, "failed to close cache store: "+err.Error())
 		}
 	}()
 
@@ -69,7 +82,7 @@ func run() error {
 		return errors.New("failed to init mail service: " + err.Error())
 	}
 
-	if err := internal.New(app, dbPool, envs, storageCache, s3Client, mailService).Init(ctx); err != nil {
+	if err := internal.New(app, dbPool, envs, storageCache, s3Client, mailService, log).Init(ctx); err != nil {
 		return errors.New("failed to initialize app: " + err.Error())
 	}
 

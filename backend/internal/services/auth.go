@@ -229,7 +229,7 @@ func (s *Services) issueSession(ctx context.Context, userID uuid.UUID, roleName,
 	}
 
 	// Resolved after the fact so the login never waits on the geo lookup.
-	go s.recordSessionLocation(sessionID, ipAddress)
+	go s.recordSessionLocation(ctx, sessionID, ipAddress)
 
 	if !knownIP {
 		go s.sendLoginAlert(userName, userEmail, ipAddress, userAgent)
@@ -276,13 +276,13 @@ func (s *Services) issueSession(ctx context.Context, userID uuid.UUID, roleName,
 
 // recordSessionLocation stamps the session row with the approximate location
 // of its IP. Best-effort: an unknown location just leaves the column empty.
-func (s *Services) recordSessionLocation(sessionID uuid.UUID, ipAddress string) {
+func (s *Services) recordSessionLocation(ctx context.Context, sessionID uuid.UUID, ipAddress string) {
 	location := s.locateIP(ipAddress)
 	if location == "" {
 		return
 	}
-	if err := s.repos.UpdateSessionLocation(context.Background(), sessionID, truncate(location, 120)); err != nil {
-		s.log.Error("failed to record session location", logger.Err(err))
+	if err := s.repos.UpdateSessionLocation(ctx, sessionID, truncate(location, 120)); err != nil {
+		s.log.Error(ctx, "failed to record session location", logger.Err(err))
 	}
 }
 

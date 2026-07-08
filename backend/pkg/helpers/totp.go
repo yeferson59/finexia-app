@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -32,6 +33,7 @@ func GenerateTOTPSecret() (string, error) {
 	if _, err := rand.Read(buf); err != nil {
 		return "", err
 	}
+
 	return base32NoPadding.EncodeToString(buf), nil
 }
 
@@ -83,10 +85,12 @@ func VerifyTOTP(secret, code string, t time.Time) (bool, int64) {
 		if err != nil {
 			return false, 0
 		}
+
 		if subtle.ConstantTimeCompare([]byte(expected), []byte(code)) == 1 {
 			return true, step
 		}
 	}
+
 	return false, 0
 }
 
@@ -95,10 +99,12 @@ func VerifyTOTP(secret, code string, t time.Time) (bool, int64) {
 func BuildOTPAuthURL(issuer, accountName, secret string) string {
 	label := url.PathEscape(issuer + ":" + accountName)
 	params := url.Values{}
+
 	params.Set("secret", secret)
 	params.Set("issuer", issuer)
 	params.Set("algorithm", "SHA1")
-	params.Set("digits", fmt.Sprint(totpDigits))
-	params.Set("period", fmt.Sprint(int(totpPeriod.Seconds())))
+	params.Set("digits", strconv.Itoa(totpDigits))
+	params.Set("period", strconv.Itoa(int(totpPeriod.Seconds())))
+
 	return "otpauth://totp/" + label + "?" + params.Encode()
 }

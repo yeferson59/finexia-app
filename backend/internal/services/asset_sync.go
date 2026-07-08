@@ -64,7 +64,7 @@ func (s *Services) fetchAndUpdatePrice(ctx context.Context, asset entities.Asset
 		priceStr = result.Rate
 
 	default:
-		log.Info("skipped — asset type not supported by Alpha Vantage", logger.Str("ticker", asset.Ticker), logger.Str("type", string(asset.AssetType)))
+		log.Info(ctx, "skipped — asset type not supported by Alpha Vantage", logger.Str("ticker", asset.Ticker), logger.Str("type", string(asset.AssetType)))
 		return entities.Asset{}, true, nil
 	}
 
@@ -80,7 +80,7 @@ func (s *Services) fetchAndUpdatePrice(ctx context.Context, asset entities.Asset
 	if err != nil {
 		return entities.Asset{}, false, fmt.Errorf("persist price for %q: %w", asset.Ticker, err)
 	}
-	log.Info("asset price updated", logger.Str("ticker", asset.Ticker), logger.Str("price", price.String()))
+	log.Info(ctx, "asset price updated", logger.Str("ticker", asset.Ticker), logger.Str("price", price.String()))
 	return updated, false, nil
 }
 
@@ -91,7 +91,7 @@ func (s *Services) SyncAssetPrices(ctx context.Context) ([]entities.Asset, []err
 
 	for _, da := range defaultAssets {
 		if _, err := s.repos.UpsertAsset(ctx, da.Ticker, da.Name, da.AssetType, da.Exchange, da.Currency); err != nil {
-			log.Error("upsert default asset failed", logger.Err(err), logger.Str("ticker", da.Ticker))
+			log.Error(ctx, "upsert default asset failed", logger.Err(err), logger.Str("ticker", da.Ticker))
 			errs = append(errs, err)
 		}
 	}
@@ -115,7 +115,7 @@ func (s *Services) SyncAssetPrices(ctx context.Context) ([]entities.Asset, []err
 
 		updated, skipped, err := s.fetchAndUpdatePrice(ctx, asset, log)
 		if err != nil {
-			log.Error("sync asset failed", logger.Err(err), logger.Str("ticker", asset.Ticker))
+			log.Error(ctx, "sync asset failed", logger.Err(err), logger.Str("ticker", asset.Ticker))
 			errs = append(errs, err)
 			apiCallMade = true
 			continue

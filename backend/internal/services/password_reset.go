@@ -49,7 +49,7 @@ func (s *Services) RequestPasswordReset(ctx context.Context, email string) error
 		return err
 	}
 
-	s.sendPasswordResetEmail(user.Name, user.Email, raw, pr.ExpiresAt)
+	s.sendPasswordResetEmail(ctx, user.Name, user.Email, raw, pr.ExpiresAt)
 
 	return nil
 }
@@ -80,7 +80,7 @@ func (s *Services) ResetPassword(ctx context.Context, rawToken, newPassword, ipA
 	}
 
 	if _, err := s.RevokeOtherSessions(ctx, pr.UserID, ""); err != nil {
-		s.log.Error("reset password: failed to revoke sessions", logger.Err(err))
+		s.log.Error(ctx, "reset password: failed to revoke sessions", logger.Err(err))
 	}
 
 	go s.sendPasswordChangedAlert(pr.UserID, ipAddress, userAgent)
@@ -120,7 +120,7 @@ func (s *Services) lookupPasswordReset(ctx context.Context, rawToken string) (en
 
 // sendPasswordResetEmail delivers the reset link. Best-effort and async: a
 // mail hiccup must not fail the request, and the user can always ask again.
-func (s *Services) sendPasswordResetEmail(userName, email, rawToken string, expiresAt time.Time) {
+func (s *Services) sendPasswordResetEmail(ctx context.Context, userName, email, rawToken string, expiresAt time.Time) {
 	if s.mail == nil {
 		return
 	}
@@ -136,7 +136,7 @@ func (s *Services) sendPasswordResetEmail(userName, email, rawToken string, expi
 
 	go func() {
 		if err := s.mail.SendPasswordReset(email, data); err != nil {
-			s.log.Error("failed to send password reset email", logger.Err(err))
+			s.log.Error(ctx, "failed to send password reset email", logger.Err(err))
 		}
 	}()
 }

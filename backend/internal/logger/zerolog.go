@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"context"
 	"io"
 	"os"
 	"time"
@@ -57,7 +58,9 @@ func New(cfg Config) Logger {
 	return &zeroLogger{zl: zl}
 }
 
-func applyFields(e *zerolog.Event, fields []Field) *zerolog.Event {
+func applyFields(ctx context.Context, e *zerolog.Event, fields []Field) *zerolog.Event {
+	e = e.Ctx(ctx)
+
 	for _, f := range fields {
 		switch f.kind {
 		case fieldStr:
@@ -82,56 +85,57 @@ func applyFields(e *zerolog.Event, fields []Field) *zerolog.Event {
 			e = e.Interface(f.key, f.anyVal)
 		}
 	}
+
 	return e
 }
 
-func (l *zeroLogger) Debug(msg string, fields ...Field) {
-	applyFields(l.zl.Debug(), fields).Msg(msg)
+func (l *zeroLogger) Debug(ctx context.Context, msg string, fields ...Field) {
+	applyFields(ctx, l.zl.Debug(), fields).Msg(msg)
 }
 
-func (l *zeroLogger) Info(msg string, fields ...Field) {
-	applyFields(l.zl.Info(), fields).Msg(msg)
+func (l *zeroLogger) Info(ctx context.Context, msg string, fields ...Field) {
+	applyFields(ctx, l.zl.Info(), fields).Msg(msg)
 }
 
-func (l *zeroLogger) Warn(msg string, fields ...Field) {
-	applyFields(l.zl.Warn(), fields).Msg(msg)
+func (l *zeroLogger) Warn(ctx context.Context, msg string, fields ...Field) {
+	applyFields(ctx, l.zl.Warn(), fields).Msg(msg)
 }
 
-func (l *zeroLogger) Error(msg string, fields ...Field) {
-	applyFields(l.zl.Error(), fields).Msg(msg)
+func (l *zeroLogger) Error(ctx context.Context, msg string, fields ...Field) {
+	applyFields(ctx, l.zl.Error(), fields).Msg(msg)
 }
 
-func (l *zeroLogger) Fatal(msg string, fields ...Field) {
-	applyFields(l.zl.Fatal(), fields).Msg(msg)
+func (l *zeroLogger) Fatal(ctx context.Context, msg string, fields ...Field) {
+	applyFields(ctx, l.zl.Fatal(), fields).Msg(msg)
 }
 
 // With returns a child logger with the given fields pre-attached.
 // The parent logger is not modified.
 func (l *zeroLogger) With(fields ...Field) Logger {
-	ctx := l.zl.With()
+	c := l.zl.With()
 	for _, f := range fields {
 		switch f.kind {
 		case fieldStr:
-			ctx = ctx.Str(f.key, f.strVal)
+			c = c.Str(f.key, f.strVal)
 		case fieldErr:
 			if f.anyVal != nil {
-				ctx = ctx.Err(f.anyVal.(error))
+				c = c.Err(f.anyVal.(error))
 			}
 		case fieldInt:
-			ctx = ctx.Int(f.key, int(f.intVal))
+			c = c.Int(f.key, int(f.intVal))
 		case fieldInt64:
-			ctx = ctx.Int64(f.key, f.intVal)
+			c = c.Int64(f.key, f.intVal)
 		case fieldBool:
-			ctx = ctx.Bool(f.key, f.boolVal)
+			c = c.Bool(f.key, f.boolVal)
 		case fieldFloat64:
-			ctx = ctx.Float64(f.key, f.floatVal)
+			c = c.Float64(f.key, f.floatVal)
 		case fieldTime:
-			ctx = ctx.Time(f.key, f.timeVal)
+			c = c.Time(f.key, f.timeVal)
 		case fieldDur:
-			ctx = ctx.Dur(f.key, f.durVal)
+			c = c.Dur(f.key, f.durVal)
 		case fieldAny:
-			ctx = ctx.Interface(f.key, f.anyVal)
+			c = c.Interface(f.key, f.anyVal)
 		}
 	}
-	return &zeroLogger{zl: ctx.Logger()}
+	return &zeroLogger{zl: c.Logger()}
 }

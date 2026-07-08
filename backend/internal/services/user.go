@@ -162,7 +162,7 @@ func (s *Services) ChangePassword(ctx context.Context, userID uuid.UUID, current
 	// computer) must not survive a password change: only the session that
 	// performed the change stays alive.
 	if _, err := s.RevokeOtherSessions(ctx, userID, currentToken); err != nil {
-		s.log.Error("change password: failed to revoke other sessions", logger.Err(err))
+		s.log.Error(ctx, "change password: failed to revoke other sessions", logger.Err(err))
 	}
 
 	go s.sendPasswordChangedAlert(userID, ipAddress, userAgent)
