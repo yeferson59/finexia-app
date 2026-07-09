@@ -9,6 +9,7 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/services"
 )
 
 func (h *Handlers) GetPortfolios(c fiber.Ctx) error {
@@ -31,7 +32,17 @@ func (h *Handlers) GetPortfoliosSummary(c fiber.Ctx) error {
 		return h.responseBadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	summaries, err := h.services.GetPortfoliosSummary(c, userID)
+	currency := strings.ToUpper(strings.TrimSpace(c.Query("currency")))
+	if currency != "" && !services.IsSupportedDisplayCurrency(currency) {
+		return h.responseBadRequest(c, "Unsupported currency", "currency must be one of: "+strings.Join(services.SupportedDisplayCurrencies, ", "))
+	}
+
+	var summaries []entities.PortfolioSummaryView
+	if currency == "" {
+		summaries, err = h.services.GetPortfoliosSummary(c, userID)
+	} else {
+		summaries, err = h.services.GetPortfoliosSummaryInCurrency(c, userID, currency)
+	}
 	if err != nil {
 		return h.responseFromDomain(c, err, "Error retrieving portfolio summaries", "Could not retrieve portfolio summaries")
 	}

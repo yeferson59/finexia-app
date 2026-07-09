@@ -71,6 +71,29 @@ func (r *Repository) GetExchangeRates(ctx context.Context, offset, limit uint) (
 	return rates, nil
 }
 
+// GetExchangeRateByPair looks up the stored rate for one direction of a
+// currency pair. Rates are synced one-directional (e.g. only EUR->USD is
+// stored, never USD->EUR); callers needing the reverse direction should
+// invert the returned rate themselves.
+func (r *Repository) GetExchangeRateByPair(ctx context.Context, from, to string) (entities.ExchangeRate, error) {
+	var er entities.ExchangeRate
+	var rateStr string
+
+	err := r.db.QueryRow(ctx, `
+		SELECT id, from_currency, to_currency, rate::text, rate_date, fetched_at
+		FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2
+	`, from, to).Scan(&er.ID, &er.FromCurrency, &er.ToCurrency, &rateStr, &er.RateDate, &er.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entities.ExchangeRate{}, errors.New("exchange rate not found")
+		}
+		return entities.ExchangeRate{}, err
+	}
+
+	er.Rate = money.MustFromString(rateStr)
+	return er, nil
+}
+
 func (r *Repository) GetExchangeRateByID(ctx context.Context, id uuid.UUID) (entities.ExchangeRate, error) {
 	var er entities.ExchangeRate
 	var rateStr string

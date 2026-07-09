@@ -1,19 +1,10 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import CardHeader from '$components/ui/card-header.svelte';
-	import Badge from '$components/ui/badge.svelte';
 	import Stat from '$components/ui/stat.svelte';
+	import CurrencyToggle from '$components/dashboard/currency-toggle.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
-
-	function fmtMoney(value: number): string {
-		return privacy.money(
-			'$' +
-				new Intl.NumberFormat('es-CO', {
-					minimumFractionDigits: 2,
-					maximumFractionDigits: 2
-				}).format(value)
-		);
-	}
+	import { formatCurrency } from '$lib/utils';
 
 	interface PortfolioSummary {
 		id: string;
@@ -25,7 +16,12 @@
 		totalPositions: number;
 	}
 
-	const { summaries = [] }: { summaries: PortfolioSummary[] } = $props();
+	const { summaries = [], currency = 'USD' }: { summaries: PortfolioSummary[]; currency?: string } =
+		$props();
+
+	function fmtMoney(value: number): string {
+		return privacy.money(formatCurrency(value, currency));
+	}
 
 	const netWorth = $derived(
 		summaries.reduce((acc, s) => acc + parseFloat(s.totalMarketValue || '0'), 0)
@@ -44,7 +40,7 @@
 <div class="net-worth-card">
 	<CardHeader eyebrow="Patrimonio total" title="Patrimonio Neto">
 		{#snippet action()}
-			<Badge tone="neutral" pill={false}>Acumulado</Badge>
+			<CurrencyToggle {currency} />
 		{/snippet}
 	</CardHeader>
 

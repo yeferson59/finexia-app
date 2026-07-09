@@ -106,6 +106,7 @@ type Repository interface {
 	UpsertExchangeRate(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (entities.ExchangeRate, error)
 	GetExchangeRates(ctx context.Context, offset, limit uint) ([]entities.ExchangeRate, error)
 	GetExchangeRateByID(ctx context.Context, id uuid.UUID) (entities.ExchangeRate, error)
+	GetExchangeRateByPair(ctx context.Context, from, to string) (entities.ExchangeRate, error)
 	UpdateExchangeRateByID(ctx context.Context, id uuid.UUID, rate money.Decimal) (entities.ExchangeRate, error)
 	SaveWaitlistEmail(ctx context.Context, email string) error
 	ListWaitlist(ctx context.Context, offset, limit uint) ([]entities.Waitlist, uint, error)

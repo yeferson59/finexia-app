@@ -9,12 +9,15 @@ interface PortfolioSummary {
 	name: string;
 	type: string;
 	baseCurrency: string;
+	displayCurrency: string;
 	totalPositions: number;
 	totalCostBase: string;
 	totalMarketValue: string;
 	totalGainLoss: string;
 	totalGainLossPct: string;
 }
+
+const SUPPORTED_CURRENCIES = ['USD', 'COP'];
 
 interface AllocationItem {
 	category: string;
@@ -52,12 +55,15 @@ interface GrowthSummary {
 	totalGrowthPct: string;
 }
 
-export const load: PageServerLoad = async ({ cookies, fetch }) => {
+export const load: PageServerLoad = async ({ cookies, fetch, url }) => {
 	const event = { cookies, fetch };
+
+	const requestedCurrency = url.searchParams.get('currency')?.toUpperCase() ?? '';
+	const currency = SUPPORTED_CURRENCIES.includes(requestedCurrency) ? requestedCurrency : 'USD';
 
 	const [transactionsRes, summaryRes, allocationRes, growthRes] = await Promise.all([
 		authedFetchSafe(event, '/portfolios/transactions'),
-		authedFetchSafe(event, '/portfolios/summary'),
+		authedFetchSafe(event, `/portfolios/summary?currency=${currency}`),
 		authedFetchSafe(event, '/portfolios/allocation'),
 		authedFetchSafe(event, '/portfolios/growth')
 	]);
@@ -89,7 +95,7 @@ export const load: PageServerLoad = async ({ cookies, fetch }) => {
 		if (success && data) portfolioGrowth = data;
 	}
 
-	return { recentTransactions, portfolioSummaries, allocation, portfolioGrowth };
+	return { recentTransactions, portfolioSummaries, allocation, portfolioGrowth, currency };
 };
 
 export const actions = {

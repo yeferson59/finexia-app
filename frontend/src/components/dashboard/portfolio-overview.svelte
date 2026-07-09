@@ -3,12 +3,14 @@
 	import CardHeader from '$components/ui/card-header.svelte';
 	import Stat from '$components/ui/stat.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
+	import { formatCurrency } from '$lib/utils';
 
 	interface PortfolioSummary {
 		id: string;
 		name: string;
 		type: string;
 		baseCurrency: string;
+		displayCurrency?: string;
 		totalPositions: number;
 		totalCostBase: string;
 		totalMarketValue: string;
@@ -16,7 +18,8 @@
 		totalGainLossPct: string;
 	}
 
-	const { summaries = [] }: { summaries: PortfolioSummary[] } = $props();
+	const { summaries = [], currency = 'USD' }: { summaries: PortfolioSummary[]; currency?: string } =
+		$props();
 
 	const totalInvested = $derived(
 		summaries.reduce((acc, s) => acc + parseFloat(s.totalCostBase || '0'), 0)
@@ -29,15 +32,8 @@
 	);
 	const totalGainLossPct = $derived(totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0);
 
-	function fmt(value: number): string {
-		return new Intl.NumberFormat('es-CO', {
-			minimumFractionDigits: 2,
-			maximumFractionDigits: 2
-		}).format(value);
-	}
-
-	function fmtMoney(value: number): string {
-		return privacy.money('$' + fmt(value));
+	function fmtMoney(value: number, currencyCode = currency): string {
+		return privacy.money(formatCurrency(value, currencyCode));
 	}
 
 	function fmtPct(value: number): string {
@@ -82,16 +78,17 @@
 				{@const costBase = parseFloat(s.totalCostBase || '0')}
 				{@const pct = parseFloat(s.totalGainLossPct || '0')}
 				{@const isUp = gainLoss >= 0}
+				{@const rowCurrency = s.displayCurrency || s.baseCurrency}
 				<div class="list-row">
 					<div class="portfolio-name">
 						<span class="name">{s.name}</span>
-						<span class="currency">{s.baseCurrency}</span>
+						<span class="currency">{rowCurrency}</span>
 					</div>
 					<span class="type-badge">{s.type}</span>
-					<span class="align-right mono">{fmtMoney(marketValue)}</span>
-					<span class="align-right mono dim">{fmtMoney(costBase)}</span>
+					<span class="align-right mono">{fmtMoney(marketValue, rowCurrency)}</span>
+					<span class="align-right mono dim">{fmtMoney(costBase, rowCurrency)}</span>
 					<div class="align-right gain-cell" class:positive={isUp} class:negative={!isUp}>
-						<span class="mono">{isUp ? '+' : '−'}{fmtMoney(Math.abs(gainLoss))}</span>
+						<span class="mono">{isUp ? '+' : '−'}{fmtMoney(Math.abs(gainLoss), rowCurrency)}</span>
 						<span class="pct">{isUp ? '+' : ''}{fmtPct(pct)}%</span>
 					</div>
 				</div>

@@ -140,3 +140,62 @@ func TestSyncExchangeRates(t *testing.T) {
 		}
 	})
 }
+
+func TestGetConversionRate(t *testing.T) {
+	t.Run("same currency needs no lookup", func(t *testing.T) {
+		repo := &fakeRepository{
+			getExchangeRateByPair: func(context.Context, string, string) (entities.ExchangeRate, error) {
+				t.Error("no rate lookup expected for a same-currency conversion")
+				return entities.ExchangeRate{}, errors.New("unexpected call")
+			},
+		}
+		svc := newTestServices(repo, newMemStorage())
+
+		rate, err := svc.GetConversionRate(context.Background(), "usd", "USD")
+		if err != nil {
+			t.Fatalf("GetConversionRate: %v", err)
+		}
+		if rate.String() != "1" {
+			t.Errorf("rate = %s, want 1", rate.String())
+		}
+	})
+
+	t.Run("hops through USD when neither direct nor inverse pair is synced", func(t *testing.T) {
+		// Only EUR->USD and USD->COP are ever synced (see defaultPairs); a
+		// direct EUR<->COP rate never exists, so this must chain both legs.
+		repo := &fakeRepository{
+			getExchangeRateByPair: func(_ context.Context, from, to string) (entities.ExchangeRate, error) {
+				switch {
+				case from == "EUR" && to == "USD":
+					return entities.ExchangeRate{FromCurrency: "EUR", ToCurrency: "USD", Rate: mustDecimal(t, "1.10")}, nil
+				case from == "USD" && to == "COP":
+					return entities.ExchangeRate{FromCurrency: "USD", ToCurrency: "COP", Rate: mustDecimal(t, "4000")}, nil
+				default:
+					return entities.ExchangeRate{}, errors.New("exchange rate not found")
+				}
+			},
+		}
+		svc := newTestServices(repo, newMemStorage())
+
+		rate, err := svc.GetConversionRate(context.Background(), "EUR", "COP")
+		if err != nil {
+			t.Fatalf("GetConversionRate: %v", err)
+		}
+		if rate.String() != "4400" {
+			t.Errorf("rate = %s, want 4400 (1.10 * 4000)", rate.String())
+		}
+	})
+
+	t.Run("returns ErrExchangeRateUnavailable when no path connects the pair", func(t *testing.T) {
+		repo := &fakeRepository{
+			getExchangeRateByPair: func(context.Context, string, string) (entities.ExchangeRate, error) {
+				return entities.ExchangeRate{}, errors.New("exchange rate not found")
+			},
+		}
+		svc := newTestServices(repo, newMemStorage())
+
+		if _, err := svc.GetConversionRate(context.Background(), "GBP", "JPY"); !errors.Is(err, ErrExchangeRateUnavailable) {
+			t.Errorf("err = %v, want ErrExchangeRateUnavailable", err)
+		}
+	})
+}

@@ -65,6 +65,7 @@ func (r *Repository) GetPortfoliosSummaryByUserID(ctx context.Context, userID uu
 		); err != nil {
 			return nil, err
 		}
+		item.DisplayCurrency = item.BaseCurrency
 		result = append(result, item)
 	}
 	return result, nil

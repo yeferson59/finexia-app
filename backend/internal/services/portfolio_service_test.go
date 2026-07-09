@@ -195,6 +195,112 @@ func TestGetPortfoliosSummary(t *testing.T) {
 	}
 }
 
+func TestGetPortfoliosSummaryInCurrency(t *testing.T) {
+	userID := uuid.New()
+
+	t.Run("same currency skips conversion but still sets DisplayCurrency", func(t *testing.T) {
+		repo := &fakeRepository{
+			getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]entities.PortfolioSummaryView, error) {
+				return []entities.PortfolioSummaryView{{
+					BaseCurrency: "USD", TotalMarketValue: "1000", TotalCostBase: "900",
+					TotalGainLoss: "100", TotalGainLossPct: "11.11",
+				}}, nil
+			},
+			getExchangeRateByPair: func(context.Context, string, string) (entities.ExchangeRate, error) {
+				t.Error("no rate lookup expected when currencies match")
+				return entities.ExchangeRate{}, errors.New("unexpected call")
+			},
+		}
+		svc := newTestServices(repo, newMemStorage())
+
+		got, err := svc.GetPortfoliosSummaryInCurrency(context.Background(), userID, "USD")
+		if err != nil {
+			t.Fatalf("GetPortfoliosSummaryInCurrency: %v", err)
+		}
+		if len(got) != 1 || got[0].DisplayCurrency != "USD" || got[0].TotalMarketValue != "1000" {
+			t.Errorf("summaries = %+v", got)
+		}
+	})
+
+	t.Run("converts totals with the direct rate and leaves the percentage untouched", func(t *testing.T) {
+		repo := &fakeRepository{
+			getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]entities.PortfolioSummaryView, error) {
+				return []entities.PortfolioSummaryView{{
+					BaseCurrency: "USD", TotalMarketValue: "1000", TotalCostBase: "900",
+					TotalGainLoss: "100", TotalGainLossPct: "11.11",
+				}}, nil
+			},
+			getExchangeRateByPair: func(_ context.Context, from, to string) (entities.ExchangeRate, error) {
+				if from == "USD" && to == "COP" {
+					return entities.ExchangeRate{FromCurrency: "USD", ToCurrency: "COP", Rate: mustDecimal(t, "4000")}, nil
+				}
+				return entities.ExchangeRate{}, errors.New("exchange rate not found")
+			},
+		}
+		svc := newTestServices(repo, newMemStorage())
+
+		got, err := svc.GetPortfoliosSummaryInCurrency(context.Background(), userID, "COP")
+		if err != nil {
+			t.Fatalf("GetPortfoliosSummaryInCurrency: %v", err)
+		}
+		if len(got) != 1 {
+			t.Fatalf("summaries = %+v, want one", got)
+		}
+		s := got[0]
+		if s.DisplayCurrency != "COP" {
+			t.Errorf("DisplayCurrency = %s, want COP", s.DisplayCurrency)
+		}
+		if s.TotalMarketValue != "4000000" || s.TotalCostBase != "3600000" || s.TotalGainLoss != "400000" {
+			t.Errorf("converted totals = %+v", s)
+		}
+		if s.TotalGainLossPct != "11.11" {
+			t.Errorf("TotalGainLossPct = %s, want unchanged 11.11", s.TotalGainLossPct)
+		}
+	})
+
+	t.Run("falls back to the inverse rate when only the opposite pair is synced", func(t *testing.T) {
+		repo := &fakeRepository{
+			getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]entities.PortfolioSummaryView, error) {
+				return []entities.PortfolioSummaryView{{
+					BaseCurrency: "COP", TotalMarketValue: "4000000", TotalCostBase: "0",
+					TotalGainLoss: "0", TotalGainLossPct: "0",
+				}}, nil
+			},
+			getExchangeRateByPair: func(_ context.Context, from, to string) (entities.ExchangeRate, error) {
+				if from == "USD" && to == "COP" {
+					return entities.ExchangeRate{FromCurrency: "USD", ToCurrency: "COP", Rate: mustDecimal(t, "4000")}, nil
+				}
+				return entities.ExchangeRate{}, errors.New("exchange rate not found")
+			},
+		}
+		svc := newTestServices(repo, newMemStorage())
+
+		got, err := svc.GetPortfoliosSummaryInCurrency(context.Background(), userID, "USD")
+		if err != nil {
+			t.Fatalf("GetPortfoliosSummaryInCurrency: %v", err)
+		}
+		if got[0].TotalMarketValue != "1000" {
+			t.Errorf("TotalMarketValue = %s, want 1000", got[0].TotalMarketValue)
+		}
+	})
+
+	t.Run("propagates an error when no rate connects the pair", func(t *testing.T) {
+		repo := &fakeRepository{
+			getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]entities.PortfolioSummaryView, error) {
+				return []entities.PortfolioSummaryView{{BaseCurrency: "EUR", TotalMarketValue: "100"}}, nil
+			},
+			getExchangeRateByPair: func(context.Context, string, string) (entities.ExchangeRate, error) {
+				return entities.ExchangeRate{}, errors.New("exchange rate not found")
+			},
+		}
+		svc := newTestServices(repo, newMemStorage())
+
+		if _, err := svc.GetPortfoliosSummaryInCurrency(context.Background(), userID, "COP"); !errors.Is(err, ErrExchangeRateUnavailable) {
+			t.Errorf("err = %v, want ErrExchangeRateUnavailable", err)
+		}
+	})
+}
+
 func TestGetPortfolio(t *testing.T) {
 	userID, portfolioID := uuid.New(), uuid.New()
 
