@@ -81,6 +81,7 @@ type fakeRepository struct {
 	getAllPortfolioSummaryRows    func(ctx context.Context) ([]entities.PortfolioSnapshotRow, error)
 	upsertPortfolioSnapshot       func(ctx context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, currency, totalGainLoss, totalGainLossPct string) error
 	upsertExchangeRate            func(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (entities.ExchangeRate, error)
+	getExchangeRateByPair         func(ctx context.Context, from, to string) (entities.ExchangeRate, error)
 	saveWaitlistEmail             func(ctx context.Context, email string) error
 	importEntryTransactions       func(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []entities.ImportTransactionRow) (int, error)
 
@@ -426,6 +427,10 @@ func (f *fakeRepository) UpsertPortfolioSnapshot(ctx context.Context, portfolioI
 
 func (f *fakeRepository) UpsertExchangeRate(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (entities.ExchangeRate, error) {
 	return f.upsertExchangeRate(ctx, from, to, rate, rateDate)
+}
+
+func (f *fakeRepository) GetExchangeRateByPair(ctx context.Context, from, to string) (entities.ExchangeRate, error) {
+	return f.getExchangeRateByPair(ctx, from, to)
 }
 
 func (f *fakeRepository) SaveWaitlistEmail(ctx context.Context, email string) error {

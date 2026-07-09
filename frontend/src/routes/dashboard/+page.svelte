@@ -25,7 +25,7 @@
 </PageHeader>
 
 <section class="net-worth-section" aria-labelledby="dashboard-title">
-	<NetWorthCard summaries={data.portfolioSummaries} />
+	<NetWorthCard summaries={data.portfolioSummaries} currency={data.currency} />
 </section>
 
 <section class="growth-section" aria-label="Crecimiento del portafolio">
@@ -34,7 +34,7 @@
 
 <section class="content-grid" aria-label="Resumen financiero">
 	<div class="grid-item full-width">
-		<PortfolioOverview summaries={data.portfolioSummaries} />
+		<PortfolioOverview summaries={data.portfolioSummaries} currency={data.currency} />
 	</div>
 
 	<div class="grid-item">

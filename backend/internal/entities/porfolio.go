@@ -352,6 +352,10 @@ type PortfolioSummaryView struct {
 	TotalGainLoss    string        `json:"totalGainLoss"`
 	TotalGainLossPct string        `json:"totalGainLossPct"`
 	CreatedAt        time.Time     `json:"createdAt"`
+	// DisplayCurrency is the currency the totals above are expressed in. It
+	// equals BaseCurrency unless the caller requested conversion to another
+	// currency (see Services.GetPortfoliosSummaryInCurrency).
+	DisplayCurrency string `json:"displayCurrency"`
 }
 
 type PorfolioSummary struct {

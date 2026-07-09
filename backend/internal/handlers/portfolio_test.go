@@ -41,6 +41,7 @@ type stubRepository struct {
 	getRecentTransactionsByUser     func(ctx context.Context, userID uuid.UUID, limit int) ([]entities.Transaction, error)
 	getAssetAllocationByUserID      func(ctx context.Context, userID uuid.UUID) ([]entities.AllocationItem, error)
 	getPortfoliosSummaryByUserID    func(ctx context.Context, userID uuid.UUID) ([]entities.PortfolioSummaryView, error)
+	getExchangeRateByPair           func(ctx context.Context, from, to string) (entities.ExchangeRate, error)
 }
 
 func (s *stubRepository) GetPortfoliosByUserID(ctx context.Context, userID uuid.UUID) ([]entities.Portfolio, error) {
@@ -101,6 +102,10 @@ func (s *stubRepository) GetAssetAllocationByUserID(ctx context.Context, userID 
 
 func (s *stubRepository) GetPortfoliosSummaryByUserID(ctx context.Context, userID uuid.UUID) ([]entities.PortfolioSummaryView, error) {
 	return s.getPortfoliosSummaryByUserID(ctx, userID)
+}
+
+func (s *stubRepository) GetExchangeRateByPair(ctx context.Context, from, to string) (entities.ExchangeRate, error) {
+	return s.getExchangeRateByPair(ctx, from, to)
 }
 
 func newTestHandlers(repo services.Repository) *Handlers {
@@ -716,5 +721,53 @@ func TestGetPortfoliosSummaryHandler(t *testing.T) {
 	data, _ := payload["data"].([]any)
 	if len(data) != 1 {
 		t.Errorf("data = %v, want one summary", payload["data"])
+	}
+}
+
+func TestGetPortfoliosSummaryHandlerCurrencyConversion(t *testing.T) {
+	userID := uuid.New()
+	repo := &stubRepository{
+		getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]entities.PortfolioSummaryView, error) {
+			return []entities.PortfolioSummaryView{{
+				Name: "Growth", BaseCurrency: "USD",
+				TotalMarketValue: "1000", TotalCostBase: "900", TotalGainLoss: "100", TotalGainLossPct: "11.11",
+			}}, nil
+		},
+		getExchangeRateByPair: func(_ context.Context, from, to string) (entities.ExchangeRate, error) {
+			if from == "USD" && to == "COP" {
+				return entities.ExchangeRate{FromCurrency: "USD", ToCurrency: "COP", Rate: money.MustFromString("4000")}, nil
+			}
+			return entities.ExchangeRate{}, errors.New("exchange rate not found")
+		},
+	}
+	h := newTestHandlers(repo)
+	app := fiber.New()
+	app.Use(authed(userID))
+	app.Get("/summary", h.GetPortfoliosSummary)
+
+	_, status, payload := doJSON(t, app, "GET", "/summary?currency=cop", "")
+	if status != fiber.StatusOK {
+		t.Fatalf("status = %d, want 200", status)
+	}
+	data, _ := payload["data"].([]any)
+	if len(data) != 1 {
+		t.Fatalf("data = %v, want one summary", payload["data"])
+	}
+	item, _ := data[0].(map[string]any)
+	if item["totalMarketValue"] != "4000000" || item["displayCurrency"] != "COP" {
+		t.Errorf("item = %+v, want totalMarketValue=4000000 displayCurrency=COP", item)
+	}
+}
+
+func TestGetPortfoliosSummaryHandlerRejectsUnsupportedCurrency(t *testing.T) {
+	userID := uuid.New()
+	h := newTestHandlers(&stubRepository{})
+	app := fiber.New()
+	app.Use(authed(userID))
+	app.Get("/summary", h.GetPortfoliosSummary)
+
+	_, status, _ := doJSON(t, app, "GET", "/summary?currency=xyz", "")
+	if status != fiber.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", status)
 	}
 }

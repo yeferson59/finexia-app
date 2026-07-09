@@ -65,6 +65,57 @@ func (s *Services) GetPortfoliosSummary(ctx context.Context, userID uuid.UUID) (
 	return s.repos.GetPortfoliosSummaryByUserID(ctx, userID)
 }
 
+// GetPortfoliosSummaryInCurrency behaves like GetPortfoliosSummary but
+// converts each portfolio's totals from its own base currency into
+// targetCurrency, so a user with portfolios in different currencies gets a
+// single, comparable display currency.
+func (s *Services) GetPortfoliosSummaryInCurrency(ctx context.Context, userID uuid.UUID, targetCurrency string) ([]entities.PortfolioSummaryView, error) {
+	summaries, err := s.repos.GetPortfoliosSummaryByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, summary := range summaries {
+		converted, err := s.convertSummaryTotals(ctx, summary, targetCurrency)
+		if err != nil {
+			return nil, err
+		}
+		summaries[i] = converted
+	}
+
+	return summaries, nil
+}
+
+func (s *Services) convertSummaryTotals(ctx context.Context, summary entities.PortfolioSummaryView, targetCurrency string) (entities.PortfolioSummaryView, error) {
+	rate, err := s.GetConversionRate(ctx, summary.BaseCurrency, targetCurrency)
+	if err != nil {
+		return entities.PortfolioSummaryView{}, err
+	}
+
+	convert := func(raw string) (string, error) {
+		amount, err := money.NewFromString(raw)
+		if err != nil {
+			return raw, err
+		}
+		return amount.Mul(rate).String(), nil
+	}
+
+	var convErr error
+	if summary.TotalCostBase, convErr = convert(summary.TotalCostBase); convErr != nil {
+		return entities.PortfolioSummaryView{}, convErr
+	}
+	if summary.TotalMarketValue, convErr = convert(summary.TotalMarketValue); convErr != nil {
+		return entities.PortfolioSummaryView{}, convErr
+	}
+	if summary.TotalGainLoss, convErr = convert(summary.TotalGainLoss); convErr != nil {
+		return entities.PortfolioSummaryView{}, convErr
+	}
+	// TotalGainLossPct is a ratio, not a money amount — currency-invariant.
+
+	summary.DisplayCurrency = targetCurrency
+	return summary, nil
+}
+
 func (s *Services) GetPortfolio(ctx context.Context, userID, portfolioID uuid.UUID) (entities.Portfolio, error) {
 	// The portfolio header and its entries are independent queries; running
 	// them concurrently halves the latency of the portfolio detail endpoint.
