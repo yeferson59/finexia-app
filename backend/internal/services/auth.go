@@ -240,7 +240,7 @@ func (s *Services) issueSession(ctx context.Context, userID uuid.UUID, roleName,
 	if ipAddress != "" {
 		go func() {
 			if err := s.repos.RecordKnownLoginIP(context.Background(), userID, ipAddress); err != nil {
-				s.log.Error("failed to record known login ip", logger.Err(err))
+				s.log.Error(ctx, "failed to record known login ip", logger.Err(err))
 			}
 		}()
 	}
