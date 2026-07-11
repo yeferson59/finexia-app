@@ -21,7 +21,7 @@ require (
 	github.com/resend/resend-go/v3 v3.10.1
 	github.com/rs/zerolog v1.35.1
 	github.com/xuri/excelize/v2 v2.11.0
-	github.com/yeferson59/gofinance v1.4.0
+	github.com/yeferson59/gofinance v1.4.2
 	golang.org/x/crypto v0.54.0
 	golang.org/x/sync v0.22.0
 )
