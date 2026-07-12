@@ -324,24 +324,14 @@ golangci-lint run
 - [ ] Comparar cobertura contra la línea base de Fase 0: no debe haber bajado.
 - [ ] Revisión final de `docs/TECH_DEBT.md`: priorizar lo anotado durante la migración.
 
-### Fase 9 — Frontend (opcional, misma filosofía, esfuerzo menor)
+### Fase 9 — Frontend
 
-El frontend SvelteKit ya está razonablemente organizado; estos pasos lo alinean con
-la organización por features:
-
-- [ ] Reorganizar por feature bajo `src/lib/features/` (SvelteKit exige que las rutas
-      vivan en `src/routes`, pero la lógica puede vivir por feature):
-  - [ ] `features/auth/` → componentes de `components/auth/` + lógica de sesión.
-  - [ ] `features/dashboard/` → `components/dashboard/` + stores relacionados.
-  - [ ] `features/landing/` → `components/landing-page/`.
-  - [ ] `lib/ui/` → `components/ui/` (design system compartido).
-- [ ] Centralizar el acceso a la API en un cliente tipado por dominio
-      (`lib/server/api/auth.ts`, `api/portfolio.ts`, …) en vez de llamadas sueltas
-      en cada `+page.server.ts`.
-- [ ] Compartir tipos de la API en `lib/api/types/` generados o mantenidos a mano
-      contra `docs/API.md` (evaluar generación desde OpenAPI como deuda futura).
-- [ ] Ajustar imports/aliases en `svelte.config.js` y verificar:
-      `pnpm check && pnpm lint && pnpm test && pnpm test:e2e`.
+La migración del frontend tiene su propio plan detallado (diagnóstico, arquitectura
+objetivo por features + capa de API tipada, checklist por fases, riesgos y criterios
+de éxito) en [`FRONTEND_ARCHITECTURE_MIGRATION.md`](./FRONTEND_ARCHITECTURE_MIGRATION.md).
+Es independiente de las fases 0–8: puede avanzar en paralelo porque el contrato HTTP
+no cambia en ninguna de las dos migraciones. El único punto de contacto es
+`docs/API.md` (Fase 0 de ambos planes), que actúa como contrato compartido.
 
 ---
 
