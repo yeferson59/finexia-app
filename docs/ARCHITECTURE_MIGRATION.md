@@ -152,18 +152,50 @@ golangci-lint run
 
 ### Fase 0 — Red de seguridad y línea base *(sin mover código)*
 
-- [ ] Ejecutar y guardar la línea base: `go test ./... -coverprofile=baseline.out` y
+- [x] Ejecutar y guardar la línea base: `go test ./... -coverprofile=baseline.out` y
       anotar el % de cobertura por paquete en este documento.
-- [ ] Verificar que CI ejecuta build + tests + lint del backend en cada PR; si no,
-      configurarlo antes de tocar nada.
-- [ ] Identificar rutas HTTP sin ningún test (comparar `routes/*.go` contra los
+
+  **Línea base de cobertura (2026-07-13, `go test ./... -count=1 -coverprofile=baseline.out`):**
+
+  | Paquete | Cobertura |
+  |---|---|
+  | `internal/alphavantage` | 84.8% |
+  | `internal/config` | 73.1% |
+  | `internal/dtos/portfolio` | 100.0% |
+  | `internal/entities` | 65.6% |
+  | `internal/finnhub` | 84.4% |
+  | `internal/geoip` | 81.8% |
+  | `internal/handlers` | 16.0% |
+  | `internal/mail` | 37.0% |
+  | `internal/middlewares` | 17.1% |
+  | `internal/prices` | 100.0% |
+  | `internal/services` | 80.6% |
+  | `internal/yahoo` | 86.2% |
+  | `pkg/helpers` | 93.3% |
+  | `cmd/api`, `internal` (root), `internal/logger`, `internal/migrator`, `internal/repositories`, `internal/routes`, `internal/scheduler` | 0.0% |
+  | `internal/dtos/{auth,marketing,user}`, `pkg/dtos` | sin tests (solo structs) |
+  | **Total** | **42.6%** |
+
+  > Nota: `repositories` (requiere Postgres real), `routes`, `scheduler` y los
+  > bootstrap (`cmd/api`, `internal/root.go`) no tienen tests unitarios; su
+  > comportamiento queda cubierto indirectamente por los tests de handlers y
+  > por los E2E del frontend.
+- [x] Verificar que CI ejecuta build + tests + lint del backend en cada PR; si no,
+      configurarlo antes de tocar nada. → No existía: añadido
+      `.github/workflows/backend-ci.yml` (build + vet + test con cobertura +
+      golangci-lint en cada PR/push que toque `backend/`).
+- [x] Identificar rutas HTTP sin ningún test (comparar `routes/*.go` contra los
       tests de handlers) y añadir al menos un test de humo por ruta crítica
-      (auth login/refresh, CRUD de portfolio, import/export).
-- [ ] Documentar el contrato HTTP actual (métodos, paths, códigos de estado) en
+      (auth login/refresh, CRUD de portfolio, import/export). → El CRUD de
+      portfolio ya estaba cubierto (`handlers/portfolio_test.go`); añadidos
+      `handlers/auth_test.go` (login, refresh, register) y
+      `handlers/export_import_test.go` (export XLSX, import preview e import).
+- [x] Documentar el contrato HTTP actual (métodos, paths, códigos de estado) en
       `docs/API.md` — servirá de contrato de no-regresión.
-- [ ] Congelar convención de errores HTTP actual (helpers de `handlers/helpers.go`)
-      para replicarla idéntica en `platform/httpx`.
-- [ ] Crear `docs/TECH_DEBT.md` para anotar mejoras detectadas durante la migración
+- [x] Congelar convención de errores HTTP actual (helpers de `handlers/helpers.go`)
+      para replicarla idéntica en `platform/httpx`. → Congelada en `docs/API.md`
+      §1.1–§1.2 (sobre de respuesta + mapeo substring→status de `responseFromDomain`).
+- [x] Crear `docs/TECH_DEBT.md` para anotar mejoras detectadas durante la migración
       que NO se harán en los PRs de migración.
 
 ### Fase 1 — Crear `platform/` (shared kernel) *(solo movimientos mecánicos)*
