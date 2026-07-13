@@ -200,28 +200,32 @@ golangci-lint run
 
 ### Fase 1 — Crear `platform/` (shared kernel) *(solo movimientos mecánicos)*
 
-- [ ] Crear `internal/platform/` y mover, en commits separados y con `gofmt`/imports
+- [x] Crear `internal/platform/` y mover, en commits separados y con `gofmt`/imports
       actualizados:
-  - [ ] `internal/config` → `internal/platform/config`
-  - [ ] `internal/logger` → `internal/platform/logger`
-  - [ ] `internal/mail` → `internal/platform/mail`
-  - [ ] `internal/geoip` → `internal/platform/geoip`
-  - [ ] `internal/prices` + `alphavantage` + `finnhub` + `yahoo` →
-        `internal/platform/marketdata` (subpaquetes: `marketdata/alphavantage`, etc.)
-- [ ] Dividir `platform/config`: separar carga de env (`env.go`) de los
+  - [x] `internal/config` → `internal/platform/config`
+  - [x] `internal/logger` → `internal/platform/logger`
+  - [x] `internal/mail` → `internal/platform/mail`
+  - [x] `internal/geoip` → `internal/platform/geoip`
+  - [x] `internal/prices` + `alphavantage` + `finnhub` + `yahoo` →
+        `internal/platform/marketdata` (subpaquetes: `marketdata/alphavantage`, etc.;
+        paquete renombrado `prices` → `marketdata`)
+- [x] Dividir `platform/config`: separar carga de env (`env.go`) de los
       constructores de infraestructura (`db.go`, `cache.go`, `storage.go`) en
       `platform/database`, `platform/cache`, `platform/objectstore`.
-- [ ] Crear `internal/platform/httpx` con:
-  - [ ] Helpers de respuesta/error extraídos de `handlers/helpers.go` (los handlers
+- [x] Crear `internal/platform/httpx` con:
+  - [x] Helpers de respuesta/error extraídos de `handlers/helpers.go` (los handlers
         legacy pasan a delegar en ellos, sin duplicar).
-  - [ ] Los middlewares genéricos (recovery, requestid, response_time, logger, cors,
+  - [x] Los middlewares genéricos (recovery, requestid, response_time, logger, cors,
         helmet, limiter) desde `internal/middlewares`. Los middlewares con lógica de
         negocio (`jwt`, `rbac`) se quedan donde están: migrarán al módulo `auth`.
-- [ ] Añadir `platform/database.WithinTx(ctx, pool, fn)` (helper de transacciones)
+        → `UserLimiter` se queda también en `middlewares` (su key depende del
+        local `LocalUserID` del JWT), delegando en `httpx.KeyedRateLimiter`.
+- [x] Añadir `platform/database.WithinTx(ctx, pool, fn)` (helper de transacciones)
       con test.
-- [ ] Verificación estándar + revisar que ningún paquete `platform/*` importe
+- [x] Verificación estándar + revisar que ningún paquete `platform/*` importe
       `entities`, `services`, `repositories` ni `handlers` (el kernel no conoce el
-      negocio): `grep -rn "finexia-app/internal/\(services\|entities\|repositories\|handlers\)" internal/platform/` debe salir vacío.
+      negocio): `grep -rn "finexia-app/internal/\(services\|entities\|repositories\|handlers\)" internal/platform/` debe salir vacío. → Verificado (grep vacío,
+      incluyendo también `middlewares`, `routes`, `dtos` y `scheduler`).
 
 ### Fase 2 — Módulo piloto: `marketing` *(el dominio más pequeño; valida el patrón)*
 
