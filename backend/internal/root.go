@@ -10,10 +10,10 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal/alphavantage"
 	"github.com/yeferson59/finexia-app/internal/finnhub"
-	"github.com/yeferson59/finexia-app/internal/geoip"
 	"github.com/yeferson59/finexia-app/internal/handlers"
 	"github.com/yeferson59/finexia-app/internal/middlewares"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
+	"github.com/yeferson59/finexia-app/internal/platform/geoip"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/prices"
