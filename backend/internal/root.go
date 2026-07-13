@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/yeferson59/finexia-app/internal/handlers"
+	"github.com/yeferson59/finexia-app/internal/marketing"
 	"github.com/yeferson59/finexia-app/internal/middlewares"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/geoip"
@@ -55,7 +56,10 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	)
 	services := services.New(&repos, b.envs, b.s3Client, b.storage, b.mailService, geoip.New(), b.log, priceProvider)
 	handlers, middlewares := handlers.New(services, b.envs), middlewares.New(ctx, b.envs, b.storage, services)
-	routes := routes.New(b.app, middlewares, handlers)
+
+	marketingModule := marketing.New(marketing.NewPostgresRepository(b.db), b.mailService)
+
+	routes := routes.New(b.app, middlewares, handlers, marketingModule)
 
 	routes.Init()
 

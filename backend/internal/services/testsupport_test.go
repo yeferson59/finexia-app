@@ -82,7 +82,6 @@ type fakeRepository struct {
 	upsertPortfolioSnapshot       func(ctx context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, currency, totalGainLoss, totalGainLossPct string) error
 	upsertExchangeRate            func(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (entities.ExchangeRate, error)
 	getExchangeRateByPair         func(ctx context.Context, from, to string) (entities.ExchangeRate, error)
-	saveWaitlistEmail             func(ctx context.Context, email string) error
 	importEntryTransactions       func(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []entities.ImportTransactionRow) (int, error)
 
 	createInvitation    func(ctx context.Context, email, name, role, tokenHash string, invitedBy *uuid.UUID, expiresAt time.Time) (entities.Invitation, error)
@@ -433,16 +432,11 @@ func (f *fakeRepository) GetExchangeRateByPair(ctx context.Context, from, to str
 	return f.getExchangeRateByPair(ctx, from, to)
 }
 
-func (f *fakeRepository) SaveWaitlistEmail(ctx context.Context, email string) error {
-	return f.saveWaitlistEmail(ctx, email)
-}
-
 // fakeMailer records outbound emails so tests can assert on the alert and
 // summary flows without a Resend client.
 type fakeMailer struct {
 	mu sync.Mutex
 
-	waitlistErr          error
 	activityErr          error
 	securityErr          error
 	weeklyErr            error
@@ -450,7 +444,6 @@ type fakeMailer struct {
 	passwordResetErr     error
 	emailVerificationErr error
 
-	waitlistTo   []string
 	invitationTo []struct {
 		To   string
 		Data mail.InvitationData
@@ -475,16 +468,6 @@ type fakeMailer struct {
 		To   string
 		Data mail.WeeklySummaryData
 	}
-}
-
-func (m *fakeMailer) SendWaitlistConfirmation(email string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.waitlistErr != nil {
-		return m.waitlistErr
-	}
-	m.waitlistTo = append(m.waitlistTo, email)
-	return nil
 }
 
 func (m *fakeMailer) SendActivityAlert(email string, data mail.ActivityAlertData) error {

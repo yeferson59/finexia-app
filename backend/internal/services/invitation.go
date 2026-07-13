@@ -12,6 +12,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/marketing"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
@@ -115,7 +116,7 @@ func (s *Services) RevokeInvitation(ctx context.Context, id uuid.UUID) error {
 	return s.repos.RevokeInvitation(ctx, id)
 }
 
-func (s *Services) ListWaitlist(ctx context.Context, offset, limit uint) ([]entities.Waitlist, uint, error) {
+func (s *Services) ListWaitlist(ctx context.Context, offset, limit uint) ([]marketing.Waitlist, uint, error) {
 	return s.repos.ListWaitlist(ctx, offset, limit)
 }
 

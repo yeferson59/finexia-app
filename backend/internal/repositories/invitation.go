@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/marketing"
 )
 
 // invitationCols is the column list shared by the invitation SELECT queries.
@@ -208,7 +209,7 @@ func (r *Repository) SetWaitlistInvited(ctx context.Context, email string) error
 	return err
 }
 
-func (r *Repository) ListWaitlist(ctx context.Context, offset, limit uint) ([]entities.Waitlist, uint, error) {
+func (r *Repository) ListWaitlist(ctx context.Context, offset, limit uint) ([]marketing.Waitlist, uint, error) {
 	var count uint
 	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM waitlist`).Scan(&count); err != nil {
 		return nil, 0, err
@@ -226,9 +227,9 @@ func (r *Repository) ListWaitlist(ctx context.Context, offset, limit uint) ([]en
 	}
 	defer rows.Close()
 
-	waitlist := make([]entities.Waitlist, 0, limit)
+	waitlist := make([]marketing.Waitlist, 0, limit)
 	for rows.Next() {
-		var w entities.Waitlist
+		var w marketing.Waitlist
 		if err := rows.Scan(&w.ID, &w.Email, &w.Status, &w.InvitedAt, &w.CreatedAt); err != nil {
 			return nil, 0, err
 		}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal/dtos/user"
 	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/marketing"
 	"github.com/yeferson59/finexia-app/internal/services"
 	"github.com/yeferson59/finexia-app/pkg/dtos"
 )
@@ -97,7 +98,7 @@ func (handler *Handlers) ListWaitlist(c fiber.Ctx) error {
 		return handler.responseFromDomain(c, err, "failed to list waitlist", "waitlist:list")
 	}
 
-	return handler.responseStatusOk(c, "waitlist", "waitlist retrieved successfully", dtos.FilterPagination[[]entities.Waitlist, fiber.Map]{
+	return handler.responseStatusOk(c, "waitlist", "waitlist retrieved successfully", dtos.FilterPagination[[]marketing.Waitlist, fiber.Map]{
 		Items:    waitlist,
 		MetaData: paginationMetadata(paginateInfo, count, "limit", "total"),
 	})

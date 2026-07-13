@@ -7,22 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type WaitlistStatus string
-
-const (
-	WaitlistStatusPending  WaitlistStatus = "pending"
-	WaitlistStatusAccepted WaitlistStatus = "invited"
-	WaitlistStatusRejected WaitlistStatus = "registered"
-)
-
-type Waitlist struct {
-	ID        uuid.UUID      `json:"id"`
-	Email     string         `json:"email"`
-	Status    WaitlistStatus `json:"status"`
-	InvitedAt *time.Time     `json:"invitedAt,omitempty"`
-	CreatedAt time.Time      `json:"createdAt"`
-}
-
 // Invitation is a single-use, expiring grant that lets an admin bring a new
 // person into the app. Only the SHA-256 hash of the token is stored; the raw
 // token travels solely in the emailed link, so a database leak cannot be used
