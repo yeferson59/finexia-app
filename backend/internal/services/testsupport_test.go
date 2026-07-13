@@ -13,7 +13,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
-	"github.com/yeferson59/finexia-app/internal/prices"
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 	"github.com/yeferson59/finexia-app/internal/repositories"
 )
 
@@ -585,15 +585,15 @@ func (m *fakeMailer) SendWeeklySummary(email string, data mail.WeeklySummaryData
 
 // fakePriceProvider stubs the market data provider used by the sync jobs.
 type fakePriceProvider struct {
-	fetchQuote        func(ctx context.Context, symbol string) (prices.QuoteResult, error)
-	fetchExchangeRate func(ctx context.Context, from, to string) (prices.ExchangeRateResult, error)
+	fetchQuote        func(ctx context.Context, symbol string) (marketdata.QuoteResult, error)
+	fetchExchangeRate func(ctx context.Context, from, to string) (marketdata.ExchangeRateResult, error)
 }
 
-func (p *fakePriceProvider) FetchQuote(ctx context.Context, symbol string) (prices.QuoteResult, error) {
+func (p *fakePriceProvider) FetchQuote(ctx context.Context, symbol string) (marketdata.QuoteResult, error) {
 	return p.fetchQuote(ctx, symbol)
 }
 
-func (p *fakePriceProvider) FetchExchangeRate(ctx context.Context, from, to string) (prices.ExchangeRateResult, error) {
+func (p *fakePriceProvider) FetchExchangeRate(ctx context.Context, from, to string) (marketdata.ExchangeRateResult, error) {
 	return p.fetchExchangeRate(ctx, from, to)
 }
 
@@ -693,7 +693,7 @@ func newTestServices(repo Repository, storage *memStorage) *Services {
 
 // newTestServicesFull wires a fake mailer and price provider in addition to
 // the repository, for flows that send email or hit market data.
-func newTestServicesFull(repo Repository, storage *memStorage, mailer Mailer, provider prices.Provider) *Services {
+func newTestServicesFull(repo Repository, storage *memStorage, mailer Mailer, provider marketdata.Provider) *Services {
 	svc := New(repo, testConfig(), nil, storage, mailer, nil, logger.Noop(), provider)
 	return &svc
 }

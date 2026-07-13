@@ -11,7 +11,7 @@ import (
 	"github.com/yeferson59/gofinance/money"
 
 	"github.com/yeferson59/finexia-app/internal/entities"
-	"github.com/yeferson59/finexia-app/internal/prices"
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
 
 func TestWasAssetPriceSyncedRecently(t *testing.T) {
@@ -53,11 +53,11 @@ func TestSyncAssetByID(t *testing.T) {
 
 	t.Run("stock price comes from a quote", func(t *testing.T) {
 		provider := &fakePriceProvider{
-			fetchQuote: func(_ context.Context, symbol string) (prices.QuoteResult, error) {
+			fetchQuote: func(_ context.Context, symbol string) (marketdata.QuoteResult, error) {
 				if symbol != "AAPL" {
 					t.Errorf("symbol = %q, want AAPL", symbol)
 				}
-				return prices.QuoteResult{Price: "190.55"}, nil
+				return marketdata.QuoteResult{Price: "190.55"}, nil
 			},
 		}
 		svc := newTestServicesFull(repoFor(stockAsset), newMemStorage(), nil, provider)
@@ -73,11 +73,11 @@ func TestSyncAssetByID(t *testing.T) {
 
 	t.Run("crypto price comes from an exchange rate on the split ticker", func(t *testing.T) {
 		provider := &fakePriceProvider{
-			fetchExchangeRate: func(_ context.Context, from, to string) (prices.ExchangeRateResult, error) {
+			fetchExchangeRate: func(_ context.Context, from, to string) (marketdata.ExchangeRateResult, error) {
 				if from != "BTC" || to != "USD" {
 					t.Errorf("pair = %s/%s, want BTC/USD", from, to)
 				}
-				return prices.ExchangeRateResult{Rate: "64000.10"}, nil
+				return marketdata.ExchangeRateResult{Rate: "64000.10"}, nil
 			},
 		}
 		svc := newTestServicesFull(repoFor(cryptoAsset), newMemStorage(), nil, provider)
@@ -111,8 +111,8 @@ func TestSyncAssetByID(t *testing.T) {
 
 	t.Run("provider failure is wrapped", func(t *testing.T) {
 		provider := &fakePriceProvider{
-			fetchQuote: func(context.Context, string) (prices.QuoteResult, error) {
-				return prices.QuoteResult{}, errors.New("rate limited")
+			fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
+				return marketdata.QuoteResult{}, errors.New("rate limited")
 			},
 		}
 		svc := newTestServicesFull(repoFor(stockAsset), newMemStorage(), nil, provider)
@@ -125,8 +125,8 @@ func TestSyncAssetByID(t *testing.T) {
 	t.Run("unknown currency is rejected", func(t *testing.T) {
 		weird := entities.Asset{ID: assetID, Ticker: "AAPL", AssetType: entities.Stock, Currency: "ZZZ"}
 		provider := &fakePriceProvider{
-			fetchQuote: func(context.Context, string) (prices.QuoteResult, error) {
-				return prices.QuoteResult{Price: "10.00"}, nil
+			fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
+				return marketdata.QuoteResult{Price: "10.00"}, nil
 			},
 		}
 		svc := newTestServicesFull(repoFor(weird), newMemStorage(), nil, provider)
@@ -138,8 +138,8 @@ func TestSyncAssetByID(t *testing.T) {
 
 	t.Run("unparseable price is rejected", func(t *testing.T) {
 		provider := &fakePriceProvider{
-			fetchQuote: func(context.Context, string) (prices.QuoteResult, error) {
-				return prices.QuoteResult{Price: "n/a"}, nil
+			fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
+				return marketdata.QuoteResult{Price: "n/a"}, nil
 			},
 		}
 		svc := newTestServicesFull(repoFor(stockAsset), newMemStorage(), nil, provider)
@@ -155,8 +155,8 @@ func TestSyncAssetByID(t *testing.T) {
 			return entities.Asset{}, errors.New("db write failed")
 		}
 		provider := &fakePriceProvider{
-			fetchQuote: func(context.Context, string) (prices.QuoteResult, error) {
-				return prices.QuoteResult{Price: "10.00"}, nil
+			fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
+				return marketdata.QuoteResult{Price: "10.00"}, nil
 			},
 		}
 		svc := newTestServicesFull(repo, newMemStorage(), nil, provider)
@@ -203,8 +203,8 @@ func TestSyncAssetPrices(t *testing.T) {
 			},
 		}
 		provider := &fakePriceProvider{
-			fetchQuote: func(context.Context, string) (prices.QuoteResult, error) {
-				return prices.QuoteResult{Price: "190.55"}, nil
+			fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
+				return marketdata.QuoteResult{Price: "190.55"}, nil
 			},
 		}
 		storage := newMemStorage()
@@ -289,10 +289,10 @@ func TestSyncAssetPrices(t *testing.T) {
 			},
 		}
 		provider := &fakePriceProvider{
-			fetchQuote: func(context.Context, string) (prices.QuoteResult, error) {
+			fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
 				quoteCalls++
 				cancel() // cancel after the first asset so the 13s sleep before the second is skipped
-				return prices.QuoteResult{Price: "10.00"}, nil
+				return marketdata.QuoteResult{Price: "10.00"}, nil
 			},
 		}
 		storage := newMemStorage()

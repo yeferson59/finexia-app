@@ -8,20 +8,20 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/yeferson59/finexia-app/internal/alphavantage"
-	"github.com/yeferson59/finexia-app/internal/finnhub"
 	"github.com/yeferson59/finexia-app/internal/handlers"
 	"github.com/yeferson59/finexia-app/internal/middlewares"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/geoip"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
-	"github.com/yeferson59/finexia-app/internal/prices"
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata/alphavantage"
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata/finnhub"
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata/yahoo"
 	"github.com/yeferson59/finexia-app/internal/repositories"
 	"github.com/yeferson59/finexia-app/internal/routes"
 	"github.com/yeferson59/finexia-app/internal/scheduler"
 	"github.com/yeferson59/finexia-app/internal/services"
-	"github.com/yeferson59/finexia-app/internal/yahoo"
 )
 
 type Bootstrap struct {
@@ -48,7 +48,7 @@ func New(app *fiber.App, db *pgxpool.Pool, envs *config.Env, storage fiber.Stora
 
 func (b *Bootstrap) Init(ctx context.Context) error {
 	repos := repositories.New(b.db)
-	priceProvider := prices.NewFallback(
+	priceProvider := marketdata.NewFallback(
 		alphavantage.New(b.envs.AlphaVantageAPIKey),
 		finnhub.New(b.envs.FinnhubAPIKey),
 		yahoo.New(),

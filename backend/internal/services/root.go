@@ -10,7 +10,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
-	"github.com/yeferson59/finexia-app/internal/prices"
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
 
 // GeoLocator resolves an IP address to a human-readable approximate location
@@ -42,13 +42,13 @@ type Services struct {
 	mail          Mailer
 	geo           GeoLocator
 	log           logger.Logger
-	priceProvider prices.Provider
+	priceProvider marketdata.Provider
 	// Pointer so every copy of Services shares the same cache (Services is
 	// passed around by value).
 	risksCache *risksCache
 }
 
-func New(repos Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.Storage, mailService Mailer, geo GeoLocator, log logger.Logger, priceProvider prices.Provider) Services {
+func New(repos Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.Storage, mailService Mailer, geo GeoLocator, log logger.Logger, priceProvider marketdata.Provider) Services {
 	return Services{
 		repos:         repos,
 		cfg:           cfg,
