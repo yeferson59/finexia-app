@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yeferson59/gofinance/money"
 
-	"github.com/yeferson59/finexia-app/internal/config"
+	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/entities"
 	"github.com/yeferson59/finexia-app/internal/logger"
 	"github.com/yeferson59/finexia-app/internal/middlewares"

@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"github.com/yeferson59/finexia-app/internal/config"
+	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/services"
 )
 

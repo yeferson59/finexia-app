@@ -10,7 +10,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yeferson59/finexia-app/internal"
-	"github.com/yeferson59/finexia-app/internal/config"
+	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/logger"
 	"github.com/yeferson59/finexia-app/internal/mail"
 )

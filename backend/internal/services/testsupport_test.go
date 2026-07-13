@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yeferson59/gofinance/money"
 
-	"github.com/yeferson59/finexia-app/internal/config"
+	"github.com/yeferson59/finexia-app/internal/platform/config"
 	portfoliodto "github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"
 	"github.com/yeferson59/finexia-app/internal/logger"
