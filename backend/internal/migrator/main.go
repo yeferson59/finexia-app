@@ -11,7 +11,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	"github.com/yeferson59/finexia-app/internal/config"
+	"github.com/yeferson59/finexia-app/internal/platform/config"
 )
 
 func main() {

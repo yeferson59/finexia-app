@@ -8,12 +8,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/yeferson59/finexia-app/internal/prices"
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
 
 const baseURL = "https://query1.finance.yahoo.com/v8/finance/chart"
 
-var _ prices.Provider = (*Client)(nil)
+var _ marketdata.Provider = (*Client)(nil)
 
 type Client struct {
 	httpClient *http.Client
@@ -67,12 +67,12 @@ func (c *Client) fetch(ctx context.Context, symbol string) (float64, error) {
 
 // FetchQuote retrieves the current price for a stock, ETF, bond, or crypto
 // using the Yahoo Finance chart API.
-func (c *Client) FetchQuote(ctx context.Context, symbol string) (prices.QuoteResult, error) {
+func (c *Client) FetchQuote(ctx context.Context, symbol string) (marketdata.QuoteResult, error) {
 	price, err := c.fetch(ctx, symbol)
 	if err != nil {
-		return prices.QuoteResult{}, err
+		return marketdata.QuoteResult{}, err
 	}
-	return prices.QuoteResult{
+	return marketdata.QuoteResult{
 		Price:     strconv.FormatFloat(price, 'f', -1, 64),
 		FetchedAt: time.Now().UTC(),
 	}, nil
@@ -81,13 +81,13 @@ func (c *Client) FetchQuote(ctx context.Context, symbol string) (prices.QuoteRes
 // FetchExchangeRate retrieves the exchange rate between two currencies.
 // Yahoo Finance uses the "{FROM}{TO}=X" symbol format which covers both fiat
 // pairs (e.g. EURUSD=X) and crypto pairs (e.g. BTCUSD=X).
-func (c *Client) FetchExchangeRate(ctx context.Context, from, to string) (prices.ExchangeRateResult, error) {
+func (c *Client) FetchExchangeRate(ctx context.Context, from, to string) (marketdata.ExchangeRateResult, error) {
 	symbol := from + to + "=X"
 	price, err := c.fetch(ctx, symbol)
 	if err != nil {
-		return prices.ExchangeRateResult{}, err
+		return marketdata.ExchangeRateResult{}, err
 	}
-	return prices.ExchangeRateResult{
+	return marketdata.ExchangeRateResult{
 		Rate:      strconv.FormatFloat(price, 'f', -1, 64),
 		FetchedAt: time.Now().UTC(),
 	}, nil

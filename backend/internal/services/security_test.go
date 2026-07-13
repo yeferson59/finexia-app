@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/entities"
-	"github.com/yeferson59/finexia-app/internal/logger"
+	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
 // newLockoutServices builds Services with the login lockout enabled, which

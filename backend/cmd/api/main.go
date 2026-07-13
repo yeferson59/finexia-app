@@ -10,9 +10,12 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yeferson59/finexia-app/internal"
-	"github.com/yeferson59/finexia-app/internal/config"
-	"github.com/yeferson59/finexia-app/internal/logger"
-	"github.com/yeferson59/finexia-app/internal/mail"
+	"github.com/yeferson59/finexia-app/internal/platform/cache"
+	"github.com/yeferson59/finexia-app/internal/platform/config"
+	"github.com/yeferson59/finexia-app/internal/platform/database"
+	"github.com/yeferson59/finexia-app/internal/platform/logger"
+	"github.com/yeferson59/finexia-app/internal/platform/mail"
+	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
 )
 
 type structValidator struct {
@@ -33,12 +36,12 @@ func main() {
 	})
 	ctx := context.Background()
 
-	if err := run(ctx, envs, cfg); err != nil {
+	if err := run(ctx, envs); err != nil {
 		log.With(logger.Str("cmd", "main")).Fatal(ctx, "application error: "+err.Error())
 	}
 }
 
-func run(ctx context.Context, envs *config.Env, cfg config.Config) error {
+func run(ctx context.Context, envs *config.Env) error {
 	app := fiber.New(fiber.Config{
 		JSONEncoder:        sonic.ConfigFastest.Marshal,
 		JSONDecoder:        sonic.ConfigFastest.Unmarshal,
@@ -59,20 +62,20 @@ func run(ctx context.Context, envs *config.Env, cfg config.Config) error {
 		Output:      os.Stderr,
 		Environment: envs.Environment,
 	})
-	dbPool, err := cfg.ConnectionDB(ctx, envs.DatabaseURL)
+	dbPool, err := database.Connect(ctx, envs.DatabaseURL)
 	if err != nil {
 		return errors.New("failed to connect to database: " + err.Error())
 	}
 	defer dbPool.Close()
 
-	storageCache := cfg.ConnectionCache(envs.CacheURL)
+	storageCache := cache.Connect(envs.CacheURL)
 	defer func() {
 		if err := storageCache.Close(); err != nil {
 			log.With(logger.Str("cmd", "run")).Fatal(ctx, "failed to close cache store: "+err.Error())
 		}
 	}()
 
-	s3Client, err := cfg.Storage(ctx, envs.AWSAccessKeyID, envs.AWSDefaultRegion, envs.AWSEndpointURL, envs.AWSSecretAccessKey)
+	s3Client, err := objectstore.Connect(ctx, envs.AWSAccessKeyID, envs.AWSDefaultRegion, envs.AWSEndpointURL, envs.AWSSecretAccessKey)
 	if err != nil {
 		return errors.New("failed to create storage: " + err.Error())
 	}

@@ -1,0 +1,120 @@
+package httpx
+
+import (
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/paginate"
+)
+
+func perform(t *testing.T, h fiber.Handler) (int, map[string]any) {
+	t.Helper()
+	app := fiber.New()
+	app.Get("/", h)
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/", nil))
+	if err != nil {
+		t.Fatalf("app.Test: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	raw, _ := io.ReadAll(resp.Body)
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		t.Fatalf("invalid JSON response %q: %v", raw, err)
+	}
+	return resp.StatusCode, payload
+}
+
+func TestFromDomainMapping(t *testing.T) {
+	cases := []struct {
+		err  string
+		want int
+	}{
+		{"too many failed login attempts", fiber.StatusTooManyRequests},
+		{"failed to parse row", fiber.StatusBadRequest},
+		{"invalid credentials", fiber.StatusBadRequest},
+		{"portfolio not found", fiber.StatusNotFound},
+		// Frozen quirk: "failed"/"invalid" are checked before "not found".
+		{"failed: portfolio not found", fiber.StatusBadRequest},
+		{"email already exists", fiber.StatusConflict},
+		{"duplicate entry", fiber.StatusConflict},
+		{"something else entirely", fiber.StatusInternalServerError},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.err, func(t *testing.T) {
+			status, payload := perform(t, func(c fiber.Ctx) error {
+				return FromDomain(c, errors.New(tc.err), "msg", "domain:action")
+			})
+			if status != tc.want {
+				t.Errorf("status = %d, want %d", status, tc.want)
+			}
+			if success, _ := payload["success"].(bool); success {
+				t.Error("success should be false")
+			}
+			if action, _ := payload["action"].(string); action != "domain:action" {
+				t.Errorf("action = %q, want domain:action", action)
+			}
+		})
+	}
+}
+
+func TestEnvelopes(t *testing.T) {
+	t.Run("OK carries the success envelope", func(t *testing.T) {
+		status, payload := perform(t, func(c fiber.Ctx) error {
+			return OK(c, "msg", "det", fiber.Map{"k": "v"})
+		})
+		if status != fiber.StatusOK {
+			t.Fatalf("status = %d, want 200", status)
+		}
+		for _, key := range []string{"success", "message", "details", "data", "timestamp"} {
+			if _, ok := payload[key]; !ok {
+				t.Errorf("missing envelope field %q", key)
+			}
+		}
+	})
+
+	t.Run("ErrorAction carries details and action", func(t *testing.T) {
+		status, payload := perform(t, func(c fiber.Ctx) error {
+			return ErrorAction(c, fiber.StatusForbidden, "msg", "det", "auth:x")
+		})
+		if status != fiber.StatusForbidden {
+			t.Fatalf("status = %d, want 403", status)
+		}
+		if action, _ := payload["action"].(string); action != "auth:x" {
+			t.Errorf("action = %q, want auth:x", action)
+		}
+		if details, _ := payload["details"].(string); details != "det" {
+			t.Errorf("details = %q, want det", details)
+		}
+	})
+
+	t.Run("Unauthorized returns 401", func(t *testing.T) {
+		status, _ := perform(t, func(c fiber.Ctx) error {
+			return Unauthorized(c, "msg", "det")
+		})
+		if status != fiber.StatusUnauthorized {
+			t.Fatalf("status = %d, want 401", status)
+		}
+	})
+}
+
+func TestPaginationMetadata(t *testing.T) {
+	info := &paginate.PageInfo{Page: 2, Limit: 10, Offset: 10}
+	meta := PaginationMetadata(info, 35, "itemsForPage", "totalItems")
+
+	if meta["totalPages"] != uint(4) {
+		t.Errorf("totalPages = %v, want 4", meta["totalPages"])
+	}
+	if meta["previous"] != true || meta["next"] != true {
+		t.Errorf("previous/next = %v/%v, want true/true", meta["previous"], meta["next"])
+	}
+	if meta["itemsForPage"] != 10 || meta["totalItems"] != uint(35) {
+		t.Errorf("unexpected keys: %v", meta)
+	}
+}

@@ -9,7 +9,7 @@ import (
 	"github.com/yeferson59/gofinance/money"
 
 	"github.com/yeferson59/finexia-app/internal/entities"
-	"github.com/yeferson59/finexia-app/internal/prices"
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
 
 func TestWasExchangeRateSyncedRecently(t *testing.T) {
@@ -33,9 +33,9 @@ func TestSyncExchangeRates(t *testing.T) {
 	t.Run("fetch failures are collected per pair and the marker is still set", func(t *testing.T) {
 		var pairsRequested []string
 		provider := &fakePriceProvider{
-			fetchExchangeRate: func(_ context.Context, from, to string) (prices.ExchangeRateResult, error) {
+			fetchExchangeRate: func(_ context.Context, from, to string) (marketdata.ExchangeRateResult, error) {
 				pairsRequested = append(pairsRequested, from+"/"+to)
-				return prices.ExchangeRateResult{}, errors.New("provider down")
+				return marketdata.ExchangeRateResult{}, errors.New("provider down")
 			},
 		}
 		storage := newMemStorage()
@@ -58,8 +58,8 @@ func TestSyncExchangeRates(t *testing.T) {
 
 	t.Run("unparseable rates are rejected", func(t *testing.T) {
 		provider := &fakePriceProvider{
-			fetchExchangeRate: func(context.Context, string, string) (prices.ExchangeRateResult, error) {
-				return prices.ExchangeRateResult{Rate: "not-a-number", FetchedAt: fetchedAt}, nil
+			fetchExchangeRate: func(context.Context, string, string) (marketdata.ExchangeRateResult, error) {
+				return marketdata.ExchangeRateResult{Rate: "not-a-number", FetchedAt: fetchedAt}, nil
 			},
 		}
 		repo := &fakeRepository{
@@ -78,8 +78,8 @@ func TestSyncExchangeRates(t *testing.T) {
 
 	t.Run("upsert failures are collected", func(t *testing.T) {
 		provider := &fakePriceProvider{
-			fetchExchangeRate: func(context.Context, string, string) (prices.ExchangeRateResult, error) {
-				return prices.ExchangeRateResult{Rate: "1.0850", FetchedAt: fetchedAt}, nil
+			fetchExchangeRate: func(context.Context, string, string) (marketdata.ExchangeRateResult, error) {
+				return marketdata.ExchangeRateResult{Rate: "1.0850", FetchedAt: fetchedAt}, nil
 			},
 		}
 		repo := &fakeRepository{
@@ -100,11 +100,11 @@ func TestSyncExchangeRates(t *testing.T) {
 		defer cancel()
 
 		provider := &fakePriceProvider{
-			fetchExchangeRate: func(_ context.Context, from, to string) (prices.ExchangeRateResult, error) {
+			fetchExchangeRate: func(_ context.Context, from, to string) (marketdata.ExchangeRateResult, error) {
 				if from != "EUR" || to != "USD" {
 					t.Errorf("first pair = %s/%s, want EUR/USD", from, to)
 				}
-				return prices.ExchangeRateResult{Rate: "1.0850", FetchedAt: fetchedAt}, nil
+				return marketdata.ExchangeRateResult{Rate: "1.0850", FetchedAt: fetchedAt}, nil
 			},
 		}
 		repo := &fakeRepository{

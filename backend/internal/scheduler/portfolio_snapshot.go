@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/yeferson59/finexia-app/internal/logger"
+	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/services"
 )
 

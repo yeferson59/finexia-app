@@ -18,8 +18,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/yeferson59/finexia-app/internal/dtos/auth"
-	"github.com/yeferson59/finexia-app/internal/logger"
-	"github.com/yeferson59/finexia-app/internal/mail"
+	"github.com/yeferson59/finexia-app/internal/platform/logger"
+	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/repositories"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
 )
