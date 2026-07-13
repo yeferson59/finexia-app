@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/yeferson59/finexia-app/internal/entities"
-	"github.com/yeferson59/finexia-app/internal/logger"
 	"github.com/yeferson59/finexia-app/internal/mail"
+	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
 // Exported so handlers can map each failure to a precise HTTP status and

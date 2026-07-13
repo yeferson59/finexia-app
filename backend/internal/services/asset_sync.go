@@ -10,7 +10,7 @@ import (
 	"github.com/yeferson59/gofinance/money"
 
 	"github.com/yeferson59/finexia-app/internal/entities"
-	"github.com/yeferson59/finexia-app/internal/logger"
+	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
 const assetSyncCacheKey = "finexia:sync:asset_prices"
