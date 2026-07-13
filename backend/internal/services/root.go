@@ -7,9 +7,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/yeferson59/finexia-app/internal/mail"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
+	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/prices"
 )
 

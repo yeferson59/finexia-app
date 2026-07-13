@@ -14,7 +14,7 @@ import (
 
 	portfoliodto "github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"
-	"github.com/yeferson59/finexia-app/internal/mail"
+	"github.com/yeferson59/finexia-app/internal/platform/mail"
 )
 
 // risksCache memoizes the risk catalog: it is seed data shared by every user

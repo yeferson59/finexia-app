@@ -11,8 +11,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/yeferson59/finexia-app/internal/entities"
-	"github.com/yeferson59/finexia-app/internal/mail"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
+	"github.com/yeferson59/finexia-app/internal/platform/mail"
 )
 
 // Exported so handlers can map each failure to a precise HTTP status and
