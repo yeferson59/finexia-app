@@ -229,26 +229,47 @@ golangci-lint run
 
 ### Fase 2 — Módulo piloto: `marketing` *(el dominio más pequeño; valida el patrón)*
 
-- [ ] Crear `internal/marketing/` con la estructura estándar de módulo:
-  - [ ] `domain.go`: mover `entities.Waitlist*` (lo que aplique de `entities/marketing.go`).
-  - [ ] `dto.go`: mover `dtos/marketing/waitlist.go`.
-  - [ ] `repository.go`: definir interfaz solo con los métodos que marketing usa hoy
-        (extraerlos de la god interface `services.Repository`).
-  - [ ] `postgres.go`: mover la implementación desde `repositories/marketing.go`.
-  - [ ] `service.go`: mover la lógica desde `services/marketing.go`; depende de su
-        `Repository` + `platform/mail.Mailer` (interfaz local con solo
-        `SendWaitlistConfirmation`).
-  - [ ] `handler.go` + `module.go` con `New(...)` y `Routes(router fiber.Router)`
+- [x] Crear `internal/marketing/` con la estructura estándar de módulo:
+  - [x] `domain.go`: mover `entities.Waitlist*` (lo que aplique de `entities/marketing.go`).
+  - [x] `dto.go`: mover `dtos/marketing/waitlist.go`.
+  - [x] `repository.go`: definir interfaz solo con los métodos que marketing usa hoy
+        (extraerlos de la god interface `services.Repository`). → 1 método
+        (`SaveWaitlistEmail`).
+  - [x] `postgres.go`: mover la implementación desde `repositories/marketing.go`.
+  - [x] `service.go`: mover la lógica desde `services/marketing.go`; depende de su
+        `Repository` + interfaz local `marketing.Mailer` con solo
+        `SendWaitlistConfirmation`.
+  - [x] `handler.go` + `module.go` con `New(...)` y `Routes(router fiber.Router)`
         replicando exactamente las rutas de `routes/marketing.go`.
-  - [ ] Mover/adaptar los tests correspondientes al paquete del módulo.
-- [ ] Cablear el módulo en el bootstrap (`internal/root.go` por ahora): construir
+  - [x] Mover/adaptar los tests correspondientes al paquete del módulo
+        (`TestSaveWaitlistEmail` + tests de la ruta; fakes locales de ~25 líneas).
+- [x] Cablear el módulo en el bootstrap (`internal/root.go` por ahora): construir
       `marketing.New(...)` y llamar a `mod.Routes(...)`; borrar el registro legacy.
-- [ ] Eliminar el código muerto legacy: métodos de marketing en `services`,
+- [x] Eliminar el código muerto legacy: métodos de marketing en `services`,
       `repositories/marketing.go`, `handlers/marketing.go`, `routes/marketing.go`,
-      `dtos/marketing/` y sus métodos en la interfaz `services.Repository`.
-- [ ] Confirmar contra `docs/API.md` que las rutas y respuestas no cambiaron.
-- [ ] **Retrospectiva del piloto**: ajustar en este documento cualquier decisión de
+      `dtos/marketing/` y sus métodos en la interfaz `services.Repository`
+      (también `SendWaitlistConfirmation` salió de `services.Mailer`).
+- [x] Confirmar contra `docs/API.md` que las rutas y respuestas no cambiaron
+      (`POST /marketing/waitlists` y `GET /users/waitlist` intactos).
+- [x] **Retrospectiva del piloto**: ajustar en este documento cualquier decisión de
       estructura que el piloto haya demostrado incómoda, antes de replicar el patrón.
+
+  **Retrospectiva (2026-07-13):**
+
+  1. **Registro de rutas de módulos durante la convivencia.** Hasta que exista
+     `internal/app` (Fase 3), los módulos se registran vía la interfaz
+     `routes.Module` (`Routes(fiber.Router)`) que el bootstrap pasa a `routes.New`.
+     El orden importa: los módulos con rutas públicas se registran **antes** del
+     `Use(JWT)` global. `app/` heredará esta responsabilidad en Fase 3.
+  2. **Entidades compartidas entre un módulo y el legacy.** `Waitlist` la lee y
+     actualiza también el flujo de invitaciones (`ListWaitlist`,
+     `SetWaitlistInvited`). Patrón validado: la entidad vive en su módulo y el
+     legacy la importa (`marketing.Waitlist`) — la dirección permitida es
+     legacy → módulo, nunca al revés. Esos dos métodos siguen en la god
+     interface, anotados para migrar con invitations en Fase 4.
+  3. **El patrón de módulo no necesitó ajustes**: estructura, interfaces por
+     consumidor y tests locales funcionaron tal como estaban diseñados. Se
+     replica sin cambios en las fases siguientes.
 
 ### Fase 3 — Composition root: `internal/app`
 
