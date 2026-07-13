@@ -9,6 +9,7 @@ import (
 
 	portfoliodto "github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/marketing"
 	"github.com/yeferson59/finexia-app/internal/repositories"
 )
 
@@ -102,14 +103,17 @@ type Repository interface {
 	GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error)
 	GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error)
 
-	// Exchange rates & marketing
+	// Exchange rates
 	UpsertExchangeRate(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (entities.ExchangeRate, error)
 	GetExchangeRates(ctx context.Context, offset, limit uint) ([]entities.ExchangeRate, error)
 	GetExchangeRateByID(ctx context.Context, id uuid.UUID) (entities.ExchangeRate, error)
 	GetExchangeRateByPair(ctx context.Context, from, to string) (entities.ExchangeRate, error)
 	UpdateExchangeRateByID(ctx context.Context, id uuid.UUID, rate money.Decimal) (entities.ExchangeRate, error)
-	SaveWaitlistEmail(ctx context.Context, email string) error
-	ListWaitlist(ctx context.Context, offset, limit uint) ([]entities.Waitlist, uint, error)
+
+	// Waitlist reads/updates used by the invitation flow. The waitlist is
+	// owned by the marketing module (Fase 2); these two methods migrate with
+	// invitations in Fase 4.
+	ListWaitlist(ctx context.Context, offset, limit uint) ([]marketing.Waitlist, uint, error)
 	SetWaitlistInvited(ctx context.Context, email string) error
 
 	// Invitations
