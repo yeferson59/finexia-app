@@ -273,15 +273,20 @@ golangci-lint run
 
 ### Fase 3 — Composition root: `internal/app`
 
-- [ ] Crear `internal/app/app.go` con un tipo `App` que:
-  - [ ] Recibe las dependencias de infraestructura (pool, cache, s3, mail, logger, env).
-  - [ ] Construye módulos migrados + el "módulo legacy" (services/handlers/routes
-        actuales) y registra rutas de ambos.
-  - [ ] Es el único lugar que arranca schedulers.
-- [ ] Adelgazar `cmd/api/main.go` para que solo cree infraestructura y llame a `app.New(...).Run(ctx)`.
-- [ ] Eliminar `internal/root.go` (su contenido queda absorbido por `app`).
-- [ ] Verificación estándar + smoke test manual: `make dev` (o docker-compose) y
-      recorrer login + dashboard desde el frontend.
+- [x] Crear `internal/app/app.go` con un tipo `App` que:
+  - [x] Recibe las dependencias de infraestructura (pool, cache, s3, mail, logger, env)
+        vía `app.Deps`.
+  - [x] Construye módulos migrados + el "módulo legacy" (services/handlers/routes
+        actuales) y registra rutas de ambos. → También absorbe la construcción del
+        `fiber.App` (sonic, validador, trust proxy) que vivía en `main.go`.
+  - [x] Es el único lugar que arranca schedulers (`startSchedulers`).
+- [x] Adelgazar `cmd/api/main.go` para que solo cree infraestructura y llame a `app.New(...).Run(ctx)`.
+- [x] Eliminar `internal/root.go` (su contenido queda absorbido por `app`).
+- [x] Verificación estándar + smoke test: sin docker en el entorno de CI, el smoke
+      manual del frontend se hace en el PR; lo cubre además un test de arranque
+      (`internal/app/app_test.go`) que compone la App real (pgx es lazy) y verifica
+      health, la ruta del módulo marketing y el gate JWT de las rutas protegidas.
+      `Run` quedó separado en `wire()` + `Listen` para poder testear la composición.
 
 ### Fase 4 — Módulo `auth` *(el más sensible: máximo cuidado, cero cambios de lógica)*
 
