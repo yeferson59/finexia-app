@@ -62,7 +62,7 @@ func New(deps Deps) *App {
 	fiberApp := fiber.New(fiber.Config{
 		JSONEncoder:        sonic.ConfigFastest.Marshal,
 		JSONDecoder:        sonic.ConfigFastest.Unmarshal,
-		StructValidator:    &structValidator{validate: validator.New()},
+		StructValidator:    new(structValidator{validate: validator.New()}),
 		ProxyHeader:        fiber.HeaderXForwardedFor,
 		TrustProxy:         deps.Envs.TrustProxy,
 		EnableIPValidation: true,
@@ -75,7 +75,7 @@ func New(deps Deps) *App {
 		},
 	})
 
-	return &App{fiber: fiberApp, deps: deps}
+	return new(App{fiber: fiberApp, deps: deps})
 }
 
 // Run wires modules, legacy layers and schedulers, then serves HTTP until
