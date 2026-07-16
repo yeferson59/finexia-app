@@ -1,4 +1,4 @@
-package services
+package auth
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/marketing"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
@@ -26,32 +26,25 @@ var allowedInviteRoles = map[string]bool{
 	"admin":    true,
 }
 
-// Exported so handlers can map each failure to a precise HTTP status and
-// message instead of pattern-matching error strings.
-var (
-	ErrInvitationInvalid = errors.New("invalid invitation")
-	ErrInvitationExpired = errors.New("invitation expired")
-)
-
 // CreateInvitation issues (or re-issues) an invitation for an email and emails
 // the recipient a single-use link. The raw token is returned only inside that
 // email; only its hash is persisted. Inviting an address that already has an
 // account is refused so the flow can never overwrite existing credentials.
-func (s *Services) CreateInvitation(ctx context.Context, email, name, role string, invitedBy uuid.UUID) (entities.Invitation, error) {
+func (s *Service) CreateInvitation(ctx context.Context, email, name, role string, invitedBy uuid.UUID) (Invitation, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" {
-		return entities.Invitation{}, errors.New("invalid email")
+		return Invitation{}, errors.New("invalid email")
 	}
 
 	if role == "" {
 		role = "customer"
 	}
 	if !allowedInviteRoles[role] {
-		return entities.Invitation{}, errors.New("invalid role")
+		return Invitation{}, errors.New("invalid role")
 	}
 
-	if _, err := s.repos.GetUserByEmail(ctx, email); err == nil {
-		return entities.Invitation{}, errors.New("user already exists")
+	if _, err := s.stores.Accounts.GetUserByEmail(ctx, email); err == nil {
+		return Invitation{}, errors.New("user already exists")
 	}
 
 	name = strings.TrimSpace(name)
@@ -63,7 +56,7 @@ func (s *Services) CreateInvitation(ctx context.Context, email, name, role strin
 
 	raw, hash, err := generateRefreshToken()
 	if err != nil {
-		return entities.Invitation{}, err
+		return Invitation{}, err
 	}
 
 	var inviter *uuid.UUID
@@ -73,14 +66,14 @@ func (s *Services) CreateInvitation(ctx context.Context, email, name, role strin
 
 	expiresAt := time.Now().UTC().Add(s.cfg.InvitationExpiry)
 
-	inv, err := s.repos.CreateInvitation(ctx, email, name, role, hash, inviter, expiresAt)
+	inv, err := s.stores.Invitations.CreateInvitation(ctx, email, name, role, hash, inviter, expiresAt)
 	if err != nil {
-		return entities.Invitation{}, err
+		return Invitation{}, err
 	}
 
 	// Advance the waitlist funnel (pending -> invited) if the person was on the
 	// list; a miss is fine, so failures never block the invitation.
-	if err := s.repos.SetWaitlistInvited(ctx, email); err != nil {
+	if err := s.stores.Waitlist.SetWaitlistInvited(ctx, email); err != nil {
 		s.log.Error(ctx, "create invitation: failed to update waitlist", logger.Err(err))
 	}
 
@@ -91,16 +84,16 @@ func (s *Services) CreateInvitation(ctx context.Context, email, name, role strin
 
 // ResendInvitation rotates the token of an existing pending invitation and
 // emails the new link, invalidating the previous one.
-func (s *Services) ResendInvitation(ctx context.Context, id, invitedBy uuid.UUID) (entities.Invitation, error) {
-	existing, err := s.repos.GetInvitationByID(ctx, id)
+func (s *Service) ResendInvitation(ctx context.Context, id, invitedBy uuid.UUID) (Invitation, error) {
+	existing, err := s.stores.Invitations.GetInvitationByID(ctx, id)
 	if err != nil {
-		return entities.Invitation{}, err
+		return Invitation{}, err
 	}
 	if existing.Status() == "accepted" {
-		return entities.Invitation{}, errors.New("invitation already accepted")
+		return Invitation{}, errors.New("invitation already accepted")
 	}
 	if existing.Status() == "revoked" {
-		return entities.Invitation{}, errors.New("invitation revoked")
+		return Invitation{}, errors.New("invitation revoked")
 	}
 
 	// Reuse CreateInvitation so the token rotation and email go through the same
@@ -108,25 +101,25 @@ func (s *Services) ResendInvitation(ctx context.Context, id, invitedBy uuid.UUID
 	return s.CreateInvitation(ctx, existing.Email, existing.Name, existing.Role, invitedBy)
 }
 
-func (s *Services) ListInvitations(ctx context.Context, offset, limit uint) ([]entities.Invitation, uint, error) {
-	return s.repos.ListInvitations(ctx, offset, limit)
+func (s *Service) ListInvitations(ctx context.Context, offset, limit uint) ([]Invitation, uint, error) {
+	return s.stores.Invitations.ListInvitations(ctx, offset, limit)
 }
 
-func (s *Services) RevokeInvitation(ctx context.Context, id uuid.UUID) error {
-	return s.repos.RevokeInvitation(ctx, id)
+func (s *Service) RevokeInvitation(ctx context.Context, id uuid.UUID) error {
+	return s.stores.Invitations.RevokeInvitation(ctx, id)
 }
 
-func (s *Services) ListWaitlist(ctx context.Context, offset, limit uint) ([]marketing.Waitlist, uint, error) {
-	return s.repos.ListWaitlist(ctx, offset, limit)
+func (s *Service) ListWaitlist(ctx context.Context, offset, limit uint) ([]marketing.Waitlist, uint, error) {
+	return s.stores.Waitlist.ListWaitlist(ctx, offset, limit)
 }
 
 // ValidateInvitation resolves a raw token to its invitation and enforces that it
 // is still redeemable, so the accept page can prefill the email and reject dead
 // links before asking for a password.
-func (s *Services) ValidateInvitation(ctx context.Context, rawToken string) (entities.Invitation, error) {
+func (s *Service) ValidateInvitation(ctx context.Context, rawToken string) (Invitation, error) {
 	inv, err := s.lookupPendingInvitation(ctx, rawToken)
 	if err != nil {
-		return entities.Invitation{}, err
+		return Invitation{}, err
 	}
 	return inv, nil
 }
@@ -134,10 +127,10 @@ func (s *Services) ValidateInvitation(ctx context.Context, rawToken string) (ent
 // AcceptInvitation consumes a valid invitation and provisions the account with
 // the password the invitee chose. The heavy lifting (create user + account,
 // mark consumed, advance waitlist) happens in a single repository transaction.
-func (s *Services) AcceptInvitation(ctx context.Context, rawToken, name, password string) (entities.User, error) {
+func (s *Service) AcceptInvitation(ctx context.Context, rawToken, name, password string) (identity.User, error) {
 	inv, err := s.lookupPendingInvitation(ctx, rawToken)
 	if err != nil {
-		return entities.User{}, err
+		return identity.User{}, err
 	}
 
 	finalName := strings.TrimSpace(name)
@@ -149,36 +142,36 @@ func (s *Services) AcceptInvitation(ctx context.Context, rawToken, name, passwor
 
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return entities.User{}, err
+		return identity.User{}, err
 	}
 
-	return s.repos.AcceptInvitation(ctx, inv.ID, finalName, inv.Email, inv.Role, string(hashed))
+	return s.stores.Invitations.AcceptInvitation(ctx, inv.ID, finalName, inv.Email, inv.Role, string(hashed))
 }
 
 // lookupPendingInvitation hashes the raw token, fetches the invitation, and
 // rejects anything not currently redeemable. The hash comparison happens in the
 // database via the unique token_hash column, so the raw token is never stored.
-func (s *Services) lookupPendingInvitation(ctx context.Context, rawToken string) (entities.Invitation, error) {
+func (s *Service) lookupPendingInvitation(ctx context.Context, rawToken string) (Invitation, error) {
 	rawToken = strings.TrimSpace(rawToken)
 	if rawToken == "" {
-		return entities.Invitation{}, ErrInvitationInvalid
+		return Invitation{}, ErrInvitationInvalid
 	}
 
 	hash, err := hashRefreshToken(rawToken)
 	if err != nil {
-		return entities.Invitation{}, ErrInvitationInvalid
+		return Invitation{}, ErrInvitationInvalid
 	}
 
-	inv, err := s.repos.GetInvitationByHash(ctx, hash)
+	inv, err := s.stores.Invitations.GetInvitationByHash(ctx, hash)
 	if err != nil {
-		return entities.Invitation{}, ErrInvitationInvalid
+		return Invitation{}, ErrInvitationInvalid
 	}
 
 	switch inv.Status() {
 	case "accepted", "revoked":
-		return entities.Invitation{}, ErrInvitationInvalid
+		return Invitation{}, ErrInvitationInvalid
 	case "expired":
-		return entities.Invitation{}, ErrInvitationExpired
+		return Invitation{}, ErrInvitationExpired
 	}
 
 	return inv, nil
@@ -187,7 +180,7 @@ func (s *Services) lookupPendingInvitation(ctx context.Context, rawToken string)
 // sendInvitationEmail delivers the invitation link. Best-effort and async: a
 // mail hiccup must not fail the admin's request, and the invitation can always
 // be resent.
-func (s *Services) sendInvitationEmail(ctx context.Context, inv entities.Invitation, rawToken string) {
+func (s *Service) sendInvitationEmail(ctx context.Context, inv Invitation, rawToken string) {
 	if s.mail == nil {
 		return
 	}
@@ -218,24 +211,4 @@ func defaultNameFromEmail(email string) string {
 		return "Nuevo usuario"
 	}
 	return helpers.NormalizateNames(local)
-}
-
-// humanizeExpiry renders the invitation lifetime for the email copy, preferring
-// whole days when the duration divides evenly.
-func humanizeExpiry(d time.Duration) string {
-	hours := int(d.Hours())
-	if hours <= 0 {
-		return "poco tiempo"
-	}
-	if hours%24 == 0 {
-		days := hours / 24
-		if days == 1 {
-			return "1 día"
-		}
-		return fmt.Sprintf("%d días", days)
-	}
-	if hours == 1 {
-		return "1 hora"
-	}
-	return fmt.Sprintf("%d horas", hours)
 }

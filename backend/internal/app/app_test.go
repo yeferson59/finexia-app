@@ -149,9 +149,17 @@ func TestAppWiresAndRoutes(t *testing.T) {
 		t.Errorf("POST /auth/password-reset = %d, want 400 for an empty body", status)
 	}
 
-	// The legacy public /auth routes (invitations) still answer before the
-	// module's group-local gate.
+	// The public invitation flow answers from the module's public zone.
 	if status := request("GET", "/auth/invitations"); status != fiber.StatusBadRequest {
 		t.Errorf("GET /auth/invitations = %d, want 400 without a token", status)
+	}
+
+	// The admin invitation/waitlist dashboard is gated by the module's own
+	// inline RequireAuth (401 with a bogus token, before RequireAdmin runs).
+	if status := request("GET", "/users/waitlist", "Authorization", "Bearer bogus-token"); status != fiber.StatusUnauthorized {
+		t.Errorf("GET /users/waitlist = %d, want 401 with an invalid token", status)
+	}
+	if status := request("GET", "/users/invitations", "Authorization", "Bearer bogus-token"); status != fiber.StatusUnauthorized {
+		t.Errorf("GET /users/invitations = %d, want 401 with an invalid token", status)
 	}
 }

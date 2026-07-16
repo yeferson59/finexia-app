@@ -1,4 +1,4 @@
-package services
+package auth
 
 import (
 	"context"
@@ -9,20 +9,16 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/identity"
 )
-
-func notFound(context.Context, string) (entities.User, error) {
-	return entities.User{}, errors.New("no rows")
-}
 
 func TestCreateInvitation_Success(t *testing.T) {
 	var capturedHash string
 	repo := &fakeRepository{
 		getUserByEmail: notFound,
-		createInvitation: func(_ context.Context, email, name, role, tokenHash string, invitedBy *uuid.UUID, expiresAt time.Time) (entities.Invitation, error) {
+		createInvitation: func(_ context.Context, email, name, role, tokenHash string, invitedBy *uuid.UUID, expiresAt time.Time) (Invitation, error) {
 			capturedHash = tokenHash
-			return entities.Invitation{
+			return Invitation{
 				ID: uuid.New(), Email: email, Name: name, Role: role,
 				TokenHash: tokenHash, InvitedBy: invitedBy, ExpiresAt: expiresAt,
 			}, nil
@@ -30,7 +26,7 @@ func TestCreateInvitation_Success(t *testing.T) {
 		setWaitlistInvited: func(context.Context, string) error { return nil },
 	}
 	mailer := &fakeMailer{}
-	svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
+	svc := newTestServiceFull(repo, newMemStorage(), mailer)
 	svc.cfg.InvitationExpiry = 72 * time.Hour
 	svc.cfg.FrontendURL = "https://app.finexia.me"
 
@@ -67,11 +63,11 @@ func TestCreateInvitation_Success(t *testing.T) {
 
 func TestCreateInvitation_RejectsExistingUser(t *testing.T) {
 	repo := &fakeRepository{
-		getUserByEmail: func(context.Context, string) (entities.User, error) {
-			return entities.User{ID: uuid.New()}, nil
+		getUserByEmail: func(context.Context, string) (identity.User, error) {
+			return identity.User{ID: uuid.New()}, nil
 		},
 	}
-	svc := newTestServicesFull(repo, newMemStorage(), &fakeMailer{}, nil)
+	svc := newTestServiceFull(repo, newMemStorage(), &fakeMailer{})
 
 	_, err := svc.CreateInvitation(context.Background(), "taken@example.com", "Taken", "customer", uuid.New())
 	if err == nil || !strings.Contains(err.Error(), "already exists") {
@@ -81,7 +77,7 @@ func TestCreateInvitation_RejectsExistingUser(t *testing.T) {
 
 func TestCreateInvitation_RejectsBadRole(t *testing.T) {
 	repo := &fakeRepository{}
-	svc := newTestServicesFull(repo, newMemStorage(), &fakeMailer{}, nil)
+	svc := newTestServiceFull(repo, newMemStorage(), &fakeMailer{})
 
 	_, err := svc.CreateInvitation(context.Background(), "x@example.com", "X", "superadmin", uuid.New())
 	if err == nil || !strings.Contains(err.Error(), "invalid role") {
@@ -98,24 +94,24 @@ func TestAcceptInvitation_Success(t *testing.T) {
 
 	var acceptedName, acceptedHash string
 	repo := &fakeRepository{
-		getInvitationByHash: func(_ context.Context, tokenHash string) (entities.Invitation, error) {
+		getInvitationByHash: func(_ context.Context, tokenHash string) (Invitation, error) {
 			if tokenHash != hash {
 				t.Errorf("service hashed token differently: %q != %q", tokenHash, hash)
 			}
-			return entities.Invitation{
+			return Invitation{
 				ID: invID, Email: "invitee@example.com", Name: "Fallback", Role: "customer",
 				ExpiresAt: time.Now().UTC().Add(time.Hour),
 			}, nil
 		},
-		acceptInvitation: func(_ context.Context, id uuid.UUID, name, email, role, passwordHash string) (entities.User, error) {
+		acceptInvitation: func(_ context.Context, id uuid.UUID, name, email, role, passwordHash string) (identity.User, error) {
 			if id != invID {
 				t.Errorf("wrong invitation id: %v", id)
 			}
 			acceptedName, acceptedHash = name, passwordHash
-			return entities.User{ID: uuid.New(), Email: email, Name: name}, nil
+			return identity.User{ID: uuid.New(), Email: email, Name: name}, nil
 		},
 	}
-	svc := newTestServicesFull(repo, newMemStorage(), &fakeMailer{}, nil)
+	svc := newTestServiceFull(repo, newMemStorage(), &fakeMailer{})
 
 	u, err := svc.AcceptInvitation(context.Background(), raw, "Jane Doe", "s3cretpass")
 	if err != nil {
@@ -135,14 +131,14 @@ func TestAcceptInvitation_Success(t *testing.T) {
 func TestAcceptInvitation_Expired(t *testing.T) {
 	raw, _, _ := generateRefreshToken()
 	repo := &fakeRepository{
-		getInvitationByHash: func(context.Context, string) (entities.Invitation, error) {
-			return entities.Invitation{
+		getInvitationByHash: func(context.Context, string) (Invitation, error) {
+			return Invitation{
 				ID: uuid.New(), Email: "old@example.com", Role: "customer",
 				ExpiresAt: time.Now().UTC().Add(-time.Hour),
 			}, nil
 		},
 	}
-	svc := newTestServicesFull(repo, newMemStorage(), &fakeMailer{}, nil)
+	svc := newTestServiceFull(repo, newMemStorage(), &fakeMailer{})
 
 	_, err := svc.AcceptInvitation(context.Background(), raw, "", "s3cretpass")
 	if !errors.Is(err, ErrInvitationExpired) {
@@ -154,14 +150,14 @@ func TestAcceptInvitation_Revoked(t *testing.T) {
 	raw, _, _ := generateRefreshToken()
 	revoked := time.Now().UTC().Add(-time.Minute)
 	repo := &fakeRepository{
-		getInvitationByHash: func(context.Context, string) (entities.Invitation, error) {
-			return entities.Invitation{
+		getInvitationByHash: func(context.Context, string) (Invitation, error) {
+			return Invitation{
 				ID: uuid.New(), Email: "revoked@example.com", Role: "customer",
 				ExpiresAt: time.Now().UTC().Add(time.Hour), RevokedAt: &revoked,
 			}, nil
 		},
 	}
-	svc := newTestServicesFull(repo, newMemStorage(), &fakeMailer{}, nil)
+	svc := newTestServiceFull(repo, newMemStorage(), &fakeMailer{})
 
 	_, err := svc.AcceptInvitation(context.Background(), raw, "", "s3cretpass")
 	if !errors.Is(err, ErrInvitationInvalid) {
