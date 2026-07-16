@@ -1,0 +1,126 @@
+package auth
+
+import (
+	"context"
+	"fmt"
+	"net/url"
+	"strings"
+	"time"
+
+	"github.com/yeferson59/finexia-app/internal/platform/logger"
+	"github.com/yeferson59/finexia-app/internal/platform/mail"
+)
+
+// issueEmailVerification creates a single-use verification token for the
+// email and emails it. Errors are logged, not returned: it runs right after
+// account creation, and a mail hiccup must not fail the registration since the
+// user can always request a new link.
+func (s *Service) issueEmailVerification(ctx context.Context, name, email string) {
+	raw, hash, err := generateRefreshToken()
+	if err != nil {
+		s.log.Error(ctx, "email verification: failed to generate token", logger.Err(err))
+		return
+	}
+
+	expiresAt := time.Now().UTC().Add(s.cfg.EmailVerificationExpiry)
+
+	v, err := s.stores.Verifications.CreateEmailVerification(ctx, email, hash, expiresAt)
+	if err != nil {
+		s.log.Error(ctx, "email verification: failed to create token", logger.Err(err))
+		return
+	}
+
+	s.sendEmailVerificationMail(ctx, name, email, raw, v.ExpiresAt)
+}
+
+// RequestEmailVerification (re)issues a verification link for an email that
+// is registered but not yet verified. The response is intentionally the same
+// regardless of whether the email exists or is already verified, so the
+// endpoint never confirms which addresses are registered.
+func (s *Service) RequestEmailVerification(ctx context.Context, email string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return nil
+	}
+
+	user, err := s.stores.Accounts.GetUserByEmail(ctx, email)
+	if err != nil || user.EmailVerified {
+		return nil
+	}
+
+	s.issueEmailVerification(ctx, user.Name, user.Email)
+
+	return nil
+}
+
+// ValidateEmailVerification reports whether a token is still redeemable, so
+// the verify page can reject dead links before confirming.
+func (s *Service) ValidateEmailVerification(ctx context.Context, rawToken string) error {
+	_, err := s.lookupEmailVerification(ctx, rawToken)
+	return err
+}
+
+// VerifyEmail consumes a valid verification token and marks the account's
+// email as verified.
+func (s *Service) VerifyEmail(ctx context.Context, rawToken string) error {
+	v, err := s.lookupEmailVerification(ctx, rawToken)
+	if err != nil {
+		return err
+	}
+
+	if err := s.stores.Verifications.ConsumeEmailVerification(ctx, v.ID, v.Identifier); err != nil {
+		return ErrEmailVerificationInvalid
+	}
+
+	return nil
+}
+
+// lookupEmailVerification hashes the raw token, fetches the verification row,
+// and rejects anything not currently redeemable. The hash comparison happens
+// in the database via the value column, so the raw token is never stored.
+func (s *Service) lookupEmailVerification(ctx context.Context, rawToken string) (Verification, error) {
+	rawToken = strings.TrimSpace(rawToken)
+	if rawToken == "" {
+		return Verification{}, ErrEmailVerificationInvalid
+	}
+
+	hash, err := hashRefreshToken(rawToken)
+	if err != nil {
+		return Verification{}, ErrEmailVerificationInvalid
+	}
+
+	v, err := s.stores.Verifications.GetEmailVerificationByHash(ctx, hash)
+	if err != nil {
+		return Verification{}, ErrEmailVerificationInvalid
+	}
+
+	if time.Now().UTC().After(v.ExpiresAt) {
+		return Verification{}, ErrEmailVerificationExpired
+	}
+
+	return v, nil
+}
+
+// sendEmailVerificationMail delivers the verification link. Best-effort and
+// async: a mail hiccup must not fail the caller, and a new link can always be
+// requested.
+func (s *Service) sendEmailVerificationMail(ctx context.Context, userName, email, rawToken string, expiresAt time.Time) {
+	if s.mail == nil {
+		return
+	}
+
+	verifyURL := fmt.Sprintf("%s/auth/verify-email?token=%s",
+		strings.TrimRight(s.cfg.FrontendURL, "/"), url.QueryEscape(rawToken))
+
+	data := mail.EmailVerificationData{
+		UserName:  userName,
+		VerifyURL: verifyURL,
+		ExpiresIn: humanizeExpiry(time.Until(expiresAt)),
+	}
+
+	go func() {
+		if err := s.mail.SendEmailVerification(email, data); err != nil {
+			s.log.Error(ctx, "failed to send email verification", logger.Err(err))
+		}
+	}()
+}
