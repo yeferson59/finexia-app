@@ -37,11 +37,12 @@ type Module struct {
 func New(deps Deps) *Module {
 	pg := NewPostgresRepository(deps.DB)
 	service := NewService(Stores{
-		Accounts:      pg,
-		Sessions:      pg,
-		RefreshTokens: pg,
-		TwoFactor:     pg,
-		Verifications: pg,
+		Accounts:       pg,
+		Sessions:       pg,
+		RefreshTokens:  pg,
+		TwoFactor:      pg,
+		Verifications:  pg,
+		PasswordResets: pg,
 	}, deps.Cfg, deps.Storage, deps.Mail, deps.Geo, deps.Log)
 
 	return newModule(deps, service)
@@ -79,6 +80,13 @@ func (m *Module) Routes(router fiber.Router) {
 	// token plus a TOTP/recovery code for a session. Rate-limited to blunt
 	// code guessing on top of the per-token attempt counter.
 	auth.Post("/2fa/login", m.authLimiter(), m.handler.twoFactorLogin)
+
+	// Public password recovery flow: request a reset link, validate its
+	// token, then confirm with a new password. Rate-limited to blunt both
+	// mail-bombing an address and token guessing.
+	auth.Post("/password-reset", m.authLimiter(), m.handler.requestPasswordReset)
+	auth.Get("/password-reset", m.authLimiter(), m.handler.validatePasswordReset)
+	auth.Post("/password-reset/confirm", m.authLimiter(), m.handler.confirmPasswordReset)
 
 	// Public email verification flow: (re)send a link, validate its token,
 	// then confirm to mark the email verified. Rate-limited to blunt both

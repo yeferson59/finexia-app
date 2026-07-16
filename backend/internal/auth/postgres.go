@@ -19,11 +19,12 @@ type PostgresRepository struct {
 }
 
 var (
-	_ AccountStore      = (*PostgresRepository)(nil)
-	_ SessionStore      = (*PostgresRepository)(nil)
-	_ RefreshTokenStore = (*PostgresRepository)(nil)
-	_ TwoFactorStore    = (*PostgresRepository)(nil)
-	_ VerificationStore = (*PostgresRepository)(nil)
+	_ AccountStore       = (*PostgresRepository)(nil)
+	_ SessionStore       = (*PostgresRepository)(nil)
+	_ RefreshTokenStore  = (*PostgresRepository)(nil)
+	_ TwoFactorStore     = (*PostgresRepository)(nil)
+	_ VerificationStore  = (*PostgresRepository)(nil)
+	_ PasswordResetStore = (*PostgresRepository)(nil)
 )
 
 func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {

@@ -309,8 +309,12 @@ golangci-lint run
   - [x] 2FA (`services/two_factor.go`, `repositories/two_factor.go`, `handlers/two_factor.go`). *(PR A)*
   - [x] Verificación de email (`services/email_verification.go`, `repositories/verification.go`,
         `handlers/email_verification.go`). *(PR A)*
-  - [ ] Password reset (`services/password_reset.go`, `repositories/password_reset.go`,
-        `handlers/password_reset.go`). *(PR B)*
+  - [x] Password reset (`services/password_reset.go`, `repositories/password_reset.go`,
+        `handlers/password_reset.go`). *(PR B)* → `PasswordResetStore` +
+        `Mailer += SendPasswordReset`; el módulo tiene su propio
+        `sendPasswordChangedAlert` (el legacy conserva su copia para
+        `ChangeMyPassword` hasta Fase 5); borrados `entities/auth.go` y el
+        paquete `dtos/auth` completo; la god interface baja de 60 a 57 métodos.
   - [ ] Invitaciones (`services/invitation.go`, `repositories/invitation.go`,
         `handlers/invitation.go`). *(PR C, con waitlist → marketing)*
 - [x] Definir la interfaz local de persistencia + `auth/postgres.go`. → En vez de
@@ -324,7 +328,8 @@ golangci-lint run
       importa (dirección legacy→módulo). El gate global de `routes.Init()` usa
       `r.auth.RequireAuth()`.
 - [x] Interfaces locales para efectos secundarios: `auth.Mailer` (crece por PR:
-      A = SecurityAlert + EmailVerification), `auth.GeoLocator`. *(reset/invitación en PR B/C)*
+      A = SecurityAlert + EmailVerification, B += PasswordReset), `auth.GeoLocator`.
+      *(invitación en PR C)*
 - [x] Job de limpieza (`scheduler/auth_cleanup.go`): movido a `auth/cleanup_job.go`
       y registrado desde `app.startSchedulers` (runner genérico en Fase 7).
 - [x] Migrar los tests del núcleo (`auth_test.go`, `two_factor_test.go`, `security_test.go`,

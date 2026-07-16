@@ -67,16 +67,23 @@ type VerificationStore interface {
 	ConsumeEmailVerification(ctx context.Context, id uuid.UUID, email string) error
 }
 
+type PasswordResetStore interface {
+	CreatePasswordReset(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) (PasswordReset, error)
+	GetPasswordResetByHash(ctx context.Context, tokenHash string) (PasswordReset, error)
+	ConsumePasswordReset(ctx context.Context, resetID, userID uuid.UUID, hashedPassword string) error
+}
+
 // Stores groups the module's persistence interfaces. The composition root
 // fills every field with the same *PostgresRepository; tests fill only what
 // the case under test touches (a nil store panics loudly, mirroring the old
 // embed-the-interface fakes).
 type Stores struct {
-	Accounts      AccountStore
-	Sessions      SessionStore
-	RefreshTokens RefreshTokenStore
-	TwoFactor     TwoFactorStore
-	Verifications VerificationStore
+	Accounts       AccountStore
+	Sessions       SessionStore
+	RefreshTokens  RefreshTokenStore
+	TwoFactor      TwoFactorStore
+	Verifications  VerificationStore
+	PasswordResets PasswordResetStore
 }
 
 // Mailer abstracts the outbound email service so tests can replace the
@@ -84,6 +91,7 @@ type Stores struct {
 type Mailer interface {
 	SendSecurityAlert(email string, data mail.SecurityAlertData) error
 	SendEmailVerification(email string, data mail.EmailVerificationData) error
+	SendPasswordReset(email string, data mail.PasswordResetData) error
 }
 
 var _ Mailer = (*mail.Service)(nil)

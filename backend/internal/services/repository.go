@@ -91,11 +91,6 @@ type Repository interface {
 	ListInvitations(ctx context.Context, offset, limit uint) ([]entities.Invitation, uint, error)
 	RevokeInvitation(ctx context.Context, id uuid.UUID) error
 	AcceptInvitation(ctx context.Context, invitationID uuid.UUID, name, email, role, passwordHash string) (entities.User, error)
-
-	// Password resets
-	CreatePasswordReset(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) (entities.PasswordReset, error)
-	GetPasswordResetByHash(ctx context.Context, tokenHash string) (entities.PasswordReset, error)
-	ConsumePasswordReset(ctx context.Context, resetID, userID uuid.UUID, hashedPassword string) error
 }
 
 // Ensure the concrete repository keeps satisfying the interface.

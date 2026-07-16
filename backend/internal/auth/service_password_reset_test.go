@@ -1,4 +1,4 @@
-package services
+package auth
 
 import (
 	"context"
@@ -9,26 +9,26 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/identity"
 )
 
 func TestRequestPasswordReset_Success(t *testing.T) {
 	userID := uuid.New()
 	var capturedHash string
 	repo := &fakeRepository{
-		getUserByEmail: func(_ context.Context, email string) (entities.User, error) {
-			return entities.User{ID: userID, Name: "Jane Doe", Email: email}, nil
+		getUserByEmail: func(_ context.Context, email string) (identity.User, error) {
+			return identity.User{ID: userID, Name: "Jane Doe", Email: email}, nil
 		},
-		createPasswordReset: func(_ context.Context, uid uuid.UUID, tokenHash string, expiresAt time.Time) (entities.PasswordReset, error) {
+		createPasswordReset: func(_ context.Context, uid uuid.UUID, tokenHash string, expiresAt time.Time) (PasswordReset, error) {
 			if uid != userID {
 				t.Errorf("wrong user id: %v", uid)
 			}
 			capturedHash = tokenHash
-			return entities.PasswordReset{ID: uuid.New(), UserID: uid, TokenHash: tokenHash, ExpiresAt: expiresAt}, nil
+			return PasswordReset{ID: uuid.New(), UserID: uid, TokenHash: tokenHash, ExpiresAt: expiresAt}, nil
 		},
 	}
 	mailer := &fakeMailer{}
-	svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
+	svc := newTestServiceFull(repo, newMemStorage(), mailer)
 	svc.cfg.PasswordResetExpiry = time.Hour
 	svc.cfg.FrontendURL = "https://app.finexia.me"
 
@@ -57,7 +57,7 @@ func TestRequestPasswordReset_UnknownEmailIsSilentSuccess(t *testing.T) {
 		getUserByEmail: notFound,
 	}
 	mailer := &fakeMailer{}
-	svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
+	svc := newTestServiceFull(repo, newMemStorage(), mailer)
 
 	if err := svc.RequestPasswordReset(context.Background(), "ghost@example.com"); err != nil {
 		t.Fatalf("expected nil error for unknown email, got %v", err)
@@ -77,12 +77,13 @@ func TestResetPassword_Success(t *testing.T) {
 
 	var consumedResetID, consumedUserID uuid.UUID
 	var consumedHash string
+	var revokedUser uuid.UUID
 	repo := &fakeRepository{
-		getPasswordResetByHash: func(_ context.Context, tokenHash string) (entities.PasswordReset, error) {
+		getPasswordResetByHash: func(_ context.Context, tokenHash string) (PasswordReset, error) {
 			if tokenHash != hash {
 				t.Errorf("service hashed token differently: %q != %q", tokenHash, hash)
 			}
-			return entities.PasswordReset{
+			return PasswordReset{
 				ID: resetID, UserID: userID,
 				ExpiresAt: time.Now().UTC().Add(time.Hour),
 			}, nil
@@ -91,15 +92,14 @@ func TestResetPassword_Success(t *testing.T) {
 			consumedResetID, consumedUserID, consumedHash = rID, uID, hashedPassword
 			return nil
 		},
-	}
-	var revokedUser uuid.UUID
-	authSvc := &fakeAuthService{
-		revokeOtherSessions: func(_ context.Context, uid uuid.UUID, _ string) (int64, error) {
+		// ResetPassword revokes every other session; an empty list makes the
+		// revocation a no-op while still proving it targets the right user.
+		listSessionsByUserID: func(_ context.Context, uid uuid.UUID) ([]identity.Session, error) {
 			revokedUser = uid
-			return 0, nil
+			return nil, nil
 		},
 	}
-	svc := newTestServicesAuth(repo, newMemStorage(), nil, authSvc)
+	svc := newTestService(repo, newMemStorage())
 
 	if err := svc.ResetPassword(context.Background(), raw, "s3cretpass", "203.0.113.9", "test-agent"); err != nil {
 		t.Fatalf("ResetPassword: %v", err)
@@ -121,14 +121,14 @@ func TestResetPassword_Success(t *testing.T) {
 func TestResetPassword_Expired(t *testing.T) {
 	raw, _, _ := generateRefreshToken()
 	repo := &fakeRepository{
-		getPasswordResetByHash: func(context.Context, string) (entities.PasswordReset, error) {
-			return entities.PasswordReset{
+		getPasswordResetByHash: func(context.Context, string) (PasswordReset, error) {
+			return PasswordReset{
 				ID: uuid.New(), UserID: uuid.New(),
 				ExpiresAt: time.Now().UTC().Add(-time.Hour),
 			}, nil
 		},
 	}
-	svc := newTestServices(repo, newMemStorage())
+	svc := newTestService(repo, newMemStorage())
 
 	err := svc.ResetPassword(context.Background(), raw, "s3cretpass", "203.0.113.9", "test-agent")
 	if !errors.Is(err, ErrPasswordResetExpired) {
@@ -140,14 +140,14 @@ func TestResetPassword_AlreadyUsed(t *testing.T) {
 	raw, _, _ := generateRefreshToken()
 	usedAt := time.Now().UTC().Add(-time.Minute)
 	repo := &fakeRepository{
-		getPasswordResetByHash: func(context.Context, string) (entities.PasswordReset, error) {
-			return entities.PasswordReset{
+		getPasswordResetByHash: func(context.Context, string) (PasswordReset, error) {
+			return PasswordReset{
 				ID: uuid.New(), UserID: uuid.New(),
 				ExpiresAt: time.Now().UTC().Add(time.Hour), UsedAt: &usedAt,
 			}, nil
 		},
 	}
-	svc := newTestServices(repo, newMemStorage())
+	svc := newTestService(repo, newMemStorage())
 
 	err := svc.ResetPassword(context.Background(), raw, "s3cretpass", "203.0.113.9", "test-agent")
 	if !errors.Is(err, ErrPasswordResetInvalid) {
@@ -158,11 +158,11 @@ func TestResetPassword_AlreadyUsed(t *testing.T) {
 func TestResetPassword_InvalidToken(t *testing.T) {
 	raw, _, _ := generateRefreshToken()
 	repo := &fakeRepository{
-		getPasswordResetByHash: func(context.Context, string) (entities.PasswordReset, error) {
-			return entities.PasswordReset{}, errors.New("not found")
+		getPasswordResetByHash: func(context.Context, string) (PasswordReset, error) {
+			return PasswordReset{}, errors.New("not found")
 		},
 	}
-	svc := newTestServices(repo, newMemStorage())
+	svc := newTestService(repo, newMemStorage())
 
 	err := svc.ResetPassword(context.Background(), raw, "s3cretpass", "203.0.113.9", "test-agent")
 	if !errors.Is(err, ErrPasswordResetInvalid) {
@@ -171,7 +171,7 @@ func TestResetPassword_InvalidToken(t *testing.T) {
 }
 
 func TestResetPassword_EmptyToken(t *testing.T) {
-	svc := newTestServices(&fakeRepository{}, newMemStorage())
+	svc := newTestService(&fakeRepository{}, newMemStorage())
 
 	err := svc.ResetPassword(context.Background(), "", "s3cretpass", "203.0.113.9", "test-agent")
 	if !errors.Is(err, ErrPasswordResetInvalid) {

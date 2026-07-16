@@ -1,9 +1,9 @@
 package routes
 
 // Auth registers the /auth routes still served by the legacy layers. The
-// core (login, register, refresh, 2FA, sessions, email verification) moved
-// to the auth module; password reset migrates in PR B of Fase 4 and the
-// public invitation flow in PR C, deleting this file.
+// core (login, register, refresh, 2FA, sessions, email verification) and the
+// password-reset flow moved to the auth module; the public invitation flow
+// migrates in PR C of Fase 4, deleting this file.
 func (r *Routes) Auth() {
 	auth := r.app.Group("/auth")
 
@@ -11,11 +11,4 @@ func (r *Routes) Auth() {
 	// password. Rate-limited to blunt token guessing.
 	auth.Get("/invitations", r.middlewares.AuthLimiter(), r.handlers.ValidateInvitation)
 	auth.Post("/invitations/accept", r.middlewares.AuthLimiter(), r.handlers.AcceptInvitation)
-
-	// Public password recovery flow: request a reset link, validate its
-	// token, then confirm with a new password. Rate-limited to blunt both
-	// mail-bombing an address and token guessing.
-	auth.Post("/password-reset", r.middlewares.AuthLimiter(), r.handlers.RequestPasswordReset)
-	auth.Get("/password-reset", r.middlewares.AuthLimiter(), r.handlers.ValidatePasswordReset)
-	auth.Post("/password-reset/confirm", r.middlewares.AuthLimiter(), r.handlers.ConfirmPasswordReset)
 }

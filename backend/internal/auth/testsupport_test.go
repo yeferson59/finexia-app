@@ -55,25 +55,31 @@ type fakeRepository struct {
 	createEmailVerification    func(ctx context.Context, email, tokenHash string, expiresAt time.Time) (Verification, error)
 	getEmailVerificationByHash func(ctx context.Context, tokenHash string) (Verification, error)
 	consumeEmailVerification   func(ctx context.Context, id uuid.UUID, email string) error
+
+	createPasswordReset    func(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) (PasswordReset, error)
+	getPasswordResetByHash func(ctx context.Context, tokenHash string) (PasswordReset, error)
+	consumePasswordReset   func(ctx context.Context, resetID, userID uuid.UUID, hashedPassword string) error
 }
 
 var (
-	_ AccountStore      = (*fakeRepository)(nil)
-	_ SessionStore      = (*fakeRepository)(nil)
-	_ RefreshTokenStore = (*fakeRepository)(nil)
-	_ TwoFactorStore    = (*fakeRepository)(nil)
-	_ VerificationStore = (*fakeRepository)(nil)
+	_ AccountStore       = (*fakeRepository)(nil)
+	_ SessionStore       = (*fakeRepository)(nil)
+	_ RefreshTokenStore  = (*fakeRepository)(nil)
+	_ TwoFactorStore     = (*fakeRepository)(nil)
+	_ VerificationStore  = (*fakeRepository)(nil)
+	_ PasswordResetStore = (*fakeRepository)(nil)
 )
 
 // testStores fills every store slot with the same fake, mirroring how the
 // composition root wires the single Postgres implementation.
 func testStores(f *fakeRepository) Stores {
 	return Stores{
-		Accounts:      f,
-		Sessions:      f,
-		RefreshTokens: f,
-		TwoFactor:     f,
-		Verifications: f,
+		Accounts:       f,
+		Sessions:       f,
+		RefreshTokens:  f,
+		TwoFactor:      f,
+		Verifications:  f,
+		PasswordResets: f,
 	}
 }
 
@@ -222,6 +228,18 @@ func (f *fakeRepository) ConsumeEmailVerification(ctx context.Context, id uuid.U
 	return f.consumeEmailVerification(ctx, id, email)
 }
 
+func (f *fakeRepository) CreatePasswordReset(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) (PasswordReset, error) {
+	return f.createPasswordReset(ctx, userID, tokenHash, expiresAt)
+}
+
+func (f *fakeRepository) GetPasswordResetByHash(ctx context.Context, tokenHash string) (PasswordReset, error) {
+	return f.getPasswordResetByHash(ctx, tokenHash)
+}
+
+func (f *fakeRepository) ConsumePasswordReset(ctx context.Context, resetID, userID uuid.UUID, hashedPassword string) error {
+	return f.consumePasswordReset(ctx, resetID, userID, hashedPassword)
+}
+
 // fakeMailer records outbound emails so tests can assert on the alert flows
 // without a Resend client. It grows with the module: password reset and
 // invitation capture arrive with their sub-areas.
@@ -230,6 +248,7 @@ type fakeMailer struct {
 
 	securityErr          error
 	emailVerificationErr error
+	passwordResetErr     error
 
 	security []struct {
 		To   string
@@ -238,6 +257,10 @@ type fakeMailer struct {
 	emailVerificationTo []struct {
 		To   string
 		Data mail.EmailVerificationData
+	}
+	passwordResetTo []struct {
+		To   string
+		Data mail.PasswordResetData
 	}
 }
 
@@ -271,6 +294,25 @@ func (m *fakeMailer) emailVerificationCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return len(m.emailVerificationTo)
+}
+
+func (m *fakeMailer) SendPasswordReset(email string, data mail.PasswordResetData) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.passwordResetErr != nil {
+		return m.passwordResetErr
+	}
+	m.passwordResetTo = append(m.passwordResetTo, struct {
+		To   string
+		Data mail.PasswordResetData
+	}{email, data})
+	return nil
+}
+
+func (m *fakeMailer) passwordResetCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.passwordResetTo)
 }
 
 // memStorage is an in-memory fiber.Storage that honours TTLs, good enough to

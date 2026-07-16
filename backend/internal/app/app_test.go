@@ -144,9 +144,14 @@ func TestAppWiresAndRoutes(t *testing.T) {
 		t.Errorf("GET /auth/session = %d, want 401 with an invalid token", status)
 	}
 
-	// The legacy public /auth routes (password reset) still answer before the
-	// module's group-local gate.
+	// The password-reset flow now answers from the module's public zone.
 	if status := request("POST", "/auth/password-reset"); status != fiber.StatusBadRequest {
 		t.Errorf("POST /auth/password-reset = %d, want 400 for an empty body", status)
+	}
+
+	// The legacy public /auth routes (invitations) still answer before the
+	// module's group-local gate.
+	if status := request("GET", "/auth/invitations"); status != fiber.StatusBadRequest {
+		t.Errorf("GET /auth/invitations = %d, want 400 without a token", status)
 	}
 }

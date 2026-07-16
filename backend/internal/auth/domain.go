@@ -47,6 +47,13 @@ var (
 	ErrEmailVerificationExpired = errors.New("email verification link expired")
 )
 
+// Exported so handlers can map each failure to a precise HTTP status and
+// message instead of pattern-matching error strings.
+var (
+	ErrPasswordResetInvalid = errors.New("invalid password reset link")
+	ErrPasswordResetExpired = errors.New("password reset link expired")
+)
+
 // TwoFactor holds a user's TOTP enrollment. A row with Enabled=false is a
 // pending setup: the secret was issued but the user has not yet confirmed a
 // code, so login is NOT gated until the enrollment is confirmed.
@@ -66,4 +73,13 @@ type Verification struct {
 	ExpiresAt  time.Time `json:"expiresAt"`
 	CreatedAt  time.Time `json:"createdAt"`
 	UpdatedAt  time.Time `json:"updatedAt"`
+}
+
+type PasswordReset struct {
+	ID        uuid.UUID  `json:"id"`
+	UserID    uuid.UUID  `json:"userId"`
+	TokenHash string     `json:"-"`
+	ExpiresAt time.Time  `json:"expiresAt"`
+	UsedAt    *time.Time `json:"usedAt,omitempty"`
+	CreatedAt time.Time  `json:"createdAt"`
 }

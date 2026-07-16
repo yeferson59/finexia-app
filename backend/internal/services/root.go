@@ -28,7 +28,6 @@ type Mailer interface {
 	SendSecurityAlert(email string, data mail.SecurityAlertData) error
 	SendWeeklySummary(email string, data mail.WeeklySummaryData) error
 	SendInvitation(email string, data mail.InvitationData) error
-	SendPasswordReset(email string, data mail.PasswordResetData) error
 }
 
 var _ Mailer = (*mail.Service)(nil)
