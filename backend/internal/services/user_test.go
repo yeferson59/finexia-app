@@ -16,13 +16,23 @@ func TestChangePassword(t *testing.T) {
 	userID := uuid.New()
 	const currentPassword = "current-password"
 
+	// verifyPassword mirrors the auth module's real behavior (and its frozen
+	// error strings) so the delegation keeps the same HTTP mapping.
+	authSvc := func() *fakeAuthService {
+		return &fakeAuthService{
+			verifyPassword: func(_ context.Context, _ uuid.UUID, password string) error {
+				if password != currentPassword {
+					return errors.New("invalid current password")
+				}
+				return nil
+			},
+		}
+	}
+
 	newRepo := func(t *testing.T) (*fakeRepository, *string) {
 		t.Helper()
 		var storedHash string
 		repo := &fakeRepository{
-			getAccountByUserID: func(context.Context, uuid.UUID) (entities.Account, error) {
-				return entities.Account{Password: mustHashPassword(t, currentPassword)}, nil
-			},
 			updateUserPassword: func(_ context.Context, uid uuid.UUID, hashed string) error {
 				if uid != userID {
 					t.Errorf("UpdateUserPassword userID = %s, want %s", uid, userID)
@@ -30,16 +40,13 @@ func TestChangePassword(t *testing.T) {
 				storedHash = hashed
 				return nil
 			},
-			listSessionsByUserID: func(context.Context, uuid.UUID) ([]entities.Session, error) {
-				return nil, nil
-			},
 		}
 		return repo, &storedHash
 	}
 
 	t.Run("success stores a new bcrypt hash", func(t *testing.T) {
 		repo, storedHash := newRepo(t)
-		svc := newTestServices(repo, newMemStorage())
+		svc := newTestServicesAuth(repo, newMemStorage(), nil, authSvc())
 
 		if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, "new-password", "203.0.113.9", "test-agent"); err != nil {
 			t.Fatalf("ChangePassword: %v", err)
@@ -52,9 +59,46 @@ func TestChangePassword(t *testing.T) {
 		}
 	})
 
+	t.Run("revokes other sessions and alerts", func(t *testing.T) {
+		repo, _ := newRepo(t)
+		repo.getUserByID = func(context.Context, uuid.UUID) (entities.User, error) {
+			return entities.User{ID: userID, Name: "Test User", Email: "test@example.com"}, nil
+		}
+		auth := authSvc()
+		var revokedUser uuid.UUID
+		var revokedToken string
+		auth.revokeOtherSessions = func(_ context.Context, uid uuid.UUID, token string) (int64, error) {
+			revokedUser, revokedToken = uid, token
+			return 1, nil
+		}
+		mailer := &fakeMailer{}
+		svc := newTestServicesAuth(repo, newMemStorage(), mailer, auth)
+
+		if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, "brand-new-pass", "203.0.113.9", "test-agent"); err != nil {
+			t.Fatalf("ChangePassword: %v", err)
+		}
+		if revokedUser != userID || revokedToken != "current-token" {
+			t.Errorf("RevokeOtherSessions called with (%s, %q), want (%s, %q)", revokedUser, revokedToken, userID, "current-token")
+		}
+
+		ok := waitFor(t, 2*time.Second, func() bool {
+			mailer.mu.Lock()
+			defer mailer.mu.Unlock()
+			return len(mailer.security) == 1
+		})
+		if !ok {
+			t.Fatal("expected a security alert email after the password change")
+		}
+		mailer.mu.Lock()
+		defer mailer.mu.Unlock()
+		if mailer.security[0].To != "test@example.com" {
+			t.Errorf("alert sent to %s, want test@example.com", mailer.security[0].To)
+		}
+	})
+
 	t.Run("wrong current password is rejected", func(t *testing.T) {
 		repo, storedHash := newRepo(t)
-		svc := newTestServices(repo, newMemStorage())
+		svc := newTestServicesAuth(repo, newMemStorage(), nil, authSvc())
 
 		err := svc.ChangePassword(context.Background(), userID, "current-token", "not-the-password", "new-password", "203.0.113.9", "test-agent")
 		if err == nil || err.Error() != "invalid current password" {
@@ -67,7 +111,7 @@ func TestChangePassword(t *testing.T) {
 
 	t.Run("new password equal to current is rejected", func(t *testing.T) {
 		repo, storedHash := newRepo(t)
-		svc := newTestServices(repo, newMemStorage())
+		svc := newTestServicesAuth(repo, newMemStorage(), nil, authSvc())
 
 		if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, currentPassword, "203.0.113.9", "test-agent"); err == nil {
 			t.Fatal("expected reusing the current password to be rejected")
@@ -78,12 +122,12 @@ func TestChangePassword(t *testing.T) {
 	})
 
 	t.Run("missing account", func(t *testing.T) {
-		repo := &fakeRepository{
-			getAccountByUserID: func(context.Context, uuid.UUID) (entities.Account, error) {
-				return entities.Account{}, errors.New("no rows")
+		auth := &fakeAuthService{
+			verifyPassword: func(context.Context, uuid.UUID, string) error {
+				return errors.New("not found account")
 			},
 		}
-		svc := newTestServices(repo, newMemStorage())
+		svc := newTestServicesAuth(&fakeRepository{}, newMemStorage(), nil, auth)
 
 		if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, "new-password", "203.0.113.9", "test-agent"); err == nil {
 			t.Fatal("expected error when the account does not exist")

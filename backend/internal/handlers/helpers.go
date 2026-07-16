@@ -7,7 +7,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/google/uuid"
 
-	"github.com/yeferson59/finexia-app/internal/middlewares"
+	"github.com/yeferson59/finexia-app/internal/auth"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
@@ -53,31 +53,19 @@ func (handler *Handlers) responseFromDomain(c fiber.Ctx, err error, message, act
 	return httpx.FromDomain(c, err, message, action)
 }
 
-func (handler *Handlers) responseErrorAction(c fiber.Ctx, status int, message, details, action string) error {
-	return httpx.ErrorAction(c, status, message, details, action)
-}
-
-func (handler *Handlers) responseSuccessAction(c fiber.Ctx, status int, message, details, action string, data any) error {
-	return httpx.SuccessAction(c, status, message, details, action, data)
-}
-
-func (handler *Handlers) responseUnauthorized(c fiber.Ctx, message, details string) error {
-	return httpx.Unauthorized(c, message, details)
-}
-
 func paginationMetadata(paginateInfo *paginate.PageInfo, count uint, limitKey, totalKey string) fiber.Map {
 	return httpx.PaginationMetadata(paginateInfo, count, limitKey, totalKey)
 }
 
 func (handler *Handlers) getUserIDTokenRole(c fiber.Ctx) (uuid.UUID, string, string, error) {
-	userIDStr, _ := c.Locals(middlewares.LocalUserID).(string)
+	userIDStr, _ := c.Locals(auth.LocalUserID).(string)
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		return uuid.Nil, "", "", err
 	}
 
-	token, _ := c.Locals(middlewares.LocalToken).(string)
-	role, _ := c.Locals(middlewares.LocalRole).(string)
+	token, _ := c.Locals(auth.LocalToken).(string)
+	role, _ := c.Locals(auth.LocalRole).(string)
 	if token == "" || role == "" {
 		return uuid.Nil, "", "", errors.New("missing authenticated identity")
 	}

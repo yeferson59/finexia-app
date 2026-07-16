@@ -290,33 +290,98 @@ golangci-lint run
 
 ### Fase 4 — Módulo `auth` *(el más sensible: máximo cuidado, cero cambios de lógica)*
 
-- [ ] Crear `internal/identity/` con los structs compartidos entre módulos:
+> **Desviación planificada (2026-07-15):** la fase se ejecuta en **3 PRs** y el
+> orden original de sub-áreas no compila por commits: `Login`⇄2FA
+> (`getTwoFactor`/`createTwoFactorPending` y `CompleteTwoFactorLogin`→`issueSession`)
+> y `Register`→`issueEmailVerification` obligan a mover el núcleo junto.
+> **PR A** = identity + núcleo (sesiones/login/refresh + 2FA + verificación de
+> email) + middlewares + cleanup job; **PR B** = password reset; **PR C** =
+> invitaciones + waitlist.
+
+- [x] Crear `internal/identity/` con los structs compartidos entre módulos:
       `User`, `Account`, `Session`, `RefreshToken` (desde `entities/auth.go` y
-      `entities/user.go`). Solo datos, sin lógica.
-- [ ] Crear `internal/auth/` y migrar por sub-áreas, en este orden (un commit cada una):
-  - [ ] Sesiones + login/registro/refresh (`services/auth.go`, `services/session.go`,
-        `repositories/auth.go`, `handlers/auth.go`).
-  - [ ] 2FA (`services/two_factor.go`, `repositories/two_factor.go`, `handlers/two_factor.go`).
-  - [ ] Password reset (`services/password_reset.go`, `repositories/password_reset.go`,
-        `handlers/password_reset.go`).
-  - [ ] Verificación de email (`services/email_verification.go`, `repositories/verification.go`,
-        `handlers/email_verification.go`).
-  - [ ] Invitaciones (`services/invitation.go`, `repositories/invitation.go`,
-        `handlers/invitation.go`).
-- [ ] Definir `auth.Repository` (interfaz local ~25-30 métodos) + `auth/postgres.go`.
-- [ ] Mover los middlewares `jwt` y `rbac` a `auth/middleware.go`; el módulo expone
+      `entities/user.go`). Solo datos, sin lógica. → `Role` incluido; `User` sin
+      los slices `Sources`/`Portfolios` (verificado: nunca se pueblan) y sin
+      back-references; `ComparePassword` pasó a helper privado del módulo.
+- [x] Crear `internal/auth/` y migrar por sub-áreas (ver nota de desviación):
+  - [x] Sesiones + login/registro/refresh (`services/auth.go`, `services/session.go`,
+        `repositories/auth.go`, `handlers/auth.go`). *(PR A)*
+  - [x] 2FA (`services/two_factor.go`, `repositories/two_factor.go`, `handlers/two_factor.go`). *(PR A)*
+  - [x] Verificación de email (`services/email_verification.go`, `repositories/verification.go`,
+        `handlers/email_verification.go`). *(PR A)*
+  - [x] Password reset (`services/password_reset.go`, `repositories/password_reset.go`,
+        `handlers/password_reset.go`). *(PR B)* → `PasswordResetStore` +
+        `Mailer += SendPasswordReset`; el módulo tiene su propio
+        `sendPasswordChangedAlert` (el legacy conserva su copia para
+        `ChangeMyPassword` hasta Fase 5); borrados `entities/auth.go` y el
+        paquete `dtos/auth` completo; la god interface baja de 60 a 57 métodos.
+  - [x] Invitaciones (`services/invitation.go`, `repositories/invitation.go`,
+        `handlers/invitation.go`). *(PR C)* → `InvitationStore` + `WaitlistStore`
+        (implementado por el **módulo marketing**, que ganó
+        `ListWaitlist`/`SetWaitlistInvited`: la tabla waitlist queda 100% en su
+        módulo y auth solo importa el tipo público `marketing.Waitlist`);
+        las 5 rutas admin viven en `Module.AdminRoutes` con guards inline
+        (`RequireAuth` + `UserLimiter` + `RequireAdmin`), registradas antes del
+        gate global; DTOs `InviteUser`/`AcceptInvitation` salieron de `dtos/user`.
+- [x] Definir la interfaz local de persistencia + `auth/postgres.go`. → En vez de
+      una sola interfaz de ~45 métodos (violaría el criterio de ≤~30), se definió
+      **un store por sub-área** (`AccountStore`, `SessionStore`, `RefreshTokenStore`,
+      `TwoFactorStore`, `VerificationStore`; ninguno >11 métodos) agrupados en
+      `auth.Stores`, todos implementados por un único `*PostgresRepository`.
+- [x] Mover los middlewares `jwt` y `rbac` a `auth/middleware.go`; el módulo expone
       `RequireAuth()` / `RequireRole(...)` para que `app` y otros módulos protejan rutas.
-- [ ] Interfaces locales para efectos secundarios: `auth.Mailer` (alertas de
-      seguridad, reset, verificación, invitación), `auth.GeoLocator`.
-- [ ] Job de limpieza (`scheduler/auth_cleanup.go`): moverlo a `auth/cleanup_job.go`
-      y registrarlo desde `app` (ver Fase 7).
-- [ ] Migrar los tests (`auth_test.go`, `two_factor_test.go`, `security_test.go`,
-      `password_reset_test.go`, `invitation_test.go`, `email_verification_test.go`)
-      con fakes locales pequeños — aquí debe notarse la ganancia frente a
-      `testsupport_test.go`.
-- [ ] Eliminar el código legacy correspondiente y purgar la interfaz `services.Repository`.
+      → Constantes `auth.Local*` públicas; el legacy (`handlers`, `UserLimiter`) las
+      importa (dirección legacy→módulo). El gate global de `routes.Init()` usa
+      `r.auth.RequireAuth()`.
+- [x] Interfaces locales para efectos secundarios: `auth.Mailer` (SecurityAlert,
+      EmailVerification, PasswordReset, Invitation), `auth.GeoLocator`.
+- [x] Job de limpieza (`scheduler/auth_cleanup.go`): movido a `auth/cleanup_job.go`
+      y registrado desde `app.startSchedulers` (runner genérico en Fase 7).
+- [x] Migrar los tests del núcleo (`auth_test.go`, `two_factor_test.go`, `security_test.go`,
+      `email_verification_test.go`, `handlers/auth_test.go`, `middlewares/rbac_test.go`)
+      con fakes locales — el testsupport del módulo solo implementa los 5 stores
+      (~40 hooks) frente a la god interface de 91 métodos del legacy.
+      *(password reset/invitaciones en PR B/C)*
+- [x] Eliminar el código legacy correspondiente y purgar la interfaz `services.Repository`.
+      → PR A: borrados services/repos/handlers/middlewares del núcleo (91 → 60
+      métodos); `ChangeMyPassword` legacy delega en el módulo vía
+      `services.AuthService`. PR B: password reset (60 → 57); borrados
+      `entities/auth.go` y `dtos/auth`. PR C: invitaciones + waitlist
+      (57 → **49**); borrados `routes/auth.go`, `entities/invitation.go`,
+      `services/token_helpers.go` y `AuthLimiter`; el `Mailer` legacy queda
+      solo con ActivityAlert/SecurityAlert/WeeklySummary.
 - [ ] Verificación estándar + E2E de auth del frontend (login, registro, forgot/reset
-      password, verify email, accept invite).
+      password, verify email, accept invite). → build+vet+test+lint en verde y
+      greps de frontera vacíos en los 3 PRs; **E2E manual pendiente antes de
+      mergear** (login, registro+verify, refresh, sesiones, 2FA, forgot/reset,
+      invite/resend/revoke/accept, waitlist admin, change password).
+
+  **Retrospectiva (PRs A/B/C, 2026-07-15):**
+
+  1. **Sub-áreas acopladas**: el checklist original suponía commits
+     independientes por sub-área; el ciclo login⇄2FA y Register→verificación
+     obligaron a mover el núcleo en un solo PR (3 commits: identity → módulo
+     sin cablear → cableado+purga). Password reset e invitaciones sí son
+     independientes.
+  2. **Stores por sub-área en vez de interfaz única**: mantiene todas las
+     interfaces pequeñas y los fakes de test triviales sin perder el único
+     `PostgresRepository`.
+  3. **Orden de registro con grupo protegido propio**: a diferencia de
+     `marketing` (solo rutas públicas), auth tiene un `Use(RequireAuth)` local
+     al grupo `/auth`; las rutas públicas legacy que quedan en `routes/auth.go`
+     deben registrarse **antes** que el módulo para que sus handlers terminales
+     precedan a ese middleware en el stack de Fiber.
+  4. **`entities.TwoFactorRecoveryCode` no se portó**: no tenía ningún uso.
+  5. **Dependencia módulo→módulo validada** (PR C): auth consume la waitlist vía
+     su interfaz local `WaitlistStore`, implementada por `marketing.Service`
+     e inyectada por `app` — primera dependencia entre módulos del plan, sin
+     importar internals. La ruta `GET /users/waitlist` quedó en
+     `auth.AdminRoutes` (dashboard de invitaciones); evaluar moverla a
+     marketing en Fase 8 (TECH_DEBT #10).
+  6. **Guards admin inline** (PR C): `AdminRoutes` encadena
+     `RequireAuth`+`UserLimiter`+`RequireAdmin` por ruta (nunca `group.Use`)
+     para no filtrar middlewares a las rutas legacy `/users/*` ni duplicar el
+     rate limit.
 
 ### Fase 5 — Módulo `user`
 

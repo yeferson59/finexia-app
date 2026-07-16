@@ -22,7 +22,7 @@ func (r *Routes) Portfolios() {
 	portfolios.Patch("/sources/:id", r.handlers.UpdatePlatform)
 	portfolios.Delete("/sources/:id", r.handlers.DeletePlatform)
 	portfolios.Get("/assets", paginate.New(), r.handlers.GetAssets)
-	portfolios.Patch("/assets/:id/price", r.middlewares.RequireAdmin(), r.handlers.UpdateAssetPrice)
+	portfolios.Patch("/assets/:id/price", r.auth.RequireAdmin(), r.handlers.UpdateAssetPrice)
 	portfolios.Get("/growth", r.handlers.GetPortfolioGrowth)
 	portfolios.Get("/export/summary", r.handlers.ExportSummary)
 	portfolios.Get("/export/transactions", r.handlers.ExportTransactions)

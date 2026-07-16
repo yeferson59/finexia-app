@@ -132,4 +132,34 @@ func TestAppWiresAndRoutes(t *testing.T) {
 	if status := request("GET", "/users/me", "Authorization", "Bearer bogus-token"); status != fiber.StatusUnauthorized {
 		t.Errorf("GET /users/me = %d, want 401 with an invalid token", status)
 	}
+
+	// The auth module's public routes answer in the public zone (an empty
+	// login body yields a 400, not a 401/404).
+	if status := request("POST", "/auth/login"); status != fiber.StatusBadRequest {
+		t.Errorf("POST /auth/login = %d, want 400 for an empty body", status)
+	}
+
+	// The auth module's own protected group is gated by its RequireAuth.
+	if status := request("GET", "/auth/session", "Authorization", "Bearer bogus-token"); status != fiber.StatusUnauthorized {
+		t.Errorf("GET /auth/session = %d, want 401 with an invalid token", status)
+	}
+
+	// The password-reset flow now answers from the module's public zone.
+	if status := request("POST", "/auth/password-reset"); status != fiber.StatusBadRequest {
+		t.Errorf("POST /auth/password-reset = %d, want 400 for an empty body", status)
+	}
+
+	// The public invitation flow answers from the module's public zone.
+	if status := request("GET", "/auth/invitations"); status != fiber.StatusBadRequest {
+		t.Errorf("GET /auth/invitations = %d, want 400 without a token", status)
+	}
+
+	// The admin invitation/waitlist dashboard is gated by the module's own
+	// inline RequireAuth (401 with a bogus token, before RequireAdmin runs).
+	if status := request("GET", "/users/waitlist", "Authorization", "Bearer bogus-token"); status != fiber.StatusUnauthorized {
+		t.Errorf("GET /users/waitlist = %d, want 401 with an invalid token", status)
+	}
+	if status := request("GET", "/users/invitations", "Authorization", "Bearer bogus-token"); status != fiber.StatusUnauthorized {
+		t.Errorf("GET /users/invitations = %d, want 401 with an invalid token", status)
+	}
 }
