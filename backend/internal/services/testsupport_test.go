@@ -62,48 +62,6 @@ type fakeRepository struct {
 	upsertExchangeRate            func(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (entities.ExchangeRate, error)
 	getExchangeRateByPair         func(ctx context.Context, from, to string) (entities.ExchangeRate, error)
 	importEntryTransactions       func(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []entities.ImportTransactionRow) (int, error)
-
-	createInvitation    func(ctx context.Context, email, name, role, tokenHash string, invitedBy *uuid.UUID, expiresAt time.Time) (entities.Invitation, error)
-	getInvitationByHash func(ctx context.Context, tokenHash string) (entities.Invitation, error)
-	getInvitationByID   func(ctx context.Context, id uuid.UUID) (entities.Invitation, error)
-	acceptInvitation    func(ctx context.Context, invitationID uuid.UUID, name, email, role, passwordHash string) (entities.User, error)
-	setWaitlistInvited  func(ctx context.Context, email string) error
-
-	createPasswordReset    func(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) (entities.PasswordReset, error)
-	getPasswordResetByHash func(ctx context.Context, tokenHash string) (entities.PasswordReset, error)
-	consumePasswordReset   func(ctx context.Context, resetID, userID uuid.UUID, hashedPassword string) error
-}
-
-func (f *fakeRepository) CreatePasswordReset(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) (entities.PasswordReset, error) {
-	return f.createPasswordReset(ctx, userID, tokenHash, expiresAt)
-}
-
-func (f *fakeRepository) GetPasswordResetByHash(ctx context.Context, tokenHash string) (entities.PasswordReset, error) {
-	return f.getPasswordResetByHash(ctx, tokenHash)
-}
-
-func (f *fakeRepository) ConsumePasswordReset(ctx context.Context, resetID, userID uuid.UUID, hashedPassword string) error {
-	return f.consumePasswordReset(ctx, resetID, userID, hashedPassword)
-}
-
-func (f *fakeRepository) CreateInvitation(ctx context.Context, email, name, role, tokenHash string, invitedBy *uuid.UUID, expiresAt time.Time) (entities.Invitation, error) {
-	return f.createInvitation(ctx, email, name, role, tokenHash, invitedBy, expiresAt)
-}
-
-func (f *fakeRepository) GetInvitationByHash(ctx context.Context, tokenHash string) (entities.Invitation, error) {
-	return f.getInvitationByHash(ctx, tokenHash)
-}
-
-func (f *fakeRepository) GetInvitationByID(ctx context.Context, id uuid.UUID) (entities.Invitation, error) {
-	return f.getInvitationByID(ctx, id)
-}
-
-func (f *fakeRepository) AcceptInvitation(ctx context.Context, invitationID uuid.UUID, name, email, role, passwordHash string) (entities.User, error) {
-	return f.acceptInvitation(ctx, invitationID, name, email, role, passwordHash)
-}
-
-func (f *fakeRepository) SetWaitlistInvited(ctx context.Context, email string) error {
-	return f.setWaitlistInvited(ctx, email)
 }
 
 func (f *fakeRepository) ImportEntryTransactions(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []entities.ImportTransactionRow) (int, error) {
@@ -271,20 +229,10 @@ func (f *fakeRepository) GetExchangeRateByPair(ctx context.Context, from, to str
 type fakeMailer struct {
 	mu sync.Mutex
 
-	activityErr      error
-	securityErr      error
-	weeklyErr        error
-	invitationErr    error
-	passwordResetErr error
+	activityErr error
+	securityErr error
+	weeklyErr   error
 
-	invitationTo []struct {
-		To   string
-		Data mail.InvitationData
-	}
-	passwordResetTo []struct {
-		To   string
-		Data mail.PasswordResetData
-	}
 	activity []struct {
 		To   string
 		Data mail.ActivityAlertData
@@ -323,44 +271,6 @@ func (m *fakeMailer) SendSecurityAlert(email string, data mail.SecurityAlertData
 		Data mail.SecurityAlertData
 	}{email, data})
 	return nil
-}
-
-func (m *fakeMailer) SendInvitation(email string, data mail.InvitationData) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.invitationErr != nil {
-		return m.invitationErr
-	}
-	m.invitationTo = append(m.invitationTo, struct {
-		To   string
-		Data mail.InvitationData
-	}{email, data})
-	return nil
-}
-
-func (m *fakeMailer) invitationCount() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return len(m.invitationTo)
-}
-
-func (m *fakeMailer) SendPasswordReset(email string, data mail.PasswordResetData) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.passwordResetErr != nil {
-		return m.passwordResetErr
-	}
-	m.passwordResetTo = append(m.passwordResetTo, struct {
-		To   string
-		Data mail.PasswordResetData
-	}{email, data})
-	return nil
-}
-
-func (m *fakeMailer) passwordResetCount() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return len(m.passwordResetTo)
 }
 
 func (m *fakeMailer) SendWeeklySummary(email string, data mail.WeeklySummaryData) error {

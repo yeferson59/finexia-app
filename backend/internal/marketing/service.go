@@ -25,3 +25,15 @@ func (s *Service) SaveWaitlistEmail(ctx context.Context, email string) error {
 
 	return s.mail.SendWaitlistConfirmation(email)
 }
+
+// ListWaitlist returns the funnel for the admin dashboard. Consumed by the
+// auth module's invitation flow through its own WaitlistStore interface.
+func (s *Service) ListWaitlist(ctx context.Context, offset, limit uint) ([]Waitlist, uint, error) {
+	return s.repo.ListWaitlist(ctx, offset, limit)
+}
+
+// SetWaitlistInvited advances a waitlist row to "invited". Consumed by the
+// auth module when an admin issues an invitation.
+func (s *Service) SetWaitlistInvited(ctx context.Context, email string) error {
+	return s.repo.SetWaitlistInvited(ctx, email)
+}

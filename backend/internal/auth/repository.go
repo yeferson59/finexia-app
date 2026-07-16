@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
+	"github.com/yeferson59/finexia-app/internal/marketing"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 )
 
@@ -67,16 +68,45 @@ type VerificationStore interface {
 	ConsumeEmailVerification(ctx context.Context, id uuid.UUID, email string) error
 }
 
+type PasswordResetStore interface {
+	CreatePasswordReset(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) (PasswordReset, error)
+	GetPasswordResetByHash(ctx context.Context, tokenHash string) (PasswordReset, error)
+	ConsumePasswordReset(ctx context.Context, resetID, userID uuid.UUID, hashedPassword string) error
+}
+
+type InvitationStore interface {
+	CreateInvitation(ctx context.Context, email, name, role, tokenHash string, invitedBy *uuid.UUID, expiresAt time.Time) (Invitation, error)
+	GetInvitationByHash(ctx context.Context, tokenHash string) (Invitation, error)
+	GetInvitationByID(ctx context.Context, id uuid.UUID) (Invitation, error)
+	ListInvitations(ctx context.Context, offset, limit uint) ([]Invitation, uint, error)
+	RevokeInvitation(ctx context.Context, id uuid.UUID) error
+	AcceptInvitation(ctx context.Context, invitationID uuid.UUID, name, email, role, passwordHash string) (identity.User, error)
+}
+
+// WaitlistStore is the slice of the marketing module the invitation flow
+// consumes (the waitlist is owned by marketing since Fase 2). Only the public
+// marketing.Waitlist type crosses the module boundary; the composition root
+// injects marketing's *Service here.
+type WaitlistStore interface {
+	ListWaitlist(ctx context.Context, offset, limit uint) ([]marketing.Waitlist, uint, error)
+	SetWaitlistInvited(ctx context.Context, email string) error
+}
+
 // Stores groups the module's persistence interfaces. The composition root
 // fills every field with the same *PostgresRepository; tests fill only what
 // the case under test touches (a nil store panics loudly, mirroring the old
 // embed-the-interface fakes).
 type Stores struct {
-	Accounts      AccountStore
-	Sessions      SessionStore
-	RefreshTokens RefreshTokenStore
-	TwoFactor     TwoFactorStore
-	Verifications VerificationStore
+	Accounts       AccountStore
+	Sessions       SessionStore
+	RefreshTokens  RefreshTokenStore
+	TwoFactor      TwoFactorStore
+	Verifications  VerificationStore
+	PasswordResets PasswordResetStore
+	Invitations    InvitationStore
+	// Waitlist is implemented by the marketing module, not by the module's
+	// own PostgresRepository.
+	Waitlist WaitlistStore
 }
 
 // Mailer abstracts the outbound email service so tests can replace the
@@ -84,6 +114,8 @@ type Stores struct {
 type Mailer interface {
 	SendSecurityAlert(email string, data mail.SecurityAlertData) error
 	SendEmailVerification(email string, data mail.EmailVerificationData) error
+	SendPasswordReset(email string, data mail.PasswordResetData) error
+	SendInvitation(email string, data mail.InvitationData) error
 }
 
 var _ Mailer = (*mail.Service)(nil)
