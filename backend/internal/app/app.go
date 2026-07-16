@@ -61,13 +61,12 @@ func (v *structValidator) Validate(out any) error {
 // used to live in cmd/api/main.go.
 func New(deps Deps) *App {
 	fiberApp := fiber.New(fiber.Config{
-		JSONEncoder:        sonic.ConfigFastest.Marshal,
-		JSONDecoder:        sonic.ConfigFastest.Unmarshal,
-		StructValidator:    new(structValidator{validate: validator.New()}),
-		ProxyHeader:        fiber.HeaderXForwardedFor,
-		TrustProxy:         deps.Envs.TrustProxy,
-		EnableIPValidation: true,
-		BodyLimit:          10 * 1024 * 1024,
+		JSONEncoder:     sonic.ConfigFastest.Marshal,
+		JSONDecoder:     sonic.ConfigFastest.Unmarshal,
+		StructValidator: new(structValidator{validate: validator.New()}),
+		ProxyHeader:     fiber.HeaderXForwardedFor,
+		TrustProxy:      deps.Envs.TrustProxy,
+		BodyLimit:       10 * 1024 * 1024,
 		TrustProxyConfig: fiber.TrustProxyConfig{
 			Loopback:  true,
 			LinkLocal: true,
