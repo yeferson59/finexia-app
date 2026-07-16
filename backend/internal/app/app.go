@@ -106,13 +106,14 @@ func (a *App) wire(ctx context.Context) {
 	// Migrated domain modules.
 	marketingModule := marketing.New(marketing.NewPostgresRepository(d.DB), d.Mail)
 	authModule := auth.New(auth.Deps{
-		Ctx:     ctx,
-		DB:      d.DB,
-		Cfg:     d.Envs,
-		Storage: d.Storage,
-		Mail:    d.Mail,
-		Geo:     geoip.New(),
-		Log:     d.Log,
+		Ctx:      ctx,
+		DB:       d.DB,
+		Cfg:      d.Envs,
+		Storage:  d.Storage,
+		Mail:     d.Mail,
+		Geo:      geoip.New(),
+		Log:      d.Log,
+		Waitlist: marketingModule.Service(),
 	})
 
 	// Legacy wiring: shrinks phase by phase until Fase 8 deletes it.

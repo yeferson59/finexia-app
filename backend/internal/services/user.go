@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 	"time"
 
@@ -19,6 +20,30 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
 )
+
+// truncate and sanitizeIP back sendPasswordChangedAlert below; temporary
+// copies of the auth module's helpers until the user domain migrates in
+// Fase 5 and the alert moves with it.
+
+// truncate keeps a string within the column limits (ip VARCHAR(45),
+// user_agent VARCHAR(255)) so an oversized header can never fail the insert.
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen]
+}
+
+// sanitizeIP discards anything that isn't a real IP literal. c.IP() is
+// fed by a client-influenced header (X-Forwarded-For); a malformed or
+// spoofed value must never be shown back to the user in a security alert as
+// if it were their real address.
+func sanitizeIP(ipAddress string) string {
+	if net.ParseIP(strings.TrimSpace(ipAddress)) == nil {
+		return ""
+	}
+	return ipAddress
+}
 
 func (s *Services) GetListUsers(ctx context.Context, offset, limit uint) ([]entities.User, uint, error) {
 	return s.repos.ListUsers(ctx, offset, limit)

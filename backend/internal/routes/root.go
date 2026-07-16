@@ -47,14 +47,13 @@ func (r *Routes) Init() {
 	)
 
 	r.Health()
-	// Legacy public /auth routes (password reset, invitation acceptance) must
-	// register BEFORE the auth module: the module's group-local RequireAuth
-	// would otherwise sit earlier in the stack and gate them.
-	r.Auth()
 	r.auth.Routes(r.app)
 	for _, m := range r.modules {
 		m.Routes(r.app)
 	}
+	// Admin invitation/waitlist dashboard: registered in the public zone with
+	// its own inline guards, before the app-wide gate (see AdminRoutes).
+	r.auth.AdminRoutes(r.app, r.middlewares.UserLimiter())
 	r.app.Get("/users/:id/avatar", r.handlers.GetUserAvatar)
 
 	r.router = r.app.Use(r.auth.RequireAuth(), r.middlewares.UserLimiter())

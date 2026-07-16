@@ -27,7 +27,6 @@ type Mailer interface {
 	SendActivityAlert(email string, data mail.ActivityAlertData) error
 	SendSecurityAlert(email string, data mail.SecurityAlertData) error
 	SendWeeklySummary(email string, data mail.WeeklySummaryData) error
-	SendInvitation(email string, data mail.InvitationData) error
 }
 
 var _ Mailer = (*mail.Service)(nil)

@@ -53,10 +53,6 @@ func (handler *Handlers) responseFromDomain(c fiber.Ctx, err error, message, act
 	return httpx.FromDomain(c, err, message, action)
 }
 
-func (handler *Handlers) responseErrorAction(c fiber.Ctx, status int, message, details, action string) error {
-	return httpx.ErrorAction(c, status, message, details, action)
-}
-
 func paginationMetadata(paginateInfo *paginate.PageInfo, count uint, limitKey, totalKey string) fiber.Map {
 	return httpx.PaginationMetadata(paginateInfo, count, limitKey, totalKey)
 }

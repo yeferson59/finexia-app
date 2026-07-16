@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/yeferson59/finexia-app/internal/platform/config"
@@ -22,6 +23,9 @@ type Deps struct {
 	Mail    Mailer
 	Geo     GeoLocator
 	Log     logger.Logger
+	// Waitlist is the marketing module's service: the invitation flow reads
+	// and advances the waitlist through it instead of touching the table.
+	Waitlist WaitlistStore
 }
 
 // Module is the auth domain module: construction via New, HTTP surface via
@@ -43,6 +47,8 @@ func New(deps Deps) *Module {
 		TwoFactor:      pg,
 		Verifications:  pg,
 		PasswordResets: pg,
+		Invitations:    pg,
+		Waitlist:       deps.Waitlist,
 	}, deps.Cfg, deps.Storage, deps.Mail, deps.Geo, deps.Log)
 
 	return newModule(deps, service)
@@ -81,6 +87,11 @@ func (m *Module) Routes(router fiber.Router) {
 	// code guessing on top of the per-token attempt counter.
 	auth.Post("/2fa/login", m.authLimiter(), m.handler.twoFactorLogin)
 
+	// Public invitation flow: validate a token, then accept it by setting a
+	// password. Rate-limited to blunt token guessing.
+	auth.Get("/invitations", m.authLimiter(), m.handler.validateInvitation)
+	auth.Post("/invitations/accept", m.authLimiter(), m.handler.acceptInvitation)
+
 	// Public password recovery flow: request a reset link, validate its
 	// token, then confirm with a new password. Rate-limited to blunt both
 	// mail-bombing an address and token guessing.
@@ -110,4 +121,24 @@ func (m *Module) Routes(router fiber.Router) {
 	auth.Delete("/sessions/:id", m.handler.revokeSession)
 	auth.Post("/sessions/revoke-others", m.handler.revokeOtherSessions)
 	auth.Post("/logout", m.handler.logout)
+}
+
+// AdminRoutes registers the invitation/waitlist dashboard under /users,
+// replicating their legacy registration. Each route carries its full chain
+// inline (never group.Use): these routes register in the public zone, before
+// the app-wide gate, and a group-level middleware at the /users prefix would
+// leak onto the legacy /users routes and double-apply the user rate limit.
+// userLimiter is injected because its ownership stays with the legacy
+// middlewares until the user domain migrates.
+func (m *Module) AdminRoutes(router fiber.Router, userLimiter fiber.Handler) {
+	users := router.Group("/users")
+
+	// Static "/invitations" segment registers before the legacy "/:id" routes
+	// so it is never captured as a user id.
+	users.Get("/invitations", m.RequireAuth(), userLimiter, m.RequireAdmin(), paginate.New(), m.handler.listInvitations)
+	users.Post("/invitations", m.RequireAuth(), userLimiter, m.RequireAdmin(), m.handler.createInvitation)
+	users.Post("/invitations/:id/resend", m.RequireAuth(), userLimiter, m.RequireAdmin(), m.handler.resendInvitation)
+	users.Delete("/invitations/:id", m.RequireAuth(), userLimiter, m.RequireAdmin(), m.handler.revokeInvitation)
+
+	users.Get("/waitlist", m.RequireAuth(), userLimiter, m.RequireAdmin(), paginate.New(), m.handler.listWaitlist)
 }
