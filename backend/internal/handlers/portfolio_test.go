@@ -14,8 +14,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/yeferson59/gofinance/money"
 
+	"github.com/yeferson59/finexia-app/internal/auth"
 	"github.com/yeferson59/finexia-app/internal/entities"
-	"github.com/yeferson59/finexia-app/internal/middlewares"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/services"
@@ -110,7 +110,7 @@ func (s *stubRepository) GetExchangeRateByPair(ctx context.Context, from, to str
 
 func newTestHandlers(repo services.Repository) *Handlers {
 	cfg := &config.Env{PublicURL: "http://localhost:8080"}
-	svc := services.New(repo, cfg, nil, nil, nil, nil, logger.Noop(), nil)
+	svc := services.New(repo, cfg, nil, nil, nil, nil, logger.Noop(), nil, nil)
 	h := New(svc, cfg)
 	return &h
 }
@@ -118,9 +118,9 @@ func newTestHandlers(repo services.Repository) *Handlers {
 // authed injects the locals the JWT middleware would normally set.
 func authed(userID uuid.UUID) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		c.Locals(middlewares.LocalUserID, userID.String())
-		c.Locals(middlewares.LocalToken, "test-token")
-		c.Locals(middlewares.LocalRole, "user")
+		c.Locals(auth.LocalUserID, userID.String())
+		c.Locals(auth.LocalToken, "test-token")
+		c.Locals(auth.LocalRole, "user")
 		return c.Next()
 	}
 }

@@ -79,7 +79,7 @@ func (s *Services) ResetPassword(ctx context.Context, rawToken, newPassword, ipA
 		return ErrPasswordResetInvalid
 	}
 
-	if _, err := s.RevokeOtherSessions(ctx, pr.UserID, ""); err != nil {
+	if _, err := s.auth.RevokeOtherSessions(ctx, pr.UserID, ""); err != nil {
 		s.log.Error(ctx, "reset password: failed to revoke sessions", logger.Err(err))
 	}
 

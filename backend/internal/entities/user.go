@@ -31,8 +31,6 @@ type User struct {
 	Sources           []InvestmentSource `json:"sources"`
 	Portfolios        []Portfolio        `json:"portfolios"`
 	Role              Role               `json:"role,omitzero"`
-	Sessions          []Session          `json:"sessions,omitempty"`
-	Accounts          []Account          `json:"accounts,omitempty"`
 }
 
 type UserPreferences struct {

@@ -3,6 +3,7 @@ package routes
 import (
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/yeferson59/finexia-app/internal/auth"
 	"github.com/yeferson59/finexia-app/internal/handlers"
 	"github.com/yeferson59/finexia-app/internal/middlewares"
 )
@@ -20,14 +21,16 @@ type Routes struct {
 	router      fiber.Router
 	middlewares middlewares.Middlewares
 	handlers    handlers.Handlers
+	auth        *auth.Module
 	modules     []Module
 }
 
-func New(app *fiber.App, middlewares middlewares.Middlewares, handlers handlers.Handlers, modules ...Module) *Routes {
+func New(app *fiber.App, middlewares middlewares.Middlewares, handlers handlers.Handlers, authModule *auth.Module, modules ...Module) *Routes {
 	return new(Routes{
 		app:         app,
 		middlewares: middlewares,
 		handlers:    handlers,
+		auth:        authModule,
 		modules:     modules,
 	})
 }
@@ -44,13 +47,17 @@ func (r *Routes) Init() {
 	)
 
 	r.Health()
+	// Legacy public /auth routes (password reset, invitation acceptance) must
+	// register BEFORE the auth module: the module's group-local RequireAuth
+	// would otherwise sit earlier in the stack and gate them.
 	r.Auth()
+	r.auth.Routes(r.app)
 	for _, m := range r.modules {
 		m.Routes(r.app)
 	}
 	r.app.Get("/users/:id/avatar", r.handlers.GetUserAvatar)
 
-	r.router = r.app.Use(r.middlewares.JWT(), r.middlewares.UserLimiter())
+	r.router = r.app.Use(r.auth.RequireAuth(), r.middlewares.UserLimiter())
 	r.Users()
 	r.Portfolios()
 	r.ExchangeRates()

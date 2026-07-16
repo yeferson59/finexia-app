@@ -17,38 +17,6 @@ import (
 // satisfied by *repositories.Repository and lets tests replace the database
 // with in-memory fakes.
 type Repository interface {
-	// Auth
-	GetAccountByUserID(ctx context.Context, userID uuid.UUID) (entities.Account, error)
-	GetAccountByEmail(ctx context.Context, email string) (entities.User, error)
-	CreateSession(ctx context.Context, userID uuid.UUID, token string, ip, ua *string, expiresAt time.Time) (uuid.UUID, error)
-	UpdateSessionToken(ctx context.Context, sessionID uuid.UUID, newToken string, expiresAt time.Time) (string, error)
-	UpdateSessionLocation(ctx context.Context, sessionID uuid.UUID, location string) error
-	ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]entities.Session, error)
-	GetRefreshTokensBySessionIDs(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) ([]string, []uuid.UUID, error)
-	DeleteSessionsByIDs(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) (int64, error)
-	HasKnownLoginIP(ctx context.Context, userID uuid.UUID, ip string) (bool, error)
-	RecordKnownLoginIP(ctx context.Context, userID uuid.UUID, ip string) error
-	CreateRefreshToken(ctx context.Context, userID uuid.UUID, tokenHash string, familyID, sessionID uuid.UUID, ip, ua *string, expiresAt time.Time) (uuid.UUID, error)
-	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (entities.RefreshToken, error)
-	MarkRefreshTokenUsed(ctx context.Context, id uuid.UUID) error
-	RevokeRefreshTokenFamily(ctx context.Context, familyID uuid.UUID) ([]string, error)
-	GetRefreshTokenFamiliesBySession(ctx context.Context, userID uuid.UUID, sessionToken string) ([]string, []uuid.UUID, error)
-	Register(ctx context.Context, name, email, password string) (entities.User, error)
-	GetSessionByUserIDToken(ctx context.Context, userID uuid.UUID, token string) (entities.User, error)
-	GetSessionByToken(ctx context.Context, token string) (entities.User, error)
-	DeleteSessionByUserIDToken(ctx context.Context, userID uuid.UUID, token string) error
-	DeleteExpiredRefreshTokens(ctx context.Context) (int64, error)
-	DeleteExpiredSessions(ctx context.Context) (int64, error)
-
-	// Two-factor authentication
-	GetTwoFactor(ctx context.Context, userID uuid.UUID) (entities.TwoFactor, error)
-	UpsertTwoFactorSecret(ctx context.Context, userID uuid.UUID, secret string) error
-	EnableTwoFactor(ctx context.Context, userID uuid.UUID) error
-	DeleteTwoFactor(ctx context.Context, userID uuid.UUID) error
-	ReplaceTwoFactorRecoveryCodes(ctx context.Context, userID uuid.UUID, codeHashes []string) error
-	ConsumeTwoFactorRecoveryCode(ctx context.Context, userID uuid.UUID, codeHash string) error
-	CountUnusedTwoFactorRecoveryCodes(ctx context.Context, userID uuid.UUID) (int, error)
-
 	// Users
 	ListUsers(ctx context.Context, offset, limit uint) ([]entities.User, uint, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (entities.User, error)
@@ -128,11 +96,6 @@ type Repository interface {
 	CreatePasswordReset(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) (entities.PasswordReset, error)
 	GetPasswordResetByHash(ctx context.Context, tokenHash string) (entities.PasswordReset, error)
 	ConsumePasswordReset(ctx context.Context, resetID, userID uuid.UUID, hashedPassword string) error
-
-	// Email verification
-	CreateEmailVerification(ctx context.Context, email, tokenHash string, expiresAt time.Time) (entities.Verification, error)
-	GetEmailVerificationByHash(ctx context.Context, tokenHash string) (entities.Verification, error)
-	ConsumeEmailVerification(ctx context.Context, id uuid.UUID, email string) error
 }
 
 // Ensure the concrete repository keeps satisfying the interface.

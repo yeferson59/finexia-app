@@ -136,13 +136,8 @@ func (s *Services) GetAvatarFromS3(ctx context.Context, userID uuid.UUID) (io.Re
 }
 
 func (s *Services) ChangePassword(ctx context.Context, userID uuid.UUID, currentToken, currentPassword, newPassword, ipAddress, userAgent string) error {
-	account, err := s.repos.GetAccountByUserID(ctx, userID)
-	if err != nil {
-		return errors.New("not found account")
-	}
-
-	if err := account.ComparePassword(currentPassword); err != nil {
-		return errors.New("invalid current password")
+	if err := s.auth.VerifyPassword(ctx, userID, currentPassword); err != nil {
+		return err
 	}
 
 	if currentPassword == newPassword {
@@ -161,7 +156,7 @@ func (s *Services) ChangePassword(ctx context.Context, userID uuid.UUID, current
 	// Whoever else holds a session (a stolen token, a forgotten shared
 	// computer) must not survive a password change: only the session that
 	// performed the change stays alive.
-	if _, err := s.RevokeOtherSessions(ctx, userID, currentToken); err != nil {
+	if _, err := s.auth.RevokeOtherSessions(ctx, userID, currentToken); err != nil {
 		s.log.Error(ctx, "change password: failed to revoke other sessions", logger.Err(err))
 	}
 

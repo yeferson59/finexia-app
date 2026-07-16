@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
@@ -28,10 +29,18 @@ type Mailer interface {
 	SendWeeklySummary(email string, data mail.WeeklySummaryData) error
 	SendInvitation(email string, data mail.InvitationData) error
 	SendPasswordReset(email string, data mail.PasswordResetData) error
-	SendEmailVerification(email string, data mail.EmailVerificationData) error
 }
 
 var _ Mailer = (*mail.Service)(nil)
+
+// AuthService is the slice of the auth module these legacy services still
+// need (change-password verification, session revocation on password
+// changes). Consumer-defined, satisfied by *auth.Service; disappears when
+// the user domain migrates in Fase 5.
+type AuthService interface {
+	VerifyPassword(ctx context.Context, userID uuid.UUID, currentPassword string) error
+	RevokeOtherSessions(ctx context.Context, userID uuid.UUID, currentToken string) (int64, error)
+}
 
 type Services struct {
 	repos         Repository
@@ -42,12 +51,13 @@ type Services struct {
 	geo           GeoLocator
 	log           logger.Logger
 	priceProvider marketdata.Provider
+	auth          AuthService
 	// Pointer so every copy of Services shares the same cache (Services is
 	// passed around by value).
 	risksCache *risksCache
 }
 
-func New(repos Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.Storage, mailService Mailer, geo GeoLocator, log logger.Logger, priceProvider marketdata.Provider) Services {
+func New(repos Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.Storage, mailService Mailer, geo GeoLocator, log logger.Logger, priceProvider marketdata.Provider, authSvc AuthService) Services {
 	return Services{
 		repos:         repos,
 		cfg:           cfg,
@@ -57,6 +67,7 @@ func New(repos Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.S
 		geo:           geo,
 		log:           log,
 		priceProvider: priceProvider,
+		auth:          authSvc,
 		risksCache:    &risksCache{},
 	}
 }

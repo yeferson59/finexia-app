@@ -10,7 +10,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 
-	"github.com/yeferson59/finexia-app/internal/middlewares"
+	"github.com/yeferson59/finexia-app/internal/auth"
 )
 
 func TestResponseFromDomain(t *testing.T) {
@@ -158,13 +158,13 @@ func TestGetUserIDTokenRole(t *testing.T) {
 		app := fiber.New()
 		app.Get("/", func(c fiber.Ctx) error {
 			if userID != "" {
-				c.Locals(middlewares.LocalUserID, userID)
+				c.Locals(auth.LocalUserID, userID)
 			}
 			if token != "" {
-				c.Locals(middlewares.LocalToken, token)
+				c.Locals(auth.LocalToken, token)
 			}
 			if role != "" {
-				c.Locals(middlewares.LocalRole, role)
+				c.Locals(auth.LocalRole, role)
 			}
 			gotID, gotToken, gotRole, gotErr = h.getUserIDTokenRole(c)
 			return c.SendStatus(fiber.StatusOK)

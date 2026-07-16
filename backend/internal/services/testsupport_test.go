@@ -14,7 +14,6 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
-	"github.com/yeferson59/finexia-app/internal/repositories"
 )
 
 // fakeRepository embeds the Repository interface so tests only override the
@@ -22,35 +21,15 @@ import (
 type fakeRepository struct {
 	Repository
 
-	getAccountByEmail                func(ctx context.Context, email string) (entities.User, error)
-	getAccountByUserID               func(ctx context.Context, userID uuid.UUID) (entities.Account, error)
-	createSession                    func(ctx context.Context, userID uuid.UUID, token string, ip, ua *string, expiresAt time.Time) (uuid.UUID, error)
-	updateSessionToken               func(ctx context.Context, sessionID uuid.UUID, newToken string, expiresAt time.Time) (string, error)
-	updateSessionLocation            func(ctx context.Context, sessionID uuid.UUID, location string) error
-	listSessionsByUserID             func(ctx context.Context, userID uuid.UUID) ([]entities.Session, error)
-	getRefreshTokensBySessionIDs     func(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) ([]string, []uuid.UUID, error)
-	deleteSessionsByIDs              func(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) (int64, error)
-	hasKnownLoginIP                  func(ctx context.Context, userID uuid.UUID, ip string) (bool, error)
-	recordKnownLoginIP               func(ctx context.Context, userID uuid.UUID, ip string) error
-	createRefreshToken               func(ctx context.Context, userID uuid.UUID, tokenHash string, familyID, sessionID uuid.UUID, ip, ua *string, expiresAt time.Time) (uuid.UUID, error)
-	getRefreshTokenByHash            func(ctx context.Context, tokenHash string) (entities.RefreshToken, error)
-	markRefreshTokenUsed             func(ctx context.Context, id uuid.UUID) error
-	revokeRefreshTokenFamily         func(ctx context.Context, familyID uuid.UUID) ([]string, error)
-	getRefreshTokenFamiliesBySession func(ctx context.Context, userID uuid.UUID, sessionToken string) ([]string, []uuid.UUID, error)
-	register                         func(ctx context.Context, name, email, password string) (entities.User, error)
-	getSessionByToken                func(ctx context.Context, token string) (entities.User, error)
-	deleteSessionByUserIDToken       func(ctx context.Context, userID uuid.UUID, token string) error
-	deleteExpiredRefreshTokens       func(ctx context.Context) (int64, error)
-	deleteExpiredSessions            func(ctx context.Context) (int64, error)
-	getUserByEmail                   func(ctx context.Context, email string) (entities.User, error)
-	getUserByID                      func(ctx context.Context, id uuid.UUID) (entities.User, error)
-	updateUser                       func(ctx context.Context, id uuid.UUID, name, email, image string) (entities.User, error)
-	updateUserProfile                func(ctx context.Context, id uuid.UUID, name, preferredCurrency, image string) (entities.User, error)
-	updateUserPassword               func(ctx context.Context, userID uuid.UUID, hashedPassword string) error
-	countAssetTransactions           func(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error)
-	getAssetTransactionsPaginated    func(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, limit, offset int) ([]entities.Transaction, error)
-	getPortfolioGrowthByUserID       func(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error)
-	getPortfolioGrowthByPortfolioID  func(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error)
+	getUserByEmail                  func(ctx context.Context, email string) (entities.User, error)
+	getUserByID                     func(ctx context.Context, id uuid.UUID) (entities.User, error)
+	updateUser                      func(ctx context.Context, id uuid.UUID, name, email, image string) (entities.User, error)
+	updateUserProfile               func(ctx context.Context, id uuid.UUID, name, preferredCurrency, image string) (entities.User, error)
+	updateUserPassword              func(ctx context.Context, userID uuid.UUID, hashedPassword string) error
+	countAssetTransactions          func(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error)
+	getAssetTransactionsPaginated   func(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, limit, offset int) ([]entities.Transaction, error)
+	getPortfolioGrowthByUserID      func(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error)
+	getPortfolioGrowthByPortfolioID func(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error)
 
 	getPortfoliosRisks            func(ctx context.Context) ([]entities.Risk, error)
 	getPortfoliosByUserID         func(ctx context.Context, userID uuid.UUID) ([]entities.Portfolio, error)
@@ -93,49 +72,6 @@ type fakeRepository struct {
 	createPasswordReset    func(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) (entities.PasswordReset, error)
 	getPasswordResetByHash func(ctx context.Context, tokenHash string) (entities.PasswordReset, error)
 	consumePasswordReset   func(ctx context.Context, resetID, userID uuid.UUID, hashedPassword string) error
-
-	createEmailVerification    func(ctx context.Context, email, tokenHash string, expiresAt time.Time) (entities.Verification, error)
-	getEmailVerificationByHash func(ctx context.Context, tokenHash string) (entities.Verification, error)
-	consumeEmailVerification   func(ctx context.Context, id uuid.UUID, email string) error
-
-	getTwoFactor                      func(ctx context.Context, userID uuid.UUID) (entities.TwoFactor, error)
-	upsertTwoFactorSecret             func(ctx context.Context, userID uuid.UUID, secret string) error
-	enableTwoFactor                   func(ctx context.Context, userID uuid.UUID) error
-	deleteTwoFactor                   func(ctx context.Context, userID uuid.UUID) error
-	replaceTwoFactorRecoveryCodes     func(ctx context.Context, userID uuid.UUID, codeHashes []string) error
-	consumeTwoFactorRecoveryCode      func(ctx context.Context, userID uuid.UUID, codeHash string) error
-	countUnusedTwoFactorRecoveryCodes func(ctx context.Context, userID uuid.UUID) (int, error)
-}
-
-func (f *fakeRepository) GetTwoFactor(ctx context.Context, userID uuid.UUID) (entities.TwoFactor, error) {
-	if f.getTwoFactor == nil {
-		return entities.TwoFactor{}, repositories.ErrTwoFactorNotFound
-	}
-	return f.getTwoFactor(ctx, userID)
-}
-
-func (f *fakeRepository) UpsertTwoFactorSecret(ctx context.Context, userID uuid.UUID, secret string) error {
-	return f.upsertTwoFactorSecret(ctx, userID, secret)
-}
-
-func (f *fakeRepository) EnableTwoFactor(ctx context.Context, userID uuid.UUID) error {
-	return f.enableTwoFactor(ctx, userID)
-}
-
-func (f *fakeRepository) DeleteTwoFactor(ctx context.Context, userID uuid.UUID) error {
-	return f.deleteTwoFactor(ctx, userID)
-}
-
-func (f *fakeRepository) ReplaceTwoFactorRecoveryCodes(ctx context.Context, userID uuid.UUID, codeHashes []string) error {
-	return f.replaceTwoFactorRecoveryCodes(ctx, userID, codeHashes)
-}
-
-func (f *fakeRepository) ConsumeTwoFactorRecoveryCode(ctx context.Context, userID uuid.UUID, codeHash string) error {
-	return f.consumeTwoFactorRecoveryCode(ctx, userID, codeHash)
-}
-
-func (f *fakeRepository) CountUnusedTwoFactorRecoveryCodes(ctx context.Context, userID uuid.UUID) (int, error) {
-	return f.countUnusedTwoFactorRecoveryCodes(ctx, userID)
 }
 
 func (f *fakeRepository) CreatePasswordReset(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) (entities.PasswordReset, error) {
@@ -148,18 +84,6 @@ func (f *fakeRepository) GetPasswordResetByHash(ctx context.Context, tokenHash s
 
 func (f *fakeRepository) ConsumePasswordReset(ctx context.Context, resetID, userID uuid.UUID, hashedPassword string) error {
 	return f.consumePasswordReset(ctx, resetID, userID, hashedPassword)
-}
-
-func (f *fakeRepository) CreateEmailVerification(ctx context.Context, email, tokenHash string, expiresAt time.Time) (entities.Verification, error) {
-	return f.createEmailVerification(ctx, email, tokenHash, expiresAt)
-}
-
-func (f *fakeRepository) GetEmailVerificationByHash(ctx context.Context, tokenHash string) (entities.Verification, error) {
-	return f.getEmailVerificationByHash(ctx, tokenHash)
-}
-
-func (f *fakeRepository) ConsumeEmailVerification(ctx context.Context, id uuid.UUID, email string) error {
-	return f.consumeEmailVerification(ctx, id, email)
 }
 
 func (f *fakeRepository) CreateInvitation(ctx context.Context, email, name, role, tokenHash string, invitedBy *uuid.UUID, expiresAt time.Time) (entities.Invitation, error) {
@@ -184,96 +108,6 @@ func (f *fakeRepository) SetWaitlistInvited(ctx context.Context, email string) e
 
 func (f *fakeRepository) ImportEntryTransactions(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []entities.ImportTransactionRow) (int, error) {
 	return f.importEntryTransactions(ctx, userID, portfolioID, sourceID, rows)
-}
-
-func (f *fakeRepository) GetAccountByEmail(ctx context.Context, email string) (entities.User, error) {
-	return f.getAccountByEmail(ctx, email)
-}
-
-func (f *fakeRepository) GetAccountByUserID(ctx context.Context, userID uuid.UUID) (entities.Account, error) {
-	return f.getAccountByUserID(ctx, userID)
-}
-
-func (f *fakeRepository) CreateSession(ctx context.Context, userID uuid.UUID, token string, ip, ua *string, expiresAt time.Time) (uuid.UUID, error) {
-	return f.createSession(ctx, userID, token, ip, ua, expiresAt)
-}
-
-func (f *fakeRepository) ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]entities.Session, error) {
-	return f.listSessionsByUserID(ctx, userID)
-}
-
-func (f *fakeRepository) GetRefreshTokensBySessionIDs(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) ([]string, []uuid.UUID, error) {
-	return f.getRefreshTokensBySessionIDs(ctx, userID, sessionIDs)
-}
-
-func (f *fakeRepository) DeleteSessionsByIDs(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) (int64, error) {
-	return f.deleteSessionsByIDs(ctx, userID, sessionIDs)
-}
-
-func (f *fakeRepository) HasKnownLoginIP(ctx context.Context, userID uuid.UUID, ip string) (bool, error) {
-	return f.hasKnownLoginIP(ctx, userID, ip)
-}
-
-// RecordKnownLoginIP runs in a fire-and-forget goroutine, so a nil hook must
-// be a no-op instead of a panic that would kill the test process.
-func (f *fakeRepository) RecordKnownLoginIP(ctx context.Context, userID uuid.UUID, ip string) error {
-	if f.recordKnownLoginIP == nil {
-		return nil
-	}
-	return f.recordKnownLoginIP(ctx, userID, ip)
-}
-
-func (f *fakeRepository) UpdateSessionToken(ctx context.Context, sessionID uuid.UUID, newToken string, expiresAt time.Time) (string, error) {
-	return f.updateSessionToken(ctx, sessionID, newToken, expiresAt)
-}
-
-// UpdateSessionLocation runs in a fire-and-forget goroutine, so a nil hook
-// must be a no-op instead of a panic that would kill the test process.
-func (f *fakeRepository) UpdateSessionLocation(ctx context.Context, sessionID uuid.UUID, location string) error {
-	if f.updateSessionLocation == nil {
-		return nil
-	}
-	return f.updateSessionLocation(ctx, sessionID, location)
-}
-
-func (f *fakeRepository) CreateRefreshToken(ctx context.Context, userID uuid.UUID, tokenHash string, familyID, sessionID uuid.UUID, ip, ua *string, expiresAt time.Time) (uuid.UUID, error) {
-	return f.createRefreshToken(ctx, userID, tokenHash, familyID, sessionID, ip, ua, expiresAt)
-}
-
-func (f *fakeRepository) GetRefreshTokenByHash(ctx context.Context, tokenHash string) (entities.RefreshToken, error) {
-	return f.getRefreshTokenByHash(ctx, tokenHash)
-}
-
-func (f *fakeRepository) MarkRefreshTokenUsed(ctx context.Context, id uuid.UUID) error {
-	return f.markRefreshTokenUsed(ctx, id)
-}
-
-func (f *fakeRepository) RevokeRefreshTokenFamily(ctx context.Context, familyID uuid.UUID) ([]string, error) {
-	return f.revokeRefreshTokenFamily(ctx, familyID)
-}
-
-func (f *fakeRepository) GetRefreshTokenFamiliesBySession(ctx context.Context, userID uuid.UUID, sessionToken string) ([]string, []uuid.UUID, error) {
-	return f.getRefreshTokenFamiliesBySession(ctx, userID, sessionToken)
-}
-
-func (f *fakeRepository) Register(ctx context.Context, name, email, password string) (entities.User, error) {
-	return f.register(ctx, name, email, password)
-}
-
-func (f *fakeRepository) GetSessionByToken(ctx context.Context, token string) (entities.User, error) {
-	return f.getSessionByToken(ctx, token)
-}
-
-func (f *fakeRepository) DeleteSessionByUserIDToken(ctx context.Context, userID uuid.UUID, token string) error {
-	return f.deleteSessionByUserIDToken(ctx, userID, token)
-}
-
-func (f *fakeRepository) DeleteExpiredRefreshTokens(ctx context.Context) (int64, error) {
-	return f.deleteExpiredRefreshTokens(ctx)
-}
-
-func (f *fakeRepository) DeleteExpiredSessions(ctx context.Context) (int64, error) {
-	return f.deleteExpiredSessions(ctx)
 }
 
 func (f *fakeRepository) GetUserByEmail(ctx context.Context, email string) (entities.User, error) {
@@ -437,12 +271,11 @@ func (f *fakeRepository) GetExchangeRateByPair(ctx context.Context, from, to str
 type fakeMailer struct {
 	mu sync.Mutex
 
-	activityErr          error
-	securityErr          error
-	weeklyErr            error
-	invitationErr        error
-	passwordResetErr     error
-	emailVerificationErr error
+	activityErr      error
+	securityErr      error
+	weeklyErr        error
+	invitationErr    error
+	passwordResetErr error
 
 	invitationTo []struct {
 		To   string
@@ -451,10 +284,6 @@ type fakeMailer struct {
 	passwordResetTo []struct {
 		To   string
 		Data mail.PasswordResetData
-	}
-	emailVerificationTo []struct {
-		To   string
-		Data mail.EmailVerificationData
 	}
 	activity []struct {
 		To   string
@@ -532,25 +361,6 @@ func (m *fakeMailer) passwordResetCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return len(m.passwordResetTo)
-}
-
-func (m *fakeMailer) SendEmailVerification(email string, data mail.EmailVerificationData) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.emailVerificationErr != nil {
-		return m.emailVerificationErr
-	}
-	m.emailVerificationTo = append(m.emailVerificationTo, struct {
-		To   string
-		Data mail.EmailVerificationData
-	}{email, data})
-	return nil
-}
-
-func (m *fakeMailer) emailVerificationCount() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return len(m.emailVerificationTo)
 }
 
 func (m *fakeMailer) SendWeeklySummary(email string, data mail.WeeklySummaryData) error {
@@ -653,11 +463,6 @@ func (s *memStorage) Reset() error {
 
 func (s *memStorage) Close() error { return nil }
 
-func (s *memStorage) has(key string) bool {
-	v, _ := s.Get(key)
-	return v != nil
-}
-
 func testConfig() *config.Env {
 	return &config.Env{
 		JWTSecret:              "test-secret",
@@ -669,14 +474,43 @@ func testConfig() *config.Env {
 	}
 }
 
+// fakeAuthService stubs the auth module slice the legacy services delegate
+// to. Nil hooks are no-ops so tests that never touch the password flows can
+// ignore it.
+type fakeAuthService struct {
+	verifyPassword      func(ctx context.Context, userID uuid.UUID, currentPassword string) error
+	revokeOtherSessions func(ctx context.Context, userID uuid.UUID, currentToken string) (int64, error)
+}
+
+func (f *fakeAuthService) VerifyPassword(ctx context.Context, userID uuid.UUID, currentPassword string) error {
+	if f.verifyPassword == nil {
+		return nil
+	}
+	return f.verifyPassword(ctx, userID, currentPassword)
+}
+
+func (f *fakeAuthService) RevokeOtherSessions(ctx context.Context, userID uuid.UUID, currentToken string) (int64, error) {
+	if f.revokeOtherSessions == nil {
+		return 0, nil
+	}
+	return f.revokeOtherSessions(ctx, userID, currentToken)
+}
+
 func newTestServices(repo Repository, storage *memStorage) *Services {
-	svc := New(repo, testConfig(), nil, storage, nil, nil, logger.Noop(), nil)
+	svc := New(repo, testConfig(), nil, storage, nil, nil, logger.Noop(), nil, &fakeAuthService{})
 	return &svc
 }
 
 // newTestServicesFull wires a fake mailer and price provider in addition to
 // the repository, for flows that send email or hit market data.
 func newTestServicesFull(repo Repository, storage *memStorage, mailer Mailer, provider marketdata.Provider) *Services {
-	svc := New(repo, testConfig(), nil, storage, mailer, nil, logger.Noop(), provider)
+	svc := New(repo, testConfig(), nil, storage, mailer, nil, logger.Noop(), provider, &fakeAuthService{})
+	return &svc
+}
+
+// newTestServicesAuth also injects a custom fake of the auth module slice,
+// for the flows that delegate to it (change/reset password).
+func newTestServicesAuth(repo Repository, storage *memStorage, mailer Mailer, authSvc AuthService) *Services {
+	svc := New(repo, testConfig(), nil, storage, mailer, nil, logger.Noop(), nil, authSvc)
 	return &svc
 }

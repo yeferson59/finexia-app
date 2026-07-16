@@ -91,11 +91,15 @@ func TestResetPassword_Success(t *testing.T) {
 			consumedResetID, consumedUserID, consumedHash = rID, uID, hashedPassword
 			return nil
 		},
-		listSessionsByUserID: func(context.Context, uuid.UUID) ([]entities.Session, error) {
-			return nil, nil
+	}
+	var revokedUser uuid.UUID
+	authSvc := &fakeAuthService{
+		revokeOtherSessions: func(_ context.Context, uid uuid.UUID, _ string) (int64, error) {
+			revokedUser = uid
+			return 0, nil
 		},
 	}
-	svc := newTestServices(repo, newMemStorage())
+	svc := newTestServicesAuth(repo, newMemStorage(), nil, authSvc)
 
 	if err := svc.ResetPassword(context.Background(), raw, "s3cretpass", "203.0.113.9", "test-agent"); err != nil {
 		t.Fatalf("ResetPassword: %v", err)
@@ -105,6 +109,9 @@ func TestResetPassword_Success(t *testing.T) {
 	}
 	if consumedUserID != userID {
 		t.Errorf("wrong user id: %v", consumedUserID)
+	}
+	if revokedUser != userID {
+		t.Errorf("expected other sessions of %s to be revoked, got %s", userID, revokedUser)
 	}
 	if consumedHash == "" || consumedHash == "s3cretpass" {
 		t.Errorf("password must be hashed before persistence, got %q", consumedHash)

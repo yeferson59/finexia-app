@@ -15,6 +15,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/yeferson59/finexia-app/internal/auth"
 	"github.com/yeferson59/finexia-app/internal/handlers"
 	"github.com/yeferson59/finexia-app/internal/marketing"
 	"github.com/yeferson59/finexia-app/internal/middlewares"
@@ -102,24 +103,33 @@ func (a *App) wire(ctx context.Context) {
 		yahoo.New(),
 	)
 
-	// Legacy wiring: shrinks phase by phase until Fase 8 deletes it.
-	svc := services.New(&repos, d.Envs, d.S3, d.Storage, d.Mail, geoip.New(), d.Log, priceProvider)
-	handl, middl := handlers.New(svc, d.Envs), middlewares.New(ctx, d.Envs, d.Storage, svc)
-
 	// Migrated domain modules.
 	marketingModule := marketing.New(marketing.NewPostgresRepository(d.DB), d.Mail)
+	authModule := auth.New(auth.Deps{
+		Ctx:     ctx,
+		DB:      d.DB,
+		Cfg:     d.Envs,
+		Storage: d.Storage,
+		Mail:    d.Mail,
+		Geo:     geoip.New(),
+		Log:     d.Log,
+	})
 
-	routes.New(a.fiber, middl, handl, marketingModule).Init()
+	// Legacy wiring: shrinks phase by phase until Fase 8 deletes it.
+	svc := services.New(&repos, d.Envs, d.S3, d.Storage, d.Mail, geoip.New(), d.Log, priceProvider, authModule.Service())
+	handl, middl := handlers.New(svc, d.Envs), middlewares.New(d.Envs, d.Storage)
 
-	a.startSchedulers(ctx, svc)
+	routes.New(a.fiber, middl, handl, authModule, marketingModule).Init()
+
+	a.startSchedulers(ctx, svc, authModule)
 }
 
 // startSchedulers is the single place background jobs come to life; Fase 7
 // replaces these ad-hoc schedulers with a generic Job runner.
-func (a *App) startSchedulers(ctx context.Context, svc services.Services) {
+func (a *App) startSchedulers(ctx context.Context, svc services.Services, authModule *auth.Module) {
 	go scheduler.NewExchangeRateScheduler(svc, 6, a.deps.Log).Start(ctx)
 	go scheduler.NewAssetPriceScheduler(svc, 14, 90*time.Second, a.deps.Log).Start(ctx)
 	go scheduler.NewPortfolioSnapshotScheduler(svc, 15, 120*time.Second, a.deps.Log).Start(ctx)
 	go scheduler.NewWeeklySummaryScheduler(svc, 9, a.deps.Log).Start(ctx)
-	go scheduler.NewAuthCleanupScheduler(svc, 3, a.deps.Log).Start(ctx)
+	go auth.NewCleanupJob(authModule.Service(), 3, a.deps.Log).Start(ctx)
 }
