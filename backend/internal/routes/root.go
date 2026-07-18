@@ -54,10 +54,8 @@ func (r *Routes) Init() {
 	// Admin invitation/waitlist dashboard: registered in the public zone with
 	// its own inline guards, before the app-wide gate (see AdminRoutes).
 	r.auth.AdminRoutes(r.app, r.middlewares.UserLimiter())
-	r.app.Get("/users/:id/avatar", r.handlers.GetUserAvatar)
 
 	r.router = r.app.Use(r.auth.RequireAuth(), r.middlewares.UserLimiter())
-	r.Users()
 	r.Portfolios()
 	r.ExchangeRates()
 	r.Assets()

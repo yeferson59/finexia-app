@@ -27,10 +27,12 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata/alphavantage"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata/finnhub"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata/yahoo"
+	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
 	"github.com/yeferson59/finexia-app/internal/repositories"
 	"github.com/yeferson59/finexia-app/internal/routes"
 	"github.com/yeferson59/finexia-app/internal/scheduler"
 	"github.com/yeferson59/finexia-app/internal/services"
+	"github.com/yeferson59/finexia-app/internal/user"
 )
 
 // Deps carries the already-connected infrastructure the App composes. main
@@ -102,6 +104,8 @@ func (a *App) wire(ctx context.Context) {
 		yahoo.New(),
 	)
 
+	geo := geoip.New()
+
 	// Migrated domain modules.
 	marketingModule := marketing.New(marketing.NewPostgresRepository(d.DB), d.Mail)
 	authModule := auth.New(auth.Deps{
@@ -110,16 +114,25 @@ func (a *App) wire(ctx context.Context) {
 		Cfg:      d.Envs,
 		Storage:  d.Storage,
 		Mail:     d.Mail,
-		Geo:      geoip.New(),
+		Geo:      geo,
 		Log:      d.Log,
 		Waitlist: marketingModule.Service(),
+	})
+	userModule := user.New(user.Deps{
+		DB:    d.DB,
+		Cfg:   d.Envs,
+		Store: objectstore.NewS3Store(d.S3, d.Envs.AWSS3BucketName),
+		Mail:  d.Mail,
+		Geo:   geo,
+		Log:   d.Log,
+		Auth:  authModule.Service(),
 	})
 
 	// Legacy wiring: shrinks phase by phase until Fase 8 deletes it.
 	svc := services.New(&repos, d.Envs, d.S3, d.Storage, d.Mail, geoip.New(), d.Log, priceProvider, authModule.Service())
 	handl, middl := handlers.New(svc, d.Envs), middlewares.New(d.Envs, d.Storage)
 
-	routes.New(a.fiber, middl, handl, authModule, marketingModule).Init()
+	routes.New(a.fiber, middl, handl, authModule, marketingModule, userModule).Init()
 
 	a.startSchedulers(ctx, svc, authModule)
 }

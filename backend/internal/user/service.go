@@ -1,7 +1,6 @@
-package services
+package user
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,16 +9,50 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
+	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
 )
+
+type mailer interface {
+	SendSecurityAlert(email string, data mail.SecurityAlertData) error
+}
+
+type authService interface {
+	VerifyPassword(ctx context.Context, userID uuid.UUID, currentPassword string) error
+	RevokeOtherSessions(ctx context.Context, userID uuid.UUID, currentToken string) (int64, error)
+}
+
+type geoService interface {
+	Locate(ctx context.Context, ip string) string
+}
+
+type Service struct {
+	repo  Repository
+	mail  mailer
+	auth  authService
+	store objectstore.Store
+	geo   geoService
+	log   logger.Logger
+	cfg   *config.Env
+}
+
+func NewService(repo Repository, mail mailer, auth authService, store objectstore.Store, geo geoService, log logger.Logger, cfg *config.Env) *Service {
+	return new(Service{
+		repo:  repo,
+		mail:  mail,
+		auth:  auth,
+		store: store,
+		geo:   geo,
+		log:   log,
+		cfg:   cfg,
+	})
+}
 
 // truncate and sanitizeIP back sendPasswordChangedAlert below; temporary
 // copies of the auth module's helpers until the user domain migrates in
@@ -31,6 +64,7 @@ func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
+
 	return s[:maxLen]
 }
 
@@ -42,31 +76,32 @@ func sanitizeIP(ipAddress string) string {
 	if net.ParseIP(strings.TrimSpace(ipAddress)) == nil {
 		return ""
 	}
+
 	return ipAddress
 }
 
-func (s *Services) GetListUsers(ctx context.Context, offset, limit uint) ([]entities.User, uint, error) {
-	return s.repos.ListUsers(ctx, offset, limit)
+func (s *Service) GetListUsers(ctx context.Context, offset, limit uint) ([]User, uint, error) {
+	return s.repo.List(ctx, offset, limit)
 }
 
-func (s *Services) GetUserByID(ctx context.Context, id uuid.UUID) (entities.User, error) {
-	return s.repos.GetUserByID(ctx, id)
+func (s *Service) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
+	return s.repo.GetByID(ctx, id)
 }
 
-func (s *Services) CreateUser(ctx context.Context, name, email string) (entities.User, error) {
+func (s *Service) CreateUser(ctx context.Context, name, email string) (User, error) {
 	name = helpers.NormalizateNames(name)
 
-	return s.repos.CreateUser(ctx, name, email)
+	return s.repo.Create(ctx, name, email)
 }
 
-func (s *Services) UpdateUser(ctx context.Context, id uuid.UUID, name, email, image string) (entities.User, error) {
-	existUser, err := s.repos.GetUserByID(ctx, id)
+func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, name, email, image string) (User, error) {
+	existUser, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return entities.User{}, err
+		return User{}, err
 	}
 
 	if existUser.DeletedAt != nil {
-		return entities.User{}, errors.New("not found user")
+		return User{}, errors.New("not found user")
 	}
 
 	if strings.TrimSpace(name) != "" && existUser.Name != name {
@@ -81,25 +116,25 @@ func (s *Services) UpdateUser(ctx context.Context, id uuid.UUID, name, email, im
 		existUser.Image = image
 	}
 
-	return s.repos.UpdateUser(ctx, existUser.ID, existUser.Name, existUser.Email, existUser.Image)
+	return s.repo.Update(ctx, existUser.ID, existUser.Name, existUser.Email, existUser.Image)
 }
 
-func (s *Services) DeleteUser(ctx context.Context, id uuid.UUID) error {
-	return s.repos.DeleteUser(ctx, id)
+func (s *Service) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	return s.repo.Delete(ctx, id)
 }
 
-func (s *Services) BanUser(ctx context.Context, id uuid.UUID, ban bool) error {
-	return s.repos.BanUser(ctx, id, ban)
+func (s *Service) BanUser(ctx context.Context, id uuid.UUID, ban bool) error {
+	return s.repo.Ban(ctx, id, ban)
 }
 
-func (s *Services) GetCurrentUser(ctx context.Context, userID uuid.UUID) (entities.User, error) {
-	return s.repos.GetUserByID(ctx, userID)
+func (s *Service) GetCurrentUser(ctx context.Context, userID uuid.UUID) (User, error) {
+	return s.repo.GetByID(ctx, userID)
 }
 
-func (s *Services) UpdateCurrentUser(ctx context.Context, userID uuid.UUID, name, preferredCurrency, image string) (entities.User, error) {
-	existing, err := s.repos.GetUserByID(ctx, userID)
+func (s *Service) UpdateCurrentUser(ctx context.Context, userID uuid.UUID, name, preferredCurrency, image string) (User, error) {
+	existing, err := s.repo.GetByID(ctx, userID)
 	if err != nil {
-		return entities.User{}, err
+		return User{}, err
 	}
 
 	if strings.TrimSpace(name) != "" {
@@ -112,55 +147,42 @@ func (s *Services) UpdateCurrentUser(ctx context.Context, userID uuid.UUID, name
 		existing.Image = image
 	}
 
-	return s.repos.UpdateUserProfile(ctx, userID, existing.Name, existing.PreferredCurrency, existing.Image)
+	return s.repo.UpdateProfile(ctx, userID, existing.Name, existing.PreferredCurrency, existing.Image)
 }
 
-func (s *Services) GetUserPreferences(ctx context.Context, userID uuid.UUID) (entities.UserPreferences, error) {
-	return s.repos.GetUserPreferences(ctx, userID)
+func (s *Service) GetUserPreferences(ctx context.Context, userID uuid.UUID) (UserPreferences, error) {
+	return s.repo.GetPreferences(ctx, userID)
 }
 
-func (s *Services) UpdateUserPreferences(ctx context.Context, userID uuid.UUID, emailAlerts, weeklySummary bool) (entities.UserPreferences, error) {
-	return s.repos.UpsertUserPreferences(ctx, userID, emailAlerts, weeklySummary)
+func (s *Service) UpdateUserPreferences(ctx context.Context, userID uuid.UUID, emailAlerts, weeklySummary bool) (UserPreferences, error) {
+	return s.repo.UpsertPreferences(ctx, userID, emailAlerts, weeklySummary)
 }
 
-func (s *Services) UploadAvatarToS3(ctx context.Context, userID uuid.UUID, file io.Reader, contentType string) (entities.User, error) {
+func (s *Service) UploadAvatarToS3(ctx context.Context, userID uuid.UUID, file io.Reader, contentType string) (User, error) {
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return entities.User{}, errors.New("failed to read file")
+		return User{}, errors.New("failed to read file")
 	}
 
 	key := fmt.Sprintf("avatars/%s/avatar", userID.String())
 
-	_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:      aws.String(s.cfg.AWSS3BucketName),
-		Key:         aws.String(key),
-		Body:        bytes.NewReader(data),
-		ContentType: aws.String(contentType),
-	})
+	err = s.store.Put(ctx, key, contentType, data)
 	if err != nil {
-		return entities.User{}, fmt.Errorf("failed to upload to S3: %w", err)
+		return User{}, fmt.Errorf("failed to upload to S3: %w", err)
 	}
 
 	imageURL := fmt.Sprintf("%s/users/%s/avatar", s.cfg.PublicURL, userID.String())
 
-	return s.repos.UpdateUserImage(ctx, userID, imageURL)
+	return s.repo.UpdateImage(ctx, userID, imageURL)
 }
 
-func (s *Services) GetAvatarFromS3(ctx context.Context, userID uuid.UUID) (io.ReadCloser, string, error) {
+func (s *Service) GetAvatarFromS3(ctx context.Context, userID uuid.UUID) (io.ReadCloser, string, error) {
 	key := fmt.Sprintf("avatars/%s/avatar", userID.String())
 
-	result, err := s.s3Client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(s.cfg.AWSS3BucketName),
-		Key:    aws.String(key),
-	})
-	if err != nil {
-		return nil, "", err
-	}
-
-	return result.Body, aws.ToString(result.ContentType), nil
+	return s.store.Get(ctx, key)
 }
 
-func (s *Services) ChangePassword(ctx context.Context, userID uuid.UUID, currentToken, currentPassword, newPassword, ipAddress, userAgent string) error {
+func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, currentToken, currentPassword, newPassword, ipAddress, userAgent string) error {
 	if err := s.auth.VerifyPassword(ctx, userID, currentPassword); err != nil {
 		return err
 	}
@@ -174,7 +196,7 @@ func (s *Services) ChangePassword(ctx context.Context, userID uuid.UUID, current
 		return err
 	}
 
-	if err := s.repos.UpdateUserPassword(ctx, userID, string(hashed)); err != nil {
+	if err := s.repo.UpdatePassword(ctx, userID, string(hashed)); err != nil {
 		return err
 	}
 
@@ -193,14 +215,14 @@ func (s *Services) ChangePassword(ctx context.Context, userID uuid.UUID, current
 // sendPasswordChangedAlert notifies the user their password changed. Like the
 // login alert, it bypasses email preferences: if the change wasn't theirs,
 // this email is their only chance to react. Best-effort.
-func (s *Services) sendPasswordChangedAlert(userID uuid.UUID, ipAddress, userAgent string) {
+func (s *Service) sendPasswordChangedAlert(userID uuid.UUID, ipAddress, userAgent string) {
 	if s.mail == nil {
 		return
 	}
 
 	ctx := context.Background()
 
-	user, err := s.repos.GetUserByID(ctx, userID)
+	user, err := s.repo.GetByID(ctx, userID)
 	if err != nil {
 		return
 	}
@@ -210,9 +232,11 @@ func (s *Services) sendPasswordChangedAlert(userID uuid.UUID, ipAddress, userAge
 	if location == "" {
 		location = "desconocida"
 	}
+
 	if ipAddress == "" {
 		ipAddress = "desconocida"
 	}
+
 	if userAgent == "" {
 		userAgent = "desconocido"
 	}
@@ -227,4 +251,18 @@ func (s *Services) sendPasswordChangedAlert(userID uuid.UUID, ipAddress, userAge
 		When:        time.Now().UTC().Format("02 Jan 2006 15:04 UTC"),
 		SecurityURL: s.cfg.FrontendURL + "/dashboard/settings",
 	})
+}
+
+// locateIP resolves the approximate location of an IP for security alert
+// emails. Bounded by its own timeout so a slow lookup can only delay the
+// (already asynchronous) email, never the request that triggered it.
+func (s *Service) locateIP(ipAddress string) string {
+	if s.geo == nil {
+		return ""
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	return s.geo.Locate(ctx, ipAddress)
 }
