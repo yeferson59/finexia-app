@@ -1,6 +1,6 @@
 # Manual de Usuario — FINEXIA
 
-**Versión del documento:** 1.1
+**Versión del documento:** 1.2
 **Fecha:** Julio 2026
 **Aplicación:** Finexia — Plataforma de gestión y seguimiento de portafolios de inversión
 
@@ -149,6 +149,18 @@ En la parte inferior de la barra lateral está el botón **Cerrar Sesión**.
 
 Es la zona central donde se muestra cada página. En la mayoría de listados encontrarás paginación y acciones contextuales (crear, editar, eliminar).
 
+### 4.4 Uso en el móvil
+
+La interfaz se adapta automáticamente a pantallas pequeñas: el contenido ocupa todo el ancho y la barra lateral queda oculta.
+
+![Dashboard de Finexia en un teléfono móvil](img/manual/15-movil-dashboard.png)
+
+Para navegar, pulsa el **botón de menú** (las tres líneas de la esquina superior izquierda): la barra lateral se despliega con las mismas secciones que en escritorio y se cierra al elegir una opción o al tocar fuera de ella.
+
+![Menú lateral desplegado en la versión móvil](img/manual/16-movil-menu.png)
+
+Todas las funciones descritas en este manual están disponibles también desde el móvil.
+
 ---
 
 ## 5. Dashboard (panel principal)
@@ -236,13 +248,18 @@ Una **posición** representa la tenencia de un activo concreto dentro de un port
 
 ### 7.2 Detalle de un activo en el portafolio
 
-Al pulsar sobre una posición se abre la vista del activo dentro de ese portafolio, con:
+Al pulsar sobre una posición se abre la vista del activo dentro de ese portafolio (el botón **Volver** te devuelve al detalle del portafolio).
 
-- **Resumen de Posición:** cantidad, valor actual, coste, ganancia/pérdida.
+![Detalle del activo AAPL con el resumen de posición, la información del activo y el historial de transacciones](img/manual/13-activo-detalle.png)
+
+La vista incluye:
+
+- El **precio de mercado** actual del activo, junto a su ticker, nombre, tipo y exchange.
+- **Resumen de Posición:** cantidad total, precio promedio de compra, precio actual, costo total, valor de mercado y **ganancia/pérdida** en importe y porcentaje.
 - **Información del Activo:** tipo, exchange donde cotiza, moneda, porcentaje de **asignación** dentro del portafolio, número de **transacciones** y **ROI** (retorno sobre la inversión).
-- **Historial de Transacciones:** todas las compras y ventas de ese activo, paginadas.
+- **Historial de Transacciones:** todas las compras y ventas de ese activo, con tipo, fecha, cantidad, precio, comisión, total y notas.
 
-Desde esta vista también puedes **registrar nuevas transacciones** del activo (ver sección 9).
+Desde esta misma vista puedes **registrar nuevas operaciones**: el botón **+ Agregar** crea una transacción nueva, y cada fila del historial ofrece acciones para **editar** la operación o registrar una **venta** (ver sección 9).
 
 ### 7.3 Precios de los activos
 
@@ -320,16 +337,21 @@ El proceso tiene tres pasos, indicados en la parte superior: **1 · Archivo**, *
 
 ### 10.2 Paso 2 — Columnas y vista previa
 
-En la pantalla **"Asigna tus columnas"** debes indicar qué columna de tu archivo corresponde a cada dato que Finexia necesita (activo/símbolo, fecha, tipo de operación, cantidad, precio, etc.):
+En la pantalla **"Asigna tus columnas"** la aplicación te dice cuántas columnas detectó en tu archivo y en qué fila están los encabezados, y te propone una **asignación sugerida** que puedes ajustar.
 
-- La aplicación muestra una **vista previa** de tus datos para ayudarte a identificar cada columna.
-- En **Valores por defecto** puedes definir datos que se aplicarán a las filas donde tu archivo no tenga ese dato (por ejemplo, una moneda o un tipo de operación por defecto).
-- Consulta la sección **"Filas omitidas"**: son filas que no se importarán por tener datos incompletos o no interpretables; se listan con el motivo para que puedas corregir tu archivo si lo deseas.
+![Paso 2 de la importación: columnas asignadas, valores por defecto y vista previa con filas válidas y con errores](img/manual/14-importar-columnas.png)
+
+En esta pantalla:
+
+- Si el libro tiene varias hojas, elige la **Hoja** correcta (al cambiarla, la aplicación vuelve a sugerir la asignación).
+- Asigna cada dato a una columna de tu archivo. Los campos **Fecha**, **Ticker/Símbolo**, **Cantidad** y **Precio** son obligatorios (marcados con `*`); **Tipo de operación**, **Nombre del activo**, **Comisiones**, **Moneda**, **Categoría** y **Notas** son opcionales — puedes dejarlos en **"— No usar —"**.
+- En **Valores por defecto** defines lo que se aplicará a las filas donde tu archivo no tenga ese dato: tipo de operación, moneda, categoría y formato de fecha (con detección automática).
+- La **vista previa** resume el resultado con contadores (p. ej. "48 filas · 46 listas para importar · 2 con errores (se omitirán)") y muestra las primeras filas interpretadas: las válidas con ✓ y las que se omitirán con ✗ y el **motivo del error** (fecha no reconocida, precio vacío…), para que puedas corregir tu archivo si lo deseas.
 
 ### 10.3 Paso 3 — Resultado
 
-1. Revisa la vista previa final: la aplicación muestra cómo quedará cada transacción interpretada.
-2. Si todo es correcto, pulsa **Confirmar importación**. Las transacciones se crearán en el portafolio elegido y verás el resultado del proceso.
+1. Cuando la asignación sea correcta, pulsa **Importar N transacciones** (el botón indica cuántas filas válidas se crearán). Si prefieres empezar de nuevo, usa **Elegir otro archivo**.
+2. Las transacciones se crearán en el portafolio elegido y verás el **resultado** del proceso: cuántas se importaron, cuántas se omitieron y el detalle de los errores, si los hubo.
 
 > **Consejos para una buena importación:**
 > - Usa una fila de encabezados clara en tu hoja.
@@ -456,7 +478,7 @@ El activo aún no está en el catálogo. Contacta con el equipo de soporte de Fi
 Usa uno de tus **códigos de recuperación** para entrar y luego reconfigura la 2FA. Si tampoco tienes los códigos, contacta con el soporte de Finexia.
 
 **¿Puedo usar Finexia en el móvil?**
-Sí. La interfaz es adaptable; en pantallas pequeñas el menú lateral se abre desde el botón de la cabecera.
+Sí. La interfaz es adaptable; en pantallas pequeñas el menú lateral se abre desde el botón de la cabecera (ver sección 4.4).
 
 **¿Cómo exporto mis datos?**
 Desde **Reportes** puedes descargar en Excel el resumen mensual, el estado de resultados (transacciones) y las métricas de riesgo y volatilidad.
