@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/entities"
@@ -62,7 +63,7 @@ func (s *Services) SyncExchangeRates(ctx context.Context) ([]entities.ExchangeRa
 			continue
 		}
 
-		rate, err := money.NewFromString(result.Rate)
+		rate, err := decimal.NewFromString(result.Rate)
 		if err != nil {
 			log.Error(ctx, "parse rate failed", logger.Err(err), logger.Str("pair", pair.From+"/"+pair.To), logger.Str("raw", result.Rate))
 			errs = append(errs, err)
@@ -119,7 +120,7 @@ func (s *Services) SyncExchangeRateByID(ctx context.Context, id uuid.UUID) (enti
 		return entities.ExchangeRate{}, fmt.Errorf("fetch exchange rate %q/%q: %w", existing.FromCurrency, existing.ToCurrency, err)
 	}
 
-	rate, err := money.NewFromString(result.Rate)
+	rate, err := decimal.NewFromString(result.Rate)
 	if err != nil {
 		return entities.ExchangeRate{}, fmt.Errorf("parse rate %q for %q/%q: %w", result.Rate, existing.FromCurrency, existing.ToCurrency, err)
 	}
@@ -143,7 +144,7 @@ func (s *Services) GetConversionRate(ctx context.Context, from, to string) (mone
 	to = strings.ToUpper(strings.TrimSpace(to))
 
 	if from == to {
-		return money.One, nil
+		return decimal.One, nil
 	}
 
 	if rate, err := s.pairRate(ctx, from, to); err == nil {
@@ -166,7 +167,7 @@ func (s *Services) GetConversionRate(ctx context.Context, from, to string) (mone
 // opposite direction if that's what was synced.
 func (s *Services) pairRate(ctx context.Context, from, to string) (money.Decimal, error) {
 	if from == to {
-		return money.One, nil
+		return decimal.One, nil
 	}
 
 	if er, err := s.repos.GetExchangeRateByPair(ctx, from, to); err == nil {
@@ -181,5 +182,5 @@ func (s *Services) pairRate(ctx context.Context, from, to string) (money.Decimal
 		return money.Decimal{}, ErrExchangeRateUnavailable
 	}
 
-	return money.One.Div(er.Rate)
+	return decimal.One.Div(er.Rate)
 }

@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/auth"
@@ -51,10 +50,6 @@ func (handler *Handlers) responseInternalServerError(c fiber.Ctx, message, detai
 
 func (handler *Handlers) responseFromDomain(c fiber.Ctx, err error, message, action string) error {
 	return httpx.FromDomain(c, err, message, action)
-}
-
-func paginationMetadata(paginateInfo *paginate.PageInfo, count uint, limitKey, totalKey string) fiber.Map {
-	return httpx.PaginationMetadata(paginateInfo, count, limitKey, totalKey)
 }
 
 func (handler *Handlers) getUserIDTokenRole(c fiber.Ctx) (uuid.UUID, string, string, error) {

@@ -4,8 +4,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/identity"
 )
 
 type AssetType string

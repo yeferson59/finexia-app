@@ -12,14 +12,58 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/auth"
 	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/services"
+	"github.com/yeferson59/finexia-app/internal/user"
 )
+
+// stubUserService satisfies services.UserService with safe no-op defaults;
+// handler tests exercise the HTTP layer, not the fire-and-forget alert flow
+// CreateTransaction kicks off in the background.
+type stubUserService struct{}
+
+func (stubUserService) GetUserPreferences(ctx context.Context, userID uuid.UUID) (user.UserPreferences, error) {
+	return user.UserPreferences{}, nil
+}
+
+func (stubUserService) GetUserByID(ctx context.Context, id uuid.UUID) (identity.User, error) {
+	return identity.User{}, nil
+}
+
+func (stubUserService) GetUsersWithWeeklySummary(ctx context.Context) ([]identity.User, error) {
+	return nil, nil
+}
+
+// trackingUserService closes prefsChecked the first time preferences are
+// looked up, letting a test observe that CreateTransaction's fire-and-forget
+// alert goroutine actually ran.
+type trackingUserService struct {
+	prefsChecked chan struct{}
+}
+
+func (t trackingUserService) GetUserPreferences(ctx context.Context, userID uuid.UUID) (user.UserPreferences, error) {
+	select {
+	case <-t.prefsChecked:
+	default:
+		close(t.prefsChecked)
+	}
+	return user.UserPreferences{EmailAlerts: false}, nil
+}
+
+func (t trackingUserService) GetUserByID(ctx context.Context, id uuid.UUID) (identity.User, error) {
+	return identity.User{}, nil
+}
+
+func (t trackingUserService) GetUsersWithWeeklySummary(ctx context.Context) ([]identity.User, error) {
+	return nil, nil
+}
 
 // stubRepository embeds services.Repository so each test only wires the
 // methods its endpoint touches; anything else panics loudly.
@@ -104,8 +148,12 @@ func (s *stubRepository) GetExchangeRateByPair(ctx context.Context, from, to str
 }
 
 func newTestHandlers(repo services.Repository) *Handlers {
+	return newTestHandlersWithUserService(repo, stubUserService{})
+}
+
+func newTestHandlersWithUserService(repo services.Repository, userSvc services.UserService) *Handlers {
 	cfg := &config.Env{PublicURL: "http://localhost:8080"}
-	svc := services.New(repo, cfg, nil, nil, nil, nil, logger.Noop(), nil, nil, nil)
+	svc := services.New(repo, cfg, nil, nil, nil, nil, logger.Noop(), nil, nil, userSvc)
 	h := New(svc, cfg)
 	return &h
 }
@@ -491,7 +539,11 @@ func TestCreateTransactionHandler(t *testing.T) {
 				return entities.Transaction{ID: uuid.New(), EntryID: eid, Type: txnType, Currency: currency}, nil
 			},
 		}
-		app := newApp(repo)
+		userSvc := trackingUserService{prefsChecked: prefsChecked}
+		h := newTestHandlersWithUserService(repo, userSvc)
+		app := fiber.New()
+		app.Use(authed(userID))
+		app.Post("/entries/:entryId/transactions", h.CreateTransaction)
 		_, status, payload := doJSON(t, app, "POST", "/entries/"+entryID.String()+"/transactions", `{"type":"sell","currency":"USD","transactionDate":"2026-06-20T00:00:00Z","notes":"partial exit"}`)
 		if status != fiber.StatusOK {
 			t.Fatalf("status = %d, want 200; payload = %v", status, payload)
@@ -724,7 +776,7 @@ func TestGetPortfoliosSummaryHandlerCurrencyConversion(t *testing.T) {
 		},
 		getExchangeRateByPair: func(_ context.Context, from, to string) (entities.ExchangeRate, error) {
 			if from == "USD" && to == "COP" {
-				return entities.ExchangeRate{FromCurrency: "USD", ToCurrency: "COP", Rate: money.MustFromString("4000")}, nil
+				return entities.ExchangeRate{FromCurrency: "USD", ToCurrency: "COP", Rate: decimal.MustFromString("4000")}, nil
 			}
 			return entities.ExchangeRate{}, errors.New("exchange rate not found")
 		},

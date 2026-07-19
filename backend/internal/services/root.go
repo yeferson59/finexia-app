@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gofiber/fiber/v3"
@@ -78,16 +77,4 @@ func New(repos Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.S
 		user:          userSvc,
 		risksCache:    &risksCache{},
 	}
-}
-
-// locateIP resolves the approximate location of an IP for security alert
-// emails. Bounded by its own timeout so a slow lookup can only delay the
-// (already asynchronous) email, never the request that triggered it.
-func (s *Services) locateIP(ipAddress string) string {
-	if s.geo == nil {
-		return ""
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	return s.geo.Locate(ctx, ipAddress)
 }

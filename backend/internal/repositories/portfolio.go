@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/dtos/portfolio"
@@ -222,7 +223,7 @@ func (r *Repository) GetEntriesByPortfolioID(ctx context.Context, portfolioID uu
 			entry.SourceID = uuid.UUID(sourceID.Bytes)
 		}
 
-		entry.Quantity = money.MustFromString(quantity)
+		entry.Quantity = decimal.MustFromString(quantity)
 		entry.Price = money.MustMoneyFromString(price, money.USD)
 
 		entries = append(entries, entry)
@@ -601,7 +602,7 @@ func (r *Repository) GetRecentTransactionsByUserID(ctx context.Context, userID u
 		); err != nil {
 			return nil, err
 		}
-		txn.Quantity = money.MustFromString(quantity)
+		txn.Quantity = decimal.MustFromString(quantity)
 		txn.Price = money.MustMoneyFromString(price, money.USD)
 		txn.Fees = money.MustMoneyFromString(fees, money.USD)
 		txns = append(txns, txn)
@@ -686,7 +687,7 @@ func (r *Repository) GetTransactionsByEntryID(ctx context.Context, userID, entry
 		); err != nil {
 			return nil, err
 		}
-		txn.Quantity = money.MustFromString(quantity)
+		txn.Quantity = decimal.MustFromString(quantity)
 		txn.Price = money.MustMoneyFromString(price, money.USD)
 		txn.Fees = money.MustMoneyFromString(fees, money.USD)
 		txns = append(txns, txn)
@@ -743,7 +744,7 @@ func (r *Repository) GetAssetTransactionsPaginated(ctx context.Context, userID, 
 		); err != nil {
 			return nil, err
 		}
-		txn.Quantity = money.MustFromString(quantity)
+		txn.Quantity = decimal.MustFromString(quantity)
 		txn.Price = money.MustMoneyFromString(price, money.USD)
 		txn.Fees = money.MustMoneyFromString(fees, money.USD)
 		txns = append(txns, txn)
@@ -788,7 +789,7 @@ func (r *Repository) CreateTransaction(ctx context.Context, userID, entryID uuid
 		return entities.Transaction{}, err
 	}
 
-	txn.Quantity = money.MustFromString(quantityValue)
+	txn.Quantity = decimal.MustFromString(quantityValue)
 	txn.Price = money.MustMoneyFromString(priceValue, money.USD)
 	txn.Fees = money.MustMoneyFromString(feesValue, money.USD)
 	return txn, nil
@@ -833,7 +834,7 @@ func (r *Repository) UpdateTransaction(ctx context.Context, userID, txnID uuid.U
 		}
 		return entities.Transaction{}, err
 	}
-	txn.Quantity = money.MustFromString(quantityValue)
+	txn.Quantity = decimal.MustFromString(quantityValue)
 	txn.Price = money.MustMoneyFromString(priceValue, money.USD)
 	txn.Fees = money.MustMoneyFromString(feesValue, money.USD)
 	return txn, nil
@@ -932,7 +933,7 @@ func (r *Repository) CreatePortfolioEntry(ctx context.Context, userID, portfolio
 		entry.SourceID = uuid.UUID(sourceIDResult.Bytes)
 	}
 
-	entry.Quantity = money.MustFromString(quantityValue)
+	entry.Quantity = decimal.MustFromString(quantityValue)
 	entry.Price = money.MustMoneyFromString(priceValue, money.USD)
 
 	return entry, nil

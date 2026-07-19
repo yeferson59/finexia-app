@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/entities"
@@ -39,7 +40,7 @@ func (r *Repository) UpsertExchangeRate(
 		return entities.ExchangeRate{}, err
 	}
 
-	er.Rate = money.MustFromString(rateStr)
+	er.Rate = decimal.MustFromString(rateStr)
 	return er, nil
 }
 
@@ -64,7 +65,7 @@ func (r *Repository) GetExchangeRates(ctx context.Context, offset, limit uint) (
 			return nil, err
 		}
 
-		er.Rate = money.MustFromString(rateStr)
+		er.Rate = decimal.MustFromString(rateStr)
 		rates = append(rates, er)
 	}
 
@@ -90,7 +91,7 @@ func (r *Repository) GetExchangeRateByPair(ctx context.Context, from, to string)
 		return entities.ExchangeRate{}, err
 	}
 
-	er.Rate = money.MustFromString(rateStr)
+	er.Rate = decimal.MustFromString(rateStr)
 	return er, nil
 }
 
@@ -109,7 +110,7 @@ func (r *Repository) GetExchangeRateByID(ctx context.Context, id uuid.UUID) (ent
 		return entities.ExchangeRate{}, err
 	}
 
-	er.Rate = money.MustFromString(rateStr)
+	er.Rate = decimal.MustFromString(rateStr)
 	return er, nil
 }
 
@@ -130,6 +131,6 @@ func (r *Repository) UpdateExchangeRateByID(ctx context.Context, id uuid.UUID, r
 		return entities.ExchangeRate{}, err
 	}
 
-	er.Rate = money.MustFromString(rateStr)
+	er.Rate = decimal.MustFromString(rateStr)
 	return er, nil
 }

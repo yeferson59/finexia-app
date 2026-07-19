@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/objectstore"

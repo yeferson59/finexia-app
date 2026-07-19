@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 	"golang.org/x/sync/errgroup"
 
@@ -93,7 +94,7 @@ func (s *Services) convertSummaryTotals(ctx context.Context, summary entities.Po
 	}
 
 	convert := func(raw string) (string, error) {
-		amount, err := money.NewFromString(raw)
+		amount, err := decimal.NewFromString(raw)
 		if err != nil {
 			return raw, err
 		}

@@ -7,10 +7,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	portfoliodto "github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/identity"
+	"github.com/yeferson59/finexia-app/internal/user"
 )
 
 func mustUSD(t *testing.T, s string) money.Money {
@@ -28,7 +31,7 @@ func mustUSD(t *testing.T, s string) money.Money {
 
 func mustDecimal(t *testing.T, s string) money.Decimal {
 	t.Helper()
-	d, err := money.NewFromString(s)
+	d, err := decimal.NewFromString(s)
 	if err != nil {
 		t.Fatalf("NewFromString(%q): %v", s, err)
 	}
@@ -795,6 +798,14 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 		mailer := &fakeMailer{}
 		svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
 		svc.cfg.FrontendURL = "https://app.finexia.me"
+		svc.user = &fakeUserService{
+			getUserPreferences: func(context.Context, uuid.UUID) (user.UserPreferences, error) {
+				return user.UserPreferences{EmailAlerts: true}, nil
+			},
+			getUserByID: func(context.Context, uuid.UUID) (identity.User, error) {
+				return identity.User{Name: "Ada", Email: "ada@example.com"}, nil
+			},
+		}
 
 		txn, err := svc.CreateTransaction(context.Background(), userID, entryID, entities.Buy, qty, price, "USD", fees, date, "note")
 		if err != nil {
@@ -835,6 +846,12 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 
 		mailer := &fakeMailer{}
 		svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
+		svc.user = &fakeUserService{
+			getUserPreferences: func(context.Context, uuid.UUID) (user.UserPreferences, error) {
+				close(prefsChecked)
+				return user.UserPreferences{EmailAlerts: false}, nil
+			},
+		}
 
 		if _, err := svc.CreateTransaction(context.Background(), userID, entryID, entities.Buy, qty, price, "USD", fees, date, ""); err != nil {
 			t.Fatalf("CreateTransaction: %v", err)
@@ -860,6 +877,12 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 
 		mailer := &fakeMailer{}
 		svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
+		svc.user = &fakeUserService{
+			getUserPreferences: func(context.Context, uuid.UUID) (user.UserPreferences, error) {
+				close(prefsChecked)
+				return user.UserPreferences{}, errors.New("preferences lookup failed")
+			},
+		}
 
 		if _, err := svc.CreateTransaction(context.Background(), userID, entryID, entities.Buy, qty, price, "USD", fees, date, ""); err != nil {
 			t.Fatalf("CreateTransaction: %v", err)

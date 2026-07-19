@@ -389,7 +389,7 @@ func (f *fakeUserService) GetUserPreferences(ctx context.Context, userID uuid.UU
 		return user.UserPreferences{}, nil
 	}
 
-	return f.GetUserPreferences(ctx, userID)
+	return f.getUserPreferences(ctx, userID)
 }
 
 func (f *fakeUserService) GetUserByID(ctx context.Context, userID uuid.UUID) (identity.User, error) {
@@ -397,7 +397,7 @@ func (f *fakeUserService) GetUserByID(ctx context.Context, userID uuid.UUID) (id
 		return identity.User{}, nil
 	}
 
-	return f.GetUserByID(ctx, userID)
+	return f.getUserByID(ctx, userID)
 }
 
 func (f *fakeUserService) GetUsersWithWeeklySummary(ctx context.Context) ([]identity.User, error) {
@@ -405,7 +405,7 @@ func (f *fakeUserService) GetUsersWithWeeklySummary(ctx context.Context) ([]iden
 		return []identity.User{}, nil
 	}
 
-	return f.GetUsersWithWeeklySummary(ctx)
+	return f.getUsersWithWeeklySummary(ctx)
 }
 
 func newTestServices(repo Repository, storage *memStorage) *Services {
@@ -417,12 +417,5 @@ func newTestServices(repo Repository, storage *memStorage) *Services {
 // the repository, for flows that send email or hit market data.
 func newTestServicesFull(repo Repository, storage *memStorage, mailer Mailer, provider marketdata.Provider) *Services {
 	svc := New(repo, testConfig(), nil, storage, mailer, nil, logger.Noop(), provider, &fakeAuthService{}, &fakeUserService{})
-	return &svc
-}
-
-// newTestServicesAuth also injects a custom fake of the auth module slice,
-// for the flows that delegate to it (change/reset password).
-func newTestServicesAuth(repo Repository, storage *memStorage, mailer Mailer, authSvc AuthService) *Services {
-	svc := New(repo, testConfig(), nil, storage, mailer, nil, logger.Noop(), nil, authSvc, &fakeUserService{})
 	return &svc
 }
