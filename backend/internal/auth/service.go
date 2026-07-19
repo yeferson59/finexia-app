@@ -33,14 +33,14 @@ type Service struct {
 }
 
 func NewService(stores Stores, cfg *config.Env, storage fiber.Storage, mailService Mailer, geo GeoLocator, log logger.Logger) *Service {
-	return &Service{
+	return new(Service{
 		stores:  stores,
 		cfg:     cfg,
 		storage: storage,
 		mail:    mailService,
 		geo:     geo,
 		log:     log,
-	}
+	})
 }
 
 func refreshCacheKey(hash string) string {

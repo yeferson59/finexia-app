@@ -10,10 +10,12 @@ import (
 
 	portfoliodto "github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"
+	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
+	"github.com/yeferson59/finexia-app/internal/user"
 )
 
 // fakeRepository embeds the Repository interface so tests only override the
@@ -21,10 +23,6 @@ import (
 type fakeRepository struct {
 	Repository
 
-	getUserByEmail                  func(ctx context.Context, email string) (entities.User, error)
-	getUserByID                     func(ctx context.Context, id uuid.UUID) (entities.User, error)
-	updateUser                      func(ctx context.Context, id uuid.UUID, name, email, image string) (entities.User, error)
-	updateUserProfile               func(ctx context.Context, id uuid.UUID, name, preferredCurrency, image string) (entities.User, error)
 	updateUserPassword              func(ctx context.Context, userID uuid.UUID, hashedPassword string) error
 	countAssetTransactions          func(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error)
 	getAssetTransactionsPaginated   func(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, limit, offset int) ([]entities.Transaction, error)
@@ -55,8 +53,6 @@ type fakeRepository struct {
 	getAssetAllocationByUserID    func(ctx context.Context, userID uuid.UUID) ([]entities.AllocationItem, error)
 	createTransaction             func(ctx context.Context, userID, entryID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error)
 	updateTransaction             func(ctx context.Context, userID, txnID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error)
-	getUserPreferences            func(ctx context.Context, userID uuid.UUID) (entities.UserPreferences, error)
-	getUsersWithWeeklySummary     func(ctx context.Context) ([]entities.User, error)
 	getAllPortfolioSummaryRows    func(ctx context.Context) ([]entities.PortfolioSnapshotRow, error)
 	upsertPortfolioSnapshot       func(ctx context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, currency, totalGainLoss, totalGainLossPct string) error
 	upsertExchangeRate            func(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (entities.ExchangeRate, error)
@@ -66,22 +62,6 @@ type fakeRepository struct {
 
 func (f *fakeRepository) ImportEntryTransactions(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []entities.ImportTransactionRow) (int, error) {
 	return f.importEntryTransactions(ctx, userID, portfolioID, sourceID, rows)
-}
-
-func (f *fakeRepository) GetUserByEmail(ctx context.Context, email string) (entities.User, error) {
-	return f.getUserByEmail(ctx, email)
-}
-
-func (f *fakeRepository) GetUserByID(ctx context.Context, id uuid.UUID) (entities.User, error) {
-	return f.getUserByID(ctx, id)
-}
-
-func (f *fakeRepository) UpdateUser(ctx context.Context, id uuid.UUID, name, email, image string) (entities.User, error) {
-	return f.updateUser(ctx, id, name, email, image)
-}
-
-func (f *fakeRepository) UpdateUserProfile(ctx context.Context, id uuid.UUID, name, preferredCurrency, image string) (entities.User, error) {
-	return f.updateUserProfile(ctx, id, name, preferredCurrency, image)
 }
 
 func (f *fakeRepository) UpdateUserPassword(ctx context.Context, userID uuid.UUID, hashedPassword string) error {
@@ -198,14 +178,6 @@ func (f *fakeRepository) CreateTransaction(ctx context.Context, userID, entryID 
 
 func (f *fakeRepository) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error) {
 	return f.updateTransaction(ctx, userID, txnID, txnType, quantity, price, currency, fees, transactionDate, notes)
-}
-
-func (f *fakeRepository) GetUserPreferences(ctx context.Context, userID uuid.UUID) (entities.UserPreferences, error) {
-	return f.getUserPreferences(ctx, userID)
-}
-
-func (f *fakeRepository) GetUsersWithWeeklySummary(ctx context.Context) ([]entities.User, error) {
-	return f.getUsersWithWeeklySummary(ctx)
 }
 
 func (f *fakeRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]entities.PortfolioSnapshotRow, error) {
@@ -406,21 +378,51 @@ func (f *fakeAuthService) RevokeOtherSessions(ctx context.Context, userID uuid.U
 	return f.revokeOtherSessions(ctx, userID, currentToken)
 }
 
+type fakeUserService struct {
+	getUserPreferences        func(ctx context.Context, userID uuid.UUID) (user.UserPreferences, error)
+	getUserByID               func(ctx context.Context, id uuid.UUID) (identity.User, error)
+	getUsersWithWeeklySummary func(ctx context.Context) ([]identity.User, error)
+}
+
+func (f *fakeUserService) GetUserPreferences(ctx context.Context, userID uuid.UUID) (user.UserPreferences, error) {
+	if f.getUserPreferences == nil {
+		return user.UserPreferences{}, nil
+	}
+
+	return f.GetUserPreferences(ctx, userID)
+}
+
+func (f *fakeUserService) GetUserByID(ctx context.Context, userID uuid.UUID) (identity.User, error) {
+	if f.getUserByID == nil {
+		return identity.User{}, nil
+	}
+
+	return f.GetUserByID(ctx, userID)
+}
+
+func (f *fakeUserService) GetUsersWithWeeklySummary(ctx context.Context) ([]identity.User, error) {
+	if f.getUsersWithWeeklySummary == nil {
+		return []identity.User{}, nil
+	}
+
+	return f.GetUsersWithWeeklySummary(ctx)
+}
+
 func newTestServices(repo Repository, storage *memStorage) *Services {
-	svc := New(repo, testConfig(), nil, storage, nil, nil, logger.Noop(), nil, &fakeAuthService{})
+	svc := New(repo, testConfig(), nil, storage, nil, nil, logger.Noop(), nil, &fakeAuthService{}, &fakeUserService{})
 	return &svc
 }
 
 // newTestServicesFull wires a fake mailer and price provider in addition to
 // the repository, for flows that send email or hit market data.
 func newTestServicesFull(repo Repository, storage *memStorage, mailer Mailer, provider marketdata.Provider) *Services {
-	svc := New(repo, testConfig(), nil, storage, mailer, nil, logger.Noop(), provider, &fakeAuthService{})
+	svc := New(repo, testConfig(), nil, storage, mailer, nil, logger.Noop(), provider, &fakeAuthService{}, &fakeUserService{})
 	return &svc
 }
 
 // newTestServicesAuth also injects a custom fake of the auth module slice,
 // for the flows that delegate to it (change/reset password).
 func newTestServicesAuth(repo Repository, storage *memStorage, mailer Mailer, authSvc AuthService) *Services {
-	svc := New(repo, testConfig(), nil, storage, mailer, nil, logger.Noop(), nil, authSvc)
+	svc := New(repo, testConfig(), nil, storage, mailer, nil, logger.Noop(), nil, authSvc, &fakeUserService{})
 	return &svc
 }

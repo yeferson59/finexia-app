@@ -88,6 +88,7 @@ func (s *Service) locateIP(ipAddress string) string {
 	if s.geo == nil {
 		return ""
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return s.geo.Locate(ctx, ipAddress)

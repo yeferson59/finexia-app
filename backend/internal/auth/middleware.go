@@ -81,5 +81,5 @@ func (m *Module) RequireAdmin() fiber.Handler {
 // authLimiter rate-limits the public auth endpoints (credential guessing,
 // token guessing, mail bombing). Same policy as the legacy AuthLimiter.
 func (m *Module) authLimiter() fiber.Handler {
-	return httpx.RateLimiter(m.storage, 10, 15*time.Minute)
+	return httpx.RateLimiter(10, 15*time.Minute, true)
 }

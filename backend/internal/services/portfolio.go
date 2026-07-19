@@ -267,12 +267,12 @@ func (s *Services) CreateTransaction(ctx context.Context, userID, entryID uuid.U
 func (s *Services) sendTransactionAlert(userID, entryID uuid.UUID, txn entities.Transaction) {
 	ctx := context.Background()
 
-	prefs, err := s.repos.GetUserPreferences(ctx, userID)
+	prefs, err := s.user.GetUserPreferences(ctx, userID)
 	if err != nil || !prefs.EmailAlerts {
 		return
 	}
 
-	user, err := s.repos.GetUserByID(ctx, userID)
+	user, err := s.user.GetUserByID(ctx, userID)
 	if err != nil {
 		return
 	}
@@ -303,7 +303,7 @@ func (s *Services) sendTransactionAlert(userID, entryID uuid.UUID, txn entities.
 }
 
 func (s *Services) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
-	users, err := s.repos.GetUsersWithWeeklySummary(ctx)
+	users, err := s.user.GetUsersWithWeeklySummary(ctx)
 	if err != nil {
 		return 0, []error{err}
 	}

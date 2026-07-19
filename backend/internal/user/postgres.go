@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/yeferson59/finexia-app/internal/identity"
 )
 
 type PostgresRepository struct {
@@ -26,7 +27,7 @@ const userCols = `u.id, u.name, u.email, u.email_verified, u.image, u.role_id,
 
 func scanUserWithRole(row interface {
 	Scan(...any) error
-}, user *User) error {
+}, user *identity.User) error {
 	var roleName string
 	if err := row.Scan(
 		&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID,
@@ -39,7 +40,7 @@ func scanUserWithRole(row interface {
 	return nil
 }
 
-func (r *PostgresRepository) List(ctx context.Context, offset, limit uint) ([]User, uint, error) {
+func (r *PostgresRepository) List(ctx context.Context, offset, limit uint) ([]identity.User, uint, error) {
 	var count uint
 	if err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE deleted_at IS NULL").Scan(&count); err != nil {
 		return nil, 0, err
@@ -58,9 +59,9 @@ func (r *PostgresRepository) List(ctx context.Context, offset, limit uint) ([]Us
 	}
 	defer rows.Close()
 
-	users := make([]User, 0, limit)
+	users := make([]identity.User, 0, limit)
 	for rows.Next() {
-		var user User
+		var user identity.User
 		if err := scanUserWithRole(rows, &user); err != nil {
 			return nil, 0, err
 		}
@@ -70,8 +71,8 @@ func (r *PostgresRepository) List(ctx context.Context, offset, limit uint) ([]Us
 	return users, count, rows.Err()
 }
 
-func (r *PostgresRepository) GetByID(ctx context.Context, id uuid.UUID) (User, error) {
-	var user User
+func (r *PostgresRepository) GetByID(ctx context.Context, id uuid.UUID) (identity.User, error) {
+	var user identity.User
 	row := r.db.QueryRow(ctx, `
 		SELECT `+userCols+`
 		FROM users u
@@ -79,26 +80,26 @@ func (r *PostgresRepository) GetByID(ctx context.Context, id uuid.UUID) (User, e
 		WHERE u.id = $1
 	`, id.String())
 	if err := scanUserWithRole(row, &user); err != nil {
-		return User{}, err
+		return identity.User{}, err
 	}
 	return user, nil
 }
 
-func (r *PostgresRepository) Create(ctx context.Context, name, email string) (User, error) {
+func (r *PostgresRepository) Create(ctx context.Context, name, email string) (identity.User, error) {
 	contextTimeout, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	var user User
+	var user identity.User
 	var roleID uuid.UUID
 
 	tx, err := r.db.BeginTx(contextTimeout, pgx.TxOptions{AccessMode: pgx.ReadWrite})
 	if err != nil {
-		return User{}, errors.New("failed create new user")
+		return identity.User{}, errors.New("failed create new user")
 	}
 
 	if err := tx.QueryRow(contextTimeout, "SELECT id FROM roles WHERE name = $1", "customer").Scan(&roleID); err != nil {
 		_ = tx.Rollback(contextTimeout)
-		return User{}, errors.New("failed create new user")
+		return identity.User{}, errors.New("failed create new user")
 	}
 
 	if err := tx.QueryRow(contextTimeout,
@@ -110,15 +111,15 @@ func (r *PostgresRepository) Create(ctx context.Context, name, email string) (Us
 		&user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.BannedAt,
 	); err != nil {
 		_ = tx.Rollback(contextTimeout)
-		return User{}, errors.New("failed create new user")
+		return identity.User{}, errors.New("failed create new user")
 	}
 
 	user.Role.Name = "customer"
 	return user, tx.Commit(contextTimeout)
 }
 
-func (r *PostgresRepository) Update(ctx context.Context, id uuid.UUID, name, email, image string) (User, error) {
-	var user User
+func (r *PostgresRepository) Update(ctx context.Context, id uuid.UUID, name, email, image string) (identity.User, error) {
+	var user identity.User
 	if err := r.db.QueryRow(ctx,
 		`UPDATE users SET name = $1, email = $2, image = $3, updated_at = $4 WHERE id = $5
 		 RETURNING id, name, email, email_verified, image, role_id, preferred_currency, created_at, updated_at, deleted_at, banned_at`,
@@ -127,7 +128,7 @@ func (r *PostgresRepository) Update(ctx context.Context, id uuid.UUID, name, ema
 		&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID,
 		&user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.BannedAt,
 	); err != nil {
-		return User{}, err
+		return identity.User{}, err
 	}
 	return user, nil
 }
@@ -161,8 +162,8 @@ func (r *PostgresRepository) Ban(ctx context.Context, id uuid.UUID, ban bool) er
 	return err
 }
 
-func (r *PostgresRepository) GetByEmail(ctx context.Context, email string) (User, error) {
-	var user User
+func (r *PostgresRepository) GetByEmail(ctx context.Context, email string) (identity.User, error) {
+	var user identity.User
 	if err := r.db.QueryRow(ctx,
 		`SELECT id, name, email, email_verified, image, role_id, preferred_currency, created_at, updated_at, deleted_at, banned_at
 		 FROM users WHERE email = $1`,
@@ -171,13 +172,13 @@ func (r *PostgresRepository) GetByEmail(ctx context.Context, email string) (User
 		&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID,
 		&user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.BannedAt,
 	); err != nil {
-		return User{}, err
+		return identity.User{}, err
 	}
 	return user, nil
 }
 
-func (r *PostgresRepository) UpdateProfile(ctx context.Context, id uuid.UUID, name, preferredCurrency, image string) (User, error) {
-	var user User
+func (r *PostgresRepository) UpdateProfile(ctx context.Context, id uuid.UUID, name, preferredCurrency, image string) (identity.User, error) {
+	var user identity.User
 	if err := r.db.QueryRow(ctx,
 		`UPDATE users SET name = $1, preferred_currency = $2, image = $3, updated_at = $4 WHERE id = $5
 		 RETURNING id, name, email, email_verified, image, role_id, preferred_currency, created_at, updated_at, deleted_at, banned_at`,
@@ -186,13 +187,13 @@ func (r *PostgresRepository) UpdateProfile(ctx context.Context, id uuid.UUID, na
 		&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID,
 		&user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.BannedAt,
 	); err != nil {
-		return User{}, err
+		return identity.User{}, err
 	}
 	return user, nil
 }
 
-func (r *PostgresRepository) UpdateImage(ctx context.Context, id uuid.UUID, image string) (User, error) {
-	var user User
+func (r *PostgresRepository) UpdateImage(ctx context.Context, id uuid.UUID, image string) (identity.User, error) {
+	var user identity.User
 	if err := r.db.QueryRow(ctx,
 		`UPDATE users SET image = $1, updated_at = $2 WHERE id = $3
 		 RETURNING id, name, email, email_verified, image, role_id, preferred_currency, created_at, updated_at, deleted_at, banned_at`,
@@ -201,7 +202,7 @@ func (r *PostgresRepository) UpdateImage(ctx context.Context, id uuid.UUID, imag
 		&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID,
 		&user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.BannedAt,
 	); err != nil {
-		return User{}, err
+		return identity.User{}, err
 	}
 	return user, nil
 }
@@ -247,7 +248,7 @@ func (r *PostgresRepository) UpdatePassword(ctx context.Context, userID uuid.UUI
 	return err
 }
 
-func (r *PostgresRepository) GetWeeklySummary(ctx context.Context) ([]User, error) {
+func (r *PostgresRepository) GetWeeklySummary(ctx context.Context) ([]identity.User, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT u.id, u.name, u.email
 		FROM users u
@@ -259,13 +260,17 @@ func (r *PostgresRepository) GetWeeklySummary(ctx context.Context) ([]User, erro
 	}
 	defer rows.Close()
 
-	var users []User
+	var users []identity.User
+
 	for rows.Next() {
-		var u User
+		var u identity.User
+
 		if err := rows.Scan(&u.ID, &u.Name, &u.Email); err != nil {
 			return nil, err
 		}
+
 		users = append(users, u)
 	}
+
 	return users, rows.Err()
 }

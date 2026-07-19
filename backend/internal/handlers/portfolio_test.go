@@ -35,7 +35,6 @@ type stubRepository struct {
 	createPortfolioEntry            func(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, costCurrency string, category entities.PortfolioEntryCategory, entryDate time.Time, notes string) (entities.PortfolioEntry, error)
 	createTransaction               func(ctx context.Context, userID, entryID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error)
 	updateTransaction               func(ctx context.Context, userID, txnID uuid.UUID, txnType entities.TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (entities.Transaction, error)
-	getUserPreferences              func(ctx context.Context, userID uuid.UUID) (entities.UserPreferences, error)
 	getPortfolioGrowthByUserID      func(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error)
 	getPortfolioGrowthByPortfolioID func(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error)
 	getRecentTransactionsByUser     func(ctx context.Context, userID uuid.UUID, limit int) ([]entities.Transaction, error)
@@ -80,10 +79,6 @@ func (s *stubRepository) UpdateTransaction(ctx context.Context, userID, txnID uu
 	return s.updateTransaction(ctx, userID, txnID, txnType, quantity, price, currency, fees, transactionDate, notes)
 }
 
-func (s *stubRepository) GetUserPreferences(ctx context.Context, userID uuid.UUID) (entities.UserPreferences, error) {
-	return s.getUserPreferences(ctx, userID)
-}
-
 func (s *stubRepository) GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]entities.PortfolioGrowthPoint, error) {
 	return s.getPortfolioGrowthByUserID(ctx, userID, hasSince, since)
 }
@@ -110,7 +105,7 @@ func (s *stubRepository) GetExchangeRateByPair(ctx context.Context, from, to str
 
 func newTestHandlers(repo services.Repository) *Handlers {
 	cfg := &config.Env{PublicURL: "http://localhost:8080"}
-	svc := services.New(repo, cfg, nil, nil, nil, nil, logger.Noop(), nil, nil)
+	svc := services.New(repo, cfg, nil, nil, nil, nil, logger.Noop(), nil, nil, nil)
 	h := New(svc, cfg)
 	return &h
 }
@@ -494,12 +489,6 @@ func TestCreateTransactionHandler(t *testing.T) {
 					t.Error("IDs not forwarded correctly")
 				}
 				return entities.Transaction{ID: uuid.New(), EntryID: eid, Type: txnType, Currency: currency}, nil
-			},
-			// The alert goroutine checks preferences; opt out so the test
-			// never reaches the (nil) mailer.
-			getUserPreferences: func(context.Context, uuid.UUID) (entities.UserPreferences, error) {
-				defer close(prefsChecked)
-				return entities.UserPreferences{EmailAlerts: false}, nil
 			},
 		}
 		app := newApp(repo)

@@ -787,12 +787,7 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 
 	t.Run("alert email sent when the user opted in", func(t *testing.T) {
 		repo := newTxnRepo()
-		repo.getUserPreferences = func(context.Context, uuid.UUID) (entities.UserPreferences, error) {
-			return entities.UserPreferences{UserID: userID, EmailAlerts: true}, nil
-		}
-		repo.getUserByID = func(context.Context, uuid.UUID) (entities.User, error) {
-			return entities.User{ID: userID, Name: "Ada", Email: "ada@example.com"}, nil
-		}
+
 		repo.getEntryWithAsset = func(context.Context, uuid.UUID) (entities.PortfolioEntry, error) {
 			return entities.PortfolioEntry{ID: entryID, Asset: entities.Asset{Ticker: "AAPL", Name: "Apple Inc."}}, nil
 		}
@@ -837,14 +832,6 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 	t.Run("no alert when alerts are disabled", func(t *testing.T) {
 		prefsChecked := make(chan struct{})
 		repo := newTxnRepo()
-		repo.getUserPreferences = func(context.Context, uuid.UUID) (entities.UserPreferences, error) {
-			defer close(prefsChecked)
-			return entities.UserPreferences{UserID: userID, EmailAlerts: false}, nil
-		}
-		repo.getUserByID = func(context.Context, uuid.UUID) (entities.User, error) {
-			t.Error("user lookup must not run when alerts are disabled")
-			return entities.User{}, nil
-		}
 
 		mailer := &fakeMailer{}
 		svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
@@ -870,10 +857,6 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 	t.Run("preferences lookup failure suppresses the alert", func(t *testing.T) {
 		prefsChecked := make(chan struct{})
 		repo := newTxnRepo()
-		repo.getUserPreferences = func(context.Context, uuid.UUID) (entities.UserPreferences, error) {
-			defer close(prefsChecked)
-			return entities.UserPreferences{}, errors.New("prefs unavailable")
-		}
 
 		mailer := &fakeMailer{}
 		svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)

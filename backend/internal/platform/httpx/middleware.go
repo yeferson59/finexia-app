@@ -9,11 +9,11 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/helmet"
-	"github.com/gofiber/fiber/v3/middleware/limiter"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/gofiber/fiber/v3/middleware/responsetime"
 	"github.com/rs/zerolog"
+	"github.com/yeferson59/finexia-app/ratelimit"
 )
 
 // Recovery converts panics into 500 responses.
@@ -58,19 +58,18 @@ func Helmet() fiber.Handler {
 }
 
 // RateLimiter limits each client (by IP) to max requests per window.
-func RateLimiter(storage fiber.Storage, max int, window time.Duration) fiber.Handler {
-	return limiter.New(limiter.Config{
-		Storage:    storage,
-		Max:        max,
-		Expiration: window,
+func RateLimiter(max int, window time.Duration, disableHeaders bool) fiber.Handler {
+	return ratelimit.New(ratelimit.Config{
+		Max:            max,
+		Expiration:     window,
+		DisableHeaders: disableHeaders,
 	})
 }
 
 // KeyedRateLimiter is RateLimiter with a custom key function, for callers
 // that limit by something other than the client IP (e.g. the user ID).
-func KeyedRateLimiter(storage fiber.Storage, max int, window time.Duration, key func(fiber.Ctx) string) fiber.Handler {
-	return limiter.New(limiter.Config{
-		Storage:      storage,
+func KeyedRateLimiter(max int, window time.Duration, key func(fiber.Ctx) string) fiber.Handler {
+	return ratelimit.New(ratelimit.Config{
 		Max:          max,
 		Expiration:   window,
 		KeyGenerator: key,

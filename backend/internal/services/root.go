@@ -8,10 +8,12 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 
+	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
+	"github.com/yeferson59/finexia-app/internal/user"
 )
 
 // GeoLocator resolves an IP address to a human-readable approximate location
@@ -40,6 +42,12 @@ type AuthService interface {
 	RevokeOtherSessions(ctx context.Context, userID uuid.UUID, currentToken string) (int64, error)
 }
 
+type UserService interface {
+	GetUserPreferences(ctx context.Context, userID uuid.UUID) (user.UserPreferences, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (identity.User, error)
+	GetUsersWithWeeklySummary(ctx context.Context) ([]identity.User, error)
+}
+
 type Services struct {
 	repos         Repository
 	cfg           *config.Env
@@ -50,12 +58,13 @@ type Services struct {
 	log           logger.Logger
 	priceProvider marketdata.Provider
 	auth          AuthService
+	user          UserService
 	// Pointer so every copy of Services shares the same cache (Services is
 	// passed around by value).
 	risksCache *risksCache
 }
 
-func New(repos Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.Storage, mailService Mailer, geo GeoLocator, log logger.Logger, priceProvider marketdata.Provider, authSvc AuthService) Services {
+func New(repos Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.Storage, mailService Mailer, geo GeoLocator, log logger.Logger, priceProvider marketdata.Provider, authSvc AuthService, userSvc UserService) Services {
 	return Services{
 		repos:         repos,
 		cfg:           cfg,
@@ -66,6 +75,7 @@ func New(repos Repository, cfg *config.Env, s3Client *s3.Client, storage fiber.S
 		log:           log,
 		priceProvider: priceProvider,
 		auth:          authSvc,
+		user:          userSvc,
 		risksCache:    &risksCache{},
 	}
 }

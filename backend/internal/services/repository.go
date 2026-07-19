@@ -16,21 +16,6 @@ import (
 // satisfied by *repositories.Repository and lets tests replace the database
 // with in-memory fakes.
 type Repository interface {
-	// Users
-	ListUsers(ctx context.Context, offset, limit uint) ([]entities.User, uint, error)
-	GetUserByID(ctx context.Context, id uuid.UUID) (entities.User, error)
-	GetUserByEmail(ctx context.Context, email string) (entities.User, error)
-	CreateUser(ctx context.Context, name, email string) (entities.User, error)
-	UpdateUser(ctx context.Context, id uuid.UUID, name, email, image string) (entities.User, error)
-	DeleteUser(ctx context.Context, id uuid.UUID) error
-	BanUser(ctx context.Context, id uuid.UUID, ban bool) error
-	UpdateUserProfile(ctx context.Context, id uuid.UUID, name, preferredCurrency, image string) (entities.User, error)
-	UpdateUserImage(ctx context.Context, id uuid.UUID, image string) (entities.User, error)
-	UpdateUserPassword(ctx context.Context, userID uuid.UUID, hashedPassword string) error
-	GetUserPreferences(ctx context.Context, userID uuid.UUID) (entities.UserPreferences, error)
-	UpsertUserPreferences(ctx context.Context, userID uuid.UUID, emailAlerts, weeklySummary bool) (entities.UserPreferences, error)
-	GetUsersWithWeeklySummary(ctx context.Context) ([]entities.User, error)
-
 	// Portfolios
 	GetPortfoliosRisks(ctx context.Context) ([]entities.Risk, error)
 	GetPortfoliosByUserID(ctx context.Context, userID uuid.UUID) ([]entities.Portfolio, error)

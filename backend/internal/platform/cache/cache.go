@@ -3,12 +3,11 @@
 package cache
 
 import (
-	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/storage/redis/v3"
 )
 
 // Connect opens a Redis-backed fiber.Storage against url.
-func Connect(url string) fiber.Storage {
+func Connect(url string) *redis.Storage {
 	return redis.New(redis.Config{
 		URL: url,
 	})

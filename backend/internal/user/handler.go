@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/google/uuid"
 
+	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/pkg/dtos"
 )
@@ -58,7 +59,7 @@ func (h *handler) GetListUsers(c fiber.Ctx) error {
 		return httpx.FromDomain(c, err, "get product pagination", "users:list")
 	}
 
-	return httpx.OK(c, "product pagination", "get products successfully", dtos.FilterPagination[[]User, fiber.Map]{
+	return httpx.OK(c, "product pagination", "get products successfully", dtos.FilterPagination[[]identity.User, fiber.Map]{
 		Items:    users,
 		MetaData: httpx.PaginationMetadata(paginateInfo, count, "usersForPage", "totalUsers"),
 	})

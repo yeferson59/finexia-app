@@ -15,7 +15,7 @@ type Service struct {
 }
 
 func NewService(repo Repository, mail Mailer) *Service {
-	return &Service{repo: repo, mail: mail}
+	return new(Service{repo: repo, mail: mail})
 }
 
 func (s *Service) SaveWaitlistEmail(ctx context.Context, email string) error {

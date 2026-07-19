@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
@@ -80,28 +81,28 @@ func sanitizeIP(ipAddress string) string {
 	return ipAddress
 }
 
-func (s *Service) GetListUsers(ctx context.Context, offset, limit uint) ([]User, uint, error) {
+func (s *Service) GetListUsers(ctx context.Context, offset, limit uint) ([]identity.User, uint, error) {
 	return s.repo.List(ctx, offset, limit)
 }
 
-func (s *Service) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
+func (s *Service) GetUserByID(ctx context.Context, id uuid.UUID) (identity.User, error) {
 	return s.repo.GetByID(ctx, id)
 }
 
-func (s *Service) CreateUser(ctx context.Context, name, email string) (User, error) {
+func (s *Service) CreateUser(ctx context.Context, name, email string) (identity.User, error) {
 	name = helpers.NormalizateNames(name)
 
 	return s.repo.Create(ctx, name, email)
 }
 
-func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, name, email, image string) (User, error) {
+func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, name, email, image string) (identity.User, error) {
 	existUser, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return User{}, err
+		return identity.User{}, err
 	}
 
 	if existUser.DeletedAt != nil {
-		return User{}, errors.New("not found user")
+		return identity.User{}, errors.New("not found user")
 	}
 
 	if strings.TrimSpace(name) != "" && existUser.Name != name {
@@ -127,14 +128,14 @@ func (s *Service) BanUser(ctx context.Context, id uuid.UUID, ban bool) error {
 	return s.repo.Ban(ctx, id, ban)
 }
 
-func (s *Service) GetCurrentUser(ctx context.Context, userID uuid.UUID) (User, error) {
+func (s *Service) GetCurrentUser(ctx context.Context, userID uuid.UUID) (identity.User, error) {
 	return s.repo.GetByID(ctx, userID)
 }
 
-func (s *Service) UpdateCurrentUser(ctx context.Context, userID uuid.UUID, name, preferredCurrency, image string) (User, error) {
+func (s *Service) UpdateCurrentUser(ctx context.Context, userID uuid.UUID, name, preferredCurrency, image string) (identity.User, error) {
 	existing, err := s.repo.GetByID(ctx, userID)
 	if err != nil {
-		return User{}, err
+		return identity.User{}, err
 	}
 
 	if strings.TrimSpace(name) != "" {
@@ -158,17 +159,17 @@ func (s *Service) UpdateUserPreferences(ctx context.Context, userID uuid.UUID, e
 	return s.repo.UpsertPreferences(ctx, userID, emailAlerts, weeklySummary)
 }
 
-func (s *Service) UploadAvatarToS3(ctx context.Context, userID uuid.UUID, file io.Reader, contentType string) (User, error) {
+func (s *Service) UploadAvatarToS3(ctx context.Context, userID uuid.UUID, file io.Reader, contentType string) (identity.User, error) {
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return User{}, errors.New("failed to read file")
+		return identity.User{}, errors.New("failed to read file")
 	}
 
 	key := fmt.Sprintf("avatars/%s/avatar", userID.String())
 
 	err = s.store.Put(ctx, key, contentType, data)
 	if err != nil {
-		return User{}, fmt.Errorf("failed to upload to S3: %w", err)
+		return identity.User{}, fmt.Errorf("failed to upload to S3: %w", err)
 	}
 
 	imageURL := fmt.Sprintf("%s/users/%s/avatar", s.cfg.PublicURL, userID.String())
@@ -265,4 +266,8 @@ func (s *Service) locateIP(ipAddress string) string {
 	defer cancel()
 
 	return s.geo.Locate(ctx, ipAddress)
+}
+
+func (s *Service) GetUsersWithWeeklySummary(ctx context.Context) ([]identity.User, error) {
+	return s.repo.GetWeeklySummary(ctx)
 }

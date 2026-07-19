@@ -10,19 +10,26 @@ import (
 )
 
 type Deps struct {
-	DB    *pgxpool.Pool
-	Cfg   *config.Env
-	Store objectstore.Store
-	Mail  mailer
-	Geo   geoService
-	Log   logger.Logger
-	Auth  authService
+	DB        *pgxpool.Pool
+	Cfg       *config.Env
+	Store     objectstore.Store
+	Mail      mailer
+	Geo       geoService
+	Log       logger.Logger
+	Auth      authService
+	AuthMiddl authMiddleware
+}
+
+type authMiddleware interface {
+	RequireAuth() fiber.Handler
+	RequireAdmin() fiber.Handler
 }
 
 type Module struct {
-	cfg     *config.Env
-	service *Service
-	handler *handler
+	cfg       *config.Env
+	service   *Service
+	handler   *handler
+	authMiddl authMiddleware
 }
 
 func New(deps Deps) *Module {
@@ -34,9 +41,10 @@ func New(deps Deps) *Module {
 
 func newModule(deps Deps, service *Service) *Module {
 	return new(Module{
-		cfg:     deps.Cfg,
-		service: service,
-		handler: new(handler{service}),
+		cfg:       deps.Cfg,
+		service:   service,
+		handler:   new(handler{service}),
+		authMiddl: deps.AuthMiddl,
 	})
 }
 
@@ -49,15 +57,9 @@ func (m *Module) Service() *Service {
 func (m *Module) Routes(router fiber.Router) {
 	users := router.Group("/users")
 
+	users.Use(m.authMiddl.RequireAuth())
+
 	users.Get("/users/:id/avatar", m.handler.GetUserAvatar)
-	users.Get("", m.RequireAdmin(), paginate.New(), m.handler.GetListUsers)
-	users.Post("", m.RequireAdmin(), m.handler.CreateUser)
-
-	// The admin invitation/waitlist routes live in the auth module
-	// (Module.AdminRoutes); they register before this group so the static
-	// "/invitations" and "/waitlist" segments are never captured by "/:id".
-
-	// Self-service routes — must be registered before /:id to avoid shadowing.
 	users.Get("/me", m.handler.GetMe)
 	users.Patch("/me", m.handler.UpdateMe)
 	users.Post("/me/avatar", m.handler.UploadAvatar)
@@ -65,8 +67,12 @@ func (m *Module) Routes(router fiber.Router) {
 	users.Patch("/me/preferences", m.handler.UpdateMyPreferences)
 	users.Patch("/me/password", m.handler.ChangeMyPassword)
 
-	users.Get("/:id", m.RequireAdmin(), m.handler.GetUserByID)
-	users.Patch("/:id", m.RequireAdmin(), m.handler.UpdateUser)
-	users.Patch("/:id/ban", m.RequireAdmin(), m.handler.BanUser)
-	users.Delete("/:id", m.RequireAdmin(), m.handler.DeleteUser)
+	users.Use(m.authMiddl.RequireAdmin())
+
+	users.Get("", paginate.New(), m.handler.GetListUsers)
+	users.Post("", m.handler.CreateUser)
+	users.Get("/:id", m.handler.GetUserByID)
+	users.Patch("/:id", m.handler.UpdateUser)
+	users.Patch("/:id/ban", m.handler.BanUser)
+	users.Delete("/:id", m.handler.DeleteUser)
 }

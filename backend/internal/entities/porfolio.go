@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/gofinance/money"
 )
 
@@ -198,7 +199,7 @@ type InvestmentSource struct {
 	IsActive         bool             `json:"isActive"`
 	CreatedAt        time.Time        `json:"createdAt"`
 	UpdatedAt        time.Time        `json:"updatedAt"`
-	User             User             `json:"user,omitzero"`
+	User             identity.User    `json:"user,omitzero"`
 	PortfolioEntries []PortfolioEntry `json:"portfolioEntries,omitempty"`
 }
 
@@ -224,7 +225,7 @@ type Portfolio struct {
 	CreatedAt          time.Time           `json:"createdAt"`
 	UpdatedAt          time.Time           `json:"updatedAt"`
 	Risk               Risk                `json:"risk,omitzero"`
-	User               User                `json:"user,omitzero"`
+	User               identity.User       `json:"user,omitzero"`
 	PortfolioEntries   []PortfolioEntry    `json:"portfolioEntries,omitempty"`
 	PortfolioSnapshots []PortfolioSnapshot `json:"portfolioSnapshots,omitempty"`
 }

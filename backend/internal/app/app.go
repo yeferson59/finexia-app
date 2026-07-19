@@ -95,42 +95,41 @@ func (a *App) Run(ctx context.Context) error {
 // wire composes every layer of the application; separated from Run so tests
 // can exercise the composed router without opening a listener.
 func (a *App) wire(ctx context.Context) {
-	d := a.deps
-
-	repos := repositories.New(d.DB)
 	priceProvider := marketdata.NewFallback(
-		alphavantage.New(d.Envs.AlphaVantageAPIKey),
-		finnhub.New(d.Envs.FinnhubAPIKey),
+		alphavantage.New(a.deps.Envs.AlphaVantageAPIKey),
+		finnhub.New(a.deps.Envs.FinnhubAPIKey),
 		yahoo.New(),
 	)
 
 	geo := geoip.New()
 
 	// Migrated domain modules.
-	marketingModule := marketing.New(marketing.NewPostgresRepository(d.DB), d.Mail)
+	marketingModule := marketing.New(marketing.NewPostgresRepository(a.deps.DB), a.deps.Mail)
 	authModule := auth.New(auth.Deps{
 		Ctx:      ctx,
-		DB:       d.DB,
-		Cfg:      d.Envs,
-		Storage:  d.Storage,
-		Mail:     d.Mail,
+		DB:       a.deps.DB,
+		Cfg:      a.deps.Envs,
+		Storage:  a.deps.Storage,
+		Mail:     a.deps.Mail,
 		Geo:      geo,
-		Log:      d.Log,
+		Log:      a.deps.Log,
 		Waitlist: marketingModule.Service(),
 	})
 	userModule := user.New(user.Deps{
-		DB:    d.DB,
-		Cfg:   d.Envs,
-		Store: objectstore.NewS3Store(d.S3, d.Envs.AWSS3BucketName),
-		Mail:  d.Mail,
-		Geo:   geo,
-		Log:   d.Log,
-		Auth:  authModule.Service(),
+		DB:        a.deps.DB,
+		Cfg:       a.deps.Envs,
+		Store:     objectstore.NewS3Store(a.deps.S3, a.deps.Envs.AWSS3BucketName),
+		Mail:      a.deps.Mail,
+		Geo:       geo,
+		Log:       a.deps.Log,
+		Auth:      authModule.Service(),
+		AuthMiddl: authModule,
 	})
 
 	// Legacy wiring: shrinks phase by phase until Fase 8 deletes it.
-	svc := services.New(&repos, d.Envs, d.S3, d.Storage, d.Mail, geoip.New(), d.Log, priceProvider, authModule.Service())
-	handl, middl := handlers.New(svc, d.Envs), middlewares.New(d.Envs, d.Storage)
+	repos := repositories.New(a.deps.DB)
+	svc := services.New(&repos, a.deps.Envs, a.deps.S3, a.deps.Storage, a.deps.Mail, geo, a.deps.Log, priceProvider, authModule.Service(), userModule.Service())
+	handl, middl := handlers.New(svc, a.deps.Envs), middlewares.New(a.deps.Envs, a.deps.Storage)
 
 	routes.New(a.fiber, middl, handl, authModule, marketingModule, userModule).Init()
 
