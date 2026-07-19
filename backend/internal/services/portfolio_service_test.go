@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yeferson59/gofinance/money"
+	"github.com/yeferson59/gofinance/v2/money"
 
 	portfoliodto "github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"

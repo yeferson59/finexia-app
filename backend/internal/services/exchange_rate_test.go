@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yeferson59/gofinance/money"
+	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/entities"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"

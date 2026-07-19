@@ -14,7 +14,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
-	"github.com/yeferson59/gofinance/money"
+	"github.com/yeferson59/gofinance/v2/decimal"
+	"github.com/yeferson59/gofinance/v2/money"
 
 	portfoliodto "github.com/yeferson59/finexia-app/internal/dtos/portfolio"
 	"github.com/yeferson59/finexia-app/internal/entities"
@@ -349,7 +350,7 @@ var decimalCleanRe = regexp.MustCompile(`[^0-9,.\-()]`)
 func parseDecimal(raw string) (money.Decimal, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
-		return money.Zero, errors.New("empty value")
+		return decimal.Zero, errors.New("empty value")
 	}
 
 	s = decimalCleanRe.ReplaceAllString(s, "")
@@ -361,7 +362,7 @@ func parseDecimal(raw string) (money.Decimal, error) {
 	}
 	s = strings.ReplaceAll(s, "-", "")
 	if s == "" {
-		return money.Zero, errors.New("not a number")
+		return decimal.Zero, errors.New("not a number")
 	}
 
 	lastComma := strings.LastIndex(s, ",")
@@ -393,9 +394,9 @@ func parseDecimal(raw string) (money.Decimal, error) {
 	if negative {
 		s = "-" + s
 	}
-	d, err := money.NewFromString(s)
+	d, err := decimal.NewFromString(s)
 	if err != nil {
-		return money.Zero, errors.New("not a number")
+		return decimal.Zero, errors.New("not a number")
 	}
 	return d, nil
 }
@@ -756,7 +757,7 @@ func buildImportRow(
 		if quantityRequired(txnType) {
 			errs = append(errs, "la cantidad está vacía")
 		} else {
-			entity.Quantity = money.Zero
+			entity.Quantity = decimal.Zero
 			dto.Quantity = "0"
 		}
 	} else if qty, err := parseDecimal(qtyRaw); err != nil {
@@ -774,7 +775,7 @@ func buildImportRow(
 		if txnType == entities.Buy || txnType == entities.Sell {
 			errs = append(errs, "el precio está vacío")
 		} else {
-			entity.Price = money.Zero.ToMoney(money.USD)
+			entity.Price = money.FromDecimal(decimal.Zero, money.USD)
 			dto.Price = "0"
 		}
 	} else if price, err := parseDecimal(priceRaw); err != nil {
@@ -782,13 +783,13 @@ func buildImportRow(
 	} else if price.InexactFloat64() < 0 {
 		errs = append(errs, fmt.Sprintf("el precio no puede ser negativo: %q", priceRaw))
 	} else {
-		entity.Price = price.ToMoney(money.USD)
+		entity.Price = money.FromDecimal(price, money.USD)
 		dto.Price = price.String()
 	}
 
 	// Fees (optional).
 	feesRaw := cellAt(row, mapping.Fees)
-	entity.Fees = money.Zero.ToMoney(money.USD)
+	entity.Fees = money.FromDecimal(decimal.Zero, money.USD)
 	dto.Fees = "0"
 	if feesRaw != "" {
 		if fees, err := parseDecimal(feesRaw); err != nil {
@@ -796,7 +797,7 @@ func buildImportRow(
 		} else if fees.InexactFloat64() < 0 {
 			errs = append(errs, fmt.Sprintf("la comisión no puede ser negativa: %q", feesRaw))
 		} else {
-			entity.Fees = fees.ToMoney(money.USD)
+			entity.Fees = money.FromDecimal(fees, money.USD)
 			dto.Fees = fees.String()
 		}
 	}

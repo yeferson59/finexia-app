@@ -13,7 +13,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/gofiber/fiber/v3/middleware/responsetime"
 	"github.com/rs/zerolog"
-	"github.com/yeferson59/finexia-app/ratelimit"
+	ratelimit "github.com/yeferson59/goratelimit"
 )
 
 // Recovery converts panics into 500 responses.
