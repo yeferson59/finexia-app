@@ -350,10 +350,10 @@ golangci-lint run
       (57 → **49**); borrados `routes/auth.go`, `entities/invitation.go`,
       `services/token_helpers.go` y `AuthLimiter`; el `Mailer` legacy queda
       solo con ActivityAlert/SecurityAlert/WeeklySummary.
-- [ ] Verificación estándar + E2E de auth del frontend (login, registro, forgot/reset
+- [x] Verificación estándar + E2E de auth del frontend (login, registro, forgot/reset
       password, verify email, accept invite). → build+vet+test+lint en verde y
-      greps de frontera vacíos en los 3 PRs; **E2E manual pendiente antes de
-      mergear** (login, registro+verify, refresh, sesiones, 2FA, forgot/reset,
+      greps de frontera vacíos en los 3 PRs; E2E manual completo pasado
+      (2026-07-19: login, registro+verify, refresh, sesiones, 2FA, forgot/reset,
       invite/resend/revoke/accept, waitlist admin, change password).
 
   **Retrospectiva (PRs A/B/C, 2026-07-15):**
@@ -385,16 +385,46 @@ golangci-lint run
 
 ### Fase 5 — Módulo `user`
 
-- [ ] Crear `internal/user/`: perfil, preferencias, avatar (S3), administración
+- [x] Crear `internal/user/`: perfil, preferencias, avatar (S3), administración
       (listar/ban/CRUD) desde `services/user.go`, `repositories/user.go`, `handlers/user.go`,
       `dtos/user/`.
-- [ ] Definir `user.Repository` local + `postgres.go`.
-- [ ] Interfaz local para el object store (solo `Put/Get/Delete` de avatares) en vez
-      de pasar `*s3.Client` crudo al service.
-- [ ] Exponer `user.Service` como interfaz pública mínima para otros módulos
+- [x] Definir `user.Repository` local + `postgres.go`. → 13 métodos.
+- [x] Interfaz local para el object store (solo `Put/Get/Delete` de avatares) en vez
+      de pasar `*s3.Client` crudo al service. → se usó `platform/objectstore.Store`
+      (exactamente Put/Get/Delete): interfaz pequeña del kernel en lugar de una
+      local del módulo; cumple el objetivo (el service ya no ve `*s3.Client`).
+- [x] Exponer `user.Service` como interfaz pública mínima para otros módulos
       (`GetUserByID`, `GetUsersWithWeeklySummary`…), consumida vía interfaces
-      definidas en cada consumidor.
-- [ ] Migrar tests, eliminar legacy, verificación estándar.
+      definidas en cada consumidor. → el legacy (`services/root.go`) define su
+      interfaz consumidora de 2 métodos; `app` inyecta `userModule.Service()`.
+- [x] Migrar tests, eliminar legacy, verificación estándar. → borrados
+      `services/user.go`, `repositories/user.go`, `handlers/user.go`,
+      `routes/users.go`, `dtos/user`, `entities/user.go`; la god interface baja
+      de 49 a **36** métodos (solo portfolio/market). En la revisión de cierre
+      (2026-07-19) se repusieron 2 tests perdidos en la migración
+      (`TestUpdateCurrentUser`, `TestUpdateUserRejectsDeletedUser`).
+
+  **Retrospectiva (2026-07-19):**
+
+  1. **Tres regresiones de rutas se detectaron en la revisión de cierre y se
+     corrigieron** (ningún test las cubría porque el módulo no tenía tests de
+     rutas): el avatar público quedó registrado como `/users/users/:id/avatar`
+     detrás de `RequireAuth` (era `GET /users/:id/avatar` público, API.md §2.3);
+     las rutas estáticas `GET /users/invitations` y `GET /users/waitlist`
+     quedaron shadowed por el `GET /users/:id` del módulo (el loop de módulos
+     corría antes de `auth.AdminRoutes` en `routes.Init`); y todas las rutas
+     `/users` perdieron el `UserLimiter` al salir del gate global.
+  2. **Lección para las fases siguientes**: al mover rutas del gate protegido
+     global a un módulo que se registra en la zona pública hay que portar
+     explícitamente (a) las rutas públicas hermanas del mismo prefijo, (b) el
+     orden de registro respecto a rutas `/prefijo/*` de otros módulos y (c) los
+     middlewares que el gate global aplicaba (`UserLimiter`).
+     `internal/app/app_test.go` ahora fija estos contratos: avatar público sin
+     token y orden de las rutas estáticas antes de `/users/:id` en el stack.
+  3. **Guards admin inline por ruta** (patrón de la retro de Fase 4 #6): se
+     reemplazó el `users.Use(RequireAdmin)` de grupo por el guard encadenado en
+     cada ruta admin, para que los paths inexistentes bajo `/users/*` devuelvan
+     404 y no 403.
 
 ### Fase 6 — Módulo `portfolio` *(el más grande: dividir agresivamente por archivos)*
 

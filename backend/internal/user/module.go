@@ -19,6 +19,10 @@ type Deps struct {
 	Log       logger.Logger
 	Auth      authService
 	AuthMiddl authMiddleware
+	// Limiter is the per-user rate limiter the legacy /users routes had via
+	// the app-wide gate; the module keeps it now that it registers in the
+	// public zone with its own RequireAuth.
+	Limiter fiber.Handler
 }
 
 type authMiddleware interface {
@@ -31,6 +35,7 @@ type Module struct {
 	service   *Service
 	handler   *handler
 	authMiddl authMiddleware
+	limiter   fiber.Handler
 }
 
 func New(deps Deps) *Module {
@@ -46,6 +51,7 @@ func newModule(deps Deps, service *Service) *Module {
 		service:   service,
 		handler:   new(handler{service}),
 		authMiddl: deps.AuthMiddl,
+		limiter:   deps.Limiter,
 	})
 }
 
@@ -56,11 +62,15 @@ func (m *Module) Service() *Service {
 }
 
 func (m *Module) Routes(router fiber.Router) {
+	// Public avatar (docs/API.md §2.3): registered as a terminal handler
+	// before the group's RequireAuth so it stays outside the auth gate.
+	router.Get("/users/:id/avatar", m.handler.GetUserAvatar)
+
 	users := router.Group("/users")
 
-	users.Use(m.authMiddl.RequireAuth())
+	users.Use(m.authMiddl.RequireAuth(), m.limiter)
 
-	users.Get("/users/:id/avatar", m.handler.GetUserAvatar)
+	// Self-service routes — must be registered before /:id to avoid shadowing.
 	users.Get("/me", m.handler.GetMe)
 	users.Patch("/me", m.handler.UpdateMe)
 	users.Post("/me/avatar", m.handler.UploadAvatar)
@@ -68,12 +78,13 @@ func (m *Module) Routes(router fiber.Router) {
 	users.Patch("/me/preferences", m.handler.UpdateMyPreferences)
 	users.Patch("/me/password", m.handler.ChangeMyPassword)
 
-	users.Use(m.authMiddl.RequireAdmin())
-
-	users.Get("", paginate.New(), m.handler.GetListUsers)
-	users.Post("", m.handler.CreateUser)
-	users.Get("/:id", m.handler.GetUserByID)
-	users.Patch("/:id", m.handler.UpdateUser)
-	users.Patch("/:id/ban", m.handler.BanUser)
-	users.Delete("/:id", m.handler.DeleteUser)
+	// Admin guards go inline per route (never group.Use) so unmatched
+	// /users/* requests fall through to a 404 instead of a 403.
+	admin := m.authMiddl.RequireAdmin()
+	users.Get("", admin, paginate.New(), m.handler.GetListUsers)
+	users.Post("", admin, m.handler.CreateUser)
+	users.Get("/:id", admin, m.handler.GetUserByID)
+	users.Patch("/:id", admin, m.handler.UpdateUser)
+	users.Patch("/:id/ban", admin, m.handler.BanUser)
+	users.Delete("/:id", admin, m.handler.DeleteUser)
 }

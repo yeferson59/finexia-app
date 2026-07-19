@@ -102,6 +102,7 @@ func (a *App) wire(ctx context.Context) {
 	)
 
 	geo := geoip.New()
+	middl := middlewares.New(a.deps.Envs, a.deps.Storage)
 
 	// Migrated domain modules.
 	marketingModule := marketing.New(marketing.NewPostgresRepository(a.deps.DB), a.deps.Mail)
@@ -124,12 +125,13 @@ func (a *App) wire(ctx context.Context) {
 		Log:       a.deps.Log,
 		Auth:      authModule.Service(),
 		AuthMiddl: authModule,
+		Limiter:   middl.UserLimiter(),
 	})
 
 	// Legacy wiring: shrinks phase by phase until Fase 8 deletes it.
 	repos := repositories.New(a.deps.DB)
 	svc := services.New(&repos, a.deps.Envs, a.deps.S3, a.deps.Storage, a.deps.Mail, geo, a.deps.Log, priceProvider, authModule.Service(), userModule.Service())
-	handl, middl := handlers.New(svc, a.deps.Envs), middlewares.New(a.deps.Envs, a.deps.Storage)
+	handl := handlers.New(svc, a.deps.Envs)
 
 	routes.New(a.fiber, middl, handl, authModule, marketingModule, userModule).Init()
 

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -161,5 +162,39 @@ func TestAppWiresAndRoutes(t *testing.T) {
 	}
 	if status := request("GET", "/users/invitations", "Authorization", "Bearer bogus-token"); status != fiber.StatusUnauthorized {
 		t.Errorf("GET /users/invitations = %d, want 401 with an invalid token", status)
+	}
+
+	// The avatar route (docs/API.md §2.3) is public: without a token the
+	// request must get past the JWT gate and reach the handler chain.
+	if status := request("GET", "/users/0b7f9c7e-1111-4222-8333-444455556666/avatar"); status == fiber.StatusBadRequest || status == fiber.StatusUnauthorized {
+		t.Errorf("GET /users/:id/avatar = %d; the route must stay public (no JWT gate)", status)
+	}
+
+	// Fiber matches routes in registration order: the static admin dashboard
+	// paths must register before the user module's "/users/:id" or they get
+	// captured by it (400 "invalid uuid" instead of the admin handler).
+	var userGets []string
+	for _, stack := range a.fiber.Stack() {
+		for _, route := range stack {
+			if route.Method == fiber.MethodGet && strings.HasPrefix(route.Path, "/users") {
+				userGets = append(userGets, route.Path)
+			}
+		}
+	}
+	index := func(path string) int {
+		for i, p := range userGets {
+			if p == path {
+				return i
+			}
+		}
+		return -1
+	}
+	if index("/users/:id/avatar") == -1 {
+		t.Errorf("GET /users/:id/avatar is not registered (GET /users* routes: %v)", userGets)
+	}
+	for _, static := range []string{"/users/invitations", "/users/waitlist"} {
+		if index(static) == -1 || (index("/users/:id") != -1 && index(static) > index("/users/:id")) {
+			t.Errorf("GET %s must register before GET /users/:id (GET /users* routes: %v)", static, userGets)
+		}
 	}
 }

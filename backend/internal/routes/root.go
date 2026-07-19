@@ -48,12 +48,14 @@ func (r *Routes) Init() {
 
 	r.Health()
 	r.auth.Routes(r.app)
+	// Admin invitation/waitlist dashboard: registered in the public zone with
+	// its own inline guards (see AdminRoutes), and before the user module so
+	// the static "/invitations" and "/waitlist" segments are never captured
+	// by its "/users/:id" route.
+	r.auth.AdminRoutes(r.app, r.middlewares.UserLimiter())
 	for _, m := range r.modules {
 		m.Routes(r.app)
 	}
-	// Admin invitation/waitlist dashboard: registered in the public zone with
-	// its own inline guards, before the app-wide gate (see AdminRoutes).
-	r.auth.AdminRoutes(r.app, r.middlewares.UserLimiter())
 
 	r.router = r.app.Use(r.auth.RequireAuth(), r.middlewares.UserLimiter())
 	r.Portfolios()
