@@ -162,25 +162,33 @@ pnpm test:e2e
 
 ## 3. Checklist de migración
 
-### Fase 0 — Red de seguridad y línea base *(sin mover código)*
+### Fase 0 — Red de seguridad y línea base *(sin mover código)* ✅
 
-- [ ] Verificar que CI ejecuta `check`, `lint`, `test:unit` y `test:e2e` del frontend
+- [x] Verificar que CI ejecuta `check`, `lint`, `test:unit` y `test:e2e` del frontend
       en cada PR; si no, configurarlo antes de tocar nada.
-- [ ] Auditar cobertura E2E actual (solo existe `e2e/landing.e2e.ts`) y añadir smoke
-      tests de los flujos críticos que la migración va a tocar:
-  - [ ] Login + logout (y redirección de rutas protegidas a `/auth`).
-  - [ ] Dashboard principal renderiza sus widgets.
-  - [ ] Detalle de portfolio + añadir entrada.
-  - [ ] Listado de transacciones + wizard de import (al menos el preview).
-  - [ ] Settings: cambio de un dato de perfil.
-  - [ ] Admin: listado de usuarios (con rol admin).
-- [ ] Capturar snapshot del HTML/SEO de la landing y páginas legales (los E2E ya
+      *(`.github/workflows/frontend-ci.yml`)*
+- [x] Auditar cobertura E2E actual (solo existe `e2e/landing.e2e.ts`) y añadir smoke
+      tests de los flujos críticos que la migración va a tocar
+      *(los flujos autenticados corren contra el stub `e2e/mocks/mock-api.mjs`,
+      escrito contra `docs/API.md`)*:
+  - [x] Login + logout (y redirección de rutas protegidas a `/auth`).
+        *(`e2e/auth.e2e.ts`)*
+  - [x] Dashboard principal renderiza sus widgets. *(`e2e/dashboard.e2e.ts`)*
+  - [x] Detalle de portfolio + añadir entrada. *(`e2e/portfolio.e2e.ts`)*
+  - [x] Listado de transacciones + wizard de import (al menos el preview).
+        *(`e2e/transactions.e2e.ts`)*
+  - [x] Settings: cambio de un dato de perfil. *(`e2e/settings.e2e.ts`)*
+  - [x] Admin: listado de usuarios (con rol admin). *(`e2e/admin.e2e.ts`)*
+- [x] Capturar snapshot del HTML/SEO de la landing y páginas legales (los E2E ya
       comparan title/meta; ampliar si hace falta) para detectar regresiones de SEO.
-- [ ] Anotar línea base: número de archivos > 500 líneas en `src/` y % de loaders
+      *(`e2e/seo.e2e.ts`: title, description, canonical, OG, robots y
+      `X-Robots-Tag` de áreas privadas)*
+- [x] Anotar línea base: número de archivos > 500 líneas en `src/` y % de loaders
       que llaman `authedFetch` directo (hoy: 24 archivos). La Fase 7 se valida
-      contra estos números.
-- [ ] Confirmar que existe `docs/API.md` (entregable de la Fase 0 del backend); si
+      contra estos números. *(→ [`FRONTEND_MIGRATION_BASELINE.md`](./FRONTEND_MIGRATION_BASELINE.md))*
+- [x] Confirmar que existe `docs/API.md` (entregable de la Fase 0 del backend); si
       aún no existe, documentar aquí al menos los endpoints que consume el frontend.
+      *(existe, generado 2026-07-13; cubre todo lo que consume el frontend)*
 
 ### Fase 1 — Fundaciones: `lib/ui`, `lib/api/client` y convenciones *(movimientos mecánicos)*
 
