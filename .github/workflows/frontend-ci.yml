@@ -1,0 +1,59 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      # The `prepare` script runs a blanket `playwright install`; skip it and
+      # install only Chromium (the browser used by unit browser tests and e2e).
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium for Playwright
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: ""
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Check (svelte-check + tsc)
+        run: pnpm check
+
+      - name: Lint (prettier + eslint)
+        run: pnpm lint
+
+      - name: Unit tests
+        run: pnpm test:unit -- --run
+
+      - name: E2E tests
+        run: pnpm test:e2e

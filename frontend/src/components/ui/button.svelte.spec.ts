@@ -28,7 +28,7 @@ describe('button.svelte', () => {
 	});
 
 	it('is disabled when either disabled or loading is set', async () => {
-		const { rerender } = render(Button, { disabled: true, children: text('X') });
+		const { rerender } = await render(Button, { disabled: true, children: text('X') });
 		await expect.element(page.getByRole('button')).toBeDisabled();
 
 		await rerender({ disabled: false, loading: true, children: text('X') });
