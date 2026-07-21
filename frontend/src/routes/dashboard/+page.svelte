@@ -4,7 +4,7 @@
 	import AssetAllocation from '$components/dashboard/asset-allocation.svelte';
 	import RecentActivity from '$components/dashboard/recent-activity.svelte';
 	import PortfolioGrowth from '$components/dashboard/portfolio-growth.svelte';
-	import PageHeader from '$components/ui/page-header.svelte';
+	import PageHeader from '$lib/ui/page-header.svelte';
 
 	import type { PageProps } from './$types';
 

@@ -3,7 +3,7 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { enhance } from '$app/forms';
-	import DatePicker from '$components/ui/date-picker.svelte';
+	import DatePicker from '$lib/ui/date-picker.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
 	import { formatCalendarDate, todayLocalDateString } from '$lib/utils';
 

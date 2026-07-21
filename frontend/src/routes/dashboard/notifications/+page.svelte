@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { untrack } from 'svelte';
-	import PageHeader from '$components/ui/page-header.svelte';
-	import Card from '$components/ui/card.svelte';
-	import Button from '$components/ui/button.svelte';
-	import Checkbox from '$components/ui/checkbox.svelte';
+	import PageHeader from '$lib/ui/page-header.svelte';
+	import Card from '$lib/ui/card.svelte';
+	import Button from '$lib/ui/button.svelte';
+	import Checkbox from '$lib/ui/checkbox.svelte';
 
 	import type { PageProps } from './$types';
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import CardHeader from '$components/ui/card-header.svelte';
+	import CardHeader from '$lib/ui/card-header.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
 	import { formatCalendarDate } from '$lib/utils';
 

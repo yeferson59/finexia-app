@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import Button from '$components/ui/button.svelte';
-	import Input from '$components/ui/input.svelte';
+	import Button from '$lib/ui/button.svelte';
+	import Input from '$lib/ui/input.svelte';
 	type FormResult = {
 		type: 'login' | 'register';
 		errors: Record<string, string> | Array<{ path: PropertyKey[]; message: string }>;

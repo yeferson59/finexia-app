@@ -190,20 +190,21 @@ pnpm test:e2e
       aún no existe, documentar aquí al menos los endpoints que consume el frontend.
       *(existe, generado 2026-07-13; cubre todo lo que consume el frontend)*
 
-### Fase 1 — Fundaciones: `lib/ui`, `lib/api/client` y convenciones *(movimientos mecánicos)*
+### Fase 1 — Fundaciones: `lib/ui`, `lib/api/client` y convenciones *(movimientos mecánicos)* ✅
 
-- [ ] Mover `src/components/ui/` → `src/lib/ui/` (componentes + specs), actualizando
+- [x] Mover `src/components/ui/` → `src/lib/ui/` (componentes + specs), actualizando
       imports a `$lib/ui/...`.
-- [ ] Mover `src/lib/server/api.ts` → `src/lib/api/client.ts` **sin cambios de
+- [x] Mover `src/lib/server/api.ts` → `src/lib/api/client.ts` **sin cambios de
       lógica** (re-export temporal desde la ruta vieja para no tocar 24 archivos en
       este PR; se elimina en Fase 2).
-- [ ] Crear `src/lib/shared/` y repartir `lib/utils.ts` por tema (`format/money.ts`,
-      `format/date.ts`, …) manteniendo re-exports temporales desde `utils.ts`.
-- [ ] Mover `src/config/*` → `src/lib/shared/config/` (y decidir el destino del
-      `env.ts` vacío: eliminarlo o poblarlo con la validación de env públicas).
-- [ ] Crear los esqueletos `src/lib/features/` y `src/lib/api/` con un `README.md`
+- [x] Crear `src/lib/shared/` y repartir `lib/utils.ts` por tema (`format/money.ts`,
+      `format/date.ts`, `css.ts`) manteniendo re-exports temporales desde `utils.ts`.
+- [x] Mover `src/config/*` → `src/lib/shared/config/` (el `env.ts` vacío se eliminó;
+      se volverá a introducir con validación de env públicas cuando haga falta).
+- [x] Crear los esqueletos `src/lib/features/` y `src/lib/api/` con un `README.md`
       corto que resuma las reglas de la sección 1.4 (qué puede importar qué).
-- [ ] Verificación estándar.
+- [x] Verificación estándar. *(`pnpm check` 0 errores, `pnpm lint`, 122 unit tests,
+      22 E2E — todo en verde)*
 
 ### Fase 2 — Capa de API tipada por dominio *(el cambio de mayor impacto)*
 

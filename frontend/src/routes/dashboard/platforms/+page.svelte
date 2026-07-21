@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import PageHeader from '$components/ui/page-header.svelte';
-	import Card from '$components/ui/card.svelte';
-	import Pagination from '$components/ui/pagination.svelte';
+	import PageHeader from '$lib/ui/page-header.svelte';
+	import Card from '$lib/ui/card.svelte';
+	import Pagination from '$lib/ui/pagination.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
 	import type { PageProps } from './$types';
 
