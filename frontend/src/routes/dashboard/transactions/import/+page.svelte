@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import PageHeader from '$components/ui/page-header.svelte';
-	import Card from '$components/ui/card.svelte';
+	import PageHeader from '$lib/ui/page-header.svelte';
+	import Card from '$lib/ui/card.svelte';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();

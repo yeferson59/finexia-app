@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import PageHeader from '$components/ui/page-header.svelte';
-	import Card from '$components/ui/card.svelte';
-	import Badge from '$components/ui/badge.svelte';
-	import Button from '$components/ui/button.svelte';
-	import Input from '$components/ui/input.svelte';
+	import PageHeader from '$lib/ui/page-header.svelte';
+	import Card from '$lib/ui/card.svelte';
+	import Badge from '$lib/ui/badge.svelte';
+	import Button from '$lib/ui/button.svelte';
+	import Input from '$lib/ui/input.svelte';
 
 	import type { PageProps } from './$types';
 

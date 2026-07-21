@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import PageHeader from '$components/ui/page-header.svelte';
+	import PageHeader from '$lib/ui/page-header.svelte';
 
 	interface FormData {
 		name: string;

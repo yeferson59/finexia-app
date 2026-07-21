@@ -3,7 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { env } from '$env/dynamic/private';
 import { redirect, fail } from '@sveltejs/kit';
 import { parseRefreshSetCookie, setAccessCookie, setRefreshCookie } from '$lib/server/session';
-import { features } from '$/config/features';
+import { features } from '$lib/shared/config/features';
 
 export const load: PageServerLoad = () => {
 	return { selfRegistrationEnabled: features.selfRegistration };

@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { features } from '$/config/features';
+	import { features } from '$lib/shared/config/features';
 
 	interface Props {
 		sidebarOpen?: boolean;

@@ -3,8 +3,8 @@
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import PageHeader from '$components/ui/page-header.svelte';
-	import DatePicker from '$components/ui/date-picker.svelte';
+	import PageHeader from '$lib/ui/page-header.svelte';
+	import DatePicker from '$lib/ui/date-picker.svelte';
 	import { todayLocalDateString } from '$lib/utils';
 
 	const { params, data, form }: PageProps = $props();

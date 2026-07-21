@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import CardHeader from '$components/ui/card-header.svelte';
-	import Stat from '$components/ui/stat.svelte';
+	import CardHeader from '$lib/ui/card-header.svelte';
+	import Stat from '$lib/ui/stat.svelte';
 	import CurrencyToggle from '$components/dashboard/currency-toggle.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
 	import { formatCurrency } from '$lib/utils';

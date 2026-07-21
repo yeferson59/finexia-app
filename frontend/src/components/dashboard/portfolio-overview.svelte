@@ -1,7 +1,7 @@
 <script lang="ts">
-	import Card from '$components/ui/card.svelte';
-	import CardHeader from '$components/ui/card-header.svelte';
-	import Stat from '$components/ui/stat.svelte';
+	import Card from '$lib/ui/card.svelte';
+	import CardHeader from '$lib/ui/card-header.svelte';
+	import Stat from '$lib/ui/stat.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
 	import { formatCurrency } from '$lib/utils';
 

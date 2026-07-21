@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import Button from '$components/ui/button.svelte';
-	import Input from '$components/ui/input.svelte';
+	import Button from '$lib/ui/button.svelte';
+	import Input from '$lib/ui/input.svelte';
 	import type { PageProps } from './$types';
 
 	const { form }: PageProps = $props();

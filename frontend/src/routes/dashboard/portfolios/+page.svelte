@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import PageHeader from '$components/ui/page-header.svelte';
-	import Badge from '$components/ui/badge.svelte';
-	import ProgressBar from '$components/ui/progress-bar.svelte';
-	import Pagination from '$components/ui/pagination.svelte';
+	import PageHeader from '$lib/ui/page-header.svelte';
+	import Badge from '$lib/ui/badge.svelte';
+	import ProgressBar from '$lib/ui/progress-bar.svelte';
+	import Pagination from '$lib/ui/pagination.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
 	import type { PageProps } from './$types';
 

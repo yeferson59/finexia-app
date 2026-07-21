@@ -3,9 +3,9 @@ import { isRedirect } from '@sveltejs/kit';
 import { actions, load } from './+page.server';
 import { ACCESS_COOKIE, REFRESH_COOKIE } from '$lib/server/session';
 import { createMockCookies, jsonResponse, type MockCookies } from '$lib/server/testing';
-import { features } from '$/config/features';
+import { features } from '$lib/shared/config/features';
 
-vi.mock('$/config/features', () => ({ features: { selfRegistration: false } }));
+vi.mock('$lib/shared/config/features', () => ({ features: { selfRegistration: false } }));
 
 type LoginEvent = Parameters<typeof actions.login>[0];
 type RegisterEvent = Parameters<typeof actions.register>[0];

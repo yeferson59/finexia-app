@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { untrack } from 'svelte';
-	import Card from '$components/ui/card.svelte';
+	import Card from '$lib/ui/card.svelte';
 	import PortfolioGrowth from '$components/dashboard/portfolio-growth.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
 	import { formatCalendarDate } from '$lib/utils';

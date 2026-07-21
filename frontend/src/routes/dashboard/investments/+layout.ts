@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { features } from '$/config/features';
+import { features } from '$lib/shared/config/features';
 import type { LayoutLoad } from './$types';
 
 /**

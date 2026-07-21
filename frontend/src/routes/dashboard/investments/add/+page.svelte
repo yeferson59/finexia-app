@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import PageHeader from '$components/ui/page-header.svelte';
+	import PageHeader from '$lib/ui/page-header.svelte';
 	import { investmentStore } from '$lib/stores/investments.svelte';
 
 	interface FormData {
