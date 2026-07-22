@@ -34,6 +34,6 @@ aquí.
 - Cada función devuelve datos tipados con los tipos de `types.ts`.
 - Validación Zod opcional de los responses críticos en dev.
 
-> Estado: Fase 2 — capa de API tipada por dominio. Los loaders/actions de
-> `routes/` consumen estos módulos; el re-export temporal `lib/server/api.ts` se
-> elimina al terminar la migración de las áreas.
+> Estado: Fase 2 completa — capa de API tipada por dominio. Todos los
+> loaders/actions de `routes/` consumen estos módulos; ninguno importa
+> `$lib/server/api` (eliminado) ni construye paths/`BASE_API` a mano.
