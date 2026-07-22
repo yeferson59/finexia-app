@@ -364,8 +364,22 @@ Decisiones validadas con la feature piloto, que las Fases 4–6 deben seguir:
         - *(Verificación: `pnpm check` 0 errores/0 warnings, `pnpm lint`, 146
           unit tests, 22 E2E incluido `portfolio.e2e.ts` — todo en verde.)*
   - [ ] Trocear `investments/*` (714 + 474) reutilizando los mismos componentes.
-- [ ] `lib/features/transactions/`: trocear `transactions/import/+page.svelte`
-      (1.007) en pasos del wizard (upload, preview, commit) + listado.
+- [x] `lib/features/transactions/`: trocear `transactions/import/+page.svelte`
+      (1.007) en pasos del wizard.
+  - `import-wizard` (contenedor: máquina de estados + lógica de fetch a
+    `import/preview` e `import/commit`) que compone tres pasos presentacionales:
+    `import-upload-step`, `import-mapping-step`, `import-result-step`. `types.ts`
+    centraliza los contratos (`ImportPreview`, `ImportResult`, `ImportMapping`…).
+  - La página `import/+page.svelte` queda como composición delgada
+    (`<ImportWizard {portfolios} {platforms} />`); los `+server.ts` de
+    `preview`/`commit` y la página de listado (164 líneas, ya bajo presupuesto)
+    no se tocan.
+  - CSS de formularios/botones scoped por paso (nombres genéricos como `.btn` /
+    `.form-group` colisionarían si fueran globales), como en el resto de páginas
+    del dashboard. Cubierto por el E2E existente `transactions.e2e.ts`
+    (upload → preview).
+  - *(Verificación: `pnpm check` 0 errores, `pnpm lint`, 141 unit tests, 22 E2E
+    en verde.)*
 - [ ] Cada PR: verificación estándar + E2E del flujo correspondiente.
 
 ### Fase 6 — Features restantes: `settings`, `admin`
