@@ -1,25 +1,13 @@
 import type { Actions, PageServerLoad } from './$types';
-import { authedFetch } from '$lib/server/api';
+import * as market from '$lib/api/market';
 import { fail } from '@sveltejs/kit';
-
-interface Asset {
-	id: string;
-	ticker: string;
-	name: string;
-	assetType: string;
-	currency: string;
-	currentPrice: { value: string; currency: string } | null;
-	priceUpdatedAt: string | null;
-}
+import type { Asset } from '$lib/api/types';
 
 export const load: PageServerLoad = async ({ cookies, fetch }) => {
-	const event = { cookies, fetch };
-
-	const res = await authedFetch(event, '/portfolios/assets?page=1&limit=100');
-	const { data, success } = await res.json();
+	const res = await market.getAssets({ cookies, fetch }, { page: 1, limit: 100 });
 
 	return {
-		assets: success && Array.isArray(data) ? (data as Asset[]) : []
+		assets: res.success && Array.isArray(res.data) ? (res.data as Asset[]) : []
 	};
 };
 
@@ -36,15 +24,13 @@ export const actions = {
 			return fail(400, { createError: 'Ticker, nombre, tipo y moneda son requeridos' });
 		}
 
-		const res = await authedFetch({ cookies, fetch }, '/assets', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ ticker, name, assetType, exchange, currency })
-		});
+		const res = await market.createAsset(
+			{ cookies, fetch },
+			{ ticker, name, assetType, exchange, currency }
+		);
 
 		if (!res.ok) {
-			const body = await res.json().catch(() => ({}));
-			return fail(res.status, { createError: body.details ?? 'No se pudo crear el activo' });
+			return fail(res.status, { createError: res.details ?? 'No se pudo crear el activo' });
 		}
 
 		return { createSuccess: true };
@@ -55,11 +41,10 @@ export const actions = {
 		const id = fd.get('id') as string;
 		if (!id) return fail(400, { syncAssetError: 'ID requerido', syncAssetId: '' });
 
-		const res = await authedFetch({ cookies, fetch }, `/assets/${id}/sync`, { method: 'POST' });
+		const res = await market.syncAsset({ cookies, fetch }, id);
 		if (!res.ok) {
-			const body = await res.json().catch(() => ({}));
 			return fail(res.status, {
-				syncAssetError: body.details ?? body.message ?? 'Sincronización fallida',
+				syncAssetError: res.details ?? res.message ?? 'Sincronización fallida',
 				syncAssetId: id
 			});
 		}
@@ -67,13 +52,11 @@ export const actions = {
 	},
 
 	syncPrices: async ({ cookies, fetch }) => {
-		const res = await authedFetch({ cookies, fetch }, '/assets/sync', { method: 'POST' });
+		const res = await market.syncAllAssets({ cookies, fetch });
 		if (!res.ok) {
-			const body = await res.json().catch(() => ({}));
-			return fail(res.status, { syncError: body.details ?? 'La sincronización falló' });
+			return fail(res.status, { syncError: res.details ?? 'La sincronización falló' });
 		}
-		const { data } = await res.json().catch(() => ({ data: null }));
-		return { syncSuccess: true, synced: Array.isArray(data) ? data.length : 0 };
+		return { syncSuccess: true, synced: Array.isArray(res.data) ? res.data.length : 0 };
 	},
 
 	importAssets: async ({ request, cookies, fetch }) => {
@@ -83,17 +66,13 @@ export const actions = {
 			return fail(400, { importError: 'Selecciona un archivo CSV o Excel' });
 		}
 
-		const res = await authedFetch({ cookies, fetch }, '/assets/import', {
-			method: 'POST',
-			body: fd
-		});
+		const res = await market.importAssets({ cookies, fetch }, fd);
 
-		const body = await res.json().catch(() => ({}));
 		if (!res.ok) {
-			return fail(res.status, { importError: body.details ?? 'No se pudo importar el archivo' });
+			return fail(res.status, { importError: res.details ?? 'No se pudo importar el archivo' });
 		}
 
-		return { importSuccess: true, importResult: body.data };
+		return { importSuccess: true, importResult: res.data };
 	},
 
 	updatePrice: async ({ request, cookies, fetch }) => {
@@ -109,16 +88,13 @@ export const actions = {
 			return fail(400, { updateError: 'Precio inválido', errorId: id });
 		}
 
-		const res = await authedFetch({ cookies, fetch }, `/portfolios/assets/${id}/price`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ price: { value: priceStr, currency } })
+		const res = await market.updateAssetPrice({ cookies, fetch }, id, {
+			price: { value: priceStr, currency }
 		});
 
 		if (!res.ok) {
-			const body = await res.json().catch(() => ({}));
 			return fail(res.status, {
-				updateError: body.details ?? 'No se pudo actualizar el precio',
+				updateError: res.details ?? 'No se pudo actualizar el precio',
 				errorId: id
 			});
 		}

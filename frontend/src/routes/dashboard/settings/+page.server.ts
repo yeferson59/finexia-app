@@ -1,46 +1,26 @@
 import type { Actions, PageServerLoad } from './$types';
 import { z } from 'zod';
 import { fail } from '@sveltejs/kit';
-import { authedFetch, authedFetchSafe } from '$lib/server/api';
+import * as user from '$lib/api/user';
+import type { ActiveSession, TwoFactorStatus } from '$lib/api/types';
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-export interface ActiveSession {
-	id: string;
-	ipAddress: string | null;
-	userAgent: string | null;
-	location: string | null;
-	createdAt: string;
-	lastActiveAt: string;
-	expiresAt: string;
-	current: boolean;
-}
-
-export interface TwoFactorStatus {
-	enabled: boolean;
-	pendingSetup: boolean;
-	recoveryCodesLeft: number;
-}
-
 export const load: PageServerLoad = async ({ locals, fetch, cookies }) => {
+	const event = { cookies, fetch };
+
 	let sessions: ActiveSession[] = [];
 	// 2FA is off by default; the null fallback just hides the section's state
 	// details if the backend can't be reached.
 	let twoFactor: TwoFactorStatus = { enabled: false, pendingSetup: false, recoveryCodesLeft: 0 };
 
 	const [sessionsRes, twoFactorRes] = await Promise.all([
-		authedFetchSafe({ cookies, fetch }, '/auth/sessions'),
-		authedFetchSafe({ cookies, fetch }, '/auth/2fa')
+		user.getSessions(event),
+		user.getTwoFactorStatus(event)
 	]);
 
-	if (sessionsRes?.ok) {
-		const body = await sessionsRes.json().catch(() => null);
-		sessions = body?.data ?? [];
-	}
-	if (twoFactorRes?.ok) {
-		const body = await twoFactorRes.json().catch(() => null);
-		if (body?.data) twoFactor = body.data;
-	}
+	if (sessionsRes.ok) sessions = sessionsRes.data ?? [];
+	if (twoFactorRes.ok && twoFactorRes.data) twoFactor = twoFactorRes.data;
 
 	return { user: locals.user, sessions, twoFactor };
 };
@@ -68,17 +48,12 @@ export const actions = {
 			return fail(400, { action: 'updateProfile', error: parsed.error.issues[0].message });
 		}
 
-		const res = await authedFetch({ cookies, fetch }, '/users/me', {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(parsed.data)
-		});
+		const res = await user.updateProfile({ cookies, fetch }, parsed.data);
 
 		if (!res.ok) {
-			const body = await res.json().catch(() => ({}));
 			return fail(res.status, {
 				action: 'updateProfile',
-				error: body.details ?? 'Error al actualizar el perfil'
+				error: res.details ?? 'Error al actualizar el perfil'
 			});
 		}
 
@@ -107,21 +82,16 @@ export const actions = {
 		const body = new FormData();
 		body.append('avatar', file);
 
-		const res = await authedFetch({ cookies, fetch }, '/users/me/avatar', {
-			method: 'POST',
-			body
-		});
+		const res = await user.uploadAvatar({ cookies, fetch }, body);
 
 		if (!res.ok) {
-			const err = await res.json().catch(() => ({}));
 			return fail(res.status, {
 				action: 'uploadAvatar',
-				error: err.details ?? 'Error al subir la imagen'
+				error: res.details ?? 'Error al subir la imagen'
 			});
 		}
 
-		const { data } = await res.json();
-		return { action: 'uploadAvatar', success: true, imageUrl: data?.image ?? '' };
+		return { action: 'uploadAvatar', success: true, imageUrl: res.data?.image ?? '' };
 	},
 
 	changePassword: async ({ request, fetch, cookies }) => {
@@ -153,14 +123,10 @@ export const actions = {
 			return fail(400, { action: 'changePassword', error: parsed.error.issues[0].message });
 		}
 
-		const res = await authedFetch({ cookies, fetch }, '/users/me/password', {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				currentPassword: parsed.data.currentPassword,
-				newPassword: parsed.data.newPassword
-			})
-		});
+		const res = await user.changePassword(
+			{ cookies, fetch },
+			{ currentPassword: parsed.data.currentPassword, newPassword: parsed.data.newPassword }
+		);
 
 		if (!res.ok) {
 			const errorMsg =
@@ -180,9 +146,7 @@ export const actions = {
 			return fail(400, { action: 'revokeSession', error: 'Sesión inválida' });
 		}
 
-		const res = await authedFetch({ cookies, fetch }, `/auth/sessions/${parsed.data}`, {
-			method: 'DELETE'
-		});
+		const res = await user.revokeSession({ cookies, fetch }, parsed.data);
 
 		if (!res.ok) {
 			return fail(res.status, {
@@ -206,27 +170,21 @@ export const actions = {
 			return fail(400, { action: 'setup2fa', error: parsed.error.issues[0].message });
 		}
 
-		const res = await authedFetch({ cookies, fetch }, '/auth/2fa/setup', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ password: parsed.data })
-		});
+		const res = await user.setupTwoFactor({ cookies, fetch }, { password: parsed.data });
 
 		if (!res.ok) {
-			const body = await res.json().catch(() => ({}));
 			const error =
-				body.action === 'auth:2fa:already-enabled'
+				res.action === 'auth:2fa:already-enabled'
 					? 'La verificación en dos pasos ya está activada.'
 					: 'Contraseña incorrecta';
 			return fail(res.status, { action: 'setup2fa', error });
 		}
 
-		const body = await res.json().catch(() => null);
 		return {
 			action: 'setup2fa',
 			success: true,
-			secret: (body?.data?.secret as string) ?? '',
-			otpauthUrl: (body?.data?.otpauthUrl as string) ?? ''
+			secret: res.data?.secret ?? '',
+			otpauthUrl: res.data?.otpauthUrl ?? ''
 		};
 	},
 
@@ -243,11 +201,7 @@ export const actions = {
 			return fail(400, { action: 'enable2fa', error: parsed.error.issues[0].message });
 		}
 
-		const res = await authedFetch({ cookies, fetch }, '/auth/2fa/enable', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ code: parsed.data })
-		});
+		const res = await user.enableTwoFactor({ cookies, fetch }, { code: parsed.data });
 
 		if (!res.ok) {
 			return fail(res.status, {
@@ -256,11 +210,10 @@ export const actions = {
 			});
 		}
 
-		const body = await res.json().catch(() => null);
 		return {
 			action: 'enable2fa',
 			success: true,
-			recoveryCodes: (body?.data?.recoveryCodes as string[]) ?? []
+			recoveryCodes: res.data?.recoveryCodes ?? []
 		};
 	},
 
@@ -280,11 +233,7 @@ export const actions = {
 			return fail(400, { action: 'disable2fa', error: parsed.error.issues[0].message });
 		}
 
-		const res = await authedFetch({ cookies, fetch }, '/auth/2fa/disable', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(parsed.data)
-		});
+		const res = await user.disableTwoFactor({ cookies, fetch }, parsed.data);
 
 		if (!res.ok) {
 			return fail(res.status, {
@@ -312,11 +261,7 @@ export const actions = {
 			return fail(400, { action: 'regenerate2faCodes', error: parsed.error.issues[0].message });
 		}
 
-		const res = await authedFetch({ cookies, fetch }, '/auth/2fa/recovery-codes', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(parsed.data)
-		});
+		const res = await user.regenerateRecoveryCodes({ cookies, fetch }, parsed.data);
 
 		if (!res.ok) {
 			return fail(res.status, {
@@ -325,18 +270,15 @@ export const actions = {
 			});
 		}
 
-		const body = await res.json().catch(() => null);
 		return {
 			action: 'regenerate2faCodes',
 			success: true,
-			recoveryCodes: (body?.data?.recoveryCodes as string[]) ?? []
+			recoveryCodes: res.data?.recoveryCodes ?? []
 		};
 	},
 
 	revokeOtherSessions: async ({ fetch, cookies }) => {
-		const res = await authedFetch({ cookies, fetch }, '/auth/sessions/revoke-others', {
-			method: 'POST'
-		});
+		const res = await user.revokeOtherSessions({ cookies, fetch });
 
 		if (!res.ok) {
 			return fail(res.status, {
@@ -345,11 +287,10 @@ export const actions = {
 			});
 		}
 
-		const body = await res.json().catch(() => null);
 		return {
 			action: 'revokeOtherSessions',
 			success: true,
-			revoked: body?.data?.revoked ?? 0
+			revoked: res.data?.revoked ?? 0
 		};
 	}
 } satisfies Actions;

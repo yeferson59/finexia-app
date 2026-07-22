@@ -1,24 +1,13 @@
 import type { Actions, PageServerLoad } from './$types';
-import { authedFetch } from '$lib/server/api';
+import * as market from '$lib/api/market';
 import { fail } from '@sveltejs/kit';
-
-interface ExchangeRate {
-	id: string;
-	fromCurrency: string;
-	toCurrency: string;
-	rate: string;
-	rateDate: string;
-	createdAt: string;
-}
+import type { ExchangeRate } from '$lib/api/types';
 
 export const load: PageServerLoad = async ({ cookies, fetch }) => {
-	const event = { cookies, fetch };
-
-	const res = await authedFetch(event, '/exchange-rates?page=1&limit=100');
-	const { data, success } = await res.json();
+	const res = await market.getExchangeRates({ cookies, fetch }, { page: 1, limit: 100 });
 
 	return {
-		rates: success && Array.isArray(data) ? (data as ExchangeRate[]) : []
+		rates: res.success && Array.isArray(res.data) ? (res.data as ExchangeRate[]) : []
 	};
 };
 
@@ -33,16 +22,11 @@ export const actions = {
 			return fail(400, { createError: 'Moneda origen, destino y tasa son requeridos' });
 		}
 
-		const res = await authedFetch({ cookies, fetch }, '/exchange-rates', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ fromCurrency, toCurrency, rate })
-		});
+		const res = await market.createRate({ cookies, fetch }, { fromCurrency, toCurrency, rate });
 
 		if (!res.ok) {
-			const body = await res.json().catch(() => ({}));
 			return fail(res.status, {
-				createError: body.details ?? 'No se pudo crear la tasa de cambio'
+				createError: res.details ?? 'No se pudo crear la tasa de cambio'
 			});
 		}
 
@@ -56,17 +40,13 @@ export const actions = {
 			return fail(400, { importError: 'Selecciona un archivo CSV o Excel' });
 		}
 
-		const res = await authedFetch({ cookies, fetch }, '/exchange-rates/import', {
-			method: 'POST',
-			body: fd
-		});
+		const res = await market.importRates({ cookies, fetch }, fd);
 
-		const body = await res.json().catch(() => ({}));
 		if (!res.ok) {
-			return fail(res.status, { importError: body.details ?? 'No se pudo importar el archivo' });
+			return fail(res.status, { importError: res.details ?? 'No se pudo importar el archivo' });
 		}
 
-		return { importSuccess: true, importResult: body.data };
+		return { importSuccess: true, importResult: res.data };
 	},
 
 	syncRate: async ({ request, cookies, fetch }) => {
@@ -74,13 +54,10 @@ export const actions = {
 		const id = fd.get('id') as string;
 		if (!id) return fail(400, { syncRateError: 'ID requerido', syncRateId: '' });
 
-		const res = await authedFetch({ cookies, fetch }, `/exchange-rates/${id}/sync`, {
-			method: 'POST'
-		});
+		const res = await market.syncRate({ cookies, fetch }, id);
 		if (!res.ok) {
-			const body = await res.json().catch(() => ({}));
 			return fail(res.status, {
-				syncRateError: body.details ?? body.message ?? 'Sincronización fallida',
+				syncRateError: res.details ?? res.message ?? 'Sincronización fallida',
 				syncRateId: id
 			});
 		}
@@ -88,13 +65,11 @@ export const actions = {
 	},
 
 	syncRates: async ({ cookies, fetch }) => {
-		const res = await authedFetch({ cookies, fetch }, '/exchange-rates/sync', { method: 'POST' });
+		const res = await market.syncAllRates({ cookies, fetch });
 		if (!res.ok) {
-			const body = await res.json().catch(() => ({}));
-			return fail(res.status, { syncError: body.details ?? 'La sincronización falló' });
+			return fail(res.status, { syncError: res.details ?? 'La sincronización falló' });
 		}
-		const { data } = await res.json().catch(() => ({ data: null }));
-		return { syncSuccess: true, synced: Array.isArray(data) ? data.length : 0 };
+		return { syncSuccess: true, synced: Array.isArray(res.data) ? res.data.length : 0 };
 	},
 
 	updateRate: async ({ request, cookies, fetch }) => {
@@ -109,16 +84,11 @@ export const actions = {
 			return fail(400, { updateError: 'Tasa inválida', errorId: id });
 		}
 
-		const res = await authedFetch({ cookies, fetch }, `/exchange-rates/${id}`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ rate })
-		});
+		const res = await market.updateRate({ cookies, fetch }, id, { rate });
 
 		if (!res.ok) {
-			const body = await res.json().catch(() => ({}));
 			return fail(res.status, {
-				updateError: body.details ?? 'No se pudo actualizar la tasa',
+				updateError: res.details ?? 'No se pudo actualizar la tasa',
 				errorId: id
 			});
 		}
