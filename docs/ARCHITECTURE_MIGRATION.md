@@ -442,10 +442,12 @@ golangci-lint run
       `postgres_entry.go`, `postgres_transaction.go`, `postgres_snapshot.go`, etc.,
       todos implementando `portfolio.Repository`.
 - [x] Dependencias hacia otros módulos vía interfaces locales:
-      `portfolio.UserReader` (implementada por `user`). → **Desviación**: los assets y
-      los exchange rates **no** se movieron a `market`; siguen dentro de `portfolio`
-      (`Asset`, `GetExchangeRateByPair`) y es `market` quien depende de `portfolio`, no
-      al revés. Por eso no existen `portfolio.AssetReader`/`RateReader` (TECH_DEBT #12).
+      `portfolio.UserReader` (implementada por `user`) y `portfolio.AssetReader`
+      (implementada por `market`). → Inicialmente los assets se quedaron en `portfolio`
+      (forzando `market → portfolio`); **corregido en la revisión de cierre
+      (2026-07-22, TECH_DEBT #12)**: el catálogo de assets se movió a `market`, la
+      dependencia quedó `portfolio → market` y `GetExchangeRateByPair` (lectura para
+      conversión de divisa) es lo único de rates que conserva `portfolio`.
 - [x] Mover el job de snapshots a `portfolio/snapshot_job.go`.
 - [x] Migrar la montaña de tests (portfolio_service_test, portfolio_test,
       transaction_import_test, etc.) con fakes locales. → **La extracción original
@@ -459,12 +461,14 @@ golangci-lint run
 
 ### Fase 7 — Módulos `market` y `notification` + scheduler genérico
 
-- [x] Crear `internal/market/`: sincronización de precios y exchange rates
-      (`services/asset_sync.go`, `services/exchange_rate*.go`, `handlers/asset.go`,
-      `handlers/exchange_rate.go`). Depende de `platform/marketdata.Provider`. →
-      **Desviación**: los tipos `Asset`/`ExchangeRate` y su persistencia se quedaron
-      en `portfolio`; `market` los consume importando el paquete `portfolio`
-      (dependencia módulo→módulo por tipos públicos). Tests locales presentes (43%).
+- [x] Crear `internal/market/`: catálogo de assets, exchange rates y sincronización
+      de precios (`services/asset_sync.go`, `services/exchange_rate*.go`,
+      `handlers/asset.go`, `handlers/exchange_rate.go`). Depende de
+      `platform/marketdata.Provider`. → Inicialmente el tipo `Asset` y su persistencia
+      se quedaron en `portfolio` (forzando `market → portfolio`); **corregido en la
+      revisión de cierre**: assets son propiedad de `market`, que ya no importa
+      `portfolio`. El parser de importación compartido se extrajo a
+      `platform/spreadsheet`.
 - [x] Crear `internal/notification/`: resumen semanal y alertas
       (`services/weekly_summary*`). Consume `user` y `portfolio` vía interfaces locales
       (`user`/`port`/`m`). → Los tests se **restauraron en la revisión de cierre

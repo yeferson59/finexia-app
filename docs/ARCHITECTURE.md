@@ -27,6 +27,7 @@ backend/
     ├── platform/                # shared kernel técnico (sin lógica de negocio)
     │   ├── config/  logger/  database/  cache/  objectstore/
     │   ├── mail/  geoip/  httpx/         # httpx: middlewares genéricos + envelope de respuesta
+    │   ├── spreadsheet/                  # lectura genérica de CSV/XLSX (compartida por los importers)
     │   └── marketdata/                   # provider de precios + alphavantage/finnhub/yahoo + fallback
     ├── identity/                # tipos compartidos (User, Account, Session, Role) — sin lógica
     │
@@ -34,8 +35,8 @@ backend/
     │                            # password reset, invitaciones, middlewares JWT/RBAC
     ├── user/                    # perfil, preferencias, avatar (S3), administración
     ├── portfolio/               # portfolios, entries, transacciones, plataformas,
-    │                            # snapshots, import/export, assets y exchange-rates (lectura)
-    ├── market/                  # sincronización de precios y exchange rates
+    │                            # snapshots, import/export (lee exchange-rates para conversión)
+    ├── market/                  # catálogo de assets, exchange rates y sincronización de precios
     ├── marketing/               # waitlist
     ├── notification/            # resumen semanal por email
     │
@@ -88,7 +89,7 @@ graph TD
         user --> auth
         user --> marketing
         portfolio --> user
-        market --> portfolio
+        portfolio --> market
         notification --> portfolio
     end
     identity[identity<br/>tipos compartidos]
@@ -114,10 +115,12 @@ graph TD
 ```
 
 El grafo es acíclico (el compilador de Go ya lo garantiza) y respeta las reglas
-anteriores. Una **desviación** consciente respecto al plan original: los tipos
-`Asset`/`ExchangeRate` y su persistencia (lectura) viven en `portfolio` en vez
-de en `market`, por lo que `market` depende de `portfolio` (no al revés). Ver
-`TECH_DEBT.md` #12.
+anteriores. El catálogo de assets (tipo `Asset`, persistencia, servicio, import)
+y los exchange-rates son propiedad de `market`; `portfolio` referencia
+`market.Asset` en sus entries y lee el catálogo a través de su interfaz local
+`AssetReader` (implementada por `market`), de modo que la dependencia va
+`portfolio → market`. `portfolio` conserva solo una lectura de exchange-rates
+para convertir a la divisa de visualización.
 
 ## 4. Blindaje automatizado
 
@@ -151,15 +154,16 @@ logger, env) y llama a `app.New(deps).Run(ctx)`. `internal/app`:
 ## 6. Cobertura de tests
 
 Medición tras la revisión de cierre (`go test ./... -coverprofile`),
-**total 41.2%** (línea base de Fase 0: 42.6%, sobre un layout distinto en el que
+**total 39.4%** (línea base de Fase 0: 42.6%, sobre un layout distinto en el que
 `repositories/`, `routes/` y `scheduler/` eran paquetes separados al 0%):
 
 | Módulo | Cobertura | Notas |
 |---|---|---|
 | `notification` | 81.8% | servicio puro, bien cubierto |
+| `platform/spreadsheet` | 72.4% | parser de importación compartido |
 | `auth` | 45.5% | núcleo de sesiones/2FA/verificación |
-| `market` | 43.0% | servicios de sync |
-| `portfolio` | 41.5% | servicio + handlers HTTP; `postgres.go` sin tests unitarios |
+| `market` | 40.1% | catálogo de assets + exchange rates + sync |
+| `portfolio` | 38.9% | servicio + handlers HTTP; `postgres.go` sin tests unitarios |
 | `marketing` | 40.0% | |
 | `user` | 11.2% | capa HTTP mayormente sin tests (deuda) |
 | `platform/marketdata*`, `config`, `database`, `geoip` | 80–100% | |
