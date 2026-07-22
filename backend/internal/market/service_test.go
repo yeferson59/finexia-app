@@ -11,7 +11,6 @@ import (
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
-	"github.com/yeferson59/finexia-app/internal/portfolio"
 )
 
 func TestWasAssetPriceSyncedRecently(t *testing.T) {
@@ -32,18 +31,18 @@ func TestWasAssetPriceSyncedRecently(t *testing.T) {
 func TestSyncAssetByID(t *testing.T) {
 	assetID := uuid.New()
 
-	stockAsset := portfolio.Asset{ID: assetID, Ticker: "AAPL", AssetType: portfolio.Stock, Currency: "USD"}
-	cryptoAsset := portfolio.Asset{ID: assetID, Ticker: "BTC-USD", AssetType: portfolio.Crypto, Currency: "USD"}
+	stockAsset := Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: "USD"}
+	cryptoAsset := Asset{ID: assetID, Ticker: "BTC-USD", AssetType: Crypto, Currency: "USD"}
 
-	storeFor := func(asset portfolio.Asset) *fakePortfolioService {
-		return &fakePortfolioService{
-			getAssetByID: func(_ context.Context, id uuid.UUID) (portfolio.Asset, error) {
+	storeFor := func(asset Asset) *fakeRepository {
+		return &fakeRepository{
+			getAssetByID: func(_ context.Context, id uuid.UUID) (Asset, error) {
 				if id != assetID {
 					t.Errorf("assetID = %s, want %s", id, assetID)
 				}
 				return asset, nil
 			},
-			updateAssetPrice: func(_ context.Context, id uuid.UUID, price money.Money) (portfolio.Asset, error) {
+			updateAssetPrice: func(_ context.Context, id uuid.UUID, price money.Money) (Asset, error) {
 				updated := asset
 				updated.CurrentPrice = &price
 				return updated, nil
@@ -60,7 +59,7 @@ func TestSyncAssetByID(t *testing.T) {
 				return marketdata.QuoteResult{Price: "190.55"}, nil
 			},
 		}
-		svc := newTestServicesFull(&fakeRepository{}, newMemStorage(), nil, provider, storeFor(stockAsset))
+		svc := newTestServicesFull(storeFor(stockAsset), newMemStorage(), provider)
 
 		got, err := svc.SyncAssetByID(context.Background(), assetID)
 		if err != nil {
@@ -80,7 +79,7 @@ func TestSyncAssetByID(t *testing.T) {
 				return marketdata.ExchangeRateResult{Rate: "64000.10"}, nil
 			},
 		}
-		svc := newTestServicesFull(&fakeRepository{}, newMemStorage(), nil, provider, storeFor(cryptoAsset))
+		svc := newTestServicesFull(storeFor(cryptoAsset), newMemStorage(), provider)
 
 		got, err := svc.SyncAssetByID(context.Background(), assetID)
 		if err != nil {
@@ -92,8 +91,8 @@ func TestSyncAssetByID(t *testing.T) {
 	})
 
 	t.Run("malformed crypto ticker is rejected", func(t *testing.T) {
-		bad := portfolio.Asset{ID: assetID, Ticker: "BTCUSD", AssetType: portfolio.Crypto, Currency: "USD"}
-		svc := newTestServicesFull(&fakeRepository{}, newMemStorage(), nil, &fakePriceProvider{}, storeFor(bad))
+		bad := Asset{ID: assetID, Ticker: "BTCUSD", AssetType: Crypto, Currency: "USD"}
+		svc := newTestServicesFull(storeFor(bad), newMemStorage(), &fakePriceProvider{})
 
 		if _, err := svc.SyncAssetByID(context.Background(), assetID); err == nil || !strings.Contains(err.Error(), "cannot parse crypto ticker") {
 			t.Errorf("err = %v, want crypto ticker parse error", err)
@@ -101,8 +100,8 @@ func TestSyncAssetByID(t *testing.T) {
 	})
 
 	t.Run("unsupported asset type is reported", func(t *testing.T) {
-		cash := portfolio.Asset{ID: assetID, Ticker: "CASH", AssetType: portfolio.Cash, Currency: "USD"}
-		svc := newTestServicesFull(&fakeRepository{}, newMemStorage(), nil, &fakePriceProvider{}, storeFor(cash))
+		cash := Asset{ID: assetID, Ticker: "CASH", AssetType: Cash, Currency: "USD"}
+		svc := newTestServicesFull(storeFor(cash), newMemStorage(), &fakePriceProvider{})
 
 		if _, err := svc.SyncAssetByID(context.Background(), assetID); err == nil || !strings.Contains(err.Error(), "not supported") {
 			t.Errorf("err = %v, want not-supported error", err)
@@ -115,7 +114,7 @@ func TestSyncAssetByID(t *testing.T) {
 				return marketdata.QuoteResult{}, errors.New("rate limited")
 			},
 		}
-		svc := newTestServicesFull(&fakeRepository{}, newMemStorage(), nil, provider, storeFor(stockAsset))
+		svc := newTestServicesFull(storeFor(stockAsset), newMemStorage(), provider)
 
 		if _, err := svc.SyncAssetByID(context.Background(), assetID); err == nil || !strings.Contains(err.Error(), "rate limited") {
 			t.Errorf("err = %v, want wrapped provider error", err)
@@ -123,13 +122,13 @@ func TestSyncAssetByID(t *testing.T) {
 	})
 
 	t.Run("unknown currency is rejected", func(t *testing.T) {
-		weird := portfolio.Asset{ID: assetID, Ticker: "AAPL", AssetType: portfolio.Stock, Currency: "ZZZ"}
+		weird := Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: "ZZZ"}
 		provider := &fakePriceProvider{
 			fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
 				return marketdata.QuoteResult{Price: "10.00"}, nil
 			},
 		}
-		svc := newTestServicesFull(&fakeRepository{}, newMemStorage(), nil, provider, storeFor(weird))
+		svc := newTestServicesFull(storeFor(weird), newMemStorage(), provider)
 
 		if _, err := svc.SyncAssetByID(context.Background(), assetID); err == nil || !strings.Contains(err.Error(), "unknown currency") {
 			t.Errorf("err = %v, want unknown currency error", err)
@@ -142,7 +141,7 @@ func TestSyncAssetByID(t *testing.T) {
 				return marketdata.QuoteResult{Price: "n/a"}, nil
 			},
 		}
-		svc := newTestServicesFull(&fakeRepository{}, newMemStorage(), nil, provider, storeFor(stockAsset))
+		svc := newTestServicesFull(storeFor(stockAsset), newMemStorage(), provider)
 
 		if _, err := svc.SyncAssetByID(context.Background(), assetID); err == nil || !strings.Contains(err.Error(), "parse price") {
 			t.Errorf("err = %v, want parse price error", err)
@@ -151,15 +150,15 @@ func TestSyncAssetByID(t *testing.T) {
 
 	t.Run("persistence failure is wrapped", func(t *testing.T) {
 		store := storeFor(stockAsset)
-		store.updateAssetPrice = func(context.Context, uuid.UUID, money.Money) (portfolio.Asset, error) {
-			return portfolio.Asset{}, errors.New("db write failed")
+		store.updateAssetPrice = func(context.Context, uuid.UUID, money.Money) (Asset, error) {
+			return Asset{}, errors.New("db write failed")
 		}
 		provider := &fakePriceProvider{
 			fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
 				return marketdata.QuoteResult{Price: "10.00"}, nil
 			},
 		}
-		svc := newTestServicesFull(&fakeRepository{}, newMemStorage(), nil, provider, store)
+		svc := newTestServicesFull(store, newMemStorage(), provider)
 
 		if _, err := svc.SyncAssetByID(context.Background(), assetID); err == nil || !strings.Contains(err.Error(), "persist price") {
 			t.Errorf("err = %v, want persist error", err)
@@ -167,12 +166,12 @@ func TestSyncAssetByID(t *testing.T) {
 	})
 
 	t.Run("asset lookup failure stops early", func(t *testing.T) {
-		store := &fakePortfolioService{
-			getAssetByID: func(context.Context, uuid.UUID) (portfolio.Asset, error) {
-				return portfolio.Asset{}, errors.New("asset not found")
+		store := &fakeRepository{
+			getAssetByID: func(context.Context, uuid.UUID) (Asset, error) {
+				return Asset{}, errors.New("asset not found")
 			},
 		}
-		svc := newTestServicesFull(&fakeRepository{}, newMemStorage(), nil, &fakePriceProvider{}, store)
+		svc := newTestServicesFull(store, newMemStorage(), &fakePriceProvider{})
 
 		if _, err := svc.SyncAssetByID(context.Background(), assetID); err == nil {
 			t.Fatal("expected error")
@@ -183,20 +182,20 @@ func TestSyncAssetByID(t *testing.T) {
 func TestSyncAssetPrices(t *testing.T) {
 	t.Run("seeds default assets and prices the catalog", func(t *testing.T) {
 		var seeded []string
-		stock := portfolio.Asset{ID: uuid.New(), Ticker: "AAPL", AssetType: portfolio.Stock, Currency: "USD"}
-		cash := portfolio.Asset{ID: uuid.New(), Ticker: "CASH", AssetType: portfolio.Cash, Currency: "USD"}
+		stock := Asset{ID: uuid.New(), Ticker: "AAPL", AssetType: Stock, Currency: "USD"}
+		cash := Asset{ID: uuid.New(), Ticker: "CASH", AssetType: Cash, Currency: "USD"}
 
-		store := &fakePortfolioService{
-			createAsset: func(_ context.Context, ticker, name string, assetType portfolio.AssetType, exchange, currency string) (portfolio.Asset, error) {
+		store := &fakeRepository{
+			upsertAsset: func(_ context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error) {
 				seeded = append(seeded, ticker)
-				return portfolio.Asset{Ticker: ticker}, nil
+				return Asset{Ticker: ticker}, nil
 			},
-			getAssets: func(_ context.Context, offset, limit uint) ([]portfolio.Asset, error) {
+			getAssets: func(_ context.Context, offset, limit uint) ([]Asset, error) {
 				// Cash first: it is skipped without an API call, so no
 				// rate-limit sleep happens before the single priced asset.
-				return []portfolio.Asset{cash, stock}, nil
+				return []Asset{cash, stock}, nil
 			},
-			updateAssetPrice: func(_ context.Context, id uuid.UUID, price money.Money) (portfolio.Asset, error) {
+			updateAssetPrice: func(_ context.Context, id uuid.UUID, price money.Money) (Asset, error) {
 				updated := stock
 				updated.CurrentPrice = &price
 				return updated, nil
@@ -208,7 +207,7 @@ func TestSyncAssetPrices(t *testing.T) {
 			},
 		}
 		storage := newMemStorage()
-		svc := newTestServicesFull(&fakeRepository{}, storage, nil, provider, store)
+		svc := newTestServicesFull(store, storage, provider)
 
 		results, errs := svc.SyncAssetPrices(context.Background())
 		if len(errs) != 0 {
@@ -226,13 +225,13 @@ func TestSyncAssetPrices(t *testing.T) {
 	})
 
 	t.Run("catalog fetch failure aborts", func(t *testing.T) {
-		store := &fakePortfolioService{
-			getAssets: func(context.Context, uint, uint) ([]portfolio.Asset, error) {
+		store := &fakeRepository{
+			getAssets: func(context.Context, uint, uint) ([]Asset, error) {
 				return nil, errors.New("db down")
 			},
 		}
 		storage := newMemStorage()
-		svc := newTestServicesFull(&fakeRepository{}, storage, nil, &fakePriceProvider{}, store)
+		svc := newTestServicesFull(store, storage, &fakePriceProvider{})
 
 		results, errs := svc.SyncAssetPrices(context.Background())
 		if results != nil {
@@ -247,15 +246,15 @@ func TestSyncAssetPrices(t *testing.T) {
 	})
 
 	t.Run("seed failures are collected but do not stop pricing", func(t *testing.T) {
-		store := &fakePortfolioService{
-			createAsset: func(context.Context, string, string, portfolio.AssetType, string, string) (portfolio.Asset, error) {
-				return portfolio.Asset{}, errors.New("seed failed")
+		store := &fakeRepository{
+			upsertAsset: func(context.Context, string, string, AssetType, string, string) (Asset, error) {
+				return Asset{}, errors.New("seed failed")
 			},
-			getAssets: func(context.Context, uint, uint) ([]portfolio.Asset, error) {
-				return []portfolio.Asset{}, nil
+			getAssets: func(context.Context, uint, uint) ([]Asset, error) {
+				return []Asset{}, nil
 			},
 		}
-		svc := newTestServicesFull(&fakeRepository{}, newMemStorage(), nil, &fakePriceProvider{}, store)
+		svc := newTestServicesFull(store, newMemStorage(), &fakePriceProvider{})
 
 		results, errs := svc.SyncAssetPrices(context.Background())
 		if len(errs) != len(defaultAssets) {
@@ -270,13 +269,13 @@ func TestSyncAssetPrices(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		a1 := portfolio.Asset{ID: uuid.New(), Ticker: "AAPL", AssetType: portfolio.Stock, Currency: "USD"}
-		a2 := portfolio.Asset{ID: uuid.New(), Ticker: "MSFT", AssetType: portfolio.Stock, Currency: "USD"}
+		a1 := Asset{ID: uuid.New(), Ticker: "AAPL", AssetType: Stock, Currency: "USD"}
+		a2 := Asset{ID: uuid.New(), Ticker: "MSFT", AssetType: Stock, Currency: "USD"}
 
 		var quoteCalls int
-		store := &fakePortfolioService{
-			getAssets: func(context.Context, uint, uint) ([]portfolio.Asset, error) {
-				return []portfolio.Asset{a1, a2}, nil
+		store := &fakeRepository{
+			getAssets: func(context.Context, uint, uint) ([]Asset, error) {
+				return []Asset{a1, a2}, nil
 			},
 		}
 		provider := &fakePriceProvider{
@@ -287,7 +286,7 @@ func TestSyncAssetPrices(t *testing.T) {
 			},
 		}
 		storage := newMemStorage()
-		svc := newTestServicesFull(&fakeRepository{}, storage, nil, provider, store)
+		svc := newTestServicesFull(store, storage, provider)
 
 		start := time.Now()
 		results, errs := svc.SyncAssetPrices(ctx)

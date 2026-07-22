@@ -1,10 +1,15 @@
 package portfolio
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/yeferson59/gofinance/v2/money"
 
+	"github.com/yeferson59/finexia-app/internal/market"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
@@ -16,6 +21,9 @@ type Deps struct {
 	Mail    Mailer
 	User    UserReader
 	Log     logger.Logger
+	// Assets serves the /portfolios/assets endpoints (catalog + manual price),
+	// whose domain lives in the market module. Satisfied by *market.Service.
+	Assets AssetReader
 	// AuthMiddl provides the route guards; the module registers in the public
 	// zone and applies them itself (Fase 5 retro: port the gate's middlewares
 	// explicitly when leaving the global protected zone).
@@ -28,6 +36,15 @@ type Deps struct {
 type authMiddleware interface {
 	RequireAuth() fiber.Handler
 	RequireAdmin() fiber.Handler
+}
+
+// AssetReader is the slice of the market module the portfolio HTTP handlers
+// need to serve the /portfolios/assets catalog and the manual price update.
+// Satisfied by *market.Service.
+type AssetReader interface {
+	GetAssets(ctx context.Context, offset, limit uint) ([]market.Asset, error)
+	SearchAssets(ctx context.Context, search string, offset, limit uint) ([]market.Asset, error)
+	UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, price money.Money) (market.Asset, error)
 }
 
 type Module struct {
@@ -47,7 +64,7 @@ func New(deps Deps) *Module {
 func newModule(deps Deps, service *Service) *Module {
 	return new(Module{
 		service:   service,
-		handler:   new(handler{service}),
+		handler:   new(handler{service: service, assets: deps.Assets}),
 		authMiddl: deps.AuthMiddl,
 		limiter:   deps.Limiter,
 	})

@@ -1,10 +1,12 @@
-package portfolio
+package market
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/yeferson59/finexia-app/internal/platform/spreadsheet"
 )
 
 // maxAssetImportRows bounds how many data rows a single asset upload may
@@ -19,83 +21,26 @@ var assetHeaderSynonyms = map[string][]string{
 	"currency":  {"currency", "moneda", "divisa", "ccy"},
 }
 
-// mapSimpleHeaders matches spreadsheet headers against a fixed set of field
-// synonyms (case/accent/punctuation-insensitive via normKey) and returns the
-// 0-based column index for each recognised field. Used by importers that —
-// unlike the freeform transactions importer — work off a small, fixed schema
-// instead of a user-driven mapping.
-func mapSimpleHeaders(headers []string, synonyms map[string][]string) map[string]int {
-	idx := make(map[string]int, len(synonyms))
-	for i, h := range headers {
-		key := normKey(h)
-		if key == "" {
-			continue
-		}
-		for field, syns := range synonyms {
-			if _, assigned := idx[field]; assigned {
-				continue
-			}
-			for _, syn := range syns {
-				if key == syn {
-					idx[field] = i
-					break
-				}
-			}
-		}
-	}
-	return idx
-}
-
-// firstNonEmptyRow returns the index of the first row with at least one
-// non-blank cell, or -1 if every row is empty.
-func firstNonEmptyRow(rows [][]string) int {
-	for i, row := range rows {
-		if !rowIsEmpty(row) {
-			return i
-		}
-	}
-	return -1
-}
-
-// cellAtIdx reads a cell by plain column index, returning "" when out of range.
-func cellAtIdx(row []string, idx int) string {
-	if idx < 0 || idx >= len(row) {
-		return ""
-	}
-	return strings.TrimSpace(row[idx])
-}
-
-// missingCols reports which of the required fields were not found in cols.
-func missingCols(cols map[string]int, required ...string) []string {
-	var missing []string
-	for _, field := range required {
-		if _, ok := cols[field]; !ok {
-			missing = append(missing, field)
-		}
-	}
-	return missing
-}
-
 // ImportAssetsFromFile parses an uploaded CSV/XLSX with columns
 // ticker, name, assetType, currency (required) and exchange (optional),
 // upserting one asset per valid row. Invalid rows are skipped and reported.
 func (s *Service) ImportAssetsFromFile(ctx context.Context, data []byte, filename, sheet string) (ImportResultResponseDTO, error) {
-	src, err := parseImportFile(data, filename, sheet)
+	src, err := spreadsheet.ReadFile(data, filename, sheet)
 	if err != nil {
 		return ImportResultResponseDTO{}, err
 	}
 
-	headerIdx := firstNonEmptyRow(src.rows)
+	headerIdx := firstNonEmptyRow(src.Rows)
 	if headerIdx == -1 {
 		return ImportResultResponseDTO{}, errors.New("invalid spreadsheet: the file is empty")
 	}
 
-	cols := mapSimpleHeaders(src.rows[headerIdx], assetHeaderSynonyms)
+	cols := mapSimpleHeaders(src.Rows[headerIdx], assetHeaderSynonyms)
 	if missing := missingCols(cols, "ticker", "name", "assettype", "currency"); len(missing) > 0 {
 		return ImportResultResponseDTO{}, fmt.Errorf("invalid spreadsheet: missing required columns: %s", strings.Join(missing, ", "))
 	}
 
-	dataRows := src.rows[headerIdx+1:]
+	dataRows := src.Rows[headerIdx+1:]
 	if len(dataRows) > maxAssetImportRows {
 		return ImportResultResponseDTO{}, fmt.Errorf("invalid spreadsheet: too many rows (max %d)", maxAssetImportRows)
 	}
@@ -104,19 +49,19 @@ func (s *Service) ImportAssetsFromFile(ctx context.Context, data []byte, filenam
 	result := ImportResultResponseDTO{Errors: []ImportResultErrorDTO{}}
 
 	for i, row := range dataRows {
-		if rowIsEmpty(row) {
+		if spreadsheet.RowIsEmpty(row) {
 			continue
 		}
 		rowNumber := headerIdx + 2 + i
 		result.TotalRows++
 
-		ticker := strings.ToUpper(cellAtIdx(row, cols["ticker"]))
-		name := cellAtIdx(row, cols["name"])
-		assetTypeRaw := cellAtIdx(row, cols["assettype"])
-		currency := strings.ToUpper(cellAtIdx(row, cols["currency"]))
+		ticker := strings.ToUpper(spreadsheet.CellAtIdx(row, cols["ticker"]))
+		name := spreadsheet.CellAtIdx(row, cols["name"])
+		assetTypeRaw := spreadsheet.CellAtIdx(row, cols["assettype"])
+		currency := strings.ToUpper(spreadsheet.CellAtIdx(row, cols["currency"]))
 		exchange := ""
 		if hasExchange {
-			exchange = cellAtIdx(row, exchangeIdx)
+			exchange = spreadsheet.CellAtIdx(row, exchangeIdx)
 		}
 
 		var rowErrs []string
@@ -134,7 +79,7 @@ func (s *Service) ImportAssetsFromFile(ctx context.Context, data []byte, filenam
 			name = name[:maxAssetNameLen]
 		}
 
-		assetType, ok := normalizeCategory(assetTypeRaw)
+		assetType, ok := NormalizeAssetType(assetTypeRaw)
 		if !ok {
 			if assetTypeRaw == "" {
 				rowErrs = append(rowErrs, "el tipo de activo está vacío")

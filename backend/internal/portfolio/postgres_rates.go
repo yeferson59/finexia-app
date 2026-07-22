@@ -12,8 +12,8 @@ import (
 // GetExchangeRateByPair looks up the stored rate for one direction of a
 // currency pair. Rates are synced one-directional (e.g. only EUR->USD is
 // stored, never USD->EUR); callers needing the reverse direction should
-// invert the returned rate themselves. Read-only: writing exchange rates
-// stays in the legacy market area until Fase 7.
+// invert the returned rate themselves. Read-only: writing/syncing exchange
+// rates is owned by the market module.
 func (r *PostgresRepository) GetExchangeRateByPair(ctx context.Context, from, to string) (money.Decimal, error) {
 	var rateStr string
 	err := r.db.QueryRow(ctx, `

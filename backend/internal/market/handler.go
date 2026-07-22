@@ -11,12 +11,10 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
-	"github.com/yeferson59/finexia-app/internal/portfolio"
 )
 
 type handler struct {
-	service          *Service
-	portfolioService portfolioService
+	service *Service
 }
 
 func (h *handler) SyncAssetPrices(c fiber.Ctx) error {
@@ -49,7 +47,7 @@ func (h *handler) ImportAssets(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid file", err.Error())
 	}
 
-	result, err := h.portfolioService.ImportAssetsFromFile(c, data, filename, c.FormValue("sheet"))
+	result, err := h.service.ImportAssetsFromFile(c, data, filename, c.FormValue("sheet"))
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error importing assets", "Could not import the uploaded assets")
 	}
@@ -66,12 +64,12 @@ func (h *handler) CreateAsset(c fiber.Ctx) error {
 	req.Ticker = strings.ToUpper(strings.TrimSpace(req.Ticker))
 	req.Currency = strings.ToUpper(strings.TrimSpace(req.Currency))
 
-	assetType := portfolio.AssetType(req.AssetType)
+	assetType := AssetType(req.AssetType)
 	if !assetType.IsValid() {
 		return httpx.BadRequest(c, "Invalid asset type", "Asset type must be one of: stock, etf, crypto, bond, cash, real_estate, commodity, other")
 	}
 
-	asset, err := h.portfolioService.CreateAsset(c, req.Ticker, req.Name, assetType, req.Exchange, req.Currency)
+	asset, err := h.service.CreateAsset(c, req.Ticker, req.Name, assetType, req.Exchange, req.Currency)
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error creating asset", "Could not create asset")
 	}

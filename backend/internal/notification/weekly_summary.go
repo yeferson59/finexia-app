@@ -42,9 +42,9 @@ func NewService(user user, portfolio port, m m, cfg *config.Env) *Service {
 	})
 }
 
-// SendWeeklySummaryEmails belongs to the notification domain and stays in the
-// legacy services until Fase 7; it consumes the portfolio module through the
-// PortfolioService interface.
+// SendWeeklySummaryEmails aggregates each subscriber's portfolios into a
+// weekly digest email. It reads users and portfolio summaries through the
+// module's local consumer interfaces (user/port) rather than owning that data.
 func (s *Service) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
 	users, err := s.user.GetUsersWithWeeklySummary(ctx)
 	if err != nil {

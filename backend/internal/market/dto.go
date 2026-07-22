@@ -1,6 +1,5 @@
-// Package portfolio keeps the request DTOs still consumed by the legacy
-// asset and exchange-rate handlers. The rest of the portfolio DTOs migrated
-// to internal/portfolio (Fase 6); these move to the market module in Fase 7.
+// Package market owns the asset catalog and exchange-rate domains: the request
+// DTOs, entities, persistence, services and HTTP handlers for both.
 package market
 
 import (

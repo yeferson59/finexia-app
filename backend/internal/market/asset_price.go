@@ -5,12 +5,11 @@ import (
 	"slices"
 
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
-	"github.com/yeferson59/finexia-app/internal/portfolio"
 )
 
 type assetPriceService interface {
 	WasAssetPriceSyncedRecently() bool
-	SyncAssetPrices(ctx context.Context) ([]portfolio.Asset, []error)
+	SyncAssetPrices(ctx context.Context) ([]Asset, []error)
 }
 
 type AssetPriceScheduler struct {

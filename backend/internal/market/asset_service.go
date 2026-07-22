@@ -1,4 +1,4 @@
-package portfolio
+package market
 
 import (
 	"context"
@@ -7,9 +7,8 @@ import (
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
-// Asset use cases. They live here temporarily: the /portfolios/assets routes
-// and the import flow need them, and the market module (Fase 7) will take
-// them over together with the Asset type.
+// Asset catalog use cases. The market module owns the asset lifecycle; the
+// portfolio module consumes these through the interfaces it declares.
 
 func (s *Service) GetAssets(ctx context.Context, offset, limit uint) ([]Asset, error) {
 	return s.repo.GetAssets(ctx, offset, limit)

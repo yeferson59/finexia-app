@@ -14,7 +14,7 @@ linters:
     - unused # Checks for unused variables/constants/functions/types
     - gocritic # Heuristic checks for code quality
     - revive # Style, documentation, and best-practices linter
-    # - depguard # Prevents usage of blacklisted imports (ARCHITECTURE VALIDATION) - Disabled temporallytemporarily due to configuration issues
+    # - depguard # Prevents usage of blacklisted imports (ARCHITECTURE VALIDATION) - Disabled temporarily; boundaries are enforced by internal/app/arch_test.go
     - prealloc # Suggests slice preallocation
     - ineffassign # Detects ineffectual assignments
     - misspell # Detects commonly misspelled English words

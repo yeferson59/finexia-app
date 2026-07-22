@@ -38,7 +38,7 @@ func TestSyncExchangeRates(t *testing.T) {
 			},
 		}
 		storage := newMemStorage()
-		svc := newTestServicesFull(&fakeRepository{}, storage, nil, provider, nil)
+		svc := newTestServicesFull(&fakeRepository{}, storage, provider)
 
 		results, errs := svc.SyncExchangeRates(context.Background())
 		if len(results) != 0 {
@@ -67,7 +67,7 @@ func TestSyncExchangeRates(t *testing.T) {
 				return ExchangeRate{}, nil
 			},
 		}
-		svc := newTestServicesFull(repo, newMemStorage(), nil, provider, nil)
+		svc := newTestServicesFull(repo, newMemStorage(), provider)
 
 		results, errs := svc.SyncExchangeRates(context.Background())
 		if len(results) != 0 || len(errs) != len(defaultPairs) {
@@ -86,7 +86,7 @@ func TestSyncExchangeRates(t *testing.T) {
 				return ExchangeRate{}, errors.New("db write failed")
 			},
 		}
-		svc := newTestServicesFull(repo, newMemStorage(), nil, provider, nil)
+		svc := newTestServicesFull(repo, newMemStorage(), provider)
 
 		results, errs := svc.SyncExchangeRates(context.Background())
 		if len(results) != 0 || len(errs) != len(defaultPairs) {
@@ -121,7 +121,7 @@ func TestSyncExchangeRates(t *testing.T) {
 			},
 		}
 		storage := newMemStorage()
-		svc := newTestServicesFull(repo, storage, nil, provider, nil)
+		svc := newTestServicesFull(repo, storage, provider)
 
 		start := time.Now()
 		results, errs := svc.SyncExchangeRates(ctx)

@@ -1,6 +1,8 @@
 // Package portfolio is the investments domain module: portfolios, entries,
-// transactions, investment platforms, snapshots and bulk import/export.
-// Assets live here temporarily until the market module exists (Fase 7).
+// transactions, investment platforms, snapshots and bulk import/export. The
+// asset catalog (the Asset type and its lifecycle) is owned by the market
+// module; this module references market.Asset and reads asset data through the
+// interfaces it declares.
 package portfolio
 
 import (
@@ -10,45 +12,28 @@ import (
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
+	"github.com/yeferson59/finexia-app/internal/market"
 )
 
-type AssetType string
-
-const (
-	Stock      AssetType = "stock"
-	ETF        AssetType = "etf"
-	Crypto     AssetType = "crypto"
-	Bond       AssetType = "bond"
-	Cash       AssetType = "cash"
-	RealEstate AssetType = "real_estate"
-	Commodity  AssetType = "commodity"
-	Other      AssetType = "other"
-)
-
-func (a AssetType) IsValid() bool {
+// entryCategoryFor maps an asset type (owned by the market module) to the
+// portfolio-side entry category. It lives here because EntryCategory is a
+// portfolio concept; keeping the mapping out of market.AssetType avoids a
+// market → portfolio dependency.
+func entryCategoryFor(a market.AssetType) EntryCategory {
 	switch a {
-	case Stock, ETF, Crypto, Bond, Cash, RealEstate, Commodity, Other:
-		return true
-	default:
-		return false
-	}
-}
-
-func (a AssetType) Transform() EntryCategory {
-	switch a {
-	case Stock:
+	case market.Stock:
 		return Stocks
-	case ETF:
+	case market.ETF:
 		return ETFs
-	case Crypto:
+	case market.Crypto:
 		return Cryptos
-	case Bond:
+	case market.Bond:
 		return Bonds
-	case Cash:
+	case market.Cash:
 		return Cashs
-	case RealEstate:
+	case market.RealEstate:
 		return RealEstates
-	case Commodity:
+	case market.Commodity:
 		return Commodities
 	default:
 		return Others
@@ -236,20 +221,6 @@ type Portfolio struct {
 	Snapshots    []Snapshot    `json:"portfolioSnapshots,omitempty"`
 }
 
-type Asset struct {
-	ID             uuid.UUID    `json:"id"`
-	Ticker         string       `json:"ticker"`
-	Name           string       `json:"name"`
-	AssetType      AssetType    `json:"assetType"`
-	Exchange       string       `json:"exchange"`
-	Currency       string       `json:"currency"`
-	CurrentPrice   *money.Money `json:"currentPrice"`
-	PriceUpdatedAt *time.Time   `json:"priceUpdatedAt"`
-	CreatedAt      time.Time    `json:"createdAt"`
-	UpdatedAt      time.Time    `json:"updatedAt"`
-	Entries        []Entry      `json:"portfolioEntries,omitempty"`
-}
-
 type Entry struct {
 	ID           uuid.UUID        `json:"id"`
 	PortfolioID  uuid.UUID        `json:"portfolioId"`
@@ -264,7 +235,7 @@ type Entry struct {
 	CreatedAt    time.Time        `json:"createdAt"`
 	UpdatedAt    time.Time        `json:"updatedAt"`
 	Portfolio    Portfolio        `json:"portfolio,omitzero"`
-	Asset        Asset            `json:"asset,omitzero"`
+	Asset        market.Asset     `json:"asset,omitzero"`
 	Source       InvestmentSource `json:"source,omitzero"`
 	Transactions []Transaction    `json:"transactions,omitempty"`
 }
@@ -290,7 +261,7 @@ type ImportTransactionRow struct {
 	RowNumber int
 	Ticker    string
 	AssetName string
-	AssetType AssetType
+	AssetType market.AssetType
 	Category  EntryCategory
 	Type      TransactionType
 	Quantity  money.Decimal

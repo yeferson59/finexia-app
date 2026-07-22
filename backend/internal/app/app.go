@@ -135,25 +135,27 @@ func (a *App) wire(ctx context.Context) {
 		AuthMiddl: authModule,
 		Limiter:   userLimiter,
 	})
+	// market owns the asset catalog; portfolio consumes it (portfolio → market),
+	// so market is built first and injected as portfolio's AssetReader.
+	marketModule := market.New(market.Deps{
+		DB:             a.deps.DB,
+		Cfg:            a.deps.Envs,
+		Storage:        a.deps.Storage,
+		Log:            a.deps.Log,
+		Provider:       priceProvider,
+		AuthMiddleware: authModule,
+		Limiter:        userLimiter,
+	})
 	portfolioModule := portfolio.New(portfolio.Deps{
 		DB:        a.deps.DB,
 		Cfg:       a.deps.Envs,
 		Storage:   a.deps.Storage,
 		Mail:      a.deps.Mail,
 		User:      userModule.Service(),
+		Assets:    marketModule.Service(),
 		Log:       a.deps.Log,
 		AuthMiddl: authModule,
 		Limiter:   userLimiter,
-	})
-	marketModule := market.New(market.Deps{
-		DB:               a.deps.DB,
-		Cfg:              a.deps.Envs,
-		Storage:          a.deps.Storage,
-		Log:              a.deps.Log,
-		PortfolioService: portfolioModule.Service(),
-		Provider:         priceProvider,
-		AuthMiddleware:   authModule,
-		Limiter:          userLimiter,
 	})
 	notificationService := notification.NewService(userModule.Service(), portfolioModule.Service(), a.deps.Mail, a.deps.Envs)
 
