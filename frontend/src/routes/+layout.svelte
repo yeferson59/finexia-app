@@ -1,6 +1,6 @@
 <script lang="ts">
 	import './layout.css';
-	import CookieNotice from '$/components/cookie-notice.svelte';
+	import { CookieNotice } from '$lib/features/legal';
 
 	let { children } = $props();
 </script>

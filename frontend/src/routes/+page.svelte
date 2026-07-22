@@ -9,16 +9,18 @@
 		LOCALE,
 		absoluteUrl
 	} from '$lib/seo';
-	import '$/components/landing-page/landing.css';
-	import Ticker from '$/components/landing-page/ticker.svelte';
-	import Header from '$/components/landing-page/header.svelte';
-	import Hero from '$/components/landing-page/hero.svelte';
-	import Benefits from '$/components/landing-page/benefits.svelte';
-	import HowItWorks from '$/components/landing-page/how-it-works.svelte';
-	import Metrics from '$/components/landing-page/metrics.svelte';
-	import Faq from '$/components/landing-page/faq.svelte';
-	import FinalCta from '$/components/landing-page/final-cta.svelte';
-	import Footer from '$/components/landing-page/footer.svelte';
+	import '$lib/features/landing/landing.css';
+	import {
+		Ticker,
+		Header,
+		Hero,
+		Benefits,
+		HowItWorks,
+		Metrics,
+		Faq,
+		FinalCta,
+		Footer
+	} from '$lib/features/landing';
 
 	const canonical = absoluteUrl('/');
 
