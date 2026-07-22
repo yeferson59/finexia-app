@@ -1,7 +1,7 @@
 /*
  * Shared utility classes for the marketing landing page. Imported once from
- * the route so the classes are global and every landing-page/*.svelte section
- * component can use them without redeclaring them in its scoped <style>.
+ * the route so the classes are global and every landing/components/*.svelte
+ * section component can use them without redeclaring them in its scoped <style>.
  */
 
 .wrap {

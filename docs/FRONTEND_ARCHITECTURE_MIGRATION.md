@@ -234,17 +234,48 @@ pnpm test:e2e
 - [x] Verificación estándar + E2E completo. *(`pnpm check` 0 errores, `pnpm lint`,
       134 unit tests, 22 E2E — todo en verde)*
 
-### Fase 3 — Feature piloto: `landing` *(la más aislada; valida el patrón)*
+### Fase 3 — Feature piloto: `landing` *(la más aislada; valida el patrón)* ✅
 
-- [ ] Crear `lib/features/landing/` y mover `components/landing-page/*` (incluido
+- [x] Crear `lib/features/landing/` y mover `components/landing-page/*` (incluido
       `landing.css`) con `index.ts` como superficie pública.
-- [ ] Actualizar `routes/+page.svelte` para importar desde
+- [x] Actualizar `routes/+page.svelte` para importar desde
       `$lib/features/landing`.
-- [ ] Mover `components/cookie-notice.svelte` a `lib/features/legal/` (lo usan
+- [x] Mover `components/cookie-notice.svelte` a `lib/features/legal/` (lo usan
       landing y páginas legales).
-- [ ] Verificar contra el snapshot SEO de Fase 0 que el HTML no cambió.
-- [ ] **Retrospectiva del piloto**: ajustar en este documento cualquier decisión
+- [x] Verificar contra el snapshot SEO de Fase 0 que el HTML no cambió.
+      *(`e2e/seo.e2e.ts` + `e2e/landing.e2e.ts` en verde; mismas clases, mismo
+      JSON-LD, mismo `<head>`)*
+- [x] **Retrospectiva del piloto**: ajustar en este documento cualquier decisión
       (naming, index.ts, ubicación de css) antes de replicar el patrón.
+      *(→ sección 3.1)*
+
+#### 3.1 Retrospectiva del piloto `landing` (patrón a replicar)
+
+Decisiones validadas con la feature piloto, que las Fases 4–6 deben seguir:
+
+- **Estructura**: los componentes viven en `features/<feature>/components/*.svelte`;
+  el `index.ts` en la raíz de la feature es la única superficie pública. Los
+  componentes se mueven con `git mv` para conservar el historial.
+- **`index.ts` = barrel de re-exports nombrados**:
+  `export { default as Header } from './components/header.svelte';`. `routes/`
+  importa desestructurando (`import { Header, Hero } from '$lib/features/landing'`),
+  nunca la ruta interna del `.svelte`.
+- **CSS global como excepción explícita a la regla "solo `index.ts`"**: un barrel
+  de JS no puede reexportar un side-effect de CSS. La hoja `landing.css` se queda
+  en la raíz de la feature (`features/landing/landing.css`) y `routes/` la importa
+  por su ruta (`import '$lib/features/landing/landing.css'`). Es el único import de
+  una feature que no pasa por `index.ts`; se documenta aquí para no tratarlo como
+  violación de frontera en la Fase 7.
+- **Reutilización entre áreas vía `index.ts`**: `Brand` y `Footer` los consume
+  también `routes/(legal)/+layout.svelte`. Que una ruta importe el `index.ts` de
+  otra feature es correcto (la regla que se blinda en Fase 7 es *feature ↛
+  feature*, no *route ↛ feature*). No se duplicaron componentes ni se creó un
+  paquete compartido prematuro.
+- **`cookie-notice` → `features/legal/`**: aunque hoy es un solo componente, se le
+  dio su propia feature porque es el hogar natural de las páginas legales
+  compartidas; su `index.ts` exporta `CookieNotice`.
+- **Cero cambios de markup/estilos**: solo se movieron archivos y se reescribieron
+  imports; los E2E de landing y SEO pasan sin tocar snapshots.
 
 ### Fase 4 — Feature `auth` *(la más sensible)*
 

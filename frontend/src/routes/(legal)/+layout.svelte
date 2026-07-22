@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import '$/components/landing-page/landing.css';
-	import Brand from '$/components/landing-page/brand.svelte';
-	import Footer from '$/components/landing-page/footer.svelte';
+	import '$lib/features/landing/landing.css';
+	import { Brand, Footer } from '$lib/features/landing';
 
 	let { children } = $props();
 </script>

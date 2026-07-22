@@ -29,6 +29,7 @@ features/<feature>/
 - Presupuesto de tamaño: una `+page.svelte` no supera ~300 líneas; ningún
   archivo de producción supera ~500. Si crece, extrae componentes aquí.
 
-> Estado: Fase 1 — esqueleto. Las features se pueblan a partir de la Fase 3
-> (`landing` es la piloto), según el checklist de
-> `docs/FRONTEND_ARCHITECTURE_MIGRATION.md`.
+> Estado: Fase 3 completada — `landing` (piloto) y `legal` ya migradas. El resto
+> de features se pueblan en las Fases 4–6 siguiendo el patrón validado en la
+> retrospectiva del piloto (sección 3.1 de
+> `docs/FRONTEND_ARCHITECTURE_MIGRATION.md`).
