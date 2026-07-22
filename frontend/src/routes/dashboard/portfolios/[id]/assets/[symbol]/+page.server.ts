@@ -1,36 +1,8 @@
 import { z } from 'zod';
-import { authedFetch, authedFetchSafe } from '$lib/server/api';
+import * as portfolio from '$lib/api/portfolio';
+import * as transactions from '$lib/api/transactions';
 import type { PageServerLoad, Actions } from './$types';
-
-interface Entry {
-	id: string;
-	assetId: string;
-	ticker: string;
-	name: string;
-	assetType: string;
-	exchange: string;
-	currency: string;
-	quantity: string;
-	price: string;
-	marketPrice: string;
-	costCurrency: string;
-	category: string;
-	entryDate: string;
-	notes: string;
-}
-
-export interface Transaction {
-	id: string;
-	entryId: string;
-	type: string;
-	quantity: string;
-	price: string;
-	currency: string;
-	fees: string;
-	transactionDate: string;
-	notes: string;
-	createdAt: string;
-}
+import type { Holding, Transaction } from '$lib/api/types';
 
 export interface TxnMeta {
 	total: number;
@@ -51,34 +23,20 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 	})();
 
 	const [response, txnRes] = await Promise.all([
-		authedFetch(event, `/portfolios/${params.id}`),
-		authedFetchSafe(
-			event,
-			`/portfolios/${params.id}/assets/${params.symbol}/transactions?page=${page}&limit=${limit}`
-		)
+		portfolio.getPortfolio(event, params.id),
+		transactions.getAssetTransactions(event, params.id, params.symbol, page, limit)
 	]);
 
-	if (!response.ok) {
+	if (!response.ok || !response.success || !response.data) {
 		return {
-			entries: [] as Entry[],
+			entries: [] as Holding[],
 			transactions: [] as Transaction[],
 			portfolioTotalValue: 0,
 			txnMeta: DEFAULT_META
 		};
 	}
 
-	const { data, success } = await response.json();
-
-	if (!success || !data) {
-		return {
-			entries: [] as Entry[],
-			transactions: [] as Transaction[],
-			portfolioTotalValue: 0,
-			txnMeta: DEFAULT_META
-		};
-	}
-
-	const allHoldings: Entry[] = data.holdings ?? [];
+	const allHoldings: Holding[] = response.data.holdings ?? [];
 	const entries = allHoldings.filter((h) => h.ticker === params.symbol);
 
 	const portfolioTotalValue = allHoldings.reduce((sum, h) => {
@@ -87,10 +45,9 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 		return sum + qty * mp;
 	}, 0);
 
-	const txnJson = txnRes ? await txnRes.json() : null;
-	const paged = txnJson?.success ? txnJson.data : null;
+	const paged = txnRes.success ? txnRes.data : null;
 
-	const transactions: Transaction[] = paged?.data ?? [];
+	const transactionsList: Transaction[] = paged?.data ?? [];
 	const txnMeta: TxnMeta = paged
 		? {
 				total: paged.total ?? 0,
@@ -100,7 +57,7 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 			}
 		: DEFAULT_META;
 
-	return { entries, transactions, portfolioTotalValue, txnMeta };
+	return { entries, transactions: transactionsList, portfolioTotalValue, txnMeta };
 };
 
 const txnSchema = z.object({
@@ -132,30 +89,21 @@ export const actions: Actions = {
 			return { success: false, error: error.message };
 		}
 
-		const response = await authedFetch(
-			{ cookies, fetch },
-			`/portfolios/entries/${data.entryId}/transactions`,
-			{
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					type: data.type,
-					quantity: data.quantity,
-					price: data.price,
-					currency: data.currency,
-					fees: data.fees,
-					transactionDate: data.transactionDate,
-					notes: data.notes ?? ''
-				})
-			}
-		);
+		const response = await transactions.createTransaction({ cookies, fetch }, data.entryId, {
+			type: data.type,
+			quantity: data.quantity,
+			price: data.price,
+			currency: data.currency,
+			fees: data.fees,
+			transactionDate: data.transactionDate,
+			notes: data.notes ?? ''
+		});
 
 		if (!response.ok) {
 			return { success: false };
 		}
 
-		const json = await response.json();
-		return { success: json.success ?? false };
+		return { success: response.success };
 	},
 
 	editTransaction: async ({ request, fetch, cookies }) => {
@@ -176,30 +124,20 @@ export const actions: Actions = {
 			return { success: false, edited: true, error: error.message };
 		}
 
-		const response = await authedFetch(
-			{ cookies, fetch },
-			`/portfolios/transactions/${data.txnId}`,
-			{
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					type: data.type,
-					quantity: data.quantity,
-					price: data.price,
-					currency: data.currency,
-					fees: data.fees,
-					transactionDate: data.transactionDate,
-					notes: data.notes ?? ''
-				})
-			}
-		);
+		const response = await transactions.updateTransaction({ cookies, fetch }, data.txnId, {
+			type: data.type,
+			quantity: data.quantity,
+			price: data.price,
+			currency: data.currency,
+			fees: data.fees,
+			transactionDate: data.transactionDate,
+			notes: data.notes ?? ''
+		});
 
 		if (!response.ok) {
-			const errorJson = await response.json().catch(() => null);
-			return { success: false, edited: true, error: errorJson?.message ?? errorJson?.action };
+			return { success: false, edited: true, error: response.message ?? response.action };
 		}
 
-		const json = await response.json();
-		return { success: json.success ?? false, edited: true };
+		return { success: response.success, edited: true };
 	}
 };

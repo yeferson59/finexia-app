@@ -1,18 +1,12 @@
 import type { LayoutServerLoad } from './$types';
-import { authedFetch } from '$lib/server/api';
+import * as portfolio from '$lib/api/portfolio';
 
 export const load: LayoutServerLoad = async ({ cookies, fetch }) => {
-	const response = await authedFetch({ cookies, fetch }, '/portfolios/risks');
+	const res = await portfolio.getRisks({ cookies, fetch });
 
-	if (!response.ok) {
+	if (!res.ok || !res.success) {
 		return { risks: [], success: false };
 	}
 
-	const { data, success } = await response.json();
-
-	if (!success) {
-		return { risks: [], success: false };
-	}
-
-	return { risks: data, success: true };
+	return { risks: res.data ?? [], success: true };
 };

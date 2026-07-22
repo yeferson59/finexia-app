@@ -59,7 +59,7 @@ export interface PortfolioSummary {
 	displayCurrency?: string;
 	isDefault?: boolean;
 	riskId?: string;
-	riskName?: string;
+	riskName: string;
 	totalPositions: number;
 	totalCostBase: string;
 	totalMarketValue: string;
