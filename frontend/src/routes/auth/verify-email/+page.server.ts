@@ -1,7 +1,7 @@
-import z from 'zod';
 import type { Actions, PageServerLoad } from './$types';
 import * as auth from '$lib/api/auth';
 import { fail, redirect } from '@sveltejs/kit';
+import { verifyEmailConfirmSchema, resendVerificationSchema } from '$lib/features/auth';
 
 export const load: PageServerLoad = async ({ url, fetch }) => {
 	const token = url.searchParams.get('token');
@@ -30,9 +30,7 @@ export const actions = {
 	confirm: async ({ request, fetch }) => {
 		const formData = await request.formData();
 
-		const parsed = await z
-			.object({ token: z.string().min(1) })
-			.safeParseAsync({ token: formData.get('token') });
+		const parsed = await verifyEmailConfirmSchema.safeParseAsync({ token: formData.get('token') });
 
 		if (!parsed.success) {
 			return fail(400, { errors: { server: 'Falta el token de verificación.' } });
@@ -52,9 +50,7 @@ export const actions = {
 	resend: async ({ request, fetch }) => {
 		const formData = await request.formData();
 
-		const parsed = await z
-			.object({ email: z.email().min(2) })
-			.safeParseAsync({ email: formData.get('email') });
+		const parsed = await resendVerificationSchema.safeParseAsync({ email: formData.get('email') });
 
 		if (!parsed.success) {
 			return fail(400, { errors: { email: 'Ingresa un email válido' } });

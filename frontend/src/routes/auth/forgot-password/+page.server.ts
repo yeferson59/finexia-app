@@ -1,15 +1,13 @@
-import z from 'zod';
 import type { Actions } from './$types';
 import * as auth from '$lib/api/auth';
 import { fail } from '@sveltejs/kit';
+import { forgotPasswordSchema } from '$lib/features/auth';
 
 export const actions = {
 	default: async ({ request, fetch }) => {
 		const formData = await request.formData();
 
-		const parsed = await z
-			.object({ email: z.email().min(2) })
-			.safeParseAsync({ email: formData.get('email') });
+		const parsed = await forgotPasswordSchema.safeParseAsync({ email: formData.get('email') });
 
 		if (!parsed.success) {
 			return fail(400, { errors: { email: 'Ingresa un email válido' } });

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import LoginRegister from '$components/auth/login-register.svelte';
+	import { LoginRegister } from '$lib/features/auth';
 	import type { ActionData, PageData } from './$types';
 
 	let { form, data }: { form: ActionData; data: PageData } = $props();
