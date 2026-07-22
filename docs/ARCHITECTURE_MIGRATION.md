@@ -428,57 +428,78 @@ golangci-lint run
 
 ### Fase 6 — Módulo `portfolio` *(el más grande: dividir agresivamente por archivos)*
 
-- [ ] Crear `internal/portfolio/` con el código repartido por sub-área en archivos
+- [x] Crear `internal/portfolio/` con el código repartido por sub-área en archivos
       (no en subpaquetes, para evitar ciclos):
-  - [ ] `portfolio.go` / `service_portfolio.go`: CRUD de portfolios, risks, summary.
-  - [ ] `entry.go`, `transaction.go`: entries y transacciones.
-  - [ ] `platform_source.go`: plataformas/fuentes de inversión.
-  - [ ] `snapshot.go`: snapshots (desde `services/portfolio_snapshot.go`).
-  - [ ] `import.go`, `export.go`: import/export masivo (desde `services/bulk_import.go`,
+  - [x] `portfolio.go` / `service_portfolio.go`: CRUD de portfolios, risks, summary.
+  - [x] `entry.go`, `transaction.go`: entries y transacciones.
+  - [x] `platform_source.go`: plataformas/fuentes de inversión.
+  - [x] `snapshot.go`: snapshots (desde `services/portfolio_snapshot.go`).
+  - [x] `import.go`, `export.go`: import/export masivo (desde `services/bulk_import.go`,
         `transaction_import.go`, `asset_import.go`, `handlers/import.go`, `handlers/export.go`);
-        usar `platform/database.WithinTx` para la atomicidad.
-- [ ] **Trocear `repositories/portfolio.go` (1.166 líneas)** en `postgres_portfolio.go`,
+        usar `platform/database.WithinTx` para la atomicidad. → `import.go` quedó en
+        911 líneas (sin trocear): incumple el criterio de <500 líneas (TECH_DEBT #13).
+- [x] **Trocear `repositories/portfolio.go` (1.166 líneas)** en `postgres_portfolio.go`,
       `postgres_entry.go`, `postgres_transaction.go`, `postgres_snapshot.go`, etc.,
       todos implementando `portfolio.Repository`.
-- [ ] Dependencias hacia otros módulos vía interfaces locales:
-      `portfolio.AssetReader` / `portfolio.RateReader` (implementadas por `market`),
-      `portfolio.UserReader` (implementada por `user`).
-- [ ] Mover el job de snapshots a `portfolio/snapshot_job.go`.
-- [ ] Migrar la montaña de tests (portfolio_service_test, portfolio_test,
-      transaction_import_test, etc.) con fakes locales.
-- [ ] Eliminar legacy, verificación estándar + E2E de dashboard/investments.
+- [x] Dependencias hacia otros módulos vía interfaces locales:
+      `portfolio.UserReader` (implementada por `user`). → **Desviación**: los assets y
+      los exchange rates **no** se movieron a `market`; siguen dentro de `portfolio`
+      (`Asset`, `GetExchangeRateByPair`) y es `market` quien depende de `portfolio`, no
+      al revés. Por eso no existen `portfolio.AssetReader`/`RateReader` (TECH_DEBT #12).
+- [x] Mover el job de snapshots a `portfolio/snapshot_job.go`.
+- [x] Migrar la montaña de tests (portfolio_service_test, portfolio_test,
+      transaction_import_test, etc.) con fakes locales. → **La extracción original
+      borró estos tests sin migrarlos** (portfolio quedó a 0%); **restaurados en la
+      revisión de cierre (2026-07-22)**: `testsupport_test.go` con un fake de
+      `portfolio.Repository` por hooks + `fakeUserReader`/`fakeMailer`, y 34 funciones
+      de test (service, áreas, import de transacciones, snapshots, import de activos);
+      cobertura del módulo 0% → 37%. Los tests cubren la capa de servicio; `postgres.go`
+      y `handler.go` siguen sin tests unitarios (TECH_DEBT #4, #11).
+- [x] Eliminar legacy, verificación estándar + E2E de dashboard/investments.
 
 ### Fase 7 — Módulos `market` y `notification` + scheduler genérico
 
-- [ ] Crear `internal/market/`: assets, exchange rates y sincronización de precios
-      (`services/asset_sync.go`, `services/exchange_rate*.go`, `repositories/exchange_rate.go`,
-      `handlers/asset.go`, `handlers/exchange_rate.go`). Depende de
-      `platform/marketdata.Provider`.
-- [ ] Crear `internal/notification/`: resumen semanal y alertas
-      (`services/weekly_summary*`, envíos de `mail` disparados por otros módulos).
-      Los módulos publican necesidades vía interfaces locales (p. ej.
-      `auth.SecurityNotifier`) implementadas por `notification`.
-- [ ] Refactorizar `internal/scheduler/` a un runner genérico:
-  - [ ] `type Job interface { Name() string; Run(ctx) error }` + `Scheduler.Register(job, schedule)`.
-  - [ ] Cada módulo expone sus jobs (`auth.CleanupJob`, `portfolio.SnapshotJob`,
+- [x] Crear `internal/market/`: sincronización de precios y exchange rates
+      (`services/asset_sync.go`, `services/exchange_rate*.go`, `handlers/asset.go`,
+      `handlers/exchange_rate.go`). Depende de `platform/marketdata.Provider`. →
+      **Desviación**: los tipos `Asset`/`ExchangeRate` y su persistencia se quedaron
+      en `portfolio`; `market` los consume importando el paquete `portfolio`
+      (dependencia módulo→módulo por tipos públicos). Tests locales presentes (43%).
+- [x] Crear `internal/notification/`: resumen semanal y alertas
+      (`services/weekly_summary*`). Consume `user` y `portfolio` vía interfaces locales
+      (`user`/`port`/`m`). → Los tests se **restauraron en la revisión de cierre
+      (2026-07-22)**: la extracción original borró `weekly_summary_test.go` sin migrarlo
+      (0%); ahora `weekly_summary_test.go` con fakes locales (0% → 81.8%).
+- [x] Refactorizar `internal/scheduler/` a un runner genérico:
+  - [x] `type Job interface { Name() string; Run(ctx) error }` + `Scheduler.Register(job, schedule)`.
+  - [x] Cada módulo expone sus jobs (`auth.CleanupJob`, `portfolio.SnapshotJob`,
         `market.PriceSyncJob`, `market.RateSyncJob`, `notification.WeeklySummaryJob`).
-  - [ ] `app` registra todos los jobs; desaparecen los 5 schedulers ad-hoc que
-        reciben `services.Services` completo.
-- [ ] Eliminar legacy, verificación estándar.
+  - [x] `app` registra todos los jobs; desaparecen los 5 schedulers ad-hoc que
+        recibían `services.Services` completo.
+- [x] Eliminar legacy, verificación estándar.
 
 ### Fase 8 — Demolición del legacy y blindaje de fronteras
 
-- [ ] Verificar que `internal/services`, `internal/repositories`, `internal/handlers`,
+- [x] Verificar que `internal/services`, `internal/repositories`, `internal/handlers`,
       `internal/routes`, `internal/dtos`, `internal/entities` y `internal/middlewares`
-      quedaron vacíos y **borrarlos**.
-- [ ] Blindar las fronteras con lint (elegir una):
-  - [ ] `depguard`/`importas` en `.golangci.yml` prohibiendo que `platform/*` importe
-        módulos de dominio y que un módulo importe internals de otro, **o**
-  - [ ] un test de arquitectura (`internal/app/arch_test.go`) que recorra los imports
-        con `go/packages` y falle ante violaciones.
+      quedaron vacíos y **borrarlos**. → Los siete paquetes fueron eliminados; la
+      estructura viva es `app, auth, health, identity, market, marketing, notification,
+      platform, portfolio, scheduler, user`.
+- [x] Blindar las fronteras con lint (elegir una):
+  - [ ] `depguard`/`importas` en `.golangci.yml` — descartada (problemas de config).
+  - [x] un test de arquitectura (`internal/app/arch_test.go`) que recorra los imports
+        y falle ante violaciones. → **Añadido en la revisión de cierre (2026-07-22)**:
+        parsea imports con `go/parser` y verifica que `platform/*` no importe dominios
+        ni `identity`, que `identity` siga siendo una hoja, y que ningún módulo importe
+        `internal/app`.
 - [ ] Actualizar `docs/API.md` y crear `docs/ARCHITECTURE.md` con la descripción de
-      la arquitectura final + reglas de dependencia (diagrama incluido).
-- [ ] Comparar cobertura contra la línea base de Fase 0: no debe haber bajado.
+      la arquitectura final + reglas de dependencia (diagrama incluido). → **Pendiente**:
+      `docs/ARCHITECTURE.md` aún no existe (TECH_DEBT #14).
+- [~] Comparar cobertura contra la línea base de Fase 0: no debe haber bajado. →
+      Tras restaurar los tests de portfolio y notification, ningún módulo queda a 0%
+      salvo `health`/`scheduler` (bootstrap, sin lógica). Falta una comparación formal
+      del total contra el 42.6% de línea base y tests de integración de `postgres.go`
+      (TECH_DEBT #4, #11).
 - [ ] Revisión final de `docs/TECH_DEBT.md`: priorizar lo anotado durante la migración.
 
 ### Fase 9 — Frontend

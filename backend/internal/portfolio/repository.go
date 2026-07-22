@@ -10,7 +10,8 @@ import (
 
 // Repository is the persistence surface the portfolio module needs, defined
 // by the consumer (this module) and satisfied by *PostgresRepository. The
-// asset methods migrate to the market module in Fase 7.
+// asset and exchange-rate reads live here (not in market) because the domain
+// types they return are owned by this module (see TECH_DEBT #12).
 type Repository interface {
 	// Portfolios
 	GetPortfoliosRisks(ctx context.Context) ([]Risk, error)
@@ -53,8 +54,8 @@ type Repository interface {
 	GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
 	GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
 
-	// Exchange rates (read-only lookup for display-currency conversion; the
-	// exchange-rate domain itself stays in the legacy market area until Fase 7)
+	// Exchange rates (read-only lookup for display-currency conversion; writing
+	// and syncing rates is owned by the market module)
 	GetExchangeRateByPair(ctx context.Context, from, to string) (money.Decimal, error)
 }
 

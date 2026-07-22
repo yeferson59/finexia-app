@@ -1,6 +1,7 @@
 // Package portfolio is the investments domain module: portfolios, entries,
 // transactions, investment platforms, snapshots and bulk import/export.
-// Assets live here temporarily until the market module exists (Fase 7).
+// Assets (and exchange rates) live here rather than in the market module: the
+// market module consumes these types by importing portfolio (see TECH_DEBT #12).
 package portfolio
 
 import (
