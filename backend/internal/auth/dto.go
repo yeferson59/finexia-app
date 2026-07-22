@@ -17,15 +17,6 @@ type LoginRequestDTO struct {
 	Password string `json:"password" validate:"required,min=8,max=20"`
 }
 
-// InviteUserDTO is the admin-side payload to invite someone. Name is optional
-// (derived from the email when absent, and the invitee can set their real name
-// on accept); Role defaults to "customer" and is whitelisted server-side.
-type InviteUserDTO struct {
-	Email string `json:"email" validate:"required,email,max=254"`
-	Name  string `json:"name"  validate:"omitempty,max=254"`
-	Role  string `json:"role"  validate:"omitempty,oneof=customer admin"`
-}
-
 // AcceptInvitationDTO is the public payload that turns an invitation into an
 // account. Password bounds mirror RegisterRequestDTO so login never rejects a
 // password set here.

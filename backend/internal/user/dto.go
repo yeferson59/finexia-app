@@ -32,3 +32,12 @@ type ChangePasswordDTO struct {
 type BanUserDTO struct {
 	Ban bool `json:"ban"`
 }
+
+// InviteUserDTO is the admin-side payload to invite someone. Name is optional
+// (derived from the email when absent, and the invitee can set their real name
+// on accept); Role defaults to "customer" and is whitelisted server-side.
+type InviteUserDTO struct {
+	Email string `json:"email" validate:"required,email,max=254"`
+	Name  string `json:"name"  validate:"omitempty,max=254"`
+	Role  string `json:"role"  validate:"omitempty,oneof=customer admin"`
+}

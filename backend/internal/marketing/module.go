@@ -24,6 +24,9 @@ func (m *Module) Service() *Service {
 }
 
 // Routes registers the module's endpoints, replicating routes/marketing.go.
+// The waitlist admin listing lives under /users/waitlist in the user module
+// instead: it is gated by user's own RequireAuth/RequireAdmin, alongside the
+// invitation dashboard.
 func (m *Module) Routes(router fiber.Router) {
 	waitlists := router.Group("/marketing")
 

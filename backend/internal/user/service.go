@@ -12,7 +12,9 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/yeferson59/finexia-app/internal/auth"
 	"github.com/yeferson59/finexia-app/internal/identity"
+	"github.com/yeferson59/finexia-app/internal/marketing"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
@@ -27,6 +29,16 @@ type mailer interface {
 type authService interface {
 	VerifyPassword(ctx context.Context, userID uuid.UUID, currentPassword string) error
 	RevokeOtherSessions(ctx context.Context, userID uuid.UUID, currentToken string) (int64, error)
+	CreateInvitation(ctx context.Context, email, name, role string, invitedBy uuid.UUID) (auth.Invitation, error)
+	ListInvitations(ctx context.Context, offset, limit uint) ([]auth.Invitation, uint, error)
+	ResendInvitation(ctx context.Context, id, invitedBy uuid.UUID) (auth.Invitation, error)
+	RevokeInvitation(ctx context.Context, id uuid.UUID) error
+}
+
+// marketingService is the slice of marketing.Service the admin waitlist
+// dashboard reads from.
+type marketingService interface {
+	ListWaitlist(ctx context.Context, offset, limit uint) ([]marketing.Waitlist, uint, error)
 }
 
 type geoService interface {
@@ -34,24 +46,26 @@ type geoService interface {
 }
 
 type Service struct {
-	repo  Repository
-	mail  mailer
-	auth  authService
-	store objectstore.Store
-	geo   geoService
-	log   logger.Logger
-	cfg   *config.Env
+	repo      Repository
+	mail      mailer
+	auth      authService
+	marketing marketingService
+	store     objectstore.Store
+	geo       geoService
+	log       logger.Logger
+	cfg       *config.Env
 }
 
-func NewService(repo Repository, mail mailer, auth authService, store objectstore.Store, geo geoService, log logger.Logger, cfg *config.Env) *Service {
+func NewService(repo Repository, mail mailer, auth authService, marketing marketingService, store objectstore.Store, geo geoService, log logger.Logger, cfg *config.Env) *Service {
 	return new(Service{
-		repo:  repo,
-		mail:  mail,
-		auth:  auth,
-		store: store,
-		geo:   geo,
-		log:   log,
-		cfg:   cfg,
+		repo:      repo,
+		mail:      mail,
+		auth:      auth,
+		marketing: marketing,
+		store:     store,
+		geo:       geo,
+		log:       log,
+		cfg:       cfg,
 	})
 }
 
@@ -270,4 +284,30 @@ func (s *Service) locateIP(ipAddress string) string {
 
 func (s *Service) GetUsersWithWeeklySummary(ctx context.Context) ([]identity.User, error) {
 	return s.repo.GetWeeklySummary(ctx)
+}
+
+// CreateInvitation, ListInvitations, ResendInvitation and RevokeInvitation
+// delegate to the auth module: invitations remain auth's data, but the
+// admin-facing HTTP surface lives under /users alongside the rest of user
+// management.
+func (s *Service) CreateInvitation(ctx context.Context, email, name, role string, invitedBy uuid.UUID) (auth.Invitation, error) {
+	return s.auth.CreateInvitation(ctx, email, name, role, invitedBy)
+}
+
+func (s *Service) ListInvitations(ctx context.Context, offset, limit uint) ([]auth.Invitation, uint, error) {
+	return s.auth.ListInvitations(ctx, offset, limit)
+}
+
+func (s *Service) ResendInvitation(ctx context.Context, id, invitedBy uuid.UUID) (auth.Invitation, error) {
+	return s.auth.ResendInvitation(ctx, id, invitedBy)
+}
+
+func (s *Service) RevokeInvitation(ctx context.Context, id uuid.UUID) error {
+	return s.auth.RevokeInvitation(ctx, id)
+}
+
+// ListWaitlist delegates to the marketing module: the waitlist is marketing's
+// data, but admins manage it from the same /users dashboard as invitations.
+func (s *Service) ListWaitlist(ctx context.Context, offset, limit uint) ([]marketing.Waitlist, uint, error) {
+	return s.marketing.ListWaitlist(ctx, offset, limit)
 }

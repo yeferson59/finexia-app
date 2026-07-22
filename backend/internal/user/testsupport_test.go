@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/yeferson59/finexia-app/internal/auth"
 	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 )
@@ -43,6 +44,24 @@ func (f *fakeAuthService) VerifyPassword(ctx context.Context, userID uuid.UUID, 
 
 func (f *fakeAuthService) RevokeOtherSessions(ctx context.Context, userID uuid.UUID, currentToken string) (int64, error) {
 	return f.revokeOtherSessions(ctx, userID, currentToken)
+}
+
+// The invitation methods below are exercised through HTTP handler tests, not
+// the Service unit tests that use fakeAuthService; no scenario needs them yet.
+func (f *fakeAuthService) CreateInvitation(ctx context.Context, email, name, role string, invitedBy uuid.UUID) (auth.Invitation, error) {
+	panic("fakeAuthService.CreateInvitation: not stubbed")
+}
+
+func (f *fakeAuthService) ListInvitations(ctx context.Context, offset, limit uint) ([]auth.Invitation, uint, error) {
+	panic("fakeAuthService.ListInvitations: not stubbed")
+}
+
+func (f *fakeAuthService) ResendInvitation(ctx context.Context, id, invitedBy uuid.UUID) (auth.Invitation, error) {
+	panic("fakeAuthService.ResendInvitation: not stubbed")
+}
+
+func (f *fakeAuthService) RevokeInvitation(ctx context.Context, id uuid.UUID) error {
+	panic("fakeAuthService.RevokeInvitation: not stubbed")
 }
 
 // fakeMailer records security alerts sent through the mailer slice, guarded
