@@ -349,8 +349,20 @@ Decisiones validadas con la feature piloto, que las Fases 4–6 deben seguir:
   - [ ] Trocear `portfolios/[id]/assets/[symbol]/+page.svelte` (**2.014 líneas**) —
         el peor archivo del frontend — en componentes de feature (cabecera del
         asset, gráfico, historial de transacciones, formularios de compra/venta…).
-  - [ ] Trocear `portfolios/[id]/+page.svelte` (1.309) y
-        `portfolios/[id]/add/+page.svelte` (996).
+  - [x] Trocear `portfolios/[id]/+page.svelte` (1.309 → 358) y
+        `portfolios/[id]/add/+page.svelte` (604 → 13). *(Rama 1 de portfolio.)*
+        - Componentes: `portfolio-summary-cards`, `portfolio-stats-cards`,
+          `allocation-donut`, `holdings-table`, `portfolio-edit-form`,
+          `portfolio-add-form`. `portfolio.ts` centraliza helpers puros
+          (`groupHoldings`, `computeTypeBreakdown`, `computeDonutSegments`,
+          `formatPct`), constantes (`PORTFOLIO_TYPES`, `ASSET_TYPE_*`) y tipos,
+          con su `portfolio.spec.ts`.
+        - `formatCurrency` (usa `privacy` + `baseCurrency`) se crea en la página
+          y se pasa como prop a los componentes que lo necesitan.
+        - `portfolio-growth` se sigue importando de `$components/dashboard`
+          (la migración de dashboard va en otra rama; no es feature↛feature).
+        - *(Verificación: `pnpm check` 0 errores/0 warnings, `pnpm lint`, 146
+          unit tests, 22 E2E incluido `portfolio.e2e.ts` — todo en verde.)*
   - [ ] Trocear `investments/*` (714 + 474) reutilizando los mismos componentes.
 - [ ] `lib/features/transactions/`: trocear `transactions/import/+page.svelte`
       (1.007) en pasos del wizard (upload, preview, commit) + listado.
