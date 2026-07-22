@@ -1,4 +1,4 @@
-import { env } from '$env/dynamic/private';
+import { joinWaitlist } from '$lib/api/marketing';
 import { json, redirect } from '@sveltejs/kit';
 import z from 'zod';
 import type { RequestHandler } from './$types';
@@ -20,11 +20,7 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 		redirect(303, '/?waitlist=invalid');
 	}
 
-	const response = await fetch(`${env.BASE_API}/marketing/waitlists`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ email: parsed.data })
-	});
+	const response = await joinWaitlist(fetch, parsed.data);
 
 	const result = await response.json().catch(() => ({ success: false, message: 'Error' }));
 

@@ -1,6 +1,6 @@
 import z from 'zod';
 import type { Actions, PageServerLoad } from './$types';
-import { env } from '$env/dynamic/private';
+import * as auth from '$lib/api/auth';
 import { fail, redirect } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ url, fetch }) => {
@@ -9,7 +9,7 @@ export const load: PageServerLoad = async ({ url, fetch }) => {
 		return { valid: false as const, reason: 'Falta el token de invitación.' };
 	}
 
-	const res = await fetch(`${env.BASE_API}/auth/invitations?token=${encodeURIComponent(token)}`);
+	const res = await auth.validateInvitation(fetch, token);
 	const body = await res.json().catch(() => ({}));
 
 	if (!res.ok || !body.success) {
@@ -55,14 +55,10 @@ export const actions = {
 			return fail(400, { errors: { confirmPassword: 'Las contraseñas no coinciden' } });
 		}
 
-		const res = await fetch(`${env.BASE_API}/auth/invitations/accept`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				token: parsed.data.token,
-				name: parsed.data.name,
-				password: parsed.data.password
-			})
+		const res = await auth.acceptInvitation(fetch, {
+			token: parsed.data.token,
+			name: parsed.data.name,
+			password: parsed.data.password
 		});
 
 		if (!res.ok) {

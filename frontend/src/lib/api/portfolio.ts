@@ -58,10 +58,7 @@ export function getPortfolioGrowth(
 }
 
 /** `GET /portfolios/:id/top-transaction` — mayor transacción del portfolio. */
-export function getTopTransaction(
-	event: ApiEvent,
-	id: string
-): Promise<ApiResult<TopTransaction>> {
+export function getTopTransaction(event: ApiEvent, id: string): Promise<ApiResult<TopTransaction>> {
 	return apiRequestSafe<TopTransaction>(event, `/portfolios/${id}/top-transaction`);
 }
 

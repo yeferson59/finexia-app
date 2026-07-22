@@ -21,7 +21,10 @@ function postJson(fetchFn: Fetch, path: string, body: unknown): Promise<Response
 }
 
 /** `POST /auth/login`. */
-export function login(fetchFn: Fetch, body: { email: string; password: string }): Promise<Response> {
+export function login(
+	fetchFn: Fetch,
+	body: { email: string; password: string }
+): Promise<Response> {
 	return postJson(fetchFn, '/auth/login', body);
 }
 
