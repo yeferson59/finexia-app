@@ -7,14 +7,14 @@ import (
 	"time"
 )
 
-// Schedule decide cuándo es la próxima ejecución a partir de 'now'.
-// Cualquier estrategia de scheduling implementa esta única interfaz.
+// Schedule decides when the next run happens, given 'now'.
+// Any scheduling strategy implements this single interface.
 type Schedule interface {
 	Next(now time.Time) time.Time
 }
 
-// Every dispara el job cada 'Interval', contado desde el momento en que
-// termina de calcularse (no desde que arrancó la ejecución anterior).
+// Every fires the job every 'Interval', counted from the moment the previous
+// run finishes (not from when it started).
 type Every struct {
 	Interval time.Duration
 }
@@ -23,7 +23,7 @@ func (e Every) Next(now time.Time) time.Time {
 	return now.Add(e.Interval)
 }
 
-// DailyAt dispara el job una vez al día a la hora indicada (hora local).
+// DailyAt fires the job once a day at the given time (local time).
 type DailyAt struct {
 	Hour   int
 	Minute int
@@ -39,11 +39,11 @@ func (d DailyAt) Next(now time.Time) time.Time {
 	return next
 }
 
-// Delayed envuelve cualquier Schedule y le suma un retraso fijo al
-// resultado de Next(). Sirve para casos como "todos los días a las
-// 6am, pero retrasado 10 min" sin tener que tocar DailyAt directamente
-// (en ese caso puntual bastaría con sumar los minutos a mano, pero
-// Delayed funciona igual sobre Every o cualquier Schedule futuro).
+// Delayed wraps any Schedule and adds a fixed delay to the result of
+// Next(). Useful for cases like "every day at 6am, but delayed 10 min"
+// without having to touch DailyAt directly (that one case could just add
+// the minutes by hand, but Delayed works the same way over Every or any
+// future Schedule).
 type Delayed struct {
 	Schedule Schedule
 	Delay    time.Duration
@@ -53,11 +53,11 @@ func (d Delayed) Next(now time.Time) time.Time {
 	return d.Schedule.Next(now).Add(d.Delay)
 }
 
-// Jitter envuelve un Schedule y le suma un retraso aleatorio entre
-// 0 y Max, recalculado en cada disparo (no es fijo como Delayed).
-// Útil cuando corres varias instancias/réplicas del mismo proceso y
-// no quieres que todas ejecuten el job exactamente al mismo segundo
-// (evita picos de carga simultáneos contra la misma base de datos, etc).
+// Jitter wraps a Schedule and adds a random delay between 0 and Max,
+// recalculated on every trigger (unlike Delayed's fixed offset). Useful
+// when running several instances/replicas of the same process and you
+// don't want them all firing the job at the exact same second (avoids
+// simultaneous load spikes against the same database, etc).
 type Jitter struct {
 	Schedule Schedule
 	Max      time.Duration
@@ -73,8 +73,8 @@ func (j Jitter) Next(now time.Time) time.Time {
 	return j.Schedule.Next(now).Add(extra)
 }
 
-// WeeklyAt dispara el job una vez por semana, en el día y hora indicados
-// (hora local). Ej: WeeklyAt{Day: time.Monday, Hour: 8, Minute: 0}.
+// WeeklyAt fires the job once a week, on the given day and time (local
+// time). E.g. WeeklyAt{Day: time.Monday, Hour: 8, Minute: 0}.
 type WeeklyAt struct {
 	Day    time.Weekday
 	Hour   int
@@ -98,8 +98,8 @@ type scheduledJob struct {
 	sched Schedule
 }
 
-// Scheduler coordina múltiples jobs con su propio Schedule, sin depender
-// de ninguna librería externa de cron. Cada job corre en su propia goroutine.
+// Scheduler coordinates multiple jobs each with its own Schedule, without
+// depending on any external cron library. Each job runs in its own goroutine.
 type Scheduler struct {
 	runner *Runner
 	jobs   []scheduledJob
@@ -112,12 +112,12 @@ func NewScheduler(runner *Runner) *Scheduler {
 	return new(Scheduler{runner: runner})
 }
 
-// Register agrega un job con su schedule. Debe llamarse antes de Start.
+// Register adds a job with its schedule. Must be called before Start.
 func (s *Scheduler) Register(job Job, sched Schedule) {
 	s.jobs = append(s.jobs, scheduledJob{job: job, sched: sched})
 }
 
-// Start lanza una goroutine por job registrado.
+// Start launches one goroutine per registered job.
 func (s *Scheduler) Start() {
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
@@ -127,9 +127,9 @@ func (s *Scheduler) Start() {
 	}
 }
 
-// Stop cancela todos los loops y espera a que terminen limpiamente.
-// No aborta un job que ya está corriendo dentro de Runner.Execute;
-// solo evita que se dispare una próxima ejecución.
+// Stop cancels all loops and waits for them to finish cleanly. It does
+// not abort a job already running inside Runner.Execute; it only
+// prevents the next run from firing.
 func (s *Scheduler) Stop() {
 	if s.cancel != nil {
 		s.cancel()
@@ -168,15 +168,15 @@ func (s *Scheduler) loop(job Job, sched Schedule) {
 // sched := NewScheduler(runner)
 // sched.Register(JobFunc{JobName: "sync-prices", Fn: syncPrices}, Every{Interval: time.Hour})
 //
-// // 6:00am + 10 minutos de retraso fijo -> corre a las 6:10am
+// // 6:00am + a fixed 10-minute delay -> runs at 6:10am
 // reportSchedule := Delayed{Schedule: DailyAt{Hour: 6, Minute: 0}, Delay: 10 * time.Minute}
 // sched.Register(JobFunc{JobName: "daily-report", Fn: buildReport}, reportSchedule)
 //
-// // cada hora + hasta 2 minutos de jitter aleatorio (para varias réplicas)
+// // every hour + up to 2 minutes of random jitter (for multiple replicas)
 // jitterSchedule := Jitter{Schedule: Every{Interval: time.Hour}, Max: 2 * time.Minute}
 // sched.Register(JobFunc{JobName: "cache-refresh", Fn: refreshCache}, jitterSchedule)
 //
 // sched.Start()
 //
-// // en el shutdown de la app:
+// // on app shutdown:
 // sched.Stop()

@@ -165,7 +165,7 @@ func (r *Runner) Execute(job Job) {
 // 		metrics.ObserveJobDuration(res.JobName, res.Attempt, res.Duration, res.Err == nil)
 // 	},
 // 	OnError: func(name string, err error) {
-// 		log.Printf("ALERTA: job %s falló definitivamente: %v", name, err)
+// 		log.Printf("ALERT: job %s failed permanently: %v", name, err)
 // 	},
 // })
 //

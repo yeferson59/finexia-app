@@ -79,7 +79,7 @@ func parseImportFile(data []byte, filename, sheet string) (importSource, error) 
 func parseCSV(data []byte) ([][]string, error) {
 	data = bytes.TrimPrefix(data, []byte{0xEF, 0xBB, 0xBF}) // UTF-8 BOM
 
-	// Detect the delimiter from the first line: exports "clásicos" use ',',
+	// Detect the delimiter from the first line: "classic" exports use ',',
 	// ';' (Excel with Spanish locale) or tabs.
 	firstLine := data
 	if i := bytes.IndexByte(data, '\n'); i >= 0 {
