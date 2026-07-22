@@ -2,8 +2,9 @@ package portfolio
 
 import (
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/yeferson59/finexia-app/internal/market"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/market"
 )
 
 // PostgresRepository implements Repository over the shared pgx pool. Its

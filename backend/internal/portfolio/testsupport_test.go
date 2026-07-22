@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
@@ -33,7 +34,7 @@ func mustUSD(t *testing.T, s string) money.Money {
 
 func mustDecimal(t *testing.T, s string) money.Decimal {
 	t.Helper()
-	d, err := money.NewFromString(s)
+	d, err := decimal.NewFromString(s)
 	if err != nil {
 		t.Fatalf("NewFromString(%q): %v", s, err)
 	}

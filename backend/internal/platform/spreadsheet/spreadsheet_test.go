@@ -35,15 +35,15 @@ func TestReadFileCSV(t *testing.T) {
 }
 
 func TestNormKey(t *testing.T) {
-	cases := map[string]string{
-		"  Descripción ": "descripcion",
-		"Asset_Type":     "asset type",
-		"FROM/TO":        "from to",
-		"Símbolo":        "simbolo",
+	cases := []struct{ in, want string }{
+		{"  Descripción ", "descripcion"},
+		{"Asset_Type", "asset type"},
+		{"FROM/TO", "from to"},
+		{"Símbolo", "simbolo"},
 	}
-	for in, want := range cases {
-		if got := NormKey(in); got != want {
-			t.Errorf("NormKey(%q) = %q, want %q", in, got, want)
+	for _, c := range cases {
+		if got := NormKey(c.in); got != c.want {
+			t.Errorf("NormKey(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }
