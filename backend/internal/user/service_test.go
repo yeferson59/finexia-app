@@ -50,7 +50,7 @@ func TestChangePassword(t *testing.T) {
 		}
 		mailer := &fakeMailer{}
 
-		svc := NewService(repo, mailer, auth, nil, nil, logger.Noop(), &config.Env{FrontendURL: "https://app.finexia.me"})
+		svc := NewService(repo, mailer, auth, nil, nil, nil, logger.Noop(), &config.Env{FrontendURL: "https://app.finexia.me"})
 
 		err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, "new-password", "203.0.113.5", "test-agent")
 		if err != nil {
@@ -94,7 +94,7 @@ func TestChangePassword(t *testing.T) {
 		auth.revokeOtherSessions = func(context.Context, uuid.UUID, string) (int64, error) {
 			return 0, nil
 		}
-		svc := NewService(repo, &fakeMailer{}, auth, nil, nil, logger.Noop(), &config.Env{})
+		svc := NewService(repo, &fakeMailer{}, auth, nil, nil, nil, logger.Noop(), &config.Env{})
 
 		if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, "new-password", "", ""); err != nil {
 			t.Fatalf("ChangePassword: %v", err)
@@ -110,7 +110,7 @@ func TestChangePassword(t *testing.T) {
 	t.Run("rejects an incorrect current password", func(t *testing.T) {
 		repo := &fakeRepository{}
 		mailer := &fakeMailer{}
-		svc := NewService(repo, mailer, authSvc(), nil, nil, logger.Noop(), &config.Env{})
+		svc := NewService(repo, mailer, authSvc(), nil, nil, nil, logger.Noop(), &config.Env{})
 
 		err := svc.ChangePassword(context.Background(), userID, "current-token", "wrong-password", "new-password", "", "")
 		if err == nil {
@@ -121,7 +121,7 @@ func TestChangePassword(t *testing.T) {
 	t.Run("rejects a new password identical to the current one", func(t *testing.T) {
 		repo := &fakeRepository{}
 		mailer := &fakeMailer{}
-		svc := NewService(repo, mailer, authSvc(), nil, nil, logger.Noop(), &config.Env{})
+		svc := NewService(repo, mailer, authSvc(), nil, nil, nil, logger.Noop(), &config.Env{})
 
 		err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, currentPassword, "", "")
 		if err == nil {
@@ -152,7 +152,7 @@ func TestUpdateCurrentUser(t *testing.T) {
 				return saved, nil
 			},
 		}
-		return NewService(repo, nil, nil, nil, nil, logger.Noop(), &config.Env{}), &saved
+		return NewService(repo, nil, nil, nil, nil, nil, logger.Noop(), &config.Env{}), &saved
 	}
 
 	t.Run("normalizes name and currency", func(t *testing.T) {
@@ -199,7 +199,7 @@ func TestUpdateUserRejectsDeletedUser(t *testing.T) {
 			return identity.User{ID: uuid.New(), DeletedAt: &deletedAt}, nil
 		},
 	}
-	svc := NewService(repo, nil, nil, nil, nil, logger.Noop(), &config.Env{})
+	svc := NewService(repo, nil, nil, nil, nil, nil, logger.Noop(), &config.Env{})
 
 	_, err := svc.UpdateUser(context.Background(), uuid.New(), "Name", "mail@example.com", "")
 	if err == nil || err.Error() != "not found user" {

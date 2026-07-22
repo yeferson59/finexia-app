@@ -16,11 +16,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/yeferson59/finexia-app/internal/auth"
-	"github.com/yeferson59/finexia-app/internal/handlers"
+	"github.com/yeferson59/finexia-app/internal/health"
+	"github.com/yeferson59/finexia-app/internal/market"
 	"github.com/yeferson59/finexia-app/internal/marketing"
-	"github.com/yeferson59/finexia-app/internal/middlewares"
+	"github.com/yeferson59/finexia-app/internal/notification"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/geoip"
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
@@ -28,10 +30,8 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata/finnhub"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata/yahoo"
 	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
-	"github.com/yeferson59/finexia-app/internal/repositories"
-	"github.com/yeferson59/finexia-app/internal/routes"
+	"github.com/yeferson59/finexia-app/internal/portfolio"
 	"github.com/yeferson59/finexia-app/internal/scheduler"
-	"github.com/yeferson59/finexia-app/internal/services"
 	"github.com/yeferson59/finexia-app/internal/user"
 )
 
@@ -92,6 +92,8 @@ func (a *App) Run(ctx context.Context) error {
 	return nil
 }
 
+const localUserID = "auth_user_id"
+
 // wire composes every layer of the application; separated from Run so tests
 // can exercise the composed router without opening a listener.
 func (a *App) wire(ctx context.Context) {
@@ -102,9 +104,14 @@ func (a *App) wire(ctx context.Context) {
 	)
 
 	geo := geoip.New()
-	middl := middlewares.New(a.deps.Envs, a.deps.Storage)
+	userLimiter := httpx.KeyedRateLimiter(200, 1*time.Minute, func(c fiber.Ctx) string {
+		userID := c.Locals(localUserID).(string)
+
+		return "user_limit:" + userID
+	})
 
 	// Migrated domain modules.
+	healthModule := health.New()
 	marketingModule := marketing.New(marketing.NewPostgresRepository(a.deps.DB), a.deps.Mail)
 	authModule := auth.New(auth.Deps{
 		Ctx:      ctx,
@@ -124,26 +131,65 @@ func (a *App) wire(ctx context.Context) {
 		Geo:       geo,
 		Log:       a.deps.Log,
 		Auth:      authModule.Service(),
+		Marketing: marketingModule.Service(),
 		AuthMiddl: authModule,
-		Limiter:   middl.UserLimiter(),
+		Limiter:   userLimiter,
+	})
+	// market owns the asset catalog; portfolio consumes it (portfolio → market),
+	// so market is built first and injected as portfolio's AssetReader.
+	marketModule := market.New(market.Deps{
+		DB:             a.deps.DB,
+		Cfg:            a.deps.Envs,
+		Storage:        a.deps.Storage,
+		Log:            a.deps.Log,
+		Provider:       priceProvider,
+		AuthMiddleware: authModule,
+		Limiter:        userLimiter,
+	})
+	portfolioModule := portfolio.New(portfolio.Deps{
+		DB:        a.deps.DB,
+		Cfg:       a.deps.Envs,
+		Storage:   a.deps.Storage,
+		Mail:      a.deps.Mail,
+		User:      userModule.Service(),
+		Assets:    marketModule.Service(),
+		Log:       a.deps.Log,
+		AuthMiddl: authModule,
+		Limiter:   userLimiter,
+	})
+	notificationService := notification.NewService(userModule.Service(), portfolioModule.Service(), a.deps.Mail, a.deps.Envs)
+
+	a.fiber.Use(httpx.Recovery(), httpx.CORS(a.deps.Envs.CORSOrigin, true), httpx.Helmet(), httpx.RequestID(), httpx.ResponseTime(), httpx.Logger(), httpx.RateLimiter(60, 1*time.Minute, false))
+
+	healthModule.Routes(a.fiber)
+	marketModule.Routes(a.fiber)
+	authModule.Routes(a.fiber)
+	marketingModule.Routes(a.fiber)
+	userModule.Routes(a.fiber)
+	portfolioModule.Routes(a.fiber)
+
+	runner := scheduler.NewRunner(scheduler.RunnerOptions{
+		Timeout:     30 * time.Second,
+		MaxRetries:  3,
+		BackoffBase: 500 * time.Millisecond,
+		BackoffMax:  10 * time.Second,
+		OnError: func(name string, err error) {
+			a.deps.Log.Error(ctx, "ALERTA: job "+name+" falló definitivamente "+err.Error())
+		},
+		Log: a.deps.Log,
 	})
 
-	// Legacy wiring: shrinks phase by phase until Fase 8 deletes it.
-	repos := repositories.New(a.deps.DB)
-	svc := services.New(&repos, a.deps.Envs, a.deps.S3, a.deps.Storage, a.deps.Mail, geo, a.deps.Log, priceProvider, authModule.Service(), userModule.Service())
-	handl := handlers.New(svc, a.deps.Envs)
+	schedule := scheduler.NewScheduler(runner)
 
-	routes.New(a.fiber, middl, handl, authModule, marketingModule, userModule).Init()
-
-	a.startSchedulers(ctx, svc, authModule)
+	a.registerJobs(schedule, authModule, portfolioModule, marketModule, notificationService)
 }
 
-// startSchedulers is the single place background jobs come to life; Fase 7
-// replaces these ad-hoc schedulers with a generic Job runner.
-func (a *App) startSchedulers(ctx context.Context, svc services.Services, authModule *auth.Module) {
-	go scheduler.NewExchangeRateScheduler(svc, 6, a.deps.Log).Start(ctx)
-	go scheduler.NewAssetPriceScheduler(svc, 14, 90*time.Second, a.deps.Log).Start(ctx)
-	go scheduler.NewPortfolioSnapshotScheduler(svc, 15, 120*time.Second, a.deps.Log).Start(ctx)
-	go scheduler.NewWeeklySummaryScheduler(svc, 9, a.deps.Log).Start(ctx)
-	go auth.NewCleanupJob(authModule.Service(), 3, a.deps.Log).Start(ctx)
+func (a *App) registerJobs(sched *scheduler.Scheduler, authModule *auth.Module, portfolioModule *portfolio.Module, marketModule *market.Module, notificationService *notification.Service) {
+	sched.Register(market.NewExchangeRateScheduler(marketModule.Service(), a.deps.Log), scheduler.DailyAt{Hour: 9, Minute: 30})
+	sched.Register(market.NewAssetPriceScheduler(marketModule.Service(), a.deps.Log), scheduler.Delayed{Schedule: scheduler.DailyAt{Hour: 9, Minute: 30}, Delay: 90 * time.Second})
+	sched.Register(portfolio.NewSnapshotJob(portfolioModule.Service(), a.deps.Log), scheduler.Delayed{Schedule: scheduler.DailyAt{Hour: 9, Minute: 30}, Delay: 120 * time.Second})
+	sched.Register(notification.NewWeeklySummaryScheduler(notificationService, a.deps.Log), scheduler.WeeklyAt{Day: time.Monday, Hour: 8, Minute: 30})
+	sched.Register(auth.NewCleanupJob(authModule.Service(), a.deps.Log), scheduler.Every{Interval: 5 * time.Hour})
+
+	sched.Start()
 }

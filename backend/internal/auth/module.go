@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/yeferson59/finexia-app/internal/platform/config"
@@ -121,24 +120,4 @@ func (m *Module) Routes(router fiber.Router) {
 	auth.Delete("/sessions/:id", m.handler.revokeSession)
 	auth.Post("/sessions/revoke-others", m.handler.revokeOtherSessions)
 	auth.Post("/logout", m.handler.logout)
-}
-
-// AdminRoutes registers the invitation/waitlist dashboard under /users,
-// replicating their legacy registration. Each route carries its full chain
-// inline (never group.Use): these routes register in the public zone, before
-// the app-wide gate, and a group-level middleware at the /users prefix would
-// leak onto the legacy /users routes and double-apply the user rate limit.
-// userLimiter is injected because its ownership stays with the legacy
-// middlewares until the user domain migrates.
-func (m *Module) AdminRoutes(router fiber.Router, userLimiter fiber.Handler) {
-	users := router.Group("/users")
-
-	// Static "/invitations" segment registers before the legacy "/:id" routes
-	// so it is never captured as a user id.
-	users.Get("/invitations", m.RequireAuth(), userLimiter, m.RequireAdmin(), paginate.New(), m.handler.listInvitations)
-	users.Post("/invitations", m.RequireAuth(), userLimiter, m.RequireAdmin(), m.handler.createInvitation)
-	users.Post("/invitations/:id/resend", m.RequireAuth(), userLimiter, m.RequireAdmin(), m.handler.resendInvitation)
-	users.Delete("/invitations/:id", m.RequireAuth(), userLimiter, m.RequireAdmin(), m.handler.revokeInvitation)
-
-	users.Get("/waitlist", m.RequireAuth(), userLimiter, m.RequireAdmin(), paginate.New(), m.handler.listWaitlist)
 }

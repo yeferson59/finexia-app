@@ -18,6 +18,7 @@ type Deps struct {
 	Geo       geoService
 	Log       logger.Logger
 	Auth      authService
+	Marketing marketingService
 	AuthMiddl authMiddleware
 	// Limiter is the per-user rate limiter the legacy /users routes had via
 	// the app-wide gate; the module keeps it now that it registers in the
@@ -40,7 +41,7 @@ type Module struct {
 
 func New(deps Deps) *Module {
 	pg := NewPostgresRepository(deps.DB)
-	service := NewService(pg, deps.Mail, deps.Auth, deps.Store, deps.Geo, deps.Log, deps.Cfg)
+	service := NewService(pg, deps.Mail, deps.Auth, deps.Marketing, deps.Store, deps.Geo, deps.Log, deps.Cfg)
 
 	return newModule(deps, service)
 }
@@ -83,6 +84,16 @@ func (m *Module) Routes(router fiber.Router) {
 	admin := m.authMiddl.RequireAdmin()
 	users.Get("", admin, paginate.New(), m.handler.GetListUsers)
 	users.Post("", admin, m.handler.CreateUser)
+
+	// Static "/invitations" and "/waitlist" segments register before the
+	// "/:id" routes below so they are never captured as a user id.
+	users.Get("/invitations", admin, paginate.New(), m.handler.listInvitations)
+	users.Post("/invitations", admin, m.handler.createInvitation)
+	users.Post("/invitations/:id/resend", admin, m.handler.resendInvitation)
+	users.Delete("/invitations/:id", admin, m.handler.revokeInvitation)
+
+	users.Get("/waitlist", admin, paginate.New(), m.handler.listWaitlist)
+
 	users.Get("/:id", admin, m.handler.GetUserByID)
 	users.Patch("/:id", admin, m.handler.UpdateUser)
 	users.Patch("/:id/ban", admin, m.handler.BanUser)
