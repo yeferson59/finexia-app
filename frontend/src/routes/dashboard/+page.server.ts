@@ -1,59 +1,17 @@
 import type { Actions, PageServerLoad } from './$types';
-import { env } from '$env/dynamic/private';
 import { redirect } from '@sveltejs/kit';
-import { authedFetchSafe } from '$lib/server/api';
+import * as auth from '$lib/api/auth';
+import * as portfolio from '$lib/api/portfolio';
+import * as transactions from '$lib/api/transactions';
 import { ACCESS_COOKIE, REFRESH_COOKIE, clearSessionCookies } from '$lib/server/session';
-
-interface PortfolioSummary {
-	id: string;
-	name: string;
-	type: string;
-	baseCurrency: string;
-	displayCurrency: string;
-	totalPositions: number;
-	totalCostBase: string;
-	totalMarketValue: string;
-	totalGainLoss: string;
-	totalGainLossPct: string;
-}
+import type {
+	AllocationItem,
+	PortfolioGrowth,
+	PortfolioSummary,
+	UserTransaction
+} from '$lib/api/types';
 
 const SUPPORTED_CURRENCIES = ['USD', 'COP'];
-
-interface AllocationItem {
-	category: string;
-	marketValue: string;
-	percent: number;
-}
-
-interface Transaction {
-	id: string;
-	entryId: string;
-	type: string;
-	quantity: string;
-	price: string;
-	currency: string;
-	fees: string;
-	transactionDate: string;
-	notes: string;
-	createdAt: string;
-	assetTicker: string;
-	assetName: string;
-}
-
-interface GrowthDataPoint {
-	date: string;
-	totalValue: string;
-	totalCostBase: string;
-	gainLoss: string;
-	gainLossPct: string;
-}
-
-interface GrowthSummary {
-	firstDate: string;
-	initialValue: string;
-	currentValue: string;
-	totalGrowthPct: string;
-}
 
 export const load: PageServerLoad = async ({ cookies, fetch, url }) => {
 	const event = { cookies, fetch };
@@ -62,38 +20,30 @@ export const load: PageServerLoad = async ({ cookies, fetch, url }) => {
 	const currency = SUPPORTED_CURRENCIES.includes(requestedCurrency) ? requestedCurrency : 'USD';
 
 	const [transactionsRes, summaryRes, allocationRes, growthRes] = await Promise.all([
-		authedFetchSafe(event, '/portfolios/transactions'),
-		authedFetchSafe(event, `/portfolios/summary?currency=${currency}`),
-		authedFetchSafe(event, '/portfolios/allocation'),
-		authedFetchSafe(event, '/portfolios/growth')
+		transactions.getRecent(event),
+		portfolio.getSummaries(event, currency),
+		portfolio.getAllocation(event),
+		portfolio.getAggregateGrowth(event)
 	]);
 
-	let recentTransactions: Transaction[] = [];
-	if (transactionsRes?.ok) {
-		const { data, success } = await transactionsRes.json();
-		if (success && Array.isArray(data)) recentTransactions = data.slice(0, 5);
-	}
+	const recentTransactions: UserTransaction[] =
+		transactionsRes.ok && transactionsRes.success && Array.isArray(transactionsRes.data)
+			? transactionsRes.data.slice(0, 5)
+			: [];
 
-	let portfolioSummaries: PortfolioSummary[] = [];
-	if (summaryRes?.ok) {
-		const { data, success } = await summaryRes.json();
-		if (success && Array.isArray(data)) portfolioSummaries = data;
-	}
+	const portfolioSummaries: PortfolioSummary[] =
+		summaryRes.ok && summaryRes.success && Array.isArray(summaryRes.data) ? summaryRes.data : [];
 
-	let allocation: AllocationItem[] = [];
-	if (allocationRes?.ok) {
-		const { data, success } = await allocationRes.json();
-		if (success && Array.isArray(data)) allocation = data;
-	}
+	const allocation: AllocationItem[] =
+		allocationRes.ok && allocationRes.success && Array.isArray(allocationRes.data)
+			? allocationRes.data
+			: [];
 
-	let portfolioGrowth: { points: GrowthDataPoint[]; summary: GrowthSummary } = {
+	let portfolioGrowth: PortfolioGrowth = {
 		points: [],
 		summary: { firstDate: '', initialValue: '0', currentValue: '0', totalGrowthPct: '0' }
 	};
-	if (growthRes?.ok) {
-		const { data, success } = await growthRes.json();
-		if (success && data) portfolioGrowth = data;
-	}
+	if (growthRes.ok && growthRes.success && growthRes.data) portfolioGrowth = growthRes.data;
 
 	return { recentTransactions, portfolioSummaries, allocation, portfolioGrowth, currency };
 };
@@ -106,13 +56,10 @@ export const actions = {
 
 		const refreshToken = cookies.get(REFRESH_COOKIE);
 
-		await fetch(`${env.BASE_API}/auth/logout`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${token}`,
-				...(refreshToken ? { Cookie: `${REFRESH_COOKIE}=${refreshToken}` } : {})
-			}
+		await auth.logout(fetch, {
+			accessToken: token,
+			refreshToken,
+			refreshCookieName: REFRESH_COOKIE
 		});
 
 		clearSessionCookies(cookies);
