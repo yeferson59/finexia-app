@@ -8,12 +8,17 @@ import (
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
-// Repository is the persistence surface the portfolio module needs, defined
-// by the consumer (this module) and satisfied by *PostgresRepository. The
-// asset and exchange-rate reads live here (not in market) because the domain
-// types they return are owned by this module (see TECH_DEBT #12).
-type Repository interface {
-	// Portfolios
+// The persistence surface is split into cohesive, consumer-defined stores
+// (mirroring auth.Stores) so each stays small and fakes only implement what a
+// scenario needs. Repository is their union, kept as a single alias because
+// the portfolio Service orchestrates across all of them.
+//
+// Note: the union is 32 methods because the asset and exchange-rate reads live
+// here (their domain types are owned by this module); relocating those to the
+// market module would bring it under the ~30 criterion (see TECH_DEBT #12/#14).
+
+// PortfolioStore persists portfolios themselves plus their risk catalog.
+type PortfolioStore interface {
 	GetPortfoliosRisks(ctx context.Context) ([]Risk, error)
 	GetPortfoliosByUserID(ctx context.Context, userID uuid.UUID) ([]Portfolio, error)
 	GetPortfoliosSummaryByUserID(ctx context.Context, userID uuid.UUID) ([]SummaryView, error)
@@ -22,21 +27,29 @@ type Repository interface {
 	UpdatePortfolio(ctx context.Context, userID, portfolioID uuid.UUID, name, description string, portfolioType Type, riskID uuid.UUID, isDefault bool) (Portfolio, error)
 	GetEntriesByPortfolioID(ctx context.Context, portfolioID uuid.UUID) ([]Entry, error)
 	GetTopTransactionByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID) (TopTransactionDTO, error)
+}
 
-	// Platforms (investment sources)
+// PlatformStore persists investment sources (platforms).
+type PlatformStore interface {
 	CreatePlatform(ctx context.Context, userID uuid.UUID, sourceType SourceType, name, description string) (InvestmentSource, error)
 	GetPlatformsWithStats(ctx context.Context, userID uuid.UUID) ([]PlatformStats, error)
 	UpdatePlatform(ctx context.Context, userID, sourceID uuid.UUID, name, description string, sourceType SourceType, isActive bool) (PlatformStats, error)
 	DeletePlatform(ctx context.Context, userID, sourceID uuid.UUID) error
+}
 
-	// Assets
+// AssetStore persists assets and reads exchange rates (read-only lookup for
+// display-currency conversion; writing/syncing rates is owned by market).
+type AssetStore interface {
 	GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, error)
 	GetAssets(ctx context.Context, offset, limit uint) ([]Asset, error)
 	SearchAssets(ctx context.Context, search string, offset, limit uint) ([]Asset, error)
 	UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error)
 	UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error)
+	GetExchangeRateByPair(ctx context.Context, from, to string) (money.Decimal, error)
+}
 
-	// Entries & transactions
+// TransactionStore persists portfolio entries and their transactions.
+type TransactionStore interface {
 	CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType TransactionType, quantity money.Decimal, price money.Money, costCurrency string, category EntryCategory, entryDate time.Time, notes string) (Entry, error)
 	GetEntryWithAsset(ctx context.Context, entryID uuid.UUID) (Entry, error)
 	GetTransactionsByEntryID(ctx context.Context, userID, entryID uuid.UUID) ([]Transaction, error)
@@ -47,16 +60,24 @@ type Repository interface {
 	CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
 	UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
 	ImportEntryTransactions(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []ImportTransactionRow) (int, error)
+}
 
-	// Snapshots & growth
+// SnapshotStore persists daily portfolio snapshots and reads growth series.
+type SnapshotStore interface {
 	GetAllPortfolioSummaryRows(ctx context.Context) ([]SnapshotRow, error)
 	UpsertPortfolioSnapshot(ctx context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, currency, totalGainLoss, totalGainLossPct string) error
 	GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
 	GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
+}
 
-	// Exchange rates (read-only lookup for display-currency conversion; writing
-	// and syncing rates is owned by the market module)
-	GetExchangeRateByPair(ctx context.Context, from, to string) (money.Decimal, error)
+// Repository is the union of the module's stores, satisfied by
+// *PostgresRepository. The Service orchestrates across all of them.
+type Repository interface {
+	PortfolioStore
+	PlatformStore
+	AssetStore
+	TransactionStore
+	SnapshotStore
 }
 
 // Ensure the concrete repository keeps satisfying the interface.
