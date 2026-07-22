@@ -2,10 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import {
-		investmentStore,
-		type Investment as StoredInvestment
-	} from '$lib/stores/investments.svelte';
+	import { investmentStore, type Investment as StoredInvestment } from '$lib/features/dashboard';
 
 	interface Investment {
 		id: string;

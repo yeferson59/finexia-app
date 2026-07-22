@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { untrack } from 'svelte';
 	import Card from '$lib/ui/card.svelte';
-	import PortfolioGrowth from '$components/dashboard/portfolio-growth.svelte';
+	import { PortfolioGrowth } from '$lib/features/dashboard';
 	import { privacy } from '$lib/stores/privacy.svelte';
 	import { formatCalendarDate } from '$lib/utils';
 	import type { PageProps } from './$types';
