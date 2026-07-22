@@ -1,6 +1,5 @@
 <script lang="ts">
-	import DashboardHeader from '$components/dashboard/header.svelte';
-	import Sidebar from '$components/dashboard/sidebar.svelte';
+	import { DashboardHeader, Sidebar } from '$lib/features/dashboard';
 
 	import type { LayoutProps } from './$types';
 

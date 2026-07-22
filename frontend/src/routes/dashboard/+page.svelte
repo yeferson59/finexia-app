@@ -1,9 +1,11 @@
 <script lang="ts">
-	import NetWorthCard from '$components/dashboard/net-worth-card.svelte';
-	import PortfolioOverview from '$components/dashboard/portfolio-overview.svelte';
-	import AssetAllocation from '$components/dashboard/asset-allocation.svelte';
-	import RecentActivity from '$components/dashboard/recent-activity.svelte';
-	import PortfolioGrowth from '$components/dashboard/portfolio-growth.svelte';
+	import {
+		NetWorthCard,
+		PortfolioOverview,
+		AssetAllocation,
+		RecentActivity,
+		PortfolioGrowth
+	} from '$lib/features/dashboard';
 	import PageHeader from '$lib/ui/page-header.svelte';
 
 	import type { PageProps } from './$types';

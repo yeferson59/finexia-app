@@ -328,12 +328,21 @@ Decisiones validadas con la feature piloto, que las Fases 4–6 deben seguir:
 
 *(una feature = un PR; orden sugerido de menor a mayor riesgo)*
 
-- [ ] `lib/features/dashboard/`:
-  - [ ] Mover `components/dashboard/*` (sidebar, header, net-worth-card,
+- [x] `lib/features/dashboard/`:
+  - [x] Mover `components/dashboard/*` (sidebar, header, net-worth-card,
         asset-allocation, portfolio-growth, portfolio-overview, recent-activity,
-        currency-toggle).
-  - [ ] Mover `lib/stores/investments.svelte.ts` → `features/dashboard/state/`
-        (o a `features/portfolio` si el piloto de Fase 3 sugirió otra cosa) con su spec.
+        currency-toggle) a `features/dashboard/components/`, con `index.ts` como
+        superficie pública. `currency-toggle` queda interno de `net-worth-card`
+        (import relativo); el resto se consume desde `$lib/features/dashboard`.
+  - [x] Mover `lib/stores/investments.svelte.ts` → `features/dashboard/state/`
+        con su spec; las páginas de `routes/dashboard/investments/**` importan el
+        store desde `$lib/features/dashboard`.
+        *(Verificación estándar: `pnpm check` 0 errores, `pnpm lint`, 141 unit
+        tests, 22 E2E — todo en verde.)*
+        - Nota: los widgets siguen importando `privacy` de `$lib/stores/privacy`
+          y los formatters de `$lib/utils` sin cambios; su relocalización a
+          `lib/shared` es transversal y se aborda en Fase 7 (fuera del alcance de
+          este PR de solo-dashboard).
 - [ ] `lib/features/platforms/`: extraer componentes de
       `routes/dashboard/platforms/**` (782 líneas la página de detalle).
 - [ ] `lib/features/portfolio/`:

@@ -29,8 +29,8 @@ features/<feature>/
 - Presupuesto de tamaño: una `+page.svelte` no supera ~300 líneas; ningún
   archivo de producción supera ~500. Si crece, extrae componentes aquí.
 
-> Estado: Fase 4 completada — `landing`, `legal` y `auth` ya migradas. El resto
-> de features se pueblan en las Fases 5–6 siguiendo el patrón validado en la
-> retrospectiva del piloto (sección 3.1 de
-> `docs/FRONTEND_ARCHITECTURE_MIGRATION.md`; ver también las notas de `auth` en
-> la sección 4.1).
+> Estado: `landing`, `legal`, `auth` y `dashboard` ya migradas (Fase 5 en curso:
+> `dashboard` hecho; faltan `platforms`, `portfolio` y `transactions`). El resto
+> de features siguen el patrón validado en la retrospectiva del piloto (sección
+> 3.1 de `docs/FRONTEND_ARCHITECTURE_MIGRATION.md`; ver también las notas de
+> `auth` en la sección 4.1).

@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import PageHeader from '$lib/ui/page-header.svelte';
-	import { investmentStore } from '$lib/stores/investments.svelte';
+	import { investmentStore } from '$lib/features/dashboard';
 
 	interface FormData {
 		name: string;
