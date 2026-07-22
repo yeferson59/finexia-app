@@ -1,6 +1,6 @@
 import z from 'zod';
 import type { Actions } from './$types';
-import { env } from '$env/dynamic/private';
+import * as auth from '$lib/api/auth';
 import { fail } from '@sveltejs/kit';
 
 export const actions = {
@@ -17,11 +17,7 @@ export const actions = {
 
 		// The backend response never reveals whether the email exists, so the
 		// UI reports the same generic success regardless of the outcome.
-		await fetch(`${env.BASE_API}/auth/password-reset`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ email: parsed.data.email })
-		});
+		await auth.requestPasswordReset(fetch, parsed.data.email);
 
 		return { sent: true as const };
 	}

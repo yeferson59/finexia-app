@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { authedFetch } from '$lib/server/api';
+import * as transactions from '$lib/api/transactions';
 import type { RequestHandler } from './$types';
 
 // Proxies the confirmed import (file + mapping + portfolio/platform) to the
@@ -7,10 +7,7 @@ import type { RequestHandler } from './$types';
 export const POST: RequestHandler = async ({ request, cookies, fetch }) => {
 	const form = await request.formData();
 
-	const res = await authedFetch({ cookies, fetch }, '/portfolios/transactions/import', {
-		method: 'POST',
-		body: form
-	});
+	const res = await transactions.importCommit({ cookies, fetch }, form);
 
 	return json(await res.json(), { status: res.status });
 };

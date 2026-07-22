@@ -1,6 +1,6 @@
 import z from 'zod';
 import type { Actions, PageServerLoad } from './$types';
-import { env } from '$env/dynamic/private';
+import * as auth from '$lib/api/auth';
 import { fail, redirect } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ url, fetch }) => {
@@ -12,7 +12,7 @@ export const load: PageServerLoad = async ({ url, fetch }) => {
 		};
 	}
 
-	const res = await fetch(`${env.BASE_API}/auth/verify-email?token=${encodeURIComponent(token)}`);
+	const res = await auth.validateEmailVerificationToken(fetch, token);
 	const body = await res.json().catch(() => ({}));
 
 	if (!res.ok || !body.success) {
@@ -38,11 +38,7 @@ export const actions = {
 			return fail(400, { errors: { server: 'Falta el token de verificación.' } });
 		}
 
-		const res = await fetch(`${env.BASE_API}/auth/verify-email/confirm`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ token: parsed.data.token })
-		});
+		const res = await auth.confirmEmailVerification(fetch, parsed.data.token);
 
 		if (!res.ok) {
 			const body = await res.json().catch(() => ({}));
@@ -66,11 +62,7 @@ export const actions = {
 
 		// The backend response never reveals whether the email exists or is
 		// already verified, so the UI reports the same generic success.
-		await fetch(`${env.BASE_API}/auth/verify-email`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ email: parsed.data.email })
-		});
+		await auth.requestEmailVerification(fetch, parsed.data.email);
 
 		return { resent: true as const };
 	}

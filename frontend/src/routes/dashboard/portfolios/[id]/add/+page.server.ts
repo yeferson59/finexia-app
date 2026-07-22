@@ -1,7 +1,7 @@
 import type { Actions } from './$types';
 import { z } from 'zod';
 import { redirect } from '@sveltejs/kit';
-import { authedFetch } from '$lib/server/api';
+import * as portfolio from '$lib/api/portfolio';
 
 export const actions = {
 	default: async ({ request, fetch, cookies, params }) => {
@@ -35,19 +35,9 @@ export const actions = {
 			return { success, error: error.message };
 		}
 
-		const response = await authedFetch({ cookies, fetch }, '/portfolios/entries', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(data)
-		});
+		const response = await portfolio.createEntry({ cookies, fetch }, data);
 
-		if (!response.ok) {
-			return { success: false };
-		}
-
-		const { success: responseSuccess } = await response.json();
-
-		if (!responseSuccess) {
+		if (!response.ok || !response.success) {
 			return { success: false };
 		}
 

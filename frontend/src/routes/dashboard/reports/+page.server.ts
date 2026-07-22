@@ -1,20 +1,6 @@
 import type { PageServerLoad } from './$types';
-import { authedFetchSafe } from '$lib/server/api';
-
-interface GrowthDataPoint {
-	date: string;
-	totalValue: string;
-	totalCostBase: string;
-	gainLoss: string;
-	gainLossPct: string;
-}
-
-interface GrowthSummary {
-	firstDate: string;
-	initialValue: string;
-	currentValue: string;
-	totalGrowthPct: string;
-}
+import * as portfolio from '$lib/api/portfolio';
+import type { GrowthDataPoint, GrowthSummary } from '$lib/api/types';
 
 export interface PerformanceCalendar {
 	year: string;
@@ -134,13 +120,11 @@ export const load: PageServerLoad = async ({ cookies, fetch }) => {
 		growthProjection: [] as GrowthProjectionEntry[]
 	};
 
-	const growthRes = await authedFetchSafe({ cookies, fetch }, '/portfolios/growth?period=ALL');
+	const growthRes = await portfolio.getAggregateGrowth({ cookies, fetch }, { period: 'ALL' });
 
-	if (!growthRes?.ok) return empty;
+	if (!growthRes.ok || !growthRes.success || !growthRes.data) return empty;
 
-	const { data, success } = await growthRes.json().catch(() => ({ data: null, success: false }));
-	if (!success || !data) return empty;
-
+	const data = growthRes.data;
 	const points: GrowthDataPoint[] = Array.isArray(data.points) ? data.points : [];
 	const summary: GrowthSummary = data.summary ?? {
 		firstDate: '',

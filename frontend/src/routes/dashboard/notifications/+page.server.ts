@@ -1,22 +1,14 @@
 import type { Actions, PageServerLoad } from './$types';
 import { z } from 'zod';
 import { fail } from '@sveltejs/kit';
-import { authedFetch, authedFetchSafe } from '$lib/server/api';
-
-interface UserPreferences {
-	userId: string;
-	emailAlerts: boolean;
-	weeklySummary: boolean;
-}
+import * as user from '$lib/api/user';
+import type { UserPreferences } from '$lib/api/types';
 
 export const load: PageServerLoad = async ({ cookies, fetch }) => {
-	const prefsRes = await authedFetchSafe({ cookies, fetch }, '/users/me/preferences');
+	const prefsRes = await user.getPreferences({ cookies, fetch });
 
 	let preferences: UserPreferences = { userId: '', emailAlerts: true, weeklySummary: true };
-	if (prefsRes?.ok) {
-		const { data, success } = await prefsRes.json();
-		if (success && data) preferences = data;
-	}
+	if (prefsRes.ok && prefsRes.success && prefsRes.data) preferences = prefsRes.data;
 
 	return { preferences };
 };
@@ -42,11 +34,7 @@ export const actions = {
 			});
 		}
 
-		const res = await authedFetch({ cookies, fetch }, '/users/me/preferences', {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(parsed.data)
-		});
+		const res = await user.updatePreferences({ cookies, fetch }, parsed.data);
 
 		if (!res.ok) {
 			return fail(res.status, {

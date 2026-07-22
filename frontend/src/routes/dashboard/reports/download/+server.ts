@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { authedFetchSafe } from '$lib/server/api';
+import * as transactions from '$lib/api/transactions';
 
 const REPORTS: Record<string, { path: string; filename: string }> = {
 	summary: { path: '/portfolios/export/summary', filename: 'resumen-mensual.xlsx' },
@@ -12,7 +12,7 @@ export const GET: RequestHandler = async ({ url, cookies, fetch }) => {
 	const report = REPORTS[type];
 	if (!report) return new Response('Not found', { status: 404 });
 
-	const res = await authedFetchSafe({ cookies, fetch }, report.path);
+	const res = await transactions.exportFile({ cookies, fetch }, report.path);
 
 	if (!res?.ok) return new Response('Error al generar el reporte', { status: res?.status ?? 502 });
 

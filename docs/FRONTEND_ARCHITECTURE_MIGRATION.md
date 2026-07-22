@@ -206,30 +206,33 @@ pnpm test:e2e
 - [x] Verificación estándar. *(`pnpm check` 0 errores, `pnpm lint`, 122 unit tests,
       22 E2E — todo en verde)*
 
-### Fase 2 — Capa de API tipada por dominio *(el cambio de mayor impacto)*
+### Fase 2 — Capa de API tipada por dominio *(el cambio de mayor impacto)* ✅
 
-- [ ] Crear `lib/api/types.ts` con los contratos que hoy están duplicados en los
+- [x] Crear `lib/api/types.ts` con los contratos que hoy están duplicados en los
       loaders (extraerlos de `portfolios/[id]/+page.server.ts`,
       `assets/[symbol]/+page.server.ts`, `admin/*/+page.server.ts`, etc.),
       contrastados contra `docs/API.md`.
-- [ ] Crear los módulos por dominio, cada uno con funciones tipadas que encapsulan
-      path + método + parseo (`const res = await authedFetch(...); return json as X`):
-  - [ ] `lib/api/auth.ts`
-  - [ ] `lib/api/portfolio.ts` (portfolios, holdings, entries, snapshots, growth)
-  - [ ] `lib/api/transactions.ts` (listado + import preview/commit + export)
-  - [ ] `lib/api/platforms.ts`
-  - [ ] `lib/api/market.ts` (assets, exchange rates)
-  - [ ] `lib/api/user.ts` (perfil, preferencias, avatar, admin de usuarios)
-  - [ ] `lib/api/marketing.ts` (waitlist)
-- [ ] Migrar los 24 loaders/actions/endpoints para consumir `lib/api/<dominio>` y
+- [x] Crear los módulos por dominio, cada uno con funciones tipadas que encapsulan
+      path + método + parseo (devuelven `ApiResult<T>`, o la `Response` cruda para
+      streams/proxies y los flujos públicos de auth/marketing):
+  - [x] `lib/api/auth.ts`
+  - [x] `lib/api/portfolio.ts` (portfolios, holdings, entries, snapshots, growth)
+  - [x] `lib/api/transactions.ts` (listado + import preview/commit + export)
+  - [x] `lib/api/platforms.ts`
+  - [x] `lib/api/market.ts` (assets, exchange rates)
+  - [x] `lib/api/user.ts` (perfil, preferencias, avatar, admin de usuarios + sesiones/2FA)
+  - [x] `lib/api/marketing.ts` (waitlist)
+- [x] Migrar los loaders/actions/endpoints para consumir `lib/api/<dominio>` y
       **borrar sus interfaces locales** (un commit por área de rutas: auth,
       dashboard raíz, portfolios, transactions, platforms, admin, settings, api/).
-- [ ] Eliminar el re-export temporal de `lib/server/api.ts`; verificar que
+- [x] Eliminar el re-export temporal de `lib/server/api.ts`; verificar que
       `authedFetch` solo se importa desde `lib/api/*`:
-      `grep -rn "server/api" src/routes/` debe salir vacío.
-- [ ] Mover los tests de `api.spec.ts` junto a `lib/api/` y añadir tests de los
-      módulos de dominio (paths correctos, propagación de errores).
-- [ ] Verificación estándar + E2E completo.
+      `grep -rn "server/api" src/routes/` sale vacío.
+- [x] Mover los tests de `api.spec.ts` junto a `lib/api/` (`client.spec.ts`) y
+      añadir tests de los módulos de dominio (`domains.spec.ts`: paths correctos,
+      métodos, propagación de errores).
+- [x] Verificación estándar + E2E completo. *(`pnpm check` 0 errores, `pnpm lint`,
+      134 unit tests, 22 E2E — todo en verde)*
 
 ### Fase 3 — Feature piloto: `landing` *(la más aislada; valida el patrón)*
 

@@ -1,76 +1,17 @@
 import z from 'zod';
 import { error, fail } from '@sveltejs/kit';
-import { authedFetch } from '$lib/server/api';
+import * as portfolio from '$lib/api/portfolio';
 import type { Actions, PageServerLoad } from './$types';
-
-interface Holding {
-	id: string;
-	assetId: string;
-	ticker: string;
-	name: string;
-	assetType: string;
-	exchange: string;
-	currency: string;
-	quantity: string;
-	price: string;
-	marketPrice: string;
-	costCurrency: string;
-	category: string;
-	entryDate: string;
-	notes: string;
-}
-
-interface PortfolioDetail {
-	id: string;
-	userId: string;
-	name: string;
-	description: string;
-	type: string;
-	baseCurrency: string;
-	isDefault: boolean;
-	riskId: string;
-	riskName: string;
-	createdAt: string;
-	updatedAt: string;
-	holdings: Holding[];
-}
-
-interface Risk {
-	id: string;
-	name: string;
-	description: string;
-}
-
-interface TopTransaction {
-	value: string;
-	type: string;
-	currency: string;
-	assetTicker: string;
-	assetName: string;
-	transactionDate: string;
-}
-
-interface GrowthDataPoint {
-	date: string;
-	totalValue: string;
-	totalCostBase: string;
-	gainLoss: string;
-	gainLossPct: string;
-}
-
-interface GrowthSummary {
-	firstDate: string;
-	initialValue: string;
-	currentValue: string;
-	totalGrowthPct: string;
-}
+import type { PortfolioGrowth, Risk, TopTransaction } from '$lib/api/types';
 
 export const load: PageServerLoad = async ({ cookies, fetch, params }) => {
+	const event = { cookies, fetch };
+
 	const [portfolioRes, risksRes, topTxRes, growthRes] = await Promise.all([
-		authedFetch({ cookies, fetch }, `/portfolios/${params.id}`),
-		authedFetch({ cookies, fetch }, '/portfolios/risks'),
-		authedFetch({ cookies, fetch }, `/portfolios/${params.id}/top-transaction`),
-		authedFetch({ cookies, fetch }, `/portfolios/${params.id}/growth`)
+		portfolio.getPortfolio(event, params.id),
+		portfolio.getRisks(event),
+		portfolio.getTopTransaction(event, params.id),
+		portfolio.getPortfolioGrowth(event, params.id)
 	]);
 
 	if (!portfolioRes.ok) {
@@ -80,32 +21,22 @@ export const load: PageServerLoad = async ({ cookies, fetch, params }) => {
 		return { portfolio: null, risks: [], topTransaction: null, growth: null };
 	}
 
-	const { data, success } = await portfolioRes.json();
-
-	if (!success || !data) {
+	if (!portfolioRes.success || !portfolioRes.data) {
 		return { portfolio: null, risks: [], topTransaction: null, growth: null };
 	}
 
-	let risks: Risk[] = [];
-	if (risksRes.ok) {
-		const risksJson = await risksRes.json();
-		risks = risksJson.data ?? [];
-	}
+	const risks: Risk[] = risksRes.ok ? (risksRes.data ?? []) : [];
 
 	let topTransaction: TopTransaction | null = null;
 	if (topTxRes.ok) {
-		const topTxJson = await topTxRes.json();
-		const tx = topTxJson.data as TopTransaction;
+		const tx = topTxRes.data;
 		topTransaction = tx?.assetTicker ? tx : null;
 	}
 
-	let growth: { points: GrowthDataPoint[]; summary: GrowthSummary } | null = null;
-	if (growthRes.ok) {
-		const growthJson = await growthRes.json();
-		if (growthJson.success && growthJson.data) growth = growthJson.data;
-	}
+	let growth: PortfolioGrowth | null = null;
+	if (growthRes.ok && growthRes.success && growthRes.data) growth = growthRes.data;
 
-	return { portfolio: data as PortfolioDetail, risks, topTransaction, growth };
+	return { portfolio: portfolioRes.data, risks, topTransaction, growth };
 };
 
 export const actions: Actions = {
@@ -136,11 +67,7 @@ export const actions: Actions = {
 			return fail(400, { action: 'updatePortfolio', success: false, error: zodError.message });
 		}
 
-		const res = await authedFetch({ cookies, fetch }, `/portfolios/${params.id}`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(data)
-		});
+		const res = await portfolio.updatePortfolio({ cookies, fetch }, params.id, data);
 
 		if (!res.ok) {
 			return fail(400, {
@@ -150,7 +77,6 @@ export const actions: Actions = {
 			});
 		}
 
-		const json = await res.json();
-		return { action: 'updatePortfolio', success: json.success ?? false };
+		return { action: 'updatePortfolio', success: res.success };
 	}
 };

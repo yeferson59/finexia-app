@@ -1,6 +1,6 @@
 import z from 'zod';
 import type { Actions, PageServerLoad } from './$types';
-import { env } from '$env/dynamic/private';
+import * as auth from '$lib/api/auth';
 import { redirect, fail } from '@sveltejs/kit';
 import { parseRefreshSetCookie, setAccessCookie, setRefreshCookie } from '$lib/server/session';
 import { features } from '$lib/shared/config/features';
@@ -27,10 +27,9 @@ export const actions = {
 			return fail(400, { type: 'login' as const, errors: loginDto.error.issues });
 		}
 
-		const response = await fetch(`${env.BASE_API}/auth/login`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ email: loginDto.data.email, password: loginDto.data.password })
+		const response = await auth.login(fetch, {
+			email: loginDto.data.email,
+			password: loginDto.data.password
 		});
 
 		if (!response.ok) {
@@ -101,10 +100,9 @@ export const actions = {
 			});
 		}
 
-		const response = await fetch(`${env.BASE_API}/auth/2fa/login`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ token: parsed.data.token, code: parsed.data.code })
+		const response = await auth.twoFactorLogin(fetch, {
+			token: parsed.data.token,
+			code: parsed.data.code
 		});
 
 		if (!response.ok) {
@@ -181,11 +179,7 @@ export const actions = {
 			});
 		}
 
-		const response = await fetch(`${env.BASE_API}/auth/register`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(data)
-		});
+		const response = await auth.register(fetch, data);
 
 		if (!response.ok) {
 			const body = await response.json().catch(() => ({}));

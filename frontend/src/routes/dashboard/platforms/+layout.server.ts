@@ -1,14 +1,12 @@
 import type { LayoutServerLoad } from './$types';
-import { authedFetch } from '$lib/server/api';
+import * as platforms from '$lib/api/platforms';
 
 export const load: LayoutServerLoad = async ({ cookies, fetch }) => {
-	const res = await authedFetch({ cookies, fetch }, '/portfolios/sources');
+	const res = await platforms.getSources({ cookies, fetch });
 
-	const { data, success } = await res.json();
-
-	if (!success) {
+	if (!res.success) {
 		return { platforms: [] };
 	}
 
-	return { platforms: data };
+	return { platforms: res.data ?? [] };
 };

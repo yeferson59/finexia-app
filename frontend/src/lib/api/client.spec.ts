@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { isRedirect } from '@sveltejs/kit';
-import { authedFetch, authedFetchSafe } from './api';
-import { ACCESS_COOKIE, REFRESH_COOKIE } from './session';
-import { createMockCookies, jsonResponse } from './testing';
+import { apiRequest, apiRequestSafe, authedFetch, authedFetchSafe } from './client';
+import { ACCESS_COOKIE, REFRESH_COOKIE } from '$lib/server/session';
+import { createMockCookies, jsonResponse } from '$lib/server/testing';
 
 /** A refresh response the backend would send: new access token + rotated cookie. */
 function refreshOk(accessToken = 'refreshed-access') {
@@ -145,5 +145,73 @@ describe('authedFetchSafe', () => {
 		const res = await authedFetchSafe({ cookies, fetch }, '/dashboard');
 
 		expect(res?.status).toBe(200);
+	});
+});
+
+describe('apiRequest', () => {
+	it('flattens a successful envelope into an ApiResult', async () => {
+		const cookies = createMockCookies({ [ACCESS_COOKIE]: 'access-1' });
+		const fetch = vi
+			.fn()
+			.mockResolvedValue(jsonResponse({ success: true, data: { id: 'p1' }, message: 'ok' }));
+
+		const res = await apiRequest<{ id: string }>({ cookies, fetch }, '/portfolios/p1');
+
+		expect(res).toEqual({
+			ok: true,
+			status: 200,
+			success: true,
+			data: { id: 'p1' },
+			message: 'ok',
+			details: undefined,
+			action: undefined
+		});
+	});
+
+	it('propagates status, message, details and action on an error envelope', async () => {
+		const cookies = createMockCookies({ [ACCESS_COOKIE]: 'access-1' });
+		const fetch = vi
+			.fn()
+			.mockResolvedValue(
+				jsonResponse(
+					{ success: false, message: 'nope', details: 'boom', action: 'x:err' },
+					{ status: 404 }
+				)
+			);
+
+		const res = await apiRequest({ cookies, fetch }, '/portfolios/missing');
+
+		expect(res.ok).toBe(false);
+		expect(res.status).toBe(404);
+		expect(res.success).toBe(false);
+		expect(res.data).toBeNull();
+		expect(res.message).toBe('nope');
+		expect(res.details).toBe('boom');
+		expect(res.action).toBe('x:err');
+	});
+});
+
+describe('apiRequestSafe', () => {
+	it('degrades to ok:false with status 0 when the backend is unreachable', async () => {
+		const cookies = createMockCookies({ [ACCESS_COOKIE]: 'access-1' });
+		const fetch = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+
+		const res = await apiRequestSafe({ cookies, fetch }, '/dashboard');
+
+		expect(res).toEqual({ ok: false, status: 0, success: false, data: null });
+	});
+
+	it('re-throws redirects so an expired session still bounces to /auth', async () => {
+		const cookies = createMockCookies();
+		const fetch = vi.fn();
+
+		let thrown: unknown;
+		try {
+			await apiRequestSafe({ cookies, fetch }, '/dashboard');
+		} catch (e) {
+			thrown = e;
+		}
+
+		expect(isRedirect(thrown)).toBe(true);
 	});
 });
