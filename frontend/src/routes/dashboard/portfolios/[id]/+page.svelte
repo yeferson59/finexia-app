@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import PortfolioGrowth from '$components/dashboard/portfolio-growth.svelte';
+	import PortfolioGrowth from '$lib/features/dashboard/components/portfolio-growth.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
 	import {
 		PortfolioEditForm,
