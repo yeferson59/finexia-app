@@ -1,7 +1,7 @@
 import z from 'zod';
 import type { Actions } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { authedFetch } from '$lib/server/api';
+import * as platforms from '$lib/api/platforms';
 
 export const actions = {
 	default: async ({ request, cookies, fetch }) => {
@@ -23,19 +23,9 @@ export const actions = {
 			return { error: error.message };
 		}
 
-		const res = await authedFetch({ cookies, fetch }, '/portfolios/sources', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(data)
-		});
+		const res = await platforms.createSource({ cookies, fetch }, data);
 
-		if (!res.ok) {
-			return { error: 'Failed to add platform' };
-		}
-
-		const { success: successResponse } = await res.json();
-
-		if (!successResponse) {
+		if (!res.ok || !res.success) {
 			return { error: 'Failed to add platform' };
 		}
 

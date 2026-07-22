@@ -1,7 +1,7 @@
 import z from 'zod';
 import { error, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { authedFetch } from '$lib/server/api';
+import * as platforms from '$lib/api/platforms';
 
 export const load: PageServerLoad = async ({ params, parent }) => {
 	const { platforms } = await parent();
@@ -43,22 +43,15 @@ export const actions: Actions = {
 			return { success: false, error: zodError.message };
 		}
 
-		const res = await authedFetch({ cookies, fetch }, `/portfolios/sources/${params.id}`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(data)
-		});
+		const res = await platforms.updateSource({ cookies, fetch }, params.id, data);
 
 		if (!res.ok) return { success: false, error: 'Error al actualizar la plataforma' };
 
-		const json = await res.json();
-		return { success: json.success ?? false };
+		return { success: res.success };
 	},
 
 	delete: async ({ cookies, fetch, params }) => {
-		const res = await authedFetch({ cookies, fetch }, `/portfolios/sources/${params.id}`, {
-			method: 'DELETE'
-		});
+		const res = await platforms.deleteSource({ cookies, fetch }, params.id);
 
 		if (!res.ok) return { success: false, error: 'Error al eliminar la plataforma' };
 

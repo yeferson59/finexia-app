@@ -190,10 +190,14 @@ export interface PagedTransactions {
 export interface Platform {
 	id: string;
 	name: string;
-	description?: string;
+	description: string;
+	sourceType: string;
+	/** Alias histórico de `sourceType` en algunas vistas/formularios. */
 	type?: string;
-	isActive?: boolean;
-	createdAt?: string;
+	isActive: boolean;
+	investments: number;
+	totalValue: string;
+	createdAt: string;
 }
 
 // ---------------------------------------------------------------------------
