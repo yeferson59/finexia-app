@@ -1,17 +1,10 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-	import { resolve } from '$app/paths';
-	import Button from '$lib/ui/button.svelte';
-	import Input from '$lib/ui/input.svelte';
-	type FormResult = {
-		type: 'login' | 'register';
-		errors: Record<string, string> | Array<{ path: PropertyKey[]; message: string }>;
-		unverified?: boolean;
-		duplicateEmail?: boolean;
-		disabled?: boolean;
-		twoFactorRequired?: boolean;
-		twoFactorToken?: string;
-	} | null;
+	import '../auth-forms.css';
+	import LoginForm from './login-form.svelte';
+	import TwoFactorChallenge from './two-factor-challenge.svelte';
+	import RegisterForm from './register-form.svelte';
+	import InviteOnlyNotice from './invite-only-notice.svelte';
+	import type { AuthActionResult } from '../types';
 
 	// Resolved server-side from the `selfRegistration` feature flag so the
 	// component never needs `$env/dynamic/public` itself — that module is only
@@ -21,37 +14,14 @@
 	let {
 		form,
 		selfRegistrationEnabled = false
-	}: { form: FormResult; selfRegistrationEnabled?: boolean } = $props();
-
-	function parseErrors(errors: unknown): Record<string, string> {
-		if (!errors) return {};
-		if (Array.isArray(errors)) {
-			const result: Record<string, string> = {};
-			for (const issue of errors) {
-				const key = issue?.path?.[0] ? String(issue.path[0]) : 'server';
-				if (!result[key]) result[key] = issue.message ?? 'Campo inválido';
-			}
-			return result;
-		}
-		if (typeof errors === 'object') return errors as Record<string, string>;
-		return {};
-	}
+	}: { form: AuthActionResult; selfRegistrationEnabled?: boolean } = $props();
 
 	// Form state
 	let isLoginMode = $state(true);
 	let slideDirection = $state<'left' | 'right'>('right');
-	let showPassword = $state(false);
-	let showConfirmPassword = $state(false);
-	let isSubmitting = $state(false);
-
-	// Login form
-	let loginEmail = $state('');
-	let loginPassword = $state('');
-	let loginErrors: Record<string, string> = $state({});
 
 	// Two-factor step: the server validated the password and handed back a
 	// short-lived token; the session only exists after a valid TOTP code.
-	let twoFactorCode = $state('');
 	const twoFactorRequired = $derived(
 		form?.type === 'login' && form.twoFactorRequired === true && !!form.twoFactorToken
 	);
@@ -59,38 +29,16 @@
 		form?.type === 'login' && form.twoFactorToken ? form.twoFactorToken : ''
 	);
 
-	// Register form
-	let registerEmail = $state('');
-	let registerPassword = $state('');
-	let registerConfirmPassword = $state('');
-	let registerName = $state('');
-	let agreeTerms = $state(false);
-	let registerErrors: Record<string, string> = $state({});
-
-	// Sync server-side form errors into local state
-	$effect(() => {
-		if (!form) return;
-		if (form.type === 'login') {
-			loginErrors = parseErrors(form.errors);
-		} else if (form.type === 'register') {
-			registerErrors = parseErrors(form.errors);
-		}
-	});
-
 	const switchToLogin = () => {
 		if (isLoginMode) return;
 		slideDirection = 'left';
 		isLoginMode = true;
-		loginErrors = {};
-		registerErrors = {};
 	};
 
 	const switchToRegister = () => {
 		if (!isLoginMode) return;
 		slideDirection = 'right';
 		isLoginMode = false;
-		loginErrors = {};
-		registerErrors = {};
 	};
 </script>
 
@@ -245,309 +193,13 @@
 			<!-- Forms Section -->
 			<section class="forms-container">
 				{#if isLoginMode && twoFactorRequired}
-					<form
-						method="POST"
-						action="?/twoFactor"
-						class="form-content"
-						id="two-factor-form"
-						use:enhance={() => {
-							isSubmitting = true;
-							loginErrors = {};
-							return async ({ update }) => {
-								await update({ reset: false });
-								isSubmitting = false;
-							};
-						}}
-					>
-						<p class="two-factor-title">Verificación en dos pasos</p>
-						<p class="two-factor-copy">
-							Ingresa el código de 6 dígitos de tu aplicación de autenticación o uno de tus códigos
-							de recuperación.
-						</p>
-
-						<input type="hidden" name="token" value={twoFactorToken} />
-
-						<Input
-							label="Código de verificación"
-							id="two-factor-code"
-							name="code"
-							type="text"
-							placeholder="123456"
-							autocomplete="one-time-code"
-							bind:value={twoFactorCode}
-							error={loginErrors['code']}
-							required
-						/>
-
-						{#if loginErrors['server']}
-							<p class="error-server" role="alert">{loginErrors['server']}</p>
-						{/if}
-
-						<Button type="submit" variant="primary" size="lg" loading={isSubmitting} fullWidth>
-							{isSubmitting ? 'Verificando...' : 'Verificar'}
-						</Button>
-					</form>
+					<TwoFactorChallenge {form} token={twoFactorToken} />
 				{:else if isLoginMode}
-					<form
-						method="POST"
-						action="?/login"
-						class="form-content"
-						class:slide-left={slideDirection === 'left'}
-						id="login-form"
-						use:enhance={() => {
-							isSubmitting = true;
-							loginErrors = {};
-							return async ({ update }) => {
-								await update({ reset: false });
-								isSubmitting = false;
-							};
-						}}
-					>
-						<Input
-							label="Email"
-							id="login-email"
-							name="email"
-							type="email"
-							placeholder="tu@email.com"
-							bind:value={loginEmail}
-							error={loginErrors['email']}
-							required
-						/>
-
-						<div class="password-wrapper">
-							<Input
-								label="Contraseña"
-								id="login-password"
-								name="password"
-								type={showPassword ? 'text' : 'password'}
-								placeholder="Ingresa tu contraseña"
-								bind:value={loginPassword}
-								error={loginErrors['password']}
-								required
-							/>
-							<button
-								type="button"
-								class="password-toggle"
-								onclick={() => (showPassword = !showPassword)}
-								aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-							>
-								{#if showPassword}
-									<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-										<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-										<circle cx="12" cy="12" r="3"></circle>
-									</svg>
-								{:else}
-									<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-										<path
-											d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1 4.24 4.24"
-										></path>
-										<line x1="1" y1="1" x2="23" y2="23"></line>
-									</svg>
-								{/if}
-							</button>
-						</div>
-
-						<div class="form-footer">
-							<a href={resolve('/auth/forgot-password')} class="forgot-link"
-								>¿Olvidaste tu contraseña?</a
-							>
-						</div>
-
-						{#if loginErrors['server']}
-							<p class="error-server" role="alert">{loginErrors['server']}</p>
-						{/if}
-
-						{#if form?.type === 'login' && form.unverified}
-							<a href={resolve('/auth/verify-email')} class="resend-link">
-								Reenviar enlace de verificación
-							</a>
-						{/if}
-
-						<Button type="submit" variant="primary" size="lg" loading={isSubmitting} fullWidth>
-							{isSubmitting ? 'Iniciando sesión...' : 'Iniciar sesión'}
-						</Button>
-
-						<div class="form-switch">
-							¿No tienes cuenta?
-							<button type="button" onclick={switchToRegister} class="switch-link">
-								Crear una
-							</button>
-						</div>
-					</form>
+					<LoginForm {form} {slideDirection} onSwitchToRegister={switchToRegister} />
 				{:else if !selfRegistrationEnabled}
-					<div
-						class="form-content invite-only"
-						class:slide-left={slideDirection === 'left'}
-						id="register-form"
-					>
-						<p class="invite-only-title">Registro por invitación</p>
-						<p class="invite-only-copy">
-							FINEXIA está en fase beta y el acceso es solo por invitación. Únete a la lista de
-							espera y te avisaremos en cuanto tengas un cupo.
-						</p>
-
-						<a href="{resolve('/')}#waitlist" class="invite-only-cta">
-							Unirme a la lista de espera
-						</a>
-
-						<div class="form-switch">
-							¿Ya tienes cuenta?
-							<button type="button" onclick={switchToLogin} class="switch-link">
-								Inicia sesión
-							</button>
-						</div>
-					</div>
+					<InviteOnlyNotice {slideDirection} onSwitchToLogin={switchToLogin} />
 				{:else}
-					<form
-						method="POST"
-						action="?/register"
-						class="form-content"
-						class:slide-left={slideDirection === 'left'}
-						id="register-form"
-						use:enhance={() => {
-							isSubmitting = true;
-							registerErrors = {};
-							return async ({ update }) => {
-								await update({ reset: false });
-								isSubmitting = false;
-							};
-						}}
-					>
-						<Input
-							label="Nombre completo"
-							id="register-name"
-							name="name"
-							type="text"
-							placeholder="Juan Pérez"
-							bind:value={registerName}
-							error={registerErrors['name']}
-							required
-						/>
-
-						<Input
-							label="Email"
-							id="register-email"
-							name="email"
-							type="email"
-							placeholder="tu@email.com"
-							bind:value={registerEmail}
-							error={registerErrors['email']}
-							required
-						/>
-
-						<div class="password-wrapper">
-							<Input
-								label="Contraseña"
-								id="register-password"
-								name="password"
-								type={showPassword ? 'text' : 'password'}
-								placeholder="Crea una contraseña segura"
-								bind:value={registerPassword}
-								error={registerErrors['password']}
-								required
-							/>
-							<button
-								type="button"
-								class="password-toggle"
-								onclick={() => (showPassword = !showPassword)}
-								aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-							>
-								{#if showPassword}
-									<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-										<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-										<circle cx="12" cy="12" r="3"></circle>
-									</svg>
-								{:else}
-									<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-										<path
-											d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1 4.24 4.24"
-										></path>
-										<line x1="1" y1="1" x2="23" y2="23"></line>
-									</svg>
-								{/if}
-							</button>
-						</div>
-
-						<div class="password-wrapper">
-							<Input
-								label="Confirmar contraseña"
-								id="register-confirm"
-								name="confirmPassword"
-								type={showConfirmPassword ? 'text' : 'password'}
-								placeholder="Repite tu contraseña"
-								bind:value={registerConfirmPassword}
-								error={registerErrors['confirmPassword']}
-								required
-							/>
-							<button
-								type="button"
-								class="password-toggle"
-								onclick={() => (showConfirmPassword = !showConfirmPassword)}
-								aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-							>
-								{#if showConfirmPassword}
-									<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-										<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-										<circle cx="12" cy="12" r="3"></circle>
-									</svg>
-								{:else}
-									<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-										<path
-											d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1 4.24 4.24"
-										></path>
-										<line x1="1" y1="1" x2="23" y2="23"></line>
-									</svg>
-								{/if}
-							</button>
-						</div>
-
-						<div class="consent">
-							<input
-								type="checkbox"
-								id="terms"
-								name="terms"
-								class="consent-input"
-								bind:checked={agreeTerms}
-							/>
-							<label for="terms" class="consent-label">
-								Autorizo el tratamiento de mis datos personales según la
-								<a href={resolve('/privacidad')} target="_blank" rel="noopener"
-									>Política de Privacidad</a
-								>
-								y acepto los
-								<a href={resolve('/terminos')} target="_blank" rel="noopener"
-									>Términos y Condiciones</a
-								>.
-							</label>
-						</div>
-						{#if registerErrors['terms']}
-							<span class="error-message">{registerErrors['terms']}</span>
-						{/if}
-
-						{#if registerErrors['server']}
-							<p class="error-server" role="alert">{registerErrors['server']}</p>
-						{/if}
-
-						{#if form?.type === 'register' && form.duplicateEmail}
-							<button type="button" onclick={switchToLogin} class="resend-link">
-								Iniciar sesión con este correo
-							</button>
-							<a href={resolve('/auth/forgot-password')} class="resend-link">
-								¿Olvidaste tu contraseña?
-							</a>
-						{/if}
-
-						<Button type="submit" variant="primary" size="lg" loading={isSubmitting} fullWidth>
-							{isSubmitting ? 'Creando cuenta...' : 'Crear cuenta'}
-						</Button>
-
-						<div class="form-switch">
-							¿Ya tienes cuenta?
-							<button type="button" onclick={switchToLogin} class="switch-link">
-								Inicia sesión
-							</button>
-						</div>
-					</form>
+					<RegisterForm {form} {slideDirection} onSwitchToLogin={switchToLogin} />
 				{/if}
 			</section>
 
@@ -912,223 +564,7 @@
 		margin-bottom: 0.5rem;
 	}
 
-	.form-content {
-		display: flex;
-		flex-direction: column;
-		gap: 1.5rem;
-		animation: slide-in-right 0.32s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-	}
-
-	.form-content.slide-left {
-		animation: slide-in-left 0.32s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-	}
-
-	@keyframes slide-in-right {
-		from {
-			opacity: 0;
-			transform: translateX(14px);
-		}
-		to {
-			opacity: 1;
-			transform: translateX(0);
-		}
-	}
-
-	@keyframes slide-in-left {
-		from {
-			opacity: 0;
-			transform: translateX(-14px);
-		}
-		to {
-			opacity: 1;
-			transform: translateX(0);
-		}
-	}
-
-	.password-wrapper {
-		position: relative;
-		width: 100%;
-	}
-
-	.password-toggle {
-		position: absolute;
-		right: 0.75rem;
-		top: 50%;
-		margin-top: 1.125rem;
-		transform: translateY(-50%);
-		background: none;
-		border: none;
-		color: var(--text-secondary);
-		cursor: pointer;
-		transition: all 0.25s ease;
-		padding: 0.5rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 40px;
-		height: 40px;
-		z-index: 10;
-	}
-
-	.password-toggle:hover {
-		color: var(--gold-primary);
-		transform: translateY(-50%) scale(1.1);
-	}
-
-	.password-toggle svg {
-		stroke-width: 2;
-	}
-
-	.form-footer {
-		display: flex;
-		justify-content: flex-end;
-		margin-top: -0.75rem;
-	}
-
-	.forgot-link {
-		font-size: 0.8rem;
-		color: var(--gold-primary);
-		text-decoration: none;
-		transition: color 0.25s ease;
-		font-weight: 500;
-		letter-spacing: 0.3px;
-	}
-
-	.forgot-link:hover {
-		color: var(--gold-light);
-		text-decoration: underline;
-	}
-
-	.form-switch {
-		text-align: center;
-		font-size: 0.9rem;
-		color: var(--text-secondary);
-		letter-spacing: 0.3px;
-		margin-top: 0.5rem;
-	}
-
-	.switch-link {
-		background: none;
-		border: none;
-		color: var(--gold-primary);
-		cursor: pointer;
-		font-weight: 700;
-		font-family: var(--font-body);
-		transition: color 0.25s ease;
-		padding: 0;
-		letter-spacing: 0.4px;
-		font-size: 0.9rem;
-	}
-
-	.switch-link:hover {
-		color: var(--gold-light);
-		text-decoration: underline;
-	}
-
-	/* ── Consent (Habeas Data / Ley 1581 de 2012) ───────────── */
-	.consent {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.75rem;
-	}
-
-	.consent-input {
-		appearance: none;
-		width: 20px;
-		height: 20px;
-		margin-top: 1px;
-		border: 1.5px solid rgba(212, 145, 42, 0.3);
-		border-radius: 6px;
-		background: rgba(255, 255, 255, 0.03);
-		cursor: pointer;
-		transition: all 0.25s ease;
-		position: relative;
-		flex-shrink: 0;
-	}
-
-	.consent-input:hover {
-		border-color: rgba(212, 145, 42, 0.5);
-	}
-
-	.consent-input:checked {
-		background: var(--amber);
-		border-color: var(--amber);
-	}
-
-	.consent-input:checked::after {
-		content: '✓';
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		color: #0d0800;
-		font-size: 0.875rem;
-		font-weight: 700;
-	}
-
-	.consent-input:focus-visible {
-		outline: 2px solid var(--amber);
-		outline-offset: 2px;
-	}
-
-	.consent-label {
-		font-size: 0.8rem;
-		line-height: 1.5;
-		color: var(--text-secondary);
-		cursor: pointer;
-		letter-spacing: 0.2px;
-		font-weight: 500;
-	}
-
-	.consent-label a {
-		color: var(--gold-primary);
-		text-decoration: underline;
-		text-underline-offset: 2px;
-		font-weight: 600;
-	}
-
-	.consent-label a:hover {
-		color: var(--gold-light);
-	}
-
-	.error-message {
-		font-size: 0.75rem;
-		color: var(--error-color);
-		margin-top: -1rem;
-		letter-spacing: 0.2px;
-		font-weight: 500;
-	}
-
-	.error-server {
-		font-size: 0.85rem;
-		color: var(--error-color);
-		background: rgba(var(--red-rgb, 220, 53, 69), 0.08);
-		border: 1px solid rgba(var(--red-rgb, 220, 53, 69), 0.25);
-		border-radius: 8px;
-		padding: 0.75rem 1rem;
-		margin: 0;
-		text-align: center;
-		font-weight: 500;
-		letter-spacing: 0.2px;
-	}
-
-	.resend-link {
-		display: block;
-		width: 100%;
-		text-align: center;
-		font-size: 0.85rem;
-		color: var(--gold-primary);
-		text-decoration: none;
-		font-weight: 600;
-		margin-top: -0.75rem;
-		background: none;
-		border: none;
-		padding: 0;
-		font-family: inherit;
-		cursor: pointer;
-	}
-
-	/* ── Invite-only register panel (beta) ──────────────────── */
+	/* ── Invite-only badge (beta) ────────────────────────────── */
 	.beta-badge {
 		display: inline-block;
 		margin-left: 0.4rem;
@@ -1142,64 +578,6 @@
 		letter-spacing: 0.4px;
 		text-transform: uppercase;
 		vertical-align: middle;
-	}
-
-	.invite-only {
-		text-align: center;
-	}
-
-	.two-factor-title {
-		font-size: 1.1rem;
-		font-weight: 700;
-		color: var(--text-primary);
-		margin: 0;
-	}
-
-	.two-factor-copy {
-		font-size: 0.9rem;
-		line-height: 1.6;
-		color: var(--text-secondary);
-		margin: 0;
-	}
-
-	.invite-only-title {
-		font-size: 1.1rem;
-		font-weight: 700;
-		color: var(--text-primary);
-		margin: 0;
-	}
-
-	.invite-only-copy {
-		font-size: 0.9rem;
-		line-height: 1.6;
-		color: var(--text-secondary);
-		margin: 0;
-	}
-
-	.invite-only-cta {
-		display: block;
-		width: 100%;
-		padding: 1rem 2rem;
-		border-radius: 8px;
-		background: var(--amber);
-		color: #0d0800;
-		font-weight: 600;
-		font-size: 0.95rem;
-		text-align: center;
-		text-decoration: none;
-		letter-spacing: 0.5px;
-		box-shadow: 0 4px 16px rgba(212, 145, 42, 0.2);
-		transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-	}
-
-	.invite-only-cta:hover {
-		background: var(--amber-light);
-		transform: translateY(-2px);
-		box-shadow: 0 6px 24px rgba(212, 145, 42, 0.35);
-	}
-
-	.resend-link:hover {
-		text-decoration: underline;
 	}
 
 	/* ── Divider + Social ────────────────────────────────────── */
@@ -1352,10 +730,6 @@
 			margin-bottom: 2rem;
 		}
 
-		.form-content {
-			gap: 1.25rem;
-		}
-
 		.social-auth {
 			grid-template-columns: 1fr;
 		}
@@ -1368,10 +742,6 @@
 	@media (max-width: 360px) {
 		.auth-card {
 			padding: 1.5rem 1rem;
-		}
-
-		.form-content {
-			gap: 1rem;
 		}
 	}
 </style>

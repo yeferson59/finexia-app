@@ -277,20 +277,52 @@ Decisiones validadas con la feature piloto, que las Fases 4–6 deben seguir:
 - **Cero cambios de markup/estilos**: solo se movieron archivos y se reescribieron
   imports; los E2E de landing y SEO pasan sin tocar snapshots.
 
-### Fase 4 — Feature `auth` *(la más sensible)*
+### Fase 4 — Feature `auth` *(la más sensible)* ✅
 
-- [ ] Crear `lib/features/auth/` y **trocear `login-register.svelte` (1.377 líneas)**
+- [x] Crear `lib/features/auth/` y **trocear `login-register.svelte` (1.377 líneas)**
       en componentes: `login-form`, `register-form`, `two-factor-challenge`,
-      más los formularios de `forgot/reset password`, `verify-email` y
-      `accept-invite` que hoy viven en sus páginas.
-- [ ] Centralizar los schemas Zod de auth en `features/auth/schemas.ts`
-      (hoy repartidos por las actions).
-- [ ] Adelgazar las páginas de `routes/auth/**`: actions que validan con los
-      schemas de la feature y llaman a `lib/api/auth`; markup que compone los
-      componentes de la feature.
-- [ ] Migrar `login-register.svelte.spec.ts` a specs por componente extraído.
-- [ ] Verificación estándar + E2E de auth completo (login, registro, 2FA si hay
-      flujo, forgot/reset, verify, invite).
+      `invite-only-notice` y `password-input` (el campo con toggle de visibilidad,
+      antes duplicado 3×), orquestados por el contenedor `login-register`; más los
+      formularios `forgot-password-form`, `reset-password-form`, `verify-email-panel`
+      y `accept-invite-form` que hoy vivían en sus páginas.
+- [x] Centralizar los schemas Zod de auth en `features/auth/schemas.ts`
+      (login, 2FA, registro, forgot/reset, accept-invite, verify/resend), antes
+      repartidos por las actions.
+- [x] Adelgazar las páginas de `routes/auth/**`: las actions validan con los
+      schemas de la feature y llaman a `lib/api/auth`; el markup solo compone los
+      componentes de la feature (las 4 páginas standalone quedan en ~12 líneas).
+- [x] Migrar `login-register.svelte.spec.ts` a specs por componente extraído
+      (`login-register` contenedor, `login-form`, `register-form`,
+      `invite-only-notice`, `password-input`).
+- [x] Verificación estándar + E2E de auth completo. *(`pnpm check` 0 errores,
+      `pnpm lint`, 141 unit tests, 22 E2E — todo en verde)*
+
+#### 4.1 Notas de la migración de `auth`
+
+- **CSS scoped → dos estrategias según el reparto:** al trocear un componente con
+  estilos scoped, el markup movido a un hijo pierde esos estilos (Svelte los
+  aísla por componente). Se resolvió así:
+  - Las clases compartidas por varios sub-formularios de `login-register`
+    (`.form-content`, `.error-server`, `.form-switch`, `.switch-link`,
+    `.resend-link`, `.forgot-link`, `.form-footer`) —todas exclusivas de auth y
+    sin colisión con otros estilos globales— bajaron a un `auth-forms.css` global
+    importado una sola vez por el contenedor (patrón `landing.css`). Las variables
+    `--gold-primary`/`--text-secondary`/`--error-color` se heredan por DOM desde
+    `main.auth-container`, así que los hijos resuelven `var(...)` sin cambios.
+  - Las clases propias de un único formulario (`.consent*`, `.two-factor-*`,
+    `.invite-only-*`, `.password-*`) y **las de nombre genérico** (`.error-message`,
+    y todo el chrome de las páginas standalone: `.wrap`, `.card`, `.brand`,
+    `.title`, `.eyebrow`…) se mantuvieron **scoped** en su componente para evitar
+    colisiones globales (p. ej. `.error-message` también existe scoped en
+    `portfolios/add`). Las páginas standalone se movieron **verbatim** a su
+    componente, preservando exactamente el scope actual.
+- **Estado de formulario dentro de cada hijo:** cada sub-formulario deriva sus
+  errores del prop `form` con `$derived(parseErrors(...))` y posee su propio
+  estado de campos/envío; el contenedor solo decide qué formulario mostrar y
+  gestiona el toggle login/registro. `parseErrors` se extrajo a `utils.ts`.
+- **`svelte:head` se queda en la página:** las páginas standalone conservan su
+  `<svelte:head>` (título + `robots noindex`) como orquestación de página; el
+  componente de feature solo aporta el `<main>` del formulario.
 
 ### Fase 5 — Features del área de inversión: `portfolio`, `dashboard`, `transactions`, `platforms`
 

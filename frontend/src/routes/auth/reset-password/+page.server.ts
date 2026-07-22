@@ -1,7 +1,7 @@
-import z from 'zod';
 import type { Actions, PageServerLoad } from './$types';
 import * as auth from '$lib/api/auth';
 import { fail, redirect } from '@sveltejs/kit';
+import { resetPasswordSchema } from '$lib/features/auth';
 
 export const load: PageServerLoad = async ({ url, fetch }) => {
 	const token = url.searchParams.get('token');
@@ -27,18 +27,11 @@ export const actions = {
 	confirm: async ({ request, fetch }) => {
 		const formData = await request.formData();
 
-		const parsed = await z
-			.object({
-				token: z.string().min(1),
-				// Mirror the backend bounds (min=8,max=20) so login never rejects it.
-				password: z.string().min(8).max(20),
-				confirmPassword: z.string().min(8).max(20)
-			})
-			.safeParseAsync({
-				token: formData.get('token'),
-				password: formData.get('password'),
-				confirmPassword: formData.get('confirmPassword')
-			});
+		const parsed = await resetPasswordSchema.safeParseAsync({
+			token: formData.get('token'),
+			password: formData.get('password'),
+			confirmPassword: formData.get('confirmPassword')
+		});
 
 		if (!parsed.success) {
 			return fail(400, { errors: parsed.error.issues });

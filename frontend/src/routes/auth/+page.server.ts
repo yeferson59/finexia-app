@@ -1,9 +1,9 @@
-import z from 'zod';
 import type { Actions, PageServerLoad } from './$types';
 import * as auth from '$lib/api/auth';
 import { redirect, fail } from '@sveltejs/kit';
 import { parseRefreshSetCookie, setAccessCookie, setRefreshCookie } from '$lib/server/session';
 import { features } from '$lib/shared/config/features';
+import { loginSchema, twoFactorSchema, registerSchema } from '$lib/features/auth';
 
 export const load: PageServerLoad = () => {
 	return { selfRegistrationEnabled: features.selfRegistration };
@@ -12,16 +12,10 @@ export const load: PageServerLoad = () => {
 export const actions = {
 	login: async ({ request, cookies, fetch }) => {
 		const formData = await request.formData();
-		const loginDto = await z
-			.object({
-				email: z.email().min(2),
-				// El backend (LoginRequestDTO) valida min=8,max=20.
-				password: z.string().min(8).max(20)
-			})
-			.safeParseAsync({
-				email: formData.get('email'),
-				password: formData.get('password')
-			});
+		const loginDto = await loginSchema.safeParseAsync({
+			email: formData.get('email'),
+			password: formData.get('password')
+		});
 
 		if (!loginDto.success) {
 			return fail(400, { type: 'login' as const, errors: loginDto.error.issues });
@@ -80,16 +74,10 @@ export const actions = {
 	},
 	twoFactor: async ({ request, cookies, fetch }) => {
 		const formData = await request.formData();
-		const parsed = await z
-			.object({
-				token: z.string().min(1),
-				// 6 dígitos TOTP o un código de recuperación XXXXX-XXXXX.
-				code: z.string().trim().min(6).max(20)
-			})
-			.safeParseAsync({
-				token: formData.get('token'),
-				code: formData.get('code')
-			});
+		const parsed = await twoFactorSchema.safeParseAsync({
+			token: formData.get('token'),
+			code: formData.get('code')
+		});
 
 		if (!parsed.success) {
 			return fail(400, {
@@ -144,22 +132,13 @@ export const actions = {
 	register: async ({ request }) => {
 		const formData = await request.formData();
 
-		const { success, data, error } = await z
-			.object({
-				name: z.string().min(2),
-				email: z.email().min(2),
-				// El backend (RegisterRequestDTO) valida min=8,max=20.
-				password: z.string().min(8).max(20),
-				confirmPassword: z.string().min(8).max(20),
-				terms: z.coerce.boolean()
-			})
-			.safeParseAsync({
-				name: formData.get('name'),
-				email: formData.get('email'),
-				password: formData.get('password'),
-				confirmPassword: formData.get('confirmPassword'),
-				terms: formData.get('terms')
-			});
+		const { success, data, error } = await registerSchema.safeParseAsync({
+			name: formData.get('name'),
+			email: formData.get('email'),
+			password: formData.get('password'),
+			confirmPassword: formData.get('confirmPassword'),
+			terms: formData.get('terms')
+		});
 
 		if (!success) {
 			return fail(400, { type: 'register' as const, errors: error.issues });
