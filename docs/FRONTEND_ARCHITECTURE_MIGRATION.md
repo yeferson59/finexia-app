@@ -334,8 +334,17 @@ Decisiones validadas con la feature piloto, que las Fases 4–6 deben seguir:
         currency-toggle).
   - [ ] Mover `lib/stores/investments.svelte.ts` → `features/dashboard/state/`
         (o a `features/portfolio` si el piloto de Fase 3 sugirió otra cosa) con su spec.
-- [ ] `lib/features/platforms/`: extraer componentes de
+- [x] `lib/features/platforms/`: extraer componentes de
       `routes/dashboard/platforms/**` (782 líneas la página de detalle).
+  - `platform-card` (tarjeta del listado), `platform-detail` (ver/editar/eliminar,
+    con su modal) y `platform-add-form`; `platforms.ts` centraliza el mapa
+    `PLATFORM_TYPES` + `formatSourceType` + el tipo `Platform` (antes duplicados
+    en detalle y alta). Las 3 páginas quedan como composición delgada.
+  - Como no hay E2E de platforms (no estaba en el smoke de Fase 0), se añadieron
+    specs de render por componente (`platform-card`, `platform-detail`) como red
+    de seguridad de la extracción.
+  - *(Verificación: `pnpm check` 0 errores, `pnpm lint`, 147 unit tests, 22 E2E
+    en verde.)*
 - [ ] `lib/features/portfolio/`:
   - [ ] Trocear `portfolios/[id]/assets/[symbol]/+page.svelte` (**2.014 líneas**) —
         el peor archivo del frontend — en componentes de feature (cabecera del
