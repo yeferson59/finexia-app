@@ -492,15 +492,20 @@ golangci-lint run
         parsea imports con `go/parser` y verifica que `platform/*` no importe dominios
         ni `identity`, que `identity` siga siendo una hoja, y que ningún módulo importe
         `internal/app`.
-- [ ] Actualizar `docs/API.md` y crear `docs/ARCHITECTURE.md` con la descripción de
-      la arquitectura final + reglas de dependencia (diagrama incluido). → **Pendiente**:
-      `docs/ARCHITECTURE.md` aún no existe (TECH_DEBT #14).
+- [x] Actualizar `docs/API.md` y crear `docs/ARCHITECTURE.md` con la descripción de
+      la arquitectura final + reglas de dependencia (diagrama incluido). → **Creado en
+      la revisión de cierre (2026-07-22)**: [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md)
+      con estructura, reglas de dependencia, diagrama mermaid del grafo de módulos, el
+      arch-test como blindaje y el mapa de cobertura.
 - [~] Comparar cobertura contra la línea base de Fase 0: no debe haber bajado. →
-      Tras restaurar los tests de portfolio y notification, ningún módulo queda a 0%
-      salvo `health`/`scheduler` (bootstrap, sin lógica). Falta una comparación formal
-      del total contra el 42.6% de línea base y tests de integración de `postgres.go`
-      (TECH_DEBT #4, #11).
-- [ ] Revisión final de `docs/TECH_DEBT.md`: priorizar lo anotado durante la migración.
+      Tras restaurar los tests de portfolio/notification y añadir tests HTTP de
+      portfolio, el total es **41.2%** (línea base 42.6%, sobre un layout distinto en
+      el que `repositories`/`routes`/`scheduler` eran paquetes separados al 0%). La
+      brecha principal es la capa HTTP de `user` (11.2%) y los `postgres.go` sin tests
+      de integración (TECH_DEBT #4, #11).
+- [x] Revisión final de `docs/TECH_DEBT.md`: priorizar lo anotado durante la migración.
+      → Entradas 1–14 vigentes; #1 (mapeo de errores por substring) y #11/#4 (tests de
+      `postgres.go`/capa HTTP de `user`) son las de mayor prioridad para post-migración.
 
 ### Fase 9 — Frontend
 
