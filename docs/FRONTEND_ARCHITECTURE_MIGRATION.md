@@ -328,13 +328,26 @@ Decisiones validadas con la feature piloto, que las Fases 4–6 deben seguir:
 
 *(una feature = un PR; orden sugerido de menor a mayor riesgo)*
 
-- [ ] `lib/features/dashboard/`:
-  - [ ] Mover `components/dashboard/*` (sidebar, header, net-worth-card,
+- [x] `lib/features/dashboard/`:
+  - [x] Mover `components/dashboard/*` (sidebar, header, net-worth-card,
         asset-allocation, portfolio-growth, portfolio-overview, recent-activity,
         currency-toggle).
   - [ ] Mover `lib/stores/investments.svelte.ts` → `features/dashboard/state/`
         (o a `features/portfolio` si el piloto de Fase 3 sugirió otra cosa) con su spec.
 - [x] `lib/features/platforms/`: extraer componentes de
+        currency-toggle) a `features/dashboard/components/`, con `index.ts` como
+        superficie pública. `currency-toggle` queda interno de `net-worth-card`
+        (import relativo); el resto se consume desde `$lib/features/dashboard`.
+  - [x] Mover `lib/stores/investments.svelte.ts` → `features/dashboard/state/`
+        con su spec; las páginas de `routes/dashboard/investments/**` importan el
+        store desde `$lib/features/dashboard`.
+        *(Verificación estándar: `pnpm check` 0 errores, `pnpm lint`, 141 unit
+        tests, 22 E2E — todo en verde.)*
+        - Nota: los widgets siguen importando `privacy` de `$lib/stores/privacy`
+          y los formatters de `$lib/utils` sin cambios; su relocalización a
+          `lib/shared` es transversal y se aborda en Fase 7 (fuera del alcance de
+          este PR de solo-dashboard).
+- [ ] `lib/features/platforms/`: extraer componentes de
       `routes/dashboard/platforms/**` (782 líneas la página de detalle).
   - `platform-card` (tarjeta del listado), `platform-detail` (ver/editar/eliminar,
     con su modal) y `platform-add-form`; `platforms.ts` centraliza el mapa
@@ -349,11 +362,37 @@ Decisiones validadas con la feature piloto, que las Fases 4–6 deben seguir:
   - [ ] Trocear `portfolios/[id]/assets/[symbol]/+page.svelte` (**2.014 líneas**) —
         el peor archivo del frontend — en componentes de feature (cabecera del
         asset, gráfico, historial de transacciones, formularios de compra/venta…).
-  - [ ] Trocear `portfolios/[id]/+page.svelte` (1.309) y
-        `portfolios/[id]/add/+page.svelte` (996).
+  - [x] Trocear `portfolios/[id]/+page.svelte` (1.309 → 358) y
+        `portfolios/[id]/add/+page.svelte` (604 → 13). *(Rama 1 de portfolio.)*
+        - Componentes: `portfolio-summary-cards`, `portfolio-stats-cards`,
+          `allocation-donut`, `holdings-table`, `portfolio-edit-form`,
+          `portfolio-add-form`. `portfolio.ts` centraliza helpers puros
+          (`groupHoldings`, `computeTypeBreakdown`, `computeDonutSegments`,
+          `formatPct`), constantes (`PORTFOLIO_TYPES`, `ASSET_TYPE_*`) y tipos,
+          con su `portfolio.spec.ts`.
+        - `formatCurrency` (usa `privacy` + `baseCurrency`) se crea en la página
+          y se pasa como prop a los componentes que lo necesitan.
+        - `portfolio-growth` se sigue importando de `$components/dashboard`
+          (la migración de dashboard va en otra rama; no es feature↛feature).
+        - *(Verificación: `pnpm check` 0 errores/0 warnings, `pnpm lint`, 146
+          unit tests, 22 E2E incluido `portfolio.e2e.ts` — todo en verde.)*
   - [ ] Trocear `investments/*` (714 + 474) reutilizando los mismos componentes.
-- [ ] `lib/features/transactions/`: trocear `transactions/import/+page.svelte`
-      (1.007) en pasos del wizard (upload, preview, commit) + listado.
+- [x] `lib/features/transactions/`: trocear `transactions/import/+page.svelte`
+      (1.007) en pasos del wizard.
+  - `import-wizard` (contenedor: máquina de estados + lógica de fetch a
+    `import/preview` e `import/commit`) que compone tres pasos presentacionales:
+    `import-upload-step`, `import-mapping-step`, `import-result-step`. `types.ts`
+    centraliza los contratos (`ImportPreview`, `ImportResult`, `ImportMapping`…).
+  - La página `import/+page.svelte` queda como composición delgada
+    (`<ImportWizard {portfolios} {platforms} />`); los `+server.ts` de
+    `preview`/`commit` y la página de listado (164 líneas, ya bajo presupuesto)
+    no se tocan.
+  - CSS de formularios/botones scoped por paso (nombres genéricos como `.btn` /
+    `.form-group` colisionarían si fueran globales), como en el resto de páginas
+    del dashboard. Cubierto por el E2E existente `transactions.e2e.ts`
+    (upload → preview).
+  - *(Verificación: `pnpm check` 0 errores, `pnpm lint`, 141 unit tests, 22 E2E
+    en verde.)*
 - [ ] Cada PR: verificación estándar + E2E del flujo correspondiente.
 
 ### Fase 6 — Features restantes: `settings`, `admin`
