@@ -10,12 +10,10 @@ import (
 
 // The persistence surface is split into cohesive, consumer-defined stores
 // (mirroring auth.Stores) so each stays small and fakes only implement what a
-// scenario needs. Repository is their union, kept as a single alias because
-// the portfolio Service orchestrates across all of them.
-//
-// Note: the union is 32 methods because the asset and exchange-rate reads live
-// here (their domain types are owned by this module); relocating those to the
-// market module would bring it under the ~30 criterion (see TECH_DEBT #12/#14).
+// scenario needs. Repository is their union (27 methods, under the ~30
+// criterion), kept as a single alias because the portfolio Service
+// orchestrates across all of them. The asset catalog moved to the market
+// module (TECH_DEBT #12); portfolio reads assets via its AssetReader interface.
 
 // PortfolioStore persists portfolios themselves plus their risk catalog.
 type PortfolioStore interface {
@@ -37,14 +35,11 @@ type PlatformStore interface {
 	DeletePlatform(ctx context.Context, userID, sourceID uuid.UUID) error
 }
 
-// AssetStore persists assets and reads exchange rates (read-only lookup for
-// display-currency conversion; writing/syncing rates is owned by market).
-type AssetStore interface {
-	GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, error)
-	GetAssets(ctx context.Context, offset, limit uint) ([]Asset, error)
-	SearchAssets(ctx context.Context, search string, offset, limit uint) ([]Asset, error)
-	UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error)
-	UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error)
+// RateStore reads stored exchange rates for display-currency conversion
+// (writing/syncing rates is owned by the market module). The asset catalog
+// also moved to market; portfolio reads assets through its AssetReader
+// interface, not this repository.
+type RateStore interface {
 	GetExchangeRateByPair(ctx context.Context, from, to string) (money.Decimal, error)
 }
 
@@ -75,7 +70,7 @@ type SnapshotStore interface {
 type Repository interface {
 	PortfolioStore
 	PlatformStore
-	AssetStore
+	RateStore
 	TransactionStore
 	SnapshotStore
 }

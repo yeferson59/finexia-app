@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/google/uuid"
 
+	"github.com/yeferson59/finexia-app/internal/market"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
@@ -25,8 +26,8 @@ func (h *handler) CreatePortfolioEntry(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
-	assetType := AssetType(req.Category)
-	category := assetType.Transform()
+	assetType := market.AssetType(req.Category)
+	category := entryCategoryFor(assetType)
 
 	if !category.IsValid() {
 		return httpx.BadRequest(c, "Invalid category", "Category must be one of: stocks, etf, crypto, bonds, cash, real_estate, commodities, other")
@@ -63,7 +64,7 @@ func (h *handler) UpdateAssetPrice(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
-	asset, err := h.service.UpdateAssetPrice(c, assetID, req.Price)
+	asset, err := h.assets.UpdateAssetPrice(c, assetID, req.Price)
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error updating asset price", "Could not update asset price")
 	}
@@ -182,12 +183,12 @@ func (h *handler) GetAssets(c fiber.Ctx) error {
 
 	search := strings.TrimSpace(c.Query("search"))
 
-	var assets []Asset
+	var assets []market.Asset
 	var err error
 	if search != "" {
-		assets, err = h.service.SearchAssets(c, search, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
+		assets, err = h.assets.SearchAssets(c, search, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
 	} else {
-		assets, err = h.service.GetAssets(c, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
+		assets, err = h.assets.GetAssets(c, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
 	}
 
 	if err != nil {

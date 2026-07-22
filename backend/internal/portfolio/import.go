@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/yeferson59/finexia-app/internal/market"
+	"github.com/yeferson59/finexia-app/internal/platform/spreadsheet"
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 )
@@ -45,9 +47,9 @@ func applyImportDefaults(defaults ImportDefaultsDTO) (ImportDefaultsDTO, error) 
 	}
 	out.Currency = cur
 	if strings.TrimSpace(out.Category) == "" {
-		out.Category = string(Stock)
+		out.Category = string(market.Stock)
 	}
-	if _, ok := normalizeCategory(out.Category); !ok {
+	if _, ok := market.NormalizeAssetType(out.Category); !ok {
 		return out, fmt.Errorf("invalid default category %q", out.Category)
 	}
 	switch out.DateFormat {
@@ -83,18 +85,18 @@ func missingRequiredFields(m *ImportMappingDTO) []string {
 
 // buildImport parses the sheet with the given (or suggested) mapping and
 // returns the full per-row preview plus the validated rows ready to persist.
-func buildImport(src importSource, mapping *ImportMappingDTO, defaults ImportDefaultsDTO) (importOutcome, error) {
+func buildImport(src spreadsheet.Source, mapping *ImportMappingDTO, defaults ImportDefaultsDTO) (importOutcome, error) {
 	defaults, err := applyImportDefaults(defaults)
 	if err != nil {
 		return importOutcome{}, err
 	}
 
-	headerIdx := detectHeaderRow(src.rows)
+	headerIdx := detectHeaderRow(src.Rows)
 	if headerIdx == -1 {
 		return importOutcome{}, errors.New("invalid spreadsheet: the file is empty")
 	}
-	headers := make([]string, len(src.rows[headerIdx]))
-	for i, h := range src.rows[headerIdx] {
+	headers := make([]string, len(src.Rows[headerIdx]))
+	for i, h := range src.Rows[headerIdx] {
 		headers[i] = strings.TrimSpace(h)
 	}
 
@@ -103,14 +105,14 @@ func buildImport(src importSource, mapping *ImportMappingDTO, defaults ImportDef
 		mapping = &suggested
 	}
 
-	dataRows := src.rows[headerIdx+1:]
+	dataRows := src.Rows[headerIdx+1:]
 	if len(dataRows) > maxImportRows {
 		return importOutcome{}, fmt.Errorf("invalid spreadsheet: too many rows (max %d)", maxImportRows)
 	}
 
 	preview := ImportPreviewResponseDTO{
-		Sheets:           src.sheets,
-		Sheet:            src.sheet,
+		Sheets:           src.Sheets,
+		Sheet:            src.Sheet,
 		HeaderRow:        headerIdx + 1,
 		Headers:          headers,
 		SuggestedMapping: suggested,
@@ -122,7 +124,7 @@ func buildImport(src importSource, mapping *ImportMappingDTO, defaults ImportDef
 	if dateOrder == "auto" {
 		var dates []string
 		for _, row := range dataRows {
-			if v := cellAt(row, mapping.Date); v != "" {
+			if v := spreadsheet.CellAt(row, mapping.Date); v != "" {
 				dates = append(dates, v)
 			}
 		}
@@ -131,7 +133,7 @@ func buildImport(src importSource, mapping *ImportMappingDTO, defaults ImportDef
 
 	var valid []ImportTransactionRow
 	for i, row := range dataRows {
-		if rowIsEmpty(row) {
+		if spreadsheet.RowIsEmpty(row) {
 			continue
 		}
 		rowNumber := headerIdx + 2 + i // 1-based sheet row number
@@ -174,7 +176,7 @@ func buildImportRow(
 	entity := ImportTransactionRow{RowNumber: rowNumber}
 
 	// Transaction type: mapped column wins, empty cells fall back to default.
-	typeRaw := cellAt(row, mapping.Type)
+	typeRaw := spreadsheet.CellAt(row, mapping.Type)
 	txnType, _ := normalizeTxnType(defaults.Type)
 	if typeRaw != "" {
 		if t, ok := normalizeTxnType(typeRaw); ok {
@@ -187,7 +189,7 @@ func buildImportRow(
 	dto.Type = string(txnType)
 
 	// Date.
-	if dateRaw := cellAt(row, mapping.Date); dateRaw == "" {
+	if dateRaw := spreadsheet.CellAt(row, mapping.Date); dateRaw == "" {
 		errs = append(errs, "la fecha está vacía")
 	} else if date, err := parseImportDate(dateRaw, dateOrder); err != nil {
 		errs = append(errs, fmt.Sprintf("fecha no reconocida: %q", dateRaw))
@@ -197,7 +199,7 @@ func buildImportRow(
 	}
 
 	// Ticker.
-	ticker := strings.ToUpper(cellAt(row, mapping.Ticker))
+	ticker := strings.ToUpper(spreadsheet.CellAt(row, mapping.Ticker))
 	switch {
 	case ticker == "":
 		errs = append(errs, "el ticker/símbolo está vacío")
@@ -209,7 +211,7 @@ func buildImportRow(
 	}
 
 	// Asset name (falls back to the ticker).
-	name := cellAt(row, mapping.AssetName)
+	name := spreadsheet.CellAt(row, mapping.AssetName)
 	if name == "" {
 		name = ticker
 	}
@@ -220,7 +222,7 @@ func buildImportRow(
 	dto.AssetName = name
 
 	// Quantity.
-	qtyRaw := cellAt(row, mapping.Quantity)
+	qtyRaw := spreadsheet.CellAt(row, mapping.Quantity)
 	if qtyRaw == "" {
 		if quantityRequired(txnType) {
 			errs = append(errs, "la cantidad está vacía")
@@ -238,7 +240,7 @@ func buildImportRow(
 	}
 
 	// Price.
-	priceRaw := cellAt(row, mapping.Price)
+	priceRaw := spreadsheet.CellAt(row, mapping.Price)
 	if priceRaw == "" {
 		if txnType == Buy || txnType == Sell {
 			errs = append(errs, "el precio está vacío")
@@ -256,7 +258,7 @@ func buildImportRow(
 	}
 
 	// Fees (optional).
-	feesRaw := cellAt(row, mapping.Fees)
+	feesRaw := spreadsheet.CellAt(row, mapping.Fees)
 	entity.Fees = money.FromDecimal(decimal.Zero, money.USD)
 	dto.Fees = "0"
 	if feesRaw != "" {
@@ -272,7 +274,7 @@ func buildImportRow(
 
 	// Currency.
 	currency := defaults.Currency
-	if curRaw := cellAt(row, mapping.Currency); curRaw != "" {
+	if curRaw := spreadsheet.CellAt(row, mapping.Currency); curRaw != "" {
 		if cur, ok := normalizeCurrency(curRaw); ok {
 			currency = cur
 		} else {
@@ -283,20 +285,20 @@ func buildImportRow(
 	dto.Currency = currency
 
 	// Category / asset type.
-	assetType, _ := normalizeCategory(defaults.Category)
-	if catRaw := cellAt(row, mapping.Category); catRaw != "" {
-		if cat, ok := normalizeCategory(catRaw); ok {
+	assetType, _ := market.NormalizeAssetType(defaults.Category)
+	if catRaw := spreadsheet.CellAt(row, mapping.Category); catRaw != "" {
+		if cat, ok := market.NormalizeAssetType(catRaw); ok {
 			assetType = cat
 		} else {
-			assetType = Other
+			assetType = market.Other
 		}
 	}
 	entity.AssetType = assetType
-	entity.Category = assetType.Transform()
+	entity.Category = entryCategoryFor(assetType)
 	dto.Category = string(assetType)
 
 	// Notes.
-	notes := cellAt(row, mapping.Notes)
+	notes := spreadsheet.CellAt(row, mapping.Notes)
 	if len(notes) > maxNotesLen {
 		notes = notes[:maxNotesLen]
 	}
@@ -317,7 +319,7 @@ func (s *Service) PreviewTransactionImport(
 	mapping *ImportMappingDTO,
 	defaults ImportDefaultsDTO,
 ) (ImportPreviewResponseDTO, error) {
-	src, err := parseImportFile(data, filename, sheet)
+	src, err := spreadsheet.ReadFile(data, filename, sheet)
 	if err != nil {
 		return ImportPreviewResponseDTO{}, err
 	}
@@ -342,7 +344,7 @@ func (s *Service) ImportTransactionsFromFile(
 	mapping ImportMappingDTO,
 	defaults ImportDefaultsDTO,
 ) (ImportResultResponseDTO, error) {
-	src, err := parseImportFile(data, filename, sheet)
+	src, err := spreadsheet.ReadFile(data, filename, sheet)
 	if err != nil {
 		return ImportResultResponseDTO{}, err
 	}

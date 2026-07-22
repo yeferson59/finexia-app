@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
-
+	"github.com/yeferson59/finexia-app/internal/market"
 )
 
 // buildXLSX creates an in-memory workbook with the given rows on one sheet.
@@ -128,10 +128,10 @@ func TestNormalizeTxnTypeAndCategory(t *testing.T) {
 	if _, ok := normalizeTxnType("???"); ok {
 		t.Error("unknown type should not normalize")
 	}
-	if cat, ok := normalizeCategory("Acciones"); !ok || cat != Stock {
+	if cat, ok := market.NormalizeAssetType("Acciones"); !ok || cat != market.Stock {
 		t.Errorf("Acciones should normalize to stock, got %v %v", cat, ok)
 	}
-	if cat, ok := normalizeCategory("Criptomonedas"); !ok || cat != Crypto {
+	if cat, ok := market.NormalizeAssetType("Criptomonedas"); !ok || cat != market.Crypto {
 		t.Errorf("Criptomonedas should normalize to crypto, got %v %v", cat, ok)
 	}
 }

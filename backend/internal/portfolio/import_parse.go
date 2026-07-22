@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/xuri/excelize/v2"
+	"github.com/yeferson59/finexia-app/internal/platform/spreadsheet"
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 )
@@ -113,7 +114,7 @@ func parseImportDate(raw, dateOrder string) (time.Time, error) {
 		return excelize.ExcelDateToTime(serial, false)
 	}
 
-	if m := textualDateRe.FindStringSubmatch(normKey(s)); m != nil {
+	if m := textualDateRe.FindStringSubmatch(spreadsheet.NormKey(s)); m != nil {
 		month, ok := spanishMonths[m[2]]
 		if !ok {
 			return time.Time{}, errors.New("unrecognized date")
@@ -188,15 +189,8 @@ func inferDateOrder(values []string) string {
 }
 
 func normalizeTxnType(raw string) (TransactionType, bool) {
-	if t, ok := txnTypeSynonyms[normKey(raw)]; ok {
+	if t, ok := txnTypeSynonyms[spreadsheet.NormKey(raw)]; ok {
 		return t, true
-	}
-	return "", false
-}
-
-func normalizeCategory(raw string) (AssetType, bool) {
-	if c, ok := categorySynonyms[normKey(raw)]; ok {
-		return c, true
 	}
 	return "", false
 }

@@ -11,67 +11,61 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
-	"github.com/yeferson59/finexia-app/internal/portfolio"
 )
 
 // fakeRepository embeds the Repository interface so tests only override the
-// methods a scenario needs; calling anything else panics loudly.
+// methods a scenario needs; calling anything else panics loudly. The asset
+// hooks default to a no-op success when unset, so seeding loops don't have to
+// stub every collaborator call along the way.
 type fakeRepository struct {
 	Repository
 
 	upsertExchangeRate func(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (ExchangeRate, error)
+
+	updateAssetPrice func(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error)
+	upsertAsset      func(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error)
+	getAssets        func(ctx context.Context, offset, limit uint) ([]Asset, error)
+	getAssetByID     func(ctx context.Context, assetID uuid.UUID) (Asset, error)
+	searchAssets     func(ctx context.Context, search string, offset, limit uint) ([]Asset, error)
 }
 
 func (f *fakeRepository) UpsertExchangeRate(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (ExchangeRate, error) {
 	return f.upsertExchangeRate(ctx, from, to, rate, rateDate)
 }
 
-// fakePortfolioService stubs the portfolioService slice market depends on for
-// asset lookups/updates.
-type fakePortfolioService struct {
-	updateAssetPrice     func(ctx context.Context, assetID uuid.UUID, price money.Money) (portfolio.Asset, error)
-	createAsset          func(ctx context.Context, ticker, name string, assetType portfolio.AssetType, exchange, currency string) (portfolio.Asset, error)
-	getAssets            func(ctx context.Context, offset, limit uint) ([]portfolio.Asset, error)
-	getAssetByID         func(ctx context.Context, assetID uuid.UUID) (portfolio.Asset, error)
-	importAssetsFromFile func(ctx context.Context, data []byte, filename, sheet string) (portfolio.ImportResultResponseDTO, error)
-}
-
-// Every method defaults to a no-op success when its hook is unset: scenarios
-// that only care about one code path (e.g. the default-asset seeding loop)
-// should not have to stub every collaborator call along the way.
-func (p *fakePortfolioService) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, price money.Money) (portfolio.Asset, error) {
-	if p.updateAssetPrice == nil {
-		return portfolio.Asset{}, nil
+func (f *fakeRepository) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error) {
+	if f.updateAssetPrice == nil {
+		return Asset{}, nil
 	}
-	return p.updateAssetPrice(ctx, assetID, price)
+	return f.updateAssetPrice(ctx, assetID, price)
 }
 
-func (p *fakePortfolioService) CreateAsset(ctx context.Context, ticker, name string, assetType portfolio.AssetType, exchange, currency string) (portfolio.Asset, error) {
-	if p.createAsset == nil {
-		return portfolio.Asset{}, nil
+func (f *fakeRepository) UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error) {
+	if f.upsertAsset == nil {
+		return Asset{}, nil
 	}
-	return p.createAsset(ctx, ticker, name, assetType, exchange, currency)
+	return f.upsertAsset(ctx, ticker, name, assetType, exchange, currency)
 }
 
-func (p *fakePortfolioService) GetAssets(ctx context.Context, offset, limit uint) ([]portfolio.Asset, error) {
-	if p.getAssets == nil {
+func (f *fakeRepository) GetAssets(ctx context.Context, offset, limit uint) ([]Asset, error) {
+	if f.getAssets == nil {
 		return nil, nil
 	}
-	return p.getAssets(ctx, offset, limit)
+	return f.getAssets(ctx, offset, limit)
 }
 
-func (p *fakePortfolioService) GetAssetByID(ctx context.Context, assetID uuid.UUID) (portfolio.Asset, error) {
-	if p.getAssetByID == nil {
-		return portfolio.Asset{}, nil
+func (f *fakeRepository) GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, error) {
+	if f.getAssetByID == nil {
+		return Asset{}, nil
 	}
-	return p.getAssetByID(ctx, assetID)
+	return f.getAssetByID(ctx, assetID)
 }
 
-func (p *fakePortfolioService) ImportAssetsFromFile(ctx context.Context, data []byte, filename, sheet string) (portfolio.ImportResultResponseDTO, error) {
-	if p.importAssetsFromFile == nil {
-		return portfolio.ImportResultResponseDTO{}, nil
+func (f *fakeRepository) SearchAssets(ctx context.Context, search string, offset, limit uint) ([]Asset, error) {
+	if f.searchAssets == nil {
+		return nil, nil
 	}
-	return p.importAssetsFromFile(ctx, data, filename, sheet)
+	return f.searchAssets(ctx, search, offset, limit)
 }
 
 // fakePriceProvider stubs the market data provider used by the sync jobs.
@@ -174,13 +168,11 @@ func mustUSD(t *testing.T, amount string) money.Money {
 }
 
 func newTestServices(repo Repository, storage *memStorage) *Service {
-	return NewService(repo, nil, storage, nil, logger.Noop())
+	return NewService(repo, storage, nil, logger.Noop())
 }
 
-// newTestServicesFull wires a price provider and portfolio service in
-// addition to the repository, for flows that hit market data or asset
-// lookups. The unused third parameter mirrors the other modules' test
-// helper shape; market has nothing to plug in there today.
-func newTestServicesFull(repo Repository, storage *memStorage, _ any, provider marketdata.Provider, port portfolioService) *Service {
-	return NewService(repo, port, storage, provider, logger.Noop())
+// newTestServicesFull wires a price provider in addition to the repository,
+// for flows that hit market data or the asset catalog.
+func newTestServicesFull(repo Repository, storage *memStorage, provider marketdata.Provider) *Service {
+	return NewService(repo, storage, provider, logger.Noop())
 }

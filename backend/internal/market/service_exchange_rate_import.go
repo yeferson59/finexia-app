@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yeferson59/finexia-app/internal/portfolio"
+	"github.com/yeferson59/finexia-app/internal/platform/spreadsheet"
 )
 
 // maxExchangeRateImportRows bounds how many data rows a single exchange-rate
@@ -23,40 +23,40 @@ var exchangeRateHeaderSynonyms = map[string][]string{
 // ImportExchangeRatesFromFile parses an uploaded CSV/XLSX with columns
 // fromCurrency, toCurrency and rate, upserting one currency pair per valid
 // row (dated today). Invalid rows are skipped and reported.
-func (s *Service) ImportExchangeRatesFromFile(ctx context.Context, data []byte, filename, sheet string) (portfolio.ImportResultResponseDTO, error) {
-	src, err := parseImportFile(data, filename, sheet)
+func (s *Service) ImportExchangeRatesFromFile(ctx context.Context, data []byte, filename, sheet string) (ImportResultResponseDTO, error) {
+	src, err := spreadsheet.ReadFile(data, filename, sheet)
 	if err != nil {
-		return portfolio.ImportResultResponseDTO{}, err
+		return ImportResultResponseDTO{}, err
 	}
 
-	headerIdx := firstNonEmptyRow(src.rows)
+	headerIdx := firstNonEmptyRow(src.Rows)
 	if headerIdx == -1 {
-		return portfolio.ImportResultResponseDTO{}, errors.New("invalid spreadsheet: the file is empty")
+		return ImportResultResponseDTO{}, errors.New("invalid spreadsheet: the file is empty")
 	}
 
-	cols := mapSimpleHeaders(src.rows[headerIdx], exchangeRateHeaderSynonyms)
+	cols := mapSimpleHeaders(src.Rows[headerIdx], exchangeRateHeaderSynonyms)
 	if missing := missingCols(cols, "fromcurrency", "tocurrency", "rate"); len(missing) > 0 {
-		return portfolio.ImportResultResponseDTO{}, fmt.Errorf("invalid spreadsheet: missing required columns: %s", strings.Join(missing, ", "))
+		return ImportResultResponseDTO{}, fmt.Errorf("invalid spreadsheet: missing required columns: %s", strings.Join(missing, ", "))
 	}
 
-	dataRows := src.rows[headerIdx+1:]
+	dataRows := src.Rows[headerIdx+1:]
 	if len(dataRows) > maxExchangeRateImportRows {
-		return portfolio.ImportResultResponseDTO{}, fmt.Errorf("invalid spreadsheet: too many rows (max %d)", maxExchangeRateImportRows)
+		return ImportResultResponseDTO{}, fmt.Errorf("invalid spreadsheet: too many rows (max %d)", maxExchangeRateImportRows)
 	}
 
 	now := time.Now()
-	result := portfolio.ImportResultResponseDTO{Errors: []portfolio.ImportResultErrorDTO{}}
+	result := ImportResultResponseDTO{Errors: []ImportResultErrorDTO{}}
 
 	for i, row := range dataRows {
-		if rowIsEmpty(row) {
+		if spreadsheet.RowIsEmpty(row) {
 			continue
 		}
 		rowNumber := headerIdx + 2 + i
 		result.TotalRows++
 
-		from := strings.ToUpper(cellAtIdx(row, cols["fromcurrency"]))
-		to := strings.ToUpper(cellAtIdx(row, cols["tocurrency"]))
-		rateRaw := cellAtIdx(row, cols["rate"])
+		from := strings.ToUpper(spreadsheet.CellAtIdx(row, cols["fromcurrency"]))
+		to := strings.ToUpper(spreadsheet.CellAtIdx(row, cols["tocurrency"]))
+		rateRaw := spreadsheet.CellAtIdx(row, cols["rate"])
 
 		var rowErrs []string
 		if len(from) != 3 {
@@ -76,7 +76,7 @@ func (s *Service) ImportExchangeRatesFromFile(ctx context.Context, data []byte, 
 		if len(rowErrs) > 0 {
 			result.Skipped++
 			if len(result.Errors) < 100 {
-				result.Errors = append(result.Errors, portfolio.ImportResultErrorDTO{Row: rowNumber, Message: strings.Join(rowErrs, "; ")})
+				result.Errors = append(result.Errors, ImportResultErrorDTO{Row: rowNumber, Message: strings.Join(rowErrs, "; ")})
 			}
 			continue
 		}
@@ -84,7 +84,7 @@ func (s *Service) ImportExchangeRatesFromFile(ctx context.Context, data []byte, 
 		if _, err := s.repo.UpsertExchangeRate(ctx, from, to, rate, now); err != nil {
 			result.Skipped++
 			if len(result.Errors) < 100 {
-				result.Errors = append(result.Errors, portfolio.ImportResultErrorDTO{Row: rowNumber, Message: err.Error()})
+				result.Errors = append(result.Errors, ImportResultErrorDTO{Row: rowNumber, Message: err.Error()})
 			}
 			continue
 		}

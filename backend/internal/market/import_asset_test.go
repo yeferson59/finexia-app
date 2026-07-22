@@ -1,11 +1,10 @@
-package portfolio
+package market
 
 import (
 	"context"
 	"errors"
 	"strings"
 	"testing"
-
 )
 
 func TestImportAssetsFromFile(t *testing.T) {

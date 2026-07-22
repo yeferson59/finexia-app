@@ -72,11 +72,6 @@ type fakeRepository struct {
 	getPlatformsWithStats           func(ctx context.Context, userID uuid.UUID) ([]PlatformStats, error)
 	updatePlatform                  func(ctx context.Context, userID, sourceID uuid.UUID, name, description string, sourceType SourceType, isActive bool) (PlatformStats, error)
 	deletePlatform                  func(ctx context.Context, userID, sourceID uuid.UUID) error
-	getAssetByID                    func(ctx context.Context, assetID uuid.UUID) (Asset, error)
-	getAssets                       func(ctx context.Context, offset, limit uint) ([]Asset, error)
-	searchAssets                    func(ctx context.Context, search string, offset, limit uint) ([]Asset, error)
-	upsertAsset                     func(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error)
-	updateAssetPrice                func(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error)
 	createPortfolioEntry            func(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType TransactionType, quantity money.Decimal, price money.Money, costCurrency string, category EntryCategory, entryDate time.Time, notes string) (Entry, error)
 	getEntryWithAsset               func(ctx context.Context, entryID uuid.UUID) (Entry, error)
 	getTransactionsByEntryID        func(ctx context.Context, userID, entryID uuid.UUID) ([]Transaction, error)
@@ -146,26 +141,6 @@ func (f *fakeRepository) UpdatePlatform(ctx context.Context, userID, sourceID uu
 
 func (f *fakeRepository) DeletePlatform(ctx context.Context, userID, sourceID uuid.UUID) error {
 	return f.deletePlatform(ctx, userID, sourceID)
-}
-
-func (f *fakeRepository) GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, error) {
-	return f.getAssetByID(ctx, assetID)
-}
-
-func (f *fakeRepository) GetAssets(ctx context.Context, offset, limit uint) ([]Asset, error) {
-	return f.getAssets(ctx, offset, limit)
-}
-
-func (f *fakeRepository) SearchAssets(ctx context.Context, search string, offset, limit uint) ([]Asset, error) {
-	return f.searchAssets(ctx, search, offset, limit)
-}
-
-func (f *fakeRepository) UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error) {
-	return f.upsertAsset(ctx, ticker, name, assetType, exchange, currency)
-}
-
-func (f *fakeRepository) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error) {
-	return f.updateAssetPrice(ctx, assetID, price)
 }
 
 func (f *fakeRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType TransactionType, quantity money.Decimal, price money.Money, costCurrency string, category EntryCategory, entryDate time.Time, notes string) (Entry, error) {

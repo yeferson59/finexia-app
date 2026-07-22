@@ -70,11 +70,14 @@ type ImportPreviewResponseDTO struct {
 	Rows []ImportRowDTO `json:"rows"`
 }
 
+// ImportResultErrorDTO reports why a single row was skipped during the
+// transaction commit.
 type ImportResultErrorDTO struct {
 	Row     int    `json:"row"`
 	Message string `json:"message"`
 }
 
+// ImportResultResponseDTO summarises a transaction import commit.
 type ImportResultResponseDTO struct {
 	TotalRows int                    `json:"totalRows"`
 	Imported  int                    `json:"imported"`

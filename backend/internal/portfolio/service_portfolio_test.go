@@ -10,10 +10,9 @@ import (
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
+	"github.com/yeferson59/finexia-app/internal/market"
 	"github.com/yeferson59/finexia-app/internal/user"
 )
-
-
 
 // waitFor polls cond until it returns true or the deadline expires. Used to
 // synchronise with the fire-and-forget alert goroutine.
@@ -532,78 +531,6 @@ func TestPlatformLifecycle(t *testing.T) {
 	})
 }
 
-func TestAssetOperations(t *testing.T) {
-	t.Run("GetAssets forwards pagination", func(t *testing.T) {
-		repo := &fakeRepository{
-			getAssets: func(_ context.Context, offset, limit uint) ([]Asset, error) {
-				if offset != 20 || limit != 10 {
-					t.Errorf("offset/limit = %d/%d, want 20/10", offset, limit)
-				}
-				return []Asset{{Ticker: "AAPL"}}, nil
-			},
-		}
-		svc := newTestServices(repo, newMemStorage())
-
-		got, err := svc.GetAssets(context.Background(), 20, 10)
-		if err != nil || len(got) != 1 {
-			t.Fatalf("GetAssets = %+v, %v", got, err)
-		}
-	})
-
-	t.Run("SearchAssets forwards the query", func(t *testing.T) {
-		repo := &fakeRepository{
-			searchAssets: func(_ context.Context, search string, offset, limit uint) ([]Asset, error) {
-				if search != "apple" {
-					t.Errorf("search = %q, want apple", search)
-				}
-				return []Asset{{Ticker: "AAPL"}}, nil
-			},
-		}
-		svc := newTestServices(repo, newMemStorage())
-
-		got, err := svc.SearchAssets(context.Background(), "apple", 0, 5)
-		if err != nil || len(got) != 1 {
-			t.Fatalf("SearchAssets = %+v, %v", got, err)
-		}
-	})
-
-	t.Run("CreateAsset upserts", func(t *testing.T) {
-		repo := &fakeRepository{
-			upsertAsset: func(_ context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error) {
-				if ticker != "MSFT" || assetType != Stock {
-					t.Errorf("ticker/type = %q/%q", ticker, assetType)
-				}
-				return Asset{ID: uuid.New(), Ticker: ticker}, nil
-			},
-		}
-		svc := newTestServices(repo, newMemStorage())
-
-		got, err := svc.CreateAsset(context.Background(), "MSFT", "Microsoft", Stock, "NASDAQ", "USD")
-		if err != nil || got.Ticker != "MSFT" {
-			t.Fatalf("CreateAsset = %+v, %v", got, err)
-		}
-	})
-
-	t.Run("UpdateAssetPrice forwards the price", func(t *testing.T) {
-		assetID := uuid.New()
-		price := mustUSD(t, "412.50")
-		repo := &fakeRepository{
-			updateAssetPrice: func(_ context.Context, aid uuid.UUID, p money.Money) (Asset, error) {
-				if aid != assetID || !p.Equal(price) {
-					t.Errorf("asset/price = %s/%s", aid, p.String())
-				}
-				return Asset{ID: aid, CurrentPrice: &p}, nil
-			},
-		}
-		svc := newTestServices(repo, newMemStorage())
-
-		got, err := svc.UpdateAssetPrice(context.Background(), assetID, price)
-		if err != nil || got.CurrentPrice == nil {
-			t.Fatalf("UpdateAssetPrice = %+v, %v", got, err)
-		}
-	})
-}
-
 func TestCreatePortfolioEntry(t *testing.T) {
 	userID, portfolioID, assetID, sourceID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	qty := mustDecimal(t, "2.5")
@@ -763,7 +690,7 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 			return identity.User{ID: userID, Name: "Ada", Email: "ada@example.com"}, nil
 		}
 		repo.getEntryWithAsset = func(context.Context, uuid.UUID) (Entry, error) {
-			return Entry{ID: entryID, Asset: Asset{Ticker: "AAPL", Name: "Apple Inc."}}, nil
+			return Entry{ID: entryID, Asset: market.Asset{Ticker: "AAPL", Name: "Apple Inc."}}, nil
 		}
 
 		mailer := &fakeMailer{}

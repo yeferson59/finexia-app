@@ -2,6 +2,7 @@ package portfolio
 
 import (
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/yeferson59/finexia-app/internal/market"
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
@@ -18,7 +19,7 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 // scanAssetCurrentPrice populates asset.CurrentPrice from a nullable numeric string
 // using the asset's own currency. money.Money.Scan only stores the value and leaves
 // the currency at the zero value (XXX), which serializes to "¤" in the browser.
-func scanAssetCurrentPrice(asset *Asset, priceStr *string) {
+func scanAssetCurrentPrice(asset *market.Asset, priceStr *string) {
 	if priceStr == nil {
 		return
 	}

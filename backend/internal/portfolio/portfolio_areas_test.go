@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
 )
 
 func TestParsePeriod(t *testing.T) {

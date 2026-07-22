@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
 )
 
 func TestWasPortfolioSnapshotCreatedToday(t *testing.T) {

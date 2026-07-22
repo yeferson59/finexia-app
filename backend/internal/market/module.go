@@ -20,14 +20,13 @@ type Module struct {
 }
 
 type Deps struct {
-	DB               *pgxpool.Pool
-	Cfg              *config.Env
-	Storage          fiber.Storage
-	Log              logger.Logger
-	PortfolioService portfolioService
-	Provider         marketdata.Provider
-	AuthMiddleware   authMiddleware
-	Limiter          fiber.Handler
+	DB             *pgxpool.Pool
+	Cfg            *config.Env
+	Storage        fiber.Storage
+	Log            logger.Logger
+	Provider       marketdata.Provider
+	AuthMiddleware authMiddleware
+	Limiter        fiber.Handler
 }
 
 type authMiddleware interface {
@@ -37,7 +36,7 @@ type authMiddleware interface {
 
 func New(deps Deps) *Module {
 	pg := NewPostgresRepository(deps.DB)
-	service := NewService(pg, deps.PortfolioService, deps.Storage, deps.Provider, deps.Log)
+	service := NewService(pg, deps.Storage, deps.Provider, deps.Log)
 
 	return newModule(deps, service)
 }
@@ -47,7 +46,7 @@ func newModule(deps Deps, service *Service) *Module {
 		cfg:       deps.Cfg,
 		storage:   deps.Storage,
 		service:   service,
-		handler:   new(handler{service, deps.PortfolioService}),
+		handler:   new(handler{service}),
 		authMiddl: deps.AuthMiddleware,
 		limiter:   deps.Limiter,
 	})

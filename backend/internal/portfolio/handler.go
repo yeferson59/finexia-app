@@ -12,6 +12,7 @@ import (
 
 type handler struct {
 	service *Service
+	assets  AssetReader
 }
 
 const (
