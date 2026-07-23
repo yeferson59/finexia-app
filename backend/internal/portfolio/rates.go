@@ -8,6 +8,8 @@ import (
 
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 // SupportedDisplayCurrencies lists the currencies a user can pick to view
@@ -21,8 +23,9 @@ func IsSupportedDisplayCurrency(currency string) bool {
 }
 
 // ErrExchangeRateUnavailable means no stored rate (direct, inverse, or via a
-// USD hop) connects the requested currency pair.
-var ErrExchangeRateUnavailable = errors.New("exchange rate not found for currency pair")
+// USD hop) connects the requested currency pair. Tagged as NotFound so it maps
+// to 404 by type rather than by the "not found" substring (docs/TECH_DEBT.md #1).
+var ErrExchangeRateUnavailable = httpx.AsNotFound(errors.New("exchange rate not found for currency pair"))
 
 // GetConversionRate returns the multiplier that turns an amount in `from`
 // into an amount in `to` (amountInFrom * rate = amountInTo). It tries a

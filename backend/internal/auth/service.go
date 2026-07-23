@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
@@ -319,12 +320,13 @@ func (s *Service) Register(ctx context.Context, name, email, password string) (R
 
 // VerifyPassword checks the user's current password. It backs the legacy user
 // service's change-password flow (via the services.AuthService interface)
-// while that flow waits for Fase 5. The two error strings are part of the
-// frozen HTTP contract: httpx.FromDomain maps them by substring.
+// while that flow waits for Fase 5. The account-lookup miss is tagged NotFound
+// so httpx.FromDomain maps it to 404 by type (docs/TECH_DEBT.md #1); the
+// wrong-password case keeps the frozen substring mapping ("invalid" → 400).
 func (s *Service) VerifyPassword(ctx context.Context, userID uuid.UUID, currentPassword string) error {
 	account, err := s.stores.Accounts.GetAccountByUserID(ctx, userID)
 	if err != nil {
-		return errors.New("not found account")
+		return httpx.AsNotFound(errors.New("not found account"))
 	}
 
 	if err := comparePassword(account.Password, currentPassword); err != nil {

@@ -2,7 +2,6 @@ package portfolio
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -114,7 +113,7 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 	}
 
 	if !owned {
-		return Entry{}, errors.New("portfolio or source not found")
+		return Entry{}, ErrPortfolioOrSourceNotFound
 	}
 
 	var entryID uuid.UUID

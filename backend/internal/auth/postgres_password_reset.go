@@ -7,11 +7,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 // ErrPasswordResetNotFound signals that no reset row matched the lookup, or
 // that the row was no longer redeemable at the moment it was consumed.
-var ErrPasswordResetNotFound = errors.New("password reset not found")
+var ErrPasswordResetNotFound = httpx.AsNotFound(errors.New("password reset not found"))
 
 // CreatePasswordReset invalidates any still-usable reset for the user (so at
 // most one link stays redeemable, mirroring how invitations replace a live

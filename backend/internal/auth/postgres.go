@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 // PostgresRepository is the single pgx-backed implementation of every store
@@ -33,7 +34,7 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 
 // ErrSessionNotFound indicates the session row no longer exists (e.g. the user
 // logged out), so any refresh token still pointing at it must be rejected.
-var ErrSessionNotFound = errors.New("session not found")
+var ErrSessionNotFound = httpx.AsNotFound(errors.New("session not found"))
 
 // userCols is the explicit column list used for SELECT queries that need a JOIN with roles.
 const userCols = `u.id, u.name, u.email, u.email_verified, u.image, u.role_id,

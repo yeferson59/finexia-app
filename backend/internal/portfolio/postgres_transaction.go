@@ -127,7 +127,7 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 		return nil, err
 	}
 	if !owned {
-		return nil, errors.New("portfolio entry not found")
+		return nil, ErrEntryNotFound
 	}
 
 	rows, err := r.db.Query(ctx, `
@@ -237,7 +237,7 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 		return Transaction{}, err
 	}
 	if !owned {
-		return Transaction{}, errors.New("portfolio entry not found")
+		return Transaction{}, ErrEntryNotFound
 	}
 
 	var txn Transaction
@@ -303,7 +303,7 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Transaction{}, errors.New("transaction not found")
+			return Transaction{}, ErrTransactionNotFound
 		}
 		return Transaction{}, err
 	}
@@ -334,7 +334,7 @@ func (r *PostgresRepository) ImportEntryTransactions(ctx context.Context, userID
 		return 0, err
 	}
 	if !owned {
-		return 0, errors.New("portfolio or source not found")
+		return 0, ErrPortfolioOrSourceNotFound
 	}
 
 	// Cache asset lookups: classic spreadsheets repeat the same ticker on

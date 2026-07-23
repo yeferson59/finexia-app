@@ -7,11 +7,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 // ErrVerificationNotFound signals that no verification row matched the
 // lookup, or that the row was gone by the time it was consumed.
-var ErrVerificationNotFound = errors.New("verification not found")
+var ErrVerificationNotFound = httpx.AsNotFound(errors.New("verification not found"))
 
 // CreateEmailVerification invalidates any pending verification for the email
 // (so at most one link stays redeemable) and inserts a fresh one.
