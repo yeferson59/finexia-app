@@ -15,7 +15,6 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
@@ -25,14 +24,14 @@ import (
 // own consumer-defined interfaces plus platform infrastructure.
 type Service struct {
 	stores  Stores
-	cfg     *config.Env
+	cfg     Config
 	storage fiber.Storage
 	mail    Mailer
 	geo     GeoLocator
 	log     logger.Logger
 }
 
-func NewService(stores Stores, cfg *config.Env, storage fiber.Storage, mailService Mailer, geo GeoLocator, log logger.Logger) *Service {
+func NewService(stores Stores, cfg Config, storage fiber.Storage, mailService Mailer, geo GeoLocator, log logger.Logger) *Service {
 	return new(Service{
 		stores:  stores,
 		cfg:     cfg,

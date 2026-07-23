@@ -11,7 +11,6 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/marketing"
-	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 )
@@ -464,13 +463,12 @@ func (s *memStorage) has(key string) bool {
 	return v != nil
 }
 
-func testConfig() *config.Env {
-	return &config.Env{
+func testConfig() Config {
+	return Config{
 		JWTSecret:              "test-secret",
 		JWTAccessDuration:      15 * time.Minute,
 		JWTRefreshDuration:     30 * 24 * time.Hour,
 		RefreshGracePeriod:     30 * time.Second,
-		PublicURL:              "http://localhost:8080",
 		TwoFactorPendingExpiry: 5 * time.Minute,
 	}
 }

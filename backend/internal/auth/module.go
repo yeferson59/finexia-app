@@ -6,7 +6,6 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
@@ -17,7 +16,7 @@ type Deps struct {
 	// request's own context instead).
 	Ctx     context.Context
 	DB      *pgxpool.Pool
-	Cfg     *config.Env
+	Cfg     Config
 	Storage fiber.Storage
 	Mail    Mailer
 	Geo     GeoLocator
@@ -31,7 +30,7 @@ type Deps struct {
 // Routes, and route guards (RequireAuth/RequireRole) for the rest of the app.
 type Module struct {
 	ctx     context.Context
-	cfg     *config.Env
+	cfg     Config
 	storage fiber.Storage
 	service *Service
 	handler *handler
