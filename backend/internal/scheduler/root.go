@@ -3,7 +3,6 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"sync"
 	"time"
 
@@ -228,7 +227,7 @@ func (r *Runner) unlock(name string) {
 // further attempt on an already-dead context.
 func (r *Runner) Execute(ctx context.Context, job Job, overrides ...JobOptions) {
 	if !r.tryLock(job.Name()) {
-		r.opts.Log.Info(ctx, "skip: ya está en ejecución", logger.Str("job", job.Name()))
+		r.opts.Log.Info(ctx, "scheduler: job omitido, ya está en ejecución", logger.Str("job", job.Name()))
 
 		return
 	}
@@ -265,14 +264,23 @@ func (r *Runner) Execute(ctx context.Context, job Job, overrides ...JobOptions) 
 		}
 
 		if err == nil {
-			r.opts.Log.Info(ctx, "job "+job.Name()+" OK en intento "+strconv.Itoa(attempt)+"/"+strconv.Itoa(totalAttempts)+" ("+duration.String()+")")
+			r.opts.Log.Info(ctx, "scheduler: job completado",
+				logger.Str("job", job.Name()),
+				logger.Int("attempt", attempt),
+				logger.Int("total_attempts", totalAttempts),
+				logger.Dur("duration", duration))
 
 			return
 		}
 
 		lastErr = err
 
-		r.opts.Log.Error(ctx, "job "+job.Name()+" falló intento "+strconv.Itoa(attempt)+"/"+strconv.Itoa(totalAttempts)+" ("+duration.String()+"): "+err.Error())
+		r.opts.Log.Error(ctx, "scheduler: intento de job falló",
+			logger.Str("job", job.Name()),
+			logger.Int("attempt", attempt),
+			logger.Int("total_attempts", totalAttempts),
+			logger.Dur("duration", duration),
+			logger.Err(err))
 
 		if attempt < totalAttempts {
 			r.wait(ctx, opts.BackoffBase, opts.BackoffMax, attempt)

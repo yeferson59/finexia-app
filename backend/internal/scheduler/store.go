@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
@@ -38,4 +39,41 @@ type StateStore interface {
 	// schedule computation, so a crash before any run still resumes
 	// correctly on the next restart.
 	SaveNextRun(ctx context.Context, jobName string, next time.Time) error
+}
+
+// MemoryStore is an in-process StateStore that keeps each job's next-run time
+// in a map, safe for concurrent use. State lives only for the lifetime of the
+// process: it does NOT survive restarts — for that, use a persistent
+// StateStore (e.g. the fiberstore adapter). It's useful as an explicit,
+// testable default, and as the per-job store for jobs that don't need
+// cross-restart durability. Within a single process it still gives the
+// Scheduler somewhere to record and read back a job's cadence.
+type MemoryStore struct {
+	mu   sync.Mutex
+	data map[string]time.Time
+}
+
+// NewMemoryStore returns an empty, ready-to-use MemoryStore.
+func NewMemoryStore() *MemoryStore {
+	return &MemoryStore{data: make(map[string]time.Time)}
+}
+
+// LoadNextRun implements StateStore.
+func (m *MemoryStore) LoadNextRun(_ context.Context, jobName string) (time.Time, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	next, ok := m.data[jobName]
+
+	return next, ok, nil
+}
+
+// SaveNextRun implements StateStore.
+func (m *MemoryStore) SaveNextRun(_ context.Context, jobName string, next time.Time) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.data[jobName] = next
+
+	return nil
 }

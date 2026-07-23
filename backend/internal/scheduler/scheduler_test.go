@@ -323,7 +323,7 @@ func TestScheduler_RegisterWithPerJobOverride(t *testing.T) {
 
 	// &once{} fires immediately, then never again during this test;
 	// isolates the assertion to the retry override, not repeated triggers.
-	sched.Register(job, &once{}, JobOptions{MaxRetries: Retries(0)})
+	sched.Register(job, &once{}, WithRetry(JobOptions{MaxRetries: Retries(0)}))
 	sched.Start()
 	defer sched.Stop()
 
@@ -615,6 +615,54 @@ func TestScheduler_SaveErrorDoesNotBlockScheduling(t *testing.T) {
 	}
 }
 
+// Regression: the post-run save must persist the freshly-computed next-run
+// even when s.ctx is already cancelled (a Stop() during or right after the
+// job's final run). Deriving the save's context from s.ctx made this save
+// fail with context.Canceled, leaving a stale, past-due next-run in the
+// store that the next restart would treat as overdue and double-run.
+func TestScheduler_SaveNextPersistsAfterContextCancelled(t *testing.T) {
+	store := newFakeStore()
+	sched := NewScheduler(newTestRunner(), SchedulerOptions{Store: store})
+
+	// Simulate a running scheduler whose context has been cancelled by Stop().
+	sched.ctx, sched.cancel = context.WithCancel(context.Background())
+	sched.cancel()
+
+	want := time.Now().Add(time.Hour)
+	sched.saveNext(JobFunc{JobName: "shutdown-save"}, want, store)
+
+	got, ok := store.get("shutdown-save")
+	if !ok {
+		t.Fatal("expected next-run to be persisted despite a cancelled scheduler context")
+	}
+
+	if !got.Equal(want) {
+		t.Fatalf("persisted next-run = %v, want %v", got, want)
+	}
+}
+
+func TestMemoryStore_RoundTrip(t *testing.T) {
+	store := NewMemoryStore()
+
+	if _, found, err := store.LoadNextRun(context.Background(), "missing"); err != nil || found {
+		t.Fatalf("expected (found=false, err=nil) for an unknown job, got found=%v err=%v", found, err)
+	}
+
+	want := time.Now().Add(time.Hour).Round(0)
+	if err := store.SaveNextRun(context.Background(), "job", want); err != nil {
+		t.Fatalf("SaveNextRun: %v", err)
+	}
+
+	got, found, err := store.LoadNextRun(context.Background(), "job")
+	if err != nil || !found {
+		t.Fatalf("expected the saved value to be found, got found=%v err=%v", found, err)
+	}
+
+	if !got.Equal(want) {
+		t.Fatalf("LoadNextRun = %v, want %v", got, want)
+	}
+}
+
 func TestNewScheduler_DefaultsStoreTimeoutWhenStoreConfigured(t *testing.T) {
 	sched := NewScheduler(newTestRunner(), SchedulerOptions{Store: newFakeStore()})
 
@@ -623,10 +671,79 @@ func TestNewScheduler_DefaultsStoreTimeoutWhenStoreConfigured(t *testing.T) {
 	}
 }
 
-func TestNewScheduler_NoStoreLeavesTimeoutZero(t *testing.T) {
+func TestNewScheduler_NoDefaultStoreButTimeoutStillDefaulted(t *testing.T) {
 	sched := NewScheduler(newTestRunner())
 
 	if sched.store != nil {
-		t.Fatal("expected no Store by default")
+		t.Fatal("expected no default Store")
+	}
+
+	// The timeout is defaulted even without a default Store, since a per-job
+	// WithStore may still need it.
+	if sched.storeTimeout != defaultStoreTimeout {
+		t.Fatalf("expected the store timeout to be defaulted, got %v", sched.storeTimeout)
+	}
+}
+
+// TestScheduler_PerJobStoreOverridesDefault verifies that WithStore persists a
+// single job to its own store, while a WithoutStore job stays ephemeral even
+// though the Scheduler has a default Store.
+func TestScheduler_PerJobStoreOverridesDefault(t *testing.T) {
+	defaultStore := newFakeStore()
+	jobStore := newFakeStore()
+
+	sched := NewScheduler(newTestRunner(), SchedulerOptions{Store: defaultStore})
+
+	firedPersist := make(chan struct{}, 1)
+	firedEphemeral := make(chan struct{}, 1)
+
+	// Persisted to its own jobStore, not the default.
+	sched.Register(
+		JobFunc{JobName: "own-store", Fn: func(ctx context.Context) error { firedPersist <- struct{}{}; return nil }},
+		&once{},
+		WithStore(jobStore),
+	)
+	// Explicitly ephemeral: must not touch the default store.
+	sched.Register(
+		JobFunc{JobName: "ephemeral", Fn: func(ctx context.Context) error { firedEphemeral <- struct{}{}; return nil }},
+		&once{},
+		WithoutStore(),
+	)
+
+	sched.Start()
+	defer sched.Stop()
+
+	for _, ch := range []chan struct{}{firedPersist, firedEphemeral} {
+		select {
+		case <-ch:
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for a job to fire")
+		}
+	}
+
+	// Poll until the per-job store has recorded its job's next-run.
+	deadline := time.Now().Add(time.Second)
+	for {
+		if _, ok := jobStore.get("own-store"); ok {
+			break
+		}
+
+		if time.Now().After(deadline) {
+			t.Fatal("expected the per-job WithStore to receive the job's next-run")
+		}
+
+		time.Sleep(time.Millisecond)
+	}
+
+	if _, ok := jobStore.get("ephemeral"); ok {
+		t.Fatal("the ephemeral job must not be written to any store")
+	}
+
+	if _, ok := defaultStore.get("ephemeral"); ok {
+		t.Fatal("WithoutStore job must not be written to the default store")
+	}
+
+	if _, ok := defaultStore.get("own-store"); ok {
+		t.Fatal("WithStore job must use its own store, not the default")
 	}
 }

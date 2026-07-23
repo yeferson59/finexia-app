@@ -2,7 +2,7 @@ package scheduler
 
 import (
 	"context"
-	"math/rand"
+	"math/rand/v2"
 	"sync"
 	"time"
 
@@ -75,7 +75,7 @@ func (j Jitter) Next(now time.Time) time.Time {
 		return j.Schedule.Next(now)
 	}
 
-	extra := time.Duration(rand.Int63n(int64(j.Max)))
+	extra := time.Duration(rand.Int64N(int64(j.Max)))
 
 	return j.Schedule.Next(now).Add(extra)
 }
@@ -104,6 +104,46 @@ type scheduledJob struct {
 	job   Job
 	sched Schedule
 	opts  []JobOptions
+	store StateStore
+}
+
+// jobConfig accumulates the per-job settings collected from RegisterOption
+// values before a job is stored: the retry-policy override forwarded to the
+// Runner, and the StateStore this job persists its cadence to.
+type jobConfig struct {
+	retry    []JobOptions
+	store    StateStore
+	storeSet bool // true once WithStore/WithoutStore ran, so an explicit nil
+	// (WithoutStore / WithStore(nil)) is distinguishable from "not set", which
+	// falls back to the Scheduler's default Store.
+}
+
+// RegisterOption customizes a single job's registration. Zero options keeps
+// the defaults: the Runner's retry policy and the Scheduler's default Store.
+type RegisterOption func(*jobConfig)
+
+// WithRetry overrides the Runner's default retry/timeout policy for this job
+// alone (see JobOptions). Replaces the old trailing JobOptions argument to
+// Register.
+func WithRetry(o JobOptions) RegisterOption {
+	return func(c *jobConfig) { c.retry = []JobOptions{o} }
+}
+
+// WithStore persists this job's next-run time to store, overriding the
+// Scheduler's default Store for this job alone. Use it to give a specific job
+// cross-restart durability (e.g. a Redis-backed store) while the rest of the
+// scheduler keeps its default — or vice versa. Passing nil is equivalent to
+// WithoutStore.
+func WithStore(store StateStore) RegisterOption {
+	return func(c *jobConfig) { c.store, c.storeSet = store, true }
+}
+
+// WithoutStore makes this job ephemeral: its cadence is computed fresh from
+// time.Now() at every Start() and never persisted, even when the Scheduler
+// has a default Store. Use it for jobs whose exact next-run doesn't need to
+// survive a restart.
+func WithoutStore() RegisterOption {
+	return func(c *jobConfig) { c.store, c.storeSet = nil, true }
 }
 
 // defaultStoreTimeout bounds each StateStore call so a slow or unreachable
@@ -149,18 +189,23 @@ func NewScheduler(runner *Runner, opts ...SchedulerOptions) *Scheduler {
 		o = opts[0]
 	}
 
-	if o.Store != nil && o.StoreTimeout <= 0 {
+	// Default the timeout whenever it's unset, not only when a default Store
+	// is configured: per-job stores (WithStore) may need it even when the
+	// Scheduler has no default Store.
+	if o.StoreTimeout <= 0 {
 		o.StoreTimeout = defaultStoreTimeout
 	}
 
 	return new(Scheduler{runner: runner, store: o.Store, storeTimeout: o.StoreTimeout})
 }
 
-// Register adds a job with its schedule, optionally overriding the
-// Runner's default retry policy for this job alone (see JobOptions). Must
-// be called before Start; calling it afterwards panics rather than
-// silently dropping the job, since that's always a caller bug.
-func (s *Scheduler) Register(job Job, sched Schedule, overrides ...JobOptions) {
+// Register adds a job with its schedule. Per-job behavior is customized with
+// RegisterOption values: WithRetry overrides the Runner's retry policy,
+// WithStore/WithoutStore control this job's state persistence independently
+// of the Scheduler's default Store. Must be called before Start; calling it
+// afterwards panics rather than silently dropping the job, since that's
+// always a caller bug.
+func (s *Scheduler) Register(job Job, sched Schedule, opts ...RegisterOption) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -168,7 +213,17 @@ func (s *Scheduler) Register(job Job, sched Schedule, overrides ...JobOptions) {
 		panic("scheduler: Register called after Start")
 	}
 
-	s.jobs = append(s.jobs, scheduledJob{job: job, sched: sched, opts: overrides})
+	var cfg jobConfig
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
+	store := s.store
+	if cfg.storeSet {
+		store = cfg.store
+	}
+
+	s.jobs = append(s.jobs, scheduledJob{job: job, sched: sched, opts: cfg.retry, store: store})
 }
 
 // Start launches one goroutine per registered job. Calling it more than
@@ -186,7 +241,7 @@ func (s *Scheduler) Start() {
 
 	for _, sj := range s.jobs {
 		s.wg.Add(1)
-		go s.loop(sj.job, sj.sched, sj.opts)
+		go s.loop(sj)
 	}
 }
 
@@ -196,31 +251,39 @@ func (s *Scheduler) Start() {
 // flight inside Runner.Execute — that job's own context-awareness (or lack
 // of it) determines whether it notices the cancellation and returns early.
 func (s *Scheduler) Stop() {
-	if s.cancel != nil {
-		s.cancel()
+	s.mu.Lock()
+	cancel := s.cancel
+	s.mu.Unlock()
+
+	if cancel != nil {
+		cancel()
 	}
 
 	s.wg.Wait()
 }
 
-func (s *Scheduler) loop(job Job, sched Schedule, overrides []JobOptions) {
+func (s *Scheduler) loop(sj scheduledJob) {
 	defer s.wg.Done()
 
-	next := s.loadNext(job, sched)
+	next := s.loadNext(sj.job, sj.sched, sj.store)
+
+	// One timer for the whole loop, re-armed after each fire instead of
+	// allocated per iteration. Safe to Reset without draining on Go 1.23+,
+	// where Stop/Reset guarantee no stale value is left in the channel.
+	timer := time.NewTimer(s.delayUntil(next))
+	defer timer.Stop()
 
 	for {
-		timer := time.NewTimer(s.delayUntil(next))
-
 		select {
 		case <-s.ctx.Done():
-			timer.Stop()
-
 			return
 		case <-timer.C:
-			s.runJob(job, overrides)
+			s.runJob(sj.job, sj.opts)
 
-			next = s.computeNext(job, sched, time.Now())
-			s.saveNext(job, next)
+			next = s.computeNext(sj.job, sj.sched, time.Now())
+			s.saveNext(sj.job, next, sj.store)
+
+			timer.Reset(s.delayUntil(next))
 		}
 	}
 }
@@ -253,10 +316,10 @@ func (s *Scheduler) computeNext(job Job, sched Schedule, now time.Time) (next ti
 // computed fresh — matching the pre-Store behavior. A freshly computed
 // value is saved immediately, so a crash before the job's first run still
 // resumes correctly on the next restart.
-func (s *Scheduler) loadNext(job Job, sched Schedule) time.Time {
-	if s.store != nil {
+func (s *Scheduler) loadNext(job Job, sched Schedule, store StateStore) time.Time {
+	if store != nil {
 		ctx, cancel := context.WithTimeout(s.ctx, s.storeTimeout)
-		next, found, err := s.store.LoadNextRun(ctx, job.Name())
+		next, found, err := store.LoadNextRun(ctx, job.Name())
 		cancel()
 
 		switch {
@@ -269,7 +332,7 @@ func (s *Scheduler) loadNext(job Job, sched Schedule) time.Time {
 	}
 
 	next := s.computeNext(job, sched, time.Now())
-	s.saveNext(job, next)
+	s.saveNext(job, next, store)
 
 	return next
 }
@@ -277,15 +340,25 @@ func (s *Scheduler) loadNext(job Job, sched Schedule) time.Time {
 // saveNext persists next for job if a Store is configured. Failures are
 // logged, not returned — persistence is best-effort and must never block
 // or break scheduling.
-func (s *Scheduler) saveNext(job Job, next time.Time) {
-	if s.store == nil {
+//
+// The timeout context is derived from context.Background(), not s.ctx, on
+// purpose: this runs right after a job completes, including the final run
+// before a Stop() that has already cancelled s.ctx. Deriving from s.ctx
+// would make that last save fail with context.Canceled, leaving a stale
+// (now past-due) next-run in the store — which the next restart would treat
+// as an overdue catch-up and fire immediately, double-running the job. The
+// cost is that a slow/unreachable store can delay Stop() by up to
+// storeTimeout for that final save, which is an acceptable, bounded trade
+// for not losing the post-run schedule state.
+func (s *Scheduler) saveNext(job Job, next time.Time, store StateStore) {
+	if store == nil {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(s.ctx, s.storeTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), s.storeTimeout)
 	defer cancel()
 
-	if err := s.store.SaveNextRun(ctx, job.Name(), next); err != nil {
+	if err := store.SaveNextRun(ctx, job.Name(), next); err != nil {
 		s.runner.opts.Log.Error(s.ctx, "scheduler: failed to persist next-run",
 			logger.Str("job", safeJobName(job)), logger.Err(err))
 	}
