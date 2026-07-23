@@ -68,12 +68,26 @@ func (s *memStorage) Reset() error {
 
 func (s *memStorage) Close() error { return nil }
 
+// TestNewValidatesRequiredDeps checks that New fails fast with a clear error
+// when a required dependency is missing, instead of panicking later in wire().
+func TestNewValidatesRequiredDeps(t *testing.T) {
+	if _, err := New(Deps{}); err == nil {
+		t.Fatal("expected New to reject an empty Deps, got nil error")
+	}
+
+	// Envs present but DB missing must still fail (Envs is dereferenced in
+	// New; the rest are only needed later, so validation must catch them up
+	// front).
+	if _, err := New(Deps{Envs: &config.Env{}}); err == nil {
+		t.Fatal("expected New to reject Deps missing DB/Storage/Mail/Log, got nil error")
+	}
+}
+
 // TestAppWiresAndRoutes is the boot smoke test of the composition root: it
 // composes the real App (pgx pool is lazy, so no database is needed) and
 // checks that public routes, module routes and the JWT gate all answer.
 func TestAppWiresAndRoutes(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel() // stops the schedulers started by wire
+	ctx := t.Context() // cancelled on cleanup, which stops the schedulers started by wire
 
 	pool, err := pgxpool.New(ctx, "postgres://user:pass@127.0.0.1:1/finexia_test")
 	if err != nil {
@@ -86,7 +100,7 @@ func TestAppWiresAndRoutes(t *testing.T) {
 		t.Fatalf("mail.New: %v", err)
 	}
 
-	a := New(Deps{
+	a, err := New(Deps{
 		Envs: &config.Env{
 			Port:               "0",
 			Environment:        "test",
@@ -102,6 +116,9 @@ func TestAppWiresAndRoutes(t *testing.T) {
 		Mail:    mailService,
 		Log:     logger.Noop(),
 	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
 	a.wire(ctx)
 
 	request := func(method, target string, header ...string) int {

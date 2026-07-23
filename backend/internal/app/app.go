@@ -36,6 +36,15 @@ import (
 	"github.com/yeferson59/finexia-app/internal/user"
 )
 
+const (
+	// shutdownTimeout bounds the graceful shutdown once the parent context
+	// is cancelled: HTTP draining plus stopping the schedulers.
+	shutdownTimeout = 30 * time.Second
+
+	// bodyLimit caps request bodies at 10 MiB.
+	bodyLimit = 10 * 1024 * 1024
+)
+
 // Deps carries the already-connected infrastructure the App composes. main
 // owns creating (and closing) these; App only wires them.
 type Deps struct {
@@ -45,6 +54,27 @@ type Deps struct {
 	S3      *s3.Client
 	Mail    *mail.Service
 	Log     logger.Logger
+}
+
+// validate reports the first required dependency that is missing, so New
+// fails fast at the composition root with a clear message instead of a nil
+// dereference deep inside wire(). S3 is intentionally optional: the app
+// wires without it (e.g. in tests) and only object-store routes need it.
+func (d Deps) validate() error {
+	switch {
+	case d.Envs == nil:
+		return errors.New("app: Deps.Envs is required")
+	case d.DB == nil:
+		return errors.New("app: Deps.DB is required")
+	case d.Storage == nil:
+		return errors.New("app: Deps.Storage is required")
+	case d.Mail == nil:
+		return errors.New("app: Deps.Mail is required")
+	case d.Log == nil:
+		return errors.New("app: Deps.Log is required")
+	default:
+		return nil
+	}
 }
 
 type App struct {
@@ -61,16 +91,21 @@ func (v *structValidator) Validate(out any) error {
 	return v.validate.Struct(out)
 }
 
-// New builds the Fiber application with the HTTP-level configuration that
-// used to live in cmd/api/main.go.
-func New(deps Deps) *App {
+// New validates the dependencies and builds the Fiber application with the
+// HTTP-level configuration that used to live in cmd/api/main.go. It returns
+// an error (rather than panicking) when a required dependency is missing.
+func New(deps Deps) (*App, error) {
+	if err := deps.validate(); err != nil {
+		return nil, err
+	}
+
 	fiberApp := fiber.New(fiber.Config{
 		JSONEncoder:     sonic.ConfigFastest.Marshal,
 		JSONDecoder:     sonic.ConfigFastest.Unmarshal,
 		StructValidator: new(structValidator{validate: validator.New()}),
 		ProxyHeader:     fiber.HeaderXForwardedFor,
 		TrustProxy:      deps.Envs.TrustProxy,
-		BodyLimit:       10 * 1024 * 1024,
+		BodyLimit:       bodyLimit,
 		TrustProxyConfig: fiber.TrustProxyConfig{
 			Loopback:  true,
 			LinkLocal: true,
@@ -79,7 +114,7 @@ func New(deps Deps) *App {
 		},
 	})
 
-	return new(App{fiber: fiberApp, deps: deps})
+	return new(App{fiber: fiberApp, deps: deps}), nil
 }
 
 // Run wires modules, legacy layers and schedulers, then serves HTTP until
@@ -88,14 +123,22 @@ func New(deps Deps) *App {
 func (a *App) Run(ctx context.Context) error {
 	a.wire(ctx)
 
+	// stopped signals that Listen has returned (e.g. a bind error), so the
+	// shutdown watcher exits instead of leaking while blocked on ctx.Done().
+	stopped := make(chan struct{})
+	defer close(stopped)
+
 	go func() {
-		<-ctx.Done()
+		select {
+		case <-ctx.Done():
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+			defer cancel()
 
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		if err := a.Shutdown(shutdownCtx); err != nil {
-			a.deps.Log.Error(shutdownCtx, "error during shutdown: "+err.Error())
+			if err := a.Shutdown(shutdownCtx); err != nil {
+				a.deps.Log.Error(shutdownCtx, "error during shutdown", logger.Err(err))
+			}
+		case <-stopped:
+			// Listen already returned; nothing to gracefully shut down.
 		}
 	}()
 
@@ -123,9 +166,33 @@ func (a *App) Shutdown(ctx context.Context) error {
 
 const localUserID = "auth_user_id"
 
+// modules holds every composed domain module so the wiring steps
+// (route mounting, scheduler registration) can pass them around as one value
+// instead of a long parameter list.
+type modules struct {
+	health       *health.Module
+	marketing    *marketing.Module
+	auth         *auth.Module
+	user         *user.Module
+	market       *market.Module
+	portfolio    *portfolio.Module
+	notification *notification.Service
+}
+
 // wire composes every layer of the application; separated from Run so tests
-// can exercise the composed router without opening a listener.
+// can exercise the composed router without opening a listener. It runs the
+// three ordered steps of the composition root: build the modules, mount
+// their routes, then start the schedulers.
 func (a *App) wire(ctx context.Context) {
+	mods := a.buildModules(ctx)
+	a.mountRoutes(mods)
+	a.startScheduler(ctx, mods)
+}
+
+// buildModules constructs the shared infrastructure (price provider, geoip,
+// per-user rate limiter) and every domain module, respecting their
+// dependency order.
+func (a *App) buildModules(ctx context.Context) *modules {
 	priceProvider := marketdata.NewFallback(
 		alphavantage.New(a.deps.Envs.AlphaVantageAPIKey),
 		finnhub.New(a.deps.Envs.FinnhubAPIKey),
@@ -139,8 +206,6 @@ func (a *App) wire(ctx context.Context) {
 		return "user_limit:" + userID
 	})
 
-	// Migrated domain modules.
-	healthModule := health.New()
 	marketingModule := marketing.New(marketing.NewPostgresRepository(a.deps.DB), a.deps.Mail)
 	authModule := auth.New(auth.Deps{
 		Ctx:      ctx,
@@ -186,44 +251,74 @@ func (a *App) wire(ctx context.Context) {
 		AuthMiddl: authModule,
 		Limiter:   userLimiter,
 	})
-	notificationService := notification.NewService(userModule.Service(), portfolioModule.Service(), a.deps.Mail, a.deps.Envs)
 
+	return &modules{
+		health:       health.New(),
+		marketing:    marketingModule,
+		auth:         authModule,
+		user:         userModule,
+		market:       marketModule,
+		portfolio:    portfolioModule,
+		notification: notification.NewService(userModule.Service(), portfolioModule.Service(), a.deps.Mail, a.deps.Envs),
+	}
+}
+
+// mountRoutes installs the global middleware chain and each module's routes.
+func (a *App) mountRoutes(mods *modules) {
 	a.fiber.Use(httpx.Recovery(), httpx.CORS(a.deps.Envs.CORSOrigin, true), httpx.Helmet(), httpx.RequestID(), httpx.ResponseTime(), httpx.Logger(), httpx.RateLimiter(60, 1*time.Minute, false))
 
-	healthModule.Routes(a.fiber)
-	marketModule.Routes(a.fiber)
-	authModule.Routes(a.fiber)
-	marketingModule.Routes(a.fiber)
-	userModule.Routes(a.fiber)
-	portfolioModule.Routes(a.fiber)
+	mods.health.Routes(a.fiber)
+	mods.market.Routes(a.fiber)
+	mods.auth.Routes(a.fiber)
+	mods.marketing.Routes(a.fiber)
+	mods.user.Routes(a.fiber)
+	mods.portfolio.Routes(a.fiber)
+}
 
+// startScheduler builds the job runner and scheduler, registers every job and
+// starts the loops. The Scheduler defaults jobs to in-memory state; the jobs
+// that must survive restarts/deploys are registered with a Redis-backed store
+// so they resume from their persisted next-run time (catching up on runs
+// missed while the process was down) instead of resetting their cadence.
+func (a *App) startScheduler(ctx context.Context, mods *modules) {
 	runner := scheduler.NewRunner(scheduler.RunnerOptions{
 		Timeout:     30 * time.Second,
 		MaxRetries:  3,
 		BackoffBase: 500 * time.Millisecond,
 		BackoffMax:  10 * time.Second,
 		OnError: func(name string, err error) {
-			a.deps.Log.Error(ctx, "ALERTA: job "+name+" falló definitivamente "+err.Error())
+			a.deps.Log.Error(ctx, "scheduler: ALERTA, job falló definitivamente",
+				logger.Str("job", name), logger.Err(err))
 		},
 		Log: a.deps.Log,
 	})
 
-	// Redis-backed: each job resumes from its persisted next-run time
-	// across restarts/deploys instead of resetting its interval.
-	schedule := scheduler.NewScheduler(runner, scheduler.SchedulerOptions{
-		Store: fiberstore.New(a.deps.Storage),
+	// Default: in-memory cadence, recomputed at each start.
+	a.schedule = scheduler.NewScheduler(runner, scheduler.SchedulerOptions{
+		Store: scheduler.NewMemoryStore(),
 	})
-	a.schedule = schedule
 
-	a.registerJobs(schedule, authModule, portfolioModule, marketModule, notificationService)
+	// Redis-backed store, opted into per job via WithStore below.
+	persistent := fiberstore.New(a.deps.Storage)
+
+	a.registerJobs(a.schedule, mods, persistent)
 }
 
-func (a *App) registerJobs(sched *scheduler.Scheduler, authModule *auth.Module, portfolioModule *portfolio.Module, marketModule *market.Module, notificationService *notification.Service) {
-	sched.Register(market.NewExchangeRateScheduler(marketModule.Service(), a.deps.Log), scheduler.DailyAt{Hour: 9, Minute: 30})
-	sched.Register(market.NewAssetPriceScheduler(marketModule.Service(), a.deps.Log), scheduler.Delayed{Schedule: scheduler.DailyAt{Hour: 9, Minute: 30}, Delay: 90 * time.Second})
-	sched.Register(portfolio.NewSnapshotJob(portfolioModule.Service(), a.deps.Log), scheduler.Delayed{Schedule: scheduler.DailyAt{Hour: 9, Minute: 30}, Delay: 120 * time.Second})
-	sched.Register(notification.NewWeeklySummaryScheduler(notificationService, a.deps.Log), scheduler.WeeklyAt{Day: time.Monday, Hour: 8, Minute: 30})
-	sched.Register(auth.NewCleanupJob(authModule.Service(), a.deps.Log), scheduler.Every{Interval: 5 * time.Hour})
+func (a *App) registerJobs(sched *scheduler.Scheduler, mods *modules, persistent scheduler.StateStore) {
+	// The daily market jobs all key off the same 09:30 local market open;
+	// the price/snapshot jobs run staggered after it.
+	marketOpen := scheduler.DailyAt{Hour: 9, Minute: 30}
+
+	// Ephemeral (default in-memory store): a missed daily run is simply
+	// skipped; the next day recomputes fresh.
+	sched.Register(market.NewExchangeRateScheduler(mods.market.Service(), a.deps.Log), marketOpen)
+	sched.Register(market.NewAssetPriceScheduler(mods.market.Service(), a.deps.Log), scheduler.Delayed{Schedule: marketOpen, Delay: 90 * time.Second})
+
+	// Persistent (Redis): resume across restarts and catch up on runs missed
+	// while the process was down.
+	sched.Register(portfolio.NewSnapshotJob(mods.portfolio.Service(), a.deps.Log), scheduler.Delayed{Schedule: marketOpen, Delay: 120 * time.Second}, scheduler.WithStore(persistent))
+	sched.Register(notification.NewWeeklySummaryScheduler(mods.notification, a.deps.Log), scheduler.WeeklyAt{Day: time.Monday, Hour: 8, Minute: 30}, scheduler.WithStore(persistent))
+	sched.Register(auth.NewCleanupJob(mods.auth.Service(), a.deps.Log), scheduler.Every{Interval: 5 * time.Hour}, scheduler.WithStore(persistent))
 
 	sched.Start()
 }

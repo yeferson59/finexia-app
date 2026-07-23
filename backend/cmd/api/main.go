@@ -58,12 +58,17 @@ func run(ctx context.Context, envs *config.Env, log logger.Logger) error {
 		return errors.New("failed to init mail service: " + err.Error())
 	}
 
-	return app.New(app.Deps{
+	application, err := app.New(app.Deps{
 		Envs:    envs,
 		DB:      dbPool,
 		Storage: storageCache,
 		S3:      s3Client,
 		Mail:    mailService,
 		Log:     log,
-	}).Run(ctx)
+	})
+	if err != nil {
+		return errors.New("failed to build application: " + err.Error())
+	}
+
+	return application.Run(ctx)
 }
