@@ -5,16 +5,23 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
-// Schedule decides when the next run happens, given 'now'.
-// Any scheduling strategy implements this single interface.
+// Schedule decides when the next run happens, given 'now'. Any scheduling
+// strategy implements this single interface. Next is expected to return a
+// time; the Scheduler defensively floors the resulting delay at 1ms if
+// Next returns a non-future time (e.g. a misconfigured Every{Interval: 0}),
+// so a broken Schedule can't spin the loop tightly.
 type Schedule interface {
 	Next(now time.Time) time.Time
 }
 
 // Every fires the job every 'Interval', counted from the moment the previous
-// run finishes (not from when it started).
+// run finishes (not from when it started). Interval must be positive; a
+// zero or negative Interval makes the Scheduler re-fire as fast as it can
+// (floored at roughly once per millisecond) instead of on any real cadence.
 type Every struct {
 	Interval time.Duration
 }
@@ -96,13 +103,18 @@ func (w WeeklyAt) Next(now time.Time) time.Time {
 type scheduledJob struct {
 	job   Job
 	sched Schedule
+	opts  []JobOptions
 }
 
 // Scheduler coordinates multiple jobs each with its own Schedule, without
 // depending on any external cron library. Each job runs in its own goroutine.
 type Scheduler struct {
 	runner *Runner
-	jobs   []scheduledJob
+
+	mu      sync.Mutex
+	jobs    []scheduledJob
+	started bool
+
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -112,24 +124,45 @@ func NewScheduler(runner *Runner) *Scheduler {
 	return new(Scheduler{runner: runner})
 }
 
-// Register adds a job with its schedule. Must be called before Start.
-func (s *Scheduler) Register(job Job, sched Schedule) {
-	s.jobs = append(s.jobs, scheduledJob{job: job, sched: sched})
+// Register adds a job with its schedule, optionally overriding the
+// Runner's default retry policy for this job alone (see JobOptions). Must
+// be called before Start; calling it afterwards panics rather than
+// silently dropping the job, since that's always a caller bug.
+func (s *Scheduler) Register(job Job, sched Schedule, overrides ...JobOptions) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.started {
+		panic("scheduler: Register called after Start")
+	}
+
+	s.jobs = append(s.jobs, scheduledJob{job: job, sched: sched, opts: overrides})
 }
 
-// Start launches one goroutine per registered job.
+// Start launches one goroutine per registered job. Calling it more than
+// once panics, since that would silently double every job's firing rate.
 func (s *Scheduler) Start() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.started {
+		panic("scheduler: Start called more than once")
+	}
+	s.started = true
+
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
 	for _, sj := range s.jobs {
 		s.wg.Add(1)
-		go s.loop(sj.job, sj.sched)
+		go s.loop(sj.job, sj.sched, sj.opts)
 	}
 }
 
-// Stop cancels all loops and waits for them to finish cleanly. It does
-// not abort a job already running inside Runner.Execute; it only
-// prevents the next run from firing.
+// Stop cancels all loops and waits for them to finish cleanly: no new run
+// will be scheduled, and any retry backoff currently in progress is cut
+// short immediately. It does not forcibly abort a job attempt already in
+// flight inside Runner.Execute — that job's own context-awareness (or lack
+// of it) determines whether it notices the cancellation and returns early.
 func (s *Scheduler) Stop() {
 	if s.cancel != nil {
 		s.cancel()
@@ -138,14 +171,11 @@ func (s *Scheduler) Stop() {
 	s.wg.Wait()
 }
 
-func (s *Scheduler) loop(job Job, sched Schedule) {
+func (s *Scheduler) loop(job Job, sched Schedule, overrides []JobOptions) {
 	defer s.wg.Done()
 
 	for {
-		now := time.Now()
-		next := sched.Next(now)
-		delay := max(0, next.Sub(now))
-		timer := time.NewTimer(delay)
+		timer := time.NewTimer(s.nextDelay(job, sched))
 
 		select {
 		case <-s.ctx.Done():
@@ -153,9 +183,60 @@ func (s *Scheduler) loop(job Job, sched Schedule) {
 
 			return
 		case <-timer.C:
-			s.runner.Execute(job)
+			s.runJob(job, overrides)
 		}
 	}
+}
+
+// nextDelay computes the wait until the next run. It floors the delay at
+// 1ms so a misconfigured Schedule (e.g. Every{Interval: 0}) can't spin the
+// loop tightly, and recovers a panicking Schedule.Next by logging it and
+// retrying in a second, rather than crashing the process.
+func (s *Scheduler) nextDelay(job Job, sched Schedule) (delay time.Duration) {
+	defer func() {
+		if p := recover(); p != nil {
+			s.runner.opts.Log.Error(s.ctx, "scheduler: Schedule.Next panicked, retrying in 1s",
+				logger.Str("job", safeJobName(job)), logger.Any("panic", p))
+
+			delay = time.Second
+		}
+	}()
+
+	now := time.Now()
+	delay = sched.Next(now).Sub(now)
+
+	if delay <= 0 {
+		delay = time.Millisecond
+	}
+
+	return delay
+}
+
+// runJob executes job through the Runner, recovering any panic that
+// escapes Execute (e.g. from a Job whose Name() panics) so one broken job
+// can't take down the whole process — the other scheduled jobs keep running.
+func (s *Scheduler) runJob(job Job, overrides []JobOptions) {
+	defer func() {
+		if p := recover(); p != nil {
+			s.runner.opts.Log.Error(s.ctx, "scheduler: recovered panic running job",
+				logger.Str("job", safeJobName(job)), logger.Any("panic", p))
+		}
+	}()
+
+	s.runner.Execute(s.ctx, job, overrides...)
+}
+
+// safeJobName reads job.Name(), recovering if it panics — used from panic
+// handlers themselves, where a Name() that panics (the very thing that may
+// have triggered the handler) must not cause a second, unrecovered panic.
+func safeJobName(job Job) (name string) {
+	defer func() {
+		if recover() != nil {
+			name = "<unknown: Name() panicked>"
+		}
+	}()
+
+	return job.Name()
 }
 
 //

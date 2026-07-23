@@ -2,6 +2,9 @@ package scheduler
 
 import (
 	"context"
+	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -143,6 +146,21 @@ func (t tick) Next(now time.Time) time.Time {
 	return now.Add(t.interval)
 }
 
+// once fires immediately on its first Next() call and then far in the
+// future, so a job scheduled with it runs exactly once during a short
+// test, isolating assertions about retries from repeated schedule triggers.
+type once struct{ fired bool }
+
+func (o *once) Next(now time.Time) time.Time {
+	if o.fired {
+		return now.Add(24 * time.Hour)
+	}
+
+	o.fired = true
+
+	return now
+}
+
 func TestScheduler_StartExecutesRegisteredJobs(t *testing.T) {
 	sched := NewScheduler(newTestRunner())
 
@@ -254,5 +272,151 @@ func TestScheduler_MultipleJobsRunIndependently(t *testing.T) {
 		case <-time.After(time.Second):
 			t.Fatal("timed out waiting for one of the two independent jobs")
 		}
+	}
+}
+
+func TestScheduler_StartCalledTwicePanics(t *testing.T) {
+	sched := NewScheduler(newTestRunner())
+	sched.Start()
+	defer sched.Stop()
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected a second Start() call to panic")
+		}
+	}()
+
+	sched.Start()
+}
+
+func TestScheduler_RegisterAfterStartPanics(t *testing.T) {
+	sched := NewScheduler(newTestRunner())
+	sched.Start()
+	defer sched.Stop()
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected Register() after Start() to panic")
+		}
+	}()
+
+	sched.Register(JobFunc{JobName: "late", Fn: func(ctx context.Context) error { return nil }}, Every{Interval: time.Hour})
+}
+
+func TestScheduler_RegisterWithPerJobOverride(t *testing.T) {
+	runner := NewRunner(RunnerOptions{MaxRetries: 5, BackoffBase: time.Second, Log: logger.Noop()})
+	sched := NewScheduler(runner)
+
+	var attempts atomic.Int32
+	firstAttempt := make(chan struct{})
+
+	job := JobFunc{
+		JobName: "override-sched",
+		Fn: func(ctx context.Context) error {
+			if attempts.Add(1) == 1 {
+				close(firstAttempt)
+			}
+
+			return errors.New("boom")
+		},
+	}
+
+	// &once{} fires immediately, then never again during this test;
+	// isolates the assertion to the retry override, not repeated triggers.
+	sched.Register(job, &once{}, JobOptions{MaxRetries: Retries(0)})
+	sched.Start()
+	defer sched.Stop()
+
+	select {
+	case <-firstAttempt:
+	case <-time.After(time.Second):
+		t.Fatal("job never fired")
+	}
+
+	time.Sleep(50 * time.Millisecond) // give an incorrect retry a chance to fire
+
+	if got := attempts.Load(); got != 1 {
+		t.Fatalf("expected the per-job MaxRetries override (0) to prevent retries, got %d attempts", got)
+	}
+}
+
+// panickyNameJob's Name() panics, exercising the panic surface inside
+// Runner.Execute that isn't covered by safeRun (which only wraps job.Run).
+type panickyNameJob struct{}
+
+func (panickyNameJob) Name() string                { panic("name panic") }
+func (panickyNameJob) Run(_ context.Context) error { return nil }
+
+func TestScheduler_PanicInOneJobDoesNotStopOthers(t *testing.T) {
+	sched := NewScheduler(newTestRunner())
+
+	fired := make(chan struct{}, 8)
+	goodJob := JobFunc{JobName: "good", Fn: func(ctx context.Context) error { fired <- struct{}{}; return nil }}
+
+	sched.Register(panickyNameJob{}, tick{interval: 5 * time.Millisecond})
+	sched.Register(goodJob, tick{interval: 5 * time.Millisecond})
+	sched.Start()
+	defer sched.Stop()
+
+	select {
+	case <-fired:
+	case <-time.After(time.Second):
+		t.Fatal("good job never fired — a panic in the other job likely crashed its goroutine (or the process)")
+	}
+}
+
+func TestScheduler_NextDelayFloorsNonPositiveDelay(t *testing.T) {
+	sched := NewScheduler(newTestRunner())
+	job := JobFunc{JobName: "zero-interval", Fn: func(ctx context.Context) error { return nil }}
+
+	if got := sched.nextDelay(job, Every{Interval: 0}); got != time.Millisecond {
+		t.Fatalf("expected a 1ms floor for a zero interval, got %v", got)
+	}
+
+	if got := sched.nextDelay(job, Every{Interval: -time.Hour}); got != time.Millisecond {
+		t.Fatalf("expected a 1ms floor for a negative interval, got %v", got)
+	}
+}
+
+func TestScheduler_StopInterruptsJobRetryBackoff(t *testing.T) {
+	runner := NewRunner(RunnerOptions{
+		MaxRetries:  20,
+		BackoffBase: time.Second, // deliberately long
+		Log:         logger.Noop(),
+	})
+	sched := NewScheduler(runner)
+
+	started := make(chan struct{})
+	var startedOnce sync.Once
+
+	job := JobFunc{
+		JobName: "slow-retry",
+		Fn: func(ctx context.Context) error {
+			startedOnce.Do(func() { close(started) })
+			return errors.New("boom")
+		},
+	}
+
+	sched.Register(job, &once{})
+	sched.Start()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("job never started")
+	}
+
+	time.Sleep(20 * time.Millisecond) // let it enter the long backoff sleep
+
+	stopped := make(chan struct{})
+	go func() {
+		sched.Stop()
+		close(stopped)
+	}()
+
+	select {
+	case <-stopped:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Stop() did not return promptly — cancellation didn't reach the retry backoff")
 	}
 }

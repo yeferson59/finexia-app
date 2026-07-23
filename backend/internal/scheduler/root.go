@@ -3,7 +3,6 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"math"
 	"strconv"
 	"sync"
 	"time"
@@ -46,6 +45,25 @@ type RunnerOptions struct {
 	Log         logger.Logger
 }
 
+// JobOptions overrides the Runner's default retry policy for a single job,
+// passed to Execute or Scheduler.Register. Timeout/BackoffBase/BackoffMax
+// of zero mean "inherit the Runner's default" (which is itself the same
+// convention RunnerOptions uses for "disabled"). MaxRetries is a pointer
+// because 0 is a meaningful, distinct override ("no retries") from "not
+// set" — use the Retries helper to build it.
+type JobOptions struct {
+	Timeout     time.Duration
+	MaxRetries  *int
+	BackoffBase time.Duration
+	BackoffMax  time.Duration
+}
+
+// Retries returns a pointer to n, for JobOptions.MaxRetries — Go has no
+// address-of-literal operator.
+func Retries(n int) *int {
+	return new(n)
+}
+
 type Runner struct {
 	opts    RunnerOptions
 	mu      sync.Mutex
@@ -64,17 +82,100 @@ func NewRunner(opts RunnerOptions) *Runner {
 	return new(Runner{opts: opts, running: make(map[string]bool)})
 }
 
-func (r *Runner) wait(attempt int) {
-	if r.opts.BackoffBase <= 0 {
+// effectiveOptions is RunnerOptions' tunable subset after merging in a
+// per-job override. OnError/OnAttempt/Log stay global — only the
+// retry/timeout policy can be overridden per job.
+type effectiveOptions struct {
+	Timeout     time.Duration
+	MaxRetries  int
+	BackoffBase time.Duration
+	BackoffMax  time.Duration
+}
+
+func (r *Runner) resolveOptions(overrides ...JobOptions) effectiveOptions {
+	eo := effectiveOptions{
+		Timeout:     r.opts.Timeout,
+		MaxRetries:  r.opts.MaxRetries,
+		BackoffBase: r.opts.BackoffBase,
+		BackoffMax:  r.opts.BackoffMax,
+	}
+
+	if len(overrides) == 0 {
+		return eo
+	}
+
+	o := overrides[0]
+
+	if o.Timeout > 0 {
+		eo.Timeout = o.Timeout
+	}
+
+	if o.MaxRetries != nil {
+		eo.MaxRetries = max(*o.MaxRetries, 0)
+	}
+
+	if o.BackoffBase > 0 {
+		eo.BackoffBase = o.BackoffBase
+	}
+
+	if o.BackoffMax > 0 {
+		eo.BackoffMax = o.BackoffMax
+	}
+
+	return eo
+}
+
+// maxDuration is the largest representable time.Duration, used to keep
+// backoffDelay's doubling from overflowing int64 when MaxRetries is large.
+const maxDuration = time.Duration(1<<63 - 1)
+
+// backoffDelay computes the exponential backoff for the given attempt
+// (1-indexed: attempt 1 -> base, attempt 2 -> 2*base, ...), saturating at
+// backoffMax (if set) and never overflowing time.Duration's int64 range.
+func backoffDelay(base, backoffMax time.Duration, attempt int) time.Duration {
+	if base <= 0 {
+		return 0
+	}
+
+	delay := base
+
+	for i := 1; i < attempt; i++ {
+		if backoffMax > 0 && delay >= backoffMax {
+			return backoffMax
+		}
+
+		if delay > maxDuration/2 {
+			delay = maxDuration
+
+			break
+		}
+
+		delay *= 2
+	}
+
+	if backoffMax > 0 && delay > backoffMax {
+		delay = backoffMax
+	}
+
+	return delay
+}
+
+// wait sleeps for the backoff delay of the given attempt, or returns early
+// if ctx is cancelled — so a Scheduler.Stop() during a retry backoff
+// doesn't have to wait out the full delay.
+func (r *Runner) wait(ctx context.Context, backoffBase, backoffMax time.Duration, attempt int) {
+	delay := backoffDelay(backoffBase, backoffMax, attempt)
+	if delay <= 0 {
 		return
 	}
 
-	delay := r.opts.BackoffBase * time.Duration(math.Pow(2, float64(attempt-1)))
-	if r.opts.BackoffMax > 0 && delay > r.opts.BackoffMax {
-		delay = r.opts.BackoffMax
-	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
 
-	time.Sleep(delay)
+	select {
+	case <-timer.C:
+	case <-ctx.Done():
+	}
 }
 
 func (r *Runner) safeRun(ctx context.Context, job Job) (err error) {
@@ -85,6 +186,19 @@ func (r *Runner) safeRun(ctx context.Context, job Job) (err error) {
 	}()
 
 	return job.Run(ctx)
+}
+
+// safeCallback runs fn, recovering and logging any panic instead of
+// letting it crash the calling goroutine (and, since these run inside
+// goroutines spawned by Scheduler, potentially the whole process).
+func (r *Runner) safeCallback(ctx context.Context, name string, fn func()) {
+	defer func() {
+		if p := recover(); p != nil {
+			r.opts.Log.Error(ctx, "scheduler: "+name+" callback panicked", logger.Any("panic", p))
+		}
+	}()
+
+	fn()
 }
 
 func (r *Runner) tryLock(name string) bool {
@@ -107,28 +221,38 @@ func (r *Runner) unlock(name string) {
 	r.running[name] = false
 }
 
-func (r *Runner) Execute(job Job) {
-	base := context.Background()
-
+// Execute runs job to completion, retrying on failure per the Runner's
+// options (or the given per-job override). ctx bounds the whole call: if
+// it's cancelled, Execute stops retrying (and interrupts any backoff wait
+// in progress) as soon as the current attempt returns, without wasting a
+// further attempt on an already-dead context.
+func (r *Runner) Execute(ctx context.Context, job Job, overrides ...JobOptions) {
 	if !r.tryLock(job.Name()) {
-		r.opts.Log.Info(base, "skip: ya está en ejecución", logger.Str("job", job.Name()))
+		r.opts.Log.Info(ctx, "skip: ya está en ejecución", logger.Str("job", job.Name()))
 
 		return
 	}
 	defer r.unlock(job.Name())
 
-	totalAttempts := r.opts.MaxRetries + 1
+	opts := r.resolveOptions(overrides...)
+	totalAttempts := opts.MaxRetries + 1
 	var lastErr error
 
 	for attempt := 1; attempt <= totalAttempts; attempt++ {
-		ctx := base
-		var cancel context.CancelFunc
+		if cErr := ctx.Err(); cErr != nil {
+			lastErr = cErr
 
-		if r.opts.Timeout > 0 {
-			ctx, cancel = context.WithTimeout(base, r.opts.Timeout)
+			break
 		}
 
-		start, err := time.Now(), r.safeRun(ctx, job)
+		attemptCtx := ctx
+		var cancel context.CancelFunc
+
+		if opts.Timeout > 0 {
+			attemptCtx, cancel = context.WithTimeout(ctx, opts.Timeout)
+		}
+
+		start, err := time.Now(), r.safeRun(attemptCtx, job)
 		duration := time.Since(start)
 
 		if cancel != nil {
@@ -136,12 +260,8 @@ func (r *Runner) Execute(job Job) {
 		}
 
 		if r.opts.OnAttempt != nil {
-			r.opts.OnAttempt(AttemptResult{
-				JobName:  job.Name(),
-				Attempt:  attempt,
-				Duration: duration,
-				Err:      err,
-			})
+			result := AttemptResult{JobName: job.Name(), Attempt: attempt, Duration: duration, Err: err}
+			r.safeCallback(ctx, "OnAttempt", func() { r.opts.OnAttempt(result) })
 		}
 
 		if err == nil {
@@ -155,12 +275,12 @@ func (r *Runner) Execute(job Job) {
 		r.opts.Log.Error(ctx, "job "+job.Name()+" falló intento "+strconv.Itoa(attempt)+"/"+strconv.Itoa(totalAttempts)+" ("+duration.String()+"): "+err.Error())
 
 		if attempt < totalAttempts {
-			r.wait(attempt)
+			r.wait(ctx, opts.BackoffBase, opts.BackoffMax, attempt)
 		}
 	}
 
 	if lastErr != nil && r.opts.OnError != nil {
-		r.opts.OnError(job.Name(), lastErr)
+		r.safeCallback(ctx, "OnError", func() { r.opts.OnError(job.Name(), lastErr) })
 	}
 }
 
@@ -178,7 +298,17 @@ func (r *Runner) Execute(job Job) {
 // 	},
 // })
 //
-// c := cron.New()
+// // one job with the Runner's default policy, one that never retries:
 // syncJob := JobFunc{JobName: "sync-prices", Fn: syncPrices}
-// c.AddFunc("@every 1h", func() { runner.Execute(syncJob) })
-// c.Start()
+// cleanupJob := JobFunc{JobName: "cleanup", Fn: cleanup}
+//
+// sched := NewScheduler(runner)
+// sched.Register(syncJob, Every{Interval: time.Hour})
+// sched.Register(cleanupJob, Every{Interval: 24 * time.Hour}, JobOptions{MaxRetries: Retries(0)})
+// sched.Start()
+//
+// // on shutdown: cancels pending retries/backoff waits and stops scheduling
+// // new runs; does not abort a job attempt already in flight unless that
+// // job itself observes ctx cancellation.
+// sched.Stop()
+//
