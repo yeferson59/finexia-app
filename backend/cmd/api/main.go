@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/yeferson59/finexia-app/internal/app"
 	"github.com/yeferson59/finexia-app/internal/platform/cache"
@@ -22,7 +24,8 @@ func main() {
 		Output:      os.Stderr,
 		Environment: envs.Environment,
 	})
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	if err := run(ctx, envs, log); err != nil {
 		log.With(logger.Str("cmd", "main")).Fatal(ctx, "application error: "+err.Error())

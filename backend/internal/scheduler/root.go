@@ -2,7 +2,7 @@ package scheduler
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"math"
 	"strconv"
 	"sync"
@@ -53,6 +53,14 @@ type Runner struct {
 }
 
 func NewRunner(opts RunnerOptions) *Runner {
+	if opts.MaxRetries < 0 {
+		opts.MaxRetries = 0
+	}
+
+	if opts.Log == nil {
+		opts.Log = logger.Noop()
+	}
+
 	return new(Runner{opts: opts, running: make(map[string]bool)})
 }
 
@@ -72,7 +80,7 @@ func (r *Runner) wait(attempt int) {
 func (r *Runner) safeRun(ctx context.Context, job Job) (err error) {
 	defer func() {
 		if p := recover(); p != nil {
-			err = errors.New("panic recuperado")
+			err = fmt.Errorf("panic recuperado: %v", p)
 		}
 	}()
 
@@ -100,10 +108,10 @@ func (r *Runner) unlock(name string) {
 }
 
 func (r *Runner) Execute(job Job) {
-	ctx := context.Background()
+	base := context.Background()
 
 	if !r.tryLock(job.Name()) {
-		r.opts.Log.Info(ctx, "skip %s: ya está en ejecución", logger.Str("job", job.Name()))
+		r.opts.Log.Info(base, "skip: ya está en ejecución", logger.Str("job", job.Name()))
 
 		return
 	}
@@ -113,10 +121,11 @@ func (r *Runner) Execute(job Job) {
 	var lastErr error
 
 	for attempt := 1; attempt <= totalAttempts; attempt++ {
+		ctx := base
 		var cancel context.CancelFunc
 
 		if r.opts.Timeout > 0 {
-			ctx, cancel = context.WithTimeout(ctx, r.opts.Timeout)
+			ctx, cancel = context.WithTimeout(base, r.opts.Timeout)
 		}
 
 		start, err := time.Now(), r.safeRun(ctx, job)

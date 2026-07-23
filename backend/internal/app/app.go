@@ -47,8 +47,9 @@ type Deps struct {
 }
 
 type App struct {
-	fiber *fiber.App
-	deps  Deps
+	fiber    *fiber.App
+	deps     Deps
+	schedule *scheduler.Scheduler
 }
 
 type structValidator struct {
@@ -81,12 +82,39 @@ func New(deps Deps) *App {
 }
 
 // Run wires modules, legacy layers and schedulers, then serves HTTP until
-// the listener stops.
+// the listener stops or ctx is cancelled (e.g. on SIGINT/SIGTERM), in which
+// case it shuts down the HTTP server and the schedulers cleanly.
 func (a *App) Run(ctx context.Context) error {
 	a.wire(ctx)
 
+	go func() {
+		<-ctx.Done()
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if err := a.Shutdown(shutdownCtx); err != nil {
+			a.deps.Log.Error(shutdownCtx, "error during shutdown: "+err.Error())
+		}
+	}()
+
 	if err := a.fiber.Listen(":" + a.deps.Envs.Port); err != nil {
 		return errors.New("failed to listen: " + err.Error())
+	}
+
+	return nil
+}
+
+// Shutdown stops accepting new HTTP requests and drains in-flight ones,
+// then stops the schedulers: it cancels their loops so no new job fires,
+// without aborting a job already in progress inside Runner.Execute.
+func (a *App) Shutdown(ctx context.Context) error {
+	if err := a.fiber.ShutdownWithContext(ctx); err != nil {
+		return err
+	}
+
+	if a.schedule != nil {
+		a.schedule.Stop()
 	}
 
 	return nil
@@ -180,6 +208,7 @@ func (a *App) wire(ctx context.Context) {
 	})
 
 	schedule := scheduler.NewScheduler(runner)
+	a.schedule = schedule
 
 	a.registerJobs(schedule, authModule, portfolioModule, marketModule, notificationService)
 }
