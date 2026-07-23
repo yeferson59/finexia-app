@@ -365,16 +365,32 @@ func TestScheduler_PanicInOneJobDoesNotStopOthers(t *testing.T) {
 	}
 }
 
-func TestScheduler_NextDelayFloorsNonPositiveDelay(t *testing.T) {
+func TestScheduler_DelayUntilFloorsNonPositiveDelay(t *testing.T) {
 	sched := NewScheduler(newTestRunner())
-	job := JobFunc{JobName: "zero-interval", Fn: func(ctx context.Context) error { return nil }}
 
-	if got := sched.nextDelay(job, Every{Interval: 0}); got != time.Millisecond {
-		t.Fatalf("expected a 1ms floor for a zero interval, got %v", got)
+	if got := sched.delayUntil(time.Now()); got != time.Millisecond {
+		t.Fatalf("expected a 1ms floor for a 'now' target, got %v", got)
 	}
 
-	if got := sched.nextDelay(job, Every{Interval: -time.Hour}); got != time.Millisecond {
-		t.Fatalf("expected a 1ms floor for a negative interval, got %v", got)
+	if got := sched.delayUntil(time.Now().Add(-time.Hour)); got != time.Millisecond {
+		t.Fatalf("expected a 1ms floor for a past target, got %v", got)
+	}
+}
+
+type panickyNextSchedule struct{}
+
+func (panickyNextSchedule) Next(time.Time) time.Time { panic("next panic") }
+
+func TestScheduler_ComputeNextRecoversPanickingSchedule(t *testing.T) {
+	sched := NewScheduler(newTestRunner())
+	sched.ctx = context.Background()
+
+	job := JobFunc{JobName: "panicky-next", Fn: func(ctx context.Context) error { return nil }}
+	now := time.Now()
+
+	got := sched.computeNext(job, panickyNextSchedule{}, now)
+	if !got.After(now) {
+		t.Fatalf("expected computeNext to fall back to a future time after a panic, got %v (now=%v)", got, now)
 	}
 }
 
@@ -418,5 +434,199 @@ func TestScheduler_StopInterruptsJobRetryBackoff(t *testing.T) {
 	case <-stopped:
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("Stop() did not return promptly — cancellation didn't reach the retry backoff")
+	}
+}
+
+// fakeStore is an in-memory StateStore for tests, standing in for a
+// Postgres- or Redis-backed implementation. loadErr/saveErr let tests
+// simulate a degraded store independently for each operation.
+type fakeStore struct {
+	mu      sync.Mutex
+	data    map[string]time.Time
+	loadErr error
+	saveErr error
+}
+
+func newFakeStore() *fakeStore {
+	return &fakeStore{data: make(map[string]time.Time)}
+}
+
+func (f *fakeStore) LoadNextRun(_ context.Context, jobName string) (time.Time, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.loadErr != nil {
+		return time.Time{}, false, f.loadErr
+	}
+
+	next, ok := f.data[jobName]
+
+	return next, ok, nil
+}
+
+func (f *fakeStore) SaveNextRun(_ context.Context, jobName string, next time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.saveErr != nil {
+		return f.saveErr
+	}
+
+	f.data[jobName] = next
+
+	return nil
+}
+
+func (f *fakeStore) get(jobName string) (time.Time, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	next, ok := f.data[jobName]
+
+	return next, ok
+}
+
+func TestScheduler_PersistsNextRunAfterExecute(t *testing.T) {
+	store := newFakeStore()
+	sched := NewScheduler(newTestRunner(), SchedulerOptions{Store: store})
+
+	fired := make(chan struct{}, 1)
+	job := JobFunc{JobName: "persist-me", Fn: func(ctx context.Context) error { fired <- struct{}{}; return nil }}
+
+	sched.Register(job, &once{}) // fires immediately
+	sched.Start()
+	defer sched.Stop()
+
+	select {
+	case <-fired:
+	case <-time.After(time.Second):
+		t.Fatal("job never fired")
+	}
+
+	// The Store may transiently hold the pre-run "next" value saved by
+	// loadNext (which for &once{} is "now", not future) until the
+	// post-run save overwrites it; poll until it settles on the real,
+	// future value instead of asserting on the first sighting.
+	deadline := time.Now().Add(time.Second)
+	for {
+		if next, ok := store.get("persist-me"); ok && next.After(time.Now()) {
+			return
+		}
+
+		if time.Now().After(deadline) {
+			t.Fatal("expected the Store to eventually hold a future persisted next-run time")
+		}
+
+		time.Sleep(time.Millisecond)
+	}
+}
+
+func TestScheduler_ResumesFromPersistedFutureNextRun(t *testing.T) {
+	store := newFakeStore()
+	const jobName = "resume-future"
+	store.data[jobName] = time.Now().Add(300 * time.Millisecond)
+
+	sched := NewScheduler(newTestRunner(), SchedulerOptions{Store: store})
+
+	fired := make(chan struct{}, 4)
+	// tick{interval: 5ms} would fire almost instantly if the persisted
+	// next-run weren't consulted at all.
+	job := JobFunc{JobName: jobName, Fn: func(ctx context.Context) error { fired <- struct{}{}; return nil }}
+
+	sched.Register(job, tick{interval: 5 * time.Millisecond})
+	sched.Start()
+	defer sched.Stop()
+
+	select {
+	case <-fired:
+		t.Fatal("job fired before its persisted next-run time — the Store was not consulted")
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	select {
+	case <-fired:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("job never fired after its persisted next-run time elapsed")
+	}
+}
+
+func TestScheduler_CatchesUpOverdueRunFromStore(t *testing.T) {
+	store := newFakeStore()
+	const jobName = "catch-up"
+	store.data[jobName] = time.Now().Add(-time.Hour)
+
+	sched := NewScheduler(newTestRunner(), SchedulerOptions{Store: store})
+
+	fired := make(chan struct{}, 1)
+	job := JobFunc{JobName: jobName, Fn: func(ctx context.Context) error { fired <- struct{}{}; return nil }}
+
+	// Every{Interval: time.Hour} would otherwise not fire for an hour; the
+	// overdue persisted next-run should trigger an immediate catch-up run.
+	sched.Register(job, Every{Interval: time.Hour})
+	sched.Start()
+	defer sched.Stop()
+
+	select {
+	case <-fired:
+	case <-time.After(time.Second):
+		t.Fatal("overdue persisted job never caught up")
+	}
+}
+
+func TestScheduler_FallsBackToFreshScheduleOnStoreLoadError(t *testing.T) {
+	store := newFakeStore()
+	store.loadErr = errors.New("store unavailable")
+
+	sched := NewScheduler(newTestRunner(), SchedulerOptions{Store: store})
+
+	fired := make(chan struct{}, 1)
+	job := JobFunc{JobName: "load-error", Fn: func(ctx context.Context) error { fired <- struct{}{}; return nil }}
+
+	sched.Register(job, tick{interval: 5 * time.Millisecond})
+	sched.Start()
+	defer sched.Stop()
+
+	select {
+	case <-fired:
+	case <-time.After(time.Second):
+		t.Fatal("job never fired despite a Store load error — expected a fallback to a fresh schedule")
+	}
+}
+
+func TestScheduler_SaveErrorDoesNotBlockScheduling(t *testing.T) {
+	store := newFakeStore()
+	store.saveErr = errors.New("store unavailable")
+
+	sched := NewScheduler(newTestRunner(), SchedulerOptions{Store: store})
+
+	fired := make(chan struct{}, 8)
+	job := JobFunc{JobName: "save-fails", Fn: func(ctx context.Context) error { fired <- struct{}{}; return nil }}
+
+	sched.Register(job, tick{interval: 5 * time.Millisecond})
+	sched.Start()
+	defer sched.Stop()
+
+	for range 3 {
+		select {
+		case <-fired:
+		case <-time.After(time.Second):
+			t.Fatal("job stopped firing after a Store save error — persistence failures must not block scheduling")
+		}
+	}
+}
+
+func TestNewScheduler_DefaultsStoreTimeoutWhenStoreConfigured(t *testing.T) {
+	sched := NewScheduler(newTestRunner(), SchedulerOptions{Store: newFakeStore()})
+
+	if sched.storeTimeout != defaultStoreTimeout {
+		t.Fatalf("expected the default store timeout to be applied, got %v", sched.storeTimeout)
+	}
+}
+
+func TestNewScheduler_NoStoreLeavesTimeoutZero(t *testing.T) {
+	sched := NewScheduler(newTestRunner())
+
+	if sched.store != nil {
+		t.Fatal("expected no Store by default")
 	}
 }

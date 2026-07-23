@@ -32,6 +32,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
 	"github.com/yeferson59/finexia-app/internal/portfolio"
 	"github.com/yeferson59/finexia-app/internal/scheduler"
+	"github.com/yeferson59/finexia-app/internal/scheduler/fiberstore"
 	"github.com/yeferson59/finexia-app/internal/user"
 )
 
@@ -207,7 +208,11 @@ func (a *App) wire(ctx context.Context) {
 		Log: a.deps.Log,
 	})
 
-	schedule := scheduler.NewScheduler(runner)
+	// Redis-backed: each job resumes from its persisted next-run time
+	// across restarts/deploys instead of resetting its interval.
+	schedule := scheduler.NewScheduler(runner, scheduler.SchedulerOptions{
+		Store: fiberstore.New(a.deps.Storage),
+	})
 	a.schedule = schedule
 
 	a.registerJobs(schedule, authModule, portfolioModule, marketModule, notificationService)

@@ -106,10 +106,30 @@ type scheduledJob struct {
 	opts  []JobOptions
 }
 
+// defaultStoreTimeout bounds each StateStore call so a slow or unreachable
+// store degrades one job's persistence instead of blocking it indefinitely.
+const defaultStoreTimeout = 5 * time.Second
+
+// SchedulerOptions configures optional, cross-cutting Scheduler behavior.
+// The zero value keeps today's default: no persistence, every job's
+// schedule computed fresh from time.Now() at Start().
+type SchedulerOptions struct {
+	// Store persists each job's next-run time across restarts. Optional —
+	// leave nil to keep the in-memory-only behavior.
+	Store StateStore
+
+	// StoreTimeout bounds each Load/Save call to Store. Defaults to 5s if
+	// Store is set and this is left zero.
+	StoreTimeout time.Duration
+}
+
 // Scheduler coordinates multiple jobs each with its own Schedule, without
 // depending on any external cron library. Each job runs in its own goroutine.
 type Scheduler struct {
 	runner *Runner
+
+	store        StateStore
+	storeTimeout time.Duration
 
 	mu      sync.Mutex
 	jobs    []scheduledJob
@@ -120,8 +140,20 @@ type Scheduler struct {
 	wg     sync.WaitGroup
 }
 
-func NewScheduler(runner *Runner) *Scheduler {
-	return new(Scheduler{runner: runner})
+// NewScheduler builds a Scheduler around runner. opts is variadic purely
+// for backward compatibility (NewScheduler(runner) keeps working); at most
+// the first element is used.
+func NewScheduler(runner *Runner, opts ...SchedulerOptions) *Scheduler {
+	var o SchedulerOptions
+	if len(opts) > 0 {
+		o = opts[0]
+	}
+
+	if o.Store != nil && o.StoreTimeout <= 0 {
+		o.StoreTimeout = defaultStoreTimeout
+	}
+
+	return new(Scheduler{runner: runner, store: o.Store, storeTimeout: o.StoreTimeout})
 }
 
 // Register adds a job with its schedule, optionally overriding the
@@ -174,8 +206,10 @@ func (s *Scheduler) Stop() {
 func (s *Scheduler) loop(job Job, sched Schedule, overrides []JobOptions) {
 	defer s.wg.Done()
 
+	next := s.loadNext(job, sched)
+
 	for {
-		timer := time.NewTimer(s.nextDelay(job, sched))
+		timer := time.NewTimer(s.delayUntil(next))
 
 		select {
 		case <-s.ctx.Done():
@@ -184,32 +218,77 @@ func (s *Scheduler) loop(job Job, sched Schedule, overrides []JobOptions) {
 			return
 		case <-timer.C:
 			s.runJob(job, overrides)
+
+			next = s.computeNext(job, sched, time.Now())
+			s.saveNext(job, next)
 		}
 	}
 }
 
-// nextDelay computes the wait until the next run. It floors the delay at
-// 1ms so a misconfigured Schedule (e.g. Every{Interval: 0}) can't spin the
-// loop tightly, and recovers a panicking Schedule.Next by logging it and
-// retrying in a second, rather than crashing the process.
-func (s *Scheduler) nextDelay(job Job, sched Schedule) (delay time.Duration) {
+// delayUntil floors the wait at 1ms so an overdue or misconfigured next
+// time (e.g. a persisted run missed while the process was down, or a
+// Schedule like Every{Interval: 0}) can't spin the loop tightly — it fires
+// almost immediately instead.
+func (s *Scheduler) delayUntil(next time.Time) time.Duration {
+	return max(time.Millisecond, time.Until(next))
+}
+
+// computeNext calls sched.Next(now), recovering a panic by logging it and
+// retrying in a second rather than crashing the process.
+func (s *Scheduler) computeNext(job Job, sched Schedule, now time.Time) (next time.Time) {
 	defer func() {
 		if p := recover(); p != nil {
 			s.runner.opts.Log.Error(s.ctx, "scheduler: Schedule.Next panicked, retrying in 1s",
 				logger.Str("job", safeJobName(job)), logger.Any("panic", p))
 
-			delay = time.Second
+			next = now.Add(time.Second)
 		}
 	}()
 
-	now := time.Now()
-	delay = sched.Next(now).Sub(now)
+	return sched.Next(now)
+}
 
-	if delay <= 0 {
-		delay = time.Millisecond
+// loadNext resolves the first next-run time for job when its loop starts:
+// from the Store if one is configured and has a persisted value, otherwise
+// computed fresh — matching the pre-Store behavior. A freshly computed
+// value is saved immediately, so a crash before the job's first run still
+// resumes correctly on the next restart.
+func (s *Scheduler) loadNext(job Job, sched Schedule) time.Time {
+	if s.store != nil {
+		ctx, cancel := context.WithTimeout(s.ctx, s.storeTimeout)
+		next, found, err := s.store.LoadNextRun(ctx, job.Name())
+		cancel()
+
+		switch {
+		case err != nil:
+			s.runner.opts.Log.Error(s.ctx, "scheduler: failed to load persisted next-run, computing fresh",
+				logger.Str("job", safeJobName(job)), logger.Err(err))
+		case found:
+			return next
+		}
 	}
 
-	return delay
+	next := s.computeNext(job, sched, time.Now())
+	s.saveNext(job, next)
+
+	return next
+}
+
+// saveNext persists next for job if a Store is configured. Failures are
+// logged, not returned — persistence is best-effort and must never block
+// or break scheduling.
+func (s *Scheduler) saveNext(job Job, next time.Time) {
+	if s.store == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(s.ctx, s.storeTimeout)
+	defer cancel()
+
+	if err := s.store.SaveNextRun(ctx, job.Name(), next); err != nil {
+		s.runner.opts.Log.Error(s.ctx, "scheduler: failed to persist next-run",
+			logger.Str("job", safeJobName(job)), logger.Err(err))
+	}
 }
 
 // runJob executes job through the Runner, recovering any panic that
@@ -246,7 +325,16 @@ func safeJobName(job Job) (name string) {
 // 	BackoffBase: 500 * time.Millisecond,
 // })
 //
+// // Without a Store: every job's cadence resets on restart — an
+// // Every{Interval: 3 * time.Hour} job starts counting 3h again from
+// // whenever the process came back up.
 // sched := NewScheduler(runner)
+//
+// // With a Store (any backing that implements StateStore — Postgres,
+// // Redis, a file, ...): each job resumes from its persisted next-run
+// // time instead, surviving restarts/deploys.
+// sched = NewScheduler(runner, SchedulerOptions{Store: myStateStore})
+//
 // sched.Register(JobFunc{JobName: "sync-prices", Fn: syncPrices}, Every{Interval: time.Hour})
 //
 // // 6:00am + a fixed 10-minute delay -> runs at 6:10am
