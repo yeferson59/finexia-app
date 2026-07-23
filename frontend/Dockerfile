@@ -6,13 +6,15 @@ WORKDIR /app
 
 COPY pnpm-lock.yaml package.json ./
 
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile
 
 COPY src ./src
 COPY static ./static
 COPY svelte.config.js vite.config.ts tsconfig.json ./
 
 RUN pnpm run build
+
+RUN pnpm prune --prod
 
 # Stage 3: Runtime
 FROM node:24-alpine
