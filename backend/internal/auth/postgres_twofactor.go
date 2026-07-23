@@ -6,11 +6,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 // ErrTwoFactorNotFound signals the user has no 2FA row at all (never started
 // a setup, or it was removed).
-var ErrTwoFactorNotFound = errors.New("two-factor not found")
+var ErrTwoFactorNotFound = httpx.AsNotFound(errors.New("two-factor not found"))
 
 func (r *PostgresRepository) GetTwoFactor(ctx context.Context, userID uuid.UUID) (TwoFactor, error) {
 	var tf TwoFactor

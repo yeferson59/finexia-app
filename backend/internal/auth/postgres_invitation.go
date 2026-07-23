@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 // invitationCols is the column list shared by the invitation SELECT queries.
@@ -17,7 +18,7 @@ const invitationCols = `id, email, name, role, token_hash, invited_by,
 
 // ErrInvitationNotFound signals that no invitation matched the lookup, letting
 // the service map it to a 404 without leaking whether a token ever existed.
-var ErrInvitationNotFound = errors.New("invitation not found")
+var ErrInvitationNotFound = httpx.AsNotFound(errors.New("invitation not found"))
 
 func scanInvitation(row interface {
 	Scan(...any) error

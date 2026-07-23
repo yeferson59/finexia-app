@@ -22,7 +22,7 @@ func (r *PostgresRepository) GetAssetByID(ctx context.Context, assetID uuid.UUID
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Asset{}, errors.New("asset not found")
+			return Asset{}, ErrAssetNotFound
 		}
 		return Asset{}, err
 	}
@@ -93,7 +93,7 @@ func (r *PostgresRepository) UpdateAssetPrice(ctx context.Context, assetID uuid.
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Asset{}, errors.New("asset not found")
+			return Asset{}, ErrAssetNotFound
 		}
 		return Asset{}, err
 	}

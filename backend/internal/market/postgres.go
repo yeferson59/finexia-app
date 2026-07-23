@@ -88,7 +88,7 @@ func (r *PostgresRepository) GetExchangeRateByPair(ctx context.Context, from, to
 	`, from, to).Scan(&er.ID, &er.FromCurrency, &er.ToCurrency, &rateStr, &er.RateDate, &er.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return ExchangeRate{}, errors.New("exchange rate not found")
+			return ExchangeRate{}, ErrExchangeRateNotFound
 		}
 		return ExchangeRate{}, err
 	}
@@ -107,7 +107,7 @@ func (r *PostgresRepository) GetExchangeRateByID(ctx context.Context, id uuid.UU
 	`, id).Scan(&er.ID, &er.FromCurrency, &er.ToCurrency, &rateStr, &er.RateDate, &er.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return ExchangeRate{}, errors.New("exchange rate not found")
+			return ExchangeRate{}, ErrExchangeRateNotFound
 		}
 		return ExchangeRate{}, err
 	}
@@ -128,7 +128,7 @@ func (r *PostgresRepository) UpdateExchangeRateByID(ctx context.Context, id uuid
 	`, id, rate.String()).Scan(&er.ID, &er.FromCurrency, &er.ToCurrency, &rateStr, &er.RateDate, &er.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return ExchangeRate{}, errors.New("exchange rate not found")
+			return ExchangeRate{}, ErrExchangeRateNotFound
 		}
 		return ExchangeRate{}, err
 	}

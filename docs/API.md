@@ -67,8 +67,11 @@ errores mapeados desde el dominio (`responseFromDomain`) el sobre lleva
 El contrato hacia el cliente no cambia: los status son los mismos que emitía el
 mapeo por texto. La única corrección de comportamiento es la del bug reconocido
 (#1): un `not found` **envuelto** por un mensaje con `failed`/`invalid` ahora
-devuelve 404 (por tipo) en vez de 400. El módulo `portfolio` ya está migrado a
-errores tipados (familia *not found*); el resto usa todavía el fallback.
+devuelve 404 (por tipo) en vez de 400. La **familia _not found_ está tipada en
+todos los dominios** (`auth`, `user`, `market`, `marketing`, `portfolio`), de
+modo que ese bug queda corregido en toda la app. Las demás categorías
+(400/409/429/500) siguen resolviéndose por el fallback de substring, con sus
+status actuales intactos.
 
 Otros helpers de estado directo: `responseBadRequest` (400),
 `responseUnauthorized` (401), `responseInternalServerError` (500),

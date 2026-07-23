@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 // ListSessions returns the user's live sessions, flagging the one that issued
@@ -52,7 +53,7 @@ func (s *Service) RevokeSession(ctx context.Context, userID, sessionID uuid.UUID
 		return err
 	}
 
-	return errors.New("not found session")
+	return httpx.AsNotFound(errors.New("not found session"))
 }
 
 // RevokeOtherSessions terminates every session except the one making the

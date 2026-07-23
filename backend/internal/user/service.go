@@ -116,7 +116,7 @@ func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, name, email, ima
 	}
 
 	if existUser.DeletedAt != nil {
-		return identity.User{}, errors.New("not found user")
+		return identity.User{}, ErrUserNotFound
 	}
 
 	if strings.TrimSpace(name) != "" && existUser.Name != name {
