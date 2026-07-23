@@ -5,7 +5,6 @@
 package httpx
 
 import (
-	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -55,25 +54,13 @@ func InternalServerError(c fiber.Ctx, message, details string) error {
 	return Error(c, fiber.StatusInternalServerError, message, details)
 }
 
-// FromDomain maps a service error to an HTTP status by matching substrings of
-// its message, and writes an error envelope carrying an action code. The
-// matching order is part of the frozen contract: "failed"/"invalid" win over
-// "not found" (see docs/TECH_DEBT.md #1 for the planned typed-error redesign).
+// FromDomain maps a service error to an HTTP status and writes an error
+// envelope carrying an action code. The status comes from the error's typed
+// Kind when it carries one (domains tag their errors via httpx.AsNotFound and
+// friends), falling back to the frozen message-substring mapping otherwise
+// (docs/TECH_DEBT.md #1, docs/API.md §1.2).
 func FromDomain(c fiber.Ctx, err error, message, action string) error {
-	status := fiber.StatusInternalServerError
-
-	switch msg := err.Error(); {
-	case strings.Contains(msg, "too many"):
-		status = fiber.StatusTooManyRequests
-	case strings.Contains(msg, "failed") || strings.Contains(msg, "invalid"):
-		status = fiber.StatusBadRequest
-	case strings.Contains(msg, "not found"):
-		status = fiber.StatusNotFound
-	case strings.Contains(msg, "already exist") || strings.Contains(msg, "already found") || strings.Contains(msg, "duplicate"):
-		status = fiber.StatusConflict
-	}
-
-	return c.Status(status).JSON(fiber.Map{
+	return c.Status(domainStatus(err)).JSON(fiber.Map{
 		"success":   false,
 		"message":   message,
 		"action":    action,

@@ -3,7 +3,7 @@ package portfolio
 import (
 	"context"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -154,7 +154,7 @@ func TestHandlerGetPortfolioByID(t *testing.T) {
 	t.Run("not found maps to 404", func(t *testing.T) {
 		repo := &fakeRepository{
 			getPortfolioByID: func(context.Context, uuid.UUID, uuid.UUID) (Portfolio, error) {
-				return Portfolio{}, errors.New("portfolio not found")
+				return Portfolio{}, ErrPortfolioNotFound
 			},
 			// GetPortfolio fetches the header and entries concurrently, so this
 			// hook runs even when the ownership check fails.
@@ -167,6 +167,27 @@ func TestHandlerGetPortfolioByID(t *testing.T) {
 		resp := do(t, app, http.MethodGet, "/portfolios/"+portfolioID.String())
 		if resp.StatusCode != fiber.StatusNotFound {
 			t.Fatalf("status = %d, want 404", resp.StatusCode)
+		}
+	})
+
+	// Regression for TECH_DEBT #1: a not-found error wrapped by a message
+	// containing "failed" used to resolve to 400 under the substring mapping
+	// ("failed" was checked before "not found"). The typed NotFound tag now
+	// wins regardless of the wrapper text.
+	t.Run("wrapped not found still maps to 404", func(t *testing.T) {
+		repo := &fakeRepository{
+			getPortfolioByID: func(context.Context, uuid.UUID, uuid.UUID) (Portfolio, error) {
+				return Portfolio{}, fmt.Errorf("failed to load portfolio: %w", ErrPortfolioNotFound)
+			},
+			getEntriesByPortfolioID: func(context.Context, uuid.UUID) ([]Entry, error) {
+				return nil, nil
+			},
+		}
+		app := newTestModule(t, repo, userID, "user")
+
+		resp := do(t, app, http.MethodGet, "/portfolios/"+portfolioID.String())
+		if resp.StatusCode != fiber.StatusNotFound {
+			t.Fatalf("status = %d, want 404 (substring mapping would give 400)", resp.StatusCode)
 		}
 	})
 }

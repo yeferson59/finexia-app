@@ -134,7 +134,7 @@ func (r *PostgresRepository) GetPortfolioByID(ctx context.Context, portfolioID, 
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Portfolio{}, errors.New("portfolio not found")
+			return Portfolio{}, ErrPortfolioNotFound
 		}
 		return Portfolio{}, err
 	}
@@ -164,7 +164,7 @@ func (r *PostgresRepository) UpdatePortfolio(ctx context.Context, userID, portfo
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Portfolio{}, errors.New("portfolio not found")
+			return Portfolio{}, ErrPortfolioNotFound
 		}
 		return Portfolio{}, err
 	}

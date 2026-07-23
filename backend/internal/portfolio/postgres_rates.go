@@ -22,7 +22,7 @@ func (r *PostgresRepository) GetExchangeRateByPair(ctx context.Context, from, to
 	`, from, to).Scan(&rateStr)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return money.Decimal{}, errors.New("exchange rate not found")
+			return money.Decimal{}, ErrExchangeRateNotFound
 		}
 		return money.Decimal{}, err
 	}

@@ -3,6 +3,7 @@ package httpx
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http/httptest"
 	"testing"
@@ -61,6 +62,49 @@ func TestFromDomainMapping(t *testing.T) {
 				t.Errorf("action = %q, want domain:action", action)
 			}
 		})
+	}
+}
+
+func TestFromDomainTypedKindWins(t *testing.T) {
+	sentinel := errors.New("portfolio not found")
+
+	cases := []struct {
+		name string
+		err  error
+		want int
+	}{
+		// A tagged NotFound must map to 404 even though the message also
+		// contains "failed", which the frozen substring order would send to
+		// 400 — this is the exact bug typed errors fix (TECH_DEBT #1).
+		{"tag beats failed-substring", AsNotFound(errors.New("failed: portfolio not found")), fiber.StatusNotFound},
+		{"AsBadRequest", AsBadRequest(errors.New("whatever")), fiber.StatusBadRequest},
+		{"AsConflict", AsConflict(errors.New("whatever")), fiber.StatusConflict},
+		{"AsTooManyRequests", AsTooManyRequests(errors.New("whatever")), fiber.StatusTooManyRequests},
+		// A tag survives a further fmt.Errorf %w wrap.
+		{"tag survives wrapping", fmt.Errorf("loading portfolio: %w", AsNotFound(sentinel)), fiber.StatusNotFound},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			status, _ := perform(t, func(c fiber.Ctx) error {
+				return FromDomain(c, tc.err, "msg", "domain:action")
+			})
+			if status != tc.want {
+				t.Errorf("status = %d, want %d", status, tc.want)
+			}
+		})
+	}
+}
+
+func TestTaggedIsTransparentToErrorsIs(t *testing.T) {
+	sentinel := errors.New("portfolio not found")
+	wrapped := fmt.Errorf("loading portfolio: %w", AsNotFound(sentinel))
+
+	if !errors.Is(wrapped, sentinel) {
+		t.Error("errors.Is should still match the wrapped sentinel through the tag")
+	}
+	if got := Tagged(KindNotFound, nil); got != nil {
+		t.Errorf("Tagged(kind, nil) = %v, want nil", got)
 	}
 }
 

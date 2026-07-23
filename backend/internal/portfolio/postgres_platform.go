@@ -2,7 +2,6 @@ package portfolio
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 )
@@ -55,7 +54,7 @@ func (r *PostgresRepository) UpdatePlatform(ctx context.Context, userID, sourceI
 		return PlatformStats{}, err
 	}
 	if tag.RowsAffected() == 0 {
-		return PlatformStats{}, errors.New("platform not found")
+		return PlatformStats{}, ErrPlatformNotFound
 	}
 
 	var p PlatformStats
@@ -87,7 +86,7 @@ func (r *PostgresRepository) DeletePlatform(ctx context.Context, userID, sourceI
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return errors.New("platform not found")
+		return ErrPlatformNotFound
 	}
 	return nil
 }

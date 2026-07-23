@@ -47,8 +47,14 @@ errores mapeados desde el dominio (`responseFromDomain`) el sobre lleva
 
 ### 1.2 Mapeo de errores de dominio a códigos HTTP
 
-`responseFromDomain` mapea el **texto** del error de servicio a un status
-(convención congelada; los módulos nuevos deben reproducirla exactamente):
+`httpx.FromDomain` resuelve el status en dos pasos (ver `TECH_DEBT.md` #1):
+
+1. **Por tipo (preferido):** si el error lleva un `httpx.Kind` (los dominios lo
+   etiquetan con `httpx.AsNotFound`, `AsBadRequest`, `AsConflict`,
+   `AsTooManyRequests`; resuelto vía `errors.As`), el status sale del tipo,
+   **independiente del texto** y robusto ante el envoltorio con `%w`.
+2. **Por substring (fallback):** para errores aún no tipados se conserva
+   **exactamente** la convención congelada original, en el mismo orden:
 
 | El mensaje de error contiene… | Status |
 |---|---|
@@ -57,6 +63,12 @@ errores mapeados desde el dominio (`responseFromDomain`) el sobre lleva
 | `not found` | `404 Not Found` |
 | `already exist`, `already found` o `duplicate` | `409 Conflict` |
 | (cualquier otro) | `500 Internal Server Error` |
+
+El contrato hacia el cliente no cambia: los status son los mismos que emitía el
+mapeo por texto. La única corrección de comportamiento es la del bug reconocido
+(#1): un `not found` **envuelto** por un mensaje con `failed`/`invalid` ahora
+devuelve 404 (por tipo) en vez de 400. El módulo `portfolio` ya está migrado a
+errores tipados (familia *not found*); el resto usa todavía el fallback.
 
 Otros helpers de estado directo: `responseBadRequest` (400),
 `responseUnauthorized` (401), `responseInternalServerError` (500),
