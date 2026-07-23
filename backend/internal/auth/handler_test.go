@@ -18,11 +18,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
-	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
-func authTestConfig() *config.Env {
+func authTestConfig() Config {
 	cfg := testConfig()
 	cfg.MaxLoginAttempts = 5
 	cfg.LoginLockout = time.Minute
@@ -32,7 +31,7 @@ func authTestConfig() *config.Env {
 // newTestApp mounts the whole module (public routes, rate limiter and the
 // group-local RequireAuth gate) on a fresh Fiber app, exercising the same
 // chain a real request traverses.
-func newTestApp(repo *fakeRepository, cfg *config.Env) *fiber.App {
+func newTestApp(repo *fakeRepository, cfg Config) *fiber.App {
 	service := NewService(testStores(repo), cfg, newMemStorage(), nil, nil, logger.Noop())
 	m := newModule(Deps{
 		Ctx:     context.Background(),

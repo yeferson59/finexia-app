@@ -6,13 +6,12 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 
-	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 type handler struct {
 	service *Service
-	cfg     *config.Env
+	cfg     Config
 }
 
 // getUserIDTokenRole extracts the authenticated identity the JWT middleware

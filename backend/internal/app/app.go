@@ -210,7 +210,7 @@ func (a *App) buildModules(ctx context.Context) *modules {
 	authModule := auth.New(auth.Deps{
 		Ctx:      ctx,
 		DB:       a.deps.DB,
-		Cfg:      a.deps.Envs,
+		Cfg:      authConfig(a.deps.Envs),
 		Storage:  a.deps.Storage,
 		Mail:     a.deps.Mail,
 		Geo:      geo,
@@ -321,4 +321,24 @@ func (a *App) registerJobs(sched *scheduler.Scheduler, mods *modules, persistent
 	sched.Register(auth.NewCleanupJob(mods.auth.Service(), a.deps.Log), scheduler.Every{Interval: 5 * time.Hour}, scheduler.WithStore(persistent))
 
 	sched.Start()
+}
+
+// authConfig projects the platform-wide environment onto the auth module's own
+// Config, keeping the module decoupled from *config.Env (docs/TECH_DEBT.md #8).
+func authConfig(env *config.Env) auth.Config {
+	return auth.Config{
+		JWTSecret:               env.JWTSecret,
+		JWTAccessDuration:       env.JWTAccessDuration,
+		JWTRefreshDuration:      env.JWTRefreshDuration,
+		RefreshGracePeriod:      env.RefreshGracePeriod,
+		MaxLoginAttempts:        env.MaxLoginAttempts,
+		LoginLockout:            env.LoginLockout,
+		Environment:             env.Environment,
+		FrontendURL:             env.FrontendURL,
+		InvitationExpiry:        env.InvitationExpiry,
+		PasswordResetExpiry:     env.PasswordResetExpiry,
+		EmailVerificationExpiry: env.EmailVerificationExpiry,
+		SelfRegistrationEnabled: env.SelfRegistrationEnabled,
+		TwoFactorPendingExpiry:  env.TwoFactorPendingExpiry,
+	}
 }
