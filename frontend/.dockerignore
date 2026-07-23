@@ -4,3 +4,5 @@
 !/svelte.config.js
 !/vite.config.ts
 !/tsconfig.json
+!/pnpm-lock.yaml
+!/package.json
