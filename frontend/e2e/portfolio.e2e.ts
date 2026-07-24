@@ -11,6 +11,31 @@ test.describe('portfolio detail', () => {
 		await expect(page.getByText('Moderado').first()).toBeVisible();
 	});
 
+	test('asset detail shows the position summary and its transactions', async ({ page }) => {
+		await login(page);
+		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}/assets/AAPL`);
+
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('AAPL');
+		await expect(page.getByRole('heading', { name: 'Resumen de Posición' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Información del Activo' })).toBeVisible();
+
+		// La transacción de compra del fixture aparece en el historial.
+		await expect(page.getByText('Compra').first()).toBeVisible();
+	});
+
+	test('asset detail opens the add-transaction and quick-sell forms', async ({ page }) => {
+		await login(page);
+		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}/assets/AAPL`);
+
+		await page.getByRole('button', { name: '+ Agregar' }).click();
+		await expect(page.getByRole('button', { name: 'Registrar transacción' })).toBeVisible();
+
+		// La venta rápida se abre desde el lote de compra del historial.
+		await page.getByRole('button', { name: 'Vender' }).click();
+		await expect(page.getByText('Vender desde compra')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Confirmar Venta Total' })).toBeVisible();
+	});
+
 	test('adds an entry through the add-asset form', async ({ page }) => {
 		await login(page);
 		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}/add`);

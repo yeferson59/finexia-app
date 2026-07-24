@@ -455,6 +455,18 @@ const server = createServer(async (req, res) => {
 		await readBody(req);
 		return send(res, 200, envelope(importPreview));
 	}
+	if (
+		req.method === 'GET' &&
+		/^\/portfolios\/[0-9a-f-]{36}\/assets\/[^/]+\/transactions$/.test(path)
+	) {
+		const symbol = decodeURIComponent(path.split('/')[4]);
+		const rows = transactions.filter((t) => t.assetTicker === symbol);
+		return send(
+			res,
+			200,
+			envelope({ data: rows, total: rows.length, page: 1, limit: 20, totalPages: 1 })
+		);
+	}
 	if (route === `GET /portfolios/${IDS.portfolio}/top-transaction`) {
 		return send(
 			res,
