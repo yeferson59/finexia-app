@@ -14,6 +14,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 func (s *Service) ValidateToken(ctx context.Context, token string) (string, error) {
@@ -28,7 +30,7 @@ func (s *Service) ValidateToken(ctx context.Context, token string) (string, erro
 		}
 
 		if !isValidToken {
-			return "", errors.New("invalid access token")
+			return "", httpx.AsBadRequest(errors.New("invalid access token"))
 		}
 
 		return token, nil
@@ -38,17 +40,17 @@ func (s *Service) ValidateToken(ctx context.Context, token string) (string, erro
 		return []byte(s.cfg.JWTSecret), nil
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 	if err != nil || jwtoken == nil || !jwtoken.Valid {
-		return "", errors.New("invalid access token")
+		return "", httpx.AsBadRequest(errors.New("invalid access token"))
 	}
 
 	claims, ok := jwtoken.Claims.(jwt.MapClaims)
 	if !ok {
-		return "", errors.New("invalid access token")
+		return "", httpx.AsBadRequest(errors.New("invalid access token"))
 	}
 
 	userIDValue, ok := claims["id"]
 	if !ok {
-		return "", errors.New("invalid access token")
+		return "", httpx.AsBadRequest(errors.New("invalid access token"))
 	}
 
 	var userID string
@@ -63,29 +65,29 @@ func (s *Service) ValidateToken(ctx context.Context, token string) (string, erro
 
 	role, ok := claims["role"].(string)
 	if !ok || role == "" {
-		return "", errors.New("invalid access token")
+		return "", httpx.AsBadRequest(errors.New("invalid access token"))
 	}
 
 	user, err := s.stores.Sessions.GetSessionByToken(ctx, token)
 	if err != nil {
-		return "", errors.New("invalid access token")
+		return "", httpx.AsBadRequest(errors.New("invalid access token"))
 	}
 
 	if userID != user.ID.String() {
-		return "", errors.New("invalid access token")
+		return "", httpx.AsBadRequest(errors.New("invalid access token"))
 	}
 
 	if token != user.Sessions[0].Token {
-		return "", errors.New("invalid access token")
+		return "", httpx.AsBadRequest(errors.New("invalid access token"))
 	}
 
 	if role != user.Role.Name {
-		return "", errors.New("invalid access token")
+		return "", httpx.AsBadRequest(errors.New("invalid access token"))
 	}
 
 	expValue, ok := claims["exp"]
 	if !ok {
-		return "", errors.New("invalid access token")
+		return "", httpx.AsBadRequest(errors.New("invalid access token"))
 	}
 
 	var expUnix int64
@@ -97,10 +99,10 @@ func (s *Service) ValidateToken(ctx context.Context, token string) (string, erro
 	case string:
 		expUnix, err = strconv.ParseInt(v, 10, 64)
 		if err != nil {
-			return "", errors.New("invalid access token")
+			return "", httpx.AsBadRequest(errors.New("invalid access token"))
 		}
 	default:
-		return "", errors.New("invalid access token")
+		return "", httpx.AsBadRequest(errors.New("invalid access token"))
 	}
 
 	expTime := time.Unix(expUnix, 0).UTC()
@@ -108,7 +110,7 @@ func (s *Service) ValidateToken(ctx context.Context, token string) (string, erro
 
 	const expirationLeeway = 30 * time.Second
 	if now.After(expTime.Add(expirationLeeway)) {
-		return "", errors.New("invalid access token")
+		return "", httpx.AsBadRequest(errors.New("invalid access token"))
 	}
 
 	cacheTTL := expTime.Sub(now)
@@ -126,7 +128,7 @@ func (s *Service) RefreshToken(ctx context.Context, rawToken, ipAddress, userAge
 
 	oldHash, err := hashRefreshToken(rawToken)
 	if err != nil {
-		return LoginInternalDTO{}, errors.New("invalid refresh token")
+		return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid refresh token"))
 	}
 	oldCacheKey := refreshCacheKey(oldHash)
 
@@ -144,44 +146,44 @@ func (s *Service) RefreshToken(ctx context.Context, rawToken, ipAddress, userAge
 		// format: tokenID|userID|role|familyID|sessionID|expiresUnix
 		parts := strings.SplitN(string(cached), "|", 6)
 		if len(parts) != 6 {
-			return LoginInternalDTO{}, errors.New("invalid refresh token")
+			return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid refresh token"))
 		}
 		tokenID, err = uuid.Parse(parts[0])
 		if err != nil {
-			return LoginInternalDTO{}, errors.New("invalid refresh token")
+			return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid refresh token"))
 		}
 		userID, err = uuid.Parse(parts[1])
 		if err != nil {
-			return LoginInternalDTO{}, errors.New("invalid refresh token")
+			return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid refresh token"))
 		}
 		role = parts[2]
 		familyID, err = uuid.Parse(parts[3])
 		if err != nil {
-			return LoginInternalDTO{}, errors.New("invalid refresh token")
+			return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid refresh token"))
 		}
 		sessionID, err = uuid.Parse(parts[4])
 		if err != nil {
-			return LoginInternalDTO{}, errors.New("invalid refresh token")
+			return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid refresh token"))
 		}
 		expiresUnix, parseErr := strconv.ParseInt(parts[5], 10, 64)
 		if parseErr != nil {
-			return LoginInternalDTO{}, errors.New("invalid refresh token")
+			return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid refresh token"))
 		}
 		if time.Now().UTC().After(time.Unix(expiresUnix, 0).UTC()) {
-			return LoginInternalDTO{}, errors.New("invalid refresh token")
+			return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid refresh token"))
 		}
 		// The cache entry knows nothing about revocations done through the
 		// database, so a revoked family must be rejected here explicitly.
 		if revoked, _ := s.storage.GetWithContext(ctx, revokedFamilyCacheKey(familyID)); len(revoked) > 0 {
-			return LoginInternalDTO{}, errors.New("invalid refresh token")
+			return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid refresh token"))
 		}
 	} else {
 		rt, dbErr := s.stores.RefreshTokens.GetRefreshTokenByHash(ctx, oldHash)
 		if dbErr != nil {
-			return LoginInternalDTO{}, errors.New("invalid refresh token")
+			return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid refresh token"))
 		}
 		if rt.RevokedAt != nil {
-			return LoginInternalDTO{}, errors.New("invalid refresh token")
+			return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid refresh token"))
 		}
 		// A consumed token may be a real reuse attack or a benign concurrent
 		// refresh (e.g. link preload + click racing with the same cookie). If it
@@ -190,10 +192,10 @@ func (s *Service) RefreshToken(ctx context.Context, rawToken, ipAddress, userAge
 		// whole family.
 		if rt.UsedAt != nil && time.Since(*rt.UsedAt) > s.cfg.RefreshGracePeriod {
 			s.revokeRefreshFamily(ctx, rt.FamilyID)
-			return LoginInternalDTO{}, errors.New("invalid refresh token")
+			return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid refresh token"))
 		}
 		if time.Now().UTC().After(rt.ExpiresAt) {
-			return LoginInternalDTO{}, errors.New("invalid refresh token")
+			return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid refresh token"))
 		}
 		tokenID = rt.ID
 		userID = rt.UserID
@@ -222,7 +224,7 @@ func (s *Service) RefreshToken(ctx context.Context, rawToken, ipAddress, userAge
 	if err != nil {
 		if errors.Is(err, ErrSessionNotFound) {
 			s.revokeRefreshFamily(ctx, familyID)
-			return LoginInternalDTO{}, errors.New("invalid refresh token")
+			return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid refresh token"))
 		}
 		return LoginInternalDTO{}, err
 	}

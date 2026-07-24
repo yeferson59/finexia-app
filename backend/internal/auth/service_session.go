@@ -47,7 +47,7 @@ func (s *Service) RevokeSession(ctx context.Context, userID, sessionID uuid.UUID
 			continue
 		}
 		if sess.Token == currentToken {
-			return errors.New("invalid session: use logout to close the current session")
+			return httpx.AsBadRequest(errors.New("invalid session: use logout to close the current session"))
 		}
 		_, err := s.revokeSessions(ctx, userID, []identity.Session{sess})
 		return err

@@ -140,7 +140,7 @@ func (r *PostgresRepository) AcceptInvitation(ctx context.Context, invitationID 
 
 	tx, err := r.db.BeginTx(ctxTimeout, pgx.TxOptions{AccessMode: pgx.ReadWrite})
 	if err != nil {
-		return identity.User{}, errors.New("failed to accept invitation")
+		return identity.User{}, httpx.AsBadRequest(errors.New("failed to accept invitation"))
 	}
 	defer func() { _ = tx.Rollback(ctxTimeout) }()
 
@@ -161,7 +161,7 @@ func (r *PostgresRepository) AcceptInvitation(ctx context.Context, invitationID 
 
 	var roleID uuid.UUID
 	if err := tx.QueryRow(ctxTimeout, "SELECT id FROM roles WHERE name = $1", role).Scan(&roleID); err != nil {
-		return identity.User{}, errors.New("invalid role")
+		return identity.User{}, httpx.AsBadRequest(errors.New("invalid role"))
 	}
 
 	var user identity.User
@@ -174,7 +174,7 @@ func (r *PostgresRepository) AcceptInvitation(ctx context.Context, invitationID 
 		&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID,
 		&user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.BannedAt,
 	); err != nil {
-		return identity.User{}, errors.New("user already exists")
+		return identity.User{}, httpx.AsConflict(errors.New("user already exists"))
 	}
 
 	if _, err := tx.Exec(ctxTimeout,

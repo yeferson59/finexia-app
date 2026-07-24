@@ -63,7 +63,7 @@ func (r *PostgresRepository) ConsumePasswordReset(ctx context.Context, resetID, 
 
 	tx, err := r.db.BeginTx(ctxTimeout, pgx.TxOptions{AccessMode: pgx.ReadWrite})
 	if err != nil {
-		return errors.New("failed to reset password")
+		return httpx.AsBadRequest(errors.New("failed to reset password"))
 	}
 	defer func() { _ = tx.Rollback(ctxTimeout) }()
 
