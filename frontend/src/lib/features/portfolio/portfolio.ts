@@ -1,7 +1,14 @@
 /**
  * Helpers puros, constantes y tipos de la feature `portfolio`, compartidos por
  * los componentes de detalle y de alta. Sin dependencias de Svelte ni de red.
+ *
+ * Los contratos del backend NO se redeclaran aquí: se importan de
+ * `$lib/api/types` (única fuente de verdad) y se reexportan para que los
+ * componentes de la feature no tengan que conocer la capa de API.
  */
+import type { GrowthDataPoint, GrowthSummary, Holding, TopTransaction } from '$lib/api/types';
+
+export type { GrowthDataPoint, GrowthSummary, TopTransaction };
 
 export const PORTFOLIO_TYPES: { value: string; label: string }[] = [
 	{ value: 'stocks_etfs', label: 'Acciones y ETF' },
@@ -37,15 +44,14 @@ export const ASSET_TYPE_COLORS: Record<string, string> = {
 	other: '#6b7280'
 };
 
-/** Entrada de holding cruda tal como llega del backend (valores en string). */
-export interface RawHolding {
-	ticker: string;
-	name: string;
-	assetType: string;
-	quantity: string;
-	price: string;
-	marketPrice: string;
-}
+/**
+ * Subconjunto de `Holding` que necesita la agregación por ticker. Se deriva del
+ * contrato para que un cambio de nombre/tipo en la API rompa aquí.
+ */
+export type RawHolding = Pick<
+	Holding,
+	'ticker' | 'name' | 'assetType' | 'quantity' | 'price' | 'marketPrice'
+>;
 
 /** Holding agregado por ticker, listo para pintar. */
 export interface HoldingView {
@@ -72,29 +78,6 @@ export interface TypeBreakdownSlice {
 export interface DonutSegment extends TypeBreakdownSlice {
 	dasharray: string;
 	dashoffset: number;
-}
-
-export interface TopTransactionData {
-	value: string;
-	type: string;
-	currency: string;
-	assetTicker: string;
-	assetName: string;
-	transactionDate: string;
-}
-
-export interface GrowthDataPoint {
-	date: string;
-	totalValue: string;
-	totalCostBase: string;
-	gainLoss: string;
-	gainLossPct: string;
-}
-
-export interface GrowthSummary {
-	initialValue: string;
-	currentValue: string;
-	totalGrowthPct: string;
 }
 
 /**

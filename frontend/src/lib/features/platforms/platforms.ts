@@ -1,7 +1,13 @@
 /**
  * Constantes y helpers de la feature `platforms`, compartidos por el detalle y
  * el formulario de alta (antes duplicados en cada página).
+ *
+ * El contrato `Platform` no se redeclara: se reexporta el de `$lib/api/types`
+ * (única fuente de verdad) para que los componentes no dependan de la capa de API.
  */
+import type { Platform } from '$lib/api/types';
+
+export type { Platform };
 
 /** Etiquetas legibles para el `sourceType` de una plataforma. */
 export const PLATFORM_TYPES = new Map<string, string>([
@@ -18,17 +24,4 @@ export const PLATFORM_TYPES = new Map<string, string>([
 
 export function formatSourceType(type: string): string {
 	return PLATFORM_TYPES.get(type) ?? type;
-}
-
-/** Plataforma de inversión tal como la devuelve `lib/api/platforms`. */
-export interface Platform {
-	id: string;
-	name: string;
-	description: string;
-	sourceType: string;
-	isActive: boolean;
-	createdAt: string;
-	updatedAt: string;
-	investments: number;
-	totalValue: string;
 }

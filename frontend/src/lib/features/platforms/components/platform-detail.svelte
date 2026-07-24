@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import Card from '$lib/ui/card.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
-	import { PLATFORM_TYPES, formatSourceType, type Platform } from '../platforms';
+	import { formatSourceType, type Platform } from '../platforms';
+	import PlatformEditForm from './platform-edit-form.svelte';
+	import PlatformDeleteDialog from './platform-delete-dialog.svelte';
 
 	let { platform }: { platform: Platform } = $props();
 
@@ -27,10 +28,8 @@
 	}
 
 	let isEditing = $state(false);
-	let isSubmitting = $state(false);
 	let submitSuccess = $state(false);
 	let showDeleteConfirm = $state(false);
-	let isDeleting = $state(false);
 
 	function goBack() {
 		goto(resolve('/dashboard/platforms'));
@@ -160,82 +159,15 @@
 				</div>
 			</Card>
 		{:else}
-			<!-- Edit mode -->
-			<Card variant="elevated" padding="none">
-				<div class="panel-body">
-					<h2 class="section-title">Editar Plataforma</h2>
-
-					<form
-						method="POST"
-						action="?/update"
-						class="platform-form"
-						use:enhance={() => {
-							isSubmitting = true;
-							return async ({ result, update }) => {
-								await update({ reset: false });
-								isSubmitting = false;
-								if (result.type === 'success' && result.data?.success) {
-									submitSuccess = true;
-									isEditing = false;
-									setTimeout(() => (submitSuccess = false), 3000);
-								}
-							};
-						}}
-					>
-						<div class="form-group">
-							<label for="name" class="form-label">Nombre <span class="required">*</span></label>
-							<input
-								id="name"
-								name="name"
-								type="text"
-								value={platform.name}
-								class="form-input"
-								required
-							/>
-						</div>
-
-						<div class="form-group">
-							<label for="description" class="form-label">Descripción</label>
-							<textarea id="description" name="description" class="form-textarea" rows="3"
-								>{platform.description}</textarea
-							>
-						</div>
-
-						<div class="form-row">
-							<div class="form-group">
-								<label for="type" class="form-label">Tipo <span class="required">*</span></label>
-								<select id="type" name="type" class="form-select" required>
-									{#each PLATFORM_TYPES.entries() as [key, label] (key)}
-										<option value={key} selected={key === platform.sourceType}>{label}</option>
-									{/each}
-								</select>
-							</div>
-
-							<div class="form-group">
-								<label for="isActive" class="form-label">Estado</label>
-								<select id="isActive" name="isActive" class="form-select">
-									<option value="true" selected={platform.isActive}>Activo</option>
-									<option value="false" selected={!platform.isActive}>Inactivo</option>
-								</select>
-							</div>
-						</div>
-
-						<div class="form-actions">
-							<button type="button" onclick={() => (isEditing = false)} class="btn btn-secondary">
-								Cancelar
-							</button>
-							<button type="submit" disabled={isSubmitting} class="btn btn-primary">
-								{#if isSubmitting}
-									<span class="spinner"></span>
-									Guardando...
-								{:else}
-									Guardar Cambios
-								{/if}
-							</button>
-						</div>
-					</form>
-				</div>
-			</Card>
+			<PlatformEditForm
+				{platform}
+				onCancel={() => (isEditing = false)}
+				onSaved={() => {
+					submitSuccess = true;
+					isEditing = false;
+					setTimeout(() => (submitSuccess = false), 3000);
+				}}
+			/>
 		{/if}
 
 		{#if submitSuccess}
@@ -246,40 +178,7 @@
 
 <!-- Delete confirmation modal -->
 {#if showDeleteConfirm}
-	<div class="modal-overlay">
-		<div class="modal-content">
-			<h3>Confirmar eliminación</h3>
-			<p>
-				¿Estás seguro de que deseas eliminar <strong>{platform.name}</strong>? Esta acción no se
-				puede deshacer.
-			</p>
-			<div class="modal-actions">
-				<button onclick={() => (showDeleteConfirm = false)} class="btn btn-secondary">
-					Cancelar
-				</button>
-				<form
-					method="POST"
-					action="?/delete"
-					use:enhance={() => {
-						isDeleting = true;
-						return async ({ update }) => {
-							await update();
-							isDeleting = false;
-						};
-					}}
-				>
-					<button type="submit" disabled={isDeleting} class="btn btn-danger">
-						{#if isDeleting}
-							<span class="spinner spinner-white"></span>
-							Eliminando...
-						{:else}
-							Eliminar
-						{/if}
-					</button>
-				</form>
-			</div>
-		</div>
-	</div>
+	<PlatformDeleteDialog platformName={platform.name} onCancel={() => (showDeleteConfirm = false)} />
 {/if}
 
 <style>
@@ -511,69 +410,6 @@
 		font-weight: 700;
 	}
 
-	/* Edit form */
-	.platform-form {
-		display: flex;
-		flex-direction: column;
-		gap: 1.25rem;
-	}
-
-	.form-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.6rem;
-	}
-
-	.form-row {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1.5rem;
-	}
-
-	.form-label {
-		font-size: 0.9rem;
-		font-weight: 600;
-		color: var(--text);
-		letter-spacing: 0.3px;
-	}
-
-	.required {
-		color: var(--red);
-	}
-
-	.form-input,
-	.form-select,
-	.form-textarea {
-		padding: 0.85rem 1rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.022);
-		color: var(--text);
-		font-size: 0.95rem;
-		font-family: var(--font-body);
-		transition: all 0.3s ease;
-	}
-
-	.form-input:focus,
-	.form-select:focus,
-	.form-textarea:focus {
-		outline: none;
-		border-color: var(--amber);
-		box-shadow: 0 0 0 3px var(--border);
-	}
-
-	.form-textarea {
-		resize: vertical;
-		min-height: 90px;
-	}
-
-	.form-actions {
-		display: flex;
-		gap: 1rem;
-		justify-content: flex-end;
-		margin-top: 0.5rem;
-	}
-
 	.success-msg {
 		color: var(--green);
 		font-size: 0.9rem;
@@ -586,138 +422,6 @@
 		margin: 0;
 	}
 
-	/* Shared button styles */
-	.btn {
-		padding: 0.75rem 1.5rem;
-		border: none;
-		border-radius: 8px;
-		font-weight: 700;
-		font-family: var(--font-body);
-		font-size: 0.9rem;
-		cursor: pointer;
-		transition: all 0.3s ease;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-		letter-spacing: 0.3px;
-	}
-
-	.btn-primary {
-		background: var(--amber);
-		color: #0d0800;
-	}
-
-	.btn-primary:hover:not(:disabled) {
-		transform: translateY(-2px);
-		box-shadow: 0 10px 25px rgba(212, 145, 42, 0.25);
-	}
-
-	.btn-primary:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
-	}
-
-	.btn-secondary {
-		background: transparent;
-		color: var(--text);
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
-	}
-
-	.btn-secondary:hover {
-		border-color: var(--amber);
-		background: var(--border);
-		color: var(--amber);
-	}
-
-	.btn-danger {
-		background: var(--red);
-		color: white;
-	}
-
-	.btn-danger:hover:not(:disabled) {
-		box-shadow: 0 10px 25px rgba(224, 90, 90, 0.3);
-	}
-
-	.btn-danger:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
-	}
-
-	/* Modal */
-	.modal-overlay {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.55);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 1000;
-		backdrop-filter: blur(4px);
-	}
-
-	.modal-content {
-		background: var(--surface);
-		border: 1px solid rgba(212, 145, 42, 0.2);
-		border-radius: 16px;
-		padding: 2rem;
-		max-width: 420px;
-		width: 90%;
-		box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
-	}
-
-	.modal-content h3 {
-		margin: 0 0 1rem;
-		color: var(--text);
-		font-size: 1.3rem;
-		font-family: var(--font-body);
-	}
-
-	.modal-content p {
-		margin: 0 0 1.5rem;
-		color: rgba(236, 234, 229, 0.7);
-		line-height: 1.6;
-	}
-
-	.modal-actions {
-		display: flex;
-		gap: 1rem;
-		align-items: center;
-	}
-
-	.modal-actions form {
-		flex: 1;
-	}
-
-	.modal-actions .btn-secondary {
-		flex: 1;
-	}
-
-	.modal-actions .btn-danger {
-		width: 100%;
-	}
-
-	.spinner {
-		display: inline-block;
-		width: 14px;
-		height: 14px;
-		border: 2px solid rgba(13, 8, 0, 0.3);
-		border-top-color: #0d0800;
-		border-radius: 50%;
-		animation: spin 0.6s linear infinite;
-	}
-
-	.spinner-white {
-		border-color: rgba(255, 255, 255, 0.3);
-		border-top-color: white;
-	}
-
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
 	@media (max-width: 768px) {
 		.page-title {
 			font-size: 1.5rem;
@@ -727,21 +431,12 @@
 			width: 100%;
 		}
 
-		.stats-grid,
-		.form-row {
+		.stats-grid {
 			grid-template-columns: 1fr;
 		}
 
 		.info-group {
 			grid-template-columns: 1fr;
-		}
-
-		.form-actions {
-			flex-direction: column-reverse;
-		}
-
-		.btn {
-			width: 100%;
 		}
 	}
 </style>

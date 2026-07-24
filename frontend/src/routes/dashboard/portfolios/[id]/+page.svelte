@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import PortfolioGrowth from '$lib/features/dashboard/components/portfolio-growth.svelte';
+	import { PortfolioGrowth } from '$lib/features/dashboard';
 	import { privacy } from '$lib/stores/privacy.svelte';
 	import {
 		PortfolioEditForm,
@@ -10,27 +10,16 @@
 		AllocationDonut,
 		HoldingsTable,
 		groupHoldings,
-		computeTypeBreakdown,
-		type RawHolding,
-		type TopTransactionData,
-		type GrowthDataPoint,
-		type GrowthSummary
+		computeTypeBreakdown
 	} from '$lib/features/portfolio';
 	import type { PageProps } from './$types';
 
 	const { params, data }: PageProps = $props();
 
 	const portfolio = $derived(data.portfolio);
-	const risks = $derived(
-		(data as unknown as { risks: { id: string; name: string }[] }).risks ?? []
-	);
-	const topTransaction = $derived(
-		(data as unknown as { topTransaction: TopTransactionData | null }).topTransaction
-	);
-	const growth = $derived(
-		(data as unknown as { growth: { points: GrowthDataPoint[]; summary: GrowthSummary } | null })
-			.growth
-	);
+	const risks = $derived(data.risks);
+	const topTransaction = $derived(data.topTransaction);
+	const growth = $derived(data.growth);
 
 	let isEditing = $state(false);
 	let submitSuccess = $state(false);
@@ -38,7 +27,7 @@
 
 	// Group entries by ticker so the same asset held in multiple platforms
 	// appears as a single row with aggregated quantity and cost basis.
-	const holdings = $derived(groupHoldings((portfolio?.holdings ?? []) as RawHolding[]));
+	const holdings = $derived(groupHoldings(portfolio?.holdings ?? []));
 
 	const totalValue = $derived(holdings.reduce((sum, h) => sum + h.value, 0));
 	const totalCost = $derived(holdings.reduce((sum, h) => sum + h.costBasis, 0));
@@ -153,15 +142,9 @@
 	<div class="alert alert-error">{submitError}</div>
 {/if}
 
-{#if isEditing}
+{#if isEditing && portfolio}
 	<PortfolioEditForm
-		portfolio={portfolio as unknown as {
-			name: string;
-			description?: string | null;
-			type: string;
-			riskId?: string;
-			isDefault: boolean;
-		}}
+		{portfolio}
 		{risks}
 		onCancel={() => (isEditing = false)}
 		onSaved={() => {
