@@ -172,8 +172,10 @@ func TestAppWiresAndRoutes(t *testing.T) {
 		t.Errorf("GET /auth/invitations = %d, want 400 without a token", status)
 	}
 
-	// The admin invitation/waitlist dashboard is gated by the module's own
-	// inline RequireAuth (401 with a bogus token, before RequireAdmin runs).
+	// The admin invitation/waitlist dashboard is gated by inline guards (401
+	// with a bogus token, before RequireAdmin runs). /users/waitlist is served
+	// by marketing and /users/invitations by user, so this also proves both
+	// modules apply the shared guards themselves.
 	if status := request("GET", "/users/waitlist", "Authorization", "Bearer bogus-token"); status != fiber.StatusUnauthorized {
 		t.Errorf("GET /users/waitlist = %d, want 401 with an invalid token", status)
 	}

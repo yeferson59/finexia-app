@@ -13,7 +13,6 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal/auth"
 	"github.com/yeferson59/finexia-app/internal/identity"
-	"github.com/yeferson59/finexia-app/internal/marketing"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/pkg/dtos"
 )
@@ -392,22 +391,4 @@ func (h *handler) revokeInvitation(c fiber.Ctx) error {
 	}
 
 	return httpx.OK(c, "invitation revoked", "invitation revoked successfully", nil)
-}
-
-// listWaitlist (admin) returns the waitlist so admins can invite from it.
-func (h *handler) listWaitlist(c fiber.Ctx) error {
-	paginateInfo, ok := paginate.FromContext(c)
-	if !ok {
-		return httpx.InternalServerError(c, "", "paginate info not found")
-	}
-
-	waitlist, count, err := h.service.ListWaitlist(c, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
-	if err != nil {
-		return httpx.FromDomain(c, err, "failed to list waitlist", "waitlist:list")
-	}
-
-	return httpx.OK(c, "waitlist", "waitlist retrieved successfully", dtos.FilterPagination[[]marketing.Waitlist, fiber.Map]{
-		Items:    waitlist,
-		MetaData: httpx.PaginationMetadata(paginateInfo, count, "limit", "total"),
-	})
 }

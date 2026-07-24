@@ -224,7 +224,6 @@ func (a *App) buildModules() *modules {
 		Geo:       geo,
 		Log:       a.deps.Log,
 		Auth:      authModule.Service(),
-		Marketing: marketingModule.Service(),
 		AuthMiddl: authModule,
 		Limiter:   userLimiter,
 	})
@@ -232,6 +231,10 @@ func (a *App) buildModules() *modules {
 	// those tables itself (docs/TECH_DEBT.md #9). The two modules need each
 	// other, so the reader is injected here, once user exists.
 	authModule.SetUsers(userModule.Service())
+	// marketing serves the admin waitlist listing itself (docs/TECH_DEBT.md
+	// #10). It is built before auth — auth's invitation flow advances the
+	// waitlist — so it receives the shared guards here instead of via New.
+	marketingModule.SetAdminGuard(authModule, userLimiter)
 	// market owns the asset catalog; portfolio consumes it (portfolio → market),
 	// so market is built first and injected as portfolio's AssetReader.
 	marketModule := market.New(market.Deps{

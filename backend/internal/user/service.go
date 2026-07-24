@@ -14,7 +14,6 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal/auth"
 	"github.com/yeferson59/finexia-app/internal/identity"
-	"github.com/yeferson59/finexia-app/internal/marketing"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
@@ -35,37 +34,29 @@ type authService interface {
 	RevokeInvitation(ctx context.Context, id uuid.UUID) error
 }
 
-// marketingService is the slice of marketing.Service the admin waitlist
-// dashboard reads from.
-type marketingService interface {
-	ListWaitlist(ctx context.Context, offset, limit uint) ([]marketing.Waitlist, uint, error)
-}
-
 type geoService interface {
 	Locate(ctx context.Context, ip string) string
 }
 
 type Service struct {
-	repo      Repository
-	mail      mailer
-	auth      authService
-	marketing marketingService
-	store     objectstore.Store
-	geo       geoService
-	log       logger.Logger
-	cfg       Config
+	repo  Repository
+	mail  mailer
+	auth  authService
+	store objectstore.Store
+	geo   geoService
+	log   logger.Logger
+	cfg   Config
 }
 
-func NewService(repo Repository, mail mailer, auth authService, marketing marketingService, store objectstore.Store, geo geoService, log logger.Logger, cfg Config) *Service {
+func NewService(repo Repository, mail mailer, auth authService, store objectstore.Store, geo geoService, log logger.Logger, cfg Config) *Service {
 	return new(Service{
-		repo:      repo,
-		mail:      mail,
-		auth:      auth,
-		marketing: marketing,
-		store:     store,
-		geo:       geo,
-		log:       log,
-		cfg:       cfg,
+		repo:  repo,
+		mail:  mail,
+		auth:  auth,
+		store: store,
+		geo:   geo,
+		log:   log,
+		cfg:   cfg,
 	})
 }
 
@@ -311,10 +302,4 @@ func (s *Service) ResendInvitation(ctx context.Context, id, invitedBy uuid.UUID)
 
 func (s *Service) RevokeInvitation(ctx context.Context, id uuid.UUID) error {
 	return s.auth.RevokeInvitation(ctx, id)
-}
-
-// ListWaitlist delegates to the marketing module: the waitlist is marketing's
-// data, but admins manage it from the same /users dashboard as invitations.
-func (s *Service) ListWaitlist(ctx context.Context, offset, limit uint) ([]marketing.Waitlist, uint, error) {
-	return s.marketing.ListWaitlist(ctx, offset, limit)
 }

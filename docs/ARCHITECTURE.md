@@ -75,9 +75,19 @@ Un módulo nuevo se añade creando su paquete y registrándolo en `internal/app`
    datos de `user`, declara `portfolio.UserReader` y `app` le inyecta
    `user.Service`. Las interfaces se mantienen pequeñas y cohesivas (ej.:
    `auth.Stores` = 5 stores; `portfolio.Repository` = unión de 5 sub-stores).
-5. **`internal/app` es el único que cablea.** Ningún módulo importa `app`; el
+   La arista punteada `auth -. runtime .-> user` del grafo es justamente eso:
+   `auth` declara `auth.UserReader` y **no importa** `user`; como `user` sí
+   importa `auth` (invitaciones, cambio de password), `app` no puede pasarle el
+   lector en `New` y lo inyecta después con `authModule.SetUsers(...)`. Lo mismo
+   hace `marketingModule.SetAdminGuard(...)` para el guard admin de
+   `GET /users/waitlist`.
+5. **Cada módulo declara su propia `Config`.** Ninguno importa
+   `platform/config`: `app` proyecta el `*config.Env` sobre `auth.Config`,
+   `user.Config`, `portfolio.Config` y `notification.Config` (`market` no
+   necesita ninguna). Lo fija `TestModulesOwnTheirConfig`.
+6. **`internal/app` es el único que cablea.** Ningún módulo importa `app`; el
    flujo de dependencias va siempre de `app` hacia abajo.
-6. **La API HTTP no cambia** respecto a lo documentado en `API.md`.
+7. **La API HTTP no cambia** respecto a lo documentado en `API.md`.
 
 ### Grafo de dependencias entre módulos
 
@@ -87,7 +97,7 @@ graph TD
     subgraph domain[Módulos de dominio]
         auth --> marketing
         user --> auth
-        user --> marketing
+        auth -. runtime .-> user
         portfolio --> user
         portfolio --> market
         notification --> portfolio
