@@ -194,7 +194,8 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 | Método | Path | Acceso | Descripción |
 |---|---|---|---|
 | GET | `/portfolios/risks` | usuario | Catálogo de niveles de riesgo |
-| GET | `/portfolios/id` | usuario | Portfolios del usuario |
+| GET | `/portfolios` | usuario | Portfolios del usuario |
+| GET | `/portfolios/id` | usuario | **Deprecado** — alias de `GET /portfolios`. Misma respuesta, más las cabeceras `Deprecation: true` y `Link: </portfolios>; rel="successor-version"` |
 | GET | `/portfolios/summary` | usuario | Resumen (soporta `?currency=`) |
 | GET | `/portfolios/transactions` | usuario | Transacciones recientes |
 | POST | `/portfolios/transactions/import/preview` | usuario | Preview del import (multipart `file`, `sheet`, `mapping`, `defaults`) |
