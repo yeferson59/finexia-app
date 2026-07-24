@@ -34,7 +34,6 @@ func authTestConfig() Config {
 func newTestApp(repo *fakeRepository, cfg Config) *fiber.App {
 	service := NewService(testStores(repo), cfg, newMemStorage(), nil, nil, logger.Noop())
 	m := newModule(Deps{
-		Ctx:     context.Background(),
 		Cfg:     cfg,
 		Storage: newMemStorage(),
 		Log:     logger.Noop(),

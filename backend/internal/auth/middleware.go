@@ -24,19 +24,26 @@ const (
 	LocalRole   = "auth_role"
 )
 
-// RequireAuth gates a route behind a live session: it verifies the bearer
-// token's signature and checks it against the session store (via
-// Service.ValidateToken), then exposes the identity through the Local* keys.
+// RequireAuth gates a route behind a live session: jwtware verifies the bearer
+// token's signature and parses its claims, then the success handler checks the
+// token against the session store (via Service.ValidateToken) and exposes the
+// identity through the Local* keys.
+//
+// The session check runs in the success handler, not in a TokenProcessorFunc,
+// so it can use the request's own context (c) for the cache/database lookups
+// instead of a context captured at startup — cancelling and deadlining the
+// lookup with the request (TECH_DEBT #6).
 func (m *Module) RequireAuth() fiber.Handler {
 	return jwtware.New(jwtware.Config{
 		SigningKey: jwtware.SigningKey{Key: []byte(m.cfg.JWTSecret)},
-		TokenProcessorFunc: func(token string) (string, error) {
-			return m.service.ValidateToken(m.ctx, token)
-		},
 		SuccessHandler: func(c fiber.Ctx) error {
 			jwtToken := jwtware.FromContext(c)
 			claims, ok := jwtToken.Claims.(jwt.MapClaims)
 			if !ok {
+				return c.SendStatus(fiber.StatusUnauthorized)
+			}
+
+			if _, err := m.service.ValidateToken(c, jwtToken.Raw); err != nil {
 				return c.SendStatus(fiber.StatusUnauthorized)
 			}
 

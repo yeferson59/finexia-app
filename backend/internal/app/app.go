@@ -184,7 +184,7 @@ type modules struct {
 // three ordered steps of the composition root: build the modules, mount
 // their routes, then start the schedulers.
 func (a *App) wire(ctx context.Context) {
-	mods := a.buildModules(ctx)
+	mods := a.buildModules()
 	a.mountRoutes(mods)
 	a.startScheduler(ctx, mods)
 }
@@ -192,7 +192,7 @@ func (a *App) wire(ctx context.Context) {
 // buildModules constructs the shared infrastructure (price provider, geoip,
 // per-user rate limiter) and every domain module, respecting their
 // dependency order.
-func (a *App) buildModules(ctx context.Context) *modules {
+func (a *App) buildModules() *modules {
 	priceProvider := marketdata.NewFallback(
 		alphavantage.New(a.deps.Envs.AlphaVantageAPIKey),
 		finnhub.New(a.deps.Envs.FinnhubAPIKey),
@@ -208,7 +208,6 @@ func (a *App) buildModules(ctx context.Context) *modules {
 
 	marketingModule := marketing.New(marketing.NewPostgresRepository(a.deps.DB), a.deps.Mail)
 	authModule := auth.New(auth.Deps{
-		Ctx:      ctx,
 		DB:       a.deps.DB,
 		Cfg:      authConfig(a.deps.Envs),
 		Storage:  a.deps.Storage,

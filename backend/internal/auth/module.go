@@ -1,8 +1,6 @@
 package auth
 
 import (
-	"context"
-
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -11,10 +9,6 @@ import (
 
 // Deps carries everything the auth module needs from the composition root.
 type Deps struct {
-	// Ctx backs the token validation done inside RequireAuth, mirroring the
-	// context the legacy middlewares.New received (TECH_DEBT: use the
-	// request's own context instead).
-	Ctx     context.Context
 	DB      *pgxpool.Pool
 	Cfg     Config
 	Storage fiber.Storage
@@ -29,7 +23,6 @@ type Deps struct {
 // Module is the auth domain module: construction via New, HTTP surface via
 // Routes, and route guards (RequireAuth/RequireRole) for the rest of the app.
 type Module struct {
-	ctx     context.Context
 	cfg     Config
 	storage fiber.Storage
 	service *Service
@@ -56,7 +49,6 @@ func New(deps Deps) *Module {
 // tests can inject fake stores through NewService.
 func newModule(deps Deps, service *Service) *Module {
 	return &Module{
-		ctx:     deps.Ctx,
 		cfg:     deps.Cfg,
 		storage: deps.Storage,
 		service: service,
