@@ -130,7 +130,7 @@ func (s *Service) BeginTwoFactorSetup(ctx context.Context, userID uuid.UUID, pas
 		return TwoFactorSetupResponseDTO{}, ErrTwoFactorAlreadyEnabled
 	}
 
-	user, err := s.stores.Accounts.GetUserByID(ctx, userID)
+	user, err := s.stores.Users.GetUserByID(ctx, userID)
 	if err != nil {
 		return TwoFactorSetupResponseDTO{}, err
 	}
@@ -323,7 +323,7 @@ func (s *Service) CompleteTwoFactorLogin(ctx context.Context, rawToken, code, ip
 	_ = s.storage.DeleteWithContext(ctx, pendingKey)
 	_ = s.storage.DeleteWithContext(ctx, attemptsKey)
 
-	user, err := s.stores.Accounts.GetUserByID(ctx, userID)
+	user, err := s.stores.Users.GetUserByID(ctx, userID)
 	if err != nil {
 		return LoginInternalDTO{}, err
 	}
@@ -369,7 +369,7 @@ func (s *Service) sendTwoFactorAlert(userID uuid.UUID, event, detail, ipAddress,
 	}
 
 	ctx := context.Background()
-	user, err := s.stores.Accounts.GetUserByID(ctx, userID)
+	user, err := s.stores.Users.GetUserByID(ctx, userID)
 	if err != nil {
 		return
 	}

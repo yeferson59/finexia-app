@@ -16,14 +16,23 @@ import (
 // *PostgresRepository implements all of them; tests fake only the stores they
 // touch.
 
-// AccountStore covers account/user lookups and registration. GetUserByID and
-// GetUserByEmail belong to the user domain's tables but are consumed by auth
-// (2FA alerts, registration duplicate check); they migrate to interfaces over
-// the user module in Fase 5.
+// AccountStore covers the credentials side of an account: the rows in
+// accounts/sessions this module owns, plus registration. The users/roles
+// tables belong to the user domain and are read through UserReader instead
+// (docs/TECH_DEBT.md #9).
 type AccountStore interface {
 	GetAccountByUserID(ctx context.Context, userID uuid.UUID) (identity.Account, error)
 	GetAccountByEmail(ctx context.Context, email string) (identity.User, error)
 	Register(ctx context.Context, name, email, password string) (identity.User, error)
+}
+
+// UserReader is the slice of the user module auth consumes: the users/roles
+// tables are the user domain's, so auth no longer queries them itself. It
+// backs the registration/invitation duplicate check, the password-reset and
+// email-verification lookups, and the profile data (name, email, role) the 2FA
+// flows and the security emails need. Satisfied by *user.Service; injected by
+// the composition root through Module.SetUsers.
+type UserReader interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (identity.User, error)
 	GetUserByEmail(ctx context.Context, email string) (identity.User, error)
 }
@@ -107,6 +116,11 @@ type Stores struct {
 	// Waitlist is implemented by the marketing module, not by the module's
 	// own PostgresRepository.
 	Waitlist WaitlistStore
+	// Users is implemented by the user module, not by the module's own
+	// PostgresRepository. auth and user depend on each other at runtime, so
+	// the composition root fills this slot after both modules exist (see
+	// Module.SetUsers).
+	Users UserReader
 }
 
 // Mailer abstracts the outbound email service so tests can replace the

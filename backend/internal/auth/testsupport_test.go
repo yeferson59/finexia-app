@@ -80,10 +80,13 @@ var (
 	_ PasswordResetStore = (*fakeRepository)(nil)
 	_ InvitationStore    = (*fakeRepository)(nil)
 	_ WaitlistStore      = (*fakeRepository)(nil)
+	_ UserReader         = (*fakeRepository)(nil)
 )
 
-// testStores fills every store slot with the same fake, mirroring how the
-// composition root wires the single Postgres implementation.
+// testStores fills every store slot with the same fake. The composition root
+// splits them across three implementations (the module's own Postgres
+// repository, marketing's service for Waitlist, user's for Users); one fake
+// covering all of them keeps the test setup to a single value.
 func testStores(f *fakeRepository) Stores {
 	return Stores{
 		Accounts:       f,
@@ -94,6 +97,7 @@ func testStores(f *fakeRepository) Stores {
 		PasswordResets: f,
 		Invitations:    f,
 		Waitlist:       f,
+		Users:          f,
 	}
 }
 

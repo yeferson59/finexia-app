@@ -103,6 +103,13 @@ func (s *Service) GetUserByID(ctx context.Context, id uuid.UUID) (identity.User,
 	return s.repo.GetByID(ctx, id)
 }
 
+// GetUserByEmail resolves a user by address. It is the read the auth module
+// consumes through its own UserReader interface (docs/TECH_DEBT.md #9): the
+// users/roles tables belong here, so auth asks instead of querying them.
+func (s *Service) GetUserByEmail(ctx context.Context, email string) (identity.User, error) {
+	return s.repo.GetByEmail(ctx, email)
+}
+
 func (s *Service) CreateUser(ctx context.Context, name, email string) (identity.User, error) {
 	name = helpers.NormalizateNames(name)
 

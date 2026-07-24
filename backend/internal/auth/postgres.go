@@ -36,25 +36,6 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 // logged out), so any refresh token still pointing at it must be rejected.
 var ErrSessionNotFound = httpx.AsNotFound(errors.New("session not found"))
 
-// userCols is the explicit column list used for SELECT queries that need a JOIN with roles.
-const userCols = `u.id, u.name, u.email, u.email_verified, u.image, u.role_id,
-	u.preferred_currency, u.created_at, u.updated_at, u.deleted_at, u.banned_at, r.name`
-
-func scanUserWithRole(row interface {
-	Scan(...any) error
-}, user *identity.User) error {
-	var roleName string
-	if err := row.Scan(
-		&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID,
-		&user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.BannedAt,
-		&roleName,
-	); err != nil {
-		return err
-	}
-	user.Role.Name = roleName
-	return nil
-}
-
 func (r *PostgresRepository) GetAccountByUserID(ctx context.Context, userID uuid.UUID) (identity.Account, error) {
 	var account identity.Account
 	if err := r.db.QueryRow(ctx,
@@ -86,35 +67,6 @@ func (r *PostgresRepository) GetAccountByEmail(ctx context.Context, email string
 
 	user.Accounts = append(user.Accounts, account)
 
-	return user, nil
-}
-
-func (r *PostgresRepository) GetUserByID(ctx context.Context, id uuid.UUID) (identity.User, error) {
-	var user identity.User
-	row := r.db.QueryRow(ctx, `
-		SELECT `+userCols+`
-		FROM users u
-		JOIN roles r ON r.id = u.role_id
-		WHERE u.id = $1
-	`, id.String())
-	if err := scanUserWithRole(row, &user); err != nil {
-		return identity.User{}, err
-	}
-	return user, nil
-}
-
-func (r *PostgresRepository) GetUserByEmail(ctx context.Context, email string) (identity.User, error) {
-	var user identity.User
-	if err := r.db.QueryRow(ctx,
-		`SELECT id, name, email, email_verified, image, role_id, preferred_currency, created_at, updated_at, deleted_at, banned_at
-		 FROM users WHERE email = $1`,
-		email,
-	).Scan(
-		&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID,
-		&user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.BannedAt,
-	); err != nil {
-		return identity.User{}, err
-	}
 	return user, nil
 }
 

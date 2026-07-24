@@ -228,6 +228,10 @@ func (a *App) buildModules() *modules {
 		AuthMiddl: authModule,
 		Limiter:   userLimiter,
 	})
+	// auth reads users/roles through the user module rather than querying
+	// those tables itself (docs/TECH_DEBT.md #9). The two modules need each
+	// other, so the reader is injected here, once user exists.
+	authModule.SetUsers(userModule.Service())
 	// market owns the asset catalog; portfolio consumes it (portfolio → market),
 	// so market is built first and injected as portfolio's AssetReader.
 	marketModule := market.New(market.Deps{

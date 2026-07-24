@@ -62,6 +62,21 @@ func (m *Module) Service() *Service {
 	return m.service
 }
 
+// SetUsers completes construction with the user module's reader, the only
+// dependency auth cannot receive through New: the two modules need each other
+// at runtime (user calls auth for invitations and password changes, auth reads
+// users/roles for 2FA and its security emails), so the composition root builds
+// auth first and injects the reader as soon as the user module exists. It
+// panics on nil rather than leaving a half-wired module that would only fail
+// later, on the first password reset or 2FA setup.
+func (m *Module) SetUsers(users UserReader) {
+	if users == nil {
+		panic("auth: SetUsers requires a non-nil UserReader")
+	}
+
+	m.service.stores.Users = users
+}
+
 // Routes registers the /auth group, replicating routes/auth.go: the public
 // endpoints first (each behind the auth rate limiter), then the group-local
 // RequireAuth gate for the session-bound ones.

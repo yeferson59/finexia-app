@@ -24,7 +24,7 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email string) error 
 		return nil
 	}
 
-	user, err := s.stores.Accounts.GetUserByEmail(ctx, email)
+	user, err := s.stores.Users.GetUserByEmail(ctx, email)
 	if err != nil {
 		return nil
 	}
@@ -144,7 +144,7 @@ func (s *Service) sendPasswordChangedAlert(userID uuid.UUID, ipAddress, userAgen
 
 	ctx := context.Background()
 
-	user, err := s.stores.Accounts.GetUserByID(ctx, userID)
+	user, err := s.stores.Users.GetUserByID(ctx, userID)
 	if err != nil {
 		return
 	}
