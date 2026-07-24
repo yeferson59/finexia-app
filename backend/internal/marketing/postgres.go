@@ -5,8 +5,13 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// pgUniqueViolation is the SQLSTATE code Postgres returns for a unique
+// constraint violation (23505).
+const pgUniqueViolation = "23505"
 
 // PostgresRepository is the pgx-backed implementation of Repository.
 type PostgresRepository struct {
@@ -24,6 +29,11 @@ func (r *PostgresRepository) SaveWaitlistEmail(ctx context.Context, email string
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
+		}
+
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
+			return ErrWaitlistEmailExists
 		}
 
 		return err

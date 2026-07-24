@@ -11,6 +11,7 @@ import (
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/market"
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/spreadsheet"
 )
 
@@ -37,28 +38,28 @@ func applyImportDefaults(defaults ImportDefaultsDTO) (ImportDefaultsDTO, error) 
 		out.Type = string(Buy)
 	}
 	if _, ok := normalizeTxnType(out.Type); !ok {
-		return out, fmt.Errorf("invalid default transaction type %q", out.Type)
+		return out, httpx.AsBadRequest(fmt.Errorf("invalid default transaction type %q", out.Type))
 	}
 	if strings.TrimSpace(out.Currency) == "" {
 		out.Currency = "USD"
 	}
 	cur, ok := normalizeCurrency(out.Currency)
 	if !ok {
-		return out, fmt.Errorf("invalid default currency %q", out.Currency)
+		return out, httpx.AsBadRequest(fmt.Errorf("invalid default currency %q", out.Currency))
 	}
 	out.Currency = cur
 	if strings.TrimSpace(out.Category) == "" {
 		out.Category = string(market.Stock)
 	}
 	if _, ok := market.NormalizeAssetType(out.Category); !ok {
-		return out, fmt.Errorf("invalid default category %q", out.Category)
+		return out, httpx.AsBadRequest(fmt.Errorf("invalid default category %q", out.Category))
 	}
 	switch out.DateFormat {
 	case "", "auto":
 		out.DateFormat = "auto"
 	case "dmy", "mdy":
 	default:
-		return out, fmt.Errorf("invalid date format %q", out.DateFormat)
+		return out, httpx.AsBadRequest(fmt.Errorf("invalid date format %q", out.DateFormat))
 	}
 	return out, nil
 }
@@ -94,7 +95,7 @@ func buildImport(src spreadsheet.Source, mapping *ImportMappingDTO, defaults Imp
 
 	headerIdx := detectHeaderRow(src.Rows)
 	if headerIdx == -1 {
-		return importOutcome{}, errors.New("invalid spreadsheet: the file is empty")
+		return importOutcome{}, httpx.AsBadRequest(errors.New("invalid spreadsheet: the file is empty"))
 	}
 	headers := make([]string, len(src.Rows[headerIdx]))
 	for i, h := range src.Rows[headerIdx] {
@@ -108,7 +109,7 @@ func buildImport(src spreadsheet.Source, mapping *ImportMappingDTO, defaults Imp
 
 	dataRows := src.Rows[headerIdx+1:]
 	if len(dataRows) > maxImportRows {
-		return importOutcome{}, fmt.Errorf("invalid spreadsheet: too many rows (max %d)", maxImportRows)
+		return importOutcome{}, httpx.AsTooManyRequests(fmt.Errorf("invalid spreadsheet: too many rows (max %d)", maxImportRows))
 	}
 
 	preview := ImportPreviewResponseDTO{
@@ -322,7 +323,7 @@ func (s *Service) PreviewTransactionImport(
 ) (ImportPreviewResponseDTO, error) {
 	src, err := spreadsheet.ReadFile(data, filename, sheet)
 	if err != nil {
-		return ImportPreviewResponseDTO{}, err
+		return ImportPreviewResponseDTO{}, httpx.AsBadRequest(err)
 	}
 	out, err := buildImport(src, mapping, defaults)
 	if err != nil {
@@ -347,7 +348,7 @@ func (s *Service) ImportTransactionsFromFile(
 ) (ImportResultResponseDTO, error) {
 	src, err := spreadsheet.ReadFile(data, filename, sheet)
 	if err != nil {
-		return ImportResultResponseDTO{}, err
+		return ImportResultResponseDTO{}, httpx.AsBadRequest(err)
 	}
 	out, err := buildImport(src, &mapping, defaults)
 	if err != nil {
@@ -355,7 +356,7 @@ func (s *Service) ImportTransactionsFromFile(
 	}
 	if len(out.preview.MissingFields) > 0 {
 		return ImportResultResponseDTO{},
-			fmt.Errorf("invalid mapping: missing required columns: %s", strings.Join(out.preview.MissingFields, ", "))
+			httpx.AsBadRequest(fmt.Errorf("invalid mapping: missing required columns: %s", strings.Join(out.preview.MissingFields, ", ")))
 	}
 
 	result := ImportResultResponseDTO{

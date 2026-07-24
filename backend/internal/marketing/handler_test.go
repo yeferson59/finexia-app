@@ -3,7 +3,6 @@ package marketing
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http/httptest"
 	"strings"
@@ -69,8 +68,10 @@ func TestCreateWaitlistRoute(t *testing.T) {
 
 	t.Run("maps a duplicate email to 409", func(t *testing.T) {
 		repo := &fakeRepository{
+			// The repository translates the DB unique violation into this
+			// tagged sentinel; the fake stands in for that contract.
 			saveWaitlistEmail: func(context.Context, string) error {
-				return errors.New("duplicate key value violates unique constraint")
+				return ErrWaitlistEmailExists
 			},
 		}
 		app := newTestApp(repo, &fakeMailer{})

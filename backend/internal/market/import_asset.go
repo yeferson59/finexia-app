@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/spreadsheet"
 )
 
@@ -27,22 +28,22 @@ var assetHeaderSynonyms = map[string][]string{
 func (s *Service) ImportAssetsFromFile(ctx context.Context, data []byte, filename, sheet string) (ImportResultResponseDTO, error) {
 	src, err := spreadsheet.ReadFile(data, filename, sheet)
 	if err != nil {
-		return ImportResultResponseDTO{}, err
+		return ImportResultResponseDTO{}, httpx.AsBadRequest(err)
 	}
 
 	headerIdx := firstNonEmptyRow(src.Rows)
 	if headerIdx == -1 {
-		return ImportResultResponseDTO{}, errors.New("invalid spreadsheet: the file is empty")
+		return ImportResultResponseDTO{}, httpx.AsBadRequest(errors.New("invalid spreadsheet: the file is empty"))
 	}
 
 	cols := mapSimpleHeaders(src.Rows[headerIdx], assetHeaderSynonyms)
 	if missing := missingCols(cols, "ticker", "name", "assettype", "currency"); len(missing) > 0 {
-		return ImportResultResponseDTO{}, fmt.Errorf("invalid spreadsheet: missing required columns: %s", strings.Join(missing, ", "))
+		return ImportResultResponseDTO{}, httpx.AsBadRequest(fmt.Errorf("invalid spreadsheet: missing required columns: %s", strings.Join(missing, ", ")))
 	}
 
 	dataRows := src.Rows[headerIdx+1:]
 	if len(dataRows) > maxAssetImportRows {
-		return ImportResultResponseDTO{}, fmt.Errorf("invalid spreadsheet: too many rows (max %d)", maxAssetImportRows)
+		return ImportResultResponseDTO{}, httpx.AsTooManyRequests(fmt.Errorf("invalid spreadsheet: too many rows (max %d)", maxAssetImportRows))
 	}
 
 	exchangeIdx, hasExchange := cols["exchange"]

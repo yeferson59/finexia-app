@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 type PostgresRepository struct {
@@ -95,12 +96,12 @@ func (r *PostgresRepository) Create(ctx context.Context, name, email string) (id
 
 	tx, err := r.db.BeginTx(contextTimeout, pgx.TxOptions{AccessMode: pgx.ReadWrite})
 	if err != nil {
-		return identity.User{}, errors.New("failed create new user")
+		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
 	}
 
 	if err := tx.QueryRow(contextTimeout, "SELECT id FROM roles WHERE name = $1", "customer").Scan(&roleID); err != nil {
 		_ = tx.Rollback(contextTimeout)
-		return identity.User{}, errors.New("failed create new user")
+		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
 	}
 
 	if err := tx.QueryRow(contextTimeout,
@@ -112,7 +113,7 @@ func (r *PostgresRepository) Create(ctx context.Context, name, email string) (id
 		&user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.BannedAt,
 	); err != nil {
 		_ = tx.Rollback(contextTimeout)
-		return identity.User{}, errors.New("failed create new user")
+		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
 	}
 
 	user.Role.Name = "customer"
