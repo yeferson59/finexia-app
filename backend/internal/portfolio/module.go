@@ -10,13 +10,12 @@ import (
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/market"
-	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
 type Deps struct {
 	DB      *pgxpool.Pool
-	Cfg     *config.Env
+	Cfg     Config
 	Storage fiber.Storage
 	Mail    Mailer
 	User    UserReader

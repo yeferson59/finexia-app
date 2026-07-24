@@ -95,6 +95,25 @@ func TestIdentityStaysALeaf(t *testing.T) {
 	}
 }
 
+// TestModulesOwnTheirConfig asserts no domain module imports platform/config:
+// reading the environment is the composition root's job, and each module
+// declares its own small Config struct that app populates (docs/TECH_DEBT.md
+// #8). internal/migrator is exempt — it is a second entrypoint, not a module.
+func TestModulesOwnTheirConfig(t *testing.T) {
+	for _, dir := range []string{
+		"auth", "user", "portfolio", "market", "marketing",
+		"notification", "scheduler", "health",
+	} {
+		for file, imports := range internalImports(t, dir) {
+			for _, imp := range imports {
+				if imp == "platform/config" {
+					t.Errorf("%s imports internal/platform/config: modules declare their own Config, populated by internal/app", file)
+				}
+			}
+		}
+	}
+}
+
 // TestNothingImportsCompositionRoot asserts no module reaches back into
 // internal/app: wiring flows one way, from app down into the modules.
 func TestNothingImportsCompositionRoot(t *testing.T) {

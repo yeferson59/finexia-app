@@ -218,7 +218,7 @@ func (a *App) buildModules() *modules {
 	})
 	userModule := user.New(user.Deps{
 		DB:        a.deps.DB,
-		Cfg:       a.deps.Envs,
+		Cfg:       userConfig(a.deps.Envs),
 		Store:     objectstore.NewS3Store(a.deps.S3, a.deps.Envs.AWSS3BucketName),
 		Mail:      a.deps.Mail,
 		Geo:       geo,
@@ -232,7 +232,6 @@ func (a *App) buildModules() *modules {
 	// so market is built first and injected as portfolio's AssetReader.
 	marketModule := market.New(market.Deps{
 		DB:             a.deps.DB,
-		Cfg:            a.deps.Envs,
 		Storage:        a.deps.Storage,
 		Log:            a.deps.Log,
 		Provider:       priceProvider,
@@ -241,7 +240,7 @@ func (a *App) buildModules() *modules {
 	})
 	portfolioModule := portfolio.New(portfolio.Deps{
 		DB:        a.deps.DB,
-		Cfg:       a.deps.Envs,
+		Cfg:       portfolioConfig(a.deps.Envs),
 		Storage:   a.deps.Storage,
 		Mail:      a.deps.Mail,
 		User:      userModule.Service(),
@@ -258,7 +257,7 @@ func (a *App) buildModules() *modules {
 		user:         userModule,
 		market:       marketModule,
 		portfolio:    portfolioModule,
-		notification: notification.NewService(userModule.Service(), portfolioModule.Service(), a.deps.Mail, a.deps.Envs),
+		notification: notification.NewService(userModule.Service(), portfolioModule.Service(), a.deps.Mail, notificationConfig(a.deps.Envs)),
 	}
 }
 
@@ -322,6 +321,12 @@ func (a *App) registerJobs(sched *scheduler.Scheduler, mods *modules, persistent
 	sched.Start()
 }
 
+// The *Config helpers below project the platform-wide environment onto each
+// module's own Config. Reading the environment is the composition root's job:
+// a module declares the handful of settings it actually consumes and stays
+// decoupled from *config.Env (docs/TECH_DEBT.md #8). market needs none, so it
+// takes no config at all.
+
 // authConfig projects the platform-wide environment onto the auth module's own
 // Config, keeping the module decoupled from *config.Env (docs/TECH_DEBT.md #8).
 func authConfig(env *config.Env) auth.Config {
@@ -339,5 +344,27 @@ func authConfig(env *config.Env) auth.Config {
 		EmailVerificationExpiry: env.EmailVerificationExpiry,
 		SelfRegistrationEnabled: env.SelfRegistrationEnabled,
 		TwoFactorPendingExpiry:  env.TwoFactorPendingExpiry,
+	}
+}
+
+// userConfig projects the environment onto the user module's Config.
+func userConfig(env *config.Env) user.Config {
+	return user.Config{
+		PublicURL:   env.PublicURL,
+		FrontendURL: env.FrontendURL,
+	}
+}
+
+// portfolioConfig projects the environment onto the portfolio module's Config.
+func portfolioConfig(env *config.Env) portfolio.Config {
+	return portfolio.Config{
+		FrontendURL: env.FrontendURL,
+	}
+}
+
+// notificationConfig projects the environment onto the notification module's Config.
+func notificationConfig(env *config.Env) notification.Config {
+	return notification.Config{
+		PublicURL: env.PublicURL,
 	}
 }

@@ -5,14 +5,13 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
 )
 
 type Deps struct {
 	DB        *pgxpool.Pool
-	Cfg       *config.Env
+	Cfg       Config
 	Store     objectstore.Store
 	Mail      mailer
 	Geo       geoService
@@ -32,7 +31,7 @@ type authMiddleware interface {
 }
 
 type Module struct {
-	cfg       *config.Env
+	cfg       Config
 	service   *Service
 	handler   *handler
 	authMiddl authMiddleware

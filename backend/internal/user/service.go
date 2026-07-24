@@ -15,7 +15,6 @@ import (
 	"github.com/yeferson59/finexia-app/internal/auth"
 	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/marketing"
-	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
@@ -54,10 +53,10 @@ type Service struct {
 	store     objectstore.Store
 	geo       geoService
 	log       logger.Logger
-	cfg       *config.Env
+	cfg       Config
 }
 
-func NewService(repo Repository, mail mailer, auth authService, marketing marketingService, store objectstore.Store, geo geoService, log logger.Logger, cfg *config.Env) *Service {
+func NewService(repo Repository, mail mailer, auth authService, marketing marketingService, store objectstore.Store, geo geoService, log logger.Logger, cfg Config) *Service {
 	return new(Service{
 		repo:      repo,
 		mail:      mail,
