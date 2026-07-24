@@ -59,7 +59,7 @@ func (r *PostgresRepository) ConsumeEmailVerification(ctx context.Context, id uu
 
 	tx, err := r.db.BeginTx(ctxTimeout, pgx.TxOptions{AccessMode: pgx.ReadWrite})
 	if err != nil {
-		return errors.New("failed to verify email")
+		return httpx.AsBadRequest(errors.New("failed to verify email"))
 	}
 	defer func() { _ = tx.Rollback(ctxTimeout) }()
 

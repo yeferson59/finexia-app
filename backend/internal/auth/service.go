@@ -116,13 +116,13 @@ func (s *Service) Login(ctx context.Context, email, password, ipAddress, userAge
 	userAgent = truncate(userAgent, 255)
 
 	if s.isLoginLocked(ctx, email) {
-		return LoginInternalDTO{}, errors.New("too many failed login attempts")
+		return LoginInternalDTO{}, httpx.AsTooManyRequests(errors.New("too many failed login attempts"))
 	}
 
 	user, err := s.stores.Accounts.GetAccountByEmail(ctx, email)
 	if err != nil {
 		s.recordLoginFailure(ctx, email)
-		return LoginInternalDTO{}, errors.New("invalid credentials")
+		return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid credentials"))
 	}
 
 	if !user.EmailVerified {
@@ -131,7 +131,7 @@ func (s *Service) Login(ctx context.Context, email, password, ipAddress, userAge
 
 	if err := comparePassword(user.Accounts[0].Password, password); err != nil {
 		s.recordLoginFailure(ctx, email)
-		return LoginInternalDTO{}, errors.New("invalid credentials")
+		return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid credentials"))
 	}
 
 	s.clearLoginFailures(ctx, email)
@@ -330,7 +330,7 @@ func (s *Service) VerifyPassword(ctx context.Context, userID uuid.UUID, currentP
 	}
 
 	if err := comparePassword(account.Password, currentPassword); err != nil {
-		return errors.New("invalid current password")
+		return httpx.AsBadRequest(errors.New("invalid current password"))
 	}
 
 	return nil

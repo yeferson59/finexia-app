@@ -33,24 +33,24 @@ func perform(t *testing.T, h fiber.Handler) (int, map[string]any) {
 
 func TestFromDomainMapping(t *testing.T) {
 	cases := []struct {
-		err  string
+		name string
+		err  error
 		want int
 	}{
-		{"too many failed login attempts", fiber.StatusTooManyRequests},
-		{"failed to parse row", fiber.StatusBadRequest},
-		{"invalid credentials", fiber.StatusBadRequest},
-		{"portfolio not found", fiber.StatusNotFound},
-		// Frozen quirk: "failed"/"invalid" are checked before "not found".
-		{"failed: portfolio not found", fiber.StatusBadRequest},
-		{"email already exists", fiber.StatusConflict},
-		{"duplicate entry", fiber.StatusConflict},
-		{"something else entirely", fiber.StatusInternalServerError},
+		{"tagged too-many", AsTooManyRequests(errors.New("too many failed login attempts")), fiber.StatusTooManyRequests},
+		{"tagged bad-request", AsBadRequest(errors.New("invalid credentials")), fiber.StatusBadRequest},
+		{"tagged not-found", AsNotFound(errors.New("portfolio not found")), fiber.StatusNotFound},
+		{"tagged conflict", AsConflict(errors.New("email already exists")), fiber.StatusConflict},
+		// No substring fallback anymore: an untagged error is always 500,
+		// regardless of what its message happens to contain.
+		{"untagged with keyword", errors.New("invalid credentials"), fiber.StatusInternalServerError},
+		{"untagged plain", errors.New("something else entirely"), fiber.StatusInternalServerError},
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.err, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			status, payload := perform(t, func(c fiber.Ctx) error {
-				return FromDomain(c, errors.New(tc.err), "msg", "domain:action")
+				return FromDomain(c, tc.err, "msg", "domain:action")
 			})
 			if status != tc.want {
 				t.Errorf("status = %d, want %d", status, tc.want)

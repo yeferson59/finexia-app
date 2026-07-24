@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
 )
@@ -68,10 +69,10 @@ func generateTwoFactorRecoveryCodes() (raws, hashes []string, err error) {
 func (s *Service) verifyCurrentPassword(ctx context.Context, userID uuid.UUID, password string) error {
 	account, err := s.stores.Accounts.GetAccountByUserID(ctx, userID)
 	if err != nil {
-		return errors.New("invalid current password")
+		return httpx.AsBadRequest(errors.New("invalid current password"))
 	}
 	if err := comparePassword(account.Password, password); err != nil {
-		return errors.New("invalid current password")
+		return httpx.AsBadRequest(errors.New("invalid current password"))
 	}
 	return nil
 }

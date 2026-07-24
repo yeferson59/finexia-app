@@ -2,7 +2,6 @@ package httpx
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -79,32 +78,16 @@ func AsNotFound(err error) error        { return Tagged(KindNotFound, err) }
 func AsConflict(err error) error        { return Tagged(KindConflict, err) }
 func AsTooManyRequests(err error) error { return Tagged(KindTooManyRequests, err) }
 
-// domainStatus resolves the HTTP status for a domain error: a tagged Kind wins;
-// otherwise the frozen substring mapping (docs/API.md §1.2) applies so that
-// modules not yet migrated to typed errors keep their exact behavior.
+// domainStatus resolves the HTTP status for a domain error from its tagged
+// Kind (resolved through the errors.Is/As chain). Errors that carry no tag map
+// to 500: every domain error that must surface a non-500 status is tagged at
+// its source (docs/TECH_DEBT.md #1). The old message-substring fallback was
+// removed once all domains tagged their errors.
 func domainStatus(err error) int {
 	var se *statusError
 	if errors.As(err, &se) {
 		return se.kind.httpStatus()
 	}
 
-	return legacyStatus(err.Error())
-}
-
-// legacyStatus is the original message-substring mapping, preserved verbatim as
-// the fallback for untagged errors. The matching order is part of the frozen
-// contract: "failed"/"invalid" win over "not found".
-func legacyStatus(msg string) int {
-	switch {
-	case strings.Contains(msg, "too many"):
-		return fiber.StatusTooManyRequests
-	case strings.Contains(msg, "failed") || strings.Contains(msg, "invalid"):
-		return fiber.StatusBadRequest
-	case strings.Contains(msg, "not found"):
-		return fiber.StatusNotFound
-	case strings.Contains(msg, "already exist") || strings.Contains(msg, "already found") || strings.Contains(msg, "duplicate"):
-		return fiber.StatusConflict
-	default:
-		return fiber.StatusInternalServerError
-	}
+	return fiber.StatusInternalServerError
 }

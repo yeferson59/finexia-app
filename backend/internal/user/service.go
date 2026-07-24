@@ -16,6 +16,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/marketing"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
@@ -176,14 +177,14 @@ func (s *Service) UpdateUserPreferences(ctx context.Context, userID uuid.UUID, e
 func (s *Service) UploadAvatarToS3(ctx context.Context, userID uuid.UUID, file io.Reader, contentType string) (identity.User, error) {
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return identity.User{}, errors.New("failed to read file")
+		return identity.User{}, httpx.AsBadRequest(errors.New("failed to read file"))
 	}
 
 	key := fmt.Sprintf("avatars/%s/avatar", userID.String())
 
 	err = s.store.Put(ctx, key, contentType, data)
 	if err != nil {
-		return identity.User{}, fmt.Errorf("failed to upload to S3: %w", err)
+		return identity.User{}, httpx.AsBadRequest(fmt.Errorf("failed to upload to S3: %w", err))
 	}
 
 	imageURL := fmt.Sprintf("%s/users/%s/avatar", s.cfg.PublicURL, userID.String())
@@ -203,7 +204,7 @@ func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, currentT
 	}
 
 	if currentPassword == newPassword {
-		return errors.New("invalid new password: must differ from current password")
+		return httpx.AsBadRequest(errors.New("invalid new password: must differ from current password"))
 	}
 
 	hashed, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)

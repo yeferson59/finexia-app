@@ -130,12 +130,12 @@ func (r *PostgresRepository) createUser(ctx context.Context, name, email string)
 
 	tx, err := r.db.BeginTx(contextTimeout, pgx.TxOptions{AccessMode: pgx.ReadWrite})
 	if err != nil {
-		return identity.User{}, errors.New("failed create new user")
+		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
 	}
 
 	if err := tx.QueryRow(contextTimeout, "SELECT id FROM roles WHERE name = $1", "customer").Scan(&roleID); err != nil {
 		_ = tx.Rollback(contextTimeout)
-		return identity.User{}, errors.New("failed create new user")
+		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
 	}
 
 	if err := tx.QueryRow(contextTimeout,
@@ -147,11 +147,11 @@ func (r *PostgresRepository) createUser(ctx context.Context, name, email string)
 		&user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.BannedAt,
 	); err != nil {
 		_ = tx.Rollback(contextTimeout)
-		return identity.User{}, errors.New("failed create new user")
+		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
 	}
 
 	if err := tx.Commit(contextTimeout); err != nil {
-		return identity.User{}, errors.New("failed create new user")
+		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
 	}
 
 	return user, nil

@@ -13,6 +13,7 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/marketing"
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
@@ -33,18 +34,18 @@ var allowedInviteRoles = map[string]bool{
 func (s *Service) CreateInvitation(ctx context.Context, email, name, role string, invitedBy uuid.UUID) (Invitation, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" {
-		return Invitation{}, errors.New("invalid email")
+		return Invitation{}, httpx.AsBadRequest(errors.New("invalid email"))
 	}
 
 	if role == "" {
 		role = "customer"
 	}
 	if !allowedInviteRoles[role] {
-		return Invitation{}, errors.New("invalid role")
+		return Invitation{}, httpx.AsBadRequest(errors.New("invalid role"))
 	}
 
 	if _, err := s.stores.Accounts.GetUserByEmail(ctx, email); err == nil {
-		return Invitation{}, errors.New("user already exists")
+		return Invitation{}, httpx.AsConflict(errors.New("user already exists"))
 	}
 
 	name = strings.TrimSpace(name)

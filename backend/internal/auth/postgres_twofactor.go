@@ -132,7 +132,7 @@ func (r *PostgresRepository) ConsumeTwoFactorRecoveryCode(ctx context.Context, u
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return errors.New("invalid recovery code")
+		return httpx.AsBadRequest(errors.New("invalid recovery code"))
 	}
 	return nil
 }

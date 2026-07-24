@@ -47,31 +47,27 @@ errores mapeados desde el dominio (`responseFromDomain`) el sobre lleva
 
 ### 1.2 Mapeo de errores de dominio a códigos HTTP
 
-`httpx.FromDomain` resuelve el status en dos pasos (ver `TECH_DEBT.md` #1):
+`httpx.FromDomain` resuelve el status **exclusivamente por el tipo del error**
+(ver `TECH_DEBT.md` #1). Cada dominio etiqueta sus errores en el origen con un
+`httpx.Kind` mediante los helpers `httpx.AsBadRequest` / `AsNotFound` /
+`AsConflict` / `AsTooManyRequests` (o `Tagged(kind, err)`); `FromDomain`
+recupera ese `Kind` vía `errors.As`, de modo que el status es **independiente
+del texto** del mensaje y robusto ante el envoltorio con `%w`:
 
-1. **Por tipo (preferido):** si el error lleva un `httpx.Kind` (los dominios lo
-   etiquetan con `httpx.AsNotFound`, `AsBadRequest`, `AsConflict`,
-   `AsTooManyRequests`; resuelto vía `errors.As`), el status sale del tipo,
-   **independiente del texto** y robusto ante el envoltorio con `%w`.
-2. **Por substring (fallback):** para errores aún no tipados se conserva
-   **exactamente** la convención congelada original, en el mismo orden:
-
-| El mensaje de error contiene… | Status |
+| Etiqueta del error | Status |
 |---|---|
-| `too many` | `429 Too Many Requests` |
-| `failed` o `invalid` | `400 Bad Request` |
-| `not found` | `404 Not Found` |
-| `already exist`, `already found` o `duplicate` | `409 Conflict` |
-| (cualquier otro) | `500 Internal Server Error` |
+| `AsTooManyRequests` | `429 Too Many Requests` |
+| `AsBadRequest` | `400 Bad Request` |
+| `AsNotFound` | `404 Not Found` |
+| `AsConflict` | `409 Conflict` |
+| (sin etiqueta) | `500 Internal Server Error` |
 
-El contrato hacia el cliente no cambia: los status son los mismos que emitía el
-mapeo por texto. La única corrección de comportamiento es la del bug reconocido
-(#1): un `not found` **envuelto** por un mensaje con `failed`/`invalid` ahora
-devuelve 404 (por tipo) en vez de 400. La **familia _not found_ está tipada en
-todos los dominios** (`auth`, `user`, `market`, `marketing`, `portfolio`), de
-modo que ese bug queda corregido en toda la app. Las demás categorías
-(400/409/429/500) siguen resolviéndose por el fallback de substring, con sus
-status actuales intactos.
+El antiguo mapeo por **substring del mensaje** fue **retirado**: un error sin
+etiquetar siempre es 500. Todo error de dominio que deba exponer un status
+distinto de 500 se etiqueta en su origen (servicio o repositorio; p. ej. las
+violaciones de unique constraint se traducen a un sentinela `AsConflict`). Los
+errores realmente internos (fallos de proveedor de precios, de S3, de DB) no se
+etiquetan y quedan como 500.
 
 Otros helpers de estado directo: `responseBadRequest` (400),
 `responseUnauthorized` (401), `responseInternalServerError` (500),
