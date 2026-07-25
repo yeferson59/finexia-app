@@ -22,9 +22,6 @@ type defaultAsset struct {
 	Currency  string
 }
 
-const assetSyncCacheKey = "finexia:sync:asset_prices"
-const assetSyncTTL = 24 * time.Hour
-
 var defaultAssets = []defaultAsset{
 	{"AAPL", "Apple Inc.", Stock, "NASDAQ", "USD"},
 	{"MSFT", "Microsoft Corporation", Stock, "NASDAQ", "USD"},
@@ -48,12 +45,6 @@ func NewService(repo Repository, storage fiber.Storage, provider marketdata.Prov
 		provider: provider,
 		log:      log,
 	})
-}
-
-func (s *Service) WasAssetPriceSyncedRecently() bool {
-	v, err := s.storage.Get(assetSyncCacheKey)
-
-	return err == nil && len(v) > 0
 }
 
 // fetchAndUpdatePrice fetches the current market price for asset and persists it.
@@ -103,7 +94,7 @@ func (s *Service) fetchAndUpdatePrice(ctx context.Context, asset Asset, log logg
 }
 
 func (s *Service) SyncAssetPrices(ctx context.Context) ([]Asset, []error) {
-	log := s.log.With(logger.Str("job", "asset_price_sync"))
+	log := s.log.With(logger.Str("job", "asset_price"))
 
 	var errs []error
 
@@ -146,7 +137,6 @@ func (s *Service) SyncAssetPrices(ctx context.Context) ([]Asset, []error) {
 		results = append(results, updated)
 	}
 
-	_ = s.storage.Set(assetSyncCacheKey, []byte(time.Now().UTC().Format(time.RFC3339)), assetSyncTTL)
 	return results, errs
 }
 

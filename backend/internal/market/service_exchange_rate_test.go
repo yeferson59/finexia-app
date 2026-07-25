@@ -11,21 +11,6 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
 
-func TestWasExchangeRateSyncedRecently(t *testing.T) {
-	storage := newMemStorage()
-	svc := newTestServices(&fakeRepository{}, storage)
-
-	if svc.WasExchangeRateSyncedRecently() {
-		t.Error("expected false before any sync")
-	}
-	if err := storage.Set(rateSyncCacheKey, []byte("2026-07-03T00:00:00Z"), time.Hour); err != nil {
-		t.Fatalf("storage.Set: %v", err)
-	}
-	if !svc.WasExchangeRateSyncedRecently() {
-		t.Error("expected true after the sync marker is set")
-	}
-}
-
 func TestSyncExchangeRates(t *testing.T) {
 	fetchedAt := time.Date(2026, 7, 1, 6, 0, 0, 0, time.UTC)
 
@@ -49,9 +34,6 @@ func TestSyncExchangeRates(t *testing.T) {
 		}
 		if len(pairsRequested) != len(defaultPairs) {
 			t.Errorf("requested pairs = %v, want all %d defaults", pairsRequested, len(defaultPairs))
-		}
-		if !svc.WasExchangeRateSyncedRecently() {
-			t.Error("the sync marker is set even when every pair fails")
 		}
 	})
 
@@ -133,9 +115,6 @@ func TestSyncExchangeRates(t *testing.T) {
 		}
 		if results[0].FromCurrency != "EUR" || results[0].ToCurrency != "USD" {
 			t.Errorf("result pair = %s/%s", results[0].FromCurrency, results[0].ToCurrency)
-		}
-		if svc.WasExchangeRateSyncedRecently() {
-			t.Error("a cancelled run must not set the sync marker")
 		}
 	})
 }

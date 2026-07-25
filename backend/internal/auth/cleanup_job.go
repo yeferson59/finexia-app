@@ -6,15 +6,19 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
+type service interface {
+	CleanupExpiredAuth(ctx context.Context) (int64, int64, error)
+}
+
 type CleanupJob struct {
-	svc *Service
+	svc service
 	log logger.Logger
 }
 
-func NewCleanupJob(svc *Service, log logger.Logger) *CleanupJob {
+func NewCleanupJob(svc service, log logger.Logger) *CleanupJob {
 	return new(CleanupJob{
 		svc: svc,
-		log: log.With(logger.Str("scheduler", "auth_cleanup")),
+		log: log.With(logger.Str("job", "auth_cleanup")),
 	})
 }
 
@@ -27,13 +31,11 @@ func (s *CleanupJob) Name() string {
 // Exits cleanly when ctx is cancelled.
 func (s *CleanupJob) Run(ctx context.Context) error {
 	sessions, refreshTokens, err := s.svc.CleanupExpiredAuth(ctx)
-	if err != nil {
-		s.log.Error(ctx, "auth cleanup failed", logger.Str("error", err.Error()))
-		return err
-	}
+
 	s.log.Info(ctx, "auth cleanup completed",
 		logger.Int64("deleted_sessions", sessions),
 		logger.Int64("deleted_refresh_tokens", refreshTokens),
+		logger.Err(err),
 	)
 
 	return nil

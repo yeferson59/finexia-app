@@ -309,13 +309,13 @@ func (s *Service) Logout(ctx context.Context, userID uuid.UUID, accessToken, raw
 // CleanupExpiredAuth prunes refresh tokens that can no longer be redeemed and
 // sessions that expired with no live refresh token left. Without this, both
 // tables grow unboundedly: rows are only ever deleted on explicit logout.
-func (s *Service) CleanupExpiredAuth(ctx context.Context) (sessions, refreshTokens int64, err error) {
-	refreshTokens, err = s.stores.RefreshTokens.DeleteExpiredRefreshTokens(ctx)
+func (s *Service) CleanupExpiredAuth(ctx context.Context) (int64, int64, error) {
+	refreshTokens, err := s.stores.RefreshTokens.DeleteExpiredRefreshTokens(ctx)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	sessions, err = s.stores.Sessions.DeleteExpiredSessions(ctx)
+	sessions, err := s.stores.Sessions.DeleteExpiredSessions(ctx)
 	if err != nil {
 		return 0, refreshTokens, err
 	}

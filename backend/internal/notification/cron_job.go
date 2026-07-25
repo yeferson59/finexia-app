@@ -2,20 +2,21 @@ package notification
 
 import (
 	"context"
+	"slices"
 
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
-type notificationsService interface {
+type service interface {
 	SendWeeklySummaryEmails(ctx context.Context) (int, []error)
 }
 
 type WeeklySummaryScheduler struct {
-	svc notificationsService
+	svc service
 	log logger.Logger
 }
 
-func NewWeeklySummaryScheduler(svc notificationsService, log logger.Logger) *WeeklySummaryScheduler {
+func NewWeeklySummaryScheduler(svc service, log logger.Logger) *WeeklySummaryScheduler {
 	return new(WeeklySummaryScheduler{
 		svc: svc,
 		log: log.With(logger.Str("scheduler", "weekly_summary")),
@@ -31,10 +32,13 @@ func (s *WeeklySummaryScheduler) Run(ctx context.Context) error {
 	if len(errs) > 0 {
 		s.log.Error(ctx, "weekly summary completed with errors", logger.Int("sent", sent), logger.Int("errors", len(errs)))
 
-		return errs[0]
-	} else {
-		s.log.Info(ctx, "weekly summary sent", logger.Int("sent", sent))
+		slices.Reverse(errs)
 
-		return nil
+		return errs[0]
 	}
+
+	s.log.Info(ctx, "weekly summary sent", logger.Int("sent", sent))
+
+	return nil
+
 }

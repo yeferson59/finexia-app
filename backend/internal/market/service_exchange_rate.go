@@ -12,14 +12,6 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
-const rateSyncCacheKey = "finexia:sync:exchange_rates"
-const rateSyncTTL = 24 * time.Hour
-
-func (s *Service) WasExchangeRateSyncedRecently() bool {
-	v, err := s.storage.Get(rateSyncCacheKey)
-	return err == nil && len(v) > 0
-}
-
 type CurrencyPair struct{ From, To string }
 
 var defaultPairs = []CurrencyPair{
@@ -29,37 +21,44 @@ var defaultPairs = []CurrencyPair{
 }
 
 func (s *Service) SyncExchangeRates(ctx context.Context) ([]ExchangeRate, []error) {
-	log := s.log.With(logger.Str("job", "exchange_rate_sync"))
+	log := s.log.With(logger.Str("job", "exchange_rate"))
 
-	results := make([]ExchangeRate, 0, len(defaultPairs))
-	var errs []error
+	size := len(defaultPairs)
+	results := make([]ExchangeRate, 0, size)
+	errs := make([]error, 0, 3*size)
 
 	for i, pair := range defaultPairs {
 		result, err := s.provider.FetchExchangeRate(ctx, pair.From, pair.To)
 		if err != nil {
-			log.Error(ctx, "fetch failed", logger.Err(err), logger.Str("pair", pair.From+"/"+pair.To))
+			log.Error(ctx, "fetch failed", logger.Str("from", pair.From), logger.Str("to", pair.To), logger.Err(err))
+
 			errs = append(errs, err)
+
 			continue
 		}
 
 		rate, err := decimal.NewFromString(result.Rate)
 		if err != nil {
-			log.Error(ctx, "parse rate failed", logger.Err(err), logger.Str("pair", pair.From+"/"+pair.To), logger.Str("raw", result.Rate))
+			log.Error(ctx, "parse rate failed", logger.Str("from", pair.From), logger.Str("to", pair.To), logger.Err(err), logger.Str("raw", result.Rate))
+
 			errs = append(errs, err)
+
 			continue
 		}
 
 		er, err := s.repo.UpsertExchangeRate(ctx, pair.From, pair.To, rate, result.FetchedAt)
 		if err != nil {
-			log.Error(ctx, "upsert failed", logger.Err(err), logger.Str("pair", pair.From+"/"+pair.To))
+			log.Error(ctx, "upsert failed", logger.Str("from", pair.From), logger.Str("to", pair.To), logger.Err(err))
+
 			errs = append(errs, err)
+
 			continue
 		}
 
-		log.Info(ctx, "rate upserted", logger.Str("pair", pair.From+"/"+pair.To), logger.Str("rate", er.Rate.String()))
+		log.Info(ctx, "rate upserted", logger.Str("from", pair.From), logger.Str("to", pair.To), logger.Str("rate", er.Rate.String()))
+
 		results = append(results, er)
 
-		// Alpha Vantage free tier allows 5 req/min; sleep between pairs to avoid hitting the limit
 		if i < len(defaultPairs)-1 {
 			select {
 			case <-ctx.Done():
@@ -69,7 +68,6 @@ func (s *Service) SyncExchangeRates(ctx context.Context) ([]ExchangeRate, []erro
 		}
 	}
 
-	_ = s.storage.Set(rateSyncCacheKey, []byte(time.Now().UTC().Format(time.RFC3339)), rateSyncTTL)
 	return results, errs
 }
 
@@ -87,7 +85,7 @@ func (s *Service) UpdateExchangeRate(ctx context.Context, id uuid.UUID, rate mon
 
 // SyncExchangeRateByID fetches and updates the rate for a single currency pair by ID.
 func (s *Service) SyncExchangeRateByID(ctx context.Context, id uuid.UUID) (ExchangeRate, error) {
-	log := s.log.With(logger.Str("job", "exchange_rate_sync_single"), logger.Str("id", id.String()))
+	log := s.log.With(logger.Str("job", "exchange_rate_ingle"), logger.Str("id", id.String()))
 
 	existing, err := s.repo.GetExchangeRateByID(ctx, id)
 	if err != nil {
@@ -110,9 +108,6 @@ func (s *Service) SyncExchangeRateByID(ctx context.Context, id uuid.UUID) (Excha
 	}
 
 	log.Info(ctx, "rate synced", logger.Str("pair", existing.FromCurrency+"/"+existing.ToCurrency), logger.Str("rate", updated.Rate.String()))
+
 	return updated, nil
 }
-
-// GetConversionRate and the display-currency helpers migrated to the
-// portfolio module (Fase 6): converting summary totals is a portfolio
-// concern and it was their only consumer.

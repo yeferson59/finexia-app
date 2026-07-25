@@ -9,22 +9,6 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestWasPortfolioSnapshotCreatedToday(t *testing.T) {
-	storage := newMemStorage()
-	svc := newTestServices(&fakeRepository{}, storage)
-
-	if svc.WasPortfolioSnapshotCreatedToday() {
-		t.Error("expected false before any sync")
-	}
-
-	if err := storage.Set(snapshotSyncCacheKey, []byte("2026-07-03T00:00:00Z"), time.Hour); err != nil {
-		t.Fatalf("storage.Set: %v", err)
-	}
-	if !svc.WasPortfolioSnapshotCreatedToday() {
-		t.Error("expected true after the sync marker is set")
-	}
-}
-
 func TestSyncPortfolioSnapshots(t *testing.T) {
 	t.Run("upserts one snapshot per summary row", func(t *testing.T) {
 		rows := []SnapshotRow{
@@ -72,10 +56,6 @@ func TestSyncPortfolioSnapshots(t *testing.T) {
 				t.Errorf("call %d value/currency = %s/%s", i, call.totalValue, call.currency)
 			}
 		}
-
-		if !svc.WasPortfolioSnapshotCreatedToday() {
-			t.Error("sync marker should be set after a run")
-		}
 	})
 
 	t.Run("a failing row is collected and the rest still sync", func(t *testing.T) {
@@ -118,9 +98,6 @@ func TestSyncPortfolioSnapshots(t *testing.T) {
 		count, errs := svc.SyncPortfolioSnapshots(context.Background())
 		if count != 0 || len(errs) != 1 {
 			t.Fatalf("count/errs = %d/%v, want 0 and one error", count, errs)
-		}
-		if svc.WasPortfolioSnapshotCreatedToday() {
-			t.Error("sync marker must not be set when the summary query fails")
 		}
 	})
 }

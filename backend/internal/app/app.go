@@ -266,7 +266,7 @@ func (a *App) buildModules() *modules {
 		Limiter:   userLimiter,
 	})
 
-	return &modules{
+	return new(modules{
 		health:       health.New(),
 		marketing:    marketingModule,
 		auth:         authModule,
@@ -274,7 +274,7 @@ func (a *App) buildModules() *modules {
 		market:       marketModule,
 		portfolio:    portfolioModule,
 		notification: notification.NewService(userService, portfolioModule.Service(), a.deps.Mail, notificationConfig(a.deps.Envs)),
-	}
+	})
 }
 
 // mountRoutes installs the global middleware chain and each module's routes.

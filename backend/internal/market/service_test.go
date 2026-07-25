@@ -13,21 +13,6 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
 
-func TestWasAssetPriceSyncedRecently(t *testing.T) {
-	storage := newMemStorage()
-	svc := newTestServices(&fakeRepository{}, storage)
-
-	if svc.WasAssetPriceSyncedRecently() {
-		t.Error("expected false before any sync")
-	}
-	if err := storage.Set(assetSyncCacheKey, []byte("2026-07-03T00:00:00Z"), time.Hour); err != nil {
-		t.Fatalf("storage.Set: %v", err)
-	}
-	if !svc.WasAssetPriceSyncedRecently() {
-		t.Error("expected true after the sync marker is set")
-	}
-}
-
 func TestSyncAssetByID(t *testing.T) {
 	assetID := uuid.New()
 
@@ -219,9 +204,6 @@ func TestSyncAssetPrices(t *testing.T) {
 		if len(results) != 1 || results[0].Ticker != "AAPL" {
 			t.Errorf("results = %+v, want the priced AAPL asset only (cash skipped)", results)
 		}
-		if !svc.WasAssetPriceSyncedRecently() {
-			t.Error("sync marker should be set after a run")
-		}
 	})
 
 	t.Run("catalog fetch failure aborts", func(t *testing.T) {
@@ -239,9 +221,6 @@ func TestSyncAssetPrices(t *testing.T) {
 		}
 		if len(errs) != 1 {
 			t.Errorf("errs = %v, want the fetch error", errs)
-		}
-		if svc.WasAssetPriceSyncedRecently() {
-			t.Error("sync marker must not be set when the catalog fetch fails")
 		}
 	})
 
@@ -298,9 +277,6 @@ func TestSyncAssetPrices(t *testing.T) {
 		}
 		if len(results) != 1 || len(errs) != 0 {
 			t.Errorf("results/errs = %d/%d, want 1/0", len(results), len(errs))
-		}
-		if svc.WasAssetPriceSyncedRecently() {
-			t.Error("a cancelled run must not set the sync marker")
 		}
 	})
 }
