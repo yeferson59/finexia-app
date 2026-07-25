@@ -21,3 +21,15 @@
 | 12 | Fase 6/7 (revisión) | **Resuelto (2026-07-22).** El catálogo de assets (tipo `Asset`, `AssetType`, persistencia, servicio e import) se movió a `market`; `portfolio` referencia `market.Asset` y lo consume vía su interfaz local `AssetReader`. La dependencia quedó `portfolio → market` (market ya no importa portfolio) y `portfolio.Repository` bajó de 32 a 27 métodos. El parser de hojas de cálculo compartido se extrajo a `platform/spreadsheet`. `portfolio` conserva solo la lectura de exchange-rates para conversión de divisa de visualización. | — |
 | 13 | Fase 6 (revisión) | Archivos de producción > 500 líneas (criterio de éxito). **Troceados en la revisión de cierre**: `portfolio/import.go` 911 → `import.go` (382) + `import_mapping.go` (338) + `import_parse.go` (218); `portfolio/handler.go` 551 → `handler.go` (282) + `handler_transactions.go` (282); `auth/service.go` 669 → `service.go` (364) + `service_token.go` (322). **Queda** `auth/postgres.go` (502), justo en el umbral ~500. | Partir `auth/postgres.go` por sub-store (account/session/refresh/2FA/verification) si crece; hoy está en el límite. |
 | 14 | Fase 8 (revisión) | **Resuelto (2026-07-22).** `docs/ARCHITECTURE.md` creado; cobertura total medida (39.4% vs 42.6% de línea base, layout distinto); `portfolio.Repository` agrupado en sub-interfaces cohesivas (PortfolioStore/PlatformStore/RateStore/TransactionStore/SnapshotStore) y, tras mover assets a market (#12), su union quedó en **27 métodos** (bajo el criterio ~30). | — |
+
+## Frontend
+
+> Mismas reglas, para la migración del frontend
+> ([`FRONTEND_ARCHITECTURE_MIGRATION.md`](./FRONTEND_ARCHITECTURE_MIGRATION.md)).
+> Priorizar al cerrar la Fase 7.
+
+| # | Detectado en | Descripción | Propuesta |
+|---|---|---|---|
+| F1 | Fase 5 (revisión) | Tres componentes de formulario quedan por encima del presupuesto de ~500 líneas: `portfolio-add-form` (587), `portfolio-entry-form` (574) y `asset-sell-panel` (501). El peso es CSS *scoped*; sus clases (`.form-group`, `.form-input`, `.btn`…) tienen nombres genéricos que colisionarían al subirlas a una hoja global, así que no aplica el patrón `landing.css` / `auth-forms.css`, y trocearlos más solo duplicaría ese CSS entre hijos. | Decidir en la Fase 7: o se acepta la excepción documentada, o se introduce un prefijo de clases por feature (cambia el HTML renderizado, hay que revalidar los E2E). |
+| F2 | Fase 5 (revisión) | `src/components/` ya no existe, pero `svelte.config.js` sigue declarando el alias `$components/*` apuntando a ese directorio. Nadie lo usa (`grep` limpio). | Borrar el alias en la Fase 7, junto con la evaluación de `$/*`. |
+| F3 | Fase 5 (revisión) | Los widgets migrados a `features/` siguen importando `privacy` de `$lib/stores/privacy` y los formatters de `$lib/utils`, que la Fase 1 dejó como re-exports temporales. | Completar la relocalización a `lib/shared` en la Fase 7 (ya está en su checklist). |

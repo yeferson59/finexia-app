@@ -7,6 +7,8 @@
 	import { todayLocalDateString } from '$lib/utils';
 	import type { Asset, Platform } from '$lib/api/types';
 	import AssetCombobox from './asset-combobox.svelte';
+	import AssetPreview from './asset-preview.svelte';
+	import PortfolioEntrySummary from './portfolio-entry-summary.svelte';
 
 	let {
 		portfolioId,
@@ -138,32 +140,7 @@
 				<p class="field-hint">Búsqueda en tiempo real · escribe el ticker o nombre del activo</p>
 
 				{#if selectedAsset}
-					<div class="asset-preview">
-						<div class="preview-item">
-							<span class="preview-label">Ticker</span>
-							<span class="preview-value">{selectedAsset.ticker}</span>
-						</div>
-						<div class="preview-item">
-							<span class="preview-label">Nombre</span>
-							<span class="preview-value">{selectedAsset.name}</span>
-						</div>
-						<div class="preview-item">
-							<span class="preview-label">Tipo</span>
-							<span class="preview-value">{selectedAsset.assetType}</span>
-						</div>
-						<div class="preview-item">
-							<span class="preview-label">Exchange</span>
-							<span class="preview-value">{selectedAsset.exchange}</span>
-						</div>
-						{#if selectedAsset.currentPrice}
-							<div class="preview-item">
-								<span class="preview-label">Precio de mercado</span>
-								<span class="preview-value"
-									>{formatCurrency(parseFloat(selectedAsset.currentPrice.value))}</span
-								>
-							</div>
-						{/if}
-					</div>
+					<AssetPreview asset={selectedAsset} {formatCurrency} />
 				{/if}
 			</div>
 		</section>
@@ -247,27 +224,13 @@
 
 		<!-- Summary Card -->
 		{#if selectedAsset && quantity && purchasePrice}
-			<section class="summary-card">
-				<h3 class="summary-title">Resumen de Inversión</h3>
-				<div class="summary-items">
-					<div class="summary-item">
-						<span class="summary-label">Activo</span>
-						<span class="summary-value">{selectedAsset.ticker} - {selectedAsset.name}</span>
-					</div>
-					<div class="summary-item">
-						<span class="summary-label">Cantidad</span>
-						<span class="summary-value">{parseFloat(quantity).toLocaleString()}</span>
-					</div>
-					<div class="summary-item">
-						<span class="summary-label">Precio Unitario</span>
-						<span class="summary-value">{formatCurrency(parseFloat(purchasePrice))}</span>
-					</div>
-					<div class="summary-item border-top">
-						<span class="summary-label">Inversión Total</span>
-						<span class="summary-value highlight">{formatCurrency(totalValue)}</span>
-					</div>
-				</div>
-			</section>
+			<PortfolioEntrySummary
+				asset={selectedAsset}
+				{quantity}
+				{purchasePrice}
+				{totalValue}
+				{formatCurrency}
+			/>
 		{/if}
 
 		<!-- Error feedback -->
@@ -343,37 +306,6 @@
 		font-weight: 400;
 		color: var(--text);
 		font-family: var(--font-display);
-	}
-
-	.asset-preview {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 1rem;
-		margin-top: 1rem;
-		padding: 1rem;
-		border-radius: 12px;
-		background: var(--surface);
-		border: 1px solid var(--border-strong);
-	}
-
-	.preview-item {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-	}
-
-	.preview-label {
-		font-size: 0.75rem;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		color: rgba(236, 234, 229, 0.5);
-		font-weight: 600;
-	}
-
-	.preview-value {
-		font-size: 0.95rem;
-		color: var(--amber);
-		font-weight: 600;
 	}
 
 	.form-group {
@@ -457,6 +389,7 @@
 
 	/* La página original declaraba `.empty-text` dos veces; se fusionan aquí con
 	   el resultado efectivo de la cascada (color de la segunda, peso de la primera). */
+
 	.empty-text {
 		margin: 0;
 		font-size: 0.95rem;
@@ -524,57 +457,6 @@
 		font-weight: 700;
 		color: var(--amber);
 		font-family: var(--font-body);
-	}
-
-	.summary-card {
-		border: 2px solid rgba(212, 145, 42, 0.3);
-		border-radius: 16px;
-		background: rgba(212, 145, 42, 0.08);
-		padding: 1.5rem;
-		animation: slide-in 0.4s ease-out;
-	}
-
-	.summary-title {
-		margin: 0 0 1.25rem;
-		font-size: 1rem;
-		font-weight: 700;
-		color: var(--amber);
-		font-family: var(--font-body);
-	}
-
-	.summary-items {
-		display: grid;
-		gap: 0.9rem;
-	}
-
-	.summary-item {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 0.75rem 0;
-	}
-
-	.summary-item.border-top {
-		border-top: 1px solid rgba(212, 145, 42, 0.2);
-		padding-top: 1rem;
-		margin-top: 0.5rem;
-	}
-
-	.summary-label {
-		font-size: 0.9rem;
-		color: rgba(236, 234, 229, 0.65);
-		font-weight: 500;
-	}
-
-	.summary-value {
-		font-size: 0.95rem;
-		color: var(--text);
-		font-weight: 600;
-	}
-
-	.summary-value.highlight {
-		color: var(--amber);
-		font-size: 1.1rem;
 	}
 
 	.form-error {
@@ -676,17 +558,7 @@
 		}
 	}
 
-	@media (max-width: 1024px) {
-		.asset-preview {
-			grid-template-columns: 1fr;
-		}
-	}
-
 	@media (max-width: 768px) {
-		.asset-preview {
-			grid-template-columns: 1fr;
-		}
-
 		.form-row {
 			grid-template-columns: 1fr;
 		}
