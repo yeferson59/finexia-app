@@ -313,18 +313,20 @@ func (s *Scheduler) computeNext(job Job, sched Schedule, now time.Time) (next ti
 // value is saved immediately, so a crash before the job's first run still
 // resumes correctly on the next restart.
 func (s *Scheduler) loadNext(job Job, sched Schedule, store StateStore) time.Time {
-	ctx, cancel := context.WithTimeout(s.ctx, s.storeTimeout)
-	next, found, err := store.LoadNextRun(ctx, job.Name())
-	cancel()
+	if store != nil {
+		ctx, cancel := context.WithTimeout(s.ctx, s.storeTimeout)
+		next, found, err := store.LoadNextRun(ctx, job.Name())
+		cancel()
 
-	switch {
-	case err != nil:
-		s.runner.opts.Log.Error(s.ctx, "scheduler: failed to load persisted next-run, computing fresh", logger.Str("job", safeJobName(job)), logger.Err(err))
-	case found:
-		return next
+		switch {
+		case err != nil:
+			s.runner.opts.Log.Error(s.ctx, "scheduler: failed to load persisted next-run, computing fresh", logger.Str("job", safeJobName(job)), logger.Err(err))
+		case found:
+			return next
+		}
 	}
 
-	next = s.computeNext(job, sched, time.Now())
+	next := s.computeNext(job, sched, time.Now())
 	s.saveNext(job, next, store)
 
 	return next
@@ -344,6 +346,10 @@ func (s *Scheduler) loadNext(job Job, sched Schedule, store StateStore) time.Tim
 // storeTimeout for that final save, which is an acceptable, bounded trade
 // for not losing the post-run schedule state.
 func (s *Scheduler) saveNext(job Job, next time.Time, store StateStore) {
+	if store == nil {
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), s.storeTimeout)
 	defer cancel()
 
