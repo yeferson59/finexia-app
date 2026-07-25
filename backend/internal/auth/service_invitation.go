@@ -44,7 +44,7 @@ func (s *Service) CreateInvitation(ctx context.Context, email, name, role string
 		return Invitation{}, httpx.AsBadRequest(errors.New("invalid role"))
 	}
 
-	if _, err := s.stores.Accounts.GetUserByEmail(ctx, email); err == nil {
+	if _, err := s.stores.Users.GetUserByEmail(ctx, email); err == nil {
 		return Invitation{}, httpx.AsConflict(errors.New("user already exists"))
 	}
 

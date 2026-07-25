@@ -164,8 +164,6 @@ func (a *App) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-const localUserID = "auth_user_id"
-
 // modules holds every composed domain module so the wiring steps
 // (route mounting, scheduler registration) can pass them around as one value
 // instead of a long parameter list.
@@ -201,30 +199,48 @@ func (a *App) buildModules() *modules {
 
 	geo := geoip.New()
 	userLimiter := httpx.KeyedRateLimiter(200, 1*time.Minute, func(c fiber.Ctx) string {
-		userID := c.Locals(localUserID).(string)
+		userID := c.Locals(httpx.LocalUserID).(string)
 
 		return "user_limit:" + userID
 	})
 
-	marketingModule := marketing.New(marketing.NewPostgresRepository(a.deps.DB), a.deps.Mail)
+	// Services first, then modules. The services form a DAG — marketing and
+	// user depend on no other domain, auth reads both — so every dependency
+	// below is a constructor argument. The modules come after, once auth
+	// exists to supply the route guards they all share.
+	marketingService := marketing.NewService(marketing.ServiceDeps{
+		DB:   a.deps.DB,
+		Mail: a.deps.Mail,
+	})
+	userService := user.NewService(user.ServiceDeps{
+		DB:    a.deps.DB,
+		Store: objectstore.NewS3Store(a.deps.S3, a.deps.Envs.AWSS3BucketName),
+		Log:   a.deps.Log,
+		Cfg:   userConfig(a.deps.Envs),
+	})
+
 	authModule := auth.New(auth.Deps{
-		DB:       a.deps.DB,
-		Cfg:      authConfig(a.deps.Envs),
-		Storage:  a.deps.Storage,
-		Mail:     a.deps.Mail,
-		Geo:      geo,
-		Log:      a.deps.Log,
-		Waitlist: marketingModule.Service(),
+		DB:      a.deps.DB,
+		Cfg:     authConfig(a.deps.Envs),
+		Storage: a.deps.Storage,
+		Mail:    a.deps.Mail,
+		Geo:     geo,
+		Log:     a.deps.Log,
+		// auth reads users/roles through the user module rather than querying
+		// those tables itself (docs/TECH_DEBT.md #9), and advances the waitlist
+		// through marketing (docs/TECH_DEBT.md #10).
+		Users:    userService,
+		Waitlist: marketingService,
+		Limiter:  userLimiter,
+	})
+
+	marketingModule := marketing.New(marketing.Deps{
+		Service:   marketingService,
+		AuthMiddl: authModule,
+		Limiter:   userLimiter,
 	})
 	userModule := user.New(user.Deps{
-		DB:        a.deps.DB,
-		Cfg:       a.deps.Envs,
-		Store:     objectstore.NewS3Store(a.deps.S3, a.deps.Envs.AWSS3BucketName),
-		Mail:      a.deps.Mail,
-		Geo:       geo,
-		Log:       a.deps.Log,
-		Auth:      authModule.Service(),
-		Marketing: marketingModule.Service(),
+		Service:   userService,
 		AuthMiddl: authModule,
 		Limiter:   userLimiter,
 	})
@@ -232,7 +248,6 @@ func (a *App) buildModules() *modules {
 	// so market is built first and injected as portfolio's AssetReader.
 	marketModule := market.New(market.Deps{
 		DB:             a.deps.DB,
-		Cfg:            a.deps.Envs,
 		Storage:        a.deps.Storage,
 		Log:            a.deps.Log,
 		Provider:       priceProvider,
@@ -241,10 +256,10 @@ func (a *App) buildModules() *modules {
 	})
 	portfolioModule := portfolio.New(portfolio.Deps{
 		DB:        a.deps.DB,
-		Cfg:       a.deps.Envs,
+		Cfg:       portfolioConfig(a.deps.Envs),
 		Storage:   a.deps.Storage,
 		Mail:      a.deps.Mail,
-		User:      userModule.Service(),
+		User:      userService,
 		Assets:    marketModule.Service(),
 		Log:       a.deps.Log,
 		AuthMiddl: authModule,
@@ -258,7 +273,7 @@ func (a *App) buildModules() *modules {
 		user:         userModule,
 		market:       marketModule,
 		portfolio:    portfolioModule,
-		notification: notification.NewService(userModule.Service(), portfolioModule.Service(), a.deps.Mail, a.deps.Envs),
+		notification: notification.NewService(userService, portfolioModule.Service(), a.deps.Mail, notificationConfig(a.deps.Envs)),
 	}
 }
 
@@ -322,6 +337,12 @@ func (a *App) registerJobs(sched *scheduler.Scheduler, mods *modules, persistent
 	sched.Start()
 }
 
+// The *Config helpers below project the platform-wide environment onto each
+// module's own Config. Reading the environment is the composition root's job:
+// a module declares the handful of settings it actually consumes and stays
+// decoupled from *config.Env (docs/TECH_DEBT.md #8). market needs none, so it
+// takes no config at all.
+
 // authConfig projects the platform-wide environment onto the auth module's own
 // Config, keeping the module decoupled from *config.Env (docs/TECH_DEBT.md #8).
 func authConfig(env *config.Env) auth.Config {
@@ -339,5 +360,27 @@ func authConfig(env *config.Env) auth.Config {
 		EmailVerificationExpiry: env.EmailVerificationExpiry,
 		SelfRegistrationEnabled: env.SelfRegistrationEnabled,
 		TwoFactorPendingExpiry:  env.TwoFactorPendingExpiry,
+	}
+}
+
+// userConfig projects the environment onto the user module's Config.
+func userConfig(env *config.Env) user.Config {
+	return user.Config{
+		PublicURL:   env.PublicURL,
+		FrontendURL: env.FrontendURL,
+	}
+}
+
+// portfolioConfig projects the environment onto the portfolio module's Config.
+func portfolioConfig(env *config.Env) portfolio.Config {
+	return portfolio.Config{
+		FrontendURL: env.FrontendURL,
+	}
+}
+
+// notificationConfig projects the environment onto the notification module's Config.
+func notificationConfig(env *config.Env) notification.Config {
+	return notification.Config{
+		PublicURL: env.PublicURL,
 	}
 }

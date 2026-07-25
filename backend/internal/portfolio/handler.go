@@ -1,7 +1,6 @@
 package portfolio
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
@@ -15,36 +14,8 @@ type handler struct {
 	assets  AssetReader
 }
 
-const (
-	LocalUserID = "auth_user_id"
-	LocalToken  = "auth_token"
-	LocalRole   = "auth_role"
-)
-
-// getUserIDTokenRole extracts the authenticated identity the JWT middleware
-// stored in the request locals.
-func getUserIDTokenRole(c fiber.Ctx) (uuid.UUID, string, string, error) {
-	userIDStr, _ := c.Locals(LocalUserID).(string)
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		return uuid.Nil, "", "", err
-	}
-
-	token, _ := c.Locals(LocalToken).(string)
-	role, _ := c.Locals(LocalRole).(string)
-	if token == "" || role == "" {
-		return uuid.Nil, "", "", errors.New("missing authenticated identity")
-	}
-
-	return userID, token, role, nil
-}
-
-func getParamUUID(c fiber.Ctx, paramName string) (uuid.UUID, error) {
-	return uuid.Parse(c.Params(paramName))
-}
-
 func (h *handler) GetPortfolios(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -58,7 +29,7 @@ func (h *handler) GetPortfolios(c fiber.Ctx) error {
 }
 
 func (h *handler) GetPortfoliosSummary(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -82,12 +53,12 @@ func (h *handler) GetPortfoliosSummary(c fiber.Ctx) error {
 }
 
 func (h *handler) GetPortfolio(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	portfolioID, err := getParamUUID(c, "id")
+	portfolioID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid portfolio ID", err.Error())
 	}
@@ -110,7 +81,7 @@ func (h *handler) GetPortfoliosRisks(c fiber.Ctx) error {
 }
 
 func (h *handler) CreatePortfolio(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -139,12 +110,12 @@ func (h *handler) CreatePortfolio(c fiber.Ctx) error {
 }
 
 func (h *handler) GetPortfolioTopTransaction(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	portfolioID, err := getParamUUID(c, "id")
+	portfolioID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid portfolio ID", err.Error())
 	}
@@ -158,12 +129,12 @@ func (h *handler) GetPortfolioTopTransaction(c fiber.Ctx) error {
 }
 
 func (h *handler) UpdatePortfolio(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	portfolioID, err := getParamUUID(c, "id")
+	portfolioID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid portfolio ID", err.Error())
 	}
@@ -192,7 +163,7 @@ func (h *handler) UpdatePortfolio(c fiber.Ctx) error {
 }
 
 func (h *handler) CreatePlatform(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -217,7 +188,7 @@ func (h *handler) CreatePlatform(c fiber.Ctx) error {
 }
 
 func (h *handler) GetPlatforms(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -236,12 +207,12 @@ func (h *handler) GetPlatforms(c fiber.Ctx) error {
 }
 
 func (h *handler) UpdatePlatform(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	sourceID, err := getParamUUID(c, "id")
+	sourceID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid platform ID", err.Error())
 	}
@@ -265,12 +236,12 @@ func (h *handler) UpdatePlatform(c fiber.Ctx) error {
 }
 
 func (h *handler) DeletePlatform(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	sourceID, err := getParamUUID(c, "id")
+	sourceID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid platform ID", err.Error())
 	}

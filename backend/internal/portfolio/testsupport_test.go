@@ -11,7 +11,6 @@ import (
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
-	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/user"
@@ -325,9 +324,8 @@ func (s *memStorage) Reset() error {
 
 func (s *memStorage) Close() error { return nil }
 
-func testConfig() *config.Env {
-	return &config.Env{
-		PublicURL:   "http://localhost:8080",
+func testConfig() Config {
+	return Config{
 		FrontendURL: "http://localhost:5173",
 	}
 }

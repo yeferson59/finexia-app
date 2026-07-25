@@ -2,52 +2,20 @@ package user
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"path/filepath"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
-	"github.com/google/uuid"
 
-	"github.com/yeferson59/finexia-app/internal/auth"
 	"github.com/yeferson59/finexia-app/internal/identity"
-	"github.com/yeferson59/finexia-app/internal/marketing"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/pkg/dtos"
 )
 
 type handler struct {
 	service *Service
-}
-
-const (
-	LocalUserID = "auth_user_id"
-	LocalToken  = "auth_token"
-	LocalRole   = "auth_role"
-)
-
-// getUserIDTokenRole extracts the authenticated identity the JWT middleware
-// stored in the request locals.
-func getUserIDTokenRole(c fiber.Ctx) (uuid.UUID, string, string, error) {
-	userIDStr, _ := c.Locals(LocalUserID).(string)
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		return uuid.Nil, "", "", err
-	}
-
-	token, _ := c.Locals(LocalToken).(string)
-	role, _ := c.Locals(LocalRole).(string)
-	if token == "" || role == "" {
-		return uuid.Nil, "", "", errors.New("missing authenticated identity")
-	}
-
-	return userID, token, role, nil
-}
-
-func getParamUUID(c fiber.Ctx, paramName string) (uuid.UUID, error) {
-	return uuid.Parse(c.Params(paramName))
 }
 
 func (h *handler) GetListUsers(c fiber.Ctx) error {
@@ -68,7 +36,7 @@ func (h *handler) GetListUsers(c fiber.Ctx) error {
 }
 
 func (h *handler) GetUserByID(c fiber.Ctx) error {
-	userID, err := getParamUUID(c, "id")
+	userID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "validate id", "invalid user id")
 	}
@@ -97,7 +65,7 @@ func (h *handler) CreateUser(c fiber.Ctx) error {
 }
 
 func (h *handler) UpdateUser(c fiber.Ctx) error {
-	userID, err := getParamUUID(c, "id")
+	userID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "", err.Error())
 	}
@@ -117,7 +85,7 @@ func (h *handler) UpdateUser(c fiber.Ctx) error {
 }
 
 func (h *handler) DeleteUser(c fiber.Ctx) error {
-	userID, err := getParamUUID(c, "id")
+	userID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "", err.Error())
 	}
@@ -130,7 +98,7 @@ func (h *handler) DeleteUser(c fiber.Ctx) error {
 }
 
 func (h *handler) BanUser(c fiber.Ctx) error {
-	userID, err := getParamUUID(c, "id")
+	userID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -153,7 +121,7 @@ func (h *handler) BanUser(c fiber.Ctx) error {
 }
 
 func (h *handler) GetMe(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -167,7 +135,7 @@ func (h *handler) GetMe(c fiber.Ctx) error {
 }
 
 func (h *handler) UpdateMe(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -186,7 +154,7 @@ func (h *handler) UpdateMe(c fiber.Ctx) error {
 }
 
 func (h *handler) UploadAvatar(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -242,7 +210,7 @@ func (h *handler) UploadAvatar(c fiber.Ctx) error {
 }
 
 func (h *handler) GetMyPreferences(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -256,7 +224,7 @@ func (h *handler) GetMyPreferences(c fiber.Ctx) error {
 }
 
 func (h *handler) UpdateMyPreferences(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -275,7 +243,7 @@ func (h *handler) UpdateMyPreferences(c fiber.Ctx) error {
 }
 
 func (h *handler) GetUserAvatar(c fiber.Ctx) error {
-	userID, err := getParamUUID(c, "id")
+	userID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -291,123 +259,4 @@ func (h *handler) GetUserAvatar(c fiber.Ctx) error {
 	c.Set("Cross-Origin-Resource-Policy", "cross-origin")
 	_, err = io.Copy(c.Response().BodyWriter(), body)
 	return err
-}
-
-func (h *handler) ChangeMyPassword(c fiber.Ctx) error {
-	userID, jwtoken, _, err := getUserIDTokenRole(c)
-	if err != nil {
-		return httpx.BadRequest(c, "Invalid user ID", err.Error())
-	}
-
-	var req ChangePasswordDTO
-	if err := c.Bind().JSON(&req); err != nil {
-		return httpx.BadRequest(c, "Invalid request", err.Error())
-	}
-
-	if len(req.NewPassword) < 8 {
-		return httpx.BadRequest(c, "Invalid password", "New password must be at least 8 characters")
-	}
-
-	// Same upper bound as register/login validation; without it the user could
-	// set a password that the login endpoint would later reject.
-	if len(req.NewPassword) > 20 {
-		return httpx.BadRequest(c, "Invalid password", "New password must be at most 20 characters")
-	}
-
-	if err := h.service.ChangePassword(c, userID, jwtoken, req.CurrentPassword, req.NewPassword, c.IP(), c.Get("User-Agent")); err != nil {
-		return httpx.FromDomain(c, err, "Error changing password", "users:me:password")
-	}
-
-	return httpx.OK(c, "Password changed", "Password changed successfully", nil)
-}
-
-// createInvitation (admin) issues an invitation and emails the recipient a
-// single-use link to set their password.
-func (h *handler) createInvitation(c fiber.Ctx) error {
-	var req InviteUserDTO
-	if err := c.Bind().Body(&req); err != nil {
-		return httpx.BadRequest(c, "invalid request body", err.Error())
-	}
-
-	invitedBy, _, _, err := getUserIDTokenRole(c)
-	if err != nil {
-		return httpx.BadRequest(c, "invalid user id", err.Error())
-	}
-
-	inv, err := h.service.CreateInvitation(c, req.Email, req.Name, req.Role, invitedBy)
-	if err != nil {
-		return httpx.FromDomain(c, err, "failed to create invitation", "invitations:create")
-	}
-
-	return httpx.Success(c, fiber.StatusCreated, "invitation sent", "invitation created successfully", inv)
-}
-
-// listInvitations (admin) returns the still-open invitations for the dashboard.
-func (h *handler) listInvitations(c fiber.Ctx) error {
-	paginateInfo, ok := paginate.FromContext(c)
-	if !ok {
-		return httpx.InternalServerError(c, "", "paginate info not found")
-	}
-
-	invitations, count, err := h.service.ListInvitations(c, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
-	if err != nil {
-		return httpx.FromDomain(c, err, "failed to list invitations", "invitations:list")
-	}
-
-	return httpx.OK(c, "invitations", "invitations retrieved successfully", dtos.FilterPagination[[]auth.Invitation, fiber.Map]{
-		Items:    invitations,
-		MetaData: httpx.PaginationMetadata(paginateInfo, count, "limit", "total"),
-	})
-}
-
-// resendInvitation (admin) rotates the token of a pending invitation and resends.
-func (h *handler) resendInvitation(c fiber.Ctx) error {
-	id, err := getParamUUID(c, "id")
-	if err != nil {
-		return httpx.BadRequest(c, "invalid invitation id", err.Error())
-	}
-
-	invitedBy, _, _, err := getUserIDTokenRole(c)
-	if err != nil {
-		return httpx.BadRequest(c, "invalid user id", err.Error())
-	}
-
-	inv, err := h.service.ResendInvitation(c, id, invitedBy)
-	if err != nil {
-		return httpx.FromDomain(c, err, "failed to resend invitation", "invitations:resend")
-	}
-
-	return httpx.OK(c, "invitation resent", "invitation resent successfully", inv)
-}
-
-// revokeInvitation (admin) invalidates a pending invitation.
-func (h *handler) revokeInvitation(c fiber.Ctx) error {
-	id, err := getParamUUID(c, "id")
-	if err != nil {
-		return httpx.BadRequest(c, "invalid invitation id", err.Error())
-	}
-
-	if err := h.service.RevokeInvitation(c, id); err != nil {
-		return httpx.FromDomain(c, err, "failed to revoke invitation", "invitations:revoke")
-	}
-
-	return httpx.OK(c, "invitation revoked", "invitation revoked successfully", nil)
-}
-
-// listWaitlist (admin) returns the waitlist so admins can invite from it.
-func (h *handler) listWaitlist(c fiber.Ctx) error {
-	paginateInfo, ok := paginate.FromContext(c)
-	if !ok {
-		return httpx.InternalServerError(c, "", "paginate info not found")
-	}
-
-	waitlist, count, err := h.service.ListWaitlist(c, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
-	if err != nil {
-		return httpx.FromDomain(c, err, "failed to list waitlist", "waitlist:list")
-	}
-
-	return httpx.OK(c, "waitlist", "waitlist retrieved successfully", dtos.FilterPagination[[]marketing.Waitlist, fiber.Map]{
-		Items:    waitlist,
-		MetaData: httpx.PaginationMetadata(paginateInfo, count, "limit", "total"),
-	})
 }

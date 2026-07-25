@@ -45,7 +45,7 @@ func (h *handler) twoFactorLogin(c fiber.Ctx) error {
 
 // twoFactorStatus reports whether the authenticated user has 2FA enabled.
 func (h *handler) twoFactorStatus(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "invalid user id", "auth:2fa:status")
 	}
@@ -61,7 +61,7 @@ func (h *handler) twoFactorStatus(c fiber.Ctx) error {
 // twoFactorSetup starts (or restarts) enrollment: it returns the secret and
 // otpauth URL. 2FA stays disabled until the user confirms a code.
 func (h *handler) twoFactorSetup(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "invalid user id", "auth:2fa:setup")
 	}
@@ -85,7 +85,7 @@ func (h *handler) twoFactorSetup(c fiber.Ctx) error {
 
 // twoFactorEnable confirms the pending setup and returns the recovery codes.
 func (h *handler) twoFactorEnable(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "invalid user id", "auth:2fa:enable")
 	}
@@ -114,7 +114,7 @@ func (h *handler) twoFactorEnable(c fiber.Ctx) error {
 
 // twoFactorDisable turns 2FA off after checking password + current code.
 func (h *handler) twoFactorDisable(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "invalid user id", "auth:2fa:disable")
 	}
@@ -140,7 +140,7 @@ func (h *handler) twoFactorDisable(c fiber.Ctx) error {
 
 // twoFactorRecoveryCodes regenerates the recovery code batch.
 func (h *handler) twoFactorRecoveryCodes(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "invalid user id", "auth:2fa:recovery")
 	}

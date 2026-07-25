@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
@@ -12,28 +11,6 @@ import (
 type handler struct {
 	service *Service
 	cfg     Config
-}
-
-// getUserIDTokenRole extracts the authenticated identity the JWT middleware
-// stored in the request locals.
-func getUserIDTokenRole(c fiber.Ctx) (uuid.UUID, string, string, error) {
-	userIDStr, _ := c.Locals(LocalUserID).(string)
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		return uuid.Nil, "", "", err
-	}
-
-	token, _ := c.Locals(LocalToken).(string)
-	role, _ := c.Locals(LocalRole).(string)
-	if token == "" || role == "" {
-		return uuid.Nil, "", "", errors.New("missing authenticated identity")
-	}
-
-	return userID, token, role, nil
-}
-
-func getParamUUID(c fiber.Ctx, paramName string) (uuid.UUID, error) {
-	return uuid.Parse(c.Params(paramName))
 }
 
 func (h *handler) login(c fiber.Ctx) error {
@@ -121,7 +98,7 @@ func (h *handler) refresh(c fiber.Ctx) error {
 }
 
 func (h *handler) getSession(c fiber.Ctx) error {
-	userID, jwtoken, _, err := getUserIDTokenRole(c)
+	userID, jwtoken, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "invalid user id", "auth:getSession")
 	}
@@ -135,7 +112,7 @@ func (h *handler) getSession(c fiber.Ctx) error {
 }
 
 func (h *handler) listSessions(c fiber.Ctx) error {
-	userID, jwtoken, _, err := getUserIDTokenRole(c)
+	userID, jwtoken, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "invalid user id", "auth:sessions:list")
 	}
@@ -149,12 +126,12 @@ func (h *handler) listSessions(c fiber.Ctx) error {
 }
 
 func (h *handler) revokeSession(c fiber.Ctx) error {
-	userID, jwtoken, _, err := getUserIDTokenRole(c)
+	userID, jwtoken, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "invalid user id", "auth:sessions:revoke")
 	}
 
-	sessionID, err := getParamUUID(c, "id")
+	sessionID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "invalid session id", "auth:sessions:revoke")
 	}
@@ -167,7 +144,7 @@ func (h *handler) revokeSession(c fiber.Ctx) error {
 }
 
 func (h *handler) revokeOtherSessions(c fiber.Ctx) error {
-	userID, jwtoken, _, err := getUserIDTokenRole(c)
+	userID, jwtoken, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "invalid user id", "auth:sessions:revokeOthers")
 	}
@@ -183,7 +160,7 @@ func (h *handler) revokeOtherSessions(c fiber.Ctx) error {
 }
 
 func (h *handler) logout(c fiber.Ctx) error {
-	userID, jwtoken, _, err := getUserIDTokenRole(c)
+	userID, jwtoken, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "invalid user id", "auth:logout")
 	}

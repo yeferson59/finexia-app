@@ -10,13 +10,12 @@ import (
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/market"
-	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
 type Deps struct {
 	DB      *pgxpool.Pool
-	Cfg     *config.Env
+	Cfg     Config
 	Storage fiber.Storage
 	Mail    Mailer
 	User    UserReader
@@ -54,6 +53,19 @@ type Module struct {
 	limiter   fiber.Handler
 }
 
+// deprecatedAlias marks a legacy path as superseded by successor, following
+// RFC 8594: clients (and anything scraping access logs) can spot callers still
+// on the old route before it is removed. The response is otherwise unchanged —
+// the alias keeps serving the same handler.
+func deprecatedAlias(successor string) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		c.Set("Deprecation", "true")
+		c.Set("Link", `<`+successor+`>; rel="successor-version"`)
+
+		return c.Next()
+	}
+}
+
 func New(deps Deps) *Module {
 	pg := NewPostgresRepository(deps.DB)
 	service := NewService(pg, deps.Cfg, deps.Storage, deps.Mail, deps.User, deps.Log)
@@ -84,7 +96,11 @@ func (m *Module) Routes(router fiber.Router) {
 	// Static routes first — Fiber matches in registration order, so they must
 	// register before the parametric "/:id" family below.
 	portfolios.Get("/risks", m.handler.GetPortfoliosRisks)
-	portfolios.Get("/id", m.handler.GetPortfolios)
+	// The user's portfolio list is canonically GET /portfolios. It historically
+	// answered at the atypical "/id" path (docs/TECH_DEBT.md #3), kept as an
+	// alias that flags itself as deprecated so existing clients keep working.
+	portfolios.Get("", m.handler.GetPortfolios)
+	portfolios.Get("/id", deprecatedAlias("/portfolios"), m.handler.GetPortfolios)
 	portfolios.Get("/summary", m.handler.GetPortfoliosSummary)
 	portfolios.Get("/transactions", m.handler.GetUserTransactions)
 	portfolios.Post("/transactions/import/preview", m.handler.PreviewTransactionsImport)

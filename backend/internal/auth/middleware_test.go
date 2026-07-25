@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
@@ -43,7 +44,7 @@ func TestRequireAuth(t *testing.T) {
 
 		app := fiber.New()
 		app.Get("/probe", m.RequireAuth(), func(c fiber.Ctx) error {
-			return c.SendString(c.Locals(LocalUserID).(string))
+			return c.SendString(c.Locals(httpx.LocalUserID).(string))
 		})
 		return app
 	}
@@ -95,7 +96,7 @@ func newRBACApp(role string, handler fiber.Handler) *fiber.App {
 	app := fiber.New()
 	app.Get("/protected", func(c fiber.Ctx) error {
 		if role != "" {
-			c.Locals(LocalRole, role)
+			c.Locals(httpx.LocalRole, role)
 		}
 		return c.Next()
 	}, handler, func(c fiber.Ctx) error {

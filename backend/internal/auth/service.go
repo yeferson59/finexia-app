@@ -294,7 +294,7 @@ func (s *Service) CreateJWToken(userID uuid.UUID, role string, expiresAt time.Ti
 }
 
 func (s *Service) Register(ctx context.Context, name, email, password string) (RegisterResponseDTO, error) {
-	_, err := s.stores.Accounts.GetUserByEmail(ctx, email)
+	_, err := s.stores.Users.GetUserByEmail(ctx, email)
 	if err == nil {
 		return RegisterResponseDTO{}, ErrEmailAlreadyExists
 	}

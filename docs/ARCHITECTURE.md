@@ -65,7 +65,14 @@ Un módulo nuevo se añade creando su paquete y registrándolo en `internal/app`
 ## 3. Reglas de dependencia
 
 1. **`platform/*` no conoce el negocio.** No importa ningún módulo de dominio ni
-   `identity`. Es el kernel técnico reutilizable.
+   `identity`. Es el kernel técnico reutilizable. Ahí vive también la convención
+   de identidad en los locals de la request (`httpx.LocalUserID`/`LocalToken`/
+   `LocalRole` y el accesor `httpx.Identity`): el middleware de `auth` la
+   escribe y los handlers de todos los módulos la leen, pero mover la identidad
+   por la request es transporte, no dominio. Antes esas tres constantes y su
+   accesor estaban copiados en `auth`, `user` y `portfolio` (y la clave, una
+   cuarta vez, en `app`), de modo que cambiar la convención obligaba a acertar
+   en cuatro sitios a la vez.
 2. **`identity/` es una hoja.** No importa ningún otro paquete interno; solo
    contiene structs compartidos por auth, user, portfolio y notification.
 3. **Un módulo solo importa `platform/`, `identity/` y las interfaces/tipos
@@ -75,9 +82,16 @@ Un módulo nuevo se añade creando su paquete y registrándolo en `internal/app`
    datos de `user`, declara `portfolio.UserReader` y `app` le inyecta
    `user.Service`. Las interfaces se mantienen pequeñas y cohesivas (ej.:
    `auth.Stores` = 5 stores; `portfolio.Repository` = unión de 5 sub-stores).
-5. **`internal/app` es el único que cablea.** Ningún módulo importa `app`; el
+5. **El grafo de módulos es acíclico y todo se inyecta por constructor.** No hay
+   setters ni slots que queden `nil` un rato: si un módulo necesita algo, lo
+   recibe en su `New`. Eso obliga a un orden de construcción, descrito abajo.
+6. **Cada módulo declara su propia `Config`.** Ninguno importa
+   `platform/config`: `app` proyecta el `*config.Env` sobre `auth.Config`,
+   `user.Config`, `portfolio.Config` y `notification.Config` (`market` no
+   necesita ninguna). Lo fija `TestModulesOwnTheirConfig`.
+7. **`internal/app` es el único que cablea.** Ningún módulo importa `app`; el
    flujo de dependencias va siempre de `app` hacia abajo.
-6. **La API HTTP no cambia** respecto a lo documentado en `API.md`.
+8. **La API HTTP no cambia** respecto a lo documentado en `API.md`.
 
 ### Grafo de dependencias entre módulos
 
@@ -86,8 +100,7 @@ graph TD
     app[app<br/>composition root]
     subgraph domain[Módulos de dominio]
         auth --> marketing
-        user --> auth
-        user --> marketing
+        auth --> user
         portfolio --> user
         portfolio --> market
         notification --> portfolio
@@ -121,6 +134,40 @@ y los exchange-rates son propiedad de `market`; `portfolio` referencia
 `AssetReader` (implementada por `market`), de modo que la dependencia va
 `portfolio → market`. `portfolio` conserva solo una lectura de exchange-rates
 para convertir a la divisa de visualización.
+
+### Orden de construcción
+
+El grafo de arriba es también el orden en que `internal/app` construye. Cuatro
+módulos (`user`, `market`, `portfolio`, `marketing`) necesitan los guards
+`RequireAuth`/`RequireAdmin` que expone `auth.Module`, y `auth` a su vez lee
+`user` (tablas users/roles) y `marketing` (waitlist). Para que eso no sea un
+ciclo, `user` y `marketing` se construyen **en dos pasos**:
+
+```go
+marketingService := marketing.NewService(...)   // no depende de ningún dominio
+userService      := user.NewService(...)        // idem
+authModule       := auth.New(auth.Deps{Users: userService, Waitlist: marketingService, ...})
+marketingModule  := marketing.New(marketing.Deps{Service: marketingService, AuthMiddl: authModule, ...})
+userModule       := user.New(user.Deps{Service: userService, AuthMiddl: authModule, ...})
+// market, portfolio y notification después, todos con authModule ya disponible
+```
+
+`NewService` construye los casos de uso a partir de infraestructura sola;
+`New` completa el módulo con su superficie HTTP y los guards. Lo que hace que
+el primer paso sea posible es que **`user` y `marketing` no importan ningún
+otro módulo de dominio** — invariante que fija
+`TestServiceFirstModulesStayIndependent`. Si alguno de los dos ganara una
+dependencia hacia `auth`, el grafo volvería a ser cíclico y el cableado
+necesitaría un setter.
+
+Por eso hay rutas que responden bajo `/users` sin pertenecer al módulo `user`:
+`PATCH /users/me/password` y `/users/invitations*` son de `auth` (credenciales
+e invitaciones son su dominio) y `GET /users/waitlist` es de `marketing`. Los
+paths no cambian —son los que documenta `API.md`—; lo que cambia es qué módulo
+los sirve. Al ser rutas terminales fuera del grupo `/users`, aplican los guards
+ellas mismas, y `mountRoutes` monta `auth` y `marketing` antes que `user` para
+que `GET/PATCH /users/:id` no las capture. `TestAppWiresAndRoutes` verifica ese
+orden.
 
 ## 4. Blindaje automatizado
 

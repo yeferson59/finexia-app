@@ -36,6 +36,7 @@ type fakeRepository struct {
 	revokeRefreshTokenFamily         func(ctx context.Context, familyID uuid.UUID) ([]string, error)
 	getRefreshTokenFamiliesBySession func(ctx context.Context, userID uuid.UUID, sessionToken string) ([]string, []uuid.UUID, error)
 	register                         func(ctx context.Context, name, email, password string) (identity.User, error)
+	updatePassword                   func(ctx context.Context, userID uuid.UUID, hashedPassword string) error
 	getSessionByUserIDToken          func(ctx context.Context, userID uuid.UUID, token string) (identity.User, error)
 	getSessionByToken                func(ctx context.Context, token string) (identity.User, error)
 	deleteSessionByUserIDToken       func(ctx context.Context, userID uuid.UUID, token string) error
@@ -80,10 +81,13 @@ var (
 	_ PasswordResetStore = (*fakeRepository)(nil)
 	_ InvitationStore    = (*fakeRepository)(nil)
 	_ WaitlistStore      = (*fakeRepository)(nil)
+	_ UserReader         = (*fakeRepository)(nil)
 )
 
-// testStores fills every store slot with the same fake, mirroring how the
-// composition root wires the single Postgres implementation.
+// testStores fills every store slot with the same fake. The composition root
+// splits them across three implementations (the module's own Postgres
+// repository, marketing's service for Waitlist, user's for Users); one fake
+// covering all of them keeps the test setup to a single value.
 func testStores(f *fakeRepository) Stores {
 	return Stores{
 		Accounts:       f,
@@ -94,6 +98,7 @@ func testStores(f *fakeRepository) Stores {
 		PasswordResets: f,
 		Invitations:    f,
 		Waitlist:       f,
+		Users:          f,
 	}
 }
 
@@ -169,6 +174,10 @@ func (f *fakeRepository) GetRefreshTokenFamiliesBySession(ctx context.Context, u
 
 func (f *fakeRepository) Register(ctx context.Context, name, email, password string) (identity.User, error) {
 	return f.register(ctx, name, email, password)
+}
+
+func (f *fakeRepository) UpdatePassword(ctx context.Context, userID uuid.UUID, hashedPassword string) error {
+	return f.updatePassword(ctx, userID, hashedPassword)
 }
 
 func (f *fakeRepository) GetSessionByUserIDToken(ctx context.Context, userID uuid.UUID, token string) (identity.User, error) {

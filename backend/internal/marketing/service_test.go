@@ -47,7 +47,7 @@ func TestSaveWaitlistEmail(t *testing.T) {
 			},
 		}
 		mailer := &fakeMailer{}
-		svc := NewService(repo, mailer)
+		svc := newService(repo, mailer)
 
 		if err := svc.SaveWaitlistEmail(context.Background(), "new@example.com"); err != nil {
 			t.Fatalf("SaveWaitlistEmail: %v", err)
@@ -67,7 +67,7 @@ func TestSaveWaitlistEmail(t *testing.T) {
 			},
 		}
 		mailer := &fakeMailer{}
-		svc := NewService(repo, mailer)
+		svc := newService(repo, mailer)
 
 		if err := svc.SaveWaitlistEmail(context.Background(), "dup@example.com"); err == nil {
 			t.Fatal("expected error")
@@ -82,7 +82,7 @@ func TestSaveWaitlistEmail(t *testing.T) {
 			saveWaitlistEmail: func(context.Context, string) error { return nil },
 		}
 		mailer := &fakeMailer{waitlistErr: errors.New("smtp down")}
-		svc := NewService(repo, mailer)
+		svc := newService(repo, mailer)
 
 		if err := svc.SaveWaitlistEmail(context.Background(), "x@example.com"); err == nil {
 			t.Fatal("expected error when the confirmation email fails")
@@ -99,7 +99,7 @@ func TestWaitlistAdminPassthroughs(t *testing.T) {
 				return []Waitlist{{Email: "a@example.com"}}, 1, nil
 			},
 		}
-		svc := NewService(repo, &fakeMailer{})
+		svc := newService(repo, &fakeMailer{})
 
 		items, count, err := svc.ListWaitlist(context.Background(), 20, 10)
 		if err != nil {
@@ -121,7 +121,7 @@ func TestWaitlistAdminPassthroughs(t *testing.T) {
 				return nil
 			},
 		}
-		svc := NewService(repo, &fakeMailer{})
+		svc := newService(repo, &fakeMailer{})
 
 		if err := svc.SetWaitlistInvited(context.Background(), "b@example.com"); err != nil {
 			t.Fatalf("SetWaitlistInvited: %v", err)
