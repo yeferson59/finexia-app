@@ -27,7 +27,7 @@ type Every struct {
 }
 
 func (e Every) Next(now time.Time) time.Time {
-	return now.Add(e.Interval)
+	return now.Add(e.Interval).UTC()
 }
 
 // DailyAt fires the job once a day at the given time (local time).
@@ -43,7 +43,7 @@ func (d DailyAt) Next(now time.Time) time.Time {
 		next = next.AddDate(0, 0, 1)
 	}
 
-	return next
+	return next.UTC()
 }
 
 // Delayed wraps any Schedule and adds a fixed delay to the result of
@@ -57,7 +57,7 @@ type Delayed struct {
 }
 
 func (d Delayed) Next(now time.Time) time.Time {
-	return d.Schedule.Next(now).Add(d.Delay)
+	return d.Schedule.Next(now).Add(d.Delay).UTC()
 }
 
 // Jitter wraps a Schedule and adds a random delay between 0 and Max,
@@ -72,12 +72,12 @@ type Jitter struct {
 
 func (j Jitter) Next(now time.Time) time.Time {
 	if j.Max <= 0 {
-		return j.Schedule.Next(now)
+		return j.Schedule.Next(now).UTC()
 	}
 
 	extra := time.Duration(rand.Int64N(int64(j.Max)))
 
-	return j.Schedule.Next(now).Add(extra)
+	return j.Schedule.Next(now).Add(extra).UTC()
 }
 
 // WeeklyAt fires the job once a week, on the given day and time (local
@@ -97,7 +97,7 @@ func (w WeeklyAt) Next(now time.Time) time.Time {
 		next = next.AddDate(0, 0, 7)
 	}
 
-	return next
+	return next.UTC()
 }
 
 type scheduledJob struct {
@@ -235,8 +235,8 @@ func (s *Scheduler) Start() {
 	if s.started {
 		panic("scheduler: Start called more than once")
 	}
-	s.started = true
 
+	s.started = true
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
 	for _, sj := range s.jobs {
@@ -266,10 +266,6 @@ func (s *Scheduler) loop(sj scheduledJob) {
 	defer s.wg.Done()
 
 	next := s.loadNext(sj.job, sj.sched, sj.store)
-
-	// One timer for the whole loop, re-armed after each fire instead of
-	// allocated per iteration. Safe to Reset without draining on Go 1.23+,
-	// where Stop/Reset guarantee no stale value is left in the channel.
 	timer := time.NewTimer(s.delayUntil(next))
 	defer timer.Stop()
 
@@ -301,8 +297,7 @@ func (s *Scheduler) delayUntil(next time.Time) time.Duration {
 func (s *Scheduler) computeNext(job Job, sched Schedule, now time.Time) (next time.Time) {
 	defer func() {
 		if p := recover(); p != nil {
-			s.runner.opts.Log.Error(s.ctx, "scheduler: Schedule.Next panicked, retrying in 1s",
-				logger.Str("job", safeJobName(job)), logger.Any("panic", p))
+			s.runner.opts.Log.Error(s.ctx, "scheduler: Schedule.Next panicked, retrying in 1s", logger.Str("job", safeJobName(job)), logger.Any("panic", p))
 
 			next = now.Add(time.Second)
 		}
@@ -324,8 +319,7 @@ func (s *Scheduler) loadNext(job Job, sched Schedule, store StateStore) time.Tim
 
 		switch {
 		case err != nil:
-			s.runner.opts.Log.Error(s.ctx, "scheduler: failed to load persisted next-run, computing fresh",
-				logger.Str("job", safeJobName(job)), logger.Err(err))
+			s.runner.opts.Log.Error(s.ctx, "scheduler: failed to load persisted next-run, computing fresh", logger.Str("job", safeJobName(job)), logger.Err(err))
 		case found:
 			return next
 		}
@@ -359,8 +353,7 @@ func (s *Scheduler) saveNext(job Job, next time.Time, store StateStore) {
 	defer cancel()
 
 	if err := store.SaveNextRun(ctx, job.Name(), next); err != nil {
-		s.runner.opts.Log.Error(s.ctx, "scheduler: failed to persist next-run",
-			logger.Str("job", safeJobName(job)), logger.Err(err))
+		s.runner.opts.Log.Error(s.ctx, "scheduler: failed to persist next-run", logger.Str("job", safeJobName(job)), logger.Err(err))
 	}
 }
 
@@ -370,8 +363,7 @@ func (s *Scheduler) saveNext(job Job, next time.Time, store StateStore) {
 func (s *Scheduler) runJob(job Job, overrides []JobOptions) {
 	defer func() {
 		if p := recover(); p != nil {
-			s.runner.opts.Log.Error(s.ctx, "scheduler: recovered panic running job",
-				logger.Str("job", safeJobName(job)), logger.Any("panic", p))
+			s.runner.opts.Log.Error(s.ctx, "scheduler: recovered panic running job", logger.Str("job", safeJobName(job)), logger.Any("panic", p))
 		}
 	}()
 
