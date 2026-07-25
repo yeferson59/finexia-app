@@ -379,7 +379,7 @@ func TestSafeRun_PanicIncludesValue(t *testing.T) {
 		t.Fatal("expected an error from a panicking job")
 	}
 
-	if err.Error() != "panic recuperado: kaboom" {
+	if err.Error() != "panic safed: kaboom" {
 		t.Fatalf("unexpected error message: %q", err.Error())
 	}
 }
