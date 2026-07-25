@@ -180,7 +180,7 @@ func (r *Runner) wait(ctx context.Context, backoffBase, backoffMax time.Duration
 func (r *Runner) safeRun(ctx context.Context, job Job) (err error) {
 	defer func() {
 		if p := recover(); p != nil {
-			err = fmt.Errorf("panic recuperado: %v", p)
+			err = fmt.Errorf("panic safed: %v", p)
 		}
 	}()
 
@@ -227,7 +227,7 @@ func (r *Runner) unlock(name string) {
 // further attempt on an already-dead context.
 func (r *Runner) Execute(ctx context.Context, job Job, overrides ...JobOptions) {
 	if !r.tryLock(job.Name()) {
-		r.opts.Log.Info(ctx, "scheduler: job omitido, ya está en ejecución", logger.Str("job", job.Name()))
+		r.opts.Log.Info(ctx, "scheduler: omitted job, it's already on execution", logger.Str("job", job.Name()))
 
 		return
 	}
@@ -264,7 +264,7 @@ func (r *Runner) Execute(ctx context.Context, job Job, overrides ...JobOptions) 
 		}
 
 		if err == nil {
-			r.opts.Log.Info(ctx, "scheduler: job completado",
+			r.opts.Log.Info(ctx, "scheduler: completed job",
 				logger.Str("job", job.Name()),
 				logger.Int("attempt", attempt),
 				logger.Int("total_attempts", totalAttempts),
@@ -275,7 +275,7 @@ func (r *Runner) Execute(ctx context.Context, job Job, overrides ...JobOptions) 
 
 		lastErr = err
 
-		r.opts.Log.Error(ctx, "scheduler: intento de job falló",
+		r.opts.Log.Error(ctx, "scheduler: intent failed job",
 			logger.Str("job", job.Name()),
 			logger.Int("attempt", attempt),
 			logger.Int("total_attempts", totalAttempts),
