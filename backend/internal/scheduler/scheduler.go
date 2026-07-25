@@ -166,18 +166,15 @@ type SchedulerOptions struct {
 // Scheduler coordinates multiple jobs each with its own Schedule, without
 // depending on any external cron library. Each job runs in its own goroutine.
 type Scheduler struct {
-	runner *Runner
-
+	runner       *Runner
 	store        StateStore
 	storeTimeout time.Duration
-
-	mu      sync.Mutex
-	jobs    []scheduledJob
-	started bool
-
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	mu           sync.Mutex
+	jobs         []scheduledJob
+	started      bool
+	ctx          context.Context
+	cancel       context.CancelFunc
+	wg           sync.WaitGroup
 }
 
 // NewScheduler builds a Scheduler around runner. opts is variadic purely

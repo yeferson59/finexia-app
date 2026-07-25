@@ -102,7 +102,7 @@ func New(deps Deps) (*App, error) {
 	fiberApp := fiber.New(fiber.Config{
 		JSONEncoder:     sonic.ConfigFastest.Marshal,
 		JSONDecoder:     sonic.ConfigFastest.Unmarshal,
-		StructValidator: new(structValidator{validate: validator.New()}),
+		StructValidator: new(structValidator{validator.New()}),
 		ProxyHeader:     fiber.HeaderXForwardedFor,
 		TrustProxy:      deps.Envs.TrustProxy,
 		BodyLimit:       bodyLimit,
@@ -301,16 +301,13 @@ func (a *App) startScheduler(ctx context.Context, mods *modules) {
 		BackoffBase: 500 * time.Millisecond,
 		BackoffMax:  10 * time.Second,
 		OnError: func(name string, err error) {
-			a.deps.Log.Error(ctx, "scheduler: ALERTA, job falló definitivamente",
-				logger.Str("job", name), logger.Err(err))
+			a.deps.Log.Error(ctx, "scheduler: ALERT, failed finalizate job", logger.Str("job", name), logger.Err(err))
 		},
 		Log: a.deps.Log,
 	})
 
 	// Default: in-memory cadence, recomputed at each start.
-	a.schedule = scheduler.NewScheduler(runner, scheduler.SchedulerOptions{
-		Store: scheduler.NewMemoryStore(),
-	})
+	a.schedule = scheduler.NewScheduler(runner)
 
 	// Redis-backed store, opted into per job via WithStore below.
 	persistent := fiberstore.New(a.deps.Storage)
