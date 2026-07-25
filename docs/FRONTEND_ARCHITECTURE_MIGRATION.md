@@ -377,6 +377,11 @@ Decisiones validadas con la feature piloto, que las Fases 4–6 deben seguir:
           trocearla se añadieron dos casos a `portfolio.e2e.ts` (resumen +
           historial; apertura de los formularios de alta y venta rápida) y la
           ruta paginada de transacciones por activo al stub `mock-api.mjs`.
+  - [x] Bajar del presupuesto de ~300 líneas por página las dos que quedaban del
+        área: `portfolios/+page.svelte` (457 → 243) extrayendo `portfolio-card`
+        (y llevando `PORTFOLIO_TYPE_LABELS`/`formatPortfolioType`/`riskTone` a
+        `portfolio.ts`), y `portfolios/[id]/+page.svelte` (358 → 174) extrayendo
+        `portfolio-detail-header`.
   - [x] Trocear `portfolios/[id]/add/+page.svelte` (996 → 17): `portfolio-entry-form`
         con `asset-combobox` (buscador con debounce), `asset-preview` y
         `portfolio-entry-summary` como internos. El tipo local `AssetSuggestion`
