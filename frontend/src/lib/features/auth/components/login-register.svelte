@@ -4,6 +4,8 @@
 	import TwoFactorChallenge from './two-factor-challenge.svelte';
 	import RegisterForm from './register-form.svelte';
 	import InviteOnlyNotice from './invite-only-notice.svelte';
+	import AuthBrandPanel from './auth-brand-panel.svelte';
+	import AuthSocialButtons from './auth-social-buttons.svelte';
 	import type { AuthActionResult } from '../types';
 
 	// Resolved server-side from the `selfRegistration` feature flag so the
@@ -44,101 +46,7 @@
 
 <main class="auth-container">
 	<!-- Left: Brand Panel (desktop only) -->
-	<aside class="brand-panel">
-		<div class="brand-content">
-			<div class="brand-logo">
-				<div class="logo-mark" aria-hidden="true">
-					<svg width="28" height="28" viewBox="0 0 30 30" fill="none">
-						<path
-							d="M7 22L12.5 14.5L16.5 18.5L23 9"
-							stroke="#0c0a06"
-							stroke-width="2.6"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						/>
-					</svg>
-				</div>
-				<span class="brand-name">FINEXIA</span>
-			</div>
-
-			<p class="brand-tagline">Tu patrimonio,<br />bajo control.</p>
-
-			<div class="brand-chart" aria-hidden="true">
-				<svg viewBox="0 0 320 160" class="chart-svg" fill="none" xmlns="http://www.w3.org/2000/svg">
-					<!-- Subtle grid lines -->
-					<line x1="0" y1="40" x2="320" y2="40" stroke="rgba(255,255,255,0.04)" stroke-width="1" />
-					<line x1="0" y1="80" x2="320" y2="80" stroke="rgba(255,255,255,0.04)" stroke-width="1" />
-					<line
-						x1="0"
-						y1="120"
-						x2="320"
-						y2="120"
-						stroke="rgba(255,255,255,0.04)"
-						stroke-width="1"
-					/>
-					<!-- Vertical tick marks -->
-					<line x1="80" y1="0" x2="80" y2="160" stroke="rgba(255,255,255,0.025)" stroke-width="1" />
-					<line
-						x1="160"
-						y1="0"
-						x2="160"
-						y2="160"
-						stroke="rgba(255,255,255,0.025)"
-						stroke-width="1"
-					/>
-					<line
-						x1="240"
-						y1="0"
-						x2="240"
-						y2="160"
-						stroke="rgba(255,255,255,0.025)"
-						stroke-width="1"
-					/>
-
-					<!-- Area fill under the line -->
-					<path
-						class="chart-area"
-						d="M0,140 C30,130 55,118 80,105 C110,90 130,88 155,72 C180,56 205,48 230,35 C255,22 280,14 320,8 L320,160 L0,160 Z"
-						fill="url(#area-grad)"
-					/>
-
-					<!-- Portfolio trend line -->
-					<path
-						class="chart-line"
-						d="M0,140 C30,130 55,118 80,105 C110,90 130,88 155,72 C180,56 205,48 230,35 C255,22 280,14 320,8"
-						stroke="url(#chart-grad)"
-						stroke-width="2.5"
-						stroke-linecap="round"
-					/>
-
-					<!-- End dot -->
-					<circle class="chart-dot" cx="320" cy="8" r="4.5" fill="var(--amber)" />
-					<circle
-						class="chart-dot-ring"
-						cx="320"
-						cy="8"
-						r="8"
-						fill="none"
-						stroke="var(--amber)"
-						stroke-width="1"
-					/>
-
-					<defs>
-						<linearGradient id="chart-grad" x1="0" y1="0" x2="1" y2="0">
-							<stop offset="0%" stop-color="rgba(212,145,42,0.2)" />
-							<stop offset="100%" stop-color="rgba(212,145,42,0.9)" />
-						</linearGradient>
-						<linearGradient id="area-grad" x1="0" y1="0" x2="0" y2="1">
-							<stop offset="0%" stop-color="rgba(212,145,42,0.08)" />
-							<stop offset="100%" stop-color="rgba(212,145,42,0)" />
-						</linearGradient>
-					</defs>
-				</svg>
-			</div>
-
-			<p class="brand-footnote">Visualiza, analiza y optimiza<br />tu riqueza en tiempo real.</p>
-		</div>
-	</aside>
+	<AuthBrandPanel />
 
 	<!-- Right: Auth Panel -->
 	<div class="auth-panel">
@@ -204,44 +112,14 @@
 			</section>
 
 			<!-- Social Divider -->
-			<div class="divider">
-				<span>o continúa con</span>
-			</div>
-
-			<!-- Social Auth -->
-			<footer class="social-auth">
-				<button type="button" class="social-button" aria-label="Iniciar sesión con Google">
-					<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-						<path
-							d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-						/>
-						<path
-							d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-						/>
-						<path
-							d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-						/>
-						<path
-							d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-						/>
-					</svg>
-					Google
-				</button>
-				<button type="button" class="social-button" aria-label="Iniciar sesión con GitHub">
-					<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-						<path
-							d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
-						/>
-					</svg>
-					GitHub
-				</button>
-			</footer>
+			<AuthSocialButtons />
 		</div>
 	</div>
 </main>
 
 <style>
 	/* ── Layout ──────────────────────────────────────────────── */
+
 	main.auth-container {
 		--gold-primary: var(--amber);
 		--gold-light: var(--amber-light);
@@ -255,147 +133,11 @@
 	}
 
 	/* ── Brand Panel ─────────────────────────────────────────── */
-	.brand-panel {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: clamp(3rem, 6vw, 5rem) clamp(2.5rem, 5vw, 4.5rem);
-		background: #07080a;
-		border-right: 1px solid var(--border);
-		position: relative;
-		overflow: hidden;
-	}
 
 	/* Ambient glow top-right */
-	.brand-panel::before {
-		content: '';
-		position: absolute;
-		top: -20%;
-		right: -10%;
-		width: 420px;
-		height: 420px;
-		border-radius: 50%;
-		background: radial-gradient(circle, rgba(212, 145, 42, 0.06) 0%, transparent 65%);
-		pointer-events: none;
-	}
-
-	.brand-content {
-		position: relative;
-		z-index: 1;
-		width: 100%;
-		max-width: 420px;
-	}
-
-	.brand-logo {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		margin-bottom: 2.5rem;
-	}
-
-	.brand-name {
-		font-family: var(--font-display);
-		font-size: clamp(2rem, 3.5vw, 3rem);
-		font-weight: 600;
-		letter-spacing: 0.12em;
-		color: var(--text);
-		line-height: 1;
-	}
-
-	.brand-tagline {
-		font-family: var(--font-display);
-		font-size: clamp(1.5rem, 2.8vw, 2.25rem);
-		font-weight: 300;
-		color: var(--text-muted);
-		line-height: 1.4;
-		margin: 0;
-		letter-spacing: 0.01em;
-	}
-
-	.brand-chart {
-		margin-top: 3rem;
-		margin-bottom: 2rem;
-	}
-
-	.chart-svg {
-		width: 100%;
-		overflow: visible;
-	}
-
-	.chart-area {
-		opacity: 0;
-		animation: fade-area 0.6s 2s ease forwards;
-	}
-
-	.chart-line {
-		stroke-dasharray: 700;
-		stroke-dashoffset: 700;
-		animation: draw-chart 1.8s 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-	}
-
-	.chart-dot {
-		opacity: 0;
-		animation: fade-dot 0.4s 2.1s ease forwards;
-	}
-
-	.chart-dot-ring {
-		opacity: 0;
-		animation: pulse-ring 1.5s 2.3s ease-out infinite;
-	}
-
-	@keyframes draw-chart {
-		to {
-			stroke-dashoffset: 0;
-		}
-	}
-	@keyframes fade-area {
-		to {
-			opacity: 1;
-		}
-	}
-	@keyframes fade-dot {
-		to {
-			opacity: 1;
-		}
-	}
-	@keyframes pulse-ring {
-		0% {
-			opacity: 0.6;
-			transform: scale(1);
-			transform-origin: 320px 8px;
-		}
-		100% {
-			opacity: 0;
-			transform: scale(2.2);
-			transform-origin: 320px 8px;
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.chart-line {
-			animation: none;
-			stroke-dashoffset: 0;
-		}
-		.chart-area,
-		.chart-dot {
-			animation: none;
-			opacity: 1;
-		}
-		.chart-dot-ring {
-			animation: none;
-			opacity: 0;
-		}
-	}
-
-	.brand-footnote {
-		font-size: 0.8rem;
-		color: var(--text-dim);
-		line-height: 1.6;
-		letter-spacing: 0.3px;
-		margin: 0;
-	}
 
 	/* ── Auth Panel ──────────────────────────────────────────── */
+
 	.auth-panel {
 		display: flex;
 		align-items: center;
@@ -426,6 +168,7 @@
 	}
 
 	/* ── Card Header (mobile only) ───────────────────────────── */
+
 	.auth-header {
 		display: none; /* shown on mobile */
 		flex-direction: column;
@@ -455,28 +198,6 @@
 	}
 
 	/* Brand panel logo is smaller */
-	.brand-logo .logo-mark {
-		width: 44px;
-		height: 44px;
-		border-radius: 11px;
-		animation: logo-float 3s ease-in-out infinite;
-	}
-
-	@keyframes logo-float {
-		0%,
-		100% {
-			transform: translateY(0px);
-		}
-		50% {
-			transform: translateY(-4px);
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.brand-logo .logo-mark {
-			animation: none;
-		}
-	}
 
 	.header-text {
 		display: flex;
@@ -502,6 +223,7 @@
 	}
 
 	/* ── Mode Toggle ─────────────────────────────────────────── */
+
 	.mode-toggle {
 		position: relative;
 		display: grid;
@@ -560,11 +282,13 @@
 	}
 
 	/* ── Forms ───────────────────────────────────────────────── */
+
 	.forms-container {
 		margin-bottom: 0.5rem;
 	}
 
 	/* ── Invite-only badge (beta) ────────────────────────────── */
+
 	.beta-badge {
 		display: inline-block;
 		margin-left: 0.4rem;
@@ -581,107 +305,27 @@
 	}
 
 	/* ── Divider + Social ────────────────────────────────────── */
-	.divider {
-		display: flex;
-		align-items: center;
-		gap: 1.25rem;
-		margin: 2rem 0;
-		color: var(--text-secondary);
-		font-size: 0.8rem;
-		letter-spacing: 0.3px;
-		text-transform: uppercase;
-		font-weight: 500;
-	}
-
-	.divider::before,
-	.divider::after {
-		content: '';
-		flex: 1;
-		height: 1px;
-		background: var(--border);
-	}
-
-	.social-auth {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
-	}
-
-	.social-button {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.75rem;
-		padding: 0.95rem 1.25rem;
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		color: var(--text-primary);
-		font-size: 0.85rem;
-		font-weight: 600;
-		font-family: var(--font-body);
-		cursor: pointer;
-		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-		letter-spacing: 0.3px;
-		text-transform: uppercase;
-		position: relative;
-		overflow: hidden;
-	}
-
-	.social-button::before {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: -100%;
-		width: 100%;
-		height: 100%;
-		background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
-		transition: left 0.5s ease;
-	}
-
-	.social-button:hover {
-		background: rgba(212, 145, 42, 0.1);
-		border-color: rgba(212, 145, 42, 0.25);
-		color: var(--gold-primary);
-		transform: translateY(-2px);
-	}
-
-	.social-button:hover::before {
-		left: 100%;
-	}
-
-	.social-button svg {
-		width: 18px;
-		height: 18px;
-		transition: transform 0.25s ease;
-		flex-shrink: 0;
-	}
-
-	.social-button:hover svg {
-		transform: scale(1.15);
-	}
 
 	/* ── Responsive ──────────────────────────────────────────── */
 
 	/* Desktop: hide card header, brand panel shows branding */
+
 	@media (min-width: 769px) {
 		.auth-header {
 			display: none;
 		}
+
 		.auth-card {
 			max-width: 440px;
 		}
 	}
 
 	/* Tablet / mobile: single column */
+
 	@media (max-width: 768px) {
 		main.auth-container {
 			grid-template-columns: 1fr;
 			background: linear-gradient(135deg, #0d0800 0%, #08090a 50%, #0d0800 100%);
-		}
-
-		.brand-panel {
-			display: none;
 		}
 
 		.auth-panel {
@@ -728,14 +372,6 @@
 
 		.mode-toggle {
 			margin-bottom: 2rem;
-		}
-
-		.social-auth {
-			grid-template-columns: 1fr;
-		}
-
-		.divider {
-			margin: 1.5rem 0;
 		}
 	}
 

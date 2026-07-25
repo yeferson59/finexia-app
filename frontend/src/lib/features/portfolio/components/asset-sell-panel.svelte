@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import DatePicker from '$lib/ui/date-picker.svelte';
-	import { formatCalendarDate, todayLocalDateString } from '$lib/utils';
+	import { todayLocalDateString } from '$lib/utils';
 	import type { Holding, Transaction } from '$lib/api/types';
+	import AssetSellPanelHeader from './asset-sell-panel-header.svelte';
 
 	let {
 		transaction,
@@ -74,23 +75,7 @@
 </script>
 
 <div class="sell-panel" bind:this={sellPanelEl}>
-	<div class="sell-panel-header">
-		<div class="sell-panel-info">
-			<span class="sell-panel-title">Vender desde compra</span>
-			<span class="sell-panel-lot">
-				Lote: {parseFloat(transaction.quantity).toLocaleString('es-CO', {
-					maximumFractionDigits: 8
-				})}
-				unidades @ {formatCurrency(parseFloat(transaction.price))} ·
-				{formatCalendarDate(transaction.transactionDate, {
-					year: 'numeric',
-					month: 'short',
-					day: 'numeric'
-				})}
-			</span>
-		</div>
-		<button class="sell-panel-close" type="button" onclick={onClose}>✕</button>
-	</div>
+	<AssetSellPanelHeader {transaction} {formatCurrency} {onClose} />
 
 	<div class="sell-mode-toggle">
 		<button
@@ -279,49 +264,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
-	}
-
-	.sell-panel-header {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 1rem;
-	}
-
-	.sell-panel-info {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-
-	.sell-panel-title {
-		font-size: 0.9rem;
-		font-weight: 700;
-		color: var(--red);
-		text-transform: uppercase;
-		letter-spacing: 0.3px;
-	}
-
-	.sell-panel-lot {
-		font-size: 0.82rem;
-		color: rgba(236, 234, 229, 0.6);
-		font-family: var(--font-mono);
-	}
-
-	.sell-panel-close {
-		padding: 0.2rem 0.5rem;
-		border: none;
-		background: transparent;
-		color: rgba(236, 234, 229, 0.4);
-		font-size: 1rem;
-		cursor: pointer;
-		border-radius: 4px;
-		transition: color 0.2s ease;
-		flex-shrink: 0;
-	}
-
-	.sell-panel-close:hover {
-		color: var(--text);
 	}
 
 	.sell-mode-toggle {

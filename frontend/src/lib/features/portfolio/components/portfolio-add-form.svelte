@@ -1,4 +1,6 @@
 <script lang="ts">
+	import PortfolioRiskPicker from './portfolio-risk-picker.svelte';
+	import PortfolioGoalFieldset from './portfolio-goal-fieldset.svelte';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -154,73 +156,16 @@
 				</div>
 			</div>
 
-			<div class="form-group">
-				<label class="label" for="risk">Nivel de Riesgo *</label>
-				<fieldset class="risk-options">
-					{#each risks as risk (risk.id)}
-						<label class="radio-label">
-							<input
-								type="radio"
-								name="riskId"
-								value={risk.id}
-								bind:group={formData.riskLevel}
-								disabled={isSubmitting}
-								required
-							/>
-							<span class="radio-content">
-								<span class="radio-title">{risk.name}</span>
-								<span class="radio-description">{risk.description}</span>
-							</span>
-						</label>
-					{/each}
-				</fieldset>
-			</div>
+			<PortfolioRiskPicker {risks} bind:selected={formData.riskLevel} disabled={isSubmitting} />
 		</fieldset>
 
-		<fieldset class="form-section">
-			<legend class="section-title">Objetivo Financiero</legend>
-
-			<div class="form-group">
-				<label for="targetAmount" class="label">Monto Objetivo (opcional)</label>
-				<div class="input-with-prefix">
-					<span class="prefix">{formData.currency}</span>
-					<input
-						type="number"
-						id="targetAmount"
-						bind:value={formData.targetAmount}
-						placeholder="0.00"
-						class="input"
-						name="priceValue"
-						class:error={errors.targetAmount}
-						disabled={isSubmitting}
-						step="0.01"
-						min="0"
-					/>
-				</div>
-				{#if errors.targetAmount}
-					<span class="error-message">{errors.targetAmount}</span>
-				{/if}
-				<p class="help-text">Define el monto que deseas alcanzar en este portafolio</p>
-			</div>
-
-			<div class="form-group">
-				<label class="checkbox-label" for="isDefault">
-					<input
-						type="checkbox"
-						id="isDefault"
-						name="isDefault"
-						bind:checked={formData.isDefault}
-						disabled={isSubmitting}
-					/>
-					<span class="checkbox-content">
-						<span class="checkbox-title">Marcar como portafolio por defecto</span>
-						<span class="checkbox-description">
-							Este portafolio se usará como selección predeterminada
-						</span>
-					</span>
-				</label>
-			</div>
-		</fieldset>
+		<PortfolioGoalFieldset
+			currency={formData.currency}
+			bind:targetAmount={formData.targetAmount}
+			bind:isDefault={formData.isDefault}
+			error={errors.targetAmount}
+			disabled={isSubmitting}
+		/>
 
 		<div class="form-actions">
 			<button type="button" onclick={handleCancel} class="btn-cancel" disabled={isSubmitting}>
@@ -361,147 +306,6 @@
 	.error-message {
 		font-size: 0.8rem;
 		color: var(--red);
-	}
-
-	.help-text {
-		margin: 0;
-		font-size: 0.8rem;
-		color: rgba(236, 234, 229, 0.5);
-	}
-
-	.input-with-prefix {
-		display: flex;
-		align-items: center;
-		border: 1px solid rgba(212, 145, 42, 0.2);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.022);
-		overflow: hidden;
-		transition: all 0.3s ease;
-	}
-
-	.input-with-prefix:focus-within {
-		border-color: var(--amber);
-		background: rgba(255, 255, 255, 0.022);
-		box-shadow: 0 0 0 3px var(--border);
-	}
-
-	.prefix {
-		padding: 0.85rem;
-		color: var(--amber);
-		font-weight: 600;
-		border-right: 1px solid rgba(212, 145, 42, 0.2);
-		background: var(--surface);
-	}
-
-	.input-with-prefix .input {
-		flex: 1;
-		padding: 0.85rem;
-		border: none;
-		background: transparent;
-	}
-
-	.input-with-prefix .input:focus {
-		box-shadow: none;
-	}
-
-	.risk-options {
-		display: grid;
-		gap: 1rem;
-		border: none;
-		padding: 0;
-		margin: 0;
-	}
-
-	.radio-label {
-		display: flex;
-		align-items: flex-start;
-		gap: 1rem;
-		padding: 1rem;
-		border: 1px solid var(--border-strong);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.022);
-		cursor: pointer;
-		transition: all 0.3s ease;
-	}
-
-	.radio-label:hover {
-		background: var(--border);
-		border-color: rgba(212, 145, 42, 0.3);
-	}
-
-	.radio-label input[type='radio'] {
-		margin-top: 0.25rem;
-		cursor: pointer;
-		accent-color: var(--amber);
-		width: 18px;
-		height: 18px;
-	}
-
-	.radio-label input[type='radio']:disabled {
-		cursor: not-allowed;
-		opacity: 0.6;
-	}
-
-	.radio-content {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-	}
-
-	.radio-title {
-		font-weight: 600;
-		color: var(--text);
-	}
-
-	.radio-description {
-		font-size: 0.85rem;
-		color: rgba(236, 234, 229, 0.5);
-	}
-
-	.checkbox-label {
-		display: flex;
-		align-items: flex-start;
-		gap: 1rem;
-		padding: 1rem;
-		border: 1px solid var(--border-strong);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.022);
-		cursor: pointer;
-		transition: all 0.3s ease;
-	}
-
-	.checkbox-label:hover {
-		background: var(--border);
-		border-color: rgba(212, 145, 42, 0.3);
-	}
-
-	.checkbox-label input[type='checkbox'] {
-		margin-top: 0.2rem;
-		cursor: pointer;
-		accent-color: var(--amber);
-		width: 18px;
-		height: 18px;
-	}
-
-	.checkbox-label input[type='checkbox']:disabled {
-		cursor: not-allowed;
-		opacity: 0.6;
-	}
-
-	.checkbox-content {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-	}
-
-	.checkbox-title {
-		font-weight: 600;
-		color: var(--text);
-	}
-
-	.checkbox-description {
-		font-size: 0.85rem;
-		color: rgba(236, 234, 229, 0.5);
 	}
 
 	.form-actions {

@@ -459,13 +459,31 @@ producto de inversión resolvía el producto en un `$effect`, así que en SSR
 renderizaba siempre "Producto no encontrado" y lo arreglaba al hidratar; con
 `$derived` el servidor ya envía el contenido real.
 
-**Por encima del presupuesto al cerrar la fase** (para la auditoría de la Fase 7):
-`portfolio-add-form` (587), `portfolio-entry-form` (574) y `asset-sell-panel`
-(501). Los tres son formularios cuyo peso es CSS *scoped*: sus clases
-(`.form-group`, `.form-input`, `.btn`…) tienen nombres genéricos que colisionarían
-con otras páginas si se subieran a una hoja global, así que no se puede aplicar el
-patrón `landing.css` / `auth-forms.css`. Trocearlos más solo duplicaría ese CSS
-entre hijos. Se deja constancia aquí y se decide en la Fase 7.
+**Presupuesto de tamaño, revisión transversal (Fases 3–5).** Al cerrar la Fase 5
+quedaban seis componentes por encima de las ~500 líneas, arrastrados desde las
+fases 3 y 4 además de la propia 5. La hipótesis inicial era que no se podían
+trocear sin subir su CSS a una hoja global (imposible: clases de nombre genérico)
+o sin duplicarlo entre hijos. Al revisarlos uno a uno resultó falsa: en todos
+había bloques con **CSS exclusivo**, que se llevan sus reglas enteras sin
+duplicar nada y sin tocar el HTML renderizado.
+
+| Componente | Fase | Antes | Después | Extraído |
+|---|---|---:|---:|---|
+| `login-register` | 4 | 747 | 383 | `auth-brand-panel`, `auth-social-buttons` |
+| `hero` | 3 | 568 | 90 | `hero-countdown`, `hero-waitlist`, `hero-preview-cards` |
+| `portfolio-add-form` | 5 | 587 | 391 | `portfolio-risk-picker`, `portfolio-goal-fieldset` |
+| `portfolio-entry-form` | 5 | 574 | 490 | `portfolio-entry-platform-field` |
+| `import-mapping-step` | 5 | 546 | 366 | `import-preview-table` |
+| `asset-sell-panel` | 5 | 501 | 443 | `asset-sell-panel-header` |
+
+Los componentes extraídos son internos de su padre (import relativo), salvo que
+ya estuvieran en el `index.ts`. De paso, `import-mapping-step` e
+`import-preview-table` compartían el mapa de tipos de operación: se centralizó en
+`features/transactions/transactions.ts`, siguiendo la convención `<feature>.ts`
+del resto de features.
+
+Con esto, **ningún archivo de producción supera ~500 líneas** fuera del área que
+toca la Fase 6 (`settings/+page.svelte` y las tres páginas de `admin/`).
 
 ### Fase 6 — Features restantes: `settings`, `admin`
 
