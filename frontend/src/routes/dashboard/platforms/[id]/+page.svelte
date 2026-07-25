@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { PlatformDetail, type Platform } from '$lib/features/platforms';
+	import { PlatformDetail } from '$lib/features/platforms';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
 
-	const platform = $derived(data.platform as unknown as Platform);
+	const platform = $derived(data.platform);
 </script>
 
 <svelte:head>

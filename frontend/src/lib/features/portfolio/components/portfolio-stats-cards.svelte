@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Card from '$lib/ui/card.svelte';
 	import { formatCalendarDate } from '$lib/utils';
-	import { formatPct, type HoldingView, type TopTransactionData } from '../portfolio';
+	import { formatPct, type HoldingView, type TopTransaction } from '../portfolio';
 
 	let {
 		totalValue,
@@ -21,7 +21,7 @@
 		bestHolding: HoldingView | null;
 		worstHolding: HoldingView | null;
 		topConcentration: HoldingView | null;
-		topTransaction: TopTransactionData | null;
+		topTransaction: TopTransaction | null;
 		formatCurrency: (value: number) => string;
 	} = $props();
 </script>

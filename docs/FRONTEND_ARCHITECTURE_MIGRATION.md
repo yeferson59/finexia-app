@@ -96,7 +96,8 @@ frontend/src/
     │   ├── transactions/       # listado + wizard de import
     │   ├── platforms/
     │   ├── dashboard/          # widgets: net-worth, allocation, recent-activity…
-    │   │   └── state/          # ← lib/stores/investments.svelte.ts
+    │   ├── investments/        # catálogo de productos + state/ (← lib/stores/
+    │   │                       #   investments.svelte.ts)
     │   ├── settings/
     │   ├── admin/              # users, assets, exchange-rates
     │   ├── landing/            # ← components/landing-page/
@@ -324,46 +325,36 @@ Decisiones validadas con la feature piloto, que las Fases 4–6 deben seguir:
   `<svelte:head>` (título + `robots noindex`) como orquestación de página; el
   componente de feature solo aporta el `<main>` del formulario.
 
-### Fase 5 — Features del área de inversión: `portfolio`, `dashboard`, `transactions`, `platforms`
+### Fase 5 — Features del área de inversión: `portfolio`, `dashboard`, `transactions`, `platforms`, `investments` ✅
 
 *(una feature = un PR; orden sugerido de menor a mayor riesgo)*
 
-- [x] `lib/features/dashboard/`:
-  - [x] Mover `components/dashboard/*` (sidebar, header, net-worth-card,
-        asset-allocation, portfolio-growth, portfolio-overview, recent-activity,
-        currency-toggle).
-  - [ ] Mover `lib/stores/investments.svelte.ts` → `features/dashboard/state/`
-        (o a `features/portfolio` si el piloto de Fase 3 sugirió otra cosa) con su spec.
+- [x] `lib/features/dashboard/`: mover `components/dashboard/*` (sidebar, header,
+      net-worth-card, asset-allocation, portfolio-growth, portfolio-overview,
+      recent-activity, currency-toggle) a `features/dashboard/components/`, con
+      `index.ts` como superficie pública. `currency-toggle` queda interno de
+      `net-worth-card` (import relativo); el resto se consume desde
+      `$lib/features/dashboard`.
+      *(Verificación: `pnpm check` 0 errores, `pnpm lint`, 141 unit tests, 22 E2E.)*
+  - Nota: los widgets siguen importando `privacy` de `$lib/stores/privacy` y los
+    formatters de `$lib/utils` sin cambios; su relocalización a `lib/shared` es
+    transversal y se aborda en Fase 7.
 - [x] `lib/features/platforms/`: extraer componentes de
-        currency-toggle) a `features/dashboard/components/`, con `index.ts` como
-        superficie pública. `currency-toggle` queda interno de `net-worth-card`
-        (import relativo); el resto se consume desde `$lib/features/dashboard`.
-  - [x] Mover `lib/stores/investments.svelte.ts` → `features/dashboard/state/`
-        con su spec; las páginas de `routes/dashboard/investments/**` importan el
-        store desde `$lib/features/dashboard`.
-        *(Verificación estándar: `pnpm check` 0 errores, `pnpm lint`, 141 unit
-        tests, 22 E2E — todo en verde.)*
-        - Nota: los widgets siguen importando `privacy` de `$lib/stores/privacy`
-          y los formatters de `$lib/utils` sin cambios; su relocalización a
-          `lib/shared` es transversal y se aborda en Fase 7 (fuera del alcance de
-          este PR de solo-dashboard).
-- [ ] `lib/features/platforms/`: extraer componentes de
       `routes/dashboard/platforms/**` (782 líneas la página de detalle).
-  - `platform-card` (tarjeta del listado), `platform-detail` (ver/editar/eliminar,
-    con su modal) y `platform-add-form`; `platforms.ts` centraliza el mapa
-    `PLATFORM_TYPES` + `formatSourceType` + el tipo `Platform` (antes duplicados
-    en detalle y alta). Las 3 páginas quedan como composición delgada.
+  - `platform-card` (tarjeta del listado), `platform-detail` (ver/editar/eliminar)
+    y `platform-add-form`; `platforms.ts` centraliza el mapa `PLATFORM_TYPES` +
+    `formatSourceType` y reexporta el contrato `Platform` de `$lib/api/types`.
+    Las 3 páginas quedan como composición delgada.
+  - `platform-edit-form` y `platform-delete-dialog` se extrajeron después, al
+    revisar la fase: el `platform-detail` inicial (747 líneas) superaba el
+    presupuesto de ~500. Son internos del detalle (import relativo).
   - Como no hay E2E de platforms (no estaba en el smoke de Fase 0), se añadieron
     specs de render por componente (`platform-card`, `platform-detail`) como red
     de seguridad de la extracción.
-  - *(Verificación: `pnpm check` 0 errores, `pnpm lint`, 147 unit tests, 22 E2E
-    en verde.)*
-- [ ] `lib/features/portfolio/`:
-  - [ ] Trocear `portfolios/[id]/assets/[symbol]/+page.svelte` (**2.014 líneas**) —
-        el peor archivo del frontend — en componentes de feature (cabecera del
-        asset, gráfico, historial de transacciones, formularios de compra/venta…).
+      *(Verificación: `pnpm check` 0 errores, `pnpm lint`, 147 unit tests, 22 E2E.)*
+- [x] `lib/features/portfolio/`:
   - [x] Trocear `portfolios/[id]/+page.svelte` (1.309 → 358) y
-        `portfolios/[id]/add/+page.svelte` (604 → 13). *(Rama 1 de portfolio.)*
+        `portfolios/add/+page.svelte` (604 → 13). *(Rama 1 de portfolio.)*
         - Componentes: `portfolio-summary-cards`, `portfolio-stats-cards`,
           `allocation-donut`, `holdings-table`, `portfolio-edit-form`,
           `portfolio-add-form`. `portfolio.ts` centraliza helpers puros
@@ -372,11 +363,31 @@ Decisiones validadas con la feature piloto, que las Fases 4–6 deben seguir:
           con su `portfolio.spec.ts`.
         - `formatCurrency` (usa `privacy` + `baseCurrency`) se crea en la página
           y se pasa como prop a los componentes que lo necesitan.
-        - `portfolio-growth` se sigue importando de `$components/dashboard`
-          (la migración de dashboard va en otra rama; no es feature↛feature).
-        - *(Verificación: `pnpm check` 0 errores/0 warnings, `pnpm lint`, 146
-          unit tests, 22 E2E incluido `portfolio.e2e.ts` — todo en verde.)*
-  - [ ] Trocear `investments/*` (714 + 474) reutilizando los mismos componentes.
+        *(Verificación: `pnpm check` 0 errores, `pnpm lint`, 146 unit tests, 22 E2E.)*
+  - [x] Trocear `portfolios/[id]/assets/[symbol]/+page.svelte` (**2.014 → 120**),
+        el peor archivo del frontend. *(Rama 2 de portfolio.)*
+        - Presentacionales: `asset-position-header`, `asset-position-summary`,
+          `asset-info-panel`. `asset-transaction-history` orquesta el formulario
+          de alta, el panel de venta rápida, la tabla + paginación y el modal de
+          edición (los cuatro internos, import relativo).
+        - `asset.ts` centraliza constantes (`TRANSACTION_TYPES`, `TYPE_STYLE`,
+          `TYPE_LABEL`), el clasificador del formulario (`txnModeFor`,
+          `priceLabelFor`) y `computePosition`, con `asset.spec.ts`.
+        - La página no tenía E2E (no estaba en el smoke de Fase 0): **antes** de
+          trocearla se añadieron dos casos a `portfolio.e2e.ts` (resumen +
+          historial; apertura de los formularios de alta y venta rápida) y la
+          ruta paginada de transacciones por activo al stub `mock-api.mjs`.
+  - [x] Bajar del presupuesto de ~300 líneas por página las dos que quedaban del
+        área: `portfolios/+page.svelte` (457 → 243) extrayendo `portfolio-card`
+        (y llevando `PORTFOLIO_TYPE_LABELS`/`formatPortfolioType`/`riskTone` a
+        `portfolio.ts`), y `portfolios/[id]/+page.svelte` (358 → 174) extrayendo
+        `portfolio-detail-header`.
+  - [x] Trocear `portfolios/[id]/add/+page.svelte` (996 → 17): `portfolio-entry-form`
+        con `asset-combobox` (buscador con debounce), `asset-preview` y
+        `portfolio-entry-summary` como internos. El tipo local `AssetSuggestion`
+        se sustituye por el contrato `Asset` de `$lib/api/types`.
+        *(Verificación: `pnpm check` 0 errores/0 warnings, `pnpm lint`, 157 unit
+        tests, 24 E2E.)*
 - [x] `lib/features/transactions/`: trocear `transactions/import/+page.svelte`
       (1.007) en pasos del wizard.
   - `import-wizard` (contenedor: máquina de estados + lógica de fetch a
@@ -391,9 +402,88 @@ Decisiones validadas con la feature piloto, que las Fases 4–6 deben seguir:
     `.form-group` colisionarían si fueran globales), como en el resto de páginas
     del dashboard. Cubierto por el E2E existente `transactions.e2e.ts`
     (upload → preview).
-  - *(Verificación: `pnpm check` 0 errores, `pnpm lint`, 141 unit tests, 22 E2E
-    en verde.)*
-- [ ] Cada PR: verificación estándar + E2E del flujo correspondiente.
+    *(Verificación: `pnpm check` 0 errores, `pnpm lint`, 141 unit tests, 22 E2E.)*
+- [x] `lib/features/investments/`: trocear `investments/[id]` (711 → 20) e
+      `investments/add` (474 → 10).
+  - `investment-detail` (con `investment-metrics` e `investment-key-facts` como
+    internos, para que ninguno pase de ~500 líneas) y `investment-add-form`.
+  - `investments.ts` centraliza el catálogo mock, `fromStoredInvestment`,
+    `getRiskColor` y `findInvestmentProduct`, con `investments.spec.ts`.
+  - El listado (242 líneas, ya bajo presupuesto) solo cambia el import del store,
+    igual que se dejó `platforms/+page.svelte`.
+    *(Verificación: `pnpm check` 0 errores/0 warnings, `pnpm lint`, 163 unit
+    tests, 24 E2E.)*
+- [x] Cada PR: verificación estándar + E2E del flujo correspondiente.
+
+#### 5.1 Dónde acabó el store de productos de inversión
+
+El plan dejaba abierto si `lib/stores/investments.svelte.ts` iba a
+`features/dashboard/state/` o a `features/portfolio`. Se movió primero a
+`features/dashboard/state/`, pero al cerrar la fase quedó claro que **ningún
+widget del dashboard lo usa**: solo lo consumen las páginas de
+`routes/dashboard/investments/**`. Con la extracción de esas dos páginas se creó
+`lib/features/investments/`, que agrupa estado (`state/`), datos (`investments.ts`)
+y componentes; el barrel de `dashboard` ya no lo exporta. Es la quinta feature de
+esta fase, aunque el título original solo listaba cuatro.
+
+#### 5.2 Revisión de cierre de la fase
+
+Al revisar lo mergeado en las ramas anteriores aparecieron cuatro defectos, todos
+corregidos antes de dar la fase por cerrada:
+
+1. **Import por ruta interna**: `routes/dashboard/portfolios/[id]` importaba
+   `PortfolioGrowth` de `features/dashboard/components/...` en vez del `index.ts`
+   de la feature (la regla que la Fase 7 va a blindar con ESLint).
+2. **Casts que tapaban los tipos**: cinco `as unknown as` en las páginas de
+   detalle de portfolio y de plataforma. Los tipos de `lib/api` ya encajaban:
+   `pnpm check` sigue en 0 errores sin ellos.
+3. **Contratos duplicados otra vez** (justo lo que centralizó la Fase 2):
+   `Platform` en `features/platforms`, y `TopTransactionData`/`GrowthDataPoint`/
+   `GrowthSummary` en `features/portfolio` y `portfolio-growth`. Las copias ya
+   habían divergido: a `GrowthSummary` le faltaba `firstDate` y `Platform`
+   inventaba un `updatedAt` que la API no devuelve. Ahora se importan de
+   `$lib/api/types` y la feature los reexporta.
+4. **Presupuesto de tamaño**: `platform-detail` (747) superaba las ~500 líneas.
+
+Dos correcciones de código muerto o roto al mover la página de alta de posición,
+como excepción explícita a la regla "mover ≠ mejorar" (se documentan aquí en vez
+de en `TECH_DEBT.md` porque son parte del código movido):
+
+- `.combobox-spinner` se usaba sin ninguna regla CSS: el indicador de carga del
+  buscador de activos era invisible.
+- La rama "✓ Guardado" del botón dependía de un `submitSuccess` que nunca se
+  ponía a `true` (inalcanzable).
+
+Y una diferencia de comportamiento que la extracción corrige: el detalle de
+producto de inversión resolvía el producto en un `$effect`, así que en SSR
+renderizaba siempre "Producto no encontrado" y lo arreglaba al hidratar; con
+`$derived` el servidor ya envía el contenido real.
+
+**Presupuesto de tamaño, revisión transversal (Fases 3–5).** Al cerrar la Fase 5
+quedaban seis componentes por encima de las ~500 líneas, arrastrados desde las
+fases 3 y 4 además de la propia 5. La hipótesis inicial era que no se podían
+trocear sin subir su CSS a una hoja global (imposible: clases de nombre genérico)
+o sin duplicarlo entre hijos. Al revisarlos uno a uno resultó falsa: en todos
+había bloques con **CSS exclusivo**, que se llevan sus reglas enteras sin
+duplicar nada y sin tocar el HTML renderizado.
+
+| Componente | Fase | Antes | Después | Extraído |
+|---|---|---:|---:|---|
+| `login-register` | 4 | 747 | 383 | `auth-brand-panel`, `auth-social-buttons` |
+| `hero` | 3 | 568 | 90 | `hero-countdown`, `hero-waitlist`, `hero-preview-cards` |
+| `portfolio-add-form` | 5 | 587 | 391 | `portfolio-risk-picker`, `portfolio-goal-fieldset` |
+| `portfolio-entry-form` | 5 | 574 | 490 | `portfolio-entry-platform-field` |
+| `import-mapping-step` | 5 | 546 | 366 | `import-preview-table` |
+| `asset-sell-panel` | 5 | 501 | 443 | `asset-sell-panel-header` |
+
+Los componentes extraídos son internos de su padre (import relativo), salvo que
+ya estuvieran en el `index.ts`. De paso, `import-mapping-step` e
+`import-preview-table` compartían el mapa de tipos de operación: se centralizó en
+`features/transactions/transactions.ts`, siguiendo la convención `<feature>.ts`
+del resto de features.
+
+Con esto, **ningún archivo de producción supera ~500 líneas** fuera del área que
+toca la Fase 6 (`settings/+page.svelte` y las tres páginas de `admin/`).
 
 ### Fase 6 — Features restantes: `settings`, `admin`
 

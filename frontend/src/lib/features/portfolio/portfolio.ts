@@ -1,7 +1,14 @@
 /**
  * Helpers puros, constantes y tipos de la feature `portfolio`, compartidos por
  * los componentes de detalle y de alta. Sin dependencias de Svelte ni de red.
+ *
+ * Los contratos del backend NO se redeclaran aquí: se importan de
+ * `$lib/api/types` (única fuente de verdad) y se reexportan para que los
+ * componentes de la feature no tengan que conocer la capa de API.
  */
+import type { GrowthDataPoint, GrowthSummary, Holding, TopTransaction } from '$lib/api/types';
+
+export type { GrowthDataPoint, GrowthSummary, TopTransaction };
 
 export const PORTFOLIO_TYPES: { value: string; label: string }[] = [
 	{ value: 'stocks_etfs', label: 'Acciones y ETF' },
@@ -37,15 +44,14 @@ export const ASSET_TYPE_COLORS: Record<string, string> = {
 	other: '#6b7280'
 };
 
-/** Entrada de holding cruda tal como llega del backend (valores en string). */
-export interface RawHolding {
-	ticker: string;
-	name: string;
-	assetType: string;
-	quantity: string;
-	price: string;
-	marketPrice: string;
-}
+/**
+ * Subconjunto de `Holding` que necesita la agregación por ticker. Se deriva del
+ * contrato para que un cambio de nombre/tipo en la API rompa aquí.
+ */
+export type RawHolding = Pick<
+	Holding,
+	'ticker' | 'name' | 'assetType' | 'quantity' | 'price' | 'marketPrice'
+>;
 
 /** Holding agregado por ticker, listo para pintar. */
 export interface HoldingView {
@@ -72,29 +78,6 @@ export interface TypeBreakdownSlice {
 export interface DonutSegment extends TypeBreakdownSlice {
 	dasharray: string;
 	dashoffset: number;
-}
-
-export interface TopTransactionData {
-	value: string;
-	type: string;
-	currency: string;
-	assetTicker: string;
-	assetName: string;
-	transactionDate: string;
-}
-
-export interface GrowthDataPoint {
-	date: string;
-	totalValue: string;
-	totalCostBase: string;
-	gainLoss: string;
-	gainLossPct: string;
-}
-
-export interface GrowthSummary {
-	initialValue: string;
-	currentValue: string;
-	totalGrowthPct: string;
 }
 
 /**
@@ -185,4 +168,61 @@ export function computeDonutSegments(typeBreakdown: TypeBreakdownSlice[]): Donut
 
 export function formatPct(value: number): string {
 	return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+}
+
+/**
+ * Etiquetas legibles del `type` de un portafolio (combinaciones de clases de
+ * activo que devuelve el backend).
+ */
+export const PORTFOLIO_TYPE_LABELS: Record<string, string> = {
+	stocks: 'Acciones',
+	etfs: 'ETFs',
+	cryptos: 'Criptomonedas',
+	bonds: 'Bonos',
+	cash: 'Efectivo',
+	forex: 'Forex',
+	real_estates: 'Inmobiliario',
+	commodities: 'Materias primas',
+	stocks_etfs: 'Acciones & ETFs',
+	stocks_cryptos: 'Acciones & Cripto',
+	stocks_bonds: 'Acciones & Bonos',
+	stocks_cash: 'Acciones & Efectivo',
+	stocks_real_estates: 'Acciones & Inmobiliario',
+	stocks_commodities: 'Acciones & Materias primas',
+	etfs_cryptos: 'ETFs & Cripto',
+	etfs_bonds: 'ETFs & Bonos',
+	etfs_cash: 'ETFs & Efectivo',
+	etfs_real_estates: 'ETFs & Inmobiliario',
+	etfs_commodities: 'ETFs & Materias primas',
+	cryptos_bonds: 'Cripto & Bonos',
+	cryptos_cash: 'Cripto & Efectivo',
+	cryptos_real_estates: 'Cripto & Inmobiliario',
+	cryptos_commodities: 'Cripto & Materias primas',
+	bonds_cash: 'Bonos & Efectivo',
+	bonds_real_estates: 'Bonos & Inmobiliario',
+	bonds_commodities: 'Bonos & Materias primas',
+	cash_real_estates: 'Efectivo & Inmobiliario',
+	cash_commodities: 'Efectivo & Materias primas',
+	real_estates_commodities: 'Inmobiliario & Materias primas',
+	forex_stocks: 'Forex & Acciones',
+	forex_etfs: 'Forex & ETFs',
+	forex_cryptos: 'Forex & Cripto',
+	forex_bonds: 'Forex & Bonos',
+	forex_cash: 'Forex & Efectivo',
+	forex_real_states: 'Forex & Inmobiliario',
+	forex_commodities: 'Forex & Materias primas',
+	diversified: 'Diversificado'
+};
+
+export function formatPortfolioType(type: string): string {
+	return PORTFOLIO_TYPE_LABELS[type] ?? type.replace(/_/g, ' ');
+}
+
+/** Tono del badge de riesgo, a partir del nombre del nivel. */
+export function riskTone(name: string): 'success' | 'warning' | 'danger' | 'neutral' {
+	const n = name.toLowerCase();
+	if (n.includes('bajo')) return 'success';
+	if (n.includes('moderado')) return 'warning';
+	if (n.includes('alto')) return 'danger';
+	return 'neutral';
 }

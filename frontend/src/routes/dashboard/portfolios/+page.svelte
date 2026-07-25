@@ -2,10 +2,9 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import PageHeader from '$lib/ui/page-header.svelte';
-	import Badge from '$lib/ui/badge.svelte';
-	import ProgressBar from '$lib/ui/progress-bar.svelte';
 	import Pagination from '$lib/ui/pagination.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
+	import { PortfolioCard, formatPct } from '$lib/features/portfolio';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
@@ -16,7 +15,7 @@
 	let page = $state(1);
 	const pagedPortfolios = $derived(portfolios.slice((page - 1) * PER_PAGE, page * PER_PAGE));
 
-	// Aggregate totals across all portfolios
+	// Totales agregados de todos los portafolios
 	const totalMarketValue = $derived(
 		portfolios.reduce((s, p) => s + (parseFloat(p.totalMarketValue) || 0), 0)
 	);
@@ -37,10 +36,6 @@
 		);
 	}
 
-	function fmtPct(value: number): string {
-		return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
-	}
-
 	function openPortfolio(id: string) {
 		goto(resolve('/dashboard/portfolios/[id]', { id }));
 	}
@@ -49,62 +44,10 @@
 		goto(resolve('/dashboard/portfolios/add'));
 	}
 
-	function riskTone(name: string): 'success' | 'warning' | 'danger' | 'neutral' {
-		const n = name.toLowerCase();
-		if (n.includes('bajo')) return 'success';
-		if (n.includes('moderado')) return 'warning';
-		if (n.includes('alto')) return 'danger';
-		return 'neutral';
-	}
-
-	// Each portfolio's share of total market value (for the progress bar)
+	// Peso de cada portafolio sobre el valor de mercado total (barra de progreso)
 	function allocation(marketValue: string): number {
 		const v = parseFloat(marketValue) || 0;
 		return totalMarketValue > 0 ? (v / totalMarketValue) * 100 : 0;
-	}
-
-	const TYPE_LABELS: Record<string, string> = {
-		stocks: 'Acciones',
-		etfs: 'ETFs',
-		cryptos: 'Criptomonedas',
-		bonds: 'Bonos',
-		cash: 'Efectivo',
-		forex: 'Forex',
-		real_estates: 'Inmobiliario',
-		commodities: 'Materias primas',
-		stocks_etfs: 'Acciones & ETFs',
-		stocks_cryptos: 'Acciones & Cripto',
-		stocks_bonds: 'Acciones & Bonos',
-		stocks_cash: 'Acciones & Efectivo',
-		stocks_real_estates: 'Acciones & Inmobiliario',
-		stocks_commodities: 'Acciones & Materias primas',
-		etfs_cryptos: 'ETFs & Cripto',
-		etfs_bonds: 'ETFs & Bonos',
-		etfs_cash: 'ETFs & Efectivo',
-		etfs_real_estates: 'ETFs & Inmobiliario',
-		etfs_commodities: 'ETFs & Materias primas',
-		cryptos_bonds: 'Cripto & Bonos',
-		cryptos_cash: 'Cripto & Efectivo',
-		cryptos_real_estates: 'Cripto & Inmobiliario',
-		cryptos_commodities: 'Cripto & Materias primas',
-		bonds_cash: 'Bonos & Efectivo',
-		bonds_real_estates: 'Bonos & Inmobiliario',
-		bonds_commodities: 'Bonos & Materias primas',
-		cash_real_estates: 'Efectivo & Inmobiliario',
-		cash_commodities: 'Efectivo & Materias primas',
-		real_estates_commodities: 'Inmobiliario & Materias primas',
-		forex_stocks: 'Forex & Acciones',
-		forex_etfs: 'Forex & ETFs',
-		forex_cryptos: 'Forex & Cripto',
-		forex_bonds: 'Forex & Bonos',
-		forex_cash: 'Forex & Efectivo',
-		forex_real_states: 'Forex & Inmobiliario',
-		forex_commodities: 'Forex & Materias primas',
-		diversified: 'Diversificado'
-	};
-
-	function formatType(type: string): string {
-		return TYPE_LABELS[type] ?? type.replace(/_/g, ' ');
 	}
 </script>
 
@@ -155,7 +98,7 @@
 			{fmt(totalGainLoss)}
 		</h2>
 		<p class="hero-delta {totalGainLoss >= 0 ? 'positive' : 'negative'}">
-			{fmtPct(totalGainLossPct)} sobre costo
+			{formatPct(totalGainLossPct)} sobre costo
 		</p>
 	</article>
 </section>
@@ -165,59 +108,12 @@
 
 	<div class="portfolios-grid">
 		{#each pagedPortfolios as portfolio (portfolio.id)}
-			{@const marketValue = parseFloat(portfolio.totalMarketValue) || 0}
-			{@const gainLoss = parseFloat(portfolio.totalGainLoss) || 0}
-			{@const gainLossPct = parseFloat(portfolio.totalGainLossPct) || 0}
-			{@const alloc = allocation(portfolio.totalMarketValue)}
-			<button
-				class="portfolio-card"
-				onclick={() => openPortfolio(portfolio.id)}
-				aria-label={`Abrir ${portfolio.name}`}
-			>
-				<div class="card-header">
-					<div class="portfolio-info">
-						<h3 class="portfolio-name">{portfolio.name}</h3>
-						<p class="portfolio-type">{formatType(portfolio.type)}</p>
-					</div>
-					<div class="card-header-right">
-						<Badge tone={riskTone(portfolio.riskName)} size="md">{portfolio.riskName}</Badge>
-						<svg
-							class="arrow-icon"
-							width="18"
-							height="18"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<path d="M9 18l6-6-6-6" />
-						</svg>
-					</div>
-				</div>
-
-				<div class="card-metrics">
-					<div class="metric">
-						<p class="label">Valor</p>
-						<p class="value">{fmt(marketValue, portfolio.baseCurrency)}</p>
-					</div>
-
-					<div class="metric">
-						<p class="label">Activos</p>
-						<p class="value">{portfolio.totalPositions}</p>
-					</div>
-
-					<div class="metric">
-						<p class="label">ROI</p>
-						<p class="value {gainLoss >= 0 ? 'positive' : 'negative'}">{fmtPct(gainLossPct)}</p>
-					</div>
-				</div>
-
-				<ProgressBar
-					value={alloc}
-					label={`${alloc.toFixed(1)}% del total`}
-					ariaLabel={`Asignación de ${portfolio.name}`}
-				/>
-			</button>
+			<PortfolioCard
+				{portfolio}
+				allocation={allocation(portfolio.totalMarketValue)}
+				formatCurrency={fmt}
+				onOpen={openPortfolio}
+			/>
 		{/each}
 	</div>
 
@@ -325,112 +221,6 @@
 		gap: 1.5rem;
 	}
 
-	.portfolio-card {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-		padding: 1.35rem;
-		border: 1px solid var(--border-strong);
-		border-radius: 16px;
-		background: var(--surface);
-		box-shadow:
-			0 20px 60px rgba(0, 0, 0, 0.3),
-			inset 0 1px 0 rgba(255, 255, 255, 0.05);
-		backdrop-filter: blur(16px);
-		cursor: pointer;
-		transition: all 0.3s ease;
-		text-align: left;
-	}
-
-	.portfolio-card:hover {
-		background: var(--surface-2);
-		border-color: rgba(212, 145, 42, 0.3);
-		transform: translateY(-4px);
-		box-shadow:
-			0 30px 80px rgba(0, 0, 0, 0.4),
-			inset 0 1px 0 rgba(255, 255, 255, 0.05);
-	}
-
-	.card-header {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 1rem;
-	}
-
-	.portfolio-info {
-		flex: 1;
-	}
-
-	.portfolio-name {
-		margin: 0 0 0.3rem;
-		font-size: 1.15rem;
-		color: var(--text);
-		font-weight: 600;
-	}
-
-	.portfolio-type {
-		margin: 0;
-		font-size: 0.8rem;
-		color: rgba(236, 234, 229, 0.52);
-	}
-
-	.card-metrics {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 1rem;
-		padding: 1rem 0;
-		border-top: 1px solid var(--border);
-		border-bottom: 1px solid var(--border);
-	}
-
-	.metric {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-	}
-
-	.metric .label {
-		margin: 0;
-		font-size: 0.7rem;
-		letter-spacing: 0.5px;
-		text-transform: uppercase;
-		color: rgba(236, 234, 229, 0.46);
-	}
-
-	.metric .value {
-		margin: 0;
-		font-size: 1.1rem;
-		font-weight: 600;
-		color: var(--amber-light);
-	}
-
-	.metric .value.positive {
-		color: var(--green);
-	}
-
-	.metric .value.negative {
-		color: var(--red);
-	}
-
-	.card-header-right {
-		display: flex;
-		align-items: center;
-		gap: 0.6rem;
-		flex-shrink: 0;
-	}
-
-	.arrow-icon {
-		color: rgba(212, 145, 42, 0.3);
-		transition: all 0.3s ease;
-		flex-shrink: 0;
-	}
-
-	.portfolio-card:hover .arrow-icon {
-		color: var(--amber-light);
-		transform: translateX(4px);
-	}
-
 	@media (max-width: 1024px) {
 		.summary-cards {
 			grid-template-columns: 1fr;
@@ -448,10 +238,6 @@
 
 		.portfolios-grid {
 			grid-template-columns: 1fr;
-		}
-
-		.card-metrics {
-			grid-template-columns: repeat(3, 1fr);
 		}
 	}
 </style>

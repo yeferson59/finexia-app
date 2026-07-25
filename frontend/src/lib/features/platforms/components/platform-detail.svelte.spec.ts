@@ -2,15 +2,15 @@ import { page } from 'vitest/browser';
 import { describe, it, expect } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import PlatformDetail from './platform-detail.svelte';
+import type { Platform } from '../platforms';
 
-const platform = {
+const platform: Platform = {
 	id: 'p1',
 	name: 'Interactive Brokers',
 	description: 'Mi bróker principal',
 	sourceType: 'broker',
 	isActive: true,
 	createdAt: '2026-01-15T00:00:00Z',
-	updatedAt: '2026-02-01T00:00:00Z',
 	investments: 4,
 	totalValue: '12500.5'
 };

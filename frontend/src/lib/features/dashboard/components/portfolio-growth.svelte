@@ -3,23 +3,11 @@
 	import Stat from '$lib/ui/stat.svelte';
 	import { privacy } from '$lib/stores/privacy.svelte';
 
-	interface GrowthDataPoint {
-		date: string;
-		totalValue: string;
-		totalCostBase: string;
-		gainLoss: string;
-		gainLossPct: string;
-	}
-
-	interface GrowthSummary {
-		initialValue: string;
-		currentValue: string;
-		totalGrowthPct: string;
-	}
+	import type { GrowthDataPoint, GrowthSummary } from '$lib/api/types';
 
 	const {
 		data = [],
-		summary = { initialValue: '0', currentValue: '0', totalGrowthPct: '0' }
+		summary = { firstDate: '', initialValue: '0', currentValue: '0', totalGrowthPct: '0' }
 	}: { data: GrowthDataPoint[]; summary: GrowthSummary } = $props();
 
 	type Period = '1M' | '3M' | '6M' | '1Y' | 'Todo';

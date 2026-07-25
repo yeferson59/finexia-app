@@ -6,7 +6,7 @@ import * as platforms from '$lib/api/platforms';
 export const load: PageServerLoad = async ({ params, parent }) => {
 	const { platforms } = await parent();
 
-	const platform = (platforms as Array<{ id: string }>).find((p) => p.id === params.id);
+	const platform = platforms.find((p) => p.id === params.id);
 
 	if (!platform) {
 		error(404, 'Plataforma no encontrada');
