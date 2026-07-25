@@ -164,8 +164,6 @@ func (a *App) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-const localUserID = "auth_user_id"
-
 // modules holds every composed domain module so the wiring steps
 // (route mounting, scheduler registration) can pass them around as one value
 // instead of a long parameter list.
@@ -201,7 +199,7 @@ func (a *App) buildModules() *modules {
 
 	geo := geoip.New()
 	userLimiter := httpx.KeyedRateLimiter(200, 1*time.Minute, func(c fiber.Ctx) string {
-		userID := c.Locals(localUserID).(string)
+		userID := c.Locals(httpx.LocalUserID).(string)
 
 		return "user_limit:" + userID
 	})

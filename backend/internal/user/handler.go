@@ -2,14 +2,12 @@ package user
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"path/filepath"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
-	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
@@ -18,34 +16,6 @@ import (
 
 type handler struct {
 	service *Service
-}
-
-const (
-	LocalUserID = "auth_user_id"
-	LocalToken  = "auth_token"
-	LocalRole   = "auth_role"
-)
-
-// getUserIDTokenRole extracts the authenticated identity the JWT middleware
-// stored in the request locals.
-func getUserIDTokenRole(c fiber.Ctx) (uuid.UUID, string, string, error) {
-	userIDStr, _ := c.Locals(LocalUserID).(string)
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		return uuid.Nil, "", "", err
-	}
-
-	token, _ := c.Locals(LocalToken).(string)
-	role, _ := c.Locals(LocalRole).(string)
-	if token == "" || role == "" {
-		return uuid.Nil, "", "", errors.New("missing authenticated identity")
-	}
-
-	return userID, token, role, nil
-}
-
-func getParamUUID(c fiber.Ctx, paramName string) (uuid.UUID, error) {
-	return uuid.Parse(c.Params(paramName))
 }
 
 func (h *handler) GetListUsers(c fiber.Ctx) error {
@@ -66,7 +36,7 @@ func (h *handler) GetListUsers(c fiber.Ctx) error {
 }
 
 func (h *handler) GetUserByID(c fiber.Ctx) error {
-	userID, err := getParamUUID(c, "id")
+	userID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "validate id", "invalid user id")
 	}
@@ -95,7 +65,7 @@ func (h *handler) CreateUser(c fiber.Ctx) error {
 }
 
 func (h *handler) UpdateUser(c fiber.Ctx) error {
-	userID, err := getParamUUID(c, "id")
+	userID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "", err.Error())
 	}
@@ -115,7 +85,7 @@ func (h *handler) UpdateUser(c fiber.Ctx) error {
 }
 
 func (h *handler) DeleteUser(c fiber.Ctx) error {
-	userID, err := getParamUUID(c, "id")
+	userID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "", err.Error())
 	}
@@ -128,7 +98,7 @@ func (h *handler) DeleteUser(c fiber.Ctx) error {
 }
 
 func (h *handler) BanUser(c fiber.Ctx) error {
-	userID, err := getParamUUID(c, "id")
+	userID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -151,7 +121,7 @@ func (h *handler) BanUser(c fiber.Ctx) error {
 }
 
 func (h *handler) GetMe(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -165,7 +135,7 @@ func (h *handler) GetMe(c fiber.Ctx) error {
 }
 
 func (h *handler) UpdateMe(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -184,7 +154,7 @@ func (h *handler) UpdateMe(c fiber.Ctx) error {
 }
 
 func (h *handler) UploadAvatar(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -240,7 +210,7 @@ func (h *handler) UploadAvatar(c fiber.Ctx) error {
 }
 
 func (h *handler) GetMyPreferences(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -254,7 +224,7 @@ func (h *handler) GetMyPreferences(c fiber.Ctx) error {
 }
 
 func (h *handler) UpdateMyPreferences(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -273,7 +243,7 @@ func (h *handler) UpdateMyPreferences(c fiber.Ctx) error {
 }
 
 func (h *handler) GetUserAvatar(c fiber.Ctx) error {
-	userID, err := getParamUUID(c, "id")
+	userID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}

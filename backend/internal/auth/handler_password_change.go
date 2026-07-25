@@ -17,7 +17,7 @@ type ChangePasswordDTO struct {
 // changePassword answers PATCH /users/me/password. The path belongs to the
 // user dashboard, but the credentials are this module's (docs/API.md §2.3).
 func (h *handler) changePassword(c fiber.Ctx) error {
-	userID, jwtoken, _, err := getUserIDTokenRole(c)
+	userID, jwtoken, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}

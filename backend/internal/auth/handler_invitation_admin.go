@@ -31,7 +31,7 @@ func (h *handler) createInvitation(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "invalid request body", err.Error())
 	}
 
-	invitedBy, _, _, err := getUserIDTokenRole(c)
+	invitedBy, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "invalid user id", err.Error())
 	}
@@ -64,12 +64,12 @@ func (h *handler) listInvitations(c fiber.Ctx) error {
 
 // resendInvitation (admin) rotates the token of a pending invitation and resends.
 func (h *handler) resendInvitation(c fiber.Ctx) error {
-	id, err := getParamUUID(c, "id")
+	id, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "invalid invitation id", err.Error())
 	}
 
-	invitedBy, _, _, err := getUserIDTokenRole(c)
+	invitedBy, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "invalid user id", err.Error())
 	}
@@ -84,7 +84,7 @@ func (h *handler) resendInvitation(c fiber.Ctx) error {
 
 // revokeInvitation (admin) invalidates a pending invitation.
 func (h *handler) revokeInvitation(c fiber.Ctx) error {
-	id, err := getParamUUID(c, "id")
+	id, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "invalid invitation id", err.Error())
 	}

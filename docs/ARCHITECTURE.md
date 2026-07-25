@@ -65,7 +65,14 @@ Un módulo nuevo se añade creando su paquete y registrándolo en `internal/app`
 ## 3. Reglas de dependencia
 
 1. **`platform/*` no conoce el negocio.** No importa ningún módulo de dominio ni
-   `identity`. Es el kernel técnico reutilizable.
+   `identity`. Es el kernel técnico reutilizable. Ahí vive también la convención
+   de identidad en los locals de la request (`httpx.LocalUserID`/`LocalToken`/
+   `LocalRole` y el accesor `httpx.Identity`): el middleware de `auth` la
+   escribe y los handlers de todos los módulos la leen, pero mover la identidad
+   por la request es transporte, no dominio. Antes esas tres constantes y su
+   accesor estaban copiados en `auth`, `user` y `portfolio` (y la clave, una
+   cuarta vez, en `app`), de modo que cambiar la convención obligaba a acertar
+   en cuatro sitios a la vez.
 2. **`identity/` es una hoja.** No importa ningún otro paquete interno; solo
    contiene structs compartidos por auth, user, portfolio y notification.
 3. **Un módulo solo importa `platform/`, `identity/` y las interfaces/tipos

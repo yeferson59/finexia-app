@@ -63,7 +63,7 @@ func parseImportForms(c fiber.Ctx) (*ImportMappingDTO, ImportDefaultsDTO, error)
 // headers, a suggested column mapping and per-row validation, without writing
 // anything.
 func (h *handler) PreviewTransactionsImport(c fiber.Ctx) error {
-	if _, _, _, err := getUserIDTokenRole(c); err != nil {
+	if _, _, _, err := httpx.Identity(c); err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
@@ -88,7 +88,7 @@ func (h *handler) PreviewTransactionsImport(c fiber.Ctx) error {
 // ImportTransactions re-parses the uploaded spreadsheet with the confirmed
 // mapping and persists every valid row into the given portfolio/platform.
 func (h *handler) ImportTransactions(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}

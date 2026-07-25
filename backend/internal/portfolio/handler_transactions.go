@@ -15,7 +15,7 @@ import (
 )
 
 func (h *handler) CreatePortfolioEntry(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -49,11 +49,11 @@ func (h *handler) CreatePortfolioEntry(c fiber.Ctx) error {
 }
 
 func (h *handler) UpdateAssetPrice(c fiber.Ctx) error {
-	if _, _, _, err := getUserIDTokenRole(c); err != nil {
+	if _, _, _, err := httpx.Identity(c); err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	assetID, err := getParamUUID(c, "id")
+	assetID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid asset ID", err.Error())
 	}
@@ -73,7 +73,7 @@ func (h *handler) UpdateAssetPrice(c fiber.Ctx) error {
 }
 
 func (h *handler) GetAssetAllocation(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -87,7 +87,7 @@ func (h *handler) GetAssetAllocation(c fiber.Ctx) error {
 }
 
 func (h *handler) GetUserTransactions(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -101,12 +101,12 @@ func (h *handler) GetUserTransactions(c fiber.Ctx) error {
 }
 
 func (h *handler) GetTransactions(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	entryID, err := getParamUUID(c, "entryId")
+	entryID, err := httpx.ParamUUID(c, "entryId")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid entry ID", err.Error())
 	}
@@ -125,7 +125,7 @@ func (h *handler) GetTransactions(c fiber.Ctx) error {
 // they read, which request DTO they bind, and which service method they
 // call, so those are the only parts left in each of them.
 func (h *handler) upsertTransaction(c fiber.Ctx, rawType string, call func(userID uuid.UUID, txnType TransactionType) (Transaction, error), failMessage, failDetails, okMessage, okDetails string) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -144,7 +144,7 @@ func (h *handler) upsertTransaction(c fiber.Ctx, rawType string, call func(userI
 }
 
 func (h *handler) CreateTransaction(c fiber.Ctx) error {
-	entryID, err := getParamUUID(c, "entryId")
+	entryID, err := httpx.ParamUUID(c, "entryId")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid entry ID", err.Error())
 	}
@@ -160,7 +160,7 @@ func (h *handler) CreateTransaction(c fiber.Ctx) error {
 }
 
 func (h *handler) UpdateTransaction(c fiber.Ctx) error {
-	txnID, err := getParamUUID(c, "txnId")
+	txnID, err := httpx.ParamUUID(c, "txnId")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid transaction ID", err.Error())
 	}
@@ -199,7 +199,7 @@ func (h *handler) GetAssets(c fiber.Ctx) error {
 }
 
 func (h *handler) GetPortfolioGrowth(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -216,12 +216,12 @@ func (h *handler) GetPortfolioGrowth(c fiber.Ctx) error {
 }
 
 func (h *handler) GetPortfolioGrowthByID(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	portfolioID, err := getParamUUID(c, "id")
+	portfolioID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid portfolio ID", err.Error())
 	}
@@ -238,12 +238,12 @@ func (h *handler) GetPortfolioGrowthByID(c fiber.Ctx) error {
 }
 
 func (h *handler) GetAssetTransactions(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	portfolioID, err := getParamUUID(c, "id")
+	portfolioID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid portfolio ID", err.Error())
 	}

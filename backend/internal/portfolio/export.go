@@ -10,7 +10,7 @@ import (
 )
 
 func (h *handler) ExportSummary(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -79,7 +79,7 @@ func (h *handler) ExportSummary(c fiber.Ctx) error {
 }
 
 func (h *handler) ExportTransactions(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
@@ -124,7 +124,7 @@ func (h *handler) ExportTransactions(c fiber.Ctx) error {
 }
 
 func (h *handler) ExportRiskMetrics(c fiber.Ctx) error {
-	userID, _, _, err := getUserIDTokenRole(c)
+	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}

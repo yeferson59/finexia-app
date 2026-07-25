@@ -10,6 +10,8 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 // stubAuth injects the request locals the JWT middleware would normally set.
@@ -24,9 +26,9 @@ type stubAuth struct {
 func (a stubAuth) RequireAuth() fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if a.authenticated {
-			c.Locals(LocalUserID, a.userID.String())
-			c.Locals(LocalToken, "test-token")
-			c.Locals(LocalRole, a.role)
+			c.Locals(httpx.LocalUserID, a.userID.String())
+			c.Locals(httpx.LocalToken, "test-token")
+			c.Locals(httpx.LocalRole, a.role)
 		}
 		return c.Next()
 	}
