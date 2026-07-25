@@ -242,14 +242,6 @@ func (r *PostgresRepository) UpsertPreferences(ctx context.Context, userID uuid.
 	return prefs, nil
 }
 
-func (r *PostgresRepository) UpdatePassword(ctx context.Context, userID uuid.UUID, hashedPassword string) error {
-	_, err := r.db.Exec(ctx,
-		"UPDATE accounts SET password = $1, updated_at = NOW() WHERE user_id = $2 AND provider_id = 'local'",
-		hashedPassword, userID.String(),
-	)
-	return err
-}
-
 func (r *PostgresRepository) GetWeeklySummary(ctx context.Context) ([]identity.User, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT u.id, u.name, u.email

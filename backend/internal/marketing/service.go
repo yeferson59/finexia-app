@@ -14,7 +14,9 @@ type Service struct {
 	mail Mailer
 }
 
-func NewService(repo Repository, mail Mailer) *Service {
+// newService is the fake-friendly constructor: the module's NewService wraps
+// it with the real Postgres repository.
+func newService(repo Repository, mail Mailer) *Service {
 	return new(Service{repo: repo, mail: mail})
 }
 

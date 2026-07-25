@@ -8,7 +8,6 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
-	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
@@ -28,7 +27,7 @@ func (h *handler) SyncAssetPrices(c fiber.Ctx) error {
 }
 
 func (h *handler) SyncSingleAsset(c fiber.Ctx) error {
-	assetID, err := getParamUUID(c, "id")
+	assetID, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid asset ID", err.Error())
 	}
@@ -119,7 +118,7 @@ func (h *handler) CreateExchangeRate(c fiber.Ctx) error {
 }
 
 func (h *handler) UpdateExchangeRate(c fiber.Ctx) error {
-	id, err := getParamUUID(c, "id")
+	id, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid exchange rate ID", err.Error())
 	}
@@ -152,7 +151,7 @@ func (h *handler) ImportExchangeRates(c fiber.Ctx) error {
 }
 
 func (h *handler) SyncSingleExchangeRate(c fiber.Ctx) error {
-	id, err := getParamUUID(c, "id")
+	id, err := httpx.ParamUUID(c, "id")
 	if err != nil {
 		return httpx.BadRequest(c, "Invalid exchange rate ID", err.Error())
 	}
@@ -191,8 +190,4 @@ func readImportFile(c fiber.Ctx) ([]byte, string, error) {
 		return nil, "", errors.New("file too large: the maximum size is 8 MB")
 	}
 	return data, fileHeader.Filename, nil
-}
-
-func getParamUUID(c fiber.Ctx, paramName string) (uuid.UUID, error) {
-	return uuid.Parse(c.Params(paramName))
 }

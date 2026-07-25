@@ -5,20 +5,30 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
 )
 
+// This module is built in two steps, and the order matters at the composition
+// root. NewService needs nothing from another module, so it runs first and its
+// result is handed to auth, which reads users/roles through it. New then
+// completes the module with auth's route guards. Splitting the two is what
+// keeps every dependency a constructor argument: no setter to forget, no slot
+// that is briefly nil.
+
+// ServiceDeps is the infrastructure the use cases need. No domain module
+// appears here — that is the property that lets the service be built first.
+type ServiceDeps struct {
+	DB    *pgxpool.Pool
+	Store objectstore.Store
+	Log   logger.Logger
+	Cfg   Config
+}
+
+// Deps is the routing half: the service NewService returned, plus the guards,
+// which only exist once the auth module is built.
 type Deps struct {
-	DB        *pgxpool.Pool
-	Cfg       *config.Env
-	Store     objectstore.Store
-	Mail      mailer
-	Geo       geoService
-	Log       logger.Logger
-	Auth      authService
-	Marketing marketingService
+	Service   *Service
 	AuthMiddl authMiddleware
 	// Limiter is the per-user rate limiter the legacy /users routes had via
 	// the app-wide gate; the module keeps it now that it registers in the
@@ -32,25 +42,24 @@ type authMiddleware interface {
 }
 
 type Module struct {
-	cfg       *config.Env
 	service   *Service
 	handler   *handler
 	authMiddl authMiddleware
 	limiter   fiber.Handler
 }
 
-func New(deps Deps) *Module {
-	pg := NewPostgresRepository(deps.DB)
-	service := NewService(pg, deps.Mail, deps.Auth, deps.Marketing, deps.Store, deps.Geo, deps.Log, deps.Cfg)
-
-	return newModule(deps, service)
+// NewService builds the module's use cases. It is the first domain thing the
+// composition root constructs, before auth.
+func NewService(deps ServiceDeps) *Service {
+	return newService(NewPostgresRepository(deps.DB), deps.Store, deps.Log, deps.Cfg)
 }
 
-func newModule(deps Deps, service *Service) *Module {
+// New completes the module with its HTTP surface. deps.Service must be the
+// value NewService returned, so auth and these routes share one service.
+func New(deps Deps) *Module {
 	return new(Module{
-		cfg:       deps.Cfg,
-		service:   service,
-		handler:   new(handler{service}),
+		service:   deps.Service,
+		handler:   new(handler{deps.Service}),
 		authMiddl: deps.AuthMiddl,
 		limiter:   deps.Limiter,
 	})
@@ -72,12 +81,13 @@ func (m *Module) Routes(router fiber.Router) {
 	users.Use(m.authMiddl.RequireAuth(), m.limiter)
 
 	// Self-service routes — must be registered before /:id to avoid shadowing.
+	// The sibling PATCH /users/me/password is served by auth, which owns the
+	// credentials and mounts earlier.
 	users.Get("/me", m.handler.GetMe)
 	users.Patch("/me", m.handler.UpdateMe)
 	users.Post("/me/avatar", m.handler.UploadAvatar)
 	users.Get("/me/preferences", m.handler.GetMyPreferences)
 	users.Patch("/me/preferences", m.handler.UpdateMyPreferences)
-	users.Patch("/me/password", m.handler.ChangeMyPassword)
 
 	// Admin guards go inline per route (never group.Use) so unmatched
 	// /users/* requests fall through to a 404 instead of a 403.
@@ -85,15 +95,9 @@ func (m *Module) Routes(router fiber.Router) {
 	users.Get("", admin, paginate.New(), m.handler.GetListUsers)
 	users.Post("", admin, m.handler.CreateUser)
 
-	// Static "/invitations" and "/waitlist" segments register before the
-	// "/:id" routes below so they are never captured as a user id.
-	users.Get("/invitations", admin, paginate.New(), m.handler.listInvitations)
-	users.Post("/invitations", admin, m.handler.createInvitation)
-	users.Post("/invitations/:id/resend", admin, m.handler.resendInvitation)
-	users.Delete("/invitations/:id", admin, m.handler.revokeInvitation)
-
-	users.Get("/waitlist", admin, paginate.New(), m.handler.listWaitlist)
-
+	// The static /users/invitations and /users/waitlist paths belong to auth
+	// and marketing respectively; both mount before this module, which is what
+	// keeps them from being captured by the "/:id" routes below.
 	users.Get("/:id", admin, m.handler.GetUserByID)
 	users.Patch("/:id", admin, m.handler.UpdateUser)
 	users.Patch("/:id/ban", admin, m.handler.BanUser)

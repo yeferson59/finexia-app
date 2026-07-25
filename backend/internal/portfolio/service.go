@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
-	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/user"
@@ -45,7 +44,7 @@ const risksCacheTTL = 10 * time.Minute
 // and consumed by other areas only through interfaces they declare.
 type Service struct {
 	repo    Repository
-	cfg     *config.Env
+	cfg     Config
 	storage fiber.Storage
 	mail    Mailer
 	user    UserReader
@@ -54,7 +53,7 @@ type Service struct {
 	risksCache *risksCache
 }
 
-func NewService(repo Repository, cfg *config.Env, storage fiber.Storage, mailService Mailer, userReader UserReader, log logger.Logger) *Service {
+func NewService(repo Repository, cfg Config, storage fiber.Storage, mailService Mailer, userReader UserReader, log logger.Logger) *Service {
 	return new(Service{
 		repo:       repo,
 		cfg:        cfg,

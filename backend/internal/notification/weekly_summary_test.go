@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
-	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/portfolio"
 )
@@ -52,7 +51,7 @@ func (f *fakeMailer) SendWeeklySummary(email string, data mail.WeeklySummaryData
 }
 
 func newTestService(users *fakeUserReader, ports *fakePortfolioReader, mailer *fakeMailer) *Service {
-	return NewService(users, ports, mailer, &config.Env{PublicURL: "https://finexia.test"})
+	return NewService(users, ports, mailer, Config{PublicURL: "https://finexia.test"})
 }
 
 func TestSendWeeklySummaryEmails(t *testing.T) {

@@ -10,6 +10,8 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 // stubAuth injects the request locals the JWT middleware would normally set.
@@ -24,9 +26,9 @@ type stubAuth struct {
 func (a stubAuth) RequireAuth() fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if a.authenticated {
-			c.Locals(LocalUserID, a.userID.String())
-			c.Locals(LocalToken, "test-token")
-			c.Locals(LocalRole, a.role)
+			c.Locals(httpx.LocalUserID, a.userID.String())
+			c.Locals(httpx.LocalToken, "test-token")
+			c.Locals(httpx.LocalRole, a.role)
 		}
 		return c.Next()
 	}
@@ -100,23 +102,46 @@ func TestHandlerGetPortfoliosRisks(t *testing.T) {
 	}
 }
 
+// TestHandlerGetPortfolios covers both paths the list answers on: the
+// canonical GET /portfolios and the legacy "/portfolios/id" alias, which must
+// keep serving the same payload while advertising its deprecation
+// (docs/TECH_DEBT.md #3).
 func TestHandlerGetPortfolios(t *testing.T) {
 	userID := uuid.New()
-	repo := &fakeRepository{
-		getPortfoliosByUserID: func(_ context.Context, uid uuid.UUID) ([]Portfolio, error) {
-			if uid != userID {
-				t.Errorf("userID = %s, want %s", uid, userID)
-			}
-			return []Portfolio{{ID: uuid.New(), Name: "Growth"}}, nil
-		},
+	newApp := func(t *testing.T) *fiber.App {
+		repo := &fakeRepository{
+			getPortfoliosByUserID: func(_ context.Context, uid uuid.UUID) ([]Portfolio, error) {
+				if uid != userID {
+					t.Errorf("userID = %s, want %s", uid, userID)
+				}
+				return []Portfolio{{ID: uuid.New(), Name: "Growth"}}, nil
+			},
+		}
+		return newTestModule(t, repo, userID, "user")
 	}
-	app := newTestModule(t, repo, userID, "user")
 
-	// The list route lives at the atypical "/portfolios/id" path (TECH_DEBT #3).
-	resp := do(t, app, http.MethodGet, "/portfolios/id")
-	if resp.StatusCode != fiber.StatusOK {
-		t.Fatalf("status = %d, want 200", resp.StatusCode)
-	}
+	t.Run("canonical path", func(t *testing.T) {
+		resp := do(t, newApp(t), http.MethodGet, "/portfolios")
+		if resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		if got := resp.Header.Get("Deprecation"); got != "" {
+			t.Errorf("Deprecation = %q, want empty on the canonical route", got)
+		}
+	})
+
+	t.Run("deprecated alias", func(t *testing.T) {
+		resp := do(t, newApp(t), http.MethodGet, "/portfolios/id")
+		if resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		if got := resp.Header.Get("Deprecation"); got != "true" {
+			t.Errorf("Deprecation = %q, want \"true\"", got)
+		}
+		if got, want := resp.Header.Get("Link"), `</portfolios>; rel="successor-version"`; got != want {
+			t.Errorf("Link = %q, want %q", got, want)
+		}
+	})
 }
 
 func TestHandlerGetPortfolioByID(t *testing.T) {

@@ -95,6 +95,48 @@ func TestIdentityStaysALeaf(t *testing.T) {
 	}
 }
 
+// TestModulesOwnTheirConfig asserts no domain module imports platform/config:
+// reading the environment is the composition root's job, and each module
+// declares its own small Config struct that app populates (docs/TECH_DEBT.md
+// #8). internal/migrator is exempt — it is a second entrypoint, not a module.
+func TestModulesOwnTheirConfig(t *testing.T) {
+	for _, dir := range []string{
+		"auth", "user", "portfolio", "market", "marketing",
+		"notification", "scheduler", "health",
+	} {
+		for file, imports := range internalImports(t, dir) {
+			for _, imp := range imports {
+				if imp == "platform/config" {
+					t.Errorf("%s imports internal/platform/config: modules declare their own Config, populated by internal/app", file)
+				}
+			}
+		}
+	}
+}
+
+// TestServiceFirstModulesStayIndependent asserts that user and marketing
+// import no other domain module. That is what lets the composition root build
+// their services first and hand them to auth as ordinary constructor
+// arguments: auth reads users/roles through user.Service and advances the
+// waitlist through marketing.Service, so if either grew a dependency back on
+// auth the graph would be cyclic again and the wiring would need a setter.
+//
+// The routes those two modules serve still need auth's guards — they take them
+// through the authMiddleware interface, in the second construction step, which
+// costs no import.
+func TestServiceFirstModulesStayIndependent(t *testing.T) {
+	for _, dir := range []string{"user", "marketing"} {
+		for file, imports := range internalImports(t, dir) {
+			for _, imp := range imports {
+				seg := firstSegment(imp)
+				if seg != dir && domainSegments[seg] {
+					t.Errorf("%s imports internal/%s: user and marketing must depend on no other domain module, so their services can be built before auth", file, imp)
+				}
+			}
+		}
+	}
+}
+
 // TestNothingImportsCompositionRoot asserts no module reaches back into
 // internal/app: wiring flows one way, from app down into the modules.
 func TestNothingImportsCompositionRoot(t *testing.T) {

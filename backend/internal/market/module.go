@@ -5,7 +5,6 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
@@ -13,7 +12,6 @@ import (
 type Module struct {
 	service   *Service
 	authMiddl authMiddleware
-	cfg       *config.Env
 	storage   fiber.Storage
 	handler   *handler
 	limiter   fiber.Handler
@@ -21,7 +19,6 @@ type Module struct {
 
 type Deps struct {
 	DB             *pgxpool.Pool
-	Cfg            *config.Env
 	Storage        fiber.Storage
 	Log            logger.Logger
 	Provider       marketdata.Provider
@@ -43,7 +40,6 @@ func New(deps Deps) *Module {
 
 func newModule(deps Deps, service *Service) *Module {
 	return new(Module{
-		cfg:       deps.Cfg,
 		storage:   deps.Storage,
 		service:   service,
 		handler:   new(handler{service}),

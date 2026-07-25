@@ -11,23 +11,15 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
-// Locals keys under which the JWT middleware exposes the authenticated
-// identity to downstream middlewares and handlers. The identity lives in the
-// request context only: it is fully derived from the (already validated)
-// bearer token, so persisting it in a server-side session store would just add
-// a storage round-trip per request. Exported because legacy consumers (the
-// per-user rate limiter, the legacy handlers) read them until their domains
-// migrate.
-const (
-	LocalUserID = "auth_user_id"
-	LocalToken  = "auth_token"
-	LocalRole   = "auth_role"
-)
-
 // RequireAuth gates a route behind a live session: jwtware verifies the bearer
 // token's signature and parses its claims, then the success handler checks the
 // token against the session store (via Service.ValidateToken) and exposes the
-// identity through the Local* keys.
+// identity through the httpx.Local* keys, which every handler reads back with
+// httpx.Identity.
+//
+// The identity lives in the request context only: it is fully derived from the
+// (already validated) bearer token, so persisting it in a server-side session
+// store would just add a storage round-trip per request.
 //
 // The session check runs in the success handler, not in a TokenProcessorFunc,
 // so it can use the request's own context (c) for the cache/database lookups
@@ -53,9 +45,9 @@ func (m *Module) RequireAuth() fiber.Handler {
 				return c.SendStatus(fiber.StatusUnauthorized)
 			}
 
-			c.Locals(LocalUserID, userID)
-			c.Locals(LocalToken, jwtToken.Raw)
-			c.Locals(LocalRole, role)
+			c.Locals(httpx.LocalUserID, userID)
+			c.Locals(httpx.LocalToken, jwtToken.Raw)
+			c.Locals(httpx.LocalRole, role)
 
 			return c.Next()
 		},
@@ -66,7 +58,7 @@ func (m *Module) RequireAuth() fiber.Handler {
 // given roles. Must be placed after RequireAuth in the handler chain.
 func (m *Module) RequireRole(roles ...string) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		role, _ := c.Locals(LocalRole).(string)
+		role, _ := c.Locals(httpx.LocalRole).(string)
 
 		if slices.Contains(roles, role) {
 			return c.Next()

@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
-	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/portfolio"
 )
@@ -30,10 +29,10 @@ type Service struct {
 	user user
 	port port
 	m    m
-	cfg  *config.Env
+	cfg  Config
 }
 
-func NewService(user user, portfolio port, m m, cfg *config.Env) *Service {
+func NewService(user user, portfolio port, m m, cfg Config) *Service {
 	return new(Service{
 		user: user,
 		port: portfolio,

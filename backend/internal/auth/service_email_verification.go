@@ -43,7 +43,7 @@ func (s *Service) RequestEmailVerification(ctx context.Context, email string) er
 		return nil
 	}
 
-	user, err := s.stores.Accounts.GetUserByEmail(ctx, email)
+	user, err := s.stores.Users.GetUserByEmail(ctx, email)
 	if err != nil || user.EmailVerified {
 		return nil
 	}

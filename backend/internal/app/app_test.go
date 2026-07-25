@@ -172,8 +172,10 @@ func TestAppWiresAndRoutes(t *testing.T) {
 		t.Errorf("GET /auth/invitations = %d, want 400 without a token", status)
 	}
 
-	// The admin invitation/waitlist dashboard is gated by the module's own
-	// inline RequireAuth (401 with a bogus token, before RequireAdmin runs).
+	// The admin invitation/waitlist dashboard is gated by inline guards (401
+	// with a bogus token, before RequireAdmin runs). /users/waitlist is served
+	// by marketing and /users/invitations by user, so this also proves both
+	// modules apply the shared guards themselves.
 	if status := request("GET", "/users/waitlist", "Authorization", "Bearer bogus-token"); status != fiber.StatusUnauthorized {
 		t.Errorf("GET /users/waitlist = %d, want 401 with an invalid token", status)
 	}
@@ -187,31 +189,53 @@ func TestAppWiresAndRoutes(t *testing.T) {
 		t.Errorf("GET /users/:id/avatar = %d; the route must stay public (no JWT gate)", status)
 	}
 
-	// Fiber matches routes in registration order: the static admin dashboard
-	// paths must register before the user module's "/users/:id" or they get
-	// captured by it (400 "invalid uuid" instead of the admin handler).
-	var userGets []string
-	for _, stack := range a.fiber.Stack() {
-		for _, route := range stack {
-			if route.Method == fiber.MethodGet && strings.HasPrefix(route.Path, "/users") {
-				userGets = append(userGets, route.Path)
+	// The self-service password change is served by the auth module, which owns
+	// the credentials; it must still answer at its /users path, behind the gate.
+	if status := request("PATCH", "/users/me/password", "Authorization", "Bearer bogus-token"); status != fiber.StatusUnauthorized {
+		t.Errorf("PATCH /users/me/password = %d, want 401 with an invalid token", status)
+	}
+
+	// Fiber matches routes in registration order: the static /users paths must
+	// register before the user module's "/users/:id" or they get captured by
+	// it (400 "invalid uuid" instead of the intended handler). Three modules
+	// register under /users — auth (password, invitations), marketing
+	// (waitlist) and user — so the ordering is a property of mountRoutes, not
+	// of any single module.
+	routesUnder := func(method, prefix string) []string {
+		var paths []string
+		for _, stack := range a.fiber.Stack() {
+			for _, route := range stack {
+				if route.Method == method && strings.HasPrefix(route.Path, prefix) {
+					paths = append(paths, route.Path)
+				}
 			}
 		}
+		return paths
 	}
-	index := func(path string) int {
-		for i, p := range userGets {
-			if p == path {
-				return i
+	assertBefore := func(method, static, parametric string) {
+		t.Helper()
+		paths := routesUnder(method, "/users")
+		index := func(path string) int {
+			for i, p := range paths {
+				if p == path {
+					return i
+				}
 			}
+			return -1
 		}
-		return -1
-	}
-	if index("/users/:id/avatar") == -1 {
-		t.Errorf("GET /users/:id/avatar is not registered (GET /users* routes: %v)", userGets)
-	}
-	for _, static := range []string{"/users/invitations", "/users/waitlist"} {
-		if index(static) == -1 || (index("/users/:id") != -1 && index(static) > index("/users/:id")) {
-			t.Errorf("GET %s must register before GET /users/:id (GET /users* routes: %v)", static, userGets)
+		if index(static) == -1 {
+			t.Errorf("%s %s is not registered (%s /users* routes: %v)", method, static, method, paths)
+			return
+		}
+		if index(parametric) != -1 && index(static) > index(parametric) {
+			t.Errorf("%s %s must register before %s %s (%s /users* routes: %v)", method, static, method, parametric, method, paths)
 		}
 	}
+
+	if len(routesUnder(fiber.MethodGet, "/users/:id/avatar")) == 0 {
+		t.Error("GET /users/:id/avatar is not registered")
+	}
+	assertBefore(fiber.MethodGet, "/users/invitations", "/users/:id")
+	assertBefore(fiber.MethodGet, "/users/waitlist", "/users/:id")
+	assertBefore(fiber.MethodPatch, "/users/me/password", "/users/:id")
 }

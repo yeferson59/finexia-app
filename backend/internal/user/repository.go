@@ -20,6 +20,5 @@ type Repository interface {
 	UpdateImage(ctx context.Context, id uuid.UUID, image string) (identity.User, error)
 	GetPreferences(ctx context.Context, userID uuid.UUID) (UserPreferences, error)
 	UpsertPreferences(ctx context.Context, userID uuid.UUID, emailAlerts, weeklySummary bool) (UserPreferences, error)
-	UpdatePassword(ctx context.Context, userID uuid.UUID, hashedPassword string) error
 	GetWeeklySummary(ctx context.Context) ([]identity.User, error)
 }
