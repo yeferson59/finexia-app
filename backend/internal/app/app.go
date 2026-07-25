@@ -206,35 +206,46 @@ func (a *App) buildModules() *modules {
 		return "user_limit:" + userID
 	})
 
-	marketingModule := marketing.New(marketing.NewPostgresRepository(a.deps.DB), a.deps.Mail)
-	authModule := auth.New(auth.Deps{
-		DB:       a.deps.DB,
-		Cfg:      authConfig(a.deps.Envs),
-		Storage:  a.deps.Storage,
-		Mail:     a.deps.Mail,
-		Geo:      geo,
-		Log:      a.deps.Log,
-		Waitlist: marketingModule.Service(),
+	// Services first, then modules. The services form a DAG — marketing and
+	// user depend on no other domain, auth reads both — so every dependency
+	// below is a constructor argument. The modules come after, once auth
+	// exists to supply the route guards they all share.
+	marketingService := marketing.NewService(marketing.ServiceDeps{
+		DB:   a.deps.DB,
+		Mail: a.deps.Mail,
 	})
-	userModule := user.New(user.Deps{
-		DB:        a.deps.DB,
-		Cfg:       userConfig(a.deps.Envs),
-		Store:     objectstore.NewS3Store(a.deps.S3, a.deps.Envs.AWSS3BucketName),
-		Mail:      a.deps.Mail,
-		Geo:       geo,
-		Log:       a.deps.Log,
-		Auth:      authModule.Service(),
+	userService := user.NewService(user.ServiceDeps{
+		DB:    a.deps.DB,
+		Store: objectstore.NewS3Store(a.deps.S3, a.deps.Envs.AWSS3BucketName),
+		Log:   a.deps.Log,
+		Cfg:   userConfig(a.deps.Envs),
+	})
+
+	authModule := auth.New(auth.Deps{
+		DB:      a.deps.DB,
+		Cfg:     authConfig(a.deps.Envs),
+		Storage: a.deps.Storage,
+		Mail:    a.deps.Mail,
+		Geo:     geo,
+		Log:     a.deps.Log,
+		// auth reads users/roles through the user module rather than querying
+		// those tables itself (docs/TECH_DEBT.md #9), and advances the waitlist
+		// through marketing (docs/TECH_DEBT.md #10).
+		Users:    userService,
+		Waitlist: marketingService,
+		Limiter:  userLimiter,
+	})
+
+	marketingModule := marketing.New(marketing.Deps{
+		Service:   marketingService,
 		AuthMiddl: authModule,
 		Limiter:   userLimiter,
 	})
-	// auth reads users/roles through the user module rather than querying
-	// those tables itself (docs/TECH_DEBT.md #9). The two modules need each
-	// other, so the reader is injected here, once user exists.
-	authModule.SetUsers(userModule.Service())
-	// marketing serves the admin waitlist listing itself (docs/TECH_DEBT.md
-	// #10). It is built before auth — auth's invitation flow advances the
-	// waitlist — so it receives the shared guards here instead of via New.
-	marketingModule.SetAdminGuard(authModule, userLimiter)
+	userModule := user.New(user.Deps{
+		Service:   userService,
+		AuthMiddl: authModule,
+		Limiter:   userLimiter,
+	})
 	// market owns the asset catalog; portfolio consumes it (portfolio → market),
 	// so market is built first and injected as portfolio's AssetReader.
 	marketModule := market.New(market.Deps{
@@ -250,7 +261,7 @@ func (a *App) buildModules() *modules {
 		Cfg:       portfolioConfig(a.deps.Envs),
 		Storage:   a.deps.Storage,
 		Mail:      a.deps.Mail,
-		User:      userModule.Service(),
+		User:      userService,
 		Assets:    marketModule.Service(),
 		Log:       a.deps.Log,
 		AuthMiddl: authModule,
@@ -264,7 +275,7 @@ func (a *App) buildModules() *modules {
 		user:         userModule,
 		market:       marketModule,
 		portfolio:    portfolioModule,
-		notification: notification.NewService(userModule.Service(), portfolioModule.Service(), a.deps.Mail, notificationConfig(a.deps.Envs)),
+		notification: notification.NewService(userService, portfolioModule.Service(), a.deps.Mail, notificationConfig(a.deps.Envs)),
 	}
 }
 

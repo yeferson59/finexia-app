@@ -71,6 +71,19 @@ func (r *PostgresRepository) GetAccountByEmail(ctx context.Context, email string
 	return user, nil
 }
 
+// UpdatePassword replaces the local account's password hash. The
+// password-reset flow has its own transactional variant (ConsumePasswordReset)
+// because it must also burn the token; this is the plain write used when an
+// authenticated user changes their own password.
+func (r *PostgresRepository) UpdatePassword(ctx context.Context, userID uuid.UUID, hashedPassword string) error {
+	_, err := r.db.Exec(ctx,
+		"UPDATE accounts SET password = $1, updated_at = NOW() WHERE user_id = $2 AND provider_id = 'local'",
+		hashedPassword, userID.String(),
+	)
+
+	return err
+}
+
 // createUser inserts a user with the default customer role. Temporary copy of
 // the user repository's CreateUser (the admin CRUD keeps its own) so Register
 // stays self-contained; unified when the user module is extracted in Fase 5.

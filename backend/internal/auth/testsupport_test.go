@@ -36,6 +36,7 @@ type fakeRepository struct {
 	revokeRefreshTokenFamily         func(ctx context.Context, familyID uuid.UUID) ([]string, error)
 	getRefreshTokenFamiliesBySession func(ctx context.Context, userID uuid.UUID, sessionToken string) ([]string, []uuid.UUID, error)
 	register                         func(ctx context.Context, name, email, password string) (identity.User, error)
+	updatePassword                   func(ctx context.Context, userID uuid.UUID, hashedPassword string) error
 	getSessionByUserIDToken          func(ctx context.Context, userID uuid.UUID, token string) (identity.User, error)
 	getSessionByToken                func(ctx context.Context, token string) (identity.User, error)
 	deleteSessionByUserIDToken       func(ctx context.Context, userID uuid.UUID, token string) error
@@ -173,6 +174,10 @@ func (f *fakeRepository) GetRefreshTokenFamiliesBySession(ctx context.Context, u
 
 func (f *fakeRepository) Register(ctx context.Context, name, email, password string) (identity.User, error) {
 	return f.register(ctx, name, email, password)
+}
+
+func (f *fakeRepository) UpdatePassword(ctx context.Context, userID uuid.UUID, hashedPassword string) error {
+	return f.updatePassword(ctx, userID, hashedPassword)
 }
 
 func (f *fakeRepository) GetSessionByUserIDToken(ctx context.Context, userID uuid.UUID, token string) (identity.User, error) {

@@ -13,7 +13,7 @@ import (
 
 func newTestApp(repo Repository, mail Mailer) *fiber.App {
 	app := fiber.New()
-	New(repo, mail).Routes(app)
+	New(Deps{Service: newService(repo, mail)}).Routes(app)
 	return app
 }
 
@@ -119,12 +119,13 @@ func (g fakeGuard) RequireAdmin() fiber.Handler { return g.handler(g.adminStatus
 // the route carries its own guards instead of inheriting the user group's.
 func TestListWaitlistRoute(t *testing.T) {
 	newApp := func(repo Repository, guard *fakeGuard) *fiber.App {
-		app := fiber.New()
-		m := New(repo, &fakeMailer{})
+		deps := Deps{Service: newService(repo, &fakeMailer{})}
 		if guard != nil {
-			m.SetAdminGuard(*guard, nil)
+			deps.AuthMiddl = *guard
 		}
-		m.Routes(app)
+
+		app := fiber.New()
+		New(deps).Routes(app)
 		return app
 	}
 

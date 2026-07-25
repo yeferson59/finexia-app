@@ -3,7 +3,12 @@ package marketing
 import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// Like the user module, this one is built in two steps: NewService first (auth
+// consumes it — the invitation flow advances the waitlist), then New with
+// auth's route guards. Every dependency stays a constructor argument.
 
 // authMiddleware is the shared route-guard surface every module consumes,
 // satisfied by *auth.Module.
@@ -12,8 +17,24 @@ type authMiddleware interface {
 	RequireAdmin() fiber.Handler
 }
 
-// Module is the marketing domain module: construction via New, HTTP surface
-// via Routes. It receives only the dependencies it uses.
+// ServiceDeps is the infrastructure the use cases need; no domain module
+// appears here, which is what lets the service be built before auth.
+type ServiceDeps struct {
+	DB   *pgxpool.Pool
+	Mail Mailer
+}
+
+// Deps is the routing half: the service NewService returned, plus the guards
+// the admin waitlist listing needs.
+type Deps struct {
+	Service   *Service
+	AuthMiddl authMiddleware
+	// Limiter is the per-user rate limiter shared with the other /users routes.
+	Limiter fiber.Handler
+}
+
+// Module is the marketing domain module: construction via NewService + New,
+// HTTP surface via Routes. It receives only the dependencies it uses.
 type Module struct {
 	service   *Service
 	handler   *handler
@@ -21,11 +42,19 @@ type Module struct {
 	limiter   fiber.Handler
 }
 
-func New(repo Repository, mail Mailer) *Module {
-	service := NewService(repo, mail)
+// NewService builds the module's use cases, before auth.
+func NewService(deps ServiceDeps) *Service {
+	return newService(NewPostgresRepository(deps.DB), deps.Mail)
+}
+
+// New completes the module with its HTTP surface. deps.Service must be the
+// value NewService returned, so auth and these routes share one service.
+func New(deps Deps) *Module {
 	return &Module{
-		service: service,
-		handler: &handler{service: service},
+		service:   deps.Service,
+		handler:   &handler{service: deps.Service},
+		authMiddl: deps.AuthMiddl,
+		limiter:   deps.Limiter,
 	}
 }
 
@@ -33,20 +62,6 @@ func New(repo Repository, mail Mailer) *Module {
 // modules (always consumed through interfaces declared by the consumer).
 func (m *Module) Service() *Service {
 	return m.service
-}
-
-// SetAdminGuard supplies the guards and per-user rate limiter the admin
-// waitlist listing needs. It arrives after construction because the auth
-// module is built with marketing's service (the invitation flow advances the
-// waitlist), so marketing cannot receive auth through New. Routes runs later
-// still, once every module exists, so the guard is always in place by then.
-func (m *Module) SetAdminGuard(guard authMiddleware, limiter fiber.Handler) {
-	if guard == nil {
-		panic("marketing: SetAdminGuard requires a non-nil authMiddleware")
-	}
-
-	m.authMiddl = guard
-	m.limiter = limiter
 }
 
 // Routes registers the module's endpoints: the public signup and the admin

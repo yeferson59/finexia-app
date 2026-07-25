@@ -2,6 +2,7 @@ package auth
 
 import (
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
@@ -18,6 +19,14 @@ type Deps struct {
 	// Waitlist is the marketing module's service: the invitation flow reads
 	// and advances the waitlist through it instead of touching the table.
 	Waitlist WaitlistStore
+	// Users is the user module's service: auth reads the users/roles tables
+	// through it instead of querying them (docs/TECH_DEBT.md #9). The user
+	// module's service is built before auth precisely so this can be an
+	// ordinary constructor dependency.
+	Users UserReader
+	// Limiter is the per-user rate limiter applied to the /users routes this
+	// module serves (password change, invitation dashboard).
+	Limiter fiber.Handler
 }
 
 // Module is the auth domain module: construction via New, HTTP surface via
@@ -25,6 +34,7 @@ type Deps struct {
 type Module struct {
 	cfg     Config
 	storage fiber.Storage
+	limiter fiber.Handler
 	service *Service
 	handler *handler
 }
@@ -40,6 +50,7 @@ func New(deps Deps) *Module {
 		PasswordResets: pg,
 		Invitations:    pg,
 		Waitlist:       deps.Waitlist,
+		Users:          deps.Users,
 	}, deps.Cfg, deps.Storage, deps.Mail, deps.Geo, deps.Log)
 
 	return newModule(deps, service)
@@ -51,6 +62,7 @@ func newModule(deps Deps, service *Service) *Module {
 	return &Module{
 		cfg:     deps.Cfg,
 		storage: deps.Storage,
+		limiter: deps.Limiter,
 		service: service,
 		handler: &handler{service: service, cfg: deps.Cfg},
 	}
@@ -60,21 +72,6 @@ func newModule(deps Deps, service *Service) *Module {
 // modules (always consumed through interfaces declared by the consumer).
 func (m *Module) Service() *Service {
 	return m.service
-}
-
-// SetUsers completes construction with the user module's reader, the only
-// dependency auth cannot receive through New: the two modules need each other
-// at runtime (user calls auth for invitations and password changes, auth reads
-// users/roles for 2FA and its security emails), so the composition root builds
-// auth first and injects the reader as soon as the user module exists. It
-// panics on nil rather than leaving a half-wired module that would only fail
-// later, on the first password reset or 2FA setup.
-func (m *Module) SetUsers(users UserReader) {
-	if users == nil {
-		panic("auth: SetUsers requires a non-nil UserReader")
-	}
-
-	m.service.stores.Users = users
 }
 
 // Routes registers the /auth group, replicating routes/auth.go: the public
@@ -126,4 +123,32 @@ func (m *Module) Routes(router fiber.Router) {
 	auth.Delete("/sessions/:id", m.handler.revokeSession)
 	auth.Post("/sessions/revoke-others", m.handler.revokeOtherSessions)
 	auth.Post("/logout", m.handler.logout)
+
+	m.userRoutes(router)
+}
+
+// userRoutes registers this module's endpoints that answer under /users: the
+// self-service password change and the admin invitation dashboard. Both are
+// auth domain (credentials and invitations) served at the paths the user
+// dashboard calls (docs/API.md §2.3 and §2.6), so they stay where they are
+// while the logic lives with its data.
+//
+// They are terminal routes registered outside the user module's /users group,
+// so they apply the guards themselves rather than inheriting that group's. The
+// composition root mounts auth before user, which is what keeps the static
+// paths from being captured by GET/PATCH /users/:id.
+func (m *Module) userRoutes(router fiber.Router) {
+	limiter := m.limiter
+	if limiter == nil {
+		limiter = func(c fiber.Ctx) error { return c.Next() }
+	}
+
+	requireAuth, requireAdmin := m.RequireAuth(), m.RequireAdmin()
+
+	router.Patch("/users/me/password", requireAuth, limiter, m.handler.changePassword)
+
+	router.Get("/users/invitations", requireAuth, limiter, requireAdmin, paginate.New(), m.handler.listInvitations)
+	router.Post("/users/invitations", requireAuth, limiter, requireAdmin, m.handler.createInvitation)
+	router.Post("/users/invitations/:id/resend", requireAuth, limiter, requireAdmin, m.handler.resendInvitation)
+	router.Delete("/users/invitations/:id", requireAuth, limiter, requireAdmin, m.handler.revokeInvitation)
 }
