@@ -352,16 +352,29 @@ func (r *PostgresRepository) ImportEntryTransactions(ctx context.Context, userID
 				SELECT id FROM assets WHERE UPPER(ticker) = $1 ORDER BY created_at LIMIT 1
 			`, row.Ticker).Scan(&assetID)
 			if errors.Is(err, pgx.ErrNoRows) {
+				// created_by, and the membership row below, are what a
+				// contributed asset needs to be visible to its contributor:
+				// the catalog only serves curated rows to everybody. Without
+				// them an imported ticker would be in the user's portfolio and
+				// missing from the picker they add the next one with.
 				err = tx.QueryRow(ctx, `
-					INSERT INTO assets (ticker, name, asset_type, exchange, currency, created_at, updated_at)
-					VALUES ($1, $2, $3::asset_type, NULL, $4, NOW(), NOW())
+					INSERT INTO assets (ticker, name, asset_type, exchange, currency, created_by, is_curated, created_at, updated_at)
+					VALUES ($1, $2, $3::asset_type, NULL, $4, $5, FALSE, NOW(), NOW())
 					ON CONFLICT (ticker, COALESCE(exchange, '')) DO UPDATE SET updated_at = NOW()
 					RETURNING id
-				`, row.Ticker, row.AssetName, row.AssetType, row.Currency).Scan(&assetID)
+				`, row.Ticker, row.AssetName, row.AssetType, row.Currency, userID).Scan(&assetID)
 			}
 			if err != nil {
 				return 0, err
 			}
+
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO user_catalog_assets (user_id, asset_id) VALUES ($1, $2)
+				ON CONFLICT DO NOTHING
+			`, userID, assetID); err != nil {
+				return 0, err
+			}
+
 			assetIDs[row.Ticker] = assetID
 		}
 

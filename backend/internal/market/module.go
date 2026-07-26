@@ -103,7 +103,15 @@ func (m *Module) Routes(router fiber.Router) {
 
 	admin := m.authMiddl.RequireAdmin()
 
-	assests.Post("", admin, m.handler.CreateAsset)
+	// Open to every user. An admin's call curates the row for everybody; anybody
+	// else's contributes one visible to them alone, capped per day, and never
+	// overwriting an existing ticker. The admin guard that used to sit here
+	// bought nothing: the transaction importer has always written to this same
+	// table for any user with a spreadsheet, and all the guard did was leave the
+	// manual path with no way to add an instrument the catalog was missing.
+	assests.Post("", m.handler.CreateAsset)
+	// The bulk path stays curated: an uploaded sheet upserts, so it can rewrite
+	// rows other users hold. A user's bulk route is the transaction importer.
 	assests.Post("/import", admin, m.handler.ImportAssets)
 
 	exchangeRates := router.Group("/exchange-rates")

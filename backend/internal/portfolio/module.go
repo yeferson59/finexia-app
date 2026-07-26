@@ -41,9 +41,12 @@ type authMiddleware interface {
 // AssetReader is the slice of the market module the portfolio HTTP handlers
 // need to serve the /portfolios/assets catalog and the manual price update.
 // Satisfied by *market.Service.
+// The catalog reads take a market.CatalogView: since assets can be contributed
+// by users, "the catalog" is no longer one list. Each caller gets the curated
+// rows plus their own, and an admin gets everything.
 type AssetReader interface {
-	GetAssets(ctx context.Context, offset, limit uint) ([]market.Asset, error)
-	SearchAssets(ctx context.Context, search string, offset, limit uint) ([]market.Asset, error)
+	GetAssets(ctx context.Context, view market.CatalogView, offset, limit uint) ([]market.Asset, error)
+	SearchAssets(ctx context.Context, view market.CatalogView, search string, offset, limit uint) ([]market.Asset, error)
 	UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, price money.Money) (market.Asset, error)
 }
 

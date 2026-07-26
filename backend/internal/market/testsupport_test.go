@@ -30,11 +30,13 @@ type fakeRepository struct {
 
 	upsertExchangeRate func(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (ExchangeRate, error)
 
-	updateAssetPrice func(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error)
-	upsertAsset      func(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error)
-	getAssets        func(ctx context.Context, offset, limit uint) ([]Asset, error)
-	getAssetByID     func(ctx context.Context, assetID uuid.UUID) (Asset, error)
-	searchAssets     func(ctx context.Context, search string, offset, limit uint) ([]Asset, error)
+	updateAssetPrice    func(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error)
+	upsertAsset         func(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error)
+	createAssetIfAbsent func(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error)
+	countContributed    func(ctx context.Context, userID uuid.UUID, since time.Time) (int, error)
+	getAssets           func(ctx context.Context, view CatalogView, offset, limit uint) ([]Asset, error)
+	getAssetByID        func(ctx context.Context, assetID uuid.UUID) (Asset, error)
+	searchAssets        func(ctx context.Context, view CatalogView, search string, offset, limit uint) ([]Asset, error)
 }
 
 func (f *fakeRepository) UpsertExchangeRate(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (ExchangeRate, error) {
@@ -55,11 +57,27 @@ func (f *fakeRepository) UpsertAsset(ctx context.Context, ticker, name string, a
 	return f.upsertAsset(ctx, ticker, name, assetType, exchange, currency)
 }
 
-func (f *fakeRepository) GetAssets(ctx context.Context, offset, limit uint) ([]Asset, error) {
+func (f *fakeRepository) CreateAssetIfAbsent(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error) {
+	if f.createAssetIfAbsent == nil {
+		return Asset{}, nil
+	}
+	return f.createAssetIfAbsent(ctx, userID, ticker, name, assetType, exchange, currency)
+}
+
+// CountAssetsContributedBy defaults to an empty quota so the scenarios that do
+// not care about it are not made to stub it.
+func (f *fakeRepository) CountAssetsContributedBy(ctx context.Context, userID uuid.UUID, since time.Time) (int, error) {
+	if f.countContributed == nil {
+		return 0, nil
+	}
+	return f.countContributed(ctx, userID, since)
+}
+
+func (f *fakeRepository) GetAssets(ctx context.Context, view CatalogView, offset, limit uint) ([]Asset, error) {
 	if f.getAssets == nil {
 		return nil, nil
 	}
-	return f.getAssets(ctx, offset, limit)
+	return f.getAssets(ctx, view, offset, limit)
 }
 
 func (f *fakeRepository) GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, error) {
@@ -69,11 +87,11 @@ func (f *fakeRepository) GetAssetByID(ctx context.Context, assetID uuid.UUID) (A
 	return f.getAssetByID(ctx, assetID)
 }
 
-func (f *fakeRepository) SearchAssets(ctx context.Context, search string, offset, limit uint) ([]Asset, error) {
+func (f *fakeRepository) SearchAssets(ctx context.Context, view CatalogView, search string, offset, limit uint) ([]Asset, error) {
 	if f.searchAssets == nil {
 		return nil, nil
 	}
-	return f.searchAssets(ctx, search, offset, limit)
+	return f.searchAssets(ctx, view, search, offset, limit)
 }
 
 // fakePriceProvider stubs the market data provider used by the sync jobs.

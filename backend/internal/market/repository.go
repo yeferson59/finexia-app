@@ -16,9 +16,20 @@ type Repository interface {
 
 	// Assets (catalog owned by this module; portfolio reads them via AssetReader)
 	GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, error)
-	GetAssets(ctx context.Context, offset, limit uint) ([]Asset, error)
-	SearchAssets(ctx context.Context, search string, offset, limit uint) ([]Asset, error)
+	GetAssets(ctx context.Context, view CatalogView, offset, limit uint) ([]Asset, error)
+	SearchAssets(ctx context.Context, view CatalogView, search string, offset, limit uint) ([]Asset, error)
+	// UpsertAsset writes a curated row, overwriting the metadata of an existing
+	// one. Operator-only: the overwrite is what makes it unsafe to expose to
+	// users, since the ticker is the conflict target and any user could reach
+	// somebody else's row through it.
 	UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error)
+	// CreateAssetIfAbsent is the user-facing counterpart: it inserts only when
+	// the ticker is new and otherwise returns the existing row untouched, so a
+	// contribution can never rewrite curated data. Either way the asset joins
+	// the user's own catalog.
+	CreateAssetIfAbsent(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error)
+	// CountAssetsContributedBy bounds how much one user can add per day.
+	CountAssetsContributedBy(ctx context.Context, userID uuid.UUID, since time.Time) (int, error)
 	UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error)
 
 	CredentialStore

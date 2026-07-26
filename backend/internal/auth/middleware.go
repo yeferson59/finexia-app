@@ -74,7 +74,7 @@ func (m *Module) RequireRole(roles ...string) fiber.Handler {
 
 // RequireAdmin is a convenience wrapper that only allows the "admin" role.
 func (m *Module) RequireAdmin() fiber.Handler {
-	return m.RequireRole("admin")
+	return m.RequireRole(httpx.RoleAdmin)
 }
 
 // authLimiter rate-limits the public auth endpoints (credential guessing,

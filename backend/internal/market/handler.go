@@ -34,23 +34,34 @@ func (h *handler) ImportAssets(c fiber.Ctx) error {
 	return httpx.OK(c, "Assets imported", "Spreadsheet imported successfully", result)
 }
 
+// CreateAsset adds an asset to the catalog, curating it when an admin asks and
+// contributing it when anybody else does.
+//
+// One route, two behaviours, instead of two routes: from the client's side this
+// is the same request — "put this instrument in the catalog" — and the caller
+// does not get to choose which of the two it becomes.
 func (h *handler) CreateAsset(c fiber.Ctx) error {
+	userID, _, role, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid identity", err.Error())
+	}
+
 	var req CreateAssetRequestDTO
 	if err := c.Bind().JSON(&req); err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
-	req.Ticker = strings.ToUpper(strings.TrimSpace(req.Ticker))
-	req.Currency = strings.ToUpper(strings.TrimSpace(req.Currency))
-
 	assetType := AssetType(req.AssetType)
-	if !assetType.IsValid() {
-		return httpx.BadRequest(c, "Invalid asset type", "Asset type must be one of: stock, etf, crypto, bond, cash, real_estate, commodity, other")
+
+	var asset Asset
+	if role == httpx.RoleAdmin {
+		asset, err = h.service.CreateAsset(c, req.Ticker, req.Name, assetType, req.Exchange, req.Currency)
+	} else {
+		asset, err = h.service.ContributeAsset(c, userID, req.Ticker, req.Name, assetType, req.Exchange, req.Currency)
 	}
 
-	asset, err := h.service.CreateAsset(c, req.Ticker, req.Name, assetType, req.Exchange, req.Currency)
 	if err != nil {
-		return httpx.FromDomain(c, err, "Error creating asset", "Could not create asset")
+		return httpx.FromDomain(c, err, "Error creating asset", assetFailureDetail(err))
 	}
 
 	return httpx.Success(c, fiber.StatusCreated, "Asset created", "Asset created successfully", asset)

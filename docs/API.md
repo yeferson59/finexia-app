@@ -210,7 +210,7 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 | GET | `/portfolios/sources` | usuario | Lista plataformas |
 | PATCH | `/portfolios/sources/:id` | usuario | Actualiza plataforma |
 | DELETE | `/portfolios/sources/:id` | usuario | Elimina plataforma |
-| GET | `/portfolios/assets` | usuario, paginada | Catálogo de assets |
+| GET | `/portfolios/assets` | usuario, paginada | Catálogo de assets (curados + los que aportó el llamante; §2.8) |
 | PATCH | `/portfolios/assets/:id/price` | admin | Fija precio manual de un asset |
 | GET | `/portfolios/growth` | usuario | Crecimiento agregado (`?since=`) |
 | GET | `/portfolios/export/summary` | usuario | XLSX `resumen-mensual.xlsx` |
@@ -251,12 +251,37 @@ agregado por portfolio: `positionsPricedOwn`, `positionsPricedManual` y
 avisar de que un total solo está parcialmente valorado a mercado. No son
 importes: `?currency=` convierte los totales y deja estos tres intactos.
 
-### 2.8 Assets (JWT + admin)
+### 2.8 Assets (JWT; *admin* donde se indica)
 
-| Método | Path | Descripción |
-|---|---|---|
-| POST | `/assets` | Crea asset |
-| POST | `/assets/import` | Import masivo de assets |
+| Método | Path | Acceso | Descripción |
+|---|---|---|---|
+| POST | `/assets` | usuario | Añade un asset al catálogo |
+| POST | `/assets/import` | admin | Import masivo de assets |
+
+`POST /assets` hace dos cosas distintas según quién llame, con el mismo cuerpo
+(`ticker`, `name`, `assetType`, `currency`, `exchange` opcional) y la misma
+respuesta `201`:
+
+| Llamante | Efecto |
+|---|---|
+| admin | **Cura** la fila: `isCurated: true`, visible para todos, y sobrescribe los metadatos si el ticker ya existía |
+| usuario | **Aporta** la fila: `isCurated: false`, visible solo para quien la aportó, y **nunca** sobrescribe un ticker existente |
+
+Si el ticker ya está en el catálogo, la aportación devuelve la fila existente y
+la añade al catálogo del llamante; la respuesta no distingue entre "creada" y
+"ya existía", porque esa diferencia solo informaría de lo que ha aportado otro
+usuario. El aporte está limitado a **50 activos nuevos por usuario cada 24
+horas** (`429` al superarlo).
+
+Esto es lo que reemplaza al viejo `admin`-only: bajo el modelo de proveedores el
+catálogo era del operador porque el operador pagaba la cuota. Con BYO-key cada
+usuario sincroniza sus propias tenencias con su propia clave, y el import de
+transacciones (§2.7) ya creaba filas para cualquier usuario que subiera un
+archivo — la puerta solo estaba cerrada por delante.
+
+El catálogo que devuelve `GET /portfolios/assets` está acotado en consecuencia:
+las filas curadas más las que ha aportado el llamante. Un admin ve la tabla
+entera, porque modera lo que aportan los usuarios.
 
 > Las rutas de sincronización de administración (`POST /assets/sync`,
 > `POST /assets/:id/sync`) **fueron retiradas**: los datos de mercado son

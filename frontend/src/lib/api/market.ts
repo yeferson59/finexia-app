@@ -50,12 +50,19 @@ export function searchAssets(
 	return authedFetchSafe(event, path);
 }
 
-/** `POST /assets` — crea un asset. */
+/**
+ * `POST /assets` — añade un asset al catálogo.
+ *
+ * El backend decide qué significa según el rol del llamante: un admin cura la
+ * fila (visible para todos) y un usuario la aporta (visible solo para él, y sin
+ * sobrescribir un ticker que ya exista). El cuerpo y la respuesta son los
+ * mismos en ambos casos.
+ */
 export function createAsset(
 	event: ApiEvent,
 	body: Record<string, unknown>
-): Promise<ApiResult<unknown>> {
-	return apiRequest<unknown>(event, '/assets', {
+): Promise<ApiResult<Asset>> {
+	return apiRequest<Asset>(event, '/assets', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(body)

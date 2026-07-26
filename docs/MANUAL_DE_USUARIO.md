@@ -244,7 +244,7 @@ Una **posición** representa la tenencia de un activo concreto dentro de un port
    - **Notas** (opcional) — cualquier comentario sobre la posición.
 4. Guarda. La posición aparecerá en la lista del portafolio y sus importes se sumarán al valor total.
 
-> **Nota:** si el activo que buscas no aparece en el catálogo, contacta con el equipo de soporte de Finexia para solicitar que lo incorporen.
+> **¿No aparece el activo que buscas?** El buscador te ofrece **Crear "TICKER"**. Rellena nombre, tipo y moneda (el mercado es opcional) y el activo queda disponible al instante para seguir con la posición. Los activos que creas los ves solo tú, hasta que el equipo de Finexia los incorpore al catálogo general. Puedes añadir hasta 50 activos nuevos cada 24 horas.
 
 ### 7.2 Detalle de un activo en el portafolio
 
@@ -368,7 +368,7 @@ En esta pantalla:
 > **Consejos para una buena importación:**
 > - Usa una fila de encabezados clara en tu hoja.
 > - Mantén formatos de fecha y número consistentes.
-> - Los símbolos/tickers deben coincidir con los del catálogo de activos.
+> - Los tickers que no estén en el catálogo se dan de alta automáticamente con el nombre, tipo y moneda del archivo, y quedan visibles solo para ti.
 > - Puedes repetir la vista previa tantas veces como necesites antes de confirmar; nada se guarda hasta el paso final.
 
 ---
@@ -509,7 +509,7 @@ Cantidad × precio, convertido a la moneda del portafolio. El precio es, por est
 Sí. Usa **Transacciones → Importar**: sube el archivo (.xlsx o .csv, máximo 8 MB), asigna las columnas, revisa la vista previa (incluidas las filas omitidas) y confirma. Nada se guarda hasta que confirmas.
 
 **No encuentro un activo al crear una posición. ¿Qué hago?**
-El activo aún no está en el catálogo. Contacta con el equipo de soporte de Finexia para solicitar que lo añadan.
+Créalo tú desde el propio buscador: pulsa **Crear "TICKER"**, indica nombre, tipo y moneda, y podrás seguir con la posición sin salir de la pantalla. Solo lo verás tú mientras el equipo de Finexia no lo incorpore al catálogo general.
 
 **¿Qué pasa si pierdo mi teléfono con la app de autenticación?**
 Usa uno de tus **códigos de recuperación** para entrar y luego reconfigura la 2FA. Si tampoco tienes los códigos, contacta con el soporte de Finexia.

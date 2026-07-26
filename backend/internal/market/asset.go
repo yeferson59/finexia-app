@@ -9,10 +9,12 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/spreadsheet"
 )
 
-// Column limits mirror the assets table (ticker VARCHAR(20), name VARCHAR(255)).
+// Column limits mirror the assets table (ticker VARCHAR(20), name VARCHAR(255),
+// exchange VARCHAR(100)).
 const (
 	maxTickerLen    = 20
 	maxAssetNameLen = 255
+	maxExchangeLen  = 100
 )
 
 // AssetType is the kind of a tradable asset.
@@ -50,8 +52,25 @@ type Asset struct {
 	Currency       string       `json:"currency"`
 	CurrentPrice   *money.Money `json:"currentPrice"`
 	PriceUpdatedAt *time.Time   `json:"priceUpdatedAt"`
-	CreatedAt      time.Time    `json:"createdAt"`
-	UpdatedAt      time.Time    `json:"updatedAt"`
+	// IsCurated marks a row the operator vouches for, which is what makes it
+	// visible to every user. A contributed row is only visible to the users who
+	// contributed it, so the flag doubles as the "everyone" audience.
+	IsCurated bool      `json:"isCurated"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// CatalogView is the audience a catalog read is served for: the curated rows,
+// plus the ones ViewerID contributed. All lifts the scope to the whole table
+// and is set only for admins, who moderate what users contribute and would
+// otherwise be unable to see it.
+//
+// It is a type rather than a bare uuid parameter because the two fields must
+// travel together — a viewer id with no All flag reads as "this user only",
+// which is exactly the wrong answer for an admin.
+type CatalogView struct {
+	ViewerID uuid.UUID
+	All      bool
 }
 
 // scanAssetCurrentPrice attaches the current price (stored as a string) to an

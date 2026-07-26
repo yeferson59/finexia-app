@@ -25,17 +25,17 @@ import (
 // the /portfolios/assets catalog and the admin price update are served through
 // it, not through portfolio's own repository.
 type fakeAssets struct {
-	getAssets        func(ctx context.Context, offset, limit uint) ([]market.Asset, error)
-	searchAssets     func(ctx context.Context, search string, offset, limit uint) ([]market.Asset, error)
+	getAssets        func(ctx context.Context, view market.CatalogView, offset, limit uint) ([]market.Asset, error)
+	searchAssets     func(ctx context.Context, view market.CatalogView, search string, offset, limit uint) ([]market.Asset, error)
 	updateAssetPrice func(ctx context.Context, assetID uuid.UUID, price money.Money) (market.Asset, error)
 }
 
-func (f fakeAssets) GetAssets(ctx context.Context, offset, limit uint) ([]market.Asset, error) {
-	return f.getAssets(ctx, offset, limit)
+func (f fakeAssets) GetAssets(ctx context.Context, view market.CatalogView, offset, limit uint) ([]market.Asset, error) {
+	return f.getAssets(ctx, view, offset, limit)
 }
 
-func (f fakeAssets) SearchAssets(ctx context.Context, search string, offset, limit uint) ([]market.Asset, error) {
-	return f.searchAssets(ctx, search, offset, limit)
+func (f fakeAssets) SearchAssets(ctx context.Context, view market.CatalogView, search string, offset, limit uint) ([]market.Asset, error) {
+	return f.searchAssets(ctx, view, search, offset, limit)
 }
 
 func (f fakeAssets) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, price money.Money) (market.Asset, error) {
@@ -515,9 +515,11 @@ func TestHandlerAssets(t *testing.T) {
 	userID := uuid.New()
 	assetID := uuid.New()
 
-	t.Run("lists the catalog", func(t *testing.T) {
+	t.Run("lists the catalog scoped to the caller", func(t *testing.T) {
+		var gotView market.CatalogView
 		assets := fakeAssets{
-			getAssets: func(_ context.Context, _, _ uint) ([]market.Asset, error) {
+			getAssets: func(_ context.Context, view market.CatalogView, _, _ uint) ([]market.Asset, error) {
+				gotView = view
 				return []market.Asset{{ID: assetID, Ticker: "AAPL"}}, nil
 			},
 		}
@@ -527,13 +529,38 @@ func TestHandlerAssets(t *testing.T) {
 		if resp.StatusCode != fiber.StatusOK {
 			t.Fatalf("status = %d, want 200", resp.StatusCode)
 		}
+		if gotView.ViewerID != userID {
+			t.Errorf("viewerID = %s, want %s", gotView.ViewerID, userID)
+		}
+		if gotView.All {
+			t.Error("a non-admin was served the whole catalog")
+		}
 	})
 
-	t.Run("a search query goes to SearchAssets", func(t *testing.T) {
-		var gotSearch string
+	t.Run("an admin sees the whole catalog", func(t *testing.T) {
+		var gotView market.CatalogView
 		assets := fakeAssets{
-			searchAssets: func(_ context.Context, search string, _, _ uint) ([]market.Asset, error) {
-				gotSearch = search
+			getAssets: func(_ context.Context, view market.CatalogView, _, _ uint) ([]market.Asset, error) {
+				gotView = view
+				return nil, nil
+			},
+		}
+		app := newTestModuleWithAssets(t, &fakeRepository{}, assets, userID, "admin")
+
+		if resp := do(t, app, http.MethodGet, "/portfolios/assets?page=1&limit=10"); resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		if !gotView.All {
+			t.Error("an admin was not served the whole catalog, so contributed assets are unmoderatable")
+		}
+	})
+
+	t.Run("a search query goes to SearchAssets, scoped the same way", func(t *testing.T) {
+		var gotSearch string
+		var gotView market.CatalogView
+		assets := fakeAssets{
+			searchAssets: func(_ context.Context, view market.CatalogView, search string, _, _ uint) ([]market.Asset, error) {
+				gotSearch, gotView = search, view
 				return nil, nil
 			},
 		}
@@ -544,6 +571,9 @@ func TestHandlerAssets(t *testing.T) {
 		}
 		if gotSearch != "apple" {
 			t.Errorf("search = %q, want %q", gotSearch, "apple")
+		}
+		if gotView.ViewerID != userID || gotView.All {
+			t.Errorf("view = %+v, want the caller's own scope", gotView)
 		}
 	})
 

@@ -263,6 +263,25 @@ vez al arrancar, y todo error de proveedor pasa por `marketdata.Errorf`, que
 depura la clave del mensaje — Alpha Vantage solo la acepta en el query string y
 los errores de transporte de Go citan la URL completa.
 
+**El catálogo dejó de ser del operador.** La fila de `assets` no lleva dato
+licenciado —solo ticker, nombre, tipo, mercado y moneda—, así que no hay razón
+para duplicarla por usuario: sigue siendo compartida, y lo que se añadió es
+procedencia (`created_by`, `is_curated`) y alcance (`user_catalog_assets`). Un
+admin cura, y su fila la ve todo el mundo; cualquier usuario aporta, y su fila
+la ven solo los usuarios que la pidieron. Las dos escrituras están separadas a
+propósito en el repositorio: `UpsertAsset` sobrescribe los metadatos del ticker
+en conflicto y es del operador, `CreateAssetIfAbsent` no sobrescribe nunca y es
+la que alcanza el usuario. Fundirlas dejaría a cualquiera reescribir el nombre
+o la moneda de un activo que otros tienen en cartera.
+
+`user_catalog_assets` es una tabla de pertenencia y no una columna porque la
+relación es de muchos a muchos por construcción: el segundo usuario que aporta
+un ticker recibe la fila que ya existía —para no partir las tenencias en dos
+activos— y aun así tiene que verla en su catálogo. Ese es también el motivo de
+que el import de transacciones escriba la pertenencia: crea activos desde antes
+de todo esto, y sin ella el ticker importado quedaría en la cartera del usuario
+pero ausente del buscador con el que añade el siguiente.
+
 ## 4. Blindaje automatizado
 
 Las reglas 1, 2 y 5 se verifican en CI mediante un **arch-test**

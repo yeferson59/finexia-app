@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Asset } from '$lib/api/types';
+	import AssetCreateInline from './asset-create-inline.svelte';
 
 	let {
 		selected = $bindable(null),
@@ -9,6 +10,7 @@
 	let showSuggestions = $state(false);
 	let suggestions = $state<Asset[]>([]);
 	let isSearching = $state(false);
+	let isCreating = $state(false);
 	let comboboxEl = $state<HTMLDivElement | null>(null);
 	let debounceTimer: ReturnType<typeof setTimeout>;
 
@@ -16,6 +18,7 @@
 		selected = asset;
 		search = asset.ticker;
 		showSuggestions = false;
+		isCreating = false;
 	}
 
 	async function fetchSuggestions(q: string) {
@@ -37,6 +40,9 @@
 	function onSearchInput() {
 		selected = null;
 		showSuggestions = true;
+		// Escribir otro ticker invalida el formulario abierto: se creaba el que
+		// estaba en pantalla al abrirlo, no el que se acaba de teclear.
+		isCreating = false;
 		clearTimeout(debounceTimer);
 		debounceTimer = setTimeout(() => fetchSuggestions(search), 300);
 	}
@@ -93,7 +99,15 @@
 		{/if}
 	</div>
 
-	{#if showSuggestions && suggestions.length > 0}
+	<!-- El alta va primero: mientras el formulario está abierto manda sobre la
+	     lista, para que una búsqueda anterior no lo tape a medio rellenar. -->
+	{#if isCreating}
+		<AssetCreateInline
+			ticker={search}
+			oncreated={selectAsset}
+			oncancel={() => (isCreating = false)}
+		/>
+	{:else if showSuggestions && suggestions.length > 0}
 		<ul class="combobox-list" role="listbox">
 			{#each suggestions as asset (asset.id)}
 				<li
@@ -130,7 +144,10 @@
 		</ul>
 	{:else if showSuggestions && !isSearching && search.trim().length > 0}
 		<div class="combobox-empty">
-			No se encontró ningún activo con "<strong>{search}</strong>"
+			<span>No se encontró ningún activo con "<strong>{search}</strong>"</span>
+			<button type="button" class="combobox-create" onclick={() => (isCreating = true)}>
+				Crear "{search.trim().toUpperCase()}"
+			</button>
 		</div>
 	{/if}
 </div>
@@ -292,9 +309,32 @@
 	}
 
 	.combobox-empty {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: 0.5rem;
 		padding: 0.75rem 1rem;
 		font-size: 0.85rem;
 		color: rgba(236, 234, 229, 0.5);
+	}
+
+	.combobox-create {
+		flex-shrink: 0;
+		padding: 0.4rem 0.75rem;
+		border: 1.5px solid rgba(212, 145, 42, 0.45);
+		border-radius: 8px;
+		background: rgba(212, 145, 42, 0.12);
+		color: var(--amber);
+		font-family: var(--font-body);
+		font-size: 0.82rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.combobox-create:hover {
+		background: rgba(212, 145, 42, 0.2);
 	}
 
 	@keyframes spin {
