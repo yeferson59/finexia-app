@@ -72,9 +72,24 @@ func (c *Config) LoadEnvs() *Env {
 		AWSSecretAccessKey: c.getString("AWS_SECRET_ACCESS_KEY", ""),
 		ResendAPIKey:       c.getString("RESEND_API_KEY", ""),
 		EmailFrom:          c.getString("EMAIL_FROM", "Finexia <noreply@finexia.me>"),
-		// "version:base64key" entries, comma separated, plus the version new
-		// credentials are sealed under. Several versions may be held at once so
-		// a key can be rotated without a downtime window.
+		// The key-encryption keys that wrap each user's market-data API key.
+		//
+		// MARKET_KEK_KEYS is a comma-separated list of "version:base64key"
+		// entries, where version is a decimal integer and the key is standard
+		// base64 (with padding) that must decode to exactly 32 bytes — AES-256.
+		// Generate one with `openssl rand -base64 32`. Several versions may be
+		// held at once so a key can be rotated without a downtime window; the
+		// rows sealed under the old version stay readable while they are
+		// re-wrapped.
+		//
+		// MARKET_KEK_ACTIVE names the version new credentials are sealed under,
+		// and must be one of the versions supplied above.
+		//
+		// The empty default does not make this optional: it is what lets the
+		// error come from secretbox, which can say which of "no key at all",
+		// "not 32 bytes" and "active version not supplied" went wrong. main
+		// refuses to start either way — sealing users' keys under a guessable
+		// default would be worse than not starting.
 		MarketKEKKeys:           c.getString("MARKET_KEK_KEYS", ""),
 		MarketKEKActive:         c.getString("MARKET_KEK_ACTIVE", "1"),
 		PublicURL:               c.getString("PUBLIC_URL", "http://localhost:8080"),

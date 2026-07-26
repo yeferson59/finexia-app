@@ -24,27 +24,31 @@ func scanCredential(row pgx.Row) (Credential, error) {
 }
 
 // UpsertCredential stores a sealed key, replacing whatever the user had for
-// that provider. A replaced key resets status and clears the previous error:
-// the new key has not been proven bad yet.
-func (r *PostgresRepository) UpsertCredential(ctx context.Context, userID uuid.UUID, cred sealedCredential, keyLast4 string, verifiedAt *time.Time) (Credential, error) {
+// that provider. The previous error is always cleared: the new key has not been
+// proven bad yet.
+//
+// status comes from the caller because saving a key proves something about it.
+// It is normally 'active'; a key saved while its quota is exhausted is stored
+// 'rate_limited', which is the honest state and is what the UI shows.
+func (r *PostgresRepository) UpsertCredential(ctx context.Context, userID uuid.UUID, cred sealedCredential, keyLast4 string, status CredentialStatus, verifiedAt *time.Time) (Credential, error) {
 	return scanCredential(r.db.QueryRow(ctx, `
 		INSERT INTO market_credentials
 			(user_id, provider, kek_version, wrapped_dek, nonce, ciphertext, last4, status, last_verified_at, last_error)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, NULL)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL)
 		ON CONFLICT (user_id, provider) DO UPDATE SET
 			kek_version      = EXCLUDED.kek_version,
 			wrapped_dek      = EXCLUDED.wrapped_dek,
 			nonce            = EXCLUDED.nonce,
 			ciphertext       = EXCLUDED.ciphertext,
 			last4            = EXCLUDED.last4,
-			status           = 'active',
+			status           = EXCLUDED.status,
 			last_verified_at = EXCLUDED.last_verified_at,
 			last_error       = NULL,
 			updated_at       = NOW()
 		RETURNING `+credentialCols,
 		userID, string(cred.Provider), cred.Sealed.KEKVersion,
 		cred.Sealed.WrappedDEK, cred.Sealed.Nonce, cred.Sealed.Ciphertext,
-		keyLast4, verifiedAt,
+		keyLast4, string(status), verifiedAt,
 	))
 }
 
@@ -134,6 +138,9 @@ func (r *PostgresRepository) DeleteCredential(ctx context.Context, userID uuid.U
 
 // SetCredentialStatus records the verdict of a provider call. lastErr is
 // expected to be already scrubbed of the key by the provider client.
+//
+// A verdict about a credential the user does not have is a bug in the caller,
+// not a no-op, so a missing row is reported rather than swallowed.
 func (r *PostgresRepository) SetCredentialStatus(ctx context.Context, userID uuid.UUID, provider ProviderID, status CredentialStatus, lastErr string) error {
 	var verifiedAt *time.Time
 	if status == CredentialActive {
@@ -141,7 +148,7 @@ func (r *PostgresRepository) SetCredentialStatus(ctx context.Context, userID uui
 		verifiedAt = &now
 	}
 
-	_, err := r.db.Exec(ctx, `
+	tag, err := r.db.Exec(ctx, `
 		UPDATE market_credentials
 		SET status = $3,
 		    last_error = NULLIF($4, ''),
@@ -149,8 +156,15 @@ func (r *PostgresRepository) SetCredentialStatus(ctx context.Context, userID uui
 		    updated_at = NOW()
 		WHERE user_id = $1 AND provider = $2
 	`, userID, string(provider), string(status), lastErr, verifiedAt)
+	if err != nil {
+		return err
+	}
 
-	return err
+	if tag.RowsAffected() == 0 {
+		return ErrCredentialNotFound
+	}
+
+	return nil
 }
 
 // UsersWithCredentials lists the users the sync job should walk. Users whose

@@ -39,16 +39,49 @@ func (r *PostgresRepository) GetHeldAssetIDs(ctx context.Context, userID uuid.UU
 	return ids, rows.Err()
 }
 
-// GetRequiredCurrencyPairs returns the conversions the user's portfolios need:
-// every distinct (asset currency → portfolio base currency) combination where
-// the two differ.
+// GetRequiredCurrencyPairs returns every conversion the user's screens actually
+// perform, which is what the BYO-key sync has to fetch with their key.
+//
+// There are three sources, and missing any of them leaves a conversion with no
+// rate to use. Under the shared model that was invisible: the operator's key
+// filled exchange_rates for everyone. Now nothing else fills them.
+//
+//  1. asset currency → portfolio base currency, for the market value of a
+//     holding quoted in another currency (portfolio_summary).
+//  2. cost currency → portfolio base currency, for the cost basis of a purchase
+//     settled in another currency (portfolio_summary again — the two legs of
+//     that view use different columns).
+//  3. portfolio base currency → the user's preferred currency, for the display
+//     conversion in GetPortfoliosSummaryInCurrency. Leaving this one out is what
+//     made ?currency= fail outright once the shared table was emptied.
+//
+// Only one direction of each pair is asked for: GetConversionRate already
+// inverts a stored rate and hops through USD.
 func (r *PostgresRepository) GetRequiredCurrencyPairs(ctx context.Context, userID uuid.UUID) ([]CurrencyPair, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT DISTINCT a.currency, p.base_currency
-		FROM portfolio_entries pe
-		JOIN portfolios p ON p.id = pe.portfolio_id
-		JOIN assets a     ON a.id = pe.asset_id
-		WHERE p.user_id = $1 AND a.currency <> p.base_currency
+		SELECT DISTINCT from_currency, to_currency
+		FROM (
+			SELECT a.currency AS from_currency, p.base_currency AS to_currency
+			FROM portfolio_entries pe
+			JOIN portfolios p ON p.id = pe.portfolio_id
+			JOIN assets a     ON a.id = pe.asset_id
+			WHERE p.user_id = $1
+		UNION
+			SELECT pe.cost_currency, p.base_currency
+			FROM portfolio_entries pe
+			JOIN portfolios p ON p.id = pe.portfolio_id
+			WHERE p.user_id = $1
+		UNION
+			SELECT p.base_currency, u.preferred_currency
+			FROM portfolios p
+			JOIN users u ON u.id = p.user_id
+			WHERE p.user_id = $1
+		) pairs
+		WHERE from_currency IS NOT NULL
+		  AND to_currency   IS NOT NULL
+		  AND from_currency <> ''
+		  AND to_currency   <> ''
+		  AND from_currency <> to_currency
 	`, userID)
 	if err != nil {
 		return nil, err

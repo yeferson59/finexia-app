@@ -10,14 +10,6 @@ import (
 
 type CurrencyPair struct{ From, To string }
 
-// DefaultPairs are the pairs synced for a user who has given no other hint of
-// which currencies they care about.
-var DefaultPairs = []CurrencyPair{
-	{"EUR", "USD"},
-	{"GBP", "USD"},
-	{"USD", "COP"},
-}
-
 // The exchange_rates table below is the shared, admin-maintained one. Rates
 // fetched with a user's own key do not come here — they go to
 // user_exchange_rates via SyncRatesForUser, because provider terms do not allow

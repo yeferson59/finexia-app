@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -218,11 +220,16 @@ func testKeyring() *secretbox.Keyring {
 }
 
 // credentialStore is an in-memory CredentialStore, enough to drive the BYO-key
-// sync without Postgres.
+// sync and the credential use cases without Postgres.
+//
+// It mirrors the two behaviours of the Postgres implementation that the service
+// actually leans on: the sync-facing reads skip keys known to be invalid, and a
+// status written against a credential that does not exist is an error rather
+// than a silent no-op.
 type credentialStore struct {
 	mu     sync.Mutex
 	sealed map[uuid.UUID][]sealedCredential
-	status map[string]CredentialStatus
+	meta   map[string]Credential
 	prices map[string]money.Money
 	rates  map[string]money.Decimal
 }
@@ -230,10 +237,14 @@ type credentialStore struct {
 func newCredentialStore() *credentialStore {
 	return &credentialStore{
 		sealed: map[uuid.UUID][]sealedCredential{},
-		status: map[string]CredentialStatus{},
+		meta:   map[string]Credential{},
 		prices: map[string]money.Money{},
 		rates:  map[string]money.Decimal{},
 	}
+}
+
+func credKey(userID uuid.UUID, provider ProviderID) string {
+	return userID.String() + "/" + string(provider)
 }
 
 // seed stores a key for a user, sealed exactly as production would.
@@ -248,13 +259,27 @@ func (c *credentialStore) seed(t *testing.T, ring *secretbox.Keyring, userID uui
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.sealed[userID] = append(c.sealed[userID], sealedCredential{Provider: provider, Sealed: sealed})
+	c.meta[credKey(userID, provider)] = Credential{
+		Provider: provider,
+		Last4:    last4(apiKey),
+		Status:   CredentialActive,
+	}
 }
 
+// GetSealedCredentials skips keys the provider already rejected, like the
+// WHERE status <> 'invalid' of the real query.
 func (c *credentialStore) GetSealedCredentials(_ context.Context, userID uuid.UUID) ([]sealedCredential, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	return c.sealed[userID], nil
+	usable := make([]sealedCredential, 0, len(c.sealed[userID]))
+	for _, sc := range c.sealed[userID] {
+		if c.meta[credKey(userID, sc.Provider)].Status != CredentialInvalid {
+			usable = append(usable, sc)
+		}
+	}
+
+	return usable, nil
 }
 
 func (c *credentialStore) GetSealedCredential(_ context.Context, userID uuid.UUID, provider ProviderID) (sealedCredential, error) {
@@ -270,10 +295,23 @@ func (c *credentialStore) GetSealedCredential(_ context.Context, userID uuid.UUI
 	return sealedCredential{}, ErrCredentialNotFound
 }
 
-func (c *credentialStore) SetCredentialStatus(_ context.Context, userID uuid.UUID, provider ProviderID, status CredentialStatus, _ string) error {
+func (c *credentialStore) SetCredentialStatus(_ context.Context, userID uuid.UUID, provider ProviderID, status CredentialStatus, lastErr string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.status[userID.String()+"/"+string(provider)] = status
+
+	key := credKey(userID, provider)
+
+	cred, ok := c.meta[key]
+	if !ok {
+		return ErrCredentialNotFound
+	}
+
+	cred.Status, cred.LastError = status, lastErr
+	if status == CredentialActive {
+		now := time.Now().UTC()
+		cred.LastVerifiedAt = &now
+	}
+	c.meta[key] = cred
 
 	return nil
 }
@@ -282,7 +320,7 @@ func (c *credentialStore) statusOf(userID uuid.UUID, provider ProviderID) Creden
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	return c.status[userID.String()+"/"+string(provider)]
+	return c.meta[credKey(userID, provider)].Status
 }
 
 func (c *credentialStore) UpsertUserAssetPrice(_ context.Context, userID, assetID uuid.UUID, price money.Money, _ string, _ ProviderID, _ time.Time) error {
@@ -321,25 +359,77 @@ func (c *credentialStore) UsersWithCredentials(context.Context) ([]uuid.UUID, er
 	return ids, nil
 }
 
-// The remaining CredentialStore methods are not exercised by the sync tests.
-func (c *credentialStore) UpsertCredential(context.Context, uuid.UUID, sealedCredential, string, *time.Time) (Credential, error) {
-	panic("UpsertCredential not stubbed")
+func (c *credentialStore) UpsertCredential(_ context.Context, userID uuid.UUID, cred sealedCredential, keyLast4 string, status CredentialStatus, verifiedAt *time.Time) (Credential, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	replaced := false
+	for i, sc := range c.sealed[userID] {
+		if sc.Provider == cred.Provider {
+			c.sealed[userID][i], replaced = cred, true
+
+			break
+		}
+	}
+	if !replaced {
+		c.sealed[userID] = append(c.sealed[userID], cred)
+	}
+
+	now := time.Now().UTC()
+	stored := Credential{
+		Provider:       cred.Provider,
+		Last4:          keyLast4,
+		Status:         status,
+		LastVerifiedAt: verifiedAt,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	c.meta[credKey(userID, cred.Provider)] = stored
+
+	return stored, nil
 }
 
-func (c *credentialStore) ListCredentials(context.Context, uuid.UUID) ([]Credential, error) {
-	panic("ListCredentials not stubbed")
+func (c *credentialStore) ListCredentials(_ context.Context, userID uuid.UUID) ([]Credential, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	creds := make([]Credential, 0, len(c.sealed[userID]))
+	for _, sc := range c.sealed[userID] {
+		if cred, ok := c.meta[credKey(userID, sc.Provider)]; ok {
+			creds = append(creds, cred)
+		}
+	}
+
+	slices.SortFunc(creds, func(a, b Credential) int {
+		return strings.Compare(string(a.Provider), string(b.Provider))
+	})
+
+	return creds, nil
 }
 
-func (c *credentialStore) DeleteCredential(context.Context, uuid.UUID, ProviderID) error {
-	panic("DeleteCredential not stubbed")
+func (c *credentialStore) DeleteCredential(_ context.Context, userID uuid.UUID, provider ProviderID) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	key := credKey(userID, provider)
+	if _, ok := c.meta[key]; !ok {
+		return ErrCredentialNotFound
+	}
+
+	delete(c.meta, key)
+	c.sealed[userID] = slices.DeleteFunc(c.sealed[userID], func(sc sealedCredential) bool {
+		return sc.Provider == provider
+	})
+
+	return nil
 }
 
 // The CredentialStore half of Repository, forwarded to the in-memory store.
 // Explicit forwarding rather than embedding: embedding both Repository and
 // CredentialStore would make every one of these selectors ambiguous.
 
-func (f *fakeRepository) UpsertCredential(ctx context.Context, userID uuid.UUID, cred sealedCredential, keyLast4 string, verifiedAt *time.Time) (Credential, error) {
-	return f.creds.UpsertCredential(ctx, userID, cred, keyLast4, verifiedAt)
+func (f *fakeRepository) UpsertCredential(ctx context.Context, userID uuid.UUID, cred sealedCredential, keyLast4 string, status CredentialStatus, verifiedAt *time.Time) (Credential, error) {
+	return f.creds.UpsertCredential(ctx, userID, cred, keyLast4, status, verifiedAt)
 }
 
 func (f *fakeRepository) ListCredentials(ctx context.Context, userID uuid.UUID) ([]Credential, error) {

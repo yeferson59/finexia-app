@@ -417,7 +417,8 @@ export const actions = {
 		return {
 			action: 'syncMarketData',
 			marketSyncSuccess: true,
-			marketSyncCount: Array.isArray(res.data) ? res.data.length : 0
+			marketSyncCount: res.data?.prices?.length ?? 0,
+			marketSyncRateCount: res.data?.rates?.length ?? 0
 		};
 	},
 

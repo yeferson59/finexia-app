@@ -14,9 +14,9 @@ import (
 )
 
 // SupportedDisplayCurrencies lists the currencies a user can pick to view
-// their portfolio totals in. Kept intentionally small for now; extend this
-// list (and, if needed, the legacy sync's defaultPairs so rates stay fresh)
-// to support more.
+// their portfolio totals in. Kept intentionally small for now; extending it is
+// enough on its own — the sync derives the pairs it fetches from what each user
+// actually holds and prefers (GetRequiredCurrencyPairs), not from a fixed list.
 var SupportedDisplayCurrencies = []string{"USD", "COP"}
 
 func IsSupportedDisplayCurrency(currency string) bool {

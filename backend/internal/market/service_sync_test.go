@@ -289,9 +289,11 @@ func TestSyncRatesForUser(t *testing.T) {
 		f := newBYOFixture(t, &fakeRepository{}, provider)
 		f.creds.seed(t, f.ring, userID, Finnhub, "key")
 
-		_, errs := f.svc.SyncRatesForUser(context.Background(), userID, DefaultPairs)
-		if len(errs) != len(DefaultPairs) {
-			t.Fatalf("errs = %d, want one per pair (%d)", len(errs), len(DefaultPairs))
+		pairs := []CurrencyPair{{"EUR", "USD"}, {"GBP", "USD"}, {"USD", "COP"}}
+
+		_, errs := f.svc.SyncRatesForUser(context.Background(), userID, pairs)
+		if len(errs) != len(pairs) {
+			t.Fatalf("errs = %d, want one per pair (%d)", len(errs), len(pairs))
 		}
 	})
 }

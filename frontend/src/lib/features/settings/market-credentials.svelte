@@ -271,7 +271,9 @@
 					{form.marketSyncCount} precio{form.marketSyncCount === 1 ? '' : 's'} actualizado{form.marketSyncCount ===
 					1
 						? ''
-						: 's'}.
+						: 's'}{form.marketSyncRateCount
+						? ` y ${form.marketSyncRateCount} tasa${form.marketSyncRateCount === 1 ? '' : 's'} de cambio`
+						: ''}.
 				</p>
 			{/if}
 		{/if}

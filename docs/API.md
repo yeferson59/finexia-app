@@ -295,6 +295,37 @@ cuatro últimos caracteres. El objeto de respuesta no tiene campo donde quepa:
 propagan al cuerpo de la respuesta: Alpha Vantage lleva la clave en el query
 string y su texto de error puede citarla.
 
+Un proveedor **inalcanzable** (timeout, 5xx, respuesta ilegible) no es lo mismo
+que una clave rechazada: da 500, no 400, y no toca el estado almacenado. Marcar
+`invalid` en ese caso sacaría la clave de las consultas de sincronización de
+forma permanente, así que una caída del proveedor retiraría en silencio una
+clave que funciona.
+
+Una clave cuya cuota está agotada **sí se guarda**, con `status: "rate_limited"`:
+negarse a guardarla dejaría sin configurar una clave perfectamente válida solo
+por la hora a la que el usuario la introdujo.
+
+`POST /market/sync` sincroniza precios **y** tasas de cambio de quien llama, y
+devuelve ambos:
+
+```json
+{
+  "prices": [
+    { "assetId": "…", "ticker": "AAPL", "price": "190.55", "source": "finnhub", "fetchedAt": "…" }
+  ],
+  "rates": [
+    { "fromCurrency": "USD", "toCurrency": "COP", "rate": "4100.5", "source": "finnhub", "fetchedAt": "…" }
+  ]
+}
+```
+
+Las tasas van en el mismo viaje porque una posición cotizada en otra moneda no
+vale nada sin ellas, y bajo BYO-key no se puede usar la de otro usuario. El
+trabajo se corta a los 60 s y devuelve lo que dio tiempo a traer: el sync
+espacia sus llamadas para no agotar la cuota personal (13 s entre peticiones a
+Alpha Vantage), así que una cartera grande no cabe en una petición HTTP. El
+resto lo recoge el job diario.
+
 ---
 
 ## 3. Reglas de no-regresión

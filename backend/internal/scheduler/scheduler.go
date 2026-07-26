@@ -401,7 +401,7 @@ func safeJobName(job Job) (name string) {
 // // time instead, surviving restarts/deploys.
 // sched = NewScheduler(runner, SchedulerOptions{Store: myStateStore})
 //
-// sched.Register(JobFunc{JobName: "sync-prices", Fn: syncPrices}, Every{Interval: time.Hour})
+// sched.Register(JobFunc{JobName: "market-sync", Fn: syncMarketData}, Every{Interval: time.Hour})
 //
 // // 6:00am + a fixed 10-minute delay -> runs at 6:10am
 // reportSchedule := Delayed{Schedule: DailyAt{Hour: 6, Minute: 0}, Delay: 10 * time.Minute}

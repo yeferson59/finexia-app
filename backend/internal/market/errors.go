@@ -29,10 +29,20 @@ var (
 	// Wraps the marketdata sentinel so callers can match either: this is the
 	// same condition, carrying an HTTP kind. Without the wrap the two would be
 	// distinct errors for one state.
-	ErrNoCredentials    = httpx.AsBadRequest(fmt.Errorf("no market data credential configured: %w", marketdata.ErrNoCredentials))
-	ErrInvalidProvider  = httpx.AsBadRequest(errors.New("unknown market data provider"))
-	ErrInvalidAPIKey    = httpx.AsBadRequest(errors.New("the provider rejected this API key"))
-	ErrKeyEncryptionOff = errors.New("market: credential encryption is not configured")
+	ErrNoCredentials   = httpx.AsBadRequest(fmt.Errorf("no market data credential configured: %w", marketdata.ErrNoCredentials))
+	ErrInvalidProvider = httpx.AsBadRequest(errors.New("unknown market data provider"))
+	ErrInvalidAPIKey   = httpx.AsBadRequest(errors.New("the provider rejected this API key"))
+	// ErrProviderUnavailable means the provider could not be reached or answered
+	// something we cannot classify — a timeout, a 5xx, a malformed body.
+	//
+	// It exists to keep that case apart from ErrInvalidAPIKey. Collapsing the two
+	// told the user their key was rejected during an outage, and, worse, let the
+	// verify endpoint persist status='invalid', which the sync queries then skip
+	// for good: one bad afternoon at the provider would silently retire a working
+	// key. Untagged, so it maps to 500 like every other upstream failure
+	// (docs/TECH_DEBT.md #1).
+	ErrProviderUnavailable = errors.New("the market data provider could not be reached")
+	ErrKeyEncryptionOff    = errors.New("market: credential encryption is not configured")
 )
 
 // isDomainCredentialError reports whether err is one this package authored, and
@@ -40,7 +50,7 @@ var (
 // transport failure — is replaced by a generic message before it reaches a
 // response body.
 func isDomainCredentialError(err error) bool {
-	for _, domain := range []error{ErrNoCredentials, ErrInvalidProvider, ErrInvalidAPIKey, ErrCredentialNotFound} {
+	for _, domain := range []error{ErrNoCredentials, ErrInvalidProvider, ErrInvalidAPIKey, ErrProviderUnavailable, ErrCredentialNotFound} {
 		if errors.Is(err, domain) {
 			return true
 		}

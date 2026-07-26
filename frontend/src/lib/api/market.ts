@@ -14,7 +14,13 @@ import {
 	type ApiEvent,
 	type ApiResult
 } from './client';
-import type { Asset, ExchangeRate, MarketCredential, MarketProvider } from './types';
+import type {
+	Asset,
+	ExchangeRate,
+	MarketCredential,
+	MarketProvider,
+	MarketSyncResult
+} from './types';
 
 // --- Assets ---------------------------------------------------------------
 
@@ -164,7 +170,14 @@ export function deleteMarketCredential(
 	return apiRequest<unknown>(event, `/market/credentials/${provider}`, { method: 'DELETE' });
 }
 
-/** `POST /market/sync` — sincroniza las tenencias del usuario con sus claves. */
-export function syncMarketData(event: ApiEvent): Promise<ApiResult<unknown[]>> {
-	return apiRequest<unknown[]>(event, '/market/sync', { method: 'POST' });
+/**
+ * `POST /market/sync` — sincroniza las tenencias del usuario con sus claves.
+ *
+ * Devuelve precios y tasas por separado: una posición cotizada en otra moneda
+ * no vale nada sin su tasa, y bajo BYO-key no se puede usar la de otro usuario.
+ * El backend corta a los 60 s y devuelve lo que dio tiempo a traer, así que una
+ * cartera grande puede volver incompleta; el resto lo recoge el job diario.
+ */
+export function syncMarketData(event: ApiEvent): Promise<ApiResult<MarketSyncResult>> {
+	return apiRequest<MarketSyncResult>(event, '/market/sync', { method: 'POST' });
 }

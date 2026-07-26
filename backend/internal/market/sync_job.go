@@ -115,13 +115,17 @@ func (j *SyncJob) syncUser(ctx context.Context, userID uuid.UUID) bool {
 
 	if _, errs := j.service.SyncAssetsForUser(ctx, userID, assetIDs); len(errs) > 0 {
 		// A user with no key configured is an expected state, not a failure:
-		// they simply see their holdings valued at cost.
-		if !errors.Is(errs[0], ErrNoCredentials) {
-			log.Error(ctx, "asset sync reported failures", logger.Int("failed", len(errs)))
-			failed = true
+		// they simply see their holdings valued at cost. It is also the only
+		// reason to stop here — without a key the rates cannot be fetched either.
+		if errors.Is(errs[0], ErrNoCredentials) {
+			return false
 		}
 
-		return failed
+		// Anything else is a failure of some assets, not of the user's run. The
+		// rates still have to be refreshed: one ticker the provider does not
+		// cover must not leave a multi-currency portfolio without conversions.
+		log.Error(ctx, "asset sync reported failures", logger.Int("failed", len(errs)))
+		failed = true
 	}
 
 	pairs, err := j.holdings.RequiredCurrencyPairs(ctx, userID)

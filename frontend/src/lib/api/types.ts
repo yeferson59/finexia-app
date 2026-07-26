@@ -312,3 +312,33 @@ export interface MarketCredential {
 	createdAt: string;
 	updatedAt: string;
 }
+
+/** Un precio que trajo la clave del propio usuario (`POST /market/sync`). */
+export interface MarketPrice {
+	assetId: string;
+	ticker: string;
+	price: string;
+	source: MarketProvider;
+	fetchedAt: string;
+}
+
+/** Una tasa de cambio que trajo la clave del propio usuario. */
+export interface MarketRate {
+	fromCurrency: string;
+	toCurrency: string;
+	rate: string;
+	source: MarketProvider;
+	fetchedAt: string;
+}
+
+/**
+ * Resultado de `POST /market/sync`.
+ *
+ * Las dos mitades van nombradas porque sincronizar no es solo precios: sin tasa
+ * de cambio una posición en otra moneda no se puede valorar, y una respuesta
+ * con precios pero sin tasas ha hecho medio trabajo.
+ */
+export interface MarketSyncResult {
+	prices: MarketPrice[];
+	rates: MarketRate[];
+}

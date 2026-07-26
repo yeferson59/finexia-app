@@ -42,7 +42,11 @@ func (s *Service) SaveCredential(ctx context.Context, userID uuid.UUID, provider
 		return Credential{}, ErrInvalidAPIKey
 	}
 
-	if err := s.probe(ctx, provider, apiKey); err != nil {
+	// A key whose quota is spent is still a good key, so probe reports the status
+	// to store rather than refusing the save: telling the user to come back
+	// tomorrow to configure a key that works today would be absurd.
+	status, err := s.probe(ctx, provider, apiKey)
+	if err != nil {
 		return Credential{}, err
 	}
 
@@ -53,7 +57,7 @@ func (s *Service) SaveCredential(ctx context.Context, userID uuid.UUID, provider
 
 	now := time.Now().UTC()
 
-	return s.repo.UpsertCredential(ctx, userID, sealed, last4(apiKey), &now)
+	return s.repo.UpsertCredential(ctx, userID, sealed, last4(apiKey), status, &now)
 }
 
 func (s *Service) DeleteCredential(ctx context.Context, userID uuid.UUID, provider ProviderID) error {
@@ -78,9 +82,17 @@ func (s *Service) VerifyCredential(ctx context.Context, userID uuid.UUID, provid
 	}
 	defer secretbox.Zero(apiKey)
 
-	status, statusErr := CredentialActive, ""
-	if err := s.probe(ctx, provider, string(apiKey)); err != nil {
-		status, statusErr = statusFor(err), err.Error()
+	status, probeErr := s.probe(ctx, provider, string(apiKey))
+	if errors.Is(probeErr, ErrProviderUnavailable) {
+		// The row is left exactly as it was. An outage is a statement about the
+		// provider, not about the key, and writing 'invalid' here would take the
+		// key out of the sync queries until the user noticed and re-verified.
+		return Credential{}, probeErr
+	}
+
+	statusErr := ""
+	if probeErr != nil {
+		statusErr = probeErr.Error()
 	}
 
 	if err := s.repo.SetCredentialStatus(ctx, userID, provider, status, statusErr); err != nil {
@@ -100,24 +112,68 @@ func (s *Service) VerifyCredential(ctx context.Context, userID uuid.UUID, provid
 	return Credential{}, ErrCredentialNotFound
 }
 
-// probe spends one request to confirm the provider accepts the key. A symbol
-// the provider simply does not cover still proves the key itself is good, so
-// ErrUnsupported counts as success.
-func (s *Service) probe(ctx context.Context, provider ProviderID, apiKey string) error {
+// probe spends one request to confirm the provider accepts the key, and reports
+// the status that request justifies storing against it.
+//
+// A non-nil error means "do not record this outcome as a verdict on the key":
+// either the provider rejected it (ErrInvalidAPIKey) or we never got an answer
+// worth acting on (ErrProviderUnavailable).
+func (s *Service) probe(ctx context.Context, provider ProviderID, apiKey string) (CredentialStatus, error) {
 	chain, err := s.providers.For([]marketdata.Credential{{Provider: provider, APIKey: apiKey}})
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	if _, err := chain.FetchQuote(ctx, verifySymbol); err != nil {
-		if errors.Is(err, marketdata.ErrUnsupported) || errors.Is(err, marketdata.ErrRateLimited) {
-			return nil
+	_, err = chain.FetchQuote(ctx, verifySymbol)
+
+	return classifyProbe(err)
+}
+
+// classifyProbe turns a provider failure into the status to store.
+//
+// It reads the failure through marketdata.Verdicts rather than errors.Is for
+// the same reason the sync job does (see recordProviderVerdict): the sentinel is
+// what carries meaning, and a failure with no sentinel — a timeout, a 5xx, a
+// body that would not decode — carries none. Treating that silence as "the
+// provider rejected the key" is what used to retire working keys during an
+// outage.
+func classifyProbe(err error) (CredentialStatus, error) {
+	if err == nil {
+		return CredentialActive, nil
+	}
+
+	verdicts := marketdata.Verdicts(err)
+	if len(verdicts) == 0 {
+		return "", ErrProviderUnavailable
+	}
+
+	var unauthorized, rateLimited, unsupported bool
+
+	for _, verdict := range verdicts {
+		switch {
+		case errors.Is(verdict.Err, marketdata.ErrUnauthorized):
+			unauthorized = true
+		case errors.Is(verdict.Err, marketdata.ErrRateLimited):
+			rateLimited = true
+		case errors.Is(verdict.Err, marketdata.ErrUnsupported):
+			unsupported = true
 		}
-
-		return ErrInvalidAPIKey
 	}
 
-	return nil
+	switch {
+	case unauthorized:
+		return CredentialInvalid, ErrInvalidAPIKey
+	case rateLimited:
+		// The key is fine, its quota is not. Stored as-is so the UI can say so,
+		// and so tomorrow's sync tries it again instead of skipping it.
+		return CredentialRateLimited, nil
+	case unsupported:
+		// The provider answered and did not object to the key; it just has no
+		// data for this symbol. That still proves the key works.
+		return CredentialActive, nil
+	default:
+		return "", ErrProviderUnavailable
+	}
 }
 
 // seal encrypts the key for storage, bound to the user and provider that own it.
@@ -194,18 +250,4 @@ func (s *Service) providerFor(ctx context.Context, userID uuid.UUID) (marketdata
 	}
 
 	return chain, pace, nil
-}
-
-// statusFor maps a provider failure onto the status stored against the key.
-// Only a rejection of the key itself marks it invalid; a spent quota leaves it
-// active so tomorrow's run tries again.
-func statusFor(err error) CredentialStatus {
-	switch {
-	case errors.Is(err, marketdata.ErrUnauthorized), errors.Is(err, ErrInvalidAPIKey):
-		return CredentialInvalid
-	case errors.Is(err, marketdata.ErrRateLimited):
-		return CredentialRateLimited
-	default:
-		return CredentialActive
-	}
 }

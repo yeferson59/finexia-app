@@ -1,6 +1,9 @@
 package market
 
 import (
+	"context"
+	"time"
+
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
@@ -74,6 +77,16 @@ func (h *handler) DeleteCredential(c fiber.Ctx) error {
 	return httpx.OK(c, "Key deleted", "", nil)
 }
 
+// onDemandSyncBudget bounds how long a user is made to wait on the sync button.
+//
+// The sync paces its calls to fit personal free-tier quotas — 13s apart with an
+// Alpha Vantage key — so a portfolio of any size runs for minutes. Rather than
+// hold the request open for all of it, the work is cut off here and whatever was
+// fetched is returned; the daily job picks up the rest. The holdings come back
+// most-recently-traded first, so the budget is spent on what the user is most
+// likely looking at.
+const onDemandSyncBudget = 60 * time.Second
+
 // SyncMarketData refreshes the caller's own holdings with the caller's own
 // keys. It replaces the admin-only global sync, which no longer has a key to
 // run under.
@@ -88,12 +101,26 @@ func (h *handler) SyncMarketData(c fiber.Ctx) error {
 		return httpx.FromDomain(c, err, "Could not read your holdings", "")
 	}
 
-	prices, errs := h.service.SyncAssetsForUser(c, userID, assetIDs)
+	pairs, err := h.holdings.RequiredCurrencyPairs(c, userID)
+	if err != nil {
+		return httpx.FromDomain(c, err, "Could not read your holdings", "")
+	}
+
+	ctx, cancel := context.WithTimeout(c.Context(), onDemandSyncBudget)
+	defer cancel()
+
+	prices, errs := h.service.SyncAssetsForUser(ctx, userID, assetIDs)
 	if len(errs) > 0 && len(prices) == 0 {
 		return httpx.FromDomain(c, errs[0], "Market data sync failed", credentialFailureDetail(errs[0]))
 	}
 
-	return httpx.OK(c, "Market data synced", "", prices)
+	// The rates matter as much as the prices: without them a holding quoted in
+	// another currency has nothing to convert through, and the shared table no
+	// longer carries a rate anybody can fall back on. Their failures do not fail
+	// the request — the prices above already succeeded.
+	rates, _ := h.service.SyncRatesForUser(ctx, userID, pairs)
+
+	return httpx.OK(c, "Market data synced", "", SyncResultDTO{Prices: prices, Rates: rates})
 }
 
 // credentialFailureDetail keeps provider text out of the response body unless

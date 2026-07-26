@@ -191,9 +191,9 @@ func (a *App) wire(ctx context.Context) {
 	a.startScheduler(ctx, mods)
 }
 
-// buildModules constructs the shared infrastructure (price provider, geoip,
-// per-user rate limiter) and every domain module, respecting their
-// dependency order.
+// buildModules constructs the shared infrastructure (the market-data provider
+// factory, geoip, per-user rate limiter) and every domain module, respecting
+// their dependency order.
 func (a *App) buildModules() *modules {
 	// Market data is BYO-key: there is no process-wide provider to build here
 	// because the application holds no provider credentials. The factory
@@ -330,23 +330,39 @@ func (a *App) startScheduler(ctx context.Context, mods *modules) {
 }
 
 func (a *App) registerJobs(sched *scheduler.Scheduler, mods *modules, persistent scheduler.StateStore) {
-	// The daily market jobs all key off the same 09:30 local market open;
-	// the price/snapshot jobs run staggered after it.
+	// The market sync starts at the local market open.
 	marketOpen := scheduler.DailyAt{Hour: 9, Minute: 30}
 
 	// Market data is BYO-key, so this walks the users who configured a key and
 	// syncs each with their own. It is persistent, unlike the two global jobs it
 	// replaces: personal quotas are small, and a run missed over a restart is
 	// worth catching up rather than silently skipping to tomorrow.
+	//
+	// It also needs its own retry policy. The runner's 30s default is a
+	// per-attempt deadline, and this job paces its calls to fit personal
+	// free-tier quotas — 13s between two Alpha Vantage requests — so a single
+	// user with a handful of holdings already runs past it. Under the default it
+	// would be cancelled mid-run every morning. Retries are off for the same
+	// reason: a second attempt re-spends quota the first one already burned, and
+	// per-user failures are logged and counted inside the job rather than raised.
 	sched.Register(
 		market.NewSyncJob(mods.market.Service(), mods.portfolio.Service(), a.deps.Log),
 		marketOpen,
 		scheduler.WithStore(persistent),
+		scheduler.WithRetry(scheduler.JobOptions{
+			Timeout:    2 * time.Hour,
+			MaxRetries: scheduler.Retries(0),
+		}),
 	)
 
 	// Persistent (Redis): resume across restarts and catch up on runs missed
 	// while the process was down.
-	sched.Register(portfolio.NewSnapshotJob(mods.portfolio.Service(), a.deps.Log), scheduler.Delayed{Schedule: marketOpen, Delay: 120 * time.Second}, scheduler.WithStore(persistent))
+	//
+	// The snapshot runs in the evening rather than staggered minutes behind the
+	// market open. Under the old model one global job refreshed every price in
+	// seconds; the BYO-key sync walks every user at their own pace and can take
+	// hours, so a snapshot taken two minutes in would record yesterday's values.
+	sched.Register(portfolio.NewSnapshotJob(mods.portfolio.Service(), a.deps.Log), scheduler.DailyAt{Hour: 22, Minute: 0}, scheduler.WithStore(persistent))
 	sched.Register(notification.NewWeeklySummaryScheduler(mods.notification, a.deps.Log), scheduler.WeeklyAt{Day: time.Monday, Hour: 8, Minute: 30}, scheduler.WithStore(persistent))
 	sched.Register(auth.NewCleanupJob(mods.auth.Service(), a.deps.Log), scheduler.Every{Interval: 5 * time.Hour}, scheduler.WithStore(persistent))
 
