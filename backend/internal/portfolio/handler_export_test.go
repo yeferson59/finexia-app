@@ -15,7 +15,7 @@ import (
 
 // The export endpoints stream a spreadsheet rather than the JSON envelope, so
 // they are asserted on the download headers and on the workbook itself: the
-// rows have to reach the file, not just the handler (docs/TECH_DEBT.md #11).
+// rows have to reach the file, not just the handler.
 
 // readSheet parses the xlsx body and returns the rows of the named sheet.
 func readSheet(t *testing.T, resp *http.Response, sheet string) [][]string {

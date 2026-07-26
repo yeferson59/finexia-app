@@ -1,9 +1,8 @@
 // Package auth is the authentication domain module: login, sessions, refresh
-// tokens, two-factor authentication and email verification (password reset
-// and invitations join it in later PRs of Fase 4). It follows the module
-// pattern validated by the marketing pilot: consumer-defined interfaces, a
-// single Postgres implementation, and an HTTP surface registered through
-// Module.Routes.
+// tokens, two-factor authentication, email verification, password reset and
+// change, and invitations. It follows the shared module pattern: consumer-
+// defined interfaces, a single Postgres implementation, and an HTTP surface
+// registered through Module.Routes.
 package auth
 
 import (

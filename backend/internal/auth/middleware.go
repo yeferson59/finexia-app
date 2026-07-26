@@ -24,7 +24,7 @@ import (
 // The session check runs in the success handler, not in a TokenProcessorFunc,
 // so it can use the request's own context (c) for the cache/database lookups
 // instead of a context captured at startup — cancelling and deadlining the
-// lookup with the request (TECH_DEBT #6).
+// lookup with the request.
 func (m *Module) RequireAuth() fiber.Handler {
 	return jwtware.New(jwtware.Config{
 		SigningKey: jwtware.SigningKey{Key: []byte(m.cfg.JWTSecret)},
@@ -78,7 +78,8 @@ func (m *Module) RequireAdmin() fiber.Handler {
 }
 
 // authLimiter rate-limits the public auth endpoints (credential guessing,
-// token guessing, mail bombing). Same policy as the legacy AuthLimiter.
+// token guessing, mail bombing). Deliberately tighter than the per-user
+// limiter: these routes are reachable without a session.
 func (m *Module) authLimiter() fiber.Handler {
 	return httpx.RateLimiter(10, 15*time.Minute, true)
 }

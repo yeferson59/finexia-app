@@ -87,24 +87,28 @@ func (r *PostgresRepository) GetByID(ctx context.Context, id uuid.UUID) (identit
 	return user, nil
 }
 
-func (r *PostgresRepository) Create(ctx context.Context, name, email string) (identity.User, error) {
-	contextTimeout, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
+// Querier is the slice of pgx that InsertUser needs. Both *pgxpool.Pool and an
+// open pgx.Tx satisfy it, which is what lets the same statement run standalone
+// or inside a caller's transaction.
+type Querier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// InsertUser writes a user row with the default customer role through q. The
+// users and roles tables belong to this module, so this is the only statement
+// in the codebase that creates a user: Create wraps it in its own transaction,
+// and auth's sign-up runs it inside the transaction that also writes the
+// accounts row, so neither row can survive the other failing.
+//
+// The error is returned untagged; each caller maps it to its own HTTP kind.
+func InsertUser(ctx context.Context, q Querier, name, email string) (identity.User, error) {
+	var roleID uuid.UUID
+	if err := q.QueryRow(ctx, "SELECT id FROM roles WHERE name = $1", "customer").Scan(&roleID); err != nil {
+		return identity.User{}, err
+	}
 
 	var user identity.User
-	var roleID uuid.UUID
-
-	tx, err := r.db.BeginTx(contextTimeout, pgx.TxOptions{AccessMode: pgx.ReadWrite})
-	if err != nil {
-		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
-	}
-
-	if err := tx.QueryRow(contextTimeout, "SELECT id FROM roles WHERE name = $1", "customer").Scan(&roleID); err != nil {
-		_ = tx.Rollback(contextTimeout)
-		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
-	}
-
-	if err := tx.QueryRow(contextTimeout,
+	if err := q.QueryRow(ctx,
 		`INSERT INTO users (name, email, role_id) VALUES ($1, $2, $3)
 		 RETURNING id, name, email, email_verified, image, role_id, preferred_currency, created_at, updated_at, deleted_at, banned_at`,
 		name, email, roleID,
@@ -112,12 +116,36 @@ func (r *PostgresRepository) Create(ctx context.Context, name, email string) (id
 		&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID,
 		&user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.BannedAt,
 	); err != nil {
-		_ = tx.Rollback(contextTimeout)
-		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
+		return identity.User{}, err
 	}
 
 	user.Role.Name = "customer"
-	return user, tx.Commit(contextTimeout)
+
+	return user, nil
+}
+
+func (r *PostgresRepository) Create(ctx context.Context, name, email string) (identity.User, error) {
+	contextTimeout, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	tx, err := r.db.BeginTx(contextTimeout, pgx.TxOptions{AccessMode: pgx.ReadWrite})
+	if err != nil {
+		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
+	}
+	// A rollback after a successful commit is a no-op, so this covers every
+	// early return without a flag.
+	defer func() { _ = tx.Rollback(contextTimeout) }()
+
+	user, err := InsertUser(contextTimeout, tx, name, email)
+	if err != nil {
+		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
+	}
+
+	if err := tx.Commit(contextTimeout); err != nil {
+		return identity.User{}, err
+	}
+
+	return user, nil
 }
 
 func (r *PostgresRepository) Update(ctx context.Context, id uuid.UUID, name, email, image string) (identity.User, error) {

@@ -135,8 +135,8 @@ func (s *Service) sendPasswordResetEmail(ctx context.Context, userName, email, r
 
 // sendPasswordChangedAlert notifies the user their password changed. Like the
 // login alert, it bypasses email preferences: if the change wasn't theirs,
-// this email is their only chance to react. Best-effort. The legacy user
-// service keeps its own copy for the change-password flow until Fase 5.
+// this email is their only chance to react. Best-effort, and shared by both
+// paths that write a password — the reset flow and ChangePassword.
 func (s *Service) sendPasswordChangedAlert(userID uuid.UUID, ipAddress, userAgent string) {
 	if s.mail == nil {
 		return

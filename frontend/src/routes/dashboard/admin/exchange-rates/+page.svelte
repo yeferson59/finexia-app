@@ -15,14 +15,11 @@
 		errors: { row: number; message: string }[];
 	}
 
-	let syncing = $state(false);
 	let updatingId = $state<string | null>(null);
-	let syncingRateId = $state<string | null>(null);
 	let creating = $state(false);
 	let importing = $state(false);
 	let showCreateForm = $state(false);
 	let showImportForm = $state(false);
-	let syncMessage = $state<string | null>(null);
 	let createMessage = $state<string | null>(null);
 	let rateInputs = $state<Record<string, string>>({});
 
@@ -35,18 +32,10 @@
 	});
 
 	$effect(() => {
-		if (form?.syncSuccess) {
-			syncMessage = `${form.synced} tasa${form.synced === 1 ? '' : 's'} sincronizada${form.synced === 1 ? '' : 's'}.`;
-			setTimeout(() => (syncMessage = null), 4000);
-		}
 		if (form?.createSuccess) {
 			showCreateForm = false;
 			createMessage = 'Tasa de cambio creada correctamente.';
 			setTimeout(() => (createMessage = null), 4000);
-		}
-		if (form?.syncRateSuccess) {
-			syncMessage = `Tasa de cambio actualizada.`;
-			setTimeout(() => (syncMessage = null), 4000);
 		}
 		if (form?.importSuccess) {
 			showImportForm = false;
@@ -77,18 +66,12 @@
 <PageHeader
 	eyebrow="Administración"
 	title="Tasas de Cambio"
-	subtitle="Gestiona pares de divisas y sincronización de tasas."
+	subtitle="Tasas compartidas, mantenidas manualmente. Las tasas de mercado las sincroniza cada usuario con su propia clave."
 >
 	{#snippet actions()}
 		<div class="header-actions">
-			{#if syncMessage}
-				<span class="sync-success">{syncMessage}</span>
-			{/if}
 			{#if createMessage}
 				<span class="sync-success">{createMessage}</span>
-			{/if}
-			{#if form?.syncError}
-				<span class="sync-error">{form.syncError}</span>
 			{/if}
 			<Button
 				variant="secondary"
@@ -106,33 +89,6 @@
 			>
 				{showImportForm ? 'Cancelar' : 'Importar CSV/Excel'}
 			</Button>
-			<form
-				method="POST"
-				action="?/syncRates"
-				use:enhance={() => {
-					syncing = true;
-					return async ({ update }) => {
-						syncing = false;
-						await update({ reset: false });
-					};
-				}}
-			>
-				<Button type="submit" loading={syncing} size="sm">
-					<svg
-						width="14"
-						height="14"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<polyline points="23 4 23 10 17 10"></polyline>
-						<polyline points="1 20 1 14 7 14"></polyline>
-						<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-					</svg>
-					Sincronizar Tasas
-				</Button>
-			</form>
 		</div>
 	{/snippet}
 </PageHeader>
@@ -267,7 +223,6 @@
 						<th>Fecha de tasa</th>
 						<th>Actualizado</th>
 						<th>Nueva tasa</th>
-						<th></th>
 					</tr>
 				</thead>
 				<tbody>
@@ -275,12 +230,7 @@
 						{@const isUpdating = updatingId === rate.id}
 						{@const hasUpdateError = form?.updateError && form?.errorId === rate.id}
 						{@const hasUpdateSuccess = form?.updateSuccess && form?.updatedId === rate.id}
-						{@const hasSyncError = form?.syncRateError && form?.syncRateId === rate.id}
-						{@const isSyncingThis = syncingRateId === rate.id}
-						<tr
-							class:row-success={hasUpdateSuccess ||
-								(form?.syncRateSuccess && form?.syncRateId === rate.id)}
-						>
+						<tr class:row-success={hasUpdateSuccess}>
 							<td class="cell-ticker">
 								{rate.fromCurrency}/{rate.toCurrency}
 							</td>
@@ -321,40 +271,6 @@
 									{/if}
 								</form>
 							</td>
-							<td class="cell-sync">
-								<form
-									method="POST"
-									action="?/syncRate"
-									use:enhance={() => {
-										syncingRateId = rate.id;
-										return async ({ update }) => {
-											syncingRateId = null;
-											await update({ reset: false });
-										};
-									}}
-								>
-									<input type="hidden" name="id" value={rate.id} />
-									<Button type="submit" size="sm" variant="ghost" loading={isSyncingThis}>
-										<svg
-											width="13"
-											height="13"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
-										>
-											<polyline points="23 4 23 10 17 10"></polyline>
-											<polyline points="1 20 1 14 7 14"></polyline>
-											<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
-											></path>
-										</svg>
-										Sync
-									</Button>
-									{#if hasSyncError}
-										<p class="row-error">{form.syncRateError}</p>
-									{/if}
-								</form>
-							</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -374,11 +290,6 @@
 		font-size: 0.82rem;
 		color: var(--green);
 		font-weight: 500;
-	}
-
-	.sync-error {
-		font-size: 0.82rem;
-		color: var(--red);
 	}
 
 	.table-wrapper {
@@ -448,10 +359,6 @@
 
 	.cell-update {
 		min-width: 160px;
-	}
-
-	.cell-sync {
-		white-space: nowrap;
 	}
 
 	.update-row {

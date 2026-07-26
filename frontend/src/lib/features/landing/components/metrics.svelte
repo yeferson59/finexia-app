@@ -20,7 +20,7 @@
 	});
 </script>
 
-<section class="block wrap">
+<section class="wrap block">
 	<div class="sec-head reveal">
 		<div class="eyebrow">Métricas que importan</div>
 		<h2 class="sec-title">Mira crecer tu patrimonio<br />con claridad</h2>

@@ -12,8 +12,8 @@ type service interface {
 }
 
 // SnapshotJob persists a daily snapshot of every portfolio's summary so the
-// growth endpoints have historical data points. Moved from the legacy
-// scheduler package in Fase 6; Fase 7 replaces it with the generic runner.
+// growth endpoints have historical data points. It is a plain scheduler.Job:
+// the composition root registers it on a daily schedule.
 type SnapshotJob struct {
 	svc service
 	log logger.Logger

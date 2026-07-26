@@ -103,9 +103,8 @@ func TestHandlerGetPortfoliosRisks(t *testing.T) {
 }
 
 // TestHandlerGetPortfolios covers both paths the list answers on: the
-// canonical GET /portfolios and the legacy "/portfolios/id" alias, which must
-// keep serving the same payload while advertising its deprecation
-// (docs/TECH_DEBT.md #3).
+// canonical GET /portfolios and the deprecated "/portfolios/id" alias, which
+// must keep serving the same payload while advertising its deprecation.
 func TestHandlerGetPortfolios(t *testing.T) {
 	userID := uuid.New()
 	newApp := func(t *testing.T) *fiber.App {
@@ -195,10 +194,9 @@ func TestHandlerGetPortfolioByID(t *testing.T) {
 		}
 	})
 
-	// Regression for TECH_DEBT #1: a not-found error wrapped by a message
-	// containing "failed" used to resolve to 400 under the substring mapping
-	// ("failed" was checked before "not found"). The typed NotFound tag now
-	// wins regardless of the wrapper text.
+	// The status must follow the typed NotFound tag, not the wrapper text:
+	// this message leads with "failed", which any message-based mapping would
+	// read as a 400.
 	t.Run("wrapped not found still maps to 404", func(t *testing.T) {
 		repo := &fakeRepository{
 			getPortfolioByID: func(context.Context, uuid.UUID, uuid.UUID) (Portfolio, error) {

@@ -1,6 +1,11 @@
 /**
- * Mercado: catálogo de assets y tasas de cambio, más las operaciones de
- * administración (alta, import, sincronización y ajuste de precio/tasa).
+ * Mercado: catálogo de assets y tasas de cambio, las operaciones de
+ * administración (alta, import y ajuste manual de precio/tasa), y las claves
+ * de proveedor que cada usuario aporta.
+ *
+ * Los datos de mercado son BYO-key: la aplicación no tiene claves de
+ * proveedor, así que ya no existe una sincronización global de administración.
+ * Cada usuario sincroniza sus propias tenencias con su propia clave.
  */
 import {
 	apiRequest,
@@ -9,7 +14,13 @@ import {
 	type ApiEvent,
 	type ApiResult
 } from './client';
-import type { Asset, ExchangeRate } from './types';
+import type {
+	Asset,
+	ExchangeRate,
+	MarketCredential,
+	MarketProvider,
+	MarketSyncResult
+} from './types';
 
 // --- Assets ---------------------------------------------------------------
 
@@ -56,16 +67,6 @@ export function importAssets(event: ApiEvent, form: FormData): Promise<ApiResult
 	return apiRequest<unknown>(event, '/assets/import', { method: 'POST', body: form });
 }
 
-/** `POST /assets/:id/sync` — sincroniza el precio de un asset. */
-export function syncAsset(event: ApiEvent, id: string): Promise<ApiResult<unknown>> {
-	return apiRequest<unknown>(event, `/assets/${id}/sync`, { method: 'POST' });
-}
-
-/** `POST /assets/sync` — sincroniza los precios de todos los assets. */
-export function syncAllAssets(event: ApiEvent): Promise<ApiResult<unknown[]>> {
-	return apiRequest<unknown[]>(event, '/assets/sync', { method: 'POST' });
-}
-
 /** `PATCH /portfolios/assets/:id/price` — fija el precio manual de un asset. */
 export function updateAssetPrice(
 	event: ApiEvent,
@@ -108,16 +109,6 @@ export function importRates(event: ApiEvent, form: FormData): Promise<ApiResult<
 	return apiRequest<unknown>(event, '/exchange-rates/import', { method: 'POST', body: form });
 }
 
-/** `POST /exchange-rates/:id/sync` — sincroniza una tasa. */
-export function syncRate(event: ApiEvent, id: string): Promise<ApiResult<unknown>> {
-	return apiRequest<unknown>(event, `/exchange-rates/${id}/sync`, { method: 'POST' });
-}
-
-/** `POST /exchange-rates/sync` — sincroniza todas las tasas. */
-export function syncAllRates(event: ApiEvent): Promise<ApiResult<unknown[]>> {
-	return apiRequest<unknown[]>(event, '/exchange-rates/sync', { method: 'POST' });
-}
-
 /** `PATCH /exchange-rates/:id` — actualiza una tasa. */
 export function updateRate(
 	event: ApiEvent,
@@ -129,4 +120,64 @@ export function updateRate(
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(body)
 	});
+}
+
+// --- Claves de proveedor (BYO-key) ----------------------------------------
+
+/**
+ * `GET /market/credentials` — estado de las claves del usuario.
+ *
+ * La respuesta nunca contiene la clave: solo su proveedor, sus cuatro últimos
+ * caracteres y su estado. No hay endpoint que devuelva una clave guardada.
+ */
+export function getMarketCredentials(event: ApiEvent): Promise<ApiResult<MarketCredential[]>> {
+	return apiRequestSafe<MarketCredential[]>(event, '/market/credentials');
+}
+
+/**
+ * `PUT /market/credentials/:provider` — guarda una clave.
+ *
+ * El backend la verifica contra el proveedor antes de sellarla, así que un
+ * 400 aquí significa que el proveedor la rechazó.
+ */
+export function saveMarketCredential(
+	event: ApiEvent,
+	provider: MarketProvider,
+	apiKey: string
+): Promise<ApiResult<MarketCredential>> {
+	return apiRequest<MarketCredential>(event, `/market/credentials/${provider}`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ apiKey })
+	});
+}
+
+/** `POST /market/credentials/:provider/verify` — recomprueba una clave guardada. */
+export function verifyMarketCredential(
+	event: ApiEvent,
+	provider: MarketProvider
+): Promise<ApiResult<MarketCredential>> {
+	return apiRequest<MarketCredential>(event, `/market/credentials/${provider}/verify`, {
+		method: 'POST'
+	});
+}
+
+/** `DELETE /market/credentials/:provider` — borra una clave. */
+export function deleteMarketCredential(
+	event: ApiEvent,
+	provider: MarketProvider
+): Promise<ApiResult<unknown>> {
+	return apiRequest<unknown>(event, `/market/credentials/${provider}`, { method: 'DELETE' });
+}
+
+/**
+ * `POST /market/sync` — sincroniza las tenencias del usuario con sus claves.
+ *
+ * Devuelve precios y tasas por separado: una posición cotizada en otra moneda
+ * no vale nada sin su tasa, y bajo BYO-key no se puede usar la de otro usuario.
+ * El backend corta a los 60 s y devuelve lo que dio tiempo a traer, así que una
+ * cartera grande puede volver incompleta; el resto lo recoge el job diario.
+ */
+export function syncMarketData(event: ApiEvent): Promise<ApiResult<MarketSyncResult>> {
+	return apiRequest<MarketSyncResult>(event, '/market/sync', { method: 'POST' });
 }

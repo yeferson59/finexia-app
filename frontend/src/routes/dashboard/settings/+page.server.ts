@@ -2,9 +2,13 @@ import type { Actions, PageServerLoad } from './$types';
 import { z } from 'zod';
 import { fail } from '@sveltejs/kit';
 import * as user from '$lib/api/user';
-import type { ActiveSession, TwoFactorStatus } from '$lib/api/types';
+import * as market from '$lib/api/market';
+import type { ActiveSession, MarketCredential, TwoFactorStatus } from '$lib/api/types';
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+/** Proveedores para los que el backend acepta una clave. */
+const marketProviderSchema = z.enum(['finnhub', 'alphavantage']);
 
 export const load: PageServerLoad = async ({ locals, fetch, cookies }) => {
 	const event = { cookies, fetch };
@@ -13,16 +17,20 @@ export const load: PageServerLoad = async ({ locals, fetch, cookies }) => {
 	// 2FA is off by default; the null fallback just hides the section's state
 	// details if the backend can't be reached.
 	let twoFactor: TwoFactorStatus = { enabled: false, pendingSetup: false, recoveryCodesLeft: 0 };
+	// Nunca contiene la clave: solo proveedor, last4 y estado.
+	let marketCredentials: MarketCredential[] = [];
 
-	const [sessionsRes, twoFactorRes] = await Promise.all([
+	const [sessionsRes, twoFactorRes, credentialsRes] = await Promise.all([
 		user.getSessions(event),
-		user.getTwoFactorStatus(event)
+		user.getTwoFactorStatus(event),
+		market.getMarketCredentials(event)
 	]);
 
 	if (sessionsRes.ok) sessions = sessionsRes.data ?? [];
 	if (twoFactorRes.ok && twoFactorRes.data) twoFactor = twoFactorRes.data;
+	if (credentialsRes.ok) marketCredentials = credentialsRes.data ?? [];
 
-	return { user: locals.user, sessions, twoFactor };
+	return { user: locals.user, sessions, twoFactor, marketCredentials };
 };
 
 export const actions = {
@@ -274,6 +282,143 @@ export const actions = {
 			action: 'regenerate2faCodes',
 			success: true,
 			recoveryCodes: res.data?.recoveryCodes ?? []
+		};
+	},
+
+	// --- Datos de mercado (BYO-key) ----------------------------------------
+	//
+	// La clave viaja del formulario al backend y ahí se sella; no se guarda en
+	// ninguna cookie ni se devuelve nunca. Ninguna de estas acciones incluye la
+	// clave en su valor de retorno, que es lo que acaba en `form` y por tanto en
+	// el HTML de la página.
+
+	saveMarketKey: async ({ request, fetch, cookies }) => {
+		const formData = await request.formData();
+
+		const parsed = z
+			.object({
+				provider: marketProviderSchema,
+				apiKey: z.string().trim().min(8, 'La clave es demasiado corta').max(256)
+			})
+			.safeParse({
+				provider: formData.get('provider'),
+				apiKey: formData.get('apiKey')
+			});
+
+		if (!parsed.success) {
+			return fail(400, {
+				action: 'saveMarketKey',
+				marketProvider: formData.get('provider'),
+				marketError: parsed.error.issues[0].message
+			});
+		}
+
+		const res = await market.saveMarketCredential(
+			{ cookies, fetch },
+			parsed.data.provider,
+			parsed.data.apiKey
+		);
+
+		if (!res.ok) {
+			// El backend verifica la clave contra el proveedor antes de guardarla,
+			// así que un 400 aquí significa que el proveedor la rechazó.
+			const error =
+				res.status === 400
+					? 'El proveedor rechazó esta clave. Compruébala y vuelve a intentarlo.'
+					: 'No se pudo guardar la clave. Inténtalo de nuevo.';
+
+			return fail(res.status, {
+				action: 'saveMarketKey',
+				marketProvider: parsed.data.provider,
+				marketError: error
+			});
+		}
+
+		return {
+			action: 'saveMarketKey',
+			marketProvider: parsed.data.provider,
+			marketSuccess: true,
+			marketMessage: 'Clave verificada y guardada cifrada.'
+		};
+	},
+
+	verifyMarketKey: async ({ request, fetch, cookies }) => {
+		const formData = await request.formData();
+		const parsed = marketProviderSchema.safeParse(formData.get('provider'));
+
+		if (!parsed.success) {
+			return fail(400, { action: 'verifyMarketKey', marketError: 'Proveedor no válido' });
+		}
+
+		const res = await market.verifyMarketCredential({ cookies, fetch }, parsed.data);
+
+		if (!res.ok) {
+			return fail(res.status, {
+				action: 'verifyMarketKey',
+				marketProvider: parsed.data,
+				marketError: 'No se pudo verificar la clave.'
+			});
+		}
+
+		const status = res.data?.status;
+		const message =
+			status === 'active'
+				? 'La clave funciona.'
+				: status === 'rate_limited'
+					? 'La clave es válida, pero su cuota está agotada.'
+					: 'El proveedor rechazó esta clave.';
+
+		return {
+			action: 'verifyMarketKey',
+			marketProvider: parsed.data,
+			marketSuccess: true,
+			marketMessage: message
+		};
+	},
+
+	deleteMarketKey: async ({ request, fetch, cookies }) => {
+		const formData = await request.formData();
+		const parsed = marketProviderSchema.safeParse(formData.get('provider'));
+
+		if (!parsed.success) {
+			return fail(400, { action: 'deleteMarketKey', marketError: 'Proveedor no válido' });
+		}
+
+		const res = await market.deleteMarketCredential({ cookies, fetch }, parsed.data);
+
+		if (!res.ok) {
+			return fail(res.status, {
+				action: 'deleteMarketKey',
+				marketProvider: parsed.data,
+				marketError: 'No se pudo eliminar la clave.'
+			});
+		}
+
+		return {
+			action: 'deleteMarketKey',
+			marketProvider: parsed.data,
+			marketSuccess: true,
+			marketMessage: 'Clave eliminada.'
+		};
+	},
+
+	syncMarketData: async ({ fetch, cookies }) => {
+		const res = await market.syncMarketData({ cookies, fetch });
+
+		if (!res.ok) {
+			const error =
+				res.status === 400
+					? 'Configura una clave antes de sincronizar.'
+					: 'La sincronización falló. Inténtalo de nuevo en unos minutos.';
+
+			return fail(res.status, { action: 'syncMarketData', marketSyncError: error });
+		}
+
+		return {
+			action: 'syncMarketData',
+			marketSyncSuccess: true,
+			marketSyncCount: res.data?.prices?.length ?? 0,
+			marketSyncRateCount: res.data?.rates?.length ?? 0
 		};
 	},
 

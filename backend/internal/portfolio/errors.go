@@ -7,11 +7,9 @@ import (
 )
 
 // Domain sentinel errors for the "not found" family, tagged with their HTTP
-// Kind so httpx.FromDomain maps them by type instead of by substring of the
-// message (docs/TECH_DEBT.md #1). Because each is tagged with AsNotFound, a
-// handler that wraps one — e.g. fmt.Errorf("failed to load: %w", ...) — still
-// resolves to 404, whereas the old substring mapping would have seen "failed"
-// and wrongly returned 400.
+// Kind so httpx.FromDomain maps them by type, never by the text of the
+// message. Because each is tagged with AsNotFound, a handler that wraps one —
+// e.g. fmt.Errorf("failed to load: %w", ...) — still resolves to 404.
 //
 // The messages are preserved verbatim from the persistence layer, so the
 // response body and any errors.Is/message assertions keep working. Callers

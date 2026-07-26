@@ -16,7 +16,7 @@ import (
 // The import endpoints are the module's only multipart surface, so their
 // handler layer (file field, size cap, JSON side-forms, required mapping) is
 // worth covering separately from the parser, which transaction_import_test.go
-// already exercises (docs/TECH_DEBT.md #11).
+// already exercises.
 
 // importForm builds a multipart body. A field whose value is empty is skipped,
 // so a test can leave one out; a nil file omits the file part entirely.

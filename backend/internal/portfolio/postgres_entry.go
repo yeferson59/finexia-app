@@ -13,9 +13,25 @@ import (
 func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfolioID uuid.UUID) ([]Entry, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT pe.id, pe.portfolio_id, pe.asset_id, pe.source_id, pe.quantity, pe.price, pe.cost_currency, pe.category, pe.entry_date, COALESCE(pe.notes, ''), pe.created_at, pe.updated_at,
-		       a.id, a.ticker, a.name, a.asset_type, COALESCE(a.exchange, ''), a.currency, a.current_price, a.price_updated_at, a.created_at, a.updated_at
+		       a.id, a.ticker, a.name, a.asset_type, COALESCE(a.exchange, ''), a.currency,
+		       -- BYO-key: the price this user's own key fetched wins; the shared
+		       -- column now only ever holds an admin-entered manual price. The
+		       -- owner comes from the portfolio row, so no signature has to carry
+		       -- a user id down here.
+		       COALESCE(uap.price::text, a.current_price::text), COALESCE(uap.fetched_at, a.price_updated_at),
+		       -- Which arm of that COALESCE won. Without it the caller gets a
+		       -- number it cannot qualify: a market price and a cost basis look
+		       -- identical, and only one of them makes a return meaningful.
+		       CASE
+		         WHEN uap.price       IS NOT NULL THEN 'own'
+		         WHEN a.current_price IS NOT NULL THEN 'manual'
+		         ELSE 'cost'
+		       END,
+		       a.created_at, a.updated_at
 		FROM portfolio_entries pe
+		JOIN portfolios p ON p.id = pe.portfolio_id
 		JOIN assets a ON a.id = pe.asset_id
+		LEFT JOIN user_asset_prices uap ON uap.asset_id = a.id AND uap.user_id = p.user_id
 		WHERE pe.portfolio_id = $1
 		ORDER BY pe.created_at DESC
 	`, portfolioID)
@@ -53,6 +69,7 @@ func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfo
 			&entry.Asset.Currency,
 			&assetPriceStr,
 			&entry.Asset.PriceUpdatedAt,
+			&entry.PriceSource,
 			&entry.Asset.CreatedAt,
 			&entry.Asset.UpdatedAt,
 		); err != nil {

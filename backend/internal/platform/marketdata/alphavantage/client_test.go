@@ -24,9 +24,9 @@ func jsonResponse(body string) *http.Response {
 
 // newTestClient builds a Client whose HTTP transport is replaced by fn.
 func newTestClient(fn roundTripFunc) *Client {
-	c := New("test-key")
-	c.httpClient.Transport = fn
-	return c
+	// A dedicated client per test: New's default is process-wide, and mutating
+	// its transport here would leak the stub into every other caller.
+	return New("test-key", &http.Client{Transport: fn})
 }
 
 func TestFetchQuote(t *testing.T) {

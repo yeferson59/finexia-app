@@ -5,10 +5,12 @@
 > hacen en los PRs de migración (regla: mover ≠ mejorar). Cada entrada indica
 > dónde se detectó y qué se propone. Priorizar al cerrar la Fase 8.
 
-**Estado (2026-07-25):** 14 de 15 entradas resueltas. Queda abierta la **#4**
+**Estado (2026-07-26):** 14 de 16 entradas resueltas. Quedan abiertas la **#4**
 (tests de integración de las implementaciones `postgres.go` contra un Postgres
 real), que necesita Docker/testcontainers y por eso no entra en las tandas
-actuales. La #3 tiene un residuo menor: retirar el alias deprecado
+actuales, y la **#16** (comando de rotación de KEK), que no bloquea nada
+mientras la KEK vieja siga declarada. La #3 tiene un residuo menor: retirar el
+alias deprecado
 `GET /portfolios/id` cuando los logs no registren tráfico.
 
 | # | Detectado en | Descripción | Propuesta |
@@ -28,6 +30,7 @@ actuales. La #3 tiene un residuo menor: retirar el alias deprecado
 | 13 | Fase 6 (revisión) | Archivos de producción > 500 líneas (criterio de éxito). **Troceados en la revisión de cierre**: `portfolio/import.go` 911 → `import.go` (382) + `import_mapping.go` (338) + `import_parse.go` (218); `portfolio/handler.go` 551 → `handler.go` (282) + `handler_transactions.go` (282); `auth/service.go` 669 → `service.go` (364) + `service_token.go` (322). **Queda** `auth/postgres.go` (502), justo en el umbral ~500. **Resuelto (2026-07-24).** `auth/postgres.go` quedó en 455 líneas al mover las consultas de users/roles al módulo user (#9) y luego se partió por sub-store, completando el patrón que 2FA/verification/password-reset/invitations ya seguían: `postgres.go` (124, tipo compartido + `AccountStore`), `postgres_session.go` (217, `SessionStore` + known-login-IPs) y `postgres_refresh_token.go` (147, `RefreshTokenStore`). Puro movimiento de código: ninguna query, firma o comportamiento cambió. Ningún fichero de producción supera hoy las 500 líneas (el mayor es `postgres_session.go`, 217). | — |
 | 14 | Fase 8 (revisión) | **Resuelto (2026-07-22).** `docs/ARCHITECTURE.md` creado; cobertura total medida (39.4% vs 42.6% de línea base, layout distinto); `portfolio.Repository` agrupado en sub-interfaces cohesivas (PortfolioStore/PlatformStore/RateStore/TransactionStore/SnapshotStore) y, tras mover assets a market (#12), su union quedó en **27 métodos** (bajo el criterio ~30). | — |
 | 15 | Cierre (2026-07-25) | **Resuelto (2026-07-25).** Al cerrar #9 y #10 el cableado quedó con dos setters (`SetUsers`, `SetAdminGuard`) porque el grafo de módulos era cíclico. La causa no era de cableado sino de propiedad: `user` guardaba cuatro handlers de `/users/invitations*` que eran *pass-through* puros a `auth.Service` (y exponían `auth.Invitation` en su DTO), y su `UpdatePassword` escribía `accounts.password` —tabla de `auth`— duplicando lo que `ConsumePasswordReset` ya hacía. Ambos volvieron a `auth`, junto con `ChangePassword` y su alerta de seguridad (de la que `auth` ya tenía una copia idéntica). Con eso `user` dejó de importar `auth` y el grafo pasó a ser acíclico. `user` y `marketing` se construyen ahora en dos pasos (`NewService` → `New`), de modo que sus servicios existen antes que `auth` y sus rutas después de los guards: **no queda ningún setter, todo es inyección por constructor**. Los paths HTTP no se movieron. Lo fija `TestServiceFirstModulesStayIndependent` y, para el orden de registro bajo `/users`, `TestAppWiresAndRoutes`. | — |
+| 16 | BYO-key (2026-07-26) | La rotación de KEK está implementada pero no es **ejecutable**: `secretbox.Rewrap` re-envuelve una credencial bajo la KEK activa sin tocar el payload, y `market_credentials.kek_version` dice qué filas siguen en la versión vieja, pero no hay ningún comando ni script que recorra la tabla. Rotar hoy exige escribir el recorrido a mano. `backend/scripts/` está vacío. | Un subcomando del binario (o de `migrator`) que lea las filas con `kek_version <> MARKET_KEK_ACTIVE`, las abra, las vuelva a sellar y las escriba, con log de progreso. No urge: mientras la KEK vieja siga listada en `MARKET_KEK_KEYS`, las filas antiguas se leen sin problema. |
 
 ## Frontend
 

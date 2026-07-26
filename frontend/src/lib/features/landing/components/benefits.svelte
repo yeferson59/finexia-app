@@ -23,7 +23,7 @@
 	];
 </script>
 
-<section class="block wrap" id="beneficios">
+<section class="wrap block" id="beneficios">
 	<div class="sec-head reveal">
 		<div class="eyebrow">Por qué Finexia</div>
 		<h2 class="sec-title">Tu patrimonio organizado<br />a tu manera</h2>

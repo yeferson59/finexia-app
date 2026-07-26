@@ -70,7 +70,7 @@
 		<input
 			id="asset-search"
 			type="text"
-			class="form-input combobox-input"
+			class="combobox-input form-input"
 			placeholder="Escribe el ticker o nombre, ej: AAPL, Bitcoin…"
 			autocomplete="off"
 			bind:value={search}

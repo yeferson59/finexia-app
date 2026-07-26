@@ -87,6 +87,9 @@ type fakeRepository struct {
 	getPortfolioGrowthByUserID      func(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
 	getPortfolioGrowthByPortfolioID func(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
 	getExchangeRateByPair           func(ctx context.Context, from, to string) (money.Decimal, error)
+	getUserExchangeRateByPair       func(ctx context.Context, userID uuid.UUID, from, to string) (money.Decimal, error)
+	getHeldAssetIDs                 func(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
+	getRequiredCurrencyPairs        func(ctx context.Context, userID uuid.UUID) ([]CurrencyPair, error)
 
 	// Consumed by fakeUserReader, not part of portfolio.Repository.
 	getUserPreferences func(ctx context.Context, userID uuid.UUID) (user.UserPreferences, error)
@@ -334,12 +337,38 @@ func testConfig() Config {
 // discarded mailer, matching the common case where a test only cares about
 // repository interactions.
 func newTestServices(repo *fakeRepository, storage *memStorage) *Service {
-	return NewService(repo, testConfig(), storage, &fakeMailer{}, fakeUserReader{repo}, logger.Noop())
+	return newService(repo, testConfig(), storage, &fakeMailer{}, fakeUserReader{repo}, logger.Noop())
 }
 
 // newTestServicesFull injects a caller-provided mailer for the flows that emit
 // the transaction activity alert. The fourth argument is retained for parity
 // with the legacy helper and ignored.
 func newTestServicesFull(repo *fakeRepository, storage *memStorage, mailer Mailer, _ any) *Service {
-	return NewService(repo, testConfig(), storage, mailer, fakeUserReader{repo}, logger.Noop())
+	return newService(repo, testConfig(), storage, mailer, fakeUserReader{repo}, logger.Noop())
+}
+
+// BYO-key additions. The user-rate hook defaults to "this user has no rate of
+// their own", so existing scenarios keep exercising the shared table.
+func (f *fakeRepository) GetUserExchangeRateByPair(ctx context.Context, userID uuid.UUID, from, to string) (money.Decimal, error) {
+	if f.getUserExchangeRateByPair == nil {
+		return money.Decimal{}, ErrExchangeRateNotFound
+	}
+
+	return f.getUserExchangeRateByPair(ctx, userID, from, to)
+}
+
+func (f *fakeRepository) GetHeldAssetIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
+	if f.getHeldAssetIDs == nil {
+		return nil, nil
+	}
+
+	return f.getHeldAssetIDs(ctx, userID)
+}
+
+func (f *fakeRepository) GetRequiredCurrencyPairs(ctx context.Context, userID uuid.UUID) ([]CurrencyPair, error) {
+	if f.getRequiredCurrencyPairs == nil {
+		return nil, nil
+	}
+
+	return f.getRequiredCurrencyPairs(ctx, userID)
 }

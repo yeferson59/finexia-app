@@ -483,13 +483,13 @@ func testConfig() Config {
 }
 
 func newTestService(repo *fakeRepository, storage *memStorage) *Service {
-	return NewService(testStores(repo), testConfig(), storage, nil, nil, logger.Noop())
+	return newService(testStores(repo), testConfig(), storage, nil, nil, logger.Noop())
 }
 
 // newTestServiceFull wires a fake mailer in addition to the repository, for
 // flows that send email.
 func newTestServiceFull(repo *fakeRepository, storage *memStorage, mailer Mailer) *Service {
-	return NewService(testStores(repo), testConfig(), storage, mailer, nil, logger.Noop())
+	return newService(testStores(repo), testConfig(), storage, mailer, nil, logger.Noop())
 }
 
 // notFound is a GetUserByEmail hook for scenarios where no account exists.

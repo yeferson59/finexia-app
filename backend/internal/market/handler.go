@@ -14,34 +14,10 @@ import (
 
 type handler struct {
 	service *Service
-}
-
-func newhandler(svc *Service) *handler {
-	return new(handler{svc})
-}
-
-func (h *handler) SyncAssetPrices(c fiber.Ctx) error {
-	assets, errs := h.service.SyncAssetPrices(c)
-
-	if len(errs) > 0 && len(assets) == 0 {
-		return httpx.InternalServerError(c, "Asset price sync failed", errs[0].Error())
-	}
-
-	return httpx.OK(c, "Asset prices synced", "", assets)
-}
-
-func (h *handler) SyncSingleAsset(c fiber.Ctx) error {
-	assetID, err := httpx.ParamUUID(c, "id")
-	if err != nil {
-		return httpx.BadRequest(c, "Invalid asset ID", err.Error())
-	}
-
-	asset, err := h.service.SyncAssetByID(c, assetID)
-	if err != nil {
-		return httpx.FromDomain(c, err, "Asset sync failed", err.Error())
-	}
-
-	return httpx.OK(c, "Asset price synced", "", asset)
+	// holdings answers "which assets does this user own", supplied by the
+	// composition root from the portfolio module. market must not import
+	// portfolio, so it is consumed through the interface declared here.
+	holdings Holdings
 }
 
 func (h *handler) ImportAssets(c fiber.Ctx) error {
@@ -78,16 +54,6 @@ func (h *handler) CreateAsset(c fiber.Ctx) error {
 	}
 
 	return httpx.Success(c, fiber.StatusCreated, "Asset created", "Asset created successfully", asset)
-}
-
-func (h *handler) SyncExchangeRates(c fiber.Ctx) error {
-	rates, errs := h.service.SyncExchangeRates(c)
-
-	if len(errs) > 0 && len(rates) == 0 {
-		return httpx.InternalServerError(c, "Exchange rate sync failed", errs[0].Error())
-	}
-
-	return httpx.OK(c, "Exchange rates synced", "", rates)
 }
 
 func (h *handler) GetExchangeRates(c fiber.Ctx) error {
@@ -152,20 +118,6 @@ func (h *handler) ImportExchangeRates(c fiber.Ctx) error {
 	}
 
 	return httpx.OK(c, "Exchange rates imported", "Spreadsheet imported successfully", result)
-}
-
-func (h *handler) SyncSingleExchangeRate(c fiber.Ctx) error {
-	id, err := httpx.ParamUUID(c, "id")
-	if err != nil {
-		return httpx.BadRequest(c, "Invalid exchange rate ID", err.Error())
-	}
-
-	rate, err := h.service.SyncExchangeRateByID(c, id)
-	if err != nil {
-		return httpx.FromDomain(c, err, "Exchange rate sync failed", err.Error())
-	}
-
-	return httpx.OK(c, "Exchange rate synced", "", rate)
 }
 
 // maxImportFileSize bounds uploaded spreadsheets; classic personal trackers

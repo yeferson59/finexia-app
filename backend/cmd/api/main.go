@@ -14,6 +14,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
+	"github.com/yeferson59/finexia-app/internal/platform/secretbox"
 )
 
 func main() {
@@ -58,12 +59,22 @@ func run(ctx context.Context, envs *config.Env, log logger.Logger) error {
 		return errors.New("failed to init mail service: " + err.Error())
 	}
 
+	// The keyring seals the market-data API keys users bring. Refusing to start
+	// without it is deliberate: a default would mean storing those keys under a
+	// guessable key, which is exactly the failure this is meant to prevent.
+	// Generate one with: openssl rand -base64 32
+	keyring, err := secretbox.NewKeyring(envs.MarketKEKKeys, envs.MarketKEKActive)
+	if err != nil {
+		return errors.New("failed to load MARKET_KEK_KEYS: " + err.Error())
+	}
+
 	application, err := app.New(app.Deps{
 		Envs:    envs,
 		DB:      dbPool,
 		Storage: storageCache,
 		S3:      s3Client,
 		Mail:    mailService,
+		Keyring: keyring,
 		Log:     log,
 	})
 	if err != nil {

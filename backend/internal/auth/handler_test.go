@@ -32,7 +32,7 @@ func authTestConfig() Config {
 // group-local RequireAuth gate) on a fresh Fiber app, exercising the same
 // chain a real request traverses.
 func newTestApp(repo *fakeRepository, cfg Config) *fiber.App {
-	service := NewService(testStores(repo), cfg, newMemStorage(), nil, nil, logger.Noop())
+	service := newService(testStores(repo), cfg, newMemStorage(), nil, nil, logger.Noop())
 	m := newModule(Deps{
 		Cfg:     cfg,
 		Storage: newMemStorage(),

@@ -307,7 +307,7 @@ func (r *Runner) Execute(ctx context.Context, job Job, overrides ...JobOptions) 
 // })
 //
 // // one job with the Runner's default policy, one that never retries:
-// syncJob := JobFunc{JobName: "sync-prices", Fn: syncPrices}
+// syncJob := JobFunc{JobName: "market-sync", Fn: syncMarketData}
 // cleanupJob := JobFunc{JobName: "cleanup", Fn: cleanup}
 //
 // sched := NewScheduler(runner)

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/fs"
@@ -97,8 +98,8 @@ func TestIdentityStaysALeaf(t *testing.T) {
 
 // TestModulesOwnTheirConfig asserts no domain module imports platform/config:
 // reading the environment is the composition root's job, and each module
-// declares its own small Config struct that app populates (docs/TECH_DEBT.md
-// #8). internal/migrator is exempt — it is a second entrypoint, not a module.
+// declares its own small Config struct that app populates. internal/migrator is
+// exempt — it is a second entrypoint, not a module.
 func TestModulesOwnTheirConfig(t *testing.T) {
 	for _, dir := range []string{
 		"auth", "user", "portfolio", "market", "marketing",
@@ -149,6 +150,70 @@ func TestNothingImportsCompositionRoot(t *testing.T) {
 				if firstSegment(imp) == "app" {
 					t.Errorf("%s imports internal/app: modules must not depend on the composition root", file)
 				}
+			}
+		}
+	}
+}
+
+// serviceAccessorCalls parses every non-test .go file under dir and returns the
+// zero-argument `x.Service()` calls it contains, keyed by file.
+func serviceAccessorCalls(t *testing.T, dir string) map[string][]string {
+	t.Helper()
+	root := filepath.Join("..", dir)
+	byFile := map[string][]string{}
+
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		fset := token.NewFileSet()
+		f, perr := parser.ParseFile(fset, path, nil, 0)
+		if perr != nil {
+			return perr
+		}
+		ast.Inspect(f, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok || len(call.Args) != 0 {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || sel.Sel.Name != "Service" {
+				return true
+			}
+			byFile[path] = append(byFile[path], fset.Position(call.Pos()).String())
+
+			return true
+		})
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walking %s: %v", root, err)
+	}
+
+	return byFile
+}
+
+// TestOnlyAppCallsServiceAccessors asserts no domain module calls a Module's
+// Service() accessor. That accessor hands out the concrete *Service, which is
+// the one way to step around the consumer-defined interfaces every cross-module
+// dependency goes through: portfolio already imports market for the Asset type,
+// so nothing but this test stops it from holding a *market.Module and reaching
+// past its own AssetReader to the whole service.
+//
+// Only the composition root may call it, because handing those services to the
+// interfaces that consume them is precisely its job.
+func TestOnlyAppCallsServiceAccessors(t *testing.T) {
+	for _, dir := range []string{
+		"auth", "user", "portfolio", "market", "marketing",
+		"notification", "scheduler", "health", "platform", "identity",
+	} {
+		for file, calls := range serviceAccessorCalls(t, dir) {
+			for _, pos := range calls {
+				t.Errorf("%s calls Service() at %s: modules consume each other through their own interfaces, never through the concrete service; only internal/app may reach for it", file, pos)
 			}
 		}
 	}

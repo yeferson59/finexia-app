@@ -1,10 +1,17 @@
+// Package finnhub talks to the Finnhub API with a key the user brought
+// themselves.
+//
+// Unlike Alpha Vantage, Finnhub accepts the key as a request header
+// (X-Finnhub-Token), so it is kept out of the URL entirely: a transport error
+// quoting the failed URL then has no key to leak. Errors still go through
+// marketdata.Errorf as a second line of defence.
 package finnhub
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -13,6 +20,9 @@ import (
 
 const baseURL = "https://finnhub.io/api/v1"
 
+// tokenHeader carries the API key, keeping it out of the request URL.
+const tokenHeader = "X-Finnhub-Token"
+
 var _ marketdata.Provider = (*Client)(nil)
 
 type Client struct {
@@ -20,78 +30,99 @@ type Client struct {
 	httpClient *http.Client
 }
 
-func New(apiKey string) *Client {
-	return new(Client{
-		apiKey:     apiKey,
-		httpClient: new(http.Client{Timeout: 10 * time.Second}),
-	})
+// New builds a client for one user's key. Callers should pass the shared
+// marketdata.DefaultHTTPClient; a nil client falls back to it rather than
+// minting a new one per call.
+func New(apiKey string, httpClient *http.Client) *Client {
+	if httpClient == nil {
+		httpClient = marketdata.DefaultHTTPClient
+	}
+
+	return &Client{apiKey: apiKey, httpClient: httpClient}
 }
 
-// FetchQuote retrieves the current price for a stock, ETF, or bond via the
-// Finnhub /quote endpoint. Returns an error if the price is zero (symbol not
-// found or API key limit reached).
-func (c *Client) FetchQuote(ctx context.Context, symbol string) (marketdata.QuoteResult, error) {
-	url := fmt.Sprintf("%s/quote?symbol=%s&token=%s", baseURL, symbol, c.apiKey)
+func (c *Client) get(ctx context.Context, path string, params url.Values, what string, out any) error {
+	endpoint := baseURL + path + "?" + params.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return marketdata.QuoteResult{}, fmt.Errorf("finnhub: build request %s: %w", symbol, err)
+		return marketdata.Errorf(marketdata.Finnhub, c.apiKey, nil, "finnhub: build request %s: %v", what, err)
 	}
+	req.Header.Set(tokenHeader, c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return marketdata.QuoteResult{}, fmt.Errorf("finnhub: http get %s: %w", symbol, err)
+		return marketdata.Errorf(marketdata.Finnhub, c.apiKey, nil, "finnhub: http get %s: %v", what, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	switch {
+	case resp.StatusCode == http.StatusUnauthorized, resp.StatusCode == http.StatusForbidden:
+		return marketdata.Errorf(marketdata.Finnhub, c.apiKey, marketdata.ErrUnauthorized, "finnhub: %s: status %d", what, resp.StatusCode)
+	case resp.StatusCode == http.StatusTooManyRequests:
+		return marketdata.Errorf(marketdata.Finnhub, c.apiKey, marketdata.ErrRateLimited, "finnhub: %s: status %d", what, resp.StatusCode)
+	case resp.StatusCode != http.StatusOK:
+		return marketdata.Errorf(marketdata.Finnhub, c.apiKey, nil, "finnhub: %s: status %d", what, resp.StatusCode)
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		return marketdata.Errorf(marketdata.Finnhub, c.apiKey, nil, "finnhub: decode %s: %v", what, err)
+	}
+
+	return nil
+}
+
+// FetchQuote retrieves the current price for a stock, ETF, or bond via the
+// Finnhub /quote endpoint. A zero price means the symbol is not covered, which
+// lets the fallback chain move on to the next provider.
+func (c *Client) FetchQuote(ctx context.Context, symbol string) (marketdata.QuoteResult, error) {
 	var result struct {
 		C float64 `json:"c"` // current price
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return marketdata.QuoteResult{}, fmt.Errorf("finnhub: decode %s: %w", symbol, err)
+
+	params := url.Values{}
+	params.Set("symbol", symbol)
+
+	if err := c.get(ctx, "/quote", params, symbol, &result); err != nil {
+		return marketdata.QuoteResult{}, err
 	}
 
 	if result.C == 0 {
-		return marketdata.QuoteResult{}, fmt.Errorf("finnhub: zero price for %s (API limit reached or invalid symbol)", symbol)
+		return marketdata.QuoteResult{}, marketdata.Errorf(marketdata.Finnhub, c.apiKey, marketdata.ErrUnsupported, "finnhub: zero price for %s", symbol)
 	}
 
 	return marketdata.QuoteResult{
 		Price:     strconv.FormatFloat(result.C, 'f', -1, 64),
+		Source:    marketdata.Finnhub,
 		FetchedAt: time.Now().UTC(),
 	}, nil
 }
 
 // FetchExchangeRate retrieves the rate between two fiat currencies via the
-// Finnhub /forex/rates endpoint. Crypto pairs are not supported by this
-// endpoint and will return an error, allowing the fallback chain to continue.
+// Finnhub /forex/rates endpoint. Crypto pairs are not served here and return
+// ErrUnsupported, allowing the fallback chain to continue.
 func (c *Client) FetchExchangeRate(ctx context.Context, from, to string) (marketdata.ExchangeRateResult, error) {
-	url := fmt.Sprintf("%s/forex/rates?base=%s&token=%s", baseURL, from, c.apiKey)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return marketdata.ExchangeRateResult{}, fmt.Errorf("finnhub: build request %s/%s: %w", from, to, err)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return marketdata.ExchangeRateResult{}, fmt.Errorf("finnhub: http get %s/%s: %w", from, to, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
+	what := from + "/" + to
 
 	var result struct {
 		Quote map[string]float64 `json:"quote"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return marketdata.ExchangeRateResult{}, fmt.Errorf("finnhub: decode %s/%s: %w", from, to, err)
+
+	params := url.Values{}
+	params.Set("base", from)
+
+	if err := c.get(ctx, "/forex/rates", params, what, &result); err != nil {
+		return marketdata.ExchangeRateResult{}, err
 	}
 
 	rate, ok := result.Quote[to]
 	if !ok || rate == 0 {
-		return marketdata.ExchangeRateResult{}, fmt.Errorf("finnhub: missing rate for %s/%s (unsupported pair or API limit)", from, to)
+		return marketdata.ExchangeRateResult{}, marketdata.Errorf(marketdata.Finnhub, c.apiKey, marketdata.ErrUnsupported, "finnhub: no rate for %s", what)
 	}
 
 	return marketdata.ExchangeRateResult{
 		Rate:      strconv.FormatFloat(rate, 'f', -1, 64),
+		Source:    marketdata.Finnhub,
 		FetchedAt: time.Now().UTC(),
 	}, nil
 }

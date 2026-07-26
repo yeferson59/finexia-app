@@ -4,7 +4,7 @@ package user
 // this domain reads, decoupled from the platform-wide *config.Env. The
 // composition root (internal/app) populates it from the environment, so the
 // module — and its tests — depend on a small, explicit struct instead of the
-// full Env (see docs/TECH_DEBT.md #8).
+// full Env.
 type Config struct {
 	// PublicURL is the API's own base URL, used to build the absolute avatar
 	// link returned after an upload.

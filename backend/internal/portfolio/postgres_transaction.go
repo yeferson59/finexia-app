@@ -87,14 +87,15 @@ func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, use
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			pe.category,
-			COALESCE(SUM(pe.quantity::numeric * COALESCE(a.current_price::numeric, pe.price::numeric)), 0)::text AS market_value
+			COALESCE(SUM(pe.quantity::numeric * COALESCE(uap.price::numeric, a.current_price::numeric, pe.price::numeric)), 0)::text AS market_value
 		FROM portfolio_entries pe
 		JOIN portfolios p ON p.id = pe.portfolio_id
 		JOIN assets a ON a.id = pe.asset_id
+		LEFT JOIN user_asset_prices uap ON uap.asset_id = a.id AND uap.user_id = p.user_id
 		WHERE p.user_id = $1
 		  AND pe.quantity::numeric > 0
 		GROUP BY pe.category
-		ORDER BY COALESCE(SUM(pe.quantity::numeric * COALESCE(a.current_price::numeric, pe.price::numeric)), 0) DESC
+		ORDER BY COALESCE(SUM(pe.quantity::numeric * COALESCE(uap.price::numeric, a.current_price::numeric, pe.price::numeric)), 0) DESC
 	`, userID)
 	if err != nil {
 		return nil, err

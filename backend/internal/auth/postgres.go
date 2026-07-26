@@ -10,15 +10,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
-	"github.com/yeferson59/finexia-app/internal/platform/httpx"
+	"github.com/yeferson59/finexia-app/internal/user"
 )
 
 // This file holds the shared repository type plus the AccountStore
 // implementation. The other stores live in siblings named after them
 // (postgres_session.go, postgres_refresh_token.go, postgres_twofactor.go,
 // postgres_verification.go, postgres_password_reset.go, postgres_invitation.go)
-// so no single file carries the whole persistence surface
-// (docs/TECH_DEBT.md #13).
+// so no single file carries the whole persistence surface.
 
 // PostgresRepository is the single pgx-backed implementation of every store
 // interface the module declares.
@@ -85,54 +84,43 @@ func (r *PostgresRepository) UpdatePassword(ctx context.Context, userID uuid.UUI
 	return err
 }
 
-// createUser inserts a user with the default customer role. Temporary copy of
-// the user repository's CreateUser (the admin CRUD keeps its own) so Register
-// stays self-contained; unified when the user module is extracted in Fase 5.
-func (r *PostgresRepository) createUser(ctx context.Context, name, email string) (identity.User, error) {
+// Register creates the pair a sign-up needs — the users row and its local
+// credentials row — in a single transaction. The two writes must stand or fall
+// together: an account insert that failed after the user was already committed
+// would leave someone who can neither log in (no credentials) nor sign up again
+// (the email is taken), with no way out from the outside.
+//
+// The users row is written through user.InsertUser rather than a query of our
+// own: that table belongs to the user module, and this transaction is the only
+// place auth writes it. Reads of users/roles go through UserReader — see
+// Deps.Users.
+func (r *PostgresRepository) Register(ctx context.Context, name, email, password string) (identity.User, error) {
 	contextTimeout, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	var user identity.User
-	var roleID uuid.UUID
-
 	tx, err := r.db.BeginTx(contextTimeout, pgx.TxOptions{AccessMode: pgx.ReadWrite})
 	if err != nil {
-		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
+		return identity.User{}, errors.New("error create new user")
 	}
+	// A rollback after a successful commit is a no-op, so this covers every
+	// early return without a flag.
+	defer func() { _ = tx.Rollback(contextTimeout) }()
 
-	if err := tx.QueryRow(contextTimeout, "SELECT id FROM roles WHERE name = $1", "customer").Scan(&roleID); err != nil {
-		_ = tx.Rollback(contextTimeout)
-		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
-	}
-
-	if err := tx.QueryRow(contextTimeout,
-		`INSERT INTO users (name, email, role_id) VALUES ($1, $2, $3)
-		 RETURNING id, name, email, email_verified, image, role_id, preferred_currency, created_at, updated_at, deleted_at, banned_at`,
-		name, email, roleID,
-	).Scan(
-		&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.RoleID,
-		&user.PreferredCurrency, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.BannedAt,
-	); err != nil {
-		_ = tx.Rollback(contextTimeout)
-		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
-	}
-
-	if err := tx.Commit(contextTimeout); err != nil {
-		return identity.User{}, httpx.AsBadRequest(errors.New("failed create new user"))
-	}
-
-	return user, nil
-}
-func (r *PostgresRepository) Register(ctx context.Context, name, email, password string) (identity.User, error) {
-	user, err := r.createUser(ctx, name, email)
+	created, err := user.InsertUser(contextTimeout, tx, name, email)
 	if err != nil {
 		return identity.User{}, errors.New("error create new user")
 	}
 
-	_, err = r.db.Exec(ctx, "INSERT INTO accounts(user_id, account_id, provider_id, password) VALUES($1, $2, $3, $4)", user.ID, "credentials", "local", password)
-	if err != nil {
+	if _, err := tx.Exec(contextTimeout,
+		"INSERT INTO accounts(user_id, account_id, provider_id, password) VALUES($1, $2, $3, $4)",
+		created.ID, "credentials", "local", password,
+	); err != nil {
 		return identity.User{}, err
 	}
 
-	return user, nil
+	if err := tx.Commit(contextTimeout); err != nil {
+		return identity.User{}, err
+	}
+
+	return created, nil
 }

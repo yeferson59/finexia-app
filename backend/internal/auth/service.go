@@ -32,7 +32,7 @@ type Service struct {
 	log     logger.Logger
 }
 
-func NewService(stores Stores, cfg Config, storage fiber.Storage, mailService Mailer, geo GeoLocator, log logger.Logger) *Service {
+func newService(stores Stores, cfg Config, storage fiber.Storage, mailService Mailer, geo GeoLocator, log logger.Logger) *Service {
 	return new(Service{
 		stores:  stores,
 		cfg:     cfg,
@@ -318,11 +318,10 @@ func (s *Service) Register(ctx context.Context, name, email, password string) (R
 	}, nil
 }
 
-// VerifyPassword checks the user's current password. It backs the legacy user
-// service's change-password flow (via the services.AuthService interface)
-// while that flow waits for Fase 5. The account-lookup miss is tagged NotFound
-// so httpx.FromDomain maps it to 404 by type (docs/TECH_DEBT.md #1); the
-// wrong-password case keeps the frozen substring mapping ("invalid" → 400).
+// VerifyPassword checks the user's current password. It is the re-authentication
+// step of ChangePassword, which this module owns. Both failures are tagged so
+// httpx.FromDomain resolves them by type: a missing account is a 404 and a
+// wrong password a 400.
 func (s *Service) VerifyPassword(ctx context.Context, userID uuid.UUID, currentPassword string) error {
 	account, err := s.stores.Accounts.GetAccountByUserID(ctx, userID)
 	if err != nil {

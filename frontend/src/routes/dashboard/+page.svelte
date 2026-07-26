@@ -4,7 +4,8 @@
 		PortfolioOverview,
 		AssetAllocation,
 		RecentActivity,
-		PortfolioGrowth
+		PortfolioGrowth,
+		MarketKeyNotice
 	} from '$lib/features/dashboard';
 	import PageHeader from '$lib/ui/page-header.svelte';
 
@@ -25,6 +26,8 @@
 >
 	Hola, <em>{data.user.name}</em>
 </PageHeader>
+
+<MarketKeyNotice hasUsableKey={data.hasUsableKey} hasBrokenKey={data.hasBrokenKey} />
 
 <section class="net-worth-section" aria-labelledby="dashboard-title">
 	<NetWorthCard summaries={data.portfolioSummaries} currency={data.currency} />

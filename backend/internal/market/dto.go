@@ -23,3 +23,23 @@ type CreateExchangeRateRequestDTO struct {
 type UpdateExchangeRateRequestDTO struct {
 	Rate money.Decimal `json:"rate" validate:"required"`
 }
+
+// SaveCredentialRequestDTO carries a user's own provider API key.
+//
+// It has no response counterpart on purpose: a stored key is never sent back,
+// so nothing that leaves this module can carry one.
+type SaveCredentialRequestDTO struct {
+	APIKey string `json:"apiKey" validate:"required,min=8,max=256"`
+}
+
+// SyncResultDTO is what POST /market/sync returns: the prices and the rates the
+// caller's own keys fetched.
+//
+// Both halves are named because a sync is not just prices. A holding quoted in
+// a currency other than its portfolio's needs a rate to be worth anything, and
+// under BYO-key nobody else's rate may be used, so a run that refreshed prices
+// but no rates has done half the job — and the response should say which half.
+type SyncResultDTO struct {
+	Prices []UserAssetPrice   `json:"prices"`
+	Rates  []UserExchangeRate `json:"rates"`
+}

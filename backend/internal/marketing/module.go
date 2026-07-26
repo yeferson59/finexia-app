@@ -4,6 +4,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 // Like the user module, this one is built in two steps: NewService first (auth
@@ -49,12 +51,24 @@ func NewService(deps ServiceDeps) *Service {
 
 // New completes the module with its HTTP surface. deps.Service must be the
 // value NewService returned, so auth and these routes share one service.
+//
+// A missing service or guard panics here rather than at the first request:
+// both are wiring, so the composition root is the only thing that can get them
+// wrong, and failing at boot is what keeps a misconfigured build from reaching
+// production quietly.
 func New(deps Deps) *Module {
+	if deps.Service == nil {
+		panic("marketing.New: Deps.Service is required — pass the value NewService returned")
+	}
+	if deps.AuthMiddl == nil {
+		panic("marketing.New: Deps.AuthMiddl is required — the waitlist listing is admin-only")
+	}
+
 	return new(Module{
 		service:   deps.Service,
 		handler:   newHandler(deps.Service),
 		authMiddl: deps.AuthMiddl,
-		limiter:   deps.Limiter,
+		limiter:   httpx.OrPassThrough(deps.Limiter),
 	})
 }
 
@@ -69,26 +83,16 @@ func (m *Module) Service() *Service {
 //
 // The listing answers at GET /users/waitlist — the path the invitation
 // dashboard has always called (docs/API.md §2.6), kept unchanged so the
-// contract does not move even though the data is marketing's
-// (docs/TECH_DEBT.md #10). It is a terminal route registered outside the user
-// module's /users group, so it carries its own guards instead of inheriting
-// that group's. The composition root mounts marketing before user, which is
+// contract does not move even though the data is marketing's. It is a terminal
+// route registered outside the user module's /users group, so it carries its
+// own guards instead of inheriting that group's. The composition root mounts marketing before user, which is
 // what keeps the static path from being captured by GET /users/:id.
 func (m *Module) Routes(router fiber.Router) {
 	waitlists := router.Group("/marketing")
 
 	waitlists.Post("/waitlists", m.handler.createWaitlist)
 
-	if m.authMiddl == nil {
-		return
-	}
-
-	limiter := m.limiter
-	if limiter == nil {
-		limiter = func(c fiber.Ctx) error { return c.Next() }
-	}
-
 	router.Get("/users/waitlist",
-		m.authMiddl.RequireAuth(), limiter, m.authMiddl.RequireAdmin(),
+		m.authMiddl.RequireAuth(), m.limiter, m.authMiddl.RequireAdmin(),
 		paginate.New(), m.handler.listWaitlist)
 }

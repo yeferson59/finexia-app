@@ -1,7 +1,7 @@
 // Package httpx holds the HTTP response conventions and generic middlewares
-// shared by every module. The envelope shapes and the domain-error mapping
-// replicate the legacy handlers/helpers.go behavior byte for byte — they are
-// the frozen contract documented in docs/API.md §1.1–§1.2.
+// shared by every module. The envelope shapes are a frozen contract: clients
+// depend on them byte for byte, so they are documented in docs/API.md §1.1–§1.2
+// and must not drift.
 package httpx
 
 import (
@@ -55,10 +55,9 @@ func InternalServerError(c fiber.Ctx, message, details string) error {
 }
 
 // FromDomain maps a service error to an HTTP status and writes an error
-// envelope carrying an action code. The status comes from the error's typed
-// Kind when it carries one (domains tag their errors via httpx.AsNotFound and
-// friends), falling back to the frozen message-substring mapping otherwise
-// (docs/TECH_DEBT.md #1, docs/API.md §1.2).
+// envelope carrying an action code (docs/API.md §1.2). The status comes from
+// the error's typed Kind — domains tag their errors via httpx.AsNotFound and
+// friends — and an untagged error is a 500.
 func FromDomain(c fiber.Ctx, err error, message, action string) error {
 	return c.Status(domainStatus(err)).JSON(fiber.Map{
 		"success":   false,

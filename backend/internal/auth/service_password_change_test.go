@@ -143,7 +143,7 @@ func TestChangePasswordRoute(t *testing.T) {
 	userID := uuid.New()
 	cfg := testConfig()
 
-	signer := NewService(testStores(&fakeRepository{}), cfg, newMemStorage(), nil, nil, logger.Noop())
+	signer := newService(testStores(&fakeRepository{}), cfg, newMemStorage(), nil, nil, logger.Noop())
 	token, err := signer.CreateJWToken(userID, "user", time.Now().UTC().Add(time.Hour))
 	if err != nil {
 		t.Fatalf("CreateJWToken: %v", err)

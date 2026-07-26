@@ -74,47 +74,11 @@ func (r *PostgresRepository) GetExchangeRates(ctx context.Context, offset, limit
 	return rates, nil
 }
 
-// GetExchangeRateByPair looks up the stored rate for one direction of a
-// currency pair. Rates are synced one-directional (e.g. only EUR->USD is
-// stored, never USD->EUR); callers needing the reverse direction should
-// invert the returned rate themselves.
-func (r *PostgresRepository) GetExchangeRateByPair(ctx context.Context, from, to string) (ExchangeRate, error) {
-	var er ExchangeRate
-	var rateStr string
-
-	err := r.db.QueryRow(ctx, `
-		SELECT id, from_currency, to_currency, rate::text, rate_date, fetched_at
-		FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2
-	`, from, to).Scan(&er.ID, &er.FromCurrency, &er.ToCurrency, &rateStr, &er.RateDate, &er.CreatedAt)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ExchangeRate{}, ErrExchangeRateNotFound
-		}
-		return ExchangeRate{}, err
-	}
-
-	er.Rate = decimal.MustFromString(rateStr)
-	return er, nil
-}
-
-func (r *PostgresRepository) GetExchangeRateByID(ctx context.Context, id uuid.UUID) (ExchangeRate, error) {
-	var er ExchangeRate
-	var rateStr string
-
-	err := r.db.QueryRow(ctx, `
-		SELECT id, from_currency, to_currency, rate::text, rate_date, fetched_at
-		FROM exchange_rates WHERE id = $1
-	`, id).Scan(&er.ID, &er.FromCurrency, &er.ToCurrency, &rateStr, &er.RateDate, &er.CreatedAt)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ExchangeRate{}, ErrExchangeRateNotFound
-		}
-		return ExchangeRate{}, err
-	}
-
-	er.Rate = decimal.MustFromString(rateStr)
-	return er, nil
-}
+// Reading a single shared rate used to live here, by pair and by id. Both went
+// unused once portfolio grew its own reads: under BYO-key a valuation asks for
+// the user's rate first (portfolio.GetUserExchangeRateByPair) and only then the
+// shared one (portfolio.GetExchangeRateByPair). This module writes the shared
+// table on behalf of an admin; it no longer reads a single row out of it.
 
 func (r *PostgresRepository) UpdateExchangeRateByID(ctx context.Context, id uuid.UUID, rate money.Decimal) (ExchangeRate, error) {
 	var er ExchangeRate

@@ -18,6 +18,11 @@ func NewFallback(providers ...Provider) *FallbackProvider {
 	return new(FallbackProvider{providers})
 }
 
+// Providers exposes the chain in the order it will be tried. Under BYO-key the
+// order decides which of a user's personal quotas is spent first, so it is
+// worth asserting on.
+func (f *FallbackProvider) Providers() []Provider { return f.providers }
+
 func (f *FallbackProvider) FetchQuote(ctx context.Context, symbol string) (QuoteResult, error) {
 	var errs []error
 	for _, p := range f.providers {

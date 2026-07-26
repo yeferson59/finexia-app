@@ -141,7 +141,7 @@ Es el menú de navegación. Sus secciones son:
 | **Transacciones** | Historial de operaciones e importación desde Excel/CSV |
 | **Reportes** | Estadísticas, calendario de rendimiento y descargas en Excel |
 | **Notificaciones** | Preferencias de avisos por correo y en la app |
-| **Configuración** | Perfil, apariencia, contraseña, 2FA y sesiones |
+| **Configuración** | Perfil, apariencia, contraseña, 2FA, sesiones y claves de datos de mercado |
 
 En la parte inferior de la barra lateral está el botón **Cerrar Sesión**.
 
@@ -263,7 +263,19 @@ Desde esta misma vista puedes **registrar nuevas operaciones**: el botón **+ Ag
 
 ### 7.3 Precios de los activos
 
-Los precios de los activos se actualizan automáticamente desde proveedores de datos de mercado. El valor de tus posiciones se recalcula con el último precio disponible, por lo que tu patrimonio refleja la cotización más reciente sin que tengas que hacer nada.
+Los precios vienen de proveedores de datos de mercado (Finnhub, Alpha Vantage), y **Finexia no tiene cuenta con ninguno de ellos**: la clave la pones tú, en *Configuración → Datos de mercado* (sección 13.4). Es gratis y se tarda un minuto; el manual lo explica ahí.
+
+Qué cambia según tengas clave o no:
+
+| | Con tu clave configurada | Sin clave |
+|---|---|---|
+| Precio de tus posiciones | Última cotización disponible | Tu **precio de compra** |
+| Actualización | Automática cada día, más el botón **Sincronizar** cuando quieras | No hay nada que actualizar |
+| Ganancia/pérdida | Real frente al mercado | Sale 0: estás comparando el coste consigo mismo |
+
+Sin clave la aplicación **no inventa un precio ni usa el de otro usuario**: los datos que trae una clave personal pertenecen a quien la puso, y las condiciones de uso de los proveedores no permiten compartirlos. El panel principal te avisa cuando no hay ninguna clave usable, para que no confundas una valoración a coste con una de mercado.
+
+Un administrador puede además fijar a mano el precio de un activo del catálogo. Ese precio sí lo ve todo el mundo, y se usa solo cuando tú no tienes dato propio para ese activo.
 
 ---
 
@@ -427,6 +439,31 @@ Ajusta las preferencias visuales de la aplicación (tema/aspecto de la interfaz)
 - **Cambiar contraseña:** introduce tu contraseña actual y la nueva. Usa contraseñas largas y únicas.
 - **Verificación en dos pasos (2FA)** y **Sesiones activas:** ver sección 14.
 
+### 13.4 Datos de mercado (tu clave de proveedor)
+
+Aquí es donde das de alta la clave con la que Finexia consulta los precios de tus activos. Sin ella tus posiciones se valoran a precio de compra (sección 7.3).
+
+**Cómo obtener una clave.** Ambos proveedores tienen plan gratuito y basta con registrarse:
+
+| Proveedor | Dónde | Plan gratuito |
+|---|---|---|
+| **Finnhub** | finnhub.io | ~60 consultas por minuto; es el recomendado |
+| **Alpha Vantage** | alphavantage.co | Más limitado (unas pocas consultas por minuto), útil como respaldo |
+
+Puedes configurar las dos. Finexia intenta primero Finnhub y recurre a Alpha Vantage si la primera no cubre un activo.
+
+**Cómo configurarla.** Pega la clave en el campo del proveedor y pulsa **Guardar**. Finexia la comprueba contra el proveedor antes de aceptarla, así que si te equivocas al copiarla te lo dice en el momento en vez de dejarte con una clave que no funciona.
+
+Por cada clave guardada verás:
+
+- Los **cuatro últimos caracteres**, para saber cuál tienes puesta.
+- Su **estado**: *activa*, *sin cuota* (has agotado el límite del día; mañana vuelve sola) o *no válida* (el proveedor la rechazó, normalmente porque la revocaste).
+- **Verificar**, que vuelve a comprobarla, y **Eliminar**, que la borra.
+
+**Sincronizar** pide los precios de tus posiciones en ese momento, sin esperar a la actualización diaria. Con una clave de Alpha Vantage el proceso va despacio a propósito, para no agotar tu cuota: si tienes muchas posiciones puede que no le dé tiempo a todas y las restantes se actualicen en la sincronización de la noche.
+
+> **La clave no se puede volver a leer, ni siquiera tú.** Se guarda cifrada y Finexia nunca la devuelve: por eso el campo aparece siempre vacío y cambiarla significa escribirla entera otra vez. Si la pierdes, genera una nueva en el proveedor. Si prefieres dejar de usarla, **Eliminar** la borra de verdad.
+
 ---
 
 ## 14. Seguridad: 2FA y sesiones
@@ -466,7 +503,7 @@ No. Finexia nunca accede a tus plataformas ni te pide credenciales. Tú registra
 Sí, puedes crear tantos como necesites, cada uno con su moneda, tipo, nivel de riesgo y monto objetivo propios.
 
 **¿Cómo se calculan los valores de mis posiciones?**
-Con el último precio disponible de cada activo (actualizado automáticamente desde proveedores de datos de mercado), multiplicado por tu cantidad, y convertido a la moneda del portafolio con las tasas de cambio del sistema.
+Cantidad × precio, convertido a la moneda del portafolio. El precio es, por este orden: el último que trajo **tu** clave de datos de mercado; si no tienes clave, el precio manual que haya fijado un administrador para ese activo; y si tampoco lo hay, tu propio precio de compra. Las tasas de cambio siguen la misma regla. Ver secciones 7.3 y 13.4.
 
 **¿Puedo importar mi histórico desde Excel?**
 Sí. Usa **Transacciones → Importar**: sube el archivo (.xlsx o .csv, máximo 8 MB), asigna las columnas, revisa la vista previa (incluidas las filas omitidas) y confirma. Nada se guarda hasta que confirmas.
@@ -496,7 +533,9 @@ Desde **Reportes** puedes descargar en Excel el resumen mensual, el estado de re
 | El código 2FA no es aceptado | Reloj del teléfono desincronizado o código expirado | Sincroniza la hora del dispositivo y usa el código vigente; como alternativa, un código de recuperación |
 | Mi sesión se cerró sola | La sesión fue revocada o expiró | Inicia sesión de nuevo; revisa **Sesiones activas** si no fuiste tú |
 | Una importación omite filas | Datos incompletos o formatos no interpretables | Revisa el detalle de **Filas omitidas**, corrige el archivo y repite la vista previa |
-| Los valores no cuadran con mi broker | Falta registrar transacciones o el precio aún no se actualiza | Completa el historial de transacciones y vuelve a revisar más tarde |
+| Los valores no cuadran con mi broker | No tienes clave de datos de mercado (se valora a coste), faltan transacciones, o el precio aún no se ha refrescado | Configura tu clave en **Configuración → Datos de mercado** y pulsa **Sincronizar**; completa el historial de transacciones |
+| Mi ganancia/pérdida sale exactamente 0 | Sin clave de datos de mercado se valora a precio de compra, así que no hay nada que comparar | Configura tu clave (sección 13.4) |
+| El estado de mi clave aparece como "sin cuota" | Has agotado el límite diario o por minuto de tu plan gratuito | No hace falta hacer nada: se reintenta en la siguiente sincronización |
 
 Si el problema persiste, contacta con el equipo de soporte de Finexia.
 
