@@ -17,7 +17,7 @@
 	}
 </script>
 
-<section class="block wrap" id="faq">
+<section class="wrap block" id="faq">
 	<div class="sec-head reveal">
 		<div class="eyebrow">Preguntas frecuentes</div>
 		<h2 class="sec-title">Lo que necesitas saber</h2>

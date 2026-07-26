@@ -18,7 +18,7 @@
 	];
 </script>
 
-<section class="block wrap" id="como-funciona">
+<section class="wrap block" id="como-funciona">
 	<div class="sec-head reveal">
 		<div class="eyebrow">Cómo funciona</div>
 		<h2 class="sec-title">De plataformas dispersas<br />a un solo mapa</h2>

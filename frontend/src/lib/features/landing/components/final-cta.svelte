@@ -1,4 +1,4 @@
-<section class="block wrap">
+<section class="wrap block">
 	<div class="final-cta reveal">
 		<div class="cta-eyebrow">Lista de espera</div>
 		<h2>Sé de los primeros<br />en tener el control.</h2>
