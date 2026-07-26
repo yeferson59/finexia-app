@@ -244,8 +244,6 @@ func (a *App) buildModules() *modules {
 		AuthMiddl: authModule,
 		Limiter:   userLimiter,
 	})
-	// market owns the asset catalog; portfolio consumes it (portfolio → market),
-	// so market is built first and injected as portfolio's AssetReader.
 	marketModule := market.New(market.Deps{
 		DB:             a.deps.DB,
 		Storage:        a.deps.Storage,
