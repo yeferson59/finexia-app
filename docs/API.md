@@ -231,8 +231,11 @@ Los exports responden `200` con cuerpo binario XLSX y
 |---|---|---|
 | POST | `/assets` | Crea asset |
 | POST | `/assets/import` | Import masivo de assets |
-| POST | `/assets/sync` | Sincroniza precios de todos los assets |
-| POST | `/assets/:id/sync` | Sincroniza un asset |
+
+> Las rutas de sincronización de administración (`POST /assets/sync`,
+> `POST /assets/:id/sync`) **fueron retiradas**: los datos de mercado son
+> BYO-key y la aplicación ya no tiene clave de proveedor con la que ejecutarlas.
+> Su sustituta es `POST /market/sync` (§2.10), con el alcance del llamante.
 
 ### 2.9 Exchange rates (JWT; *admin* donde se indica)
 
@@ -241,9 +244,56 @@ Los exports responden `200` con cuerpo binario XLSX y
 | GET | `/exchange-rates` | usuario, paginada | Lista tasas |
 | POST | `/exchange-rates` | admin | Crea tasa |
 | POST | `/exchange-rates/import` | admin | Import masivo |
-| POST | `/exchange-rates/sync` | admin | Sincroniza todas |
-| POST | `/exchange-rates/:id/sync` | admin | Sincroniza una |
 | PATCH | `/exchange-rates/:id` | admin | Actualiza tasa |
+
+> Esta tabla contiene solo tasas introducidas por el operador. Las que trae la
+> clave de un usuario van a `user_exchange_rates` y únicamente él las ve.
+> `POST /exchange-rates/sync` y `POST /exchange-rates/:id/sync` fueron
+> retiradas por el mismo motivo que las de assets.
+
+### 2.10 Datos de mercado — BYO-key (JWT)
+
+Cada usuario aporta su propia clave de proveedor. Todas estas rutas actúan
+sobre las claves y tenencias de **quien llama**: el id de usuario sale de los
+locals de autenticación, nunca del path, así que no hay variante de admin ni
+forma de nombrar la credencial de otro.
+
+Las de escritura llevan un limitador propio, más estrecho que el compartido
+(~10/min por usuario): guardar y verificar gastan cuota del proveedor del
+usuario.
+
+| Método | Path | Descripción |
+|---|---|---|
+| GET | `/market/credentials` | Estado de las claves propias |
+| PUT | `/market/credentials/:provider` | Guarda una clave (body `{ "apiKey": "…" }`) |
+| POST | `/market/credentials/:provider/verify` | Recomprueba una clave guardada |
+| DELETE | `/market/credentials/:provider` | Borra una clave |
+| POST | `/market/sync` | Sincroniza las tenencias propias con las claves propias |
+
+`:provider` es `finnhub` o `alphavantage`.
+
+**La clave nunca se devuelve**, ni siquiera a su dueño: se guarda cifrada
+(cifrado de sobre, `internal/platform/secretbox`) y de ella solo se sirven sus
+cuatro últimos caracteres. El objeto de respuesta no tiene campo donde quepa:
+
+```json
+{
+  "provider": "finnhub",
+  "last4": "3f9a",
+  "status": "active",
+  "lastVerifiedAt": "2026-07-26T09:30:00Z",
+  "createdAt": "2026-07-20T11:00:00Z",
+  "updatedAt": "2026-07-26T09:30:00Z"
+}
+```
+
+`status` es `active`, `invalid` (el proveedor rechazó la clave) o
+`rate_limited` (la clave sirve, pero su cuota está agotada).
+
+`PUT` verifica la clave contra el proveedor **antes** de guardarla, así que un
+400 significa que el proveedor la rechazó. Los errores del proveedor no se
+propagan al cuerpo de la respuesta: Alpha Vantage lleva la clave en el query
+string y su texto de error puede citarla.
 
 ---
 

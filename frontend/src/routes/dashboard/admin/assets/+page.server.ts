@@ -36,29 +36,6 @@ export const actions = {
 		return { createSuccess: true };
 	},
 
-	syncAsset: async ({ request, cookies, fetch }) => {
-		const fd = await request.formData();
-		const id = fd.get('id') as string;
-		if (!id) return fail(400, { syncAssetError: 'ID requerido', syncAssetId: '' });
-
-		const res = await market.syncAsset({ cookies, fetch }, id);
-		if (!res.ok) {
-			return fail(res.status, {
-				syncAssetError: res.details ?? res.message ?? 'Sincronización fallida',
-				syncAssetId: id
-			});
-		}
-		return { syncAssetSuccess: true, syncAssetId: id };
-	},
-
-	syncPrices: async ({ cookies, fetch }) => {
-		const res = await market.syncAllAssets({ cookies, fetch });
-		if (!res.ok) {
-			return fail(res.status, { syncError: res.details ?? 'La sincronización falló' });
-		}
-		return { syncSuccess: true, synced: Array.isArray(res.data) ? res.data.length : 0 };
-	},
-
 	importAssets: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
 		const file = fd.get('file');

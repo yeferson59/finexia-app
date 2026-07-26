@@ -49,29 +49,6 @@ export const actions = {
 		return { importSuccess: true, importResult: res.data };
 	},
 
-	syncRate: async ({ request, cookies, fetch }) => {
-		const fd = await request.formData();
-		const id = fd.get('id') as string;
-		if (!id) return fail(400, { syncRateError: 'ID requerido', syncRateId: '' });
-
-		const res = await market.syncRate({ cookies, fetch }, id);
-		if (!res.ok) {
-			return fail(res.status, {
-				syncRateError: res.details ?? res.message ?? 'Sincronización fallida',
-				syncRateId: id
-			});
-		}
-		return { syncRateSuccess: true, syncRateId: id };
-	},
-
-	syncRates: async ({ cookies, fetch }) => {
-		const res = await market.syncAllRates({ cookies, fetch });
-		if (!res.ok) {
-			return fail(res.status, { syncError: res.details ?? 'La sincronización falló' });
-		}
-		return { syncSuccess: true, synced: Array.isArray(res.data) ? res.data.length : 0 };
-	},
-
 	updateRate: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
 		const id = fd.get('id') as string;

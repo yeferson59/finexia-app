@@ -28,7 +28,8 @@ backend/
     │   ├── config/  logger/  database/  cache/  objectstore/
     │   ├── mail/  geoip/  httpx/         # httpx: middlewares genéricos + envelope de respuesta
     │   ├── spreadsheet/                  # lectura genérica de CSV/XLSX (compartida por los importers)
-    │   └── marketdata/                   # provider de precios + alphavantage/finnhub/yahoo + fallback
+    │   ├── marketdata/                   # provider de precios (BYO-key) + alphavantage/finnhub + fallback + providers/
+    │   └── secretbox/                    # cifrado de sobre de las claves que aportan los usuarios
     ├── identity/                # tipos compartidos (User, Account, Session, Role) — sin lógica
     │
     ├── auth/                    # login, sesiones, refresh, 2FA, verificación de email,
@@ -36,7 +37,7 @@ backend/
     ├── user/                    # perfil, preferencias, avatar (S3), administración
     ├── portfolio/               # portfolios, entries, transacciones, plataformas,
     │                            # snapshots, import/export (lee exchange-rates para conversión)
-    ├── market/                  # catálogo de assets, exchange rates y sincronización de precios
+    ├── market/                  # catálogo de assets, exchange rates, claves BYO-key y sync por usuario
     ├── marketing/               # waitlist
     ├── notification/            # resumen semanal por email
     │
@@ -135,6 +136,12 @@ y los exchange-rates son propiedad de `market`; `portfolio` referencia
 `portfolio → market`. `portfolio` conserva solo una lectura de exchange-rates
 para convertir a la divisa de visualización.
 
+La sincronización BYO-key necesita el sentido contrario —saber qué activos
+tiene un usuario para no gastar su cuota personal en el catálogo entero— y eso
+habría cerrado un ciclo. Se resuelve con la regla de siempre: `market` declara
+la interfaz `Holdings` que necesita y `portfolio` la implementa
+(`portfolio/holdings.go`). El grafo sigue siendo `portfolio → market`.
+
 ### Orden de construcción
 
 El grafo de arriba es también el orden en que `internal/app` construye. Cuatro
@@ -169,6 +176,34 @@ ellas mismas, y `mountRoutes` monta `auth` y `marketing` antes que `user` para
 que `GET/PATCH /users/:id` no las capture. `TestAppWiresAndRoutes` verifica ese
 orden.
 
+### Datos de mercado: BYO-key
+
+La aplicación no guarda credenciales de ningún proveedor de datos de mercado.
+Cada usuario aporta la suya, y eso impone dos invariantes que atraviesan varios
+módulos:
+
+**La clave no se puede recuperar de la base de datos.** Se sella con cifrado de
+sobre en `platform/secretbox`: una DEK aleatoria por credencial, envuelta bajo
+una KEK que vive en el entorno (`MARKET_KEK_KEYS`) y nunca en Postgres. El AAD
+ata cada secreto a su dueño y proveedor, así que copiar un ciphertext a la fila
+de otro usuario no lo hace legible: escribir en la tabla no da acceso a la
+clave de nadie. La KEK admite varias versiones a la vez y `Rewrap` rota
+re-envolviendo solo la DEK, sin volver a pedir nada a los usuarios. El proceso
+no arranca sin KEK, deliberadamente.
+
+**El dato que trae una clave es de quien la puso.** Los ToS de los proveedores
+no permiten redistribuir datos de un plan personal, así que precios y tasas van
+a `user_asset_prices` / `user_exchange_rates`, y la valoración (`portfolio` y
+la vista `portfolio_summary`) prefiere el dato del propio usuario, luego el
+precio manual del operador, y por último su coste de compra — nunca el dato de
+otro usuario.
+
+De ahí se sigue lo demás: los clientes de proveedor se construyen por ejecución
+(`marketdata.Factory`, implementada en `marketdata/providers`) en vez de una
+vez al arrancar, y todo error de proveedor pasa por `marketdata.Errorf`, que
+depura la clave del mensaje — Alpha Vantage solo la acepta en el query string y
+los errores de transporte de Go citan la URL completa.
+
 ## 4. Blindaje automatizado
 
 Las reglas 1, 2 y 5 se verifican en CI mediante un **arch-test**
@@ -194,9 +229,12 @@ logger, env) y llama a `app.New(deps).Run(ctx)`. `internal/app`:
    (`auth`, `auth.AdminRoutes`), luego el resto de módulos y por último las
    rutas bajo el gate global,
 4. registra todos los cron jobs en el `scheduler.Scheduler` genérico
-   (`auth.CleanupJob`, `portfolio.SnapshotJob`,
-   `market.{AssetPrice,ExchangeRate}Scheduler`,
+   (`auth.CleanupJob`, `portfolio.SnapshotJob`, `market.SyncJob`,
    `notification.WeeklySummaryScheduler`).
+
+`market.SyncJob` sustituyó a los dos jobs globales de precios y tasas: sin
+clave de operador no hay nada global que sincronizar, así que recorre los
+usuarios que tienen clave propia y sincroniza cada uno con la suya.
 
 ## 6. Cobertura de tests
 

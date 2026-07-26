@@ -6,6 +6,7 @@
 	import Card from '$lib/ui/card.svelte';
 	import Input from '$lib/ui/input.svelte';
 	import Button from '$lib/ui/button.svelte';
+	import MarketCredentials from '$lib/features/settings/market-credentials.svelte';
 
 	import type { PageProps } from './$types';
 
@@ -638,6 +639,9 @@
 			{/if}
 		</div>
 	</Card>
+
+	<!-- Market data (BYO-key) -->
+	<MarketCredentials credentials={data.marketCredentials} {form} />
 
 	<!-- Active sessions -->
 	<Card variant="elevated" padding="none">

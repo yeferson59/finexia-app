@@ -13,3 +13,4 @@ export { default as PortfolioOverview } from './components/portfolio-overview.sv
 export { default as AssetAllocation } from './components/asset-allocation.svelte';
 export { default as RecentActivity } from './components/recent-activity.svelte';
 export { default as PortfolioGrowth } from './components/portfolio-growth.svelte';
+export { default as MarketKeyNotice } from './components/market-key-notice.svelte';

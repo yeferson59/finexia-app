@@ -3,6 +3,7 @@ import { redirect } from '@sveltejs/kit';
 import * as auth from '$lib/api/auth';
 import * as portfolio from '$lib/api/portfolio';
 import * as transactions from '$lib/api/transactions';
+import * as market from '$lib/api/market';
 import { ACCESS_COOKIE, REFRESH_COOKIE, clearSessionCookies } from '$lib/server/session';
 import type {
 	AllocationItem,
@@ -19,12 +20,15 @@ export const load: PageServerLoad = async ({ cookies, fetch, url }) => {
 	const requestedCurrency = url.searchParams.get('currency')?.toUpperCase() ?? '';
 	const currency = SUPPORTED_CURRENCIES.includes(requestedCurrency) ? requestedCurrency : 'USD';
 
-	const [transactionsRes, summaryRes, allocationRes, growthRes] = await Promise.all([
-		transactions.getRecent(event),
-		portfolio.getSummaries(event, currency),
-		portfolio.getAllocation(event),
-		portfolio.getAggregateGrowth(event)
-	]);
+	const [transactionsRes, summaryRes, allocationRes, growthRes, credentialsRes] = await Promise.all(
+		[
+			transactions.getRecent(event),
+			portfolio.getSummaries(event, currency),
+			portfolio.getAllocation(event),
+			portfolio.getAggregateGrowth(event),
+			market.getMarketCredentials(event)
+		]
+	);
 
 	const recentTransactions: UserTransaction[] =
 		transactionsRes.ok && transactionsRes.success && Array.isArray(transactionsRes.data)
@@ -45,7 +49,23 @@ export const load: PageServerLoad = async ({ cookies, fetch, url }) => {
 	};
 	if (growthRes.ok && growthRes.success && growthRes.data) portfolioGrowth = growthRes.data;
 
-	return { recentTransactions, portfolioSummaries, allocation, portfolioGrowth, currency };
+	// Las cifras de mercado dependen de la clave del propio usuario, así que el
+	// dashboard necesita saber si hay una usable para no presentar un valor a
+	// coste como si fuera de mercado. Un fallo al leerlas se trata como "sí hay
+	// clave": callar es mejor que avisar en falso.
+	const credentials = credentialsRes.ok ? (credentialsRes.data ?? []) : null;
+	const hasUsableKey = credentials === null || credentials.some((c) => c.status !== 'invalid');
+	const hasBrokenKey = credentials !== null && credentials.length > 0 && !hasUsableKey;
+
+	return {
+		recentTransactions,
+		portfolioSummaries,
+		allocation,
+		portfolioGrowth,
+		currency,
+		hasUsableKey,
+		hasBrokenKey
+	};
 };
 
 export const actions = {
