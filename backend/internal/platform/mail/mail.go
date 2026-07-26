@@ -91,11 +91,11 @@ func New(apiKey, from string) (*Service, error) {
 		return nil, fmt.Errorf("mail: parse templates: %w", err)
 	}
 
-	return &Service{
+	return new(Service{
 		client: resend.NewClient(apiKey),
 		from:   from,
 		tmpl:   tmpl,
-	}, nil
+	}), nil
 }
 
 func (s *Service) SendWaitlistConfirmation(email string) error {
@@ -104,12 +104,12 @@ func (s *Service) SendWaitlistConfirmation(email string) error {
 		return errors.New("mail: render waitlist template: " + err.Error())
 	}
 
-	params := &resend.SendEmailRequest{
+	params := new(resend.SendEmailRequest{
 		From:    s.from,
 		To:      []string{email},
 		Subject: "¡Tu lugar está reservado — Finexia acceso anticipado",
 		Html:    body.String(),
-	}
+	})
 
 	if _, err := s.client.Emails.Send(params); err != nil {
 		return fmt.Errorf("mail: send waitlist confirmation to %s: %w", email, err)
@@ -125,12 +125,12 @@ func (s *Service) SendActivityAlert(email string, data ActivityAlertData) error 
 	}
 
 	subject := fmt.Sprintf("Nueva transacción: %s %s — Finexia", data.TransactionType, data.AssetTicker)
-	params := &resend.SendEmailRequest{
+	params := new(resend.SendEmailRequest{
 		From:    s.from,
 		To:      []string{email},
 		Subject: subject,
 		Html:    body.String(),
-	}
+	})
 
 	if _, err := s.client.Emails.Send(params); err != nil {
 		return fmt.Errorf("mail: send activity alert to %s: %w", email, err)
@@ -145,12 +145,12 @@ func (s *Service) SendSecurityAlert(email string, data SecurityAlertData) error 
 		return fmt.Errorf("mail: render security_alert template: %w", err)
 	}
 
-	params := &resend.SendEmailRequest{
+	params := new(resend.SendEmailRequest{
 		From:    s.from,
 		To:      []string{email},
 		Subject: fmt.Sprintf("Alerta de seguridad: %s — Finexia", data.Event),
 		Html:    body.String(),
-	}
+	})
 
 	if _, err := s.client.Emails.Send(params); err != nil {
 		return fmt.Errorf("mail: send security alert to %s: %w", email, err)
@@ -165,12 +165,12 @@ func (s *Service) SendInvitation(email string, data InvitationData) error {
 		return fmt.Errorf("mail: render invitation template: %w", err)
 	}
 
-	params := &resend.SendEmailRequest{
+	params := new(resend.SendEmailRequest{
 		From:    s.from,
 		To:      []string{email},
 		Subject: "Tu invitación a Finexia",
 		Html:    body.String(),
-	}
+	})
 
 	if _, err := s.client.Emails.Send(params); err != nil {
 		return fmt.Errorf("mail: send invitation to %s: %w", email, err)
@@ -185,12 +185,12 @@ func (s *Service) SendPasswordReset(email string, data PasswordResetData) error 
 		return fmt.Errorf("mail: render password_reset template: %w", err)
 	}
 
-	params := &resend.SendEmailRequest{
+	params := new(resend.SendEmailRequest{
 		From:    s.from,
 		To:      []string{email},
 		Subject: "Restablece tu contraseña — Finexia",
 		Html:    body.String(),
-	}
+	})
 
 	if _, err := s.client.Emails.Send(params); err != nil {
 		return fmt.Errorf("mail: send password reset to %s: %w", email, err)
@@ -205,12 +205,12 @@ func (s *Service) SendEmailVerification(email string, data EmailVerificationData
 		return fmt.Errorf("mail: render email_verification template: %w", err)
 	}
 
-	params := &resend.SendEmailRequest{
+	params := new(resend.SendEmailRequest{
 		From:    s.from,
 		To:      []string{email},
 		Subject: "Verifica tu correo — Finexia",
 		Html:    body.String(),
-	}
+	})
 
 	if _, err := s.client.Emails.Send(params); err != nil {
 		return fmt.Errorf("mail: send email verification to %s: %w", email, err)
@@ -225,12 +225,12 @@ func (s *Service) SendWeeklySummary(email string, data WeeklySummaryData) error 
 		return fmt.Errorf("mail: render weekly_summary template: %w", err)
 	}
 
-	params := &resend.SendEmailRequest{
+	params := new(resend.SendEmailRequest{
 		From:    s.from,
 		To:      []string{email},
 		Subject: fmt.Sprintf("Tu resumen semanal — %s — Finexia", data.WeekLabel),
 		Html:    body.String(),
-	}
+	})
 
 	if _, err := s.client.Emails.Send(params); err != nil {
 		return fmt.Errorf("mail: send weekly summary to %s: %w", email, err)

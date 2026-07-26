@@ -16,6 +16,10 @@ type handler struct {
 	service *Service
 }
 
+func newhandler(svc *Service) *handler {
+	return new(handler{svc})
+}
+
 func (h *handler) SyncAssetPrices(c fiber.Ctx) error {
 	assets, errs := h.service.SyncAssetPrices(c)
 

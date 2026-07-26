@@ -50,12 +50,12 @@ func NewService(deps ServiceDeps) *Service {
 // New completes the module with its HTTP surface. deps.Service must be the
 // value NewService returned, so auth and these routes share one service.
 func New(deps Deps) *Module {
-	return &Module{
+	return new(Module{
 		service:   deps.Service,
-		handler:   &handler{service: deps.Service},
+		handler:   newHandler(deps.Service),
 		authMiddl: deps.AuthMiddl,
 		limiter:   deps.Limiter,
-	}
+	})
 }
 
 // Service exposes the module's use cases to the composition root and other

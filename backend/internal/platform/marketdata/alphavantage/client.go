@@ -20,10 +20,10 @@ type Client struct {
 }
 
 func New(apiKey string) *Client {
-	return &Client{
+	return new(Client{
 		apiKey:     apiKey,
-		httpClient: &http.Client{Timeout: 10 * time.Second},
-	}
+		httpClient: new(http.Client{Timeout: 10 * time.Second}),
+	})
 }
 
 func (c *Client) FetchExchangeRate(ctx context.Context, from, to string) (marketdata.ExchangeRateResult, error) {

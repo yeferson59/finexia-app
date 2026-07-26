@@ -21,10 +21,10 @@ type Client struct {
 }
 
 func New(apiKey string) *Client {
-	return &Client{
+	return new(Client{
 		apiKey:     apiKey,
-		httpClient: &http.Client{Timeout: 10 * time.Second},
-	}
+		httpClient: new(http.Client{Timeout: 10 * time.Second}),
+	})
 }
 
 // FetchQuote retrieves the current price for a stock, ETF, or bond via the

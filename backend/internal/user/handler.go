@@ -18,6 +18,10 @@ type handler struct {
 	service *Service
 }
 
+func newHandler(svc *Service) *handler {
+	return new(handler{svc})
+}
+
 func (h *handler) GetListUsers(c fiber.Ctx) error {
 	paginateInfo, ok := paginate.FromContext(c)
 	if !ok {

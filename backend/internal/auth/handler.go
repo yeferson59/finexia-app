@@ -13,6 +13,10 @@ type handler struct {
 	cfg     Config
 }
 
+func newHandler(svc *Service, cfg Config) *handler {
+	return new(handler{svc, cfg})
+}
+
 func (h *handler) login(c fiber.Ctx) error {
 	var loginDto LoginRequestDTO
 
@@ -35,7 +39,7 @@ func (h *handler) login(c fiber.Ctx) error {
 		return httpx.FromDomain(c, err, "failed to login", "auth:login")
 	}
 
-	c.Cookie(&fiber.Cookie{
+	c.Cookie(new(fiber.Cookie{
 		Name:     "refresh_token",
 		Value:    result.RawRefreshToken,
 		Path:     "/",
@@ -43,7 +47,7 @@ func (h *handler) login(c fiber.Ctx) error {
 		Secure:   h.cfg.Environment == "production",
 		SameSite: "Strict",
 		MaxAge:   int(h.cfg.JWTRefreshDuration.Seconds()),
-	})
+	}))
 
 	return httpx.OK(c, "successfully logged in", "valid credentials",
 		LoginResponseDTO{ID: result.ID, AccessToken: result.AccessToken})
@@ -83,7 +87,7 @@ func (h *handler) refresh(c fiber.Ctx) error {
 		return httpx.Unauthorized(c, "invalid refresh token", "auth:refresh")
 	}
 
-	c.Cookie(&fiber.Cookie{
+	c.Cookie(new(fiber.Cookie{
 		Name:     "refresh_token",
 		Value:    result.RawRefreshToken,
 		Path:     "/",
@@ -91,7 +95,7 @@ func (h *handler) refresh(c fiber.Ctx) error {
 		Secure:   h.cfg.Environment == "production",
 		SameSite: "Strict",
 		MaxAge:   int(h.cfg.JWTRefreshDuration.Seconds()),
-	})
+	}))
 
 	return httpx.OK(c, "token refreshed", "valid refresh token",
 		LoginResponseDTO{AccessToken: result.AccessToken})
@@ -171,12 +175,12 @@ func (h *handler) logout(c fiber.Ctx) error {
 		return httpx.FromDomain(c, err, "failed to logout", "auth:logout")
 	}
 
-	c.Cookie(&fiber.Cookie{
+	c.Cookie(new(fiber.Cookie{
 		Name:   "refresh_token",
 		Value:  "",
 		Path:   "/",
 		MaxAge: -1,
-	})
+	}))
 
 	return httpx.OK(c, "successfully logged out", "valid access token", nil)
 }

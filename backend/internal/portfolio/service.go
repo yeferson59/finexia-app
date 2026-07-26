@@ -61,6 +61,6 @@ func NewService(repo Repository, cfg Config, storage fiber.Storage, mailService 
 		mail:       mailService,
 		user:       userReader,
 		log:        log,
-		risksCache: &risksCache{},
+		risksCache: new(risksCache{}),
 	})
 }

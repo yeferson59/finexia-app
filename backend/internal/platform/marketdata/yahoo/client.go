@@ -20,9 +20,9 @@ type Client struct {
 }
 
 func New() *Client {
-	return &Client{
-		httpClient: &http.Client{Timeout: 10 * time.Second},
-	}
+	return new(Client{
+		httpClient: new(http.Client{Timeout: 10 * time.Second}),
+	})
 }
 
 func (c *Client) fetch(ctx context.Context, symbol string) (float64, error) {

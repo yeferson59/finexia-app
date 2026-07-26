@@ -42,7 +42,7 @@ func newModule(deps Deps, service *Service) *Module {
 	return new(Module{
 		storage:   deps.Storage,
 		service:   service,
-		handler:   new(handler{service}),
+		handler:   newhandler(service),
 		authMiddl: deps.AuthMiddleware,
 		limiter:   deps.Limiter,
 	})

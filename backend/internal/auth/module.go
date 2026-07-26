@@ -59,13 +59,13 @@ func New(deps Deps) *Module {
 // newModule finishes construction from an already-built service; split out so
 // tests can inject fake stores through NewService.
 func newModule(deps Deps, service *Service) *Module {
-	return &Module{
+	return new(Module{
 		cfg:     deps.Cfg,
 		storage: deps.Storage,
 		limiter: deps.Limiter,
 		service: service,
-		handler: &handler{service: service, cfg: deps.Cfg},
-	}
+		handler: newHandler(service, deps.Cfg),
+	})
 }
 
 // Service exposes the module's use cases to the composition root and other

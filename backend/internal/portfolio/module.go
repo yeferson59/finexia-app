@@ -76,7 +76,7 @@ func New(deps Deps) *Module {
 func newModule(deps Deps, service *Service) *Module {
 	return new(Module{
 		service:   service,
-		handler:   new(handler{service: service, assets: deps.Assets}),
+		handler:   newHandler(service, deps.Assets),
 		authMiddl: deps.AuthMiddl,
 		limiter:   deps.Limiter,
 	})

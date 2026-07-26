@@ -15,7 +15,7 @@ type FallbackProvider struct {
 }
 
 func NewFallback(providers ...Provider) *FallbackProvider {
-	return &FallbackProvider{providers: providers}
+	return new(FallbackProvider{providers})
 }
 
 func (f *FallbackProvider) FetchQuote(ctx context.Context, symbol string) (QuoteResult, error) {

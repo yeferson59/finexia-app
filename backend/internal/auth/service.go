@@ -181,10 +181,10 @@ func (s *Service) issueSession(ctx context.Context, userID uuid.UUID, roleName, 
 
 	var ip, ua *string
 	if ipAddress != "" {
-		ip = &ipAddress
+		ip = new(ipAddress)
 	}
 	if userAgent != "" {
-		ua = &userAgent
+		ua = new(userAgent)
 	}
 
 	sessionID, err := s.stores.Sessions.CreateSession(ctx, userID, jwToken, ip, ua, accessExpiresAt)

@@ -67,7 +67,7 @@ func Tagged(kind Kind, err error) error {
 		return nil
 	}
 
-	return &statusError{kind: kind, err: err}
+	return new(statusError{kind, err})
 }
 
 // AsBadRequest, AsNotFound, AsConflict and AsTooManyRequests read better at a
@@ -84,8 +84,7 @@ func AsTooManyRequests(err error) error { return Tagged(KindTooManyRequests, err
 // its source (docs/TECH_DEBT.md #1). The old message-substring fallback was
 // removed once all domains tagged their errors.
 func domainStatus(err error) int {
-	var se *statusError
-	if errors.As(err, &se) {
+	if se, exist := errors.AsType[*statusError](err); exist {
 		return se.kind.httpStatus()
 	}
 
