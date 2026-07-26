@@ -28,6 +28,12 @@ const (
 	LocalRole = "auth_role"
 )
 
+// RoleAdmin is the privileged role's name. It lives beside LocalRole because
+// the two are one convention: a handler that reads the role from the locals to
+// decide what to do — rather than being gated by the guard — compares against
+// this, and the guard itself is built from it.
+const RoleAdmin = "admin"
+
 // ErrNoIdentity reports that the locals carry no usable identity: the request
 // reached the handler without passing the auth middleware, or passed it with
 // an incomplete claim set. Handlers translate it to a 400.

@@ -30,7 +30,11 @@ export const actions = {
 		);
 
 		if (!res.ok) {
-			return fail(res.status, { createError: res.details ?? 'No se pudo crear el activo' });
+			// `details` lo pone el binder del backend; los errores de dominio
+			// (ticker vacío, moneda inválida, cuota) viajan en `action`.
+			return fail(res.status, {
+				createError: res.details ?? res.action ?? 'No se pudo crear el activo'
+			});
 		}
 
 		return { createSuccess: true };

@@ -21,6 +21,37 @@ var (
 	ErrCredentialNotFound   = httpx.AsNotFound(errors.New("market data credential not found"))
 )
 
+// Catalog input errors. Both creation paths — the operator's and the user's —
+// validate through normalizeAssetInput and return these, so the same bad ticker
+// is answered the same way whoever sent it.
+var (
+	errAssetTickerRequired  = httpx.AsBadRequest(errors.New("el ticker es obligatorio"))
+	errAssetTickerTooLong   = httpx.AsBadRequest(errors.New("el ticker supera el máximo de caracteres"))
+	errAssetExchangeTooLong = httpx.AsBadRequest(errors.New("el mercado supera el máximo de caracteres"))
+	errAssetTypeInvalid     = httpx.AsBadRequest(errors.New("el tipo de activo debe ser uno de: stock, etf, crypto, bond, cash, real_estate, commodity, other"))
+	errAssetCurrencyInvalid = httpx.AsBadRequest(errors.New("la moneda debe ser un código ISO de 3 letras"))
+
+	// ErrAssetQuotaExceeded is a 429 rather than a 403: the user is allowed to
+	// contribute assets, just not this many more today.
+	ErrAssetQuotaExceeded = httpx.AsTooManyRequests(fmt.Errorf("has añadido demasiados activos nuevos en las últimas 24 horas (máximo %d)", maxContributedAssetsPerDay))
+)
+
+// assetFailureDetail returns the message only when this package authored it.
+// Anything else — a driver error, a constraint name — is replaced, so a failed
+// insert cannot echo the schema back over the wire.
+func assetFailureDetail(err error) string {
+	for _, domain := range []error{
+		errAssetTickerRequired, errAssetTickerTooLong, errAssetExchangeTooLong,
+		errAssetTypeInvalid, errAssetCurrencyInvalid, ErrAssetQuotaExceeded,
+	} {
+		if errors.Is(err, domain) {
+			return err.Error()
+		}
+	}
+
+	return "No se pudo crear el activo"
+}
+
 // BYO-key errors. A user with no key is not a failure of the application, so
 // ErrNoCredentials is a 400 the UI turns into "add your key in settings"
 // rather than a 500.

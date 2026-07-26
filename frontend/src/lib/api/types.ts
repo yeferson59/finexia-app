@@ -220,6 +220,11 @@ export interface Asset {
 	exchange?: string;
 	currentPrice: AssetPrice | null;
 	priceUpdatedAt: string | null;
+	/**
+	 * `true` si lo curó el operador y lo ve todo el mundo; `false` si lo aportó
+	 * un usuario, en cuyo caso solo lo ven quienes lo aportaron (API §2.8).
+	 */
+	isCurated?: boolean;
 }
 
 /** Tasa de cambio (`GET /exchange-rates`). */

@@ -250,6 +250,7 @@
 						<th>Ticker</th>
 						<th>Nombre</th>
 						<th>Tipo</th>
+						<th>Origen</th>
 						<th>Precio manual</th>
 						<th>Actualizado</th>
 						<th>Nuevo precio</th>
@@ -265,6 +266,13 @@
 							<td class="cell-name">{asset.name}</td>
 							<td>
 								<Badge tone="neutral">{asset.assetType}</Badge>
+							</td>
+							<td>
+								<!-- Un activo aportado por un usuario solo lo ve quien lo aportó;
+								     crearlo aquí con el mismo ticker lo cura para todos. -->
+								<Badge tone={asset.isCurated ? 'info' : 'warning'}>
+									{asset.isCurated ? 'Catálogo' : 'Aportado'}
+								</Badge>
 							</td>
 							<td class="cell-price">{formatPrice(asset.currentPrice, asset.currency)}</td>
 							<td class="cell-date">{formatDate(asset.priceUpdatedAt)}</td>

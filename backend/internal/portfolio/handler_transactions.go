@@ -181,14 +181,22 @@ func (h *handler) GetAssets(c fiber.Ctx) error {
 		return httpx.InternalServerError(c, "", "paginate info not found")
 	}
 
+	userID, _, role, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	// Admins see the whole table because they moderate what users contribute;
+	// everybody else sees the curated rows plus their own.
+	view := market.CatalogView{ViewerID: userID, All: role == httpx.RoleAdmin}
+
 	search := strings.TrimSpace(c.Query("search"))
 
 	var assets []market.Asset
-	var err error
 	if search != "" {
-		assets, err = h.assets.SearchAssets(c, search, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
+		assets, err = h.assets.SearchAssets(c, view, search, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
 	} else {
-		assets, err = h.assets.GetAssets(c, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
+		assets, err = h.assets.GetAssets(c, view, uint(paginateInfo.Offset), uint(paginateInfo.Limit))
 	}
 
 	if err != nil {
