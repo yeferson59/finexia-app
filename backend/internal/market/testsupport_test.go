@@ -177,14 +177,6 @@ func newTestServices(repo Repository, storage *memStorage) *Service {
 	return newService(repo, storage, nil, testKeyring(), logger.Noop())
 }
 
-// newTestServicesFull wires a price provider in addition to the repository, for
-// flows that hit market data. Under BYO-key the provider is no longer injected
-// directly: it is what the factory hands back for the calling user's keys, so
-// the fake factory below returns this one for any credential.
-func newTestServicesFull(repo Repository, storage *memStorage, provider marketdata.Provider) *Service {
-	return newService(repo, storage, &fakeFactory{provider: provider}, testKeyring(), logger.Noop())
-}
-
 // fakeFactory stands in for marketdata/providers. It ignores the keys and
 // returns a canned provider, so tests exercise the sync logic rather than the
 // chain assembly (which providers has its own tests for).

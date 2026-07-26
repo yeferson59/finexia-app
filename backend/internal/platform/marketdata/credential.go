@@ -63,7 +63,7 @@ func (c Credential) Format(f fmt.State, verb rune) {
 	switch verb {
 	case 'v':
 		if f.Flag('#') {
-			fmt.Fprintf(f, "marketdata.Credential{Provider:%q, APIKey:%q}", string(c.Provider), redacted)
+			_, _ = fmt.Fprintf(f, "marketdata.Credential{Provider:%q, APIKey:%q}", string(c.Provider), redacted)
 
 			return
 		}
