@@ -342,13 +342,13 @@ func TestScheduler_RegisterWithPerJobOverride(t *testing.T) {
 
 // panickyNameJob's Name() panics, exercising the panic surface inside
 // Runner.Execute that isn't covered by safeRun (which only wraps job.Run).
-/*
- * type panickyNameJob struct{}
 
- func (panickyNameJob) Name() string                { panic("name panic") }
- func (panickyNameJob) Run(_ context.Context) error { return nil }
+type panickyNameJob struct{}
 
- func TestScheduler_PanicInOneJobDoesNotStopOthers(t *testing.T) {
+func (panickyNameJob) Name() string                { panic("name panic") }
+func (panickyNameJob) Run(_ context.Context) error { return nil }
+
+func TestScheduler_PanicInOneJobDoesNotStopOthers(t *testing.T) {
 	sched := NewScheduler(newTestRunner())
 
 	fired := make(chan struct{}, 8)
@@ -364,8 +364,7 @@ func TestScheduler_RegisterWithPerJobOverride(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("good job never fired — a panic in the other job likely crashed its goroutine (or the process)")
 	}
- }
-*/
+}
 
 func TestScheduler_DelayUntilFloorsNonPositiveDelay(t *testing.T) {
 	sched := NewScheduler(newTestRunner())

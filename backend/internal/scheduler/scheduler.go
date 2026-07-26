@@ -315,7 +315,7 @@ func (s *Scheduler) computeNext(job Job, sched Schedule, now time.Time) (next ti
 func (s *Scheduler) loadNext(job Job, sched Schedule, store StateStore) time.Time {
 	if store != nil {
 		ctx, cancel := context.WithTimeout(s.ctx, s.storeTimeout)
-		next, found, err := store.LoadNextRun(ctx, job.Name())
+		next, found, err := store.LoadNextRun(ctx, safeJobName(job))
 		cancel()
 
 		switch {
@@ -353,7 +353,7 @@ func (s *Scheduler) saveNext(job Job, next time.Time, store StateStore) {
 	ctx, cancel := context.WithTimeout(context.Background(), s.storeTimeout)
 	defer cancel()
 
-	if err := store.SaveNextRun(ctx, job.Name(), next); err != nil {
+	if err := store.SaveNextRun(ctx, safeJobName(job), next); err != nil {
 		s.runner.opts.Log.Error(s.ctx, "scheduler: failed to persist next-run", logger.Str("job", safeJobName(job)), logger.Err(err))
 	}
 }
