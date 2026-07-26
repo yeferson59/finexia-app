@@ -222,7 +222,10 @@ comentario en `.golangci.yml`.)
 `cmd/api/main.go` solo crea la infraestructura (pool pgx, cache, S3, mail,
 logger, env) y llama a `app.New(deps).Run(ctx)`. `internal/app`:
 
-1. construye el provider de precios (fallback alphavantage→finnhub→yahoo),
+1. construye la fábrica de proveedores de datos de mercado
+   (`marketdata/providers`), que **no** lleva ninguna clave: cada ejecución de
+   sync arma su cadena con las claves del usuario que la origina, en el orden
+   `finnhub → alphavantage` (`marketdata.SupportedProviders`),
 2. construye cada módulo con sus dependencias (incluyendo las interfaces
    módulo→módulo, p. ej. `portfolio` recibe `user.Service` como `UserReader`),
 3. registra las rutas: primero las públicas y los grupos con guard propio
@@ -236,23 +239,78 @@ logger, env) y llama a `app.New(deps).Run(ctx)`. `internal/app`:
 clave de operador no hay nada global que sincronizar, así que recorre los
 usuarios que tienen clave propia y sincroniza cada uno con la suya.
 
+Ese job es también el único registrado con política de reintento propia
+(`scheduler.WithRetry`). El timeout por defecto del runner son 30 s, pero el
+sync espacia sus llamadas para caber en las cuotas gratuitas personales —13 s
+entre dos peticiones a Alpha Vantage—, así que un solo usuario con unas pocas
+posiciones ya lo excede. Se le da 2 h y cero reintentos: repetir un intento
+vuelve a gastar la cuota que el primero ya consumió, y los fallos por usuario se
+cuentan dentro del job en vez de propagarse.
+
+`portfolio.SnapshotJob` corre por la noche, no escalonado tras la apertura de
+mercado: bajo el modelo anterior un job global refrescaba todos los precios en
+segundos, mientras que el sync BYO-key puede tardar horas, y un snapshot tomado
+dos minutos después de la apertura registraría los valores de ayer.
+
 ## 6. Cobertura de tests
 
-Medición tras la revisión de cierre (`go test ./... -coverprofile`),
-**total 39.4%** (línea base de Fase 0: 42.6%, sobre un layout distinto en el que
-`repositories/`, `routes/` y `scheduler/` eran paquetes separados al 0%):
+Medición tras el cierre de los cabos sueltos de BYO-key
+(`go test ./... -coverprofile`), **total 55.8%** (línea base de Fase 0: 42.6%,
+sobre un layout distinto en el que `repositories/`, `routes/` y `scheduler/`
+eran paquetes separados al 0%):
 
 | Módulo | Cobertura | Notas |
 |---|---|---|
-| `notification` | 81.8% | servicio puro, bien cubierto |
+| `scheduler` (+ `fiberstore`) | 98.5% / 95.8% | runner y cadencias |
+| `platform/marketdata` (+ `providers`, clientes) | 82–100% | incluye los tests de no-fuga de la clave |
+| `platform/secretbox` | 86.0% | cifrado de sobre, AAD y rotación de KEK |
+| `notification` | 80.0% | servicio puro, bien cubierto |
 | `platform/spreadsheet` | 72.4% | parser de importación compartido |
-| `auth` | 45.5% | núcleo de sesiones/2FA/verificación |
-| `market` | 40.1% | catálogo de assets + exchange rates + sync |
-| `portfolio` | 38.9% | servicio + handlers HTTP; `postgres.go` sin tests unitarios |
-| `marketing` | 40.0% | |
-| `user` | 11.2% | capa HTTP mayormente sin tests (deuda) |
-| `platform/marketdata*`, `config`, `database`, `geoip` | 80–100% | |
+| `portfolio` | 63.6% | servicio + handlers HTTP; `postgres.go` sin tests unitarios |
+| `app` | 62.9% | cableado y registro de rutas/jobs |
+| `market` | 53.2% | catálogo, exchange rates, sync y credenciales BYO-key |
+| `auth` | 48.1% | núcleo de sesiones/2FA/verificación |
+| `marketing` | 48.3% | |
+| `user` | 5.0% | capa HTTP mayormente sin tests (deuda) |
 
 Los `postgres.go` de cada módulo no tienen tests unitarios (requieren Postgres
 real); se propone integración con testcontainers en `TECH_DEBT.md` #4/#11. La
 capa HTTP de `user` es la mayor brecha pendiente.
+
+## 7. Variables de entorno
+
+Referencia completa en `backend/.env.example`; se leen en
+`platform/config/env.go`. Todas tienen un valor por defecto razonable para
+desarrollo salvo las tres que el proceso necesita para existir: `DATABASE_URL`,
+`JWT_SECRET` y `MARKET_KEK_KEYS`.
+
+### `MARKET_KEK_KEYS` y `MARKET_KEK_ACTIVE`
+
+Son las claves que envuelven las claves de proveedor de cada usuario. Formato:
+
+```
+MARKET_KEK_KEYS=1:<base64>,2:<base64>
+MARKET_KEK_ACTIVE=2
+```
+
+- Lista separada por comas de entradas `versión:clave`. La versión es un entero
+  decimal; la clave es base64 **estándar con padding** que debe decodificar a
+  **exactamente 32 bytes** (AES-256). Se genera con `openssl rand -base64 32`.
+- `MARKET_KEK_ACTIVE` nombra la versión bajo la que se sellan las credenciales
+  nuevas, y tiene que ser una de las suministradas. Su valor por defecto es `1`.
+- **El proceso no arranca sin ella** (`cmd/api/main.go`). Es deliberado: un
+  valor por defecto significaría que todos los despliegues sellan las claves de
+  sus usuarios bajo algo adivinable, y la propiedad que sostiene el modelo es
+  justo que un volcado de Postgres no basta para recuperar ninguna clave —
+  porque lo que las abre vive aquí, en el entorno.
+
+**Rotación.** Se añade la versión nueva a la lista, se apunta
+`MARKET_KEK_ACTIVE` a ella y se mantiene la vieja listada hasta que todas las
+filas se hayan vuelto a envolver. `secretbox.Rewrap` re-envuelve solo la DEK de
+cada credencial, así que rotar no obliga a pedir a los usuarios que vuelvan a
+introducir sus claves. Hoy `Rewrap` no tiene todavía un comando de operador que
+lo ejecute sobre la tabla; ver `TECH_DEBT.md`.
+
+No hay —ni debe haber— ninguna variable con claves de proveedor de datos de
+mercado. `ALPHA_VANTAGE_API_KEY` y `FINNHUB_API_KEY` desaparecieron con el
+modelo BYO-key y ya no las lee nada.
