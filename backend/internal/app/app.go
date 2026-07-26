@@ -26,10 +26,9 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
-	"github.com/yeferson59/finexia-app/internal/platform/marketdata/alphavantage"
-	"github.com/yeferson59/finexia-app/internal/platform/marketdata/finnhub"
-	"github.com/yeferson59/finexia-app/internal/platform/marketdata/yahoo"
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata/providers"
 	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
+	"github.com/yeferson59/finexia-app/internal/platform/secretbox"
 	"github.com/yeferson59/finexia-app/internal/portfolio"
 	"github.com/yeferson59/finexia-app/internal/scheduler"
 	"github.com/yeferson59/finexia-app/internal/scheduler/fiberstore"
@@ -53,6 +52,9 @@ type Deps struct {
 	Storage fiber.Storage
 	S3      *s3.Client
 	Mail    *mail.Service
+	// Keyring seals the market-data API keys users bring. Required: without it
+	// the market module cannot store a credential at all.
+	Keyring *secretbox.Keyring
 	Log     logger.Logger
 }
 
@@ -70,6 +72,8 @@ func (d Deps) validate() error {
 		return errors.New("app: Deps.Storage is required")
 	case d.Mail == nil:
 		return errors.New("app: Deps.Mail is required")
+	case d.Keyring == nil:
+		return errors.New("app: Deps.Keyring is required")
 	case d.Log == nil:
 		return errors.New("app: Deps.Log is required")
 	default:
@@ -191,11 +195,10 @@ func (a *App) wire(ctx context.Context) {
 // per-user rate limiter) and every domain module, respecting their
 // dependency order.
 func (a *App) buildModules() *modules {
-	priceProvider := marketdata.NewFallback(
-		alphavantage.New(a.deps.Envs.AlphaVantageAPIKey),
-		finnhub.New(a.deps.Envs.FinnhubAPIKey),
-		yahoo.New(),
-	)
+	// Market data is BYO-key: there is no process-wide provider to build here
+	// because the application holds no provider credentials. The factory
+	// assembles a chain per sync run from the calling user's own keys.
+	priceProviders := providers.New(marketdata.DefaultHTTPClient)
 
 	geo := geoip.New()
 	userLimiter := httpx.KeyedRateLimiter(200, 1*time.Minute, func(c fiber.Ctx) string {
@@ -244,13 +247,16 @@ func (a *App) buildModules() *modules {
 		AuthMiddl: authModule,
 		Limiter:   userLimiter,
 	})
-	marketModule := market.New(market.Deps{
-		DB:             a.deps.DB,
-		Storage:        a.deps.Storage,
-		Log:            a.deps.Log,
-		Provider:       priceProvider,
-		AuthMiddleware: authModule,
-		Limiter:        userLimiter,
+	// market and portfolio need each other's services, so market is built in
+	// two steps like user and marketing: the service first, which portfolio
+	// consumes for the asset catalog, then the module with its routes and with
+	// portfolio's holdings, which the per-user BYO-key sync needs.
+	marketService := market.NewService(market.ServiceDeps{
+		DB:        a.deps.DB,
+		Storage:   a.deps.Storage,
+		Log:       a.deps.Log,
+		Providers: priceProviders,
+		Keyring:   a.deps.Keyring,
 	})
 	portfolioModule := portfolio.New(portfolio.Deps{
 		DB:        a.deps.DB,
@@ -258,10 +264,22 @@ func (a *App) buildModules() *modules {
 		Storage:   a.deps.Storage,
 		Mail:      a.deps.Mail,
 		User:      userService,
-		Assets:    marketModule.Service(),
+		Assets:    marketService,
 		Log:       a.deps.Log,
 		AuthMiddl: authModule,
 		Limiter:   userLimiter,
+	})
+	marketModule := market.New(market.Deps{
+		Service:        marketService,
+		AuthMiddleware: authModule,
+		Limiter:        userLimiter,
+		Holdings:       portfolioModule.Service(),
+		// Writing a credential is a sensitive surface and every verification
+		// spends the user's own provider quota, so it gets a much tighter gate
+		// than the shared 200/min above.
+		CredentialLimiter: httpx.KeyedRateLimiter(10, 1*time.Minute, func(c fiber.Ctx) string {
+			return "market_credentials:" + c.Locals(httpx.LocalUserID).(string)
+		}),
 	})
 
 	return new(modules{
@@ -318,10 +336,15 @@ func (a *App) registerJobs(sched *scheduler.Scheduler, mods *modules, persistent
 	// the price/snapshot jobs run staggered after it.
 	marketOpen := scheduler.DailyAt{Hour: 9, Minute: 30}
 
-	// Ephemeral (default in-memory store): a missed daily run is simply
-	// skipped; the next day recomputes fresh.
-	sched.Register(market.NewExchangeRateScheduler(mods.market.Service(), a.deps.Log), marketOpen)
-	sched.Register(market.NewAssetPriceScheduler(mods.market.Service(), a.deps.Log), scheduler.Delayed{Schedule: marketOpen, Delay: 90 * time.Second})
+	// Market data is BYO-key, so this walks the users who configured a key and
+	// syncs each with their own. It is persistent, unlike the two global jobs it
+	// replaces: personal quotas are small, and a run missed over a restart is
+	// worth catching up rather than silently skipping to tomorrow.
+	sched.Register(
+		market.NewSyncJob(mods.market.Service(), mods.portfolio.Service(), a.deps.Log),
+		marketOpen,
+		scheduler.WithStore(persistent),
+	)
 
 	// Persistent (Redis): resume across restarts and catch up on runs missed
 	// while the process was down.

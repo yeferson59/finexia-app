@@ -10,30 +10,33 @@ import (
 )
 
 type Env struct {
-	Environment             string
-	Port                    string
-	PathMigration           string
-	DatabaseURL             string
-	CacheURL                string
-	JWTSecret               string
-	JWTAccessDuration       time.Duration
-	JWTRefreshDuration      time.Duration
-	RefreshGracePeriod      time.Duration
-	MaxLoginAttempts        int
-	LoginLockout            time.Duration
-	TrustProxy              bool
-	TrustedProxies          []string
-	CORSEnabled             bool
-	CORSOrigin              []string
-	AWSAccessKeyID          string
-	AWSDefaultRegion        string
-	AWSEndpointURL          string
-	AWSS3BucketName         string
-	AWSSecretAccessKey      string
-	ResendAPIKey            string
-	EmailFrom               string
-	AlphaVantageAPIKey      string
-	FinnhubAPIKey           string
+	Environment        string
+	Port               string
+	PathMigration      string
+	DatabaseURL        string
+	CacheURL           string
+	JWTSecret          string
+	JWTAccessDuration  time.Duration
+	JWTRefreshDuration time.Duration
+	RefreshGracePeriod time.Duration
+	MaxLoginAttempts   int
+	LoginLockout       time.Duration
+	TrustProxy         bool
+	TrustedProxies     []string
+	CORSEnabled        bool
+	CORSOrigin         []string
+	AWSAccessKeyID     string
+	AWSDefaultRegion   string
+	AWSEndpointURL     string
+	AWSS3BucketName    string
+	AWSSecretAccessKey string
+	ResendAPIKey       string
+	EmailFrom          string
+	// Market data is BYO-key: each user supplies their own provider key, so
+	// the application holds no provider credentials of its own. These two are
+	// the keys that seal the users' keys, not keys to any provider.
+	MarketKEKKeys           string
+	MarketKEKActive         string
 	PublicURL               string
 	FrontendURL             string
 	InvitationExpiry        time.Duration
@@ -47,30 +50,33 @@ func (c *Config) LoadEnvs() *Env {
 	_ = godotenv.Load()
 
 	return &Env{
-		Environment:             c.getString("ENVIRONMENT", "development"),
-		Port:                    c.getString("PORT", "8080"),
-		PathMigration:           c.getString("PATH_MIGRATION", "file://internal/migrations"),
-		DatabaseURL:             c.getString("DATABASE_URL", ""),
-		CacheURL:                c.getString("CACHE_URL", ""),
-		JWTSecret:               c.getString("JWT_SECRET", "secret"),
-		JWTAccessDuration:       c.getDuration("JWT_ACCESS_DURATION", 15*time.Minute),
-		JWTRefreshDuration:      c.getDuration("JWT_REFRESH_DURATION", 30*24*time.Hour),
-		RefreshGracePeriod:      c.getDuration("JWT_REFRESH_GRACE_PERIOD", 30*time.Second),
-		MaxLoginAttempts:        c.getInt("MAX_LOGIN_ATTEMPTS", 5),
-		LoginLockout:            c.getDuration("LOGIN_LOCKOUT_DURATION", 15*time.Minute),
-		TrustProxy:              c.getBool("TRUST_PROXY", true),
-		TrustedProxies:          c.getSlice("TRUSTED_PROXIES"),
-		CORSEnabled:             c.getBool("CORS_ENABLED", true),
-		CORSOrigin:              c.getSlice("CORS_ORIGIN", "http://localhost:5173"),
-		AWSAccessKeyID:          c.getString("AWS_ACCESS_KEY_ID", ""),
-		AWSDefaultRegion:        c.getString("AWS_DEFAULT_REGION", ""),
-		AWSEndpointURL:          c.getString("AWS_ENDPOINT_URL", ""),
-		AWSS3BucketName:         c.getString("AWS_S3_BUCKET_NAME", ""),
-		AWSSecretAccessKey:      c.getString("AWS_SECRET_ACCESS_KEY", ""),
-		ResendAPIKey:            c.getString("RESEND_API_KEY", ""),
-		EmailFrom:               c.getString("EMAIL_FROM", "Finexia <noreply@finexia.me>"),
-		AlphaVantageAPIKey:      c.getString("ALPHA_VANTAGE_API_KEY", ""),
-		FinnhubAPIKey:           c.getString("FINNHUB_API_KEY", ""),
+		Environment:        c.getString("ENVIRONMENT", "development"),
+		Port:               c.getString("PORT", "8080"),
+		PathMigration:      c.getString("PATH_MIGRATION", "file://internal/migrations"),
+		DatabaseURL:        c.getString("DATABASE_URL", ""),
+		CacheURL:           c.getString("CACHE_URL", ""),
+		JWTSecret:          c.getString("JWT_SECRET", "secret"),
+		JWTAccessDuration:  c.getDuration("JWT_ACCESS_DURATION", 15*time.Minute),
+		JWTRefreshDuration: c.getDuration("JWT_REFRESH_DURATION", 30*24*time.Hour),
+		RefreshGracePeriod: c.getDuration("JWT_REFRESH_GRACE_PERIOD", 30*time.Second),
+		MaxLoginAttempts:   c.getInt("MAX_LOGIN_ATTEMPTS", 5),
+		LoginLockout:       c.getDuration("LOGIN_LOCKOUT_DURATION", 15*time.Minute),
+		TrustProxy:         c.getBool("TRUST_PROXY", true),
+		TrustedProxies:     c.getSlice("TRUSTED_PROXIES"),
+		CORSEnabled:        c.getBool("CORS_ENABLED", true),
+		CORSOrigin:         c.getSlice("CORS_ORIGIN", "http://localhost:5173"),
+		AWSAccessKeyID:     c.getString("AWS_ACCESS_KEY_ID", ""),
+		AWSDefaultRegion:   c.getString("AWS_DEFAULT_REGION", ""),
+		AWSEndpointURL:     c.getString("AWS_ENDPOINT_URL", ""),
+		AWSS3BucketName:    c.getString("AWS_S3_BUCKET_NAME", ""),
+		AWSSecretAccessKey: c.getString("AWS_SECRET_ACCESS_KEY", ""),
+		ResendAPIKey:       c.getString("RESEND_API_KEY", ""),
+		EmailFrom:          c.getString("EMAIL_FROM", "Finexia <noreply@finexia.me>"),
+		// "version:base64key" entries, comma separated, plus the version new
+		// credentials are sealed under. Several versions may be held at once so
+		// a key can be rotated without a downtime window.
+		MarketKEKKeys:           c.getString("MARKET_KEK_KEYS", ""),
+		MarketKEKActive:         c.getString("MARKET_KEK_ACTIVE", "1"),
 		PublicURL:               c.getString("PUBLIC_URL", "http://localhost:8080"),
 		FrontendURL:             c.getString("FRONTEND_URL", "http://localhost:5173"),
 		InvitationExpiry:        c.getDuration("INVITATION_EXPIRY", 72*time.Hour),

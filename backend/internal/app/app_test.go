@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"net/http/httptest"
 	"strings"
 	"sync"
@@ -14,6 +16,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
+	"github.com/yeferson59/finexia-app/internal/platform/secretbox"
 )
 
 // memStorage is a minimal in-memory fiber.Storage so wiring needs no Redis.
@@ -114,6 +117,7 @@ func TestAppWiresAndRoutes(t *testing.T) {
 		Storage: &memStorage{},
 		S3:      nil,
 		Mail:    mailService,
+		Keyring: testKeyring(t),
 		Log:     logger.Noop(),
 	})
 	if err != nil {
@@ -238,4 +242,23 @@ func TestAppWiresAndRoutes(t *testing.T) {
 	assertBefore(fiber.MethodGet, "/users/invitations", "/users/:id")
 	assertBefore(fiber.MethodGet, "/users/waitlist", "/users/:id")
 	assertBefore(fiber.MethodPatch, "/users/me/password", "/users/:id")
+}
+
+// testKeyring builds the market-credential keyring the composition root now
+// requires. New refuses to build without one, deliberately: a default would
+// mean sealing users' provider keys under a guessable key.
+func testKeyring(t *testing.T) *secretbox.Keyring {
+	t.Helper()
+
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatalf("rand: %v", err)
+	}
+
+	ring, err := secretbox.NewKeyring("1:"+base64.StdEncoding.EncodeToString(key), "1")
+	if err != nil {
+		t.Fatalf("NewKeyring: %v", err)
+	}
+
+	return ring
 }

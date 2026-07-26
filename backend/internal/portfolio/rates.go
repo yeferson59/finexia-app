@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
@@ -29,10 +30,14 @@ var ErrExchangeRateUnavailable = httpx.AsNotFound(errors.New("exchange rate not 
 
 // GetConversionRate returns the multiplier that turns an amount in `from`
 // into an amount in `to` (amountInFrom * rate = amountInTo). It tries a
-// direct pair, then its inverse, then a two-hop conversion through USD
-// (every synced pair involves USD, see the legacy sync's defaultPairs),
+// direct pair, then its inverse, then a two-hop conversion through USD,
 // since rates are only stored one-directional.
-func (s *Service) GetConversionRate(ctx context.Context, from, to string) (money.Decimal, error) {
+//
+// It takes a userID because rates are BYO-key data: the rate this user's own
+// key fetched is consulted first, and only then the shared table, which now
+// holds admin-entered rows alone. Serving another user's fetched rate would be
+// the same redistribution problem as serving their prices.
+func (s *Service) GetConversionRate(ctx context.Context, userID uuid.UUID, from, to string) (money.Decimal, error) {
 	from = strings.ToUpper(strings.TrimSpace(from))
 	to = strings.ToUpper(strings.TrimSpace(to))
 
@@ -40,15 +45,15 @@ func (s *Service) GetConversionRate(ctx context.Context, from, to string) (money
 		return decimal.One, nil
 	}
 
-	if rate, err := s.pairRate(ctx, from, to); err == nil {
+	if rate, err := s.pairRate(ctx, userID, from, to); err == nil {
 		return rate, nil
 	}
 
-	fromToUSD, err := s.pairRate(ctx, from, "USD")
+	fromToUSD, err := s.pairRate(ctx, userID, from, "USD")
 	if err != nil {
 		return money.Decimal{}, ErrExchangeRateUnavailable
 	}
-	usdToTarget, err := s.pairRate(ctx, "USD", to)
+	usdToTarget, err := s.pairRate(ctx, userID, "USD", to)
 	if err != nil {
 		return money.Decimal{}, ErrExchangeRateUnavailable
 	}
@@ -57,17 +62,20 @@ func (s *Service) GetConversionRate(ctx context.Context, from, to string) (money
 }
 
 // pairRate resolves a single pair directly, falling back to inverting the
-// opposite direction if that's what was synced.
-func (s *Service) pairRate(ctx context.Context, from, to string) (money.Decimal, error) {
+// opposite direction if that's what was fetched.
+//
+// Each direction is looked up in the user's own cache first, then in the shared
+// table, so a user with their own rate never falls back to a stale shared one.
+func (s *Service) pairRate(ctx context.Context, userID uuid.UUID, from, to string) (money.Decimal, error) {
 	if from == to {
 		return decimal.One, nil
 	}
 
-	if rate, err := s.repo.GetExchangeRateByPair(ctx, from, to); err == nil {
+	if rate, err := s.storedRate(ctx, userID, from, to); err == nil {
 		return rate, nil
 	}
 
-	rate, err := s.repo.GetExchangeRateByPair(ctx, to, from)
+	rate, err := s.storedRate(ctx, userID, to, from)
 	if err != nil {
 		return money.Decimal{}, ErrExchangeRateUnavailable
 	}
@@ -76,4 +84,13 @@ func (s *Service) pairRate(ctx context.Context, from, to string) (money.Decimal,
 	}
 
 	return decimal.One.Div(rate)
+}
+
+// storedRate reads one direction, preferring the user's own data.
+func (s *Service) storedRate(ctx context.Context, userID uuid.UUID, from, to string) (money.Decimal, error) {
+	if rate, err := s.repo.GetUserExchangeRateByPair(ctx, userID, from, to); err == nil {
+		return rate, nil
+	}
+
+	return s.repo.GetExchangeRateByPair(ctx, from, to)
 }

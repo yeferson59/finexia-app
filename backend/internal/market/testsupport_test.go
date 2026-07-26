@@ -2,6 +2,8 @@ package market
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"sync"
 	"testing"
 	"time"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
+	"github.com/yeferson59/finexia-app/internal/platform/secretbox"
 )
 
 // fakeRepository embeds the Repository interface so tests only override the
@@ -19,6 +22,9 @@ import (
 // stub every collaborator call along the way.
 type fakeRepository struct {
 	Repository
+	// creds backs the CredentialStore half. Nil in scenarios that do not touch
+	// BYO-key, in which case those methods panic like any other unstubbed one.
+	creds *credentialStore
 
 	upsertExchangeRate func(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (ExchangeRate, error)
 
@@ -168,11 +174,210 @@ func mustUSD(t *testing.T, amount string) money.Money {
 }
 
 func newTestServices(repo Repository, storage *memStorage) *Service {
-	return NewService(repo, storage, nil, logger.Noop())
+	return newService(repo, storage, nil, testKeyring(), logger.Noop())
 }
 
-// newTestServicesFull wires a price provider in addition to the repository,
-// for flows that hit market data or the asset catalog.
+// newTestServicesFull wires a price provider in addition to the repository, for
+// flows that hit market data. Under BYO-key the provider is no longer injected
+// directly: it is what the factory hands back for the calling user's keys, so
+// the fake factory below returns this one for any credential.
 func newTestServicesFull(repo Repository, storage *memStorage, provider marketdata.Provider) *Service {
-	return NewService(repo, storage, provider, logger.Noop())
+	return newService(repo, storage, &fakeFactory{provider: provider}, testKeyring(), logger.Noop())
+}
+
+// fakeFactory stands in for marketdata/providers. It ignores the keys and
+// returns a canned provider, so tests exercise the sync logic rather than the
+// chain assembly (which providers has its own tests for).
+type fakeFactory struct {
+	provider marketdata.Provider
+	// gotCreds records what the service handed over, so a test can assert the
+	// right user's keys were opened.
+	gotCreds []marketdata.Credential
+	err      error
+}
+
+func (f *fakeFactory) For(creds []marketdata.Credential) (marketdata.Provider, error) {
+	f.gotCreds = creds
+
+	if f.err != nil {
+		return nil, f.err
+	}
+	if len(creds) == 0 {
+		return nil, marketdata.ErrNoCredentials
+	}
+
+	return f.provider, nil
+}
+
+// testKeyring builds a real keyring over a throwaway key: the sealing path is
+// cheap and exercising it for real is worth more than stubbing it.
+func testKeyring() *secretbox.Keyring {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		panic("rand: " + err.Error())
+	}
+
+	ring, err := secretbox.NewKeyring("1:"+base64.StdEncoding.EncodeToString(key), "1")
+	if err != nil {
+		panic("keyring: " + err.Error())
+	}
+
+	return ring
+}
+
+// credentialStore is an in-memory CredentialStore, enough to drive the BYO-key
+// sync without Postgres.
+type credentialStore struct {
+	mu     sync.Mutex
+	sealed map[uuid.UUID][]sealedCredential
+	status map[string]CredentialStatus
+	prices map[string]money.Money
+	rates  map[string]money.Decimal
+}
+
+func newCredentialStore() *credentialStore {
+	return &credentialStore{
+		sealed: map[uuid.UUID][]sealedCredential{},
+		status: map[string]CredentialStatus{},
+		prices: map[string]money.Money{},
+		rates:  map[string]money.Decimal{},
+	}
+}
+
+// seed stores a key for a user, sealed exactly as production would.
+func (c *credentialStore) seed(t *testing.T, ring *secretbox.Keyring, userID uuid.UUID, provider ProviderID, apiKey string) {
+	t.Helper()
+
+	sealed, err := ring.Seal([]byte(apiKey), credentialAAD(userID.String(), string(provider)))
+	if err != nil {
+		t.Fatalf("seal: %v", err)
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sealed[userID] = append(c.sealed[userID], sealedCredential{Provider: provider, Sealed: sealed})
+}
+
+func (c *credentialStore) GetSealedCredentials(_ context.Context, userID uuid.UUID) ([]sealedCredential, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.sealed[userID], nil
+}
+
+func (c *credentialStore) GetSealedCredential(_ context.Context, userID uuid.UUID, provider ProviderID) (sealedCredential, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, sc := range c.sealed[userID] {
+		if sc.Provider == provider {
+			return sc, nil
+		}
+	}
+
+	return sealedCredential{}, ErrCredentialNotFound
+}
+
+func (c *credentialStore) SetCredentialStatus(_ context.Context, userID uuid.UUID, provider ProviderID, status CredentialStatus, _ string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.status[userID.String()+"/"+string(provider)] = status
+
+	return nil
+}
+
+func (c *credentialStore) statusOf(userID uuid.UUID, provider ProviderID) CredentialStatus {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.status[userID.String()+"/"+string(provider)]
+}
+
+func (c *credentialStore) UpsertUserAssetPrice(_ context.Context, userID, assetID uuid.UUID, price money.Money, _ string, _ ProviderID, _ time.Time) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.prices[userID.String()+"/"+assetID.String()] = price
+
+	return nil
+}
+
+func (c *credentialStore) priceOf(userID, assetID uuid.UUID) (money.Money, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	p, ok := c.prices[userID.String()+"/"+assetID.String()]
+
+	return p, ok
+}
+
+func (c *credentialStore) UpsertUserExchangeRate(_ context.Context, userID uuid.UUID, from, to string, rate money.Decimal, _ ProviderID, _ time.Time) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.rates[userID.String()+"/"+from+to] = rate
+
+	return nil
+}
+
+func (c *credentialStore) UsersWithCredentials(context.Context) ([]uuid.UUID, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	ids := make([]uuid.UUID, 0, len(c.sealed))
+	for id := range c.sealed {
+		ids = append(ids, id)
+	}
+
+	return ids, nil
+}
+
+// The remaining CredentialStore methods are not exercised by the sync tests.
+func (c *credentialStore) UpsertCredential(context.Context, uuid.UUID, sealedCredential, string, *time.Time) (Credential, error) {
+	panic("UpsertCredential not stubbed")
+}
+
+func (c *credentialStore) ListCredentials(context.Context, uuid.UUID) ([]Credential, error) {
+	panic("ListCredentials not stubbed")
+}
+
+func (c *credentialStore) DeleteCredential(context.Context, uuid.UUID, ProviderID) error {
+	panic("DeleteCredential not stubbed")
+}
+
+// The CredentialStore half of Repository, forwarded to the in-memory store.
+// Explicit forwarding rather than embedding: embedding both Repository and
+// CredentialStore would make every one of these selectors ambiguous.
+
+func (f *fakeRepository) UpsertCredential(ctx context.Context, userID uuid.UUID, cred sealedCredential, keyLast4 string, verifiedAt *time.Time) (Credential, error) {
+	return f.creds.UpsertCredential(ctx, userID, cred, keyLast4, verifiedAt)
+}
+
+func (f *fakeRepository) ListCredentials(ctx context.Context, userID uuid.UUID) ([]Credential, error) {
+	return f.creds.ListCredentials(ctx, userID)
+}
+
+func (f *fakeRepository) GetSealedCredentials(ctx context.Context, userID uuid.UUID) ([]sealedCredential, error) {
+	return f.creds.GetSealedCredentials(ctx, userID)
+}
+
+func (f *fakeRepository) GetSealedCredential(ctx context.Context, userID uuid.UUID, provider ProviderID) (sealedCredential, error) {
+	return f.creds.GetSealedCredential(ctx, userID, provider)
+}
+
+func (f *fakeRepository) DeleteCredential(ctx context.Context, userID uuid.UUID, provider ProviderID) error {
+	return f.creds.DeleteCredential(ctx, userID, provider)
+}
+
+func (f *fakeRepository) SetCredentialStatus(ctx context.Context, userID uuid.UUID, provider ProviderID, status CredentialStatus, lastErr string) error {
+	return f.creds.SetCredentialStatus(ctx, userID, provider, status, lastErr)
+}
+
+func (f *fakeRepository) UsersWithCredentials(ctx context.Context) ([]uuid.UUID, error) {
+	return f.creds.UsersWithCredentials(ctx)
+}
+
+func (f *fakeRepository) UpsertUserAssetPrice(ctx context.Context, userID, assetID uuid.UUID, price money.Money, currency string, source ProviderID, fetchedAt time.Time) error {
+	return f.creds.UpsertUserAssetPrice(ctx, userID, assetID, price, currency, source, fetchedAt)
+}
+
+func (f *fakeRepository) UpsertUserExchangeRate(ctx context.Context, userID uuid.UUID, from, to string, rate money.Decimal, source ProviderID, fetchedAt time.Time) error {
+	return f.creds.UpsertUserExchangeRate(ctx, userID, from, to, rate, source, fetchedAt)
 }

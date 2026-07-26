@@ -59,7 +59,7 @@ func (s *Service) GetPortfoliosSummaryInCurrency(ctx context.Context, userID uui
 	}
 
 	for i, summary := range summaries {
-		converted, err := s.convertSummaryTotals(ctx, summary, targetCurrency)
+		converted, err := s.convertSummaryTotals(ctx, userID, summary, targetCurrency)
 		if err != nil {
 			return nil, err
 		}
@@ -69,8 +69,8 @@ func (s *Service) GetPortfoliosSummaryInCurrency(ctx context.Context, userID uui
 	return summaries, nil
 }
 
-func (s *Service) convertSummaryTotals(ctx context.Context, summary SummaryView, targetCurrency string) (SummaryView, error) {
-	rate, err := s.GetConversionRate(ctx, summary.BaseCurrency, targetCurrency)
+func (s *Service) convertSummaryTotals(ctx context.Context, userID uuid.UUID, summary SummaryView, targetCurrency string) (SummaryView, error) {
+	rate, err := s.GetConversionRate(ctx, userID, summary.BaseCurrency, targetCurrency)
 	if err != nil {
 		return SummaryView{}, err
 	}

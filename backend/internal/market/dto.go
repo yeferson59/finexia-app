@@ -23,3 +23,11 @@ type CreateExchangeRateRequestDTO struct {
 type UpdateExchangeRateRequestDTO struct {
 	Rate money.Decimal `json:"rate" validate:"required"`
 }
+
+// SaveCredentialRequestDTO carries a user's own provider API key.
+//
+// It has no response counterpart on purpose: a stored key is never sent back,
+// so nothing that leaves this module can carry one.
+type SaveCredentialRequestDTO struct {
+	APIKey string `json:"apiKey" validate:"required,min=8,max=256"`
+}

@@ -41,7 +41,25 @@ type PlatformStore interface {
 // interface, not this repository.
 type RateStore interface {
 	GetExchangeRateByPair(ctx context.Context, from, to string) (money.Decimal, error)
+	// GetUserExchangeRateByPair reads the rate the user's own key fetched.
+	// Under BYO-key it is consulted before the shared table, which now only
+	// holds admin-entered rows.
+	GetUserExchangeRateByPair(ctx context.Context, userID uuid.UUID, from, to string) (money.Decimal, error)
 }
+
+// HoldingsStore answers what the per-user market sync needs to know: which
+// assets this user holds, and which currency conversions their portfolios
+// require. Reading it is what keeps a personal API quota spent only on the
+// assets the user actually owns.
+type HoldingsStore interface {
+	GetHeldAssetIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
+	GetRequiredCurrencyPairs(ctx context.Context, userID uuid.UUID) ([]CurrencyPair, error)
+}
+
+// CurrencyPair is a conversion a user's portfolios need. It mirrors
+// market.CurrencyPair; the two are kept separate so this module's repository
+// surface does not leak the market module's types.
+type CurrencyPair struct{ From, To string }
 
 // TransactionStore persists portfolio entries and their transactions.
 type TransactionStore interface {
@@ -73,6 +91,7 @@ type Repository interface {
 	RateStore
 	TransactionStore
 	SnapshotStore
+	HoldingsStore
 }
 
 // Ensure the concrete repository keeps satisfying the interface.
