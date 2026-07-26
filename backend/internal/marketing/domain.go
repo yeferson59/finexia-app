@@ -1,5 +1,5 @@
-// Package marketing is the first domain module of the modular-monolith
-// migration (Fase 2 pilot): it owns the public waitlist sign-up.
+// Package marketing owns the public waitlist: the sign-up endpoint, the admin
+// listing, and the invitation state auth advances through its service.
 package marketing
 
 import (

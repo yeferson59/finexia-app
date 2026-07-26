@@ -15,16 +15,16 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
-// TestRequireAuth exercises the JWT gate end to end: with the session check now
-// running in the success handler (using the request context, TECH_DEBT #6), a
-// valid token must reach the route with the identity in locals, and a token the
-// session store rejects must yield 401.
+// TestRequireAuth exercises the JWT gate end to end: with the session check
+// running in the success handler against the request context, a valid token
+// must reach the route with the identity in locals, and a token the session
+// store rejects must yield 401.
 func TestRequireAuth(t *testing.T) {
 	userID := uuid.New()
 	cfg := testConfig()
 
 	// Sign one token; any service built with the same secret accepts it.
-	signer := NewService(testStores(&fakeRepository{}), cfg, newMemStorage(), nil, nil, logger.Noop())
+	signer := newService(testStores(&fakeRepository{}), cfg, newMemStorage(), nil, nil, logger.Noop())
 	token, err := signer.CreateJWToken(userID, "user", time.Now().UTC().Add(time.Hour))
 	if err != nil {
 		t.Fatalf("CreateJWToken: %v", err)
@@ -39,7 +39,7 @@ func TestRequireAuth(t *testing.T) {
 				return sessionUser, sessionErr
 			},
 		}
-		service := NewService(testStores(repo), cfg, newMemStorage(), nil, nil, logger.Noop())
+		service := newService(testStores(repo), cfg, newMemStorage(), nil, nil, logger.Noop())
 		m := newModule(Deps{Cfg: cfg, Storage: newMemStorage(), Log: logger.Noop()}, service)
 
 		app := fiber.New()

@@ -5,6 +5,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 	"github.com/yeferson59/finexia-app/internal/platform/secretbox"
@@ -69,13 +70,25 @@ func NewService(deps ServiceDeps) *Service {
 
 // New completes the module with its HTTP surface. deps.Service must be the
 // value NewService returned, so portfolio and these routes share one service.
+//
+// A missing service or guard panics here rather than at the first request:
+// both are wiring, so the composition root is the only thing that can get them
+// wrong, and failing at boot is what keeps a misconfigured build from reaching
+// production quietly.
 func New(deps Deps) *Module {
+	if deps.Service == nil {
+		panic("market.New: Deps.Service is required — pass the value NewService returned")
+	}
+	if deps.AuthMiddleware == nil {
+		panic("market.New: Deps.AuthMiddleware is required — every market route is guarded by it")
+	}
+
 	return new(Module{
 		service:     deps.Service,
 		handler:     new(handler{deps.Service, deps.Holdings}),
 		authMiddl:   deps.AuthMiddleware,
-		limiter:     deps.Limiter,
-		credLimiter: deps.CredentialLimiter,
+		limiter:     httpx.OrPassThrough(deps.Limiter),
+		credLimiter: httpx.OrPassThrough(deps.CredentialLimiter),
 	})
 }
 

@@ -337,14 +337,14 @@ func testConfig() Config {
 // discarded mailer, matching the common case where a test only cares about
 // repository interactions.
 func newTestServices(repo *fakeRepository, storage *memStorage) *Service {
-	return NewService(repo, testConfig(), storage, &fakeMailer{}, fakeUserReader{repo}, logger.Noop())
+	return newService(repo, testConfig(), storage, &fakeMailer{}, fakeUserReader{repo}, logger.Noop())
 }
 
 // newTestServicesFull injects a caller-provided mailer for the flows that emit
 // the transaction activity alert. The fourth argument is retained for parity
 // with the legacy helper and ignored.
 func newTestServicesFull(repo *fakeRepository, storage *memStorage, mailer Mailer, _ any) *Service {
-	return NewService(repo, testConfig(), storage, mailer, fakeUserReader{repo}, logger.Noop())
+	return newService(repo, testConfig(), storage, mailer, fakeUserReader{repo}, logger.Noop())
 }
 
 // BYO-key additions. The user-rate hook defaults to "this user has no rate of

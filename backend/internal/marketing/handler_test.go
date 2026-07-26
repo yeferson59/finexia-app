@@ -13,7 +13,7 @@ import (
 
 func newTestApp(repo Repository, mail Mailer) *fiber.App {
 	app := fiber.New()
-	New(Deps{Service: newService(repo, mail)}).Routes(app)
+	New(Deps{Service: newService(repo, mail), AuthMiddl: fakeGuard{}}).Routes(app)
 	return app
 }
 
@@ -114,18 +114,13 @@ func (g fakeGuard) handler(status int) fiber.Handler {
 func (g fakeGuard) RequireAuth() fiber.Handler  { return g.handler(g.authStatus) }
 func (g fakeGuard) RequireAdmin() fiber.Handler { return g.handler(g.adminStatus) }
 
-// TestListWaitlistRoute covers the admin listing this module took over from
-// the user module (docs/TECH_DEBT.md #10). The path stays /users/waitlist, so
-// the route carries its own guards instead of inheriting the user group's.
+// TestListWaitlistRoute covers the admin listing this module serves even
+// though the path stays /users/waitlist: the route carries its own guards
+// instead of inheriting the user group's.
 func TestListWaitlistRoute(t *testing.T) {
-	newApp := func(repo Repository, guard *fakeGuard) *fiber.App {
-		deps := Deps{Service: newService(repo, &fakeMailer{})}
-		if guard != nil {
-			deps.AuthMiddl = *guard
-		}
-
+	newApp := func(repo Repository, guard fakeGuard) *fiber.App {
 		app := fiber.New()
-		New(deps).Routes(app)
+		New(Deps{Service: newService(repo, &fakeMailer{}), AuthMiddl: guard}).Routes(app)
 		return app
 	}
 
@@ -156,7 +151,7 @@ func TestListWaitlistRoute(t *testing.T) {
 			},
 		}
 
-		status, payload := get(t, newApp(repo, &fakeGuard{}))
+		status, payload := get(t, newApp(repo, fakeGuard{}))
 		if status != fiber.StatusOK {
 			t.Fatalf("status = %d, want 200", status)
 		}
@@ -172,18 +167,25 @@ func TestListWaitlistRoute(t *testing.T) {
 	})
 
 	t.Run("is gated by the shared guards", func(t *testing.T) {
-		if status, _ := get(t, newApp(&fakeRepository{}, &fakeGuard{authStatus: fiber.StatusUnauthorized})); status != fiber.StatusUnauthorized {
+		if status, _ := get(t, newApp(&fakeRepository{}, fakeGuard{authStatus: fiber.StatusUnauthorized})); status != fiber.StatusUnauthorized {
 			t.Errorf("status = %d, want 401 when RequireAuth rejects", status)
 		}
-		if status, _ := get(t, newApp(&fakeRepository{}, &fakeGuard{adminStatus: fiber.StatusForbidden})); status != fiber.StatusForbidden {
+		if status, _ := get(t, newApp(&fakeRepository{}, fakeGuard{adminStatus: fiber.StatusForbidden})); status != fiber.StatusForbidden {
 			t.Errorf("status = %d, want 403 when RequireAdmin rejects", status)
 		}
 	})
 
-	t.Run("is not registered without a guard", func(t *testing.T) {
-		// A missing guard must never expose the listing unprotected.
-		if status, _ := get(t, newApp(&fakeRepository{}, nil)); status != fiber.StatusNotFound {
-			t.Errorf("status = %d, want 404 when no guard was injected", status)
-		}
+	t.Run("refuses to build without a guard", func(t *testing.T) {
+		// A missing guard must never expose the listing unprotected. It used
+		// to drop the route instead, which was safe but silent: the listing
+		// simply 404'd and only a user would notice. Failing at construction
+		// puts the wiring bug where it belongs — at boot.
+		defer func() {
+			if recover() == nil {
+				t.Error("New returned normally without a guard, want a panic")
+			}
+		}()
+
+		New(Deps{Service: newService(&fakeRepository{}, &fakeMailer{})})
 	})
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
@@ -20,9 +21,8 @@ type Deps struct {
 	// and advances the waitlist through it instead of touching the table.
 	Waitlist WaitlistStore
 	// Users is the user module's service: auth reads the users/roles tables
-	// through it instead of querying them (docs/TECH_DEBT.md #9). The user
-	// module's service is built before auth precisely so this can be an
-	// ordinary constructor dependency.
+	// through it instead of querying them. The user module's service is built
+	// before auth precisely so this can be an ordinary constructor dependency.
 	Users UserReader
 	// Limiter is the per-user rate limiter applied to the /users routes this
 	// module serves (password change, invitation dashboard).
@@ -41,7 +41,7 @@ type Module struct {
 
 func New(deps Deps) *Module {
 	pg := NewPostgresRepository(deps.DB)
-	service := NewService(Stores{
+	service := newService(Stores{
 		Accounts:       pg,
 		Sessions:       pg,
 		RefreshTokens:  pg,
@@ -57,12 +57,17 @@ func New(deps Deps) *Module {
 }
 
 // newModule finishes construction from an already-built service; split out so
-// tests can inject fake stores through NewService.
+// tests can inject fake stores through newService.
+//
+// This module declares no guard dependency of its own — it is the guard — so
+// there is nothing here that must fail the build. The limiter is the one
+// injected handler, and it degrades rather than refuses; see
+// httpx.OrPassThrough.
 func newModule(deps Deps, service *Service) *Module {
 	return new(Module{
 		cfg:     deps.Cfg,
 		storage: deps.Storage,
-		limiter: deps.Limiter,
+		limiter: httpx.OrPassThrough(deps.Limiter),
 		service: service,
 		handler: newHandler(service, deps.Cfg),
 	})
@@ -138,17 +143,12 @@ func (m *Module) Routes(router fiber.Router) {
 // composition root mounts auth before user, which is what keeps the static
 // paths from being captured by GET/PATCH /users/:id.
 func (m *Module) userRoutes(router fiber.Router) {
-	limiter := m.limiter
-	if limiter == nil {
-		limiter = func(c fiber.Ctx) error { return c.Next() }
-	}
-
 	requireAuth, requireAdmin := m.RequireAuth(), m.RequireAdmin()
 
-	router.Patch("/users/me/password", requireAuth, limiter, m.handler.changePassword)
+	router.Patch("/users/me/password", requireAuth, m.limiter, m.handler.changePassword)
 
-	router.Get("/users/invitations", requireAuth, limiter, requireAdmin, paginate.New(), m.handler.listInvitations)
-	router.Post("/users/invitations", requireAuth, limiter, requireAdmin, m.handler.createInvitation)
-	router.Post("/users/invitations/:id/resend", requireAuth, limiter, requireAdmin, m.handler.resendInvitation)
-	router.Delete("/users/invitations/:id", requireAuth, limiter, requireAdmin, m.handler.revokeInvitation)
+	router.Get("/users/invitations", requireAuth, m.limiter, requireAdmin, paginate.New(), m.handler.listInvitations)
+	router.Post("/users/invitations", requireAuth, m.limiter, requireAdmin, m.handler.createInvitation)
+	router.Post("/users/invitations/:id/resend", requireAuth, m.limiter, requireAdmin, m.handler.resendInvitation)
+	router.Delete("/users/invitations/:id", requireAuth, m.limiter, requireAdmin, m.handler.revokeInvitation)
 }

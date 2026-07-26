@@ -9,10 +9,9 @@ import (
 )
 
 // Domain sentinel errors for the "not found" family, tagged with their HTTP
-// Kind so httpx.FromDomain maps them by type instead of by substring of the
-// message (docs/TECH_DEBT.md #1). Tagging keeps the same 404 the substring
-// mapping produced, and stays correct if a caller wraps the error with a
-// message that happens to contain "failed"/"invalid".
+// Kind so httpx.FromDomain maps them by type rather than by the text of the
+// message — the 404 survives a caller wrapping the error with a message that
+// happens to contain "failed"/"invalid".
 //
 // Messages are preserved verbatim from the persistence layer so response
 // bodies and any errors.Is/message assertions keep working.
@@ -39,8 +38,7 @@ var (
 	// told the user their key was rejected during an outage, and, worse, let the
 	// verify endpoint persist status='invalid', which the sync queries then skip
 	// for good: one bad afternoon at the provider would silently retire a working
-	// key. Untagged, so it maps to 500 like every other upstream failure
-	// (docs/TECH_DEBT.md #1).
+	// key. Untagged, so it maps to 500 like every other upstream failure.
 	ErrProviderUnavailable = errors.New("the market data provider could not be reached")
 	ErrKeyEncryptionOff    = errors.New("market: credential encryption is not configured")
 )

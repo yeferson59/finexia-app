@@ -53,7 +53,7 @@ type Service struct {
 	risksCache *risksCache
 }
 
-func NewService(repo Repository, cfg Config, storage fiber.Storage, mailService Mailer, userReader UserReader, log logger.Logger) *Service {
+func newService(repo Repository, cfg Config, storage fiber.Storage, mailService Mailer, userReader UserReader, log logger.Logger) *Service {
 	return new(Service{
 		repo:       repo,
 		cfg:        cfg,

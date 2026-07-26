@@ -75,3 +75,19 @@ func KeyedRateLimiter(max int, window time.Duration, key func(fiber.Ctx) string)
 		KeyGenerator: key,
 	})
 }
+
+// OrPassThrough returns h, or a middleware that does nothing when h is nil.
+//
+// Modules use it for the rate limiters the composition root injects, and only
+// for those: a missing limiter costs a route its per-user budget but leaves it
+// correct and still guarded, so degrading beats refusing to start. Route
+// guards get the opposite treatment — each module's New panics when one is
+// missing, because a route that answers unguarded (or silently stops
+// answering) is not a degradation.
+func OrPassThrough(h fiber.Handler) fiber.Handler {
+	if h != nil {
+		return h
+	}
+
+	return func(c fiber.Ctx) error { return c.Next() }
+}

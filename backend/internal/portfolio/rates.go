@@ -25,7 +25,7 @@ func IsSupportedDisplayCurrency(currency string) bool {
 
 // ErrExchangeRateUnavailable means no stored rate (direct, inverse, or via a
 // USD hop) connects the requested currency pair. Tagged as NotFound so it maps
-// to 404 by type rather than by the "not found" substring (docs/TECH_DEBT.md #1).
+// to 404 by type, whatever a caller wraps around it.
 var ErrExchangeRateUnavailable = httpx.AsNotFound(errors.New("exchange rate not found for currency pair"))
 
 // GetConversionRate returns the multiplier that turns an amount in `from`

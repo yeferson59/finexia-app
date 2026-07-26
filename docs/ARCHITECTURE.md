@@ -83,9 +83,13 @@ Un módulo nuevo se añade creando su paquete y registrándolo en `internal/app`
    datos de `user`, declara `portfolio.UserReader` y `app` le inyecta
    `user.Service`. Las interfaces se mantienen pequeñas y cohesivas (ej.:
    `auth.Stores` = 5 stores; `portfolio.Repository` = unión de 5 sub-stores).
-5. **El grafo de módulos es acíclico y todo se inyecta por constructor.** No hay
-   setters ni slots que queden `nil` un rato: si un módulo necesita algo, lo
-   recibe en su `New`. Eso obliga a un orden de construcción, descrito abajo.
+5. **El grafo de *imports* entre módulos es acíclico y todo se inyecta por
+   constructor.** No hay setters ni slots que queden `nil` un rato: si un módulo
+   necesita algo, lo recibe en su `New`, y si falta algo obligatorio ese `New`
+   hace `panic`. Hay dependencias que van en sentido contrario al import —los
+   guards de `auth`, sobre todo— y se resuelven invirtiendo la interfaz, no
+   importando; el grafo de abajo las dibuja. Eso obliga a un orden de
+   construcción, descrito más adelante.
 6. **Cada módulo declara su propia `Config`.** Ninguno importa
    `platform/config`: `app` proyecta el `*config.Env` sobre `auth.Config`,
    `user.Config`, `portfolio.Config` y `notification.Config` (`market` no
@@ -96,15 +100,27 @@ Un módulo nuevo se añade creando su paquete y registrándolo en `internal/app`
 
 ### Grafo de dependencias entre módulos
 
+Flecha sólida = **import**. Flecha punteada = dependencia que existe en
+ejecución pero **no** es un import: el consumidor declara la interfaz que
+necesita y `app` le inyecta el módulo que la satisface.
+
 ```mermaid
 graph TD
     app[app<br/>composition root]
     subgraph domain[Módulos de dominio]
-        auth --> marketing
         auth --> user
+        auth --> marketing
         portfolio --> user
         portfolio --> market
+        notification --> user
+        notification --> market
         notification --> portfolio
+
+        user -. guards .-> auth
+        marketing -. guards .-> auth
+        portfolio -. guards .-> auth
+        market -. guards .-> auth
+        market -. holdings .-> portfolio
     end
     identity[identity<br/>tipos compartidos]
     platform[platform/*<br/>shared kernel]
@@ -122,33 +138,54 @@ graph TD
     portfolio --> identity
     notification --> identity
 
-    auth -.-> platform
-    portfolio -.-> platform
-    market -.-> platform
-    domain -.-> platform
+    domain --> platform
 ```
 
-El grafo es acíclico (el compilador de Go ya lo garantiza) y respeta las reglas
-anteriores. El catálogo de assets (tipo `Asset`, persistencia, servicio, import)
-y los exchange-rates son propiedad de `market`; `portfolio` referencia
-`market.Asset` en sus entries y lee el catálogo a través de su interfaz local
-`AssetReader` (implementada por `market`), de modo que la dependencia va
-`portfolio → market`. `portfolio` conserva solo una lectura de exchange-rates
-para convertir a la divisa de visualización.
+**El subgrafo sólido es acíclico y el compilador de Go lo garantiza. El grafo
+completo no lo es**, y ahí está todo el interés: cada punteada es un ciclo que
+se rompió invirtiendo la dependencia, y entre las dos capas está la razón de
+que el orden de construcción no sea trivial.
+
+Las cuatro punteadas `guards` son el mismo caso. `user`, `marketing`,
+`portfolio` y `market` necesitan `RequireAuth`/`RequireAdmin`, que solo `auth`
+puede dar: validan la sesión contra su propia tabla (`auth/middleware.go`), así
+que no pueden vivir en `platform`. Cada uno declara su propia interfaz
+`authMiddleware` de dos métodos y recibe el `*auth.Module` como valor, de modo
+que ninguno importa `auth`. Es la arista que obliga a construir `auth` antes que
+esos cuatro y, cruzada con las sólidas `auth → user` y `auth → marketing`, la
+que hace necesaria la construcción en dos pasos de la sección siguiente.
+
+La punteada `holdings` es la misma jugada en el par `market`/`portfolio`. El
+catálogo de assets (tipo `Asset`, persistencia, servicio, import) y los
+exchange-rates son propiedad de `market`; `portfolio` referencia `market.Asset`
+en sus entries y lee el catálogo a través de su interfaz local `AssetReader`
+(implementada por `market`), de modo que el import va `portfolio → market`.
+`portfolio` conserva solo una lectura de exchange-rates para convertir a la
+divisa de visualización.
 
 La sincronización BYO-key necesita el sentido contrario —saber qué activos
 tiene un usuario para no gastar su cuota personal en el catálogo entero— y eso
-habría cerrado un ciclo. Se resuelve con la regla de siempre: `market` declara
-la interfaz `Holdings` que necesita y `portfolio` la implementa
-(`portfolio/holdings.go`). El grafo sigue siendo `portfolio → market`.
+habría cerrado el ciclo en los imports. Se resuelve con la regla de siempre:
+`market` declara la interfaz `Holdings` que necesita y `portfolio` la implementa
+(`portfolio/holdings.go`). El import sigue siendo `portfolio → market` y solo la
+punteada va al revés.
 
 ### Orden de construcción
 
-El grafo de arriba es también el orden en que `internal/app` construye. Cuatro
-módulos (`user`, `market`, `portfolio`, `marketing`) necesitan los guards
-`RequireAuth`/`RequireAdmin` que expone `auth.Module`, y `auth` a su vez lee
-`user` (tablas users/roles) y `marketing` (waitlist). Para que eso no sea un
-ciclo, `user` y `marketing` se construyen **en dos pasos**:
+`internal/app` construye siguiendo el grafo **completo** de arriba, punteadas
+incluidas — son dependencias reales aunque no sean imports, y son justamente
+las que lo vuelven un problema. Cruzar `user -. guards .-> auth` con
+`auth --> user` deja un ciclo que ningún orden lineal resuelve, y lo mismo pasa
+con `marketing`.
+
+Sobre esa arista sólida `auth → user`, conviene precisar qué la compone: `auth`
+lee `users`/`roles` a través de `user.Service`, y la única vez que las escribe
+es el alta. `Register` abre una transacción y ejecuta dentro de ella
+`user.InsertUser` —la única sentencia del código que crea un usuario— junto al
+`INSERT` en `accounts`, de modo que ninguna de las dos filas puede quedar sin la
+otra.
+
+Para romper el ciclo, `user` y `marketing` se construyen **en dos pasos**:
 
 ```go
 marketingService := marketing.NewService(...)   // no depende de ningún dominio
@@ -163,9 +200,31 @@ userModule       := user.New(user.Deps{Service: userService, AuthMiddl: authModu
 `New` completa el módulo con su superficie HTTP y los guards. Lo que hace que
 el primer paso sea posible es que **`user` y `marketing` no importan ningún
 otro módulo de dominio** — invariante que fija
-`TestServiceFirstModulesStayIndependent`. Si alguno de los dos ganara una
-dependencia hacia `auth`, el grafo volvería a ser cíclico y el cableado
-necesitaría un setter.
+`TestServiceFirstModulesStayIndependent`. Nótese que ya dependen de `auth` —la
+punteada `guards`—; lo que no pueden ganar es un **import**, porque entonces el
+ciclo pasaría al grafo sólido, donde no hay interfaz que lo rompa, y el cableado
+volvería a necesitar un setter.
+
+`NewService` es, en los tres módulos que lo exportan, ese primer paso y nada
+más: recibe un `ServiceDeps` de infraestructura. Los constructores de bajo
+nivel que arman un servicio a partir de un repositorio ya construido
+(`auth`, `portfolio`) son `newService`, sin exportar — no son API del módulo,
+solo el punto por donde los tests inyectan un repositorio falso.
+
+Hay dos clases de dependencia inyectada y fallan distinto a propósito. Los
+**guards y el servicio** son obligatorios: si faltan, `New` hace `panic` con el
+campo que falta. Son cableado, así que el único que puede equivocarse es el
+composition root, y un módulo mal construido debe tumbar el arranque en vez de
+llegar a producción sirviendo rutas sin protección —o, peor, dejando de
+servirlas en silencio, que es lo que hacía `marketing` antes—. Los
+**rate limiters** son opcionales y caen a `httpx.OrPassThrough`: su ausencia le
+cuesta a la ruta su presupuesto por usuario, pero la deja correcta y protegida,
+y degradar es preferible a no arrancar.
+
+Por último, `Module.Service()` devuelve el `*Service` concreto, que es la única
+forma de saltarse las interfaces por las que pasa toda dependencia entre
+módulos. Solo `app` puede llamarlo —repartir esos servicios a quienes los
+consumen es exactamente su trabajo—; lo fija `TestOnlyAppCallsServiceAccessors`.
 
 Por eso hay rutas que responden bajo `/users` sin pertenecer al módulo `user`:
 `PATCH /users/me/password` y `/users/invitations*` son de `auth` (credenciales

@@ -18,7 +18,7 @@ func newLockoutService(repo *fakeRepository, storage *memStorage, maxAttempts in
 	cfg := testConfig()
 	cfg.MaxLoginAttempts = maxAttempts
 	cfg.LoginLockout = time.Minute
-	return NewService(testStores(repo), cfg, storage, nil, nil, logger.Noop())
+	return newService(testStores(repo), cfg, storage, nil, nil, logger.Noop())
 }
 
 func TestLoginLockout(t *testing.T) {

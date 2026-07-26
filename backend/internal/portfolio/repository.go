@@ -12,8 +12,8 @@ import (
 // (mirroring auth.Stores) so each stays small and fakes only implement what a
 // scenario needs. Repository is their union (27 methods, under the ~30
 // criterion), kept as a single alias because the portfolio Service
-// orchestrates across all of them. The asset catalog moved to the market
-// module (TECH_DEBT #12); portfolio reads assets via its AssetReader interface.
+// orchestrates across all of them. The asset catalog belongs to the market
+// module; portfolio reads assets via its AssetReader interface instead.
 
 // PortfolioStore persists portfolios themselves plus their risk catalog.
 type PortfolioStore interface {

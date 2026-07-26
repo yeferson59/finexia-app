@@ -19,7 +19,7 @@ import (
 
 // This file covers the write and listing handlers of the module — the ones the
 // service-level tests never reach because they exercise binding, path-param
-// parsing and DTO validation rather than domain logic (docs/TECH_DEBT.md #11).
+// parsing and DTO validation rather than domain logic.
 
 // fakeAssets stands in for the market module behind portfolio's AssetReader:
 // the /portfolios/assets catalog and the admin price update are served through

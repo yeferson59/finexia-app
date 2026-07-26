@@ -73,10 +73,10 @@ func TestFromDomainTypedKindWins(t *testing.T) {
 		err  error
 		want int
 	}{
-		// A tagged NotFound must map to 404 even though the message also
-		// contains "failed", which the frozen substring order would send to
-		// 400 — this is the exact bug typed errors fix (TECH_DEBT #1).
-		{"tag beats failed-substring", AsNotFound(errors.New("failed: portfolio not found")), fiber.StatusNotFound},
+		// The status must come from the tag alone: this message mixes the
+		// words a message-based mapping would trip over ("failed" and "not
+		// found") and still has to resolve to the tagged 404.
+		{"tag decides, not the message", AsNotFound(errors.New("failed: portfolio not found")), fiber.StatusNotFound},
 		{"AsBadRequest", AsBadRequest(errors.New("whatever")), fiber.StatusBadRequest},
 		{"AsConflict", AsConflict(errors.New("whatever")), fiber.StatusConflict},
 		{"AsTooManyRequests", AsTooManyRequests(errors.New("whatever")), fiber.StatusTooManyRequests},

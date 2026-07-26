@@ -6,7 +6,7 @@ import "time"
 // this domain reads, decoupled from the platform-wide *config.Env. The
 // composition root (internal/app) populates it from the environment, so the
 // module — and its tests — depend on a small, explicit struct instead of the
-// full ~35-field Env (see docs/TECH_DEBT.md #8).
+// full ~35-field Env.
 type Config struct {
 	// JWTSecret signs and verifies access tokens.
 	JWTSecret string

@@ -16,8 +16,8 @@ func newHandler(svc *Service) *handler {
 	return new(handler{svc})
 }
 
-// createWaitlist keeps the exact contract of the legacy
-// POST /marketing/waitlists handler (docs/API.md §2.2).
+// createWaitlist serves the public sign-up, POST /marketing/waitlists
+// (docs/API.md §2.2).
 func (h *handler) createWaitlist(c fiber.Ctx) error {
 	var req waitlistRequest
 

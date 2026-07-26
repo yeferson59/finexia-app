@@ -7,15 +7,14 @@ import (
 )
 
 // Kind classifies a domain error into the HTTP status FromDomain must emit, so
-// the status stops depending on substrings of the error message
-// (docs/TECH_DEBT.md #1). A domain tags its errors with one of these values;
-// FromDomain resolves the kind through errors.As and only falls back to the
-// frozen message-substring mapping for errors that haven't been tagged yet.
+// the status never depends on substrings of the error message. A domain tags
+// its errors with one of these values at the point they are created, and
+// FromDomain resolves the kind through errors.As.
 type Kind int
 
 const (
-	// KindInternal is the zero value and maps to 500. It is also the result
-	// when neither a tag nor a substring matches.
+	// KindInternal is the zero value and maps to 500, which is also what an
+	// untagged error yields.
 	KindInternal Kind = iota
 	// KindBadRequest maps to 400.
 	KindBadRequest
@@ -81,8 +80,7 @@ func AsTooManyRequests(err error) error { return Tagged(KindTooManyRequests, err
 // domainStatus resolves the HTTP status for a domain error from its tagged
 // Kind (resolved through the errors.Is/As chain). Errors that carry no tag map
 // to 500: every domain error that must surface a non-500 status is tagged at
-// its source (docs/TECH_DEBT.md #1). The old message-substring fallback was
-// removed once all domains tagged their errors.
+// its source, so an untagged error reaching here is a genuine internal fault.
 func domainStatus(err error) int {
 	if se, exist := errors.AsType[*statusError](err); exist {
 		return se.kind.httpStatus()

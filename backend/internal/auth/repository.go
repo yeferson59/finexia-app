@@ -17,9 +17,9 @@ import (
 // touch.
 
 // AccountStore covers the credentials side of an account: the rows in
-// accounts/sessions this module owns, plus registration. The users/roles
-// tables belong to the user domain and are read through UserReader instead
-// (docs/TECH_DEBT.md #9).
+// accounts this module owns, plus registration. The users/roles tables belong
+// to the user domain — they are read through UserReader, and Register writes
+// the users row through user.InsertUser inside its own transaction.
 type AccountStore interface {
 	GetAccountByUserID(ctx context.Context, userID uuid.UUID) (identity.Account, error)
 	GetAccountByEmail(ctx context.Context, email string) (identity.User, error)
@@ -94,7 +94,7 @@ type InvitationStore interface {
 }
 
 // WaitlistStore is the slice of the marketing module the invitation flow
-// consumes (the waitlist is owned by marketing since Fase 2). Only the public
+// consumes; the waitlist table belongs to marketing. Only the public
 // marketing.Waitlist type crosses the module boundary; the composition root
 // injects marketing's *Service here.
 type WaitlistStore interface {

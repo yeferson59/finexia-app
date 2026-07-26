@@ -1,7 +1,7 @@
 // Package app is the composition root: the only place that wires
-// infrastructure into modules, the legacy services/handlers/routes, and the
-// schedulers. Adding a domain module means registering it here and nowhere
-// else.
+// infrastructure into the domain modules and the schedulers, and the only one
+// that reads the environment. Adding a domain module means registering it here
+// and nowhere else.
 package app
 
 import (
@@ -121,7 +121,7 @@ func New(deps Deps) (*App, error) {
 	return new(App{fiber: fiberApp, deps: deps}), nil
 }
 
-// Run wires modules, legacy layers and schedulers, then serves HTTP until
+// Run wires the modules, their routes and the schedulers, then serves HTTP until
 // the listener stops or ctx is cancelled (e.g. on SIGINT/SIGTERM), in which
 // case it shuts down the HTTP server and the schedulers cleanly.
 func (a *App) Run(ctx context.Context) error {
@@ -228,9 +228,9 @@ func (a *App) buildModules() *modules {
 		Mail:    a.deps.Mail,
 		Geo:     geo,
 		Log:     a.deps.Log,
-		// auth reads users/roles through the user module rather than querying
-		// those tables itself (docs/TECH_DEBT.md #9), and advances the waitlist
-		// through marketing (docs/TECH_DEBT.md #10).
+		// auth owns neither table it needs here: users/roles belong to user and
+		// the waitlist to marketing, so it reads both through their services
+		// instead of querying them. Both are built above for this reason.
 		Users:    userService,
 		Waitlist: marketingService,
 		Limiter:  userLimiter,
@@ -372,11 +372,10 @@ func (a *App) registerJobs(sched *scheduler.Scheduler, mods *modules, persistent
 // The *Config helpers below project the platform-wide environment onto each
 // module's own Config. Reading the environment is the composition root's job:
 // a module declares the handful of settings it actually consumes and stays
-// decoupled from *config.Env (docs/TECH_DEBT.md #8). market needs none, so it
-// takes no config at all.
+// decoupled from *config.Env. market needs none, so it takes no config at all.
 
 // authConfig projects the platform-wide environment onto the auth module's own
-// Config, keeping the module decoupled from *config.Env (docs/TECH_DEBT.md #8).
+// Config, keeping the module decoupled from *config.Env.
 func authConfig(env *config.Env) auth.Config {
 	return auth.Config{
 		JWTSecret:               env.JWTSecret,

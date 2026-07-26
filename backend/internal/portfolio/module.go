@@ -10,6 +10,7 @@ import (
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/market"
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
@@ -23,12 +24,12 @@ type Deps struct {
 	// Assets serves the /portfolios/assets endpoints (catalog + manual price),
 	// whose domain lives in the market module. Satisfied by *market.Service.
 	Assets AssetReader
-	// AuthMiddl provides the route guards; the module registers in the public
-	// zone and applies them itself (Fase 5 retro: port the gate's middlewares
-	// explicitly when leaving the global protected zone).
+	// AuthMiddl provides the route guards. The module registers in the public
+	// zone, so it applies them itself rather than inheriting them from a
+	// global protected group.
 	AuthMiddl authMiddleware
-	// Limiter is the per-user rate limiter the legacy /portfolios routes had
-	// via the app-wide gate.
+	// Limiter is the per-user rate limiter applied to the /portfolios routes,
+	// injected so every module shares one budget per user.
 	Limiter fiber.Handler
 }
 
@@ -68,17 +69,28 @@ func deprecatedAlias(successor string) fiber.Handler {
 
 func New(deps Deps) *Module {
 	pg := NewPostgresRepository(deps.DB)
-	service := NewService(pg, deps.Cfg, deps.Storage, deps.Mail, deps.User, deps.Log)
+	service := newService(pg, deps.Cfg, deps.Storage, deps.Mail, deps.User, deps.Log)
 
 	return newModule(deps, service)
 }
 
+// newModule finishes construction from an already-built service; split out so
+// tests can inject a fake repository.
+//
+// A missing guard panics here rather than at the first request: it is wiring,
+// so the composition root is the only thing that can get it wrong, and failing
+// at boot is what keeps a misconfigured build from reaching production
+// quietly.
 func newModule(deps Deps, service *Service) *Module {
+	if deps.AuthMiddl == nil {
+		panic("portfolio.New: Deps.AuthMiddl is required — every /portfolios route is guarded by it")
+	}
+
 	return new(Module{
 		service:   service,
 		handler:   newHandler(service, deps.Assets),
 		authMiddl: deps.AuthMiddl,
-		limiter:   deps.Limiter,
+		limiter:   httpx.OrPassThrough(deps.Limiter),
 	})
 }
 
@@ -97,8 +109,9 @@ func (m *Module) Routes(router fiber.Router) {
 	// register before the parametric "/:id" family below.
 	portfolios.Get("/risks", m.handler.GetPortfoliosRisks)
 	// The user's portfolio list is canonically GET /portfolios. It historically
-	// answered at the atypical "/id" path (docs/TECH_DEBT.md #3), kept as an
-	// alias that flags itself as deprecated so existing clients keep working.
+	// answered at the atypical "/id" path, kept as an alias that flags itself
+	// deprecated so existing clients keep working. Drop the alias once the
+	// Deprecation header stops showing traffic in the logs.
 	portfolios.Get("", m.handler.GetPortfolios)
 	portfolios.Get("/id", deprecatedAlias("/portfolios"), m.handler.GetPortfolios)
 	portfolios.Get("/summary", m.handler.GetPortfoliosSummary)

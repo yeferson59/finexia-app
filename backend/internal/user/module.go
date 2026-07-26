@@ -5,6 +5,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
 )
@@ -30,9 +31,9 @@ type ServiceDeps struct {
 type Deps struct {
 	Service   *Service
 	AuthMiddl authMiddleware
-	// Limiter is the per-user rate limiter the legacy /users routes had via
-	// the app-wide gate; the module keeps it now that it registers in the
-	// public zone with its own RequireAuth.
+	// Limiter is the per-user rate limiter applied to the /users routes. The
+	// module registers in the public zone, so it applies this and its own
+	// RequireAuth itself.
 	Limiter fiber.Handler
 }
 
@@ -56,12 +57,24 @@ func NewService(deps ServiceDeps) *Service {
 
 // New completes the module with its HTTP surface. deps.Service must be the
 // value NewService returned, so auth and these routes share one service.
+//
+// A missing service or guard panics here rather than at the first request:
+// both are wiring, so the composition root is the only thing that can get them
+// wrong, and failing at boot is what keeps a misconfigured build from reaching
+// production quietly.
 func New(deps Deps) *Module {
+	if deps.Service == nil {
+		panic("user.New: Deps.Service is required — pass the value NewService returned")
+	}
+	if deps.AuthMiddl == nil {
+		panic("user.New: Deps.AuthMiddl is required — every /users route is guarded by it")
+	}
+
 	return new(Module{
 		service:   deps.Service,
 		handler:   newHandler(deps.Service),
 		authMiddl: deps.AuthMiddl,
-		limiter:   deps.Limiter,
+		limiter:   httpx.OrPassThrough(deps.Limiter),
 	})
 }
 
