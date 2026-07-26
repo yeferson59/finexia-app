@@ -55,7 +55,7 @@ func New(cfg Config) Logger {
 		Timestamp().
 		Logger()
 
-	return &zeroLogger{zl: zl}
+	return new(zeroLogger{zl})
 }
 
 func applyFields(ctx context.Context, e *zerolog.Event, fields []Field) *zerolog.Event {
@@ -137,5 +137,5 @@ func (l *zeroLogger) With(fields ...Field) Logger {
 			c = c.Interface(f.key, f.anyVal)
 		}
 	}
-	return &zeroLogger{zl: c.Logger()}
+	return new(zeroLogger{c.Logger()})
 }

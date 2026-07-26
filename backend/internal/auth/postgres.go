@@ -36,8 +36,9 @@ var (
 )
 
 func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
-	return &PostgresRepository{db: db}
+	return new(PostgresRepository{db})
 }
+
 func (r *PostgresRepository) GetAccountByUserID(ctx context.Context, userID uuid.UUID) (identity.Account, error) {
 	var account identity.Account
 	if err := r.db.QueryRow(ctx,

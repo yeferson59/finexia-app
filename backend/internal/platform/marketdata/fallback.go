@@ -15,7 +15,7 @@ type FallbackProvider struct {
 }
 
 func NewFallback(providers ...Provider) *FallbackProvider {
-	return &FallbackProvider{providers: providers}
+	return new(FallbackProvider{providers})
 }
 
 // Providers exposes the chain in the order it will be tried. Under BYO-key the

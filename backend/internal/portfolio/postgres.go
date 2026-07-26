@@ -14,7 +14,7 @@ type PostgresRepository struct {
 }
 
 func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
-	return new(PostgresRepository{db: db})
+	return new(PostgresRepository{db})
 }
 
 // scanAssetCurrentPrice populates asset.CurrentPrice from a nullable numeric string
@@ -32,5 +32,5 @@ func scanAssetCurrentPrice(asset *market.Asset, priceStr *string) {
 	if err != nil {
 		return
 	}
-	asset.CurrentPrice = &m
+	asset.CurrentPrice = new(m)
 }

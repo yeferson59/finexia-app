@@ -21,7 +21,7 @@ type PostgresRepository struct {
 var _ Repository = (*PostgresRepository)(nil)
 
 func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
-	return &PostgresRepository{db: db}
+	return new(PostgresRepository{db})
 }
 
 func (r *PostgresRepository) SaveWaitlistEmail(ctx context.Context, email string) error {

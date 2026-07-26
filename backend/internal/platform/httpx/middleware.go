@@ -40,7 +40,7 @@ func Logger() fiber.Handler {
 	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 
 	return zerologmw.New(zerologmw.Config{
-		Logger: &logger,
+		Logger: new(logger),
 	})
 }
 

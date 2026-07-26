@@ -104,7 +104,7 @@ func buildImport(src spreadsheet.Source, mapping *ImportMappingDTO, defaults Imp
 
 	suggested := suggestMapping(headers)
 	if mapping == nil {
-		mapping = &suggested
+		mapping = new(suggested)
 	}
 
 	dataRows := src.Rows[headerIdx+1:]

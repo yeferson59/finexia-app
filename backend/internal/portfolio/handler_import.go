@@ -43,7 +43,8 @@ func readImportFile(c fiber.Ctx) ([]byte, string, error) {
 func parseImportForms(c fiber.Ctx) (*ImportMappingDTO, ImportDefaultsDTO, error) {
 	var mapping *ImportMappingDTO
 	if raw := c.FormValue("mapping"); raw != "" {
-		mapping = &ImportMappingDTO{}
+		mapping = new(ImportMappingDTO{})
+
 		if err := json.Unmarshal([]byte(raw), mapping); err != nil {
 			return nil, ImportDefaultsDTO{}, errors.New("invalid mapping: malformed JSON")
 		}

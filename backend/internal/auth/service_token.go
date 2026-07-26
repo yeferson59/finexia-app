@@ -245,10 +245,10 @@ func (s *Service) RefreshToken(ctx context.Context, rawToken, ipAddress, userAge
 
 	var ip, ua *string
 	if ipAddress != "" {
-		ip = &ipAddress
+		ip = new(ipAddress)
 	}
 	if userAgent != "" {
-		ua = &userAgent
+		ua = new(userAgent)
 	}
 
 	newRTID, err := s.stores.RefreshTokens.CreateRefreshToken(ctx, userID, newHash, familyID, sessionID, ip, ua, refreshExpiresAt)

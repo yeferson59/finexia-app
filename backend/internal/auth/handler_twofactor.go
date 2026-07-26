@@ -29,7 +29,7 @@ func (h *handler) twoFactorLogin(c fiber.Ctx) error {
 		return httpx.FromDomain(c, err, "failed to verify two-factor code", "auth:2fa:login")
 	}
 
-	c.Cookie(&fiber.Cookie{
+	c.Cookie(new(fiber.Cookie{
 		Name:     "refresh_token",
 		Value:    result.RawRefreshToken,
 		Path:     "/",
@@ -37,7 +37,7 @@ func (h *handler) twoFactorLogin(c fiber.Ctx) error {
 		Secure:   h.cfg.Environment == "production",
 		SameSite: "Strict",
 		MaxAge:   int(h.cfg.JWTRefreshDuration.Seconds()),
-	})
+	}))
 
 	return httpx.OK(c, "successfully logged in", "valid two-factor code",
 		LoginResponseDTO{ID: result.ID, AccessToken: result.AccessToken})

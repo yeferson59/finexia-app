@@ -221,7 +221,6 @@ func (a *App) buildModules() *modules {
 		Log:   a.deps.Log,
 		Cfg:   userConfig(a.deps.Envs),
 	})
-
 	authModule := auth.New(auth.Deps{
 		DB:      a.deps.DB,
 		Cfg:     authConfig(a.deps.Envs),
@@ -236,7 +235,6 @@ func (a *App) buildModules() *modules {
 		Waitlist: marketingService,
 		Limiter:  userLimiter,
 	})
-
 	marketingModule := marketing.New(marketing.Deps{
 		Service:   marketingService,
 		AuthMiddl: authModule,

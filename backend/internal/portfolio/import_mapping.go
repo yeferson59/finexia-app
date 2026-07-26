@@ -150,7 +150,8 @@ func suggestMapping(headers []string) ImportMappingDTO {
 	toPtr := func(f importField) *int {
 		if col, ok := result[f]; ok {
 			c := col
-			return &c
+
+			return new(c)
 		}
 		return nil
 	}

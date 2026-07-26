@@ -20,10 +20,10 @@ type Client struct {
 }
 
 func New() *Client {
-	return &Client{
-		httpClient: &http.Client{Timeout: 5 * time.Second},
+	return new(Client{
+		httpClient: new(http.Client{Timeout: 5 * time.Second}),
 		baseURL:    "https://ipwho.is",
-	}
+	})
 }
 
 // Locate returns "City, Region, Country" (deduplicated, best available

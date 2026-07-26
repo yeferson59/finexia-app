@@ -14,6 +14,10 @@ type handler struct {
 	assets  AssetReader
 }
 
+func newHandler(svc *Service, assets AssetReader) *handler {
+	return new(handler{svc, assets})
+}
+
 func (h *handler) GetPortfolios(c fiber.Ctx) error {
 	userID, _, _, err := httpx.Identity(c)
 	if err != nil {

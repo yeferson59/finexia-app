@@ -60,15 +60,18 @@ func scanAssetCurrentPrice(asset *Asset, priceStr *string) {
 	if priceStr == nil {
 		return
 	}
+
 	cur, err := money.CurrencyFromISOCode(asset.Currency)
 	if err != nil {
 		return
 	}
+
 	m, err := money.NewMoneyFromString(*priceStr, cur)
 	if err != nil {
 		return
 	}
-	asset.CurrentPrice = &m
+
+	asset.CurrentPrice = new(m)
 }
 
 var categorySynonyms = map[string]AssetType{
