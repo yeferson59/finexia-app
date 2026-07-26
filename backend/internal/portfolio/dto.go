@@ -225,6 +225,15 @@ type HoldingResponseDTO struct {
 	Category     string    `json:"category"`
 	EntryDate    time.Time `json:"entryDate"`
 	Notes        string    `json:"notes"`
+	// PriceSource qualifies MarketPrice: "own" (this user's key), "manual"
+	// (operator reference price) or "cost" (no price — MarketPrice is empty and
+	// the position is valued at Price). A client that shows a return has to
+	// read this: at "cost" the return is zero by construction.
+	PriceSource string `json:"priceSource"`
+	// PriceUpdatedAt is when MarketPrice was fetched, null when there is none.
+	// Under BYO-key a sync can take hours and is capped per request, so a
+	// price's age is part of reading it.
+	PriceUpdatedAt *time.Time `json:"priceUpdatedAt"`
 }
 
 // PortfolioDetailResponseDTO is the payload returned for a single portfolio,
@@ -310,20 +319,22 @@ func NewPortfolioDetailResponse(p Portfolio) PortfolioDetailResponseDTO {
 		}
 
 		holdings = append(holdings, HoldingResponseDTO{
-			ID:           entry.ID,
-			AssetID:      entry.AssetID,
-			Ticker:       entry.Asset.Ticker,
-			Name:         entry.Asset.Name,
-			AssetType:    string(entry.Asset.AssetType),
-			Exchange:     entry.Asset.Exchange,
-			Currency:     entry.Asset.Currency,
-			Quantity:     entry.Quantity.String(),
-			Price:        entry.Price.String(),
-			MarketPrice:  marketPrice,
-			CostCurrency: entry.CostCurrency,
-			Category:     string(entry.Category),
-			EntryDate:    entry.EntryDate,
-			Notes:        entry.Notes,
+			ID:             entry.ID,
+			AssetID:        entry.AssetID,
+			Ticker:         entry.Asset.Ticker,
+			Name:           entry.Asset.Name,
+			AssetType:      string(entry.Asset.AssetType),
+			Exchange:       entry.Asset.Exchange,
+			Currency:       entry.Asset.Currency,
+			Quantity:       entry.Quantity.String(),
+			Price:          entry.Price.String(),
+			MarketPrice:    marketPrice,
+			CostCurrency:   entry.CostCurrency,
+			Category:       string(entry.Category),
+			EntryDate:      entry.EntryDate,
+			Notes:          entry.Notes,
+			PriceSource:    string(entry.PriceSource),
+			PriceUpdatedAt: entry.Asset.PriceUpdatedAt,
 		})
 	}
 

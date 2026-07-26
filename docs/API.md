@@ -225,6 +225,32 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 Los exports responden `200` con cuerpo binario XLSX y
 `Content-Disposition: attachment; filename="…"` (sin sobre JSON).
 
+#### Procedencia del precio
+
+Bajo BYO-key la valoración prefiere el precio que trajo la clave del propio
+usuario, luego el precio manual del operador, y si no hay ninguno **valora la
+posición a su coste de compra** (§2.10). Los tres dan un número de la misma
+forma y significan cosas distintas, así que las respuestas dicen cuál sirvieron.
+
+Cada holding de `GET /portfolios/:id` lleva:
+
+| Campo | Valor |
+|---|---|
+| `priceSource` | `own` — precio de la clave del propio usuario |
+| | `manual` — precio de referencia del operador, sin garantía de frescura |
+| | `cost` — no hay precio; la posición vale su coste |
+| `priceUpdatedAt` | Cuándo se obtuvo `marketPrice`; `null` si no hay |
+
+Con `priceSource: "cost"`, `marketPrice` viene **vacío** —nunca `"0"`— y la
+rentabilidad de esa posición es cero por construcción, no por mercado: un
+cliente que la pinte como retorno está inventando el dato.
+
+`GET /portfolios/summary` (y `GET /portfolios`) traen el mismo desglose
+agregado por portfolio: `positionsPricedOwn`, `positionsPricedManual` y
+`positionsAtCost`, que **suman exactamente `totalPositions`**. Sirven para
+avisar de que un total solo está parcialmente valorado a mercado. No son
+importes: `?currency=` convierte los totales y deja estos tres intactos.
+
 ### 2.8 Assets (JWT + admin)
 
 | Método | Path | Descripción |

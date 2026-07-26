@@ -25,7 +25,10 @@ func (r *PostgresRepository) GetPortfoliosSummaryByUserID(ctx context.Context, u
 			COALESCE(ps.total_market_value, 0)::text,
 			COALESCE(ps.total_gain_loss,    0)::text,
 			COALESCE(ps.total_gain_loss_pct,0)::text,
-			p.created_at
+			p.created_at,
+			COALESCE(ps.positions_priced_own,    0)::bigint,
+			COALESCE(ps.positions_priced_manual, 0)::bigint,
+			COALESCE(ps.positions_at_cost,       0)::bigint
 		FROM portfolios p
 		JOIN  risks ri          ON ri.id = p.risk_id
 		LEFT JOIN portfolio_summary ps ON ps.portfolio_id = p.id
@@ -55,6 +58,9 @@ func (r *PostgresRepository) GetPortfoliosSummaryByUserID(ctx context.Context, u
 			&item.TotalGainLoss,
 			&item.TotalGainLossPct,
 			&item.CreatedAt,
+			&item.PositionsPricedOwn,
+			&item.PositionsPricedManual,
+			&item.PositionsAtCost,
 		); err != nil {
 			return nil, err
 		}

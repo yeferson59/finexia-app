@@ -18,7 +18,16 @@ func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfo
 		       -- column now only ever holds an admin-entered manual price. The
 		       -- owner comes from the portfolio row, so no signature has to carry
 		       -- a user id down here.
-		       COALESCE(uap.price::text, a.current_price::text), COALESCE(uap.fetched_at, a.price_updated_at), a.created_at, a.updated_at
+		       COALESCE(uap.price::text, a.current_price::text), COALESCE(uap.fetched_at, a.price_updated_at),
+		       -- Which arm of that COALESCE won. Without it the caller gets a
+		       -- number it cannot qualify: a market price and a cost basis look
+		       -- identical, and only one of them makes a return meaningful.
+		       CASE
+		         WHEN uap.price       IS NOT NULL THEN 'own'
+		         WHEN a.current_price IS NOT NULL THEN 'manual'
+		         ELSE 'cost'
+		       END,
+		       a.created_at, a.updated_at
 		FROM portfolio_entries pe
 		JOIN portfolios p ON p.id = pe.portfolio_id
 		JOIN assets a ON a.id = pe.asset_id
@@ -60,6 +69,7 @@ func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfo
 			&entry.Asset.Currency,
 			&assetPriceStr,
 			&entry.Asset.PriceUpdatedAt,
+			&entry.PriceSource,
 			&entry.Asset.CreatedAt,
 			&entry.Asset.UpdatedAt,
 		); err != nil {

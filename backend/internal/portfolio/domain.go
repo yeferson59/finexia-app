@@ -221,6 +221,28 @@ type Portfolio struct {
 	Snapshots    []Snapshot    `json:"portfolioSnapshots,omitempty"`
 }
 
+// PriceSource says where the price used to value a position came from. Under
+// BYO-key that is a property of the position, not of the asset: the same
+// ticker is priced by one user's own key and left at cost for another, so it
+// lives on Entry rather than on market.Asset.
+//
+// The three values mirror the COALESCE the valuation applies, in order.
+type PriceSource string
+
+const (
+	// PriceSourceOwn is a price fetched with this user's own provider key. It
+	// is the only one that makes the valuation a market valuation.
+	PriceSourceOwn PriceSource = "own"
+	// PriceSourceManual is the operator's manually entered reference price
+	// (assets.current_price, PATCH /portfolios/assets/:id/price). It carries no
+	// provider licence and no freshness guarantee.
+	PriceSourceManual PriceSource = "manual"
+	// PriceSourceCost means no price was available and the position is valued
+	// at what it cost. Its gain/loss is zero by construction, so a client must
+	// not present it as a return.
+	PriceSourceCost PriceSource = "cost"
+)
+
 type Entry struct {
 	ID           uuid.UUID        `json:"id"`
 	PortfolioID  uuid.UUID        `json:"portfolioId"`
@@ -238,6 +260,10 @@ type Entry struct {
 	Asset        market.Asset     `json:"asset,omitzero"`
 	Source       InvestmentSource `json:"source,omitzero"`
 	Transactions []Transaction    `json:"transactions,omitempty"`
+	// PriceSource qualifies Asset.CurrentPrice, which the entry query already
+	// resolves through the same preference. Only the queries that resolve it
+	// populate this; elsewhere it is empty.
+	PriceSource PriceSource `json:"priceSource,omitempty"`
 }
 
 type Transaction struct {
@@ -324,6 +350,14 @@ type SummaryView struct {
 	// equals BaseCurrency unless the caller requested conversion to another
 	// currency (see Service.GetPortfoliosSummaryInCurrency).
 	DisplayCurrency string `json:"displayCurrency"`
+	// The three counts below partition TotalPositions by where each position's
+	// price came from (see PriceSource). They are what tells a client how much
+	// of TotalMarketValue is an actual market value: when PositionsAtCost is
+	// the whole portfolio, TotalGainLoss is zero because nothing was priced,
+	// not because nothing moved.
+	PositionsPricedOwn    int64 `json:"positionsPricedOwn"`
+	PositionsPricedManual int64 `json:"positionsPricedManual"`
+	PositionsAtCost       int64 `json:"positionsAtCost"`
 }
 
 type SnapshotRow struct {
