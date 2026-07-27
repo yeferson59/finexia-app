@@ -243,7 +243,7 @@ func TestHandlerPlatformCRUD(t *testing.T) {
 	})
 
 	t.Run("lists platforms", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getPlatformsWithStats: func(_ context.Context, uid uuid.UUID) ([]PlatformStats, error) {
 				if uid != userID {
 					t.Errorf("userID = %s, want %s", uid, userID)
@@ -252,7 +252,7 @@ func TestHandlerPlatformCRUD(t *testing.T) {
 					ID: sourceID, Name: "ibkr", SourceType: SourceType("broker"), Investments: 3,
 				}}, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		resp := do(t, app, http.MethodGet, "/portfolios/sources")

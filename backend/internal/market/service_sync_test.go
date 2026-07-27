@@ -128,7 +128,7 @@ func TestSyncAssetsForUser(t *testing.T) {
 	})
 
 	t.Run("one user's key cannot open another user's stored credential", func(t *testing.T) {
-		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: "USD"}), &fakePriceProvider{})
+		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: "USD"}), new(fakePriceProvider{}))
 
 		other := uuid.New()
 		f.creds.seed(t, f.ring, userID, Finnhub, "alices-key")

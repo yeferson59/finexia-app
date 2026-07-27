@@ -55,9 +55,7 @@ func (s *Service) SaveCredential(ctx context.Context, userID uuid.UUID, provider
 		return Credential{}, err
 	}
 
-	now := time.Now().UTC()
-
-	return s.repo.UpsertCredential(ctx, userID, sealed, last4(apiKey), status, &now)
+	return s.repo.UpsertCredential(ctx, userID, sealed, last4(apiKey), status, new(time.Now().UTC()))
 }
 
 func (s *Service) DeleteCredential(ctx context.Context, userID uuid.UUID, provider ProviderID) error {

@@ -276,7 +276,7 @@ func TestImportTransactionsFromFile(t *testing.T) {
 	svc := newTestServices(repo, nil)
 
 	mapping := ImportMappingDTO{}
-	col := func(i int) *int { return &i }
+	col := func(i int) *int { return new(i) }
 	mapping.Date, mapping.Type, mapping.Ticker, mapping.Quantity, mapping.Price, mapping.Fees =
 		col(0), col(1), col(2), col(3), col(4), col(5)
 

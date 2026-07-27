@@ -209,11 +209,11 @@ func TestListSessionsMarksCurrent(t *testing.T) {
 	current := sessionFixture(userID, "current-token")
 	other := sessionFixture(userID, "other-token")
 
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		listSessionsByUserID: func(context.Context, uuid.UUID) ([]identity.Session, error) {
 			return []identity.Session{current, other}, nil
 		},
-	}
+	})
 	svc := newTestService(repo, newMemStorage())
 
 	sessions, err := svc.ListSessions(context.Background(), userID, "current-token")

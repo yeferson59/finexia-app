@@ -15,11 +15,11 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func jsonResponse(body string) *http.Response {
-	return &http.Response{
+	return new(http.Response{
 		StatusCode: http.StatusOK,
 		Body:       io.NopCloser(strings.NewReader(body)),
 		Header:     make(http.Header),
-	}
+	})
 }
 
 func newTestClient(fn roundTripFunc) *Client {

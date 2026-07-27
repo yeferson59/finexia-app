@@ -255,15 +255,15 @@ func TestValidateToken(t *testing.T) {
 	}
 
 	newSvc := func(sessionUser identity.User, sessionErr error) (*Service, *memStorage, *int) {
-		calls := 0
+		calls := new(0)
 		repo := new(fakeRepository{
 			getSessionByToken: func(context.Context, string) (identity.User, error) {
-				calls++
+				*calls++
 				return sessionUser, sessionErr
 			},
 		})
 		storage := newMemStorage()
-		return newTestService(repo, storage), storage, &calls
+		return newTestService(repo, storage), storage, calls
 	}
 
 	signToken := func(t *testing.T, svc *Service, exp time.Time) string {

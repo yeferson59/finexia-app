@@ -28,7 +28,7 @@ func New(httpClient *http.Client) *Factory {
 		httpClient = marketdata.DefaultHTTPClient
 	}
 
-	return &Factory{httpClient: httpClient}
+	return new(Factory{httpClient: httpClient})
 }
 
 // For assembles the chain for one caller, in marketdata.SupportedProviders

@@ -138,7 +138,7 @@ func TestAcceptInvitation_Expired(t *testing.T) {
 			}, nil
 		},
 	})
-	svc := newTestServiceFull(repo, newMemStorage(), &fakeMailer{})
+	svc := newTestServiceFull(repo, newMemStorage(), new(fakeMailer{}))
 
 	_, err := svc.AcceptInvitation(context.Background(), raw, "", "s3cretpass")
 	if !errors.Is(err, ErrInvitationExpired) {
@@ -148,16 +148,15 @@ func TestAcceptInvitation_Expired(t *testing.T) {
 
 func TestAcceptInvitation_Revoked(t *testing.T) {
 	raw, _, _ := generateRefreshToken()
-	revoked := time.Now().UTC().Add(-time.Minute)
 	repo := new(fakeRepository{
 		getInvitationByHash: func(context.Context, string) (Invitation, error) {
 			return Invitation{
 				ID: uuid.New(), Email: "revoked@example.com", Role: "customer",
-				ExpiresAt: time.Now().UTC().Add(time.Hour), RevokedAt: &revoked,
+				ExpiresAt: time.Now().UTC().Add(time.Hour), RevokedAt: new(time.Now().UTC().Add(-time.Minute)),
 			}, nil
 		},
 	})
-	svc := newTestServiceFull(repo, newMemStorage(), &fakeMailer{})
+	svc := newTestServiceFull(repo, newMemStorage(), new(fakeMailer{}))
 
 	_, err := svc.AcceptInvitation(context.Background(), raw, "", "s3cretpass")
 	if !errors.Is(err, ErrInvitationInvalid) {

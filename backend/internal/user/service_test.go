@@ -30,6 +30,7 @@ func TestUpdateCurrentUser(t *testing.T) {
 			},
 			updateUserProfile: func(_ context.Context, id uuid.UUID, name, preferredCurrency, image string) (identity.User, error) {
 				saved = identity.User{ID: id, Name: name, PreferredCurrency: preferredCurrency, Image: image}
+
 				return saved, nil
 			},
 		})
@@ -74,10 +75,9 @@ func TestUpdateCurrentUser(t *testing.T) {
 }
 
 func TestUpdateUserRejectsDeletedUser(t *testing.T) {
-	deletedAt := time.Now()
 	repo := new(fakeRepository{
 		getUserByID: func(context.Context, uuid.UUID) (identity.User, error) {
-			return identity.User{ID: uuid.New(), DeletedAt: &deletedAt}, nil
+			return identity.User{ID: uuid.New(), DeletedAt: new(time.Now())}, nil
 		},
 	})
 

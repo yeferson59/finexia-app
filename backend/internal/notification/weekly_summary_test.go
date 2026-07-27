@@ -202,9 +202,9 @@ func TestSendWeeklySummaryEmails(t *testing.T) {
 	})
 
 	t.Run("subscriber query failure aborts", func(t *testing.T) {
-		users := &fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
+		users := new(fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
 			return nil, errors.New("db down")
-		}}
+		}})
 		svc := newTestService(users, new(fakePortfolioReader{}), new(fakeMailer{}))
 
 		sent, errs := svc.SendWeeklySummaryEmails(context.Background())

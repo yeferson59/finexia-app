@@ -50,8 +50,8 @@ func TestPortfolioDetailReportsPriceProvenance(t *testing.T) {
 		Name:         "Main",
 		BaseCurrency: "USD",
 		Entries: []Entry{
-			pricedEntry("AAPL", PriceSourceOwn, "190.55", &fetched),
-			pricedEntry("MSFT", PriceSourceManual, "410.00", &fetched),
+			pricedEntry("AAPL", PriceSourceOwn, "190.55", new(fetched)),
+			pricedEntry("MSFT", PriceSourceManual, "410.00", new(fetched)),
 			pricedEntry("XYZ", PriceSourceCost, "", nil),
 		},
 	}
