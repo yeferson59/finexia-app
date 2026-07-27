@@ -54,7 +54,7 @@ func assertSpreadsheetDownload(t *testing.T, resp *http.Response, filename strin
 
 func TestHandlerExportSummary(t *testing.T) {
 	userID := uuid.New()
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]SummaryView, error) {
 			return []SummaryView{{
 				Name: "Growth", Type: Type("stocks"), BaseCurrency: "USD", RiskName: "moderate",
@@ -65,7 +65,7 @@ func TestHandlerExportSummary(t *testing.T) {
 		getAssetAllocationByUserID: func(context.Context, uuid.UUID) ([]AllocationItem, error) {
 			return []AllocationItem{{Category: Stocks, MarketValue: "1000"}}, nil
 		},
-	}
+	})
 	app := newTestModule(t, repo, userID, "user")
 
 	resp := do(t, app, http.MethodGet, "/portfolios/export/summary")
@@ -87,7 +87,7 @@ func TestHandlerExportTransactions(t *testing.T) {
 	userID := uuid.New()
 	txnDate := time.Date(2026, time.April, 7, 0, 0, 0, 0, time.UTC)
 	var gotLimit int
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getRecentTransactionsByUserID: func(_ context.Context, _ uuid.UUID, limit int) ([]Transaction, error) {
 			gotLimit = limit
 			return []Transaction{{
@@ -95,7 +95,7 @@ func TestHandlerExportTransactions(t *testing.T) {
 				TransactionDate: txnDate, Notes: "first buy",
 			}}, nil
 		},
-	}
+	})
 	app := newTestModule(t, repo, userID, "user")
 
 	resp := do(t, app, http.MethodGet, "/portfolios/export/transactions")
@@ -118,7 +118,7 @@ func TestHandlerExportTransactions(t *testing.T) {
 func TestHandlerExportRiskMetrics(t *testing.T) {
 	userID := uuid.New()
 	var gotHasSince bool
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
 			gotHasSince = hasSince
 			return []GrowthPoint{{
@@ -126,7 +126,7 @@ func TestHandlerExportRiskMetrics(t *testing.T) {
 				TotalValue: "1000", TotalCostBase: "900", GainLoss: "100", GainLossPct: "11.11",
 			}}, nil
 		},
-	}
+	})
 	app := newTestModule(t, repo, userID, "user")
 
 	resp := do(t, app, http.MethodGet, "/portfolios/export/risk")

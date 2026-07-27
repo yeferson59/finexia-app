@@ -68,10 +68,10 @@ func TestInsertUserUsesLookedUpRole(t *testing.T) {
 	roleID := uuid.New()
 	userID := uuid.New()
 
-	q := &stubQuerier{rows: []pgx.Row{
+	q := new(stubQuerier{rows: []pgx.Row{
 		stubRow{fill: func(dest []any) { *dest[0].(*uuid.UUID) = roleID }},
 		insertedUserRow(userID, "Jane Doe", "jane@example.com", roleID),
-	}}
+	}})
 
 	got, err := InsertUser(context.Background(), q, "Jane Doe", "jane@example.com")
 	if err != nil {
@@ -105,7 +105,7 @@ func TestInsertUserStopsOnFailure(t *testing.T) {
 	boom := errors.New("boom")
 
 	t.Run("role lookup fails", func(t *testing.T) {
-		q := &stubQuerier{rows: []pgx.Row{stubRow{err: boom}}}
+		q := new(stubQuerier{rows: []pgx.Row{stubRow{err: boom}}})
 
 		if _, err := InsertUser(context.Background(), q, "Jane", "jane@example.com"); !errors.Is(err, boom) {
 			t.Fatalf("err = %v, want %v", err, boom)
@@ -116,10 +116,10 @@ func TestInsertUserStopsOnFailure(t *testing.T) {
 	})
 
 	t.Run("insert fails", func(t *testing.T) {
-		q := &stubQuerier{rows: []pgx.Row{
+		q := new(stubQuerier{rows: []pgx.Row{
 			stubRow{fill: func(dest []any) { *dest[0].(*uuid.UUID) = uuid.New() }},
 			stubRow{err: boom},
-		}}
+		}})
 
 		if _, err := InsertUser(context.Background(), q, "Jane", "jane@example.com"); !errors.Is(err, boom) {
 			t.Fatalf("err = %v, want %v", err, boom)

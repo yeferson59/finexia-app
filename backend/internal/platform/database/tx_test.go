@@ -47,7 +47,7 @@ func TestWithinTx(t *testing.T) {
 
 	t.Run("commits when fn succeeds", func(t *testing.T) {
 		tx := &fakeTx{}
-		err := WithinTx(ctx, &fakeBeginner{tx: tx}, func(context.Context, pgx.Tx) error {
+		err := WithinTx(ctx, new(fakeBeginner{tx: tx}), func(context.Context, pgx.Tx) error {
 			return nil
 		})
 		if err != nil {
@@ -64,7 +64,7 @@ func TestWithinTx(t *testing.T) {
 	t.Run("rolls back when fn fails", func(t *testing.T) {
 		tx := &fakeTx{}
 		wantErr := errors.New("boom")
-		err := WithinTx(ctx, &fakeBeginner{tx: tx}, func(context.Context, pgx.Tx) error {
+		err := WithinTx(ctx, new(fakeBeginner{tx: tx}), func(context.Context, pgx.Tx) error {
 			return wantErr
 		})
 		if !errors.Is(err, wantErr) {
@@ -82,7 +82,7 @@ func TestWithinTx(t *testing.T) {
 		tx := &fakeTx{}
 		func() {
 			defer func() { _ = recover() }()
-			_ = WithinTx(ctx, &fakeBeginner{tx: tx}, func(context.Context, pgx.Tx) error {
+			_ = WithinTx(ctx, new(fakeBeginner{tx: tx}), func(context.Context, pgx.Tx) error {
 				panic("boom")
 			})
 		}()
@@ -96,7 +96,7 @@ func TestWithinTx(t *testing.T) {
 
 	t.Run("propagates Begin errors", func(t *testing.T) {
 		wantErr := errors.New("no connection")
-		err := WithinTx(ctx, &fakeBeginner{beginErr: wantErr}, func(context.Context, pgx.Tx) error {
+		err := WithinTx(ctx, new(fakeBeginner{beginErr: wantErr}), func(context.Context, pgx.Tx) error {
 			t.Error("fn should not run when Begin fails")
 			return nil
 		})
@@ -108,7 +108,7 @@ func TestWithinTx(t *testing.T) {
 	t.Run("returns the commit error", func(t *testing.T) {
 		wantErr := errors.New("serialization failure")
 		tx := &fakeTx{commitErr: wantErr}
-		err := WithinTx(ctx, &fakeBeginner{tx: tx}, func(context.Context, pgx.Tx) error {
+		err := WithinTx(ctx, new(fakeBeginner{tx: tx}), func(context.Context, pgx.Tx) error {
 			return nil
 		})
 		if !errors.Is(err, wantErr) {

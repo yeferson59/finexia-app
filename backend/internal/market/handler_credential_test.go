@@ -123,7 +123,7 @@ func assertNoKeyLeak(t *testing.T, where, body string) {
 }
 
 func TestCredentialRoutesNeverReturnTheKey(t *testing.T) {
-	f := newBYOFixture(t, &fakeRepository{}, quoteOK())
+	f := newBYOFixture(t, new(fakeRepository{}), quoteOK())
 	app := newCredentialApp(t, f, stubHoldings{}, uuid.New())
 
 	save := request(t, app, http.MethodPut, "/market/credentials/finnhub", `{"apiKey":"`+testAPIKey+`"}`)
@@ -151,7 +151,7 @@ func TestCredentialRoutesNeverReturnTheKey(t *testing.T) {
 
 func TestSaveCredentialHandlerErrors(t *testing.T) {
 	t.Run("a rejected key is a 400 that says so", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteFailing(providerErr(Finnhub, marketdata.ErrUnauthorized, "finnhub: status 401")))
+		f := newBYOFixture(t, new(fakeRepository{}), quoteFailing(providerErr(Finnhub, marketdata.ErrUnauthorized, "finnhub: status 401")))
 		app := newCredentialApp(t, f, stubHoldings{}, uuid.New())
 
 		resp := request(t, app, http.MethodPut, "/market/credentials/finnhub", `{"apiKey":"`+testAPIKey+`"}`)
@@ -166,13 +166,13 @@ func TestSaveCredentialHandlerErrors(t *testing.T) {
 	// rides in the request URL, so quoting a transport error would quote the key.
 	t.Run("provider text does not reach the response body", func(t *testing.T) {
 		leaky := "alphavantage: http get https://www.alphavantage.co/query?apikey=" + testAPIKey
-		f := newBYOFixture(t, &fakeRepository{}, &fakePriceProvider{
+		f := newBYOFixture(t, new(fakeRepository{}), new(fakePriceProvider{
 			fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
 				// Deliberately unscrubbed, standing in for anything that might
 				// slip past the client's own scrubbing.
-				return marketdata.QuoteResult{}, &rawError{msg: leaky}
+				return marketdata.QuoteResult{}, new(rawError{msg: leaky})
 			},
-		})
+		}))
 		app := newCredentialApp(t, f, stubHoldings{}, uuid.New())
 
 		body := bodyOf(t, request(t, app, http.MethodPut, "/market/credentials/alphavantage", `{"apiKey":"`+testAPIKey+`"}`))
@@ -180,7 +180,7 @@ func TestSaveCredentialHandlerErrors(t *testing.T) {
 	})
 
 	t.Run("an unknown provider is a 400", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteOK())
+		f := newBYOFixture(t, new(fakeRepository{}), quoteOK())
 		app := newCredentialApp(t, f, stubHoldings{}, uuid.New())
 
 		resp := request(t, app, http.MethodPut, "/market/credentials/nasdaq", `{"apiKey":"`+testAPIKey+`"}`)
@@ -197,7 +197,7 @@ type rawError struct{ msg string }
 func (e *rawError) Error() string { return e.msg }
 
 func TestDeleteCredentialHandler(t *testing.T) {
-	f := newBYOFixture(t, &fakeRepository{}, quoteOK())
+	f := newBYOFixture(t, new(fakeRepository{}), quoteOK())
 	app := newCredentialApp(t, f, stubHoldings{}, uuid.New())
 
 	if resp := request(t, app, http.MethodDelete, "/market/credentials/finnhub", ""); resp.StatusCode != http.StatusNotFound {
@@ -217,25 +217,25 @@ func TestSyncMarketDataHandler(t *testing.T) {
 	assetID := uuid.New()
 
 	repoFor := func() *fakeRepository {
-		return &fakeRepository{
+		return new(fakeRepository{
 			getAssetByID: func(context.Context, uuid.UUID) (Asset, error) {
 				return Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: "USD"}, nil
 			},
-		}
+		})
 	}
 
 	// The regression: the on-demand sync used to fetch prices only, leaving a
 	// multi-currency portfolio with no rate to convert through — and under
 	// BYO-key nobody else's rate may be used.
 	t.Run("it syncs rates as well as prices", func(t *testing.T) {
-		provider := &fakePriceProvider{
+		provider := new(fakePriceProvider{
 			fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
 				return marketdata.QuoteResult{Price: "190.55", Source: Finnhub}, nil
 			},
 			fetchExchangeRate: func(context.Context, string, string) (marketdata.ExchangeRateResult, error) {
 				return marketdata.ExchangeRateResult{Rate: "4100.5", Source: Finnhub}, nil
 			},
-		}
+		})
 
 		f := newBYOFixture(t, repoFor(), provider)
 		holdings := stubHoldings{

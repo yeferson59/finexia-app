@@ -26,7 +26,7 @@ func TestContributeAsset(t *testing.T) {
 		var gotUserID uuid.UUID
 		var gotTicker, gotName, gotCurrency string
 
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			upsertAsset: func(context.Context, string, string, AssetType, string, string) (Asset, error) {
 				t.Fatal("a contribution reached UpsertAsset, which overwrites rows other users hold")
 
@@ -37,7 +37,7 @@ func TestContributeAsset(t *testing.T) {
 
 				return Asset{Ticker: ticker}, nil
 			},
-		}
+		})
 
 		svc := newTestServices(repo, newMemStorage())
 
@@ -61,13 +61,13 @@ func TestContributeAsset(t *testing.T) {
 
 	t.Run("an absent name falls back to the ticker", func(t *testing.T) {
 		var gotName string
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			createAssetIfAbsent: func(_ context.Context, _ uuid.UUID, _, name string, _ AssetType, _, _ string) (Asset, error) {
 				gotName = name
 
 				return Asset{}, nil
 			},
-		}
+		})
 
 		if _, err := newTestServices(repo, newMemStorage()).ContributeAsset(context.Background(), userID, "GEB", "", Stock, "", "COP"); err != nil {
 			t.Fatalf("ContributeAsset: %v", err)
@@ -94,13 +94,13 @@ func TestContributeAsset(t *testing.T) {
 
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
-				repo := &fakeRepository{
+				repo := new(fakeRepository{
 					createAssetIfAbsent: func(context.Context, uuid.UUID, string, string, AssetType, string, string) (Asset, error) {
 						t.Fatal("invalid input reached the repository")
 
 						return Asset{}, nil
 					},
-				}
+				})
 
 				_, err := newTestServices(repo, newMemStorage()).ContributeAsset(context.Background(), userID, tc.ticker, "Name", tc.asset, "", tc.currency)
 				if !errors.Is(err, tc.want) {
@@ -112,7 +112,7 @@ func TestContributeAsset(t *testing.T) {
 
 	t.Run("stops at the daily quota", func(t *testing.T) {
 		var since time.Time
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			countContributed: func(_ context.Context, uid uuid.UUID, from time.Time) (int, error) {
 				if uid != userID {
 					t.Errorf("counted for %s, want %s", uid, userID)
@@ -126,7 +126,7 @@ func TestContributeAsset(t *testing.T) {
 
 				return Asset{}, nil
 			},
-		}
+		})
 
 		_, err := newTestServices(repo, newMemStorage()).ContributeAsset(context.Background(), userID, "AAPL", "Apple", Stock, "", "USD")
 		if !errors.Is(err, ErrAssetQuotaExceeded) {
@@ -165,7 +165,7 @@ func TestHandlerCreateAsset(t *testing.T) {
 
 	t.Run("a user contributes rather than curates", func(t *testing.T) {
 		var contributed bool
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			upsertAsset: func(context.Context, string, string, AssetType, string, string) (Asset, error) {
 				t.Fatal("a non-admin reached the curating path")
 
@@ -180,7 +180,7 @@ func TestHandlerCreateAsset(t *testing.T) {
 
 				return Asset{ID: uuid.New(), Ticker: ticker}, nil
 			},
-		}
+		})
 
 		resp := request(t, newAssetApp(t, repo, userID, "user"), http.MethodPost, "/assets", body)
 		if resp.StatusCode != fiber.StatusCreated {
@@ -193,7 +193,7 @@ func TestHandlerCreateAsset(t *testing.T) {
 
 	t.Run("an admin curates", func(t *testing.T) {
 		var curated bool
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			upsertAsset: func(_ context.Context, ticker, _ string, _ AssetType, _, _ string) (Asset, error) {
 				curated = true
 
@@ -204,7 +204,7 @@ func TestHandlerCreateAsset(t *testing.T) {
 
 				return Asset{}, nil
 			},
-		}
+		})
 
 		resp := request(t, newAssetApp(t, repo, userID, "admin"), http.MethodPost, "/assets", body)
 		if resp.StatusCode != fiber.StatusCreated {
@@ -216,11 +216,11 @@ func TestHandlerCreateAsset(t *testing.T) {
 	})
 
 	t.Run("the quota answers 429", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			countContributed: func(context.Context, uuid.UUID, time.Time) (int, error) {
 				return maxContributedAssetsPerDay, nil
 			},
-		}
+		})
 
 		resp := request(t, newAssetApp(t, repo, userID, "user"), http.MethodPost, "/assets", body)
 		if resp.StatusCode != fiber.StatusTooManyRequests {
@@ -229,11 +229,11 @@ func TestHandlerCreateAsset(t *testing.T) {
 	})
 
 	t.Run("a rejected input says why, an internal failure does not", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			createAssetIfAbsent: func(context.Context, uuid.UUID, string, string, AssetType, string, string) (Asset, error) {
 				return Asset{}, errors.New(`pq: duplicate key value violates unique constraint "idx_assets_ticker_exchange"`)
 			},
-		}
+		})
 		app := newAssetApp(t, repo, userID, "user")
 
 		bad := request(t, app, http.MethodPost, "/assets", `{"ticker":"AAPL","name":"Apple","assetType":"nft","currency":"USD"}`)

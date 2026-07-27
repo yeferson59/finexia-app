@@ -40,13 +40,13 @@ func (m *fakeMailer) SendWaitlistConfirmation(email string) error {
 func TestSaveWaitlistEmail(t *testing.T) {
 	t.Run("saves and sends the confirmation", func(t *testing.T) {
 		var saved string
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			saveWaitlistEmail: func(_ context.Context, email string) error {
 				saved = email
 				return nil
 			},
-		}
-		mailer := &fakeMailer{}
+		})
+		mailer := new(fakeMailer{})
 		svc := newService(repo, mailer)
 
 		if err := svc.SaveWaitlistEmail(context.Background(), "new@example.com"); err != nil {
@@ -61,12 +61,12 @@ func TestSaveWaitlistEmail(t *testing.T) {
 	})
 
 	t.Run("repository failure skips the confirmation email", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			saveWaitlistEmail: func(context.Context, string) error {
 				return errors.New("duplicate email")
 			},
-		}
-		mailer := &fakeMailer{}
+		})
+		mailer := new(fakeMailer{})
 		svc := newService(repo, mailer)
 
 		if err := svc.SaveWaitlistEmail(context.Background(), "dup@example.com"); err == nil {
@@ -78,10 +78,10 @@ func TestSaveWaitlistEmail(t *testing.T) {
 	})
 
 	t.Run("mail failure is surfaced", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			saveWaitlistEmail: func(context.Context, string) error { return nil },
-		}
-		mailer := &fakeMailer{waitlistErr: errors.New("smtp down")}
+		})
+		mailer := new(fakeMailer{waitlistErr: errors.New("smtp down")})
 		svc := newService(repo, mailer)
 
 		if err := svc.SaveWaitlistEmail(context.Background(), "x@example.com"); err == nil {
@@ -93,13 +93,13 @@ func TestSaveWaitlistEmail(t *testing.T) {
 func TestWaitlistAdminPassthroughs(t *testing.T) {
 	t.Run("ListWaitlist delegates with the same window", func(t *testing.T) {
 		var gotOffset, gotLimit uint
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			listWaitlist: func(_ context.Context, offset, limit uint) ([]Waitlist, uint, error) {
 				gotOffset, gotLimit = offset, limit
 				return []Waitlist{{Email: "a@example.com"}}, 1, nil
 			},
-		}
-		svc := newService(repo, &fakeMailer{})
+		})
+		svc := newService(repo, new(fakeMailer{}))
 
 		items, count, err := svc.ListWaitlist(context.Background(), 20, 10)
 		if err != nil {
@@ -115,13 +115,13 @@ func TestWaitlistAdminPassthroughs(t *testing.T) {
 
 	t.Run("SetWaitlistInvited delegates the email", func(t *testing.T) {
 		var got string
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			setWaitlistInvited: func(_ context.Context, email string) error {
 				got = email
 				return nil
 			},
-		}
-		svc := newService(repo, &fakeMailer{})
+		})
+		svc := newService(repo, new(fakeMailer{}))
 
 		if err := svc.SetWaitlistInvited(context.Background(), "b@example.com"); err != nil {
 			t.Fatalf("SetWaitlistInvited: %v", err)

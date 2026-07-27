@@ -36,7 +36,7 @@ func New(apiKey string, httpClient *http.Client) *Client {
 		httpClient = marketdata.DefaultHTTPClient
 	}
 
-	return &Client{apiKey: apiKey, httpClient: httpClient}
+	return new(Client{apiKey: apiKey, httpClient: httpClient})
 }
 
 // get issues a query and decodes it into out. The response envelope is

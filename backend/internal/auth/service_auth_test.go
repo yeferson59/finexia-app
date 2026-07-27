@@ -73,7 +73,7 @@ func TestLoginSuccess(t *testing.T) {
 	rtID := uuid.New()
 
 	var storedHash string
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getAccountByEmail: func(_ context.Context, email string) (identity.User, error) {
 			if email != user.Email {
 				return identity.User{}, errors.New("not found")
@@ -99,7 +99,7 @@ func TestLoginSuccess(t *testing.T) {
 			storedHash = tokenHash
 			return rtID, nil
 		},
-	}
+	})
 	storage := newMemStorage()
 	svc := newTestService(repo, storage)
 
@@ -184,11 +184,11 @@ func TestLoginFailures(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			repo := &fakeRepository{
+			repo := new(fakeRepository{
 				getAccountByEmail: func(context.Context, string) (identity.User, error) {
 					return tc.user, tc.userErr
 				},
-			}
+			})
 			svc := newTestService(repo, newMemStorage())
 
 			_, err := svc.Login(context.Background(), tc.email, tc.password, "", "")
@@ -201,11 +201,11 @@ func TestLoginFailures(t *testing.T) {
 
 func TestRegister(t *testing.T) {
 	t.Run("existing user is rejected", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getUserByEmail: func(context.Context, string) (identity.User, error) {
 				return identity.User{Email: "taken@example.com"}, nil
 			},
-		}
+		})
 		svc := newTestService(repo, newMemStorage())
 
 		_, err := svc.Register(context.Background(), "Any Name", "taken@example.com", "password")
@@ -216,7 +216,7 @@ func TestRegister(t *testing.T) {
 
 	t.Run("stores normalized name and hashed password", func(t *testing.T) {
 		const password = "plain-password"
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getUserByEmail: func(context.Context, string) (identity.User, error) {
 				return identity.User{}, errors.New("no rows")
 			},
@@ -235,7 +235,7 @@ func TestRegister(t *testing.T) {
 			createEmailVerification: func(_ context.Context, email, tokenHash string, expiresAt time.Time) (Verification, error) {
 				return Verification{ID: uuid.New(), Identifier: email, Value: tokenHash, ExpiresAt: expiresAt}, nil
 			},
-		}
+		})
 		svc := newTestService(repo, newMemStorage())
 
 		result, err := svc.Register(context.Background(), "  john DOE ", "john@example.com", password)
@@ -256,12 +256,12 @@ func TestValidateToken(t *testing.T) {
 
 	newSvc := func(sessionUser identity.User, sessionErr error) (*Service, *memStorage, *int) {
 		calls := 0
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getSessionByToken: func(context.Context, string) (identity.User, error) {
 				calls++
 				return sessionUser, sessionErr
 			},
-		}
+		})
 		storage := newMemStorage()
 		return newTestService(repo, storage), storage, &calls
 	}
@@ -366,7 +366,7 @@ func TestValidateToken(t *testing.T) {
 	})
 
 	t.Run("role mismatch is rejected", func(t *testing.T) {
-		svcForSigning := newTestService(&fakeRepository{}, newMemStorage())
+		svcForSigning := newTestService(new(fakeRepository{}), newMemStorage())
 		token, err := svcForSigning.CreateJWToken(user.ID, "admin", time.Now().UTC().Add(10*time.Minute))
 		if err != nil {
 			t.Fatalf("CreateJWToken: %v", err)
@@ -406,16 +406,16 @@ func newRefreshFixture(t *testing.T) *refreshFixture {
 		t.Fatalf("generateRefreshToken: %v", err)
 	}
 
-	f := &refreshFixture{
+	f := new(refreshFixture{
 		raw:       raw,
 		hash:      hash,
 		userID:    uuid.New(),
 		familyID:  uuid.New(),
 		sessionID: uuid.New(),
 		storage:   newMemStorage(),
-	}
+	})
 
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		markRefreshTokenUsed: func(_ context.Context, id uuid.UUID) error {
 			f.markedUsed = append(f.markedUsed, id)
 			return nil
@@ -438,7 +438,7 @@ func newRefreshFixture(t *testing.T) *refreshFixture {
 			f.revoked = append(f.revoked, familyID)
 			return nil, nil
 		},
-	}
+	})
 	f.svc = newTestService(repo, f.storage)
 	return f
 }
@@ -544,7 +544,7 @@ func TestRefreshTokenReuseDetection(t *testing.T) {
 				SessionID: f.sessionID,
 				Role:      "user",
 				ExpiresAt: time.Now().UTC().Add(time.Hour),
-				UsedAt:    &usedAt,
+				UsedAt:    new(usedAt),
 			}, nil
 		}
 
@@ -570,7 +570,7 @@ func TestRefreshTokenReuseDetection(t *testing.T) {
 				SessionID: f.sessionID,
 				Role:      "user",
 				ExpiresAt: time.Now().UTC().Add(time.Hour),
-				UsedAt:    &usedAt,
+				UsedAt:    new(usedAt),
 			}, nil
 		}
 
@@ -590,7 +590,7 @@ func TestRefreshTokenReuseDetection(t *testing.T) {
 				ID:        uuid.New(),
 				FamilyID:  f.familyID,
 				ExpiresAt: time.Now().UTC().Add(time.Hour),
-				RevokedAt: &revokedAt,
+				RevokedAt: new(revokedAt),
 			}, nil
 		}
 
@@ -640,7 +640,7 @@ func TestLogout(t *testing.T) {
 	}
 
 	var deletedSession bool
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getRefreshTokenFamiliesBySession: func(_ context.Context, uid uuid.UUID, token string) ([]string, []uuid.UUID, error) {
 			if uid != userID || token != accessToken {
 				t.Errorf("unexpected session lookup: %s %s", uid, token)
@@ -651,7 +651,7 @@ func TestLogout(t *testing.T) {
 			deletedSession = uid == userID && token == accessToken
 			return nil
 		},
-	}
+	})
 	storage := newMemStorage()
 	_ = storage.Set(validateTokenCacheKey(accessToken), []byte("true"), time.Hour)
 	_ = storage.Set(refreshCacheKey(hash), []byte("cached"), time.Hour)
@@ -676,14 +676,14 @@ func TestLogout(t *testing.T) {
 }
 
 func TestLogoutPropagatesSessionDeleteError(t *testing.T) {
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getRefreshTokenFamiliesBySession: func(context.Context, uuid.UUID, string) ([]string, []uuid.UUID, error) {
 			return nil, nil, errors.New("db down")
 		},
 		deleteSessionByUserIDToken: func(context.Context, uuid.UUID, string) error {
 			return errors.New("delete failed")
 		},
-	}
+	})
 	svc := newTestService(repo, newMemStorage())
 
 	err := svc.Logout(context.Background(), uuid.New(), "token", "")
@@ -694,10 +694,10 @@ func TestLogoutPropagatesSessionDeleteError(t *testing.T) {
 
 func TestCleanupExpiredAuth(t *testing.T) {
 	t.Run("returns both counters", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			deleteExpiredRefreshTokens: func(context.Context) (int64, error) { return 7, nil },
 			deleteExpiredSessions:      func(context.Context) (int64, error) { return 3, nil },
-		}
+		})
 		svc := newTestService(repo, newMemStorage())
 
 		sessions, refreshTokens, err := svc.CleanupExpiredAuth(context.Background())
@@ -710,9 +710,9 @@ func TestCleanupExpiredAuth(t *testing.T) {
 	})
 
 	t.Run("propagates refresh token cleanup error", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			deleteExpiredRefreshTokens: func(context.Context) (int64, error) { return 0, errors.New("boom") },
-		}
+		})
 		svc := newTestService(repo, newMemStorage())
 
 		if _, _, err := svc.CleanupExpiredAuth(context.Background()); err == nil {

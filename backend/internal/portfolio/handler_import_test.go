@@ -22,7 +22,7 @@ import (
 // so a test can leave one out; a nil file omits the file part entirely.
 func importForm(t *testing.T, file []byte, filename string, fields map[string]string) (*bytes.Buffer, string) {
 	t.Helper()
-	body := &bytes.Buffer{}
+	body := new(bytes.Buffer{})
 	w := multipart.NewWriter(body)
 
 	if file != nil {
@@ -71,7 +71,7 @@ func TestHandlerPreviewTransactionsImport(t *testing.T) {
 	userID := uuid.New()
 
 	t.Run("parses the upload and suggests a mapping", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		body, contentType := importForm(t, csvImport, "movimientos.csv", nil)
 		resp := doMultipart(t, app, "/portfolios/transactions/import/preview", body, contentType)
@@ -93,7 +93,7 @@ func TestHandlerPreviewTransactionsImport(t *testing.T) {
 	})
 
 	t.Run("requires the file field", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		body, contentType := importForm(t, nil, "", map[string]string{"sheet": "Sheet1"})
 		resp := doMultipart(t, app, "/portfolios/transactions/import/preview", body, contentType)
@@ -103,7 +103,7 @@ func TestHandlerPreviewTransactionsImport(t *testing.T) {
 	})
 
 	t.Run("rejects a malformed mapping", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		body, contentType := importForm(t, csvImport, "movimientos.csv", map[string]string{"mapping": `{`})
 		resp := doMultipart(t, app, "/portfolios/transactions/import/preview", body, contentType)
@@ -113,7 +113,7 @@ func TestHandlerPreviewTransactionsImport(t *testing.T) {
 	})
 
 	t.Run("rejects a malformed defaults", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		body, contentType := importForm(t, csvImport, "movimientos.csv", map[string]string{"defaults": `{`})
 		resp := doMultipart(t, app, "/portfolios/transactions/import/preview", body, contentType)
@@ -139,7 +139,7 @@ func TestHandlerImportTransactions(t *testing.T) {
 
 	t.Run("persists the mapped rows", func(t *testing.T) {
 		var persisted []ImportTransactionRow
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			importEntryTransactions: func(_ context.Context, uid, pid, sid uuid.UUID, rows []ImportTransactionRow) (int, error) {
 				if uid != userID || pid != portfolioID || sid != sourceID {
 					t.Errorf("ids = %s/%s/%s, want %s/%s/%s", uid, pid, sid, userID, portfolioID, sourceID)
@@ -147,7 +147,7 @@ func TestHandlerImportTransactions(t *testing.T) {
 				persisted = rows
 				return len(rows), nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		body, contentType := importForm(t, csvImport, "movimientos.csv", baseFields())
@@ -173,7 +173,7 @@ func TestHandlerImportTransactions(t *testing.T) {
 	})
 
 	t.Run("requires a confirmed mapping", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		fields := baseFields()
 		delete(fields, "mapping")
@@ -185,7 +185,7 @@ func TestHandlerImportTransactions(t *testing.T) {
 	})
 
 	t.Run("rejects non-uuid target ids", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		for _, field := range []string{"portfolioId", "sourceId"} {
 			fields := baseFields()

@@ -25,7 +25,7 @@ func TestGetConversionRate(t *testing.T) {
 	userID := uuid.New()
 
 	t.Run("the user's own rate wins over the shared one", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getUserExchangeRateByPair: func(_ context.Context, _ uuid.UUID, from, to string) (money.Decimal, error) {
 				if from == "USD" && to == "COP" {
 					return rate(t, "4100"), nil
@@ -36,7 +36,7 @@ func TestGetConversionRate(t *testing.T) {
 			getExchangeRateByPair: func(context.Context, string, string) (money.Decimal, error) {
 				return rate(t, "3900"), nil
 			},
-		}
+		})
 
 		got, err := newTestServices(repo, newMemStorage()).GetConversionRate(context.Background(), userID, "USD", "COP")
 		if err != nil {
@@ -51,7 +51,7 @@ func TestGetConversionRate(t *testing.T) {
 	})
 
 	t.Run("it falls back to the shared, admin-entered rate", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getExchangeRateByPair: func(_ context.Context, from, to string) (money.Decimal, error) {
 				if from == "USD" && to == "COP" {
 					return rate(t, "3900"), nil
@@ -59,7 +59,7 @@ func TestGetConversionRate(t *testing.T) {
 
 				return money.Decimal{}, ErrExchangeRateNotFound
 			},
-		}
+		})
 
 		got, err := newTestServices(repo, newMemStorage()).GetConversionRate(context.Background(), userID, "USD", "COP")
 		if err != nil {
@@ -71,7 +71,7 @@ func TestGetConversionRate(t *testing.T) {
 	})
 
 	t.Run("the opposite direction is inverted", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getExchangeRateByPair: func(_ context.Context, from, to string) (money.Decimal, error) {
 				if from == "USD" && to == "COP" {
 					return rate(t, "4000"), nil
@@ -79,7 +79,7 @@ func TestGetConversionRate(t *testing.T) {
 
 				return money.Decimal{}, ErrExchangeRateNotFound
 			},
-		}
+		})
 
 		got, err := newTestServices(repo, newMemStorage()).GetConversionRate(context.Background(), userID, "COP", "USD")
 		if err != nil {
@@ -98,7 +98,7 @@ func TestGetConversionRate(t *testing.T) {
 	})
 
 	t.Run("an unrelated pair is resolved through USD", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getExchangeRateByPair: func(_ context.Context, from, to string) (money.Decimal, error) {
 				switch {
 				case from == "EUR" && to == "USD":
@@ -109,7 +109,7 @@ func TestGetConversionRate(t *testing.T) {
 
 				return money.Decimal{}, ErrExchangeRateNotFound
 			},
-		}
+		})
 
 		got, err := newTestServices(repo, newMemStorage()).GetConversionRate(context.Background(), userID, "EUR", "COP")
 		if err != nil {
@@ -121,7 +121,7 @@ func TestGetConversionRate(t *testing.T) {
 	})
 
 	t.Run("the same currency needs no rate at all", func(t *testing.T) {
-		got, err := newTestServices(&fakeRepository{}, newMemStorage()).GetConversionRate(context.Background(), userID, "USD", "USD")
+		got, err := newTestServices(new(fakeRepository{}), newMemStorage()).GetConversionRate(context.Background(), userID, "USD", "USD")
 		if err != nil {
 			t.Fatalf("GetConversionRate: %v", err)
 		}
@@ -134,11 +134,11 @@ func TestGetConversionRate(t *testing.T) {
 	// the shared table and before their first sync. It has to be a clean 404,
 	// not a wrong number.
 	t.Run("no rate anywhere is reported, not guessed", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getExchangeRateByPair: func(context.Context, string, string) (money.Decimal, error) {
 				return money.Decimal{}, ErrExchangeRateNotFound
 			},
-		}
+		})
 
 		_, err := newTestServices(repo, newMemStorage()).GetConversionRate(context.Background(), userID, "USD", "COP")
 		if err == nil {

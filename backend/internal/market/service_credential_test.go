@@ -19,26 +19,26 @@ func providerErr(provider ProviderID, sentinel error, msg string) error {
 }
 
 func quoteFailing(err error) *fakePriceProvider {
-	return &fakePriceProvider{
+	return new(fakePriceProvider{
 		fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
 			return marketdata.QuoteResult{}, err
 		},
-	}
+	})
 }
 
 func quoteOK() *fakePriceProvider {
-	return &fakePriceProvider{
+	return new(fakePriceProvider{
 		fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
 			return marketdata.QuoteResult{Price: "190.55", Source: Finnhub}, nil
 		},
-	}
+	})
 }
 
 func TestSaveCredential(t *testing.T) {
 	userID := uuid.New()
 
 	t.Run("a key the provider accepts is stored active", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteOK())
+		f := newBYOFixture(t, new(fakeRepository{}), quoteOK())
 
 		cred, err := f.svc.SaveCredential(context.Background(), userID, Finnhub, "a-real-looking-key")
 		if err != nil {
@@ -54,7 +54,7 @@ func TestSaveCredential(t *testing.T) {
 	})
 
 	t.Run("a key the provider rejects is not stored at all", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteFailing(providerErr(Finnhub, marketdata.ErrUnauthorized, "finnhub: status 401")))
+		f := newBYOFixture(t, new(fakeRepository{}), quoteFailing(providerErr(Finnhub, marketdata.ErrUnauthorized, "finnhub: status 401")))
 
 		_, err := f.svc.SaveCredential(context.Background(), userID, Finnhub, "wrong-key")
 		if !errors.Is(err, ErrInvalidAPIKey) {
@@ -71,7 +71,7 @@ func TestSaveCredential(t *testing.T) {
 	// says nothing about the key. Reporting it as a rejection told users their
 	// key was bad during somebody else's outage.
 	t.Run("an unreachable provider is not a rejected key", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteFailing(providerErr(Finnhub, nil, "finnhub: http get quote: dial tcp: i/o timeout")))
+		f := newBYOFixture(t, new(fakeRepository{}), quoteFailing(providerErr(Finnhub, nil, "finnhub: http get quote: dial tcp: i/o timeout")))
 
 		_, err := f.svc.SaveCredential(context.Background(), userID, Finnhub, "a-real-looking-key")
 		if !errors.Is(err, ErrProviderUnavailable) {
@@ -83,7 +83,7 @@ func TestSaveCredential(t *testing.T) {
 	})
 
 	t.Run("a key whose quota is spent is still stored, flagged rate_limited", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteFailing(providerErr(AlphaVantage, marketdata.ErrRateLimited, "alphavantage: note")))
+		f := newBYOFixture(t, new(fakeRepository{}), quoteFailing(providerErr(AlphaVantage, marketdata.ErrRateLimited, "alphavantage: note")))
 
 		// Refusing the save here would mean a user who hit their daily limit
 		// could not configure a key that works perfectly well.
@@ -97,7 +97,7 @@ func TestSaveCredential(t *testing.T) {
 	})
 
 	t.Run("a symbol the provider does not cover still proves the key", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteFailing(providerErr(Finnhub, marketdata.ErrUnsupported, "finnhub: no data")))
+		f := newBYOFixture(t, new(fakeRepository{}), quoteFailing(providerErr(Finnhub, marketdata.ErrUnsupported, "finnhub: no data")))
 
 		cred, err := f.svc.SaveCredential(context.Background(), userID, Finnhub, "a-real-looking-key")
 		if err != nil {
@@ -109,7 +109,7 @@ func TestSaveCredential(t *testing.T) {
 	})
 
 	t.Run("an unknown provider is rejected before any request", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteOK())
+		f := newBYOFixture(t, new(fakeRepository{}), quoteOK())
 
 		if _, err := f.svc.SaveCredential(context.Background(), userID, ProviderID("nasdaq"), "key"); !errors.Is(err, ErrInvalidProvider) {
 			t.Fatalf("err = %v, want ErrInvalidProvider", err)
@@ -117,7 +117,7 @@ func TestSaveCredential(t *testing.T) {
 	})
 
 	t.Run("the stored key round-trips through the keyring", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteOK())
+		f := newBYOFixture(t, new(fakeRepository{}), quoteOK())
 
 		if _, err := f.svc.SaveCredential(context.Background(), userID, Finnhub, "round-trip-key"); err != nil {
 			t.Fatalf("SaveCredential: %v", err)
@@ -133,7 +133,7 @@ func TestSaveCredential(t *testing.T) {
 	})
 
 	t.Run("a sealed key cannot be opened under another user", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteOK())
+		f := newBYOFixture(t, new(fakeRepository{}), quoteOK())
 
 		if _, err := f.svc.SaveCredential(context.Background(), userID, Finnhub, "round-trip-key"); err != nil {
 			t.Fatalf("SaveCredential: %v", err)
@@ -156,7 +156,7 @@ func TestVerifyCredential(t *testing.T) {
 	userID := uuid.New()
 
 	t.Run("a working key is marked active", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteOK())
+		f := newBYOFixture(t, new(fakeRepository{}), quoteOK())
 		f.creds.seed(t, f.ring, userID, Finnhub, "user-finnhub-key")
 
 		cred, err := f.svc.VerifyCredential(context.Background(), userID, Finnhub)
@@ -172,7 +172,7 @@ func TestVerifyCredential(t *testing.T) {
 	})
 
 	t.Run("a revoked key is marked invalid", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteFailing(providerErr(Finnhub, marketdata.ErrUnauthorized, "finnhub: status 401")))
+		f := newBYOFixture(t, new(fakeRepository{}), quoteFailing(providerErr(Finnhub, marketdata.ErrUnauthorized, "finnhub: status 401")))
 		f.creds.seed(t, f.ring, userID, Finnhub, "revoked-key")
 
 		if _, err := f.svc.VerifyCredential(context.Background(), userID, Finnhub); err != nil {
@@ -188,7 +188,7 @@ func TestVerifyCredential(t *testing.T) {
 	// out of GetSealedCredentials and UsersWithCredentials for good, so one bad
 	// afternoon at the provider would silently retire a key that still works.
 	t.Run("an unreachable provider leaves the stored status untouched", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteFailing(providerErr(Finnhub, nil, "finnhub: http get quote: connection refused")))
+		f := newBYOFixture(t, new(fakeRepository{}), quoteFailing(providerErr(Finnhub, nil, "finnhub: http get quote: connection refused")))
 		f.creds.seed(t, f.ring, userID, Finnhub, "still-good-key")
 
 		_, err := f.svc.VerifyCredential(context.Background(), userID, Finnhub)
@@ -208,7 +208,7 @@ func TestVerifyCredential(t *testing.T) {
 	})
 
 	t.Run("verifying a provider the user has not configured is a not-found", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteOK())
+		f := newBYOFixture(t, new(fakeRepository{}), quoteOK())
 
 		if _, err := f.svc.VerifyCredential(context.Background(), userID, Finnhub); !errors.Is(err, ErrCredentialNotFound) {
 			t.Fatalf("err = %v, want ErrCredentialNotFound", err)
@@ -220,7 +220,7 @@ func TestDeleteCredential(t *testing.T) {
 	userID := uuid.New()
 
 	t.Run("deleting removes the key from the sync path", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteOK())
+		f := newBYOFixture(t, new(fakeRepository{}), quoteOK())
 		f.creds.seed(t, f.ring, userID, Finnhub, "user-finnhub-key")
 
 		if err := f.svc.DeleteCredential(context.Background(), userID, Finnhub); err != nil {
@@ -233,7 +233,7 @@ func TestDeleteCredential(t *testing.T) {
 	})
 
 	t.Run("deleting a key that is not there is a not-found", func(t *testing.T) {
-		f := newBYOFixture(t, &fakeRepository{}, quoteOK())
+		f := newBYOFixture(t, new(fakeRepository{}), quoteOK())
 
 		if err := f.svc.DeleteCredential(context.Background(), userID, Finnhub); !errors.Is(err, ErrCredentialNotFound) {
 			t.Fatalf("err = %v, want ErrCredentialNotFound", err)
@@ -243,7 +243,7 @@ func TestDeleteCredential(t *testing.T) {
 
 func TestProviderForSkipsUnreadableKeys(t *testing.T) {
 	userID := uuid.New()
-	f := newBYOFixture(t, &fakeRepository{}, quoteOK())
+	f := newBYOFixture(t, new(fakeRepository{}), quoteOK())
 
 	f.creds.seed(t, f.ring, userID, Finnhub, "readable-key")
 

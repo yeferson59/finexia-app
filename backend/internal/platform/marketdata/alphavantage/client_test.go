@@ -15,18 +15,18 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func jsonResponse(body string) *http.Response {
-	return &http.Response{
+	return new(http.Response{
 		StatusCode: http.StatusOK,
 		Body:       io.NopCloser(strings.NewReader(body)),
 		Header:     make(http.Header),
-	}
+	})
 }
 
 // newTestClient builds a Client whose HTTP transport is replaced by fn.
 func newTestClient(fn roundTripFunc) *Client {
 	// A dedicated client per test: New's default is process-wide, and mutating
 	// its transport here would leak the stub into every other caller.
-	return New("test-key", &http.Client{Transport: fn})
+	return New("test-key", new(http.Client{Transport: fn}))
 }
 
 func TestFetchQuote(t *testing.T) {

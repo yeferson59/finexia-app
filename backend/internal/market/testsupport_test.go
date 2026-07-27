@@ -121,7 +121,7 @@ type memItem struct {
 }
 
 func newMemStorage() *memStorage {
-	return &memStorage{items: map[string]memItem{}}
+	return new(memStorage{items: map[string]memItem{}})
 }
 
 func (s *memStorage) GetWithContext(_ context.Context, key string) ([]byte, error) {
@@ -253,12 +253,12 @@ type credentialStore struct {
 }
 
 func newCredentialStore() *credentialStore {
-	return &credentialStore{
+	return new(credentialStore{
 		sealed: map[uuid.UUID][]sealedCredential{},
 		meta:   map[string]Credential{},
 		prices: map[string]money.Money{},
 		rates:  map[string]money.Decimal{},
-	}
+	})
 }
 
 func credKey(userID uuid.UUID, provider ProviderID) string {
@@ -326,8 +326,7 @@ func (c *credentialStore) SetCredentialStatus(_ context.Context, userID uuid.UUI
 
 	cred.Status, cred.LastError = status, lastErr
 	if status == CredentialActive {
-		now := time.Now().UTC()
-		cred.LastVerifiedAt = &now
+		cred.LastVerifiedAt = new(time.Now().UTC())
 	}
 	c.meta[key] = cred
 

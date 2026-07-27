@@ -46,7 +46,7 @@ func WithTTL(ttl time.Duration) Option {
 
 // New builds a Store backed by storage.
 func New(storage fiber.Storage, opts ...Option) *Store {
-	s := &Store{storage: storage, prefix: defaultPrefix}
+	s := new(Store{storage: storage, prefix: defaultPrefix})
 
 	for _, opt := range opts {
 		opt(s)

@@ -17,12 +17,12 @@ func TestImportExchangeRatesFromFile(t *testing.T) {
 			"USD,COP,-4000\n"
 
 		var pairs []string
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			upsertExchangeRate: func(_ context.Context, from, to string, rate money.Decimal, _ time.Time) (ExchangeRate, error) {
 				pairs = append(pairs, from+"/"+to)
 				return ExchangeRate{FromCurrency: from, ToCurrency: to, Rate: rate}, nil
 			},
-		}
+		})
 		svc := newTestServices(repo, newMemStorage())
 
 		result, err := svc.ImportExchangeRatesFromFile(context.Background(), []byte(csv), "rates.csv", "")
@@ -45,7 +45,7 @@ func TestImportExchangeRatesFromFile(t *testing.T) {
 
 	t.Run("missing required columns fail fast", func(t *testing.T) {
 		csv := "par,valor\nEUR/USD,1.08\n"
-		svc := newTestServices(&fakeRepository{}, newMemStorage())
+		svc := newTestServices(new(fakeRepository{}), newMemStorage())
 
 		_, err := svc.ImportExchangeRatesFromFile(context.Background(), []byte(csv), "rates.csv", "")
 		if err == nil || !strings.Contains(err.Error(), "missing required columns") {

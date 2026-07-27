@@ -55,7 +55,7 @@ type MemoryStore struct {
 
 // NewMemoryStore returns an empty, ready-to-use MemoryStore.
 func NewMemoryStore() *MemoryStore {
-	return &MemoryStore{data: make(map[string]time.Time)}
+	return new(MemoryStore{data: make(map[string]time.Time)})
 }
 
 // LoadNextRun implements StateStore.

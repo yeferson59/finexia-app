@@ -81,7 +81,7 @@ func TestNewValidatesRequiredDeps(t *testing.T) {
 	// Envs present but DB missing must still fail (Envs is dereferenced in
 	// New; the rest are only needed later, so validation must catch them up
 	// front).
-	if _, err := New(Deps{Envs: &config.Env{}}); err == nil {
+	if _, err := New(Deps{Envs: new(config.Env{})}); err == nil {
 		t.Fatal("expected New to reject Deps missing DB/Storage/Mail/Log, got nil error")
 	}
 }
@@ -104,7 +104,7 @@ func TestAppWiresAndRoutes(t *testing.T) {
 	}
 
 	a, err := New(Deps{
-		Envs: &config.Env{
+		Envs: new(config.Env{
 			Port:               "0",
 			Environment:        "test",
 			JWTSecret:          "test-secret",
@@ -112,9 +112,9 @@ func TestAppWiresAndRoutes(t *testing.T) {
 			JWTRefreshDuration: 30 * 24 * time.Hour,
 			PublicURL:          "http://localhost:8080",
 			CORSOrigin:         []string{"http://localhost:5173"},
-		},
+		}),
 		DB:      pool,
-		Storage: &memStorage{},
+		Storage: new(memStorage{}),
 		S3:      nil,
 		Mail:    mailService,
 		Keyring: testKeyring(t),

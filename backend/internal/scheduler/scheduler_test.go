@@ -323,7 +323,7 @@ func TestScheduler_RegisterWithPerJobOverride(t *testing.T) {
 
 	// &once{} fires immediately, then never again during this test;
 	// isolates the assertion to the retry override, not repeated triggers.
-	sched.Register(job, &once{}, WithRetry(JobOptions{MaxRetries: Retries(0)}))
+	sched.Register(job, new(once{}), WithRetry(JobOptions{MaxRetries: Retries(0)}))
 	sched.Start()
 	defer sched.Stop()
 
@@ -414,7 +414,7 @@ func TestScheduler_StopInterruptsJobRetryBackoff(t *testing.T) {
 		},
 	}
 
-	sched.Register(job, &once{})
+	sched.Register(job, new(once{}))
 	sched.Start()
 
 	select {
@@ -449,7 +449,7 @@ type fakeStore struct {
 }
 
 func newFakeStore() *fakeStore {
-	return &fakeStore{data: make(map[string]time.Time)}
+	return new(fakeStore{data: make(map[string]time.Time)})
 }
 
 func (f *fakeStore) LoadNextRun(_ context.Context, jobName string) (time.Time, bool, error) {
@@ -494,7 +494,7 @@ func TestScheduler_PersistsNextRunAfterExecute(t *testing.T) {
 	fired := make(chan struct{}, 1)
 	job := JobFunc{JobName: "persist-me", Fn: func(ctx context.Context) error { fired <- struct{}{}; return nil }}
 
-	sched.Register(job, &once{}) // fires immediately
+	sched.Register(job, new(once{})) // fires immediately
 	sched.Start()
 	defer sched.Stop()
 
@@ -701,13 +701,13 @@ func TestScheduler_PerJobStoreOverridesDefault(t *testing.T) {
 	// Persisted to its own jobStore, not the default.
 	sched.Register(
 		JobFunc{JobName: "own-store", Fn: func(ctx context.Context) error { firedPersist <- struct{}{}; return nil }},
-		&once{},
+		new(once{}),
 		WithStore(jobStore),
 	)
 	// Explicitly ephemeral: must not touch the default store.
 	sched.Register(
 		JobFunc{JobName: "ephemeral", Fn: func(ctx context.Context) error { firedEphemeral <- struct{}{}; return nil }},
-		&once{},
+		new(once{}),
 		WithoutStore(),
 	)
 

@@ -26,7 +26,7 @@ func TestLoginLockout(t *testing.T) {
 	user := verifiedUser(t, password)
 
 	sessionRepo := func() *fakeRepository {
-		return &fakeRepository{
+		return new(fakeRepository{
 			getAccountByEmail: func(_ context.Context, email string) (identity.User, error) {
 				if email != user.Email {
 					return identity.User{}, errors.New("no rows")
@@ -39,7 +39,7 @@ func TestLoginLockout(t *testing.T) {
 			createRefreshToken: func(context.Context, uuid.UUID, string, uuid.UUID, uuid.UUID, *string, *string, time.Time) (uuid.UUID, error) {
 				return uuid.New(), nil
 			},
-		}
+		})
 	}
 
 	t.Run("locks after max failed attempts even with the right password", func(t *testing.T) {
@@ -109,7 +109,7 @@ func TestLoginRecordsIPAndAlertsOnUnknownIP(t *testing.T) {
 	user := verifiedUser(t, password)
 
 	var gotIP, gotUA *string
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getAccountByEmail: func(context.Context, string) (identity.User, error) {
 			return user, nil
 		},
@@ -123,8 +123,8 @@ func TestLoginRecordsIPAndAlertsOnUnknownIP(t *testing.T) {
 		createRefreshToken: func(context.Context, uuid.UUID, string, uuid.UUID, uuid.UUID, *string, *string, time.Time) (uuid.UUID, error) {
 			return uuid.New(), nil
 		},
-	}
-	mailer := &fakeMailer{}
+	})
+	mailer := new(fakeMailer{})
 	svc := newTestServiceFull(repo, newMemStorage(), mailer)
 
 	if _, err := svc.Login(context.Background(), user.Email, password, "203.0.113.7", "TestAgent/1.0"); err != nil {
@@ -162,7 +162,7 @@ func TestLoginDoesNotAlertOnKnownIP(t *testing.T) {
 	const password = "s3cret-password"
 	user := verifiedUser(t, password)
 
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getAccountByEmail: func(context.Context, string) (identity.User, error) {
 			return user, nil
 		},
@@ -175,8 +175,8 @@ func TestLoginDoesNotAlertOnKnownIP(t *testing.T) {
 		createRefreshToken: func(context.Context, uuid.UUID, string, uuid.UUID, uuid.UUID, *string, *string, time.Time) (uuid.UUID, error) {
 			return uuid.New(), nil
 		},
-	}
-	mailer := &fakeMailer{}
+	})
+	mailer := new(fakeMailer{})
 	svc := newTestServiceFull(repo, newMemStorage(), mailer)
 
 	if _, err := svc.Login(context.Background(), user.Email, password, "203.0.113.7", "TestAgent/1.0"); err != nil {
@@ -192,15 +192,13 @@ func TestLoginDoesNotAlertOnKnownIP(t *testing.T) {
 }
 
 func sessionFixture(userID uuid.UUID, token string) identity.Session {
-	ip := "198.51.100.1"
-	ua := "Agent/1.0"
 	return identity.Session{
 		ID:        uuid.New(),
 		UserID:    userID,
 		Token:     token,
 		ExpiresAt: time.Now().Add(time.Hour),
-		IPAddress: &ip,
-		UserAgent: &ua,
+		IPAddress: new("198.51.100.1"),
+		UserAgent: new("Agent/1.0"),
 		CreatedAt: time.Now().Add(-time.Hour),
 		UpdatedAt: time.Now(),
 	}
@@ -238,7 +236,7 @@ func TestRevokeSession(t *testing.T) {
 	const otherHash = "deadbeef"
 
 	newRepo := func(deleted *[]uuid.UUID) *fakeRepository {
-		return &fakeRepository{
+		return new(fakeRepository{
 			listSessionsByUserID: func(context.Context, uuid.UUID) ([]identity.Session, error) {
 				return []identity.Session{current, other}, nil
 			},
@@ -249,7 +247,7 @@ func TestRevokeSession(t *testing.T) {
 				*deleted = append(*deleted, ids...)
 				return int64(len(ids)), nil
 			},
-		}
+		})
 	}
 
 	t.Run("revokes another session and purges its caches", func(t *testing.T) {
@@ -308,7 +306,7 @@ func TestRevokeOtherSessions(t *testing.T) {
 	otherB := sessionFixture(userID, "token-b")
 
 	var deleted []uuid.UUID
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		listSessionsByUserID: func(context.Context, uuid.UUID) ([]identity.Session, error) {
 			return []identity.Session{current, otherA, otherB}, nil
 		},
@@ -319,7 +317,7 @@ func TestRevokeOtherSessions(t *testing.T) {
 			deleted = append(deleted, ids...)
 			return int64(len(ids)), nil
 		},
-	}
+	})
 	storage := newMemStorage()
 	_ = storage.Set(validateTokenCacheKey("current-token"), []byte("true"), time.Hour)
 	svc := newTestService(repo, storage)

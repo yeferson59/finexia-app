@@ -147,7 +147,7 @@ func TestPreviewSuggestsMappingFromSpanishHeaders(t *testing.T) {
 		{"03/03/2024", "Dividendo", "AAPL", "Apple Inc.", "", "12", "", ""},
 	})
 
-	svc := newTestServices(&fakeRepository{}, nil)
+	svc := newTestServices(new(fakeRepository{}), nil)
 	preview, err := svc.PreviewTransactionImport(data, "inversiones.xlsx", "", nil, ImportDefaultsDTO{})
 	if err != nil {
 		t.Fatalf("preview: %v", err)
@@ -199,7 +199,7 @@ func TestPreviewReportsRowErrors(t *testing.T) {
 		{"21/01/2024", "TSLA", "abc", "250"},
 	})
 
-	svc := newTestServices(&fakeRepository{}, nil)
+	svc := newTestServices(new(fakeRepository{}), nil)
 	preview, err := svc.PreviewTransactionImport(data, "archivo.xlsx", "", nil, ImportDefaultsDTO{})
 	if err != nil {
 		t.Fatalf("preview: %v", err)
@@ -225,7 +225,7 @@ func TestPreviewMissingRequiredColumns(t *testing.T) {
 		{"algo", "otra cosa"},
 	})
 
-	svc := newTestServices(&fakeRepository{}, nil)
+	svc := newTestServices(new(fakeRepository{}), nil)
 	preview, err := svc.PreviewTransactionImport(data, "archivo.xlsx", "", nil, ImportDefaultsDTO{})
 	if err != nil {
 		t.Fatalf("preview: %v", err)
@@ -241,7 +241,7 @@ func TestPreviewMissingRequiredColumns(t *testing.T) {
 func TestPreviewParsesCSVWithSemicolons(t *testing.T) {
 	csvData := []byte("Fecha;Tipo;Ticker;Cantidad;Precio\n15/01/2024;Compra;VOO;2;430,10\n16/01/2024;Compra;VOO;1;431,00\n")
 
-	svc := newTestServices(&fakeRepository{}, nil)
+	svc := newTestServices(new(fakeRepository{}), nil)
 	preview, err := svc.PreviewTransactionImport(csvData, "movimientos.csv", "", nil, ImportDefaultsDTO{})
 	if err != nil {
 		t.Fatalf("preview: %v", err)
@@ -264,7 +264,7 @@ func TestImportTransactionsFromFile(t *testing.T) {
 
 	userID, portfolioID, sourceID := uuid.New(), uuid.New(), uuid.New()
 	var captured []ImportTransactionRow
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		importEntryTransactions: func(_ context.Context, gotUser, gotPortfolio, gotSource uuid.UUID, rows []ImportTransactionRow) (int, error) {
 			if gotUser != userID || gotPortfolio != portfolioID || gotSource != sourceID {
 				t.Errorf("unexpected ids passed to repository")
@@ -272,7 +272,7 @@ func TestImportTransactionsFromFile(t *testing.T) {
 			captured = rows
 			return len(rows), nil
 		},
-	}
+	})
 	svc := newTestServices(repo, nil)
 
 	mapping := ImportMappingDTO{}
@@ -313,7 +313,7 @@ func TestImportRejectsMissingMapping(t *testing.T) {
 		{"Fecha", "Ticker"},
 		{"15/01/2024", "AAPL"},
 	})
-	svc := newTestServices(&fakeRepository{}, nil)
+	svc := newTestServices(new(fakeRepository{}), nil)
 
 	_, err := svc.ImportTransactionsFromFile(
 		context.Background(), uuid.New(), uuid.New(), uuid.New(),

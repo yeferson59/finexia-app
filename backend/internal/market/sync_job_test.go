@@ -15,14 +15,14 @@ func TestSyncJobRun(t *testing.T) {
 	assetID := uuid.New()
 
 	repoFor := func() *fakeRepository {
-		return &fakeRepository{
+		return new(fakeRepository{
 			getAssetByID: func(context.Context, uuid.UUID) (Asset, error) {
 				return Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: "USD"}, nil
 			},
 			upsertAsset: func(context.Context, string, string, AssetType, string, string) (Asset, error) {
 				return Asset{}, nil
 			},
-		}
+		})
 	}
 
 	holdingsFor := func() stubHoldings {
@@ -38,7 +38,7 @@ func TestSyncJobRun(t *testing.T) {
 	t.Run("a failing asset does not stop the rate sync", func(t *testing.T) {
 		var ratesFetched int
 
-		provider := &fakePriceProvider{
+		provider := new(fakePriceProvider{
 			fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
 				return marketdata.QuoteResult{}, providerErr(Finnhub, marketdata.ErrUnsupported, "finnhub: no data for AAPL")
 			},
@@ -47,7 +47,7 @@ func TestSyncJobRun(t *testing.T) {
 
 				return marketdata.ExchangeRateResult{Rate: "4100.5", Source: Finnhub}, nil
 			},
-		}
+		})
 
 		f := newBYOFixture(t, repoFor(), provider)
 		f.creds.seed(t, f.ring, userID, Finnhub, "user-finnhub-key")
@@ -74,14 +74,14 @@ func TestSyncJobRun(t *testing.T) {
 	})
 
 	t.Run("a healthy run reports no error", func(t *testing.T) {
-		provider := &fakePriceProvider{
+		provider := new(fakePriceProvider{
 			fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
 				return marketdata.QuoteResult{Price: "190.55", Source: Finnhub}, nil
 			},
 			fetchExchangeRate: func(context.Context, string, string) (marketdata.ExchangeRateResult, error) {
 				return marketdata.ExchangeRateResult{Rate: "4100.5", Source: Finnhub}, nil
 			},
-		}
+		})
 
 		f := newBYOFixture(t, repoFor(), provider)
 		f.creds.seed(t, f.ring, userID, Finnhub, "user-finnhub-key")

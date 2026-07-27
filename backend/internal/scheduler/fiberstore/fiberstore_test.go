@@ -17,7 +17,7 @@ type memStorage struct {
 }
 
 func newMemStorage() *memStorage {
-	return &memStorage{data: make(map[string][]byte)}
+	return new(memStorage{data: make(map[string][]byte)})
 }
 
 func (m *memStorage) GetWithContext(_ context.Context, key string) ([]byte, error) { return m.Get(key) }

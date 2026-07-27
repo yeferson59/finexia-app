@@ -78,7 +78,7 @@ func TestLoginHandlerSmoke(t *testing.T) {
 	}
 
 	newRepo := func() *fakeRepository {
-		return &fakeRepository{
+		return new(fakeRepository{
 			getAccountByEmail: func(_ context.Context, email string) (identity.User, error) {
 				if email != "user@example.com" {
 					return identity.User{}, errors.New("account not found")
@@ -101,7 +101,7 @@ func TestLoginHandlerSmoke(t *testing.T) {
 			createRefreshToken: func(context.Context, uuid.UUID, string, uuid.UUID, uuid.UUID, *string, *string, time.Time) (uuid.UUID, error) {
 				return uuid.New(), nil
 			},
-		}
+		})
 	}
 
 	t.Run("logs in with valid credentials and sets the refresh cookie", func(t *testing.T) {
@@ -147,7 +147,7 @@ func TestLoginHandlerSmoke(t *testing.T) {
 
 func TestRefreshHandlerSmoke(t *testing.T) {
 	t.Run("rejects a request without the refresh cookie", func(t *testing.T) {
-		app := newTestApp(&fakeRepository{}, authTestConfig())
+		app := newTestApp(new(fakeRepository{}), authTestConfig())
 
 		_, status, payload := doJSON(t, app, "POST", "/auth/refresh", "")
 		if status != fiber.StatusUnauthorized {
@@ -163,7 +163,7 @@ func TestRefreshHandlerSmoke(t *testing.T) {
 		// The raw cookie value must be URL-safe base64: the service decodes it
 		// before hashing and rejects anything else as an invalid token.
 		rawToken := base64.URLEncoding.EncodeToString(bytes.Repeat([]byte{1}, 32))
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getRefreshTokenByHash: func(context.Context, string) (identity.RefreshToken, error) {
 				return identity.RefreshToken{
 					ID:        uuid.New(),
@@ -181,11 +181,11 @@ func TestRefreshHandlerSmoke(t *testing.T) {
 			createRefreshToken: func(context.Context, uuid.UUID, string, uuid.UUID, uuid.UUID, *string, *string, time.Time) (uuid.UUID, error) {
 				return uuid.New(), nil
 			},
-		}
+		})
 		app := newTestApp(repo, authTestConfig())
 
 		req := httptest.NewRequest("POST", "/auth/refresh", nil)
-		req.AddCookie(&http.Cookie{Name: "refresh_token", Value: rawToken})
+		req.AddCookie(new(http.Cookie{Name: "refresh_token", Value: rawToken}))
 		resp, err := app.Test(req)
 		if err != nil {
 			t.Fatalf("app.Test: %v", err)
@@ -212,7 +212,7 @@ func TestRegisterHandlerSmoke(t *testing.T) {
 	t.Run("returns 403 while self-registration is disabled", func(t *testing.T) {
 		cfg := authTestConfig()
 		cfg.SelfRegistrationEnabled = false
-		app := newTestApp(&fakeRepository{}, cfg)
+		app := newTestApp(new(fakeRepository{}), cfg)
 
 		_, status, payload := doJSON(t, app, "POST", "/auth/register",
 			`{"name":"New User","email":"new@example.com","password":"secret-password"}`)
@@ -228,11 +228,11 @@ func TestRegisterHandlerSmoke(t *testing.T) {
 func TestProtectedAuthRoutesRequireToken(t *testing.T) {
 	// getSessionByToken hook: RequireAuth validates the bearer token against
 	// the session store; an unknown token must yield 401.
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getSessionByToken: func(context.Context, string) (identity.User, error) {
 			return identity.User{}, errors.New("no rows")
 		},
-	}
+	})
 	app := newTestApp(repo, authTestConfig())
 
 	for _, target := range []string{"/auth/session", "/auth/sessions", "/auth/2fa"} {

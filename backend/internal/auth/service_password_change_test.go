@@ -33,7 +33,7 @@ func TestChangePassword(t *testing.T) {
 	// baseRepo answers the reads every case needs: the stored credentials and
 	// the profile the alert email is addressed to.
 	baseRepo := func() *fakeRepository {
-		return &fakeRepository{
+		return new(fakeRepository{
 			getAccountByUserID: func(context.Context, uuid.UUID) (identity.Account, error) {
 				return identity.Account{UserID: userID, Password: string(currentHash)}, nil
 			},
@@ -44,7 +44,7 @@ func TestChangePassword(t *testing.T) {
 			listSessionsByUserID: func(context.Context, uuid.UUID) ([]identity.Session, error) {
 				return nil, nil
 			},
-		}
+		})
 	}
 
 	t.Run("revokes the other sessions and alerts", func(t *testing.T) {
@@ -62,7 +62,7 @@ func TestChangePassword(t *testing.T) {
 			deleted = ids
 			return int64(len(ids)), nil
 		}
-		mailer := &fakeMailer{}
+		mailer := new(fakeMailer{})
 		svc := newTestServiceFull(repo, newMemStorage(), mailer)
 
 		if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, "new-password", "203.0.113.5", "test-agent"); err != nil {
@@ -101,7 +101,7 @@ func TestChangePassword(t *testing.T) {
 			storedHash = hashed
 			return nil
 		}
-		svc := newTestServiceFull(repo, newMemStorage(), &fakeMailer{})
+		svc := newTestServiceFull(repo, newMemStorage(), new(fakeMailer{}))
 
 		if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, "new-password", "", ""); err != nil {
 			t.Fatalf("ChangePassword: %v", err)
@@ -119,7 +119,7 @@ func TestChangePassword(t *testing.T) {
 		// A nil updatePassword hook panics if the write is reached, so a plain
 		// error proves the check short-circuits.
 		repo.updatePassword = nil
-		svc := newTestServiceFull(repo, newMemStorage(), &fakeMailer{})
+		svc := newTestServiceFull(repo, newMemStorage(), new(fakeMailer{}))
 
 		if err := svc.ChangePassword(context.Background(), userID, "current-token", "wrong-password", "new-password", "", ""); err == nil {
 			t.Fatal("expected an error for an incorrect current password")
@@ -129,7 +129,7 @@ func TestChangePassword(t *testing.T) {
 	t.Run("rejects a new password identical to the current one", func(t *testing.T) {
 		repo := baseRepo()
 		repo.updatePassword = nil
-		svc := newTestServiceFull(repo, newMemStorage(), &fakeMailer{})
+		svc := newTestServiceFull(repo, newMemStorage(), new(fakeMailer{}))
 
 		if err := svc.ChangePassword(context.Background(), userID, "current-token", currentPassword, currentPassword, "", ""); err == nil {
 			t.Fatal("expected an error when the new password matches the current one")
@@ -143,13 +143,13 @@ func TestChangePasswordRoute(t *testing.T) {
 	userID := uuid.New()
 	cfg := testConfig()
 
-	signer := newService(testStores(&fakeRepository{}), cfg, newMemStorage(), nil, nil, logger.Noop())
+	signer := newService(testStores(new(fakeRepository{})), cfg, newMemStorage(), nil, nil, logger.Noop())
 	token, err := signer.CreateJWToken(userID, "user", time.Now().UTC().Add(time.Hour))
 	if err != nil {
 		t.Fatalf("CreateJWToken: %v", err)
 	}
 
-	app := newTestApp(&fakeRepository{
+	app := newTestApp(new(fakeRepository{
 		getSessionByToken: func(context.Context, string) (identity.User, error) {
 			return identity.User{
 				ID:       userID,
@@ -157,7 +157,7 @@ func TestChangePasswordRoute(t *testing.T) {
 				Sessions: []identity.Session{{Token: token}},
 			}, nil
 		},
-	}, cfg)
+	}), cfg)
 
 	patch := func(t *testing.T, body, bearer string) int {
 		t.Helper()

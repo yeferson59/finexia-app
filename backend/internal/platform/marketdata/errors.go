@@ -50,11 +50,11 @@ func (e *providerError) Unwrap() error { return e.sentinel }
 // parameter, so keeping the original in the chain would keep the key one
 // Error() call away.
 func Errorf(provider ProviderName, apiKey string, sentinel error, format string, args ...any) error {
-	return &providerError{
+	return new(providerError{
 		provider: provider,
 		msg:      scrub(fmt.Sprintf(format, args...), apiKey),
 		sentinel: sentinel,
-	}
+	})
 }
 
 // Verdict is what one provider said about one call.

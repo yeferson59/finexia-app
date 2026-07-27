@@ -14,7 +14,7 @@ import (
 
 func TestRegisterSendsEmailVerification(t *testing.T) {
 	var capturedHash, capturedEmail string
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getUserByEmail: notFound,
 		register: func(_ context.Context, name, email, hashed string) (identity.User, error) {
 			return identity.User{Name: name, Email: email}, nil
@@ -24,8 +24,8 @@ func TestRegisterSendsEmailVerification(t *testing.T) {
 			capturedHash = tokenHash
 			return Verification{ID: uuid.New(), Identifier: email, Value: tokenHash, ExpiresAt: expiresAt}, nil
 		},
-	}
-	mailer := &fakeMailer{}
+	})
+	mailer := new(fakeMailer{})
 	svc := newTestServiceFull(repo, newMemStorage(), mailer)
 	svc.cfg.EmailVerificationExpiry = 24 * time.Hour
 	svc.cfg.FrontendURL = "https://app.finexia.me"
@@ -54,10 +54,10 @@ func TestRegisterSendsEmailVerification(t *testing.T) {
 }
 
 func TestRequestEmailVerification_UnknownEmailIsSilentSuccess(t *testing.T) {
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getUserByEmail: notFound,
-	}
-	mailer := &fakeMailer{}
+	})
+	mailer := new(fakeMailer{})
 	svc := newTestServiceFull(repo, newMemStorage(), mailer)
 
 	if err := svc.RequestEmailVerification(context.Background(), "ghost@example.com"); err != nil {
@@ -69,12 +69,12 @@ func TestRequestEmailVerification_UnknownEmailIsSilentSuccess(t *testing.T) {
 }
 
 func TestRequestEmailVerification_AlreadyVerifiedIsSilentSuccess(t *testing.T) {
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getUserByEmail: func(_ context.Context, email string) (identity.User, error) {
 			return identity.User{Email: email, EmailVerified: true}, nil
 		},
-	}
-	mailer := &fakeMailer{}
+	})
+	mailer := new(fakeMailer{})
 	svc := newTestServiceFull(repo, newMemStorage(), mailer)
 
 	if err := svc.RequestEmailVerification(context.Background(), "verified@example.com"); err != nil {
@@ -94,7 +94,7 @@ func TestVerifyEmail_Success(t *testing.T) {
 
 	var consumedID uuid.UUID
 	var consumedEmail string
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getEmailVerificationByHash: func(_ context.Context, tokenHash string) (Verification, error) {
 			if tokenHash != hash {
 				t.Errorf("service hashed token differently: %q != %q", tokenHash, hash)
@@ -108,7 +108,7 @@ func TestVerifyEmail_Success(t *testing.T) {
 			consumedID, consumedEmail = id, email
 			return nil
 		},
-	}
+	})
 	svc := newTestService(repo, newMemStorage())
 
 	if err := svc.VerifyEmail(context.Background(), raw); err != nil {
@@ -124,14 +124,14 @@ func TestVerifyEmail_Success(t *testing.T) {
 
 func TestVerifyEmail_Expired(t *testing.T) {
 	raw, _, _ := generateRefreshToken()
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getEmailVerificationByHash: func(context.Context, string) (Verification, error) {
 			return Verification{
 				ID: uuid.New(), Identifier: "jane@example.com",
 				ExpiresAt: time.Now().UTC().Add(-time.Hour),
 			}, nil
 		},
-	}
+	})
 	svc := newTestService(repo, newMemStorage())
 
 	err := svc.VerifyEmail(context.Background(), raw)
@@ -142,11 +142,11 @@ func TestVerifyEmail_Expired(t *testing.T) {
 
 func TestVerifyEmail_InvalidToken(t *testing.T) {
 	raw, _, _ := generateRefreshToken()
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getEmailVerificationByHash: func(context.Context, string) (Verification, error) {
 			return Verification{}, errors.New("not found")
 		},
-	}
+	})
 	svc := newTestService(repo, newMemStorage())
 
 	err := svc.VerifyEmail(context.Background(), raw)
@@ -156,7 +156,7 @@ func TestVerifyEmail_InvalidToken(t *testing.T) {
 }
 
 func TestVerifyEmail_EmptyToken(t *testing.T) {
-	svc := newTestService(&fakeRepository{}, newMemStorage())
+	svc := newTestService(new(fakeRepository{}), newMemStorage())
 
 	err := svc.VerifyEmail(context.Background(), "")
 	if !errors.Is(err, ErrEmailVerificationInvalid) {

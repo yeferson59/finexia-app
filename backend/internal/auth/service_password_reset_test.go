@@ -15,7 +15,7 @@ import (
 func TestRequestPasswordReset_Success(t *testing.T) {
 	userID := uuid.New()
 	var capturedHash string
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getUserByEmail: func(_ context.Context, email string) (identity.User, error) {
 			return identity.User{ID: userID, Name: "Jane Doe", Email: email}, nil
 		},
@@ -26,8 +26,8 @@ func TestRequestPasswordReset_Success(t *testing.T) {
 			capturedHash = tokenHash
 			return PasswordReset{ID: uuid.New(), UserID: uid, TokenHash: tokenHash, ExpiresAt: expiresAt}, nil
 		},
-	}
-	mailer := &fakeMailer{}
+	})
+	mailer := new(fakeMailer{})
 	svc := newTestServiceFull(repo, newMemStorage(), mailer)
 	svc.cfg.PasswordResetExpiry = time.Hour
 	svc.cfg.FrontendURL = "https://app.finexia.me"
@@ -53,10 +53,10 @@ func TestRequestPasswordReset_Success(t *testing.T) {
 }
 
 func TestRequestPasswordReset_UnknownEmailIsSilentSuccess(t *testing.T) {
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getUserByEmail: notFound,
-	}
-	mailer := &fakeMailer{}
+	})
+	mailer := new(fakeMailer{})
 	svc := newTestServiceFull(repo, newMemStorage(), mailer)
 
 	if err := svc.RequestPasswordReset(context.Background(), "ghost@example.com"); err != nil {
@@ -78,7 +78,7 @@ func TestResetPassword_Success(t *testing.T) {
 	var consumedResetID, consumedUserID uuid.UUID
 	var consumedHash string
 	var revokedUser uuid.UUID
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getPasswordResetByHash: func(_ context.Context, tokenHash string) (PasswordReset, error) {
 			if tokenHash != hash {
 				t.Errorf("service hashed token differently: %q != %q", tokenHash, hash)
@@ -98,7 +98,7 @@ func TestResetPassword_Success(t *testing.T) {
 			revokedUser = uid
 			return nil, nil
 		},
-	}
+	})
 	svc := newTestService(repo, newMemStorage())
 
 	if err := svc.ResetPassword(context.Background(), raw, "s3cretpass", "203.0.113.9", "test-agent"); err != nil {
@@ -120,14 +120,14 @@ func TestResetPassword_Success(t *testing.T) {
 
 func TestResetPassword_Expired(t *testing.T) {
 	raw, _, _ := generateRefreshToken()
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getPasswordResetByHash: func(context.Context, string) (PasswordReset, error) {
 			return PasswordReset{
 				ID: uuid.New(), UserID: uuid.New(),
 				ExpiresAt: time.Now().UTC().Add(-time.Hour),
 			}, nil
 		},
-	}
+	})
 	svc := newTestService(repo, newMemStorage())
 
 	err := svc.ResetPassword(context.Background(), raw, "s3cretpass", "203.0.113.9", "test-agent")
@@ -138,15 +138,14 @@ func TestResetPassword_Expired(t *testing.T) {
 
 func TestResetPassword_AlreadyUsed(t *testing.T) {
 	raw, _, _ := generateRefreshToken()
-	usedAt := time.Now().UTC().Add(-time.Minute)
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getPasswordResetByHash: func(context.Context, string) (PasswordReset, error) {
 			return PasswordReset{
 				ID: uuid.New(), UserID: uuid.New(),
-				ExpiresAt: time.Now().UTC().Add(time.Hour), UsedAt: &usedAt,
+				ExpiresAt: time.Now().UTC().Add(time.Hour), UsedAt: new(time.Now().UTC().Add(-time.Minute)),
 			}, nil
 		},
-	}
+	})
 	svc := newTestService(repo, newMemStorage())
 
 	err := svc.ResetPassword(context.Background(), raw, "s3cretpass", "203.0.113.9", "test-agent")
@@ -157,11 +156,11 @@ func TestResetPassword_AlreadyUsed(t *testing.T) {
 
 func TestResetPassword_InvalidToken(t *testing.T) {
 	raw, _, _ := generateRefreshToken()
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getPasswordResetByHash: func(context.Context, string) (PasswordReset, error) {
 			return PasswordReset{}, errors.New("not found")
 		},
-	}
+	})
 	svc := newTestService(repo, newMemStorage())
 
 	err := svc.ResetPassword(context.Background(), raw, "s3cretpass", "203.0.113.9", "test-agent")
@@ -171,7 +170,7 @@ func TestResetPassword_InvalidToken(t *testing.T) {
 }
 
 func TestResetPassword_EmptyToken(t *testing.T) {
-	svc := newTestService(&fakeRepository{}, newMemStorage())
+	svc := newTestService(new(fakeRepository{}), newMemStorage())
 
 	err := svc.ResetPassword(context.Background(), "", "s3cretpass", "203.0.113.9", "test-agent")
 	if !errors.Is(err, ErrPasswordResetInvalid) {

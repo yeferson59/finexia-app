@@ -61,16 +61,16 @@ func TestSendWeeklySummaryEmails(t *testing.T) {
 			{Name: "Growth", Type: portfolio.TypeStocks, BaseCurrency: "USD", TotalMarketValue: "600.00", TotalGainLoss: "100.00", TotalGainLossPct: "20.00"},
 			{Name: "Crypto", Type: portfolio.TypeCryptos, BaseCurrency: "USD", TotalMarketValue: "500.00", TotalGainLoss: "-50.00", TotalGainLossPct: "-9.09"},
 		}
-		users := &fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
+		users := new(fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
 			return []identity.User{u}, nil
-		}}
-		ports := &fakePortfolioReader{getSummary: func(_ context.Context, uid uuid.UUID) ([]portfolio.SummaryView, error) {
+		}})
+		ports := new(fakePortfolioReader{getSummary: func(_ context.Context, uid uuid.UUID) ([]portfolio.SummaryView, error) {
 			if uid != u.ID {
 				t.Errorf("userID = %s, want %s", uid, u.ID)
 			}
 			return summaries, nil
-		}}
-		mailer := &fakeMailer{}
+		}})
+		mailer := new(fakeMailer{})
 		svc := newTestService(users, ports, mailer)
 
 		sent, errs := svc.SendWeeklySummaryEmails(context.Background())
@@ -117,15 +117,15 @@ func TestSendWeeklySummaryEmails(t *testing.T) {
 	})
 
 	t.Run("negative overall gain uses the red color", func(t *testing.T) {
-		users := &fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
+		users := new(fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
 			return []identity.User{{ID: uuid.New(), Email: "x@example.com"}}, nil
-		}}
-		ports := &fakePortfolioReader{getSummary: func(context.Context, uuid.UUID) ([]portfolio.SummaryView, error) {
+		}})
+		ports := new(fakePortfolioReader{getSummary: func(context.Context, uuid.UUID) ([]portfolio.SummaryView, error) {
 			return []portfolio.SummaryView{
 				{Name: "Down", BaseCurrency: "USD", TotalMarketValue: "900.00", TotalGainLoss: "-100.00", TotalGainLossPct: "-10.00"},
 			}, nil
-		}}
-		mailer := &fakeMailer{}
+		}})
+		mailer := new(fakeMailer{})
 		svc := newTestService(users, ports, mailer)
 
 		sent, errs := svc.SendWeeklySummaryEmails(context.Background())
@@ -143,13 +143,13 @@ func TestSendWeeklySummaryEmails(t *testing.T) {
 	})
 
 	t.Run("users without portfolios are skipped", func(t *testing.T) {
-		users := &fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
+		users := new(fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
 			return []identity.User{{ID: uuid.New(), Email: "empty@example.com"}}, nil
-		}}
-		ports := &fakePortfolioReader{getSummary: func(context.Context, uuid.UUID) ([]portfolio.SummaryView, error) {
+		}})
+		ports := new(fakePortfolioReader{getSummary: func(context.Context, uuid.UUID) ([]portfolio.SummaryView, error) {
 			return []portfolio.SummaryView{}, nil
-		}}
-		mailer := &fakeMailer{}
+		}})
+		mailer := new(fakeMailer{})
 		svc := newTestService(users, ports, mailer)
 
 		sent, errs := svc.SendWeeklySummaryEmails(context.Background())
@@ -164,16 +164,16 @@ func TestSendWeeklySummaryEmails(t *testing.T) {
 	t.Run("summary lookup failure skips the user without failing the batch", func(t *testing.T) {
 		okUser := identity.User{ID: uuid.New(), Email: "ok@example.com"}
 		badUser := identity.User{ID: uuid.New(), Email: "bad@example.com"}
-		users := &fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
+		users := new(fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
 			return []identity.User{badUser, okUser}, nil
-		}}
-		ports := &fakePortfolioReader{getSummary: func(_ context.Context, uid uuid.UUID) ([]portfolio.SummaryView, error) {
+		}})
+		ports := new(fakePortfolioReader{getSummary: func(_ context.Context, uid uuid.UUID) ([]portfolio.SummaryView, error) {
 			if uid == badUser.ID {
 				return nil, errors.New("summary view broken")
 			}
 			return []portfolio.SummaryView{{Name: "P", BaseCurrency: "USD", TotalMarketValue: "10.00", TotalGainLoss: "1.00", TotalGainLossPct: "11.11"}}, nil
-		}}
-		mailer := &fakeMailer{}
+		}})
+		mailer := new(fakeMailer{})
 		svc := newTestService(users, ports, mailer)
 
 		sent, errs := svc.SendWeeklySummaryEmails(context.Background())
@@ -186,13 +186,13 @@ func TestSendWeeklySummaryEmails(t *testing.T) {
 	})
 
 	t.Run("mail failures are collected per user", func(t *testing.T) {
-		users := &fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
+		users := new(fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
 			return []identity.User{{ID: uuid.New(), Email: "x@example.com"}}, nil
-		}}
-		ports := &fakePortfolioReader{getSummary: func(context.Context, uuid.UUID) ([]portfolio.SummaryView, error) {
+		}})
+		ports := new(fakePortfolioReader{getSummary: func(context.Context, uuid.UUID) ([]portfolio.SummaryView, error) {
 			return []portfolio.SummaryView{{Name: "P", BaseCurrency: "USD", TotalMarketValue: "10.00", TotalGainLoss: "0.00", TotalGainLossPct: "0.00"}}, nil
-		}}
-		mailer := &fakeMailer{weeklyErr: errors.New("smtp down")}
+		}})
+		mailer := new(fakeMailer{weeklyErr: errors.New("smtp down")})
 		svc := newTestService(users, ports, mailer)
 
 		sent, errs := svc.SendWeeklySummaryEmails(context.Background())
@@ -205,7 +205,7 @@ func TestSendWeeklySummaryEmails(t *testing.T) {
 		users := &fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
 			return nil, errors.New("db down")
 		}}
-		svc := newTestService(users, &fakePortfolioReader{}, &fakeMailer{})
+		svc := newTestService(users, new(fakePortfolioReader{}), new(fakeMailer{}))
 
 		sent, errs := svc.SendWeeklySummaryEmails(context.Background())
 		if sent != 0 || len(errs) != 1 {

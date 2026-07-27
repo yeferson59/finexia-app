@@ -407,7 +407,7 @@ type memItem struct {
 }
 
 func newMemStorage() *memStorage {
-	return &memStorage{items: map[string]memItem{}}
+	return new(memStorage{items: map[string]memItem{}})
 }
 
 func (s *memStorage) GetWithContext(_ context.Context, key string) ([]byte, error) {

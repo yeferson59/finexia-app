@@ -144,8 +144,7 @@ func (r *PostgresRepository) DeleteCredential(ctx context.Context, userID uuid.U
 func (r *PostgresRepository) SetCredentialStatus(ctx context.Context, userID uuid.UUID, provider ProviderID, status CredentialStatus, lastErr string) error {
 	var verifiedAt *time.Time
 	if status == CredentialActive {
-		now := time.Now().UTC()
-		verifiedAt = &now
+		verifiedAt = new(time.Now().UTC())
 	}
 
 	tag, err := r.db.Exec(ctx, `

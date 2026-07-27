@@ -100,4 +100,4 @@ func scrub(text, apiKey string) string {
 // DefaultHTTPClient is shared by every provider client. Clients are now built
 // per sync run rather than once at startup, so each one minting its own client
 // would leak connections and defeat keep-alive.
-var DefaultHTTPClient = &http.Client{Timeout: 10 * time.Second}
+var DefaultHTTPClient = new(http.Client{Timeout: 10 * time.Second})

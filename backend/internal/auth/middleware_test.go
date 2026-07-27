@@ -24,7 +24,7 @@ func TestRequireAuth(t *testing.T) {
 	cfg := testConfig()
 
 	// Sign one token; any service built with the same secret accepts it.
-	signer := newService(testStores(&fakeRepository{}), cfg, newMemStorage(), nil, nil, logger.Noop())
+	signer := newService(testStores(new(fakeRepository{})), cfg, newMemStorage(), nil, nil, logger.Noop())
 	token, err := signer.CreateJWToken(userID, "user", time.Now().UTC().Add(time.Hour))
 	if err != nil {
 		t.Fatalf("CreateJWToken: %v", err)
@@ -34,11 +34,11 @@ func TestRequireAuth(t *testing.T) {
 	// id from locals. A fresh storage per app keeps ValidateToken's positive
 	// cache from leaking between subtests.
 	probeApp := func(sessionUser identity.User, sessionErr error) *fiber.App {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getSessionByToken: func(context.Context, string) (identity.User, error) {
 				return sessionUser, sessionErr
 			},
-		}
+		})
 		service := newService(testStores(repo), cfg, newMemStorage(), nil, nil, logger.Noop())
 		m := newModule(Deps{Cfg: cfg, Storage: newMemStorage(), Log: logger.Noop()}, service)
 
@@ -106,7 +106,7 @@ func newRBACApp(role string, handler fiber.Handler) *fiber.App {
 }
 
 func TestRequireRole(t *testing.T) {
-	m := &Module{}
+	m := new(Module{})
 
 	cases := []struct {
 		name       string
@@ -138,7 +138,7 @@ func TestRequireRole(t *testing.T) {
 }
 
 func TestRequireAdmin(t *testing.T) {
-	m := &Module{}
+	m := new(Module{})
 
 	t.Run("admin passes", func(t *testing.T) {
 		app := newRBACApp("admin", m.RequireAdmin())

@@ -267,7 +267,7 @@ type memItem struct {
 }
 
 func newMemStorage() *memStorage {
-	return &memStorage{items: map[string]memItem{}}
+	return new(memStorage{items: map[string]memItem{}})
 }
 
 func (s *memStorage) GetWithContext(_ context.Context, key string) ([]byte, error) {
@@ -337,7 +337,7 @@ func testConfig() Config {
 // discarded mailer, matching the common case where a test only cares about
 // repository interactions.
 func newTestServices(repo *fakeRepository, storage *memStorage) *Service {
-	return newService(repo, testConfig(), storage, &fakeMailer{}, fakeUserReader{repo}, logger.Noop())
+	return newService(repo, testConfig(), storage, new(fakeMailer{}), fakeUserReader{repo}, logger.Noop())
 }
 
 // newTestServicesFull injects a caller-provided mailer for the flows that emit

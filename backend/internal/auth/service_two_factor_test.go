@@ -24,13 +24,15 @@ func wireTwoFactorRepo(repo *fakeRepository, state *twoFactorState) {
 		if state.row == nil {
 			return TwoFactor{}, ErrTwoFactorNotFound
 		}
+
 		return *state.row, nil
 	}
 	repo.upsertTwoFactorSecret = func(_ context.Context, userID uuid.UUID, secret string) error {
 		if state.row != nil && state.row.Enabled {
 			return errors.New("two-factor already enabled")
 		}
-		state.row = &TwoFactor{UserID: userID, Secret: secret}
+
+		state.row = new(TwoFactor{UserID: userID, Secret: secret})
 		return nil
 	}
 	repo.enableTwoFactor = func(_ context.Context, _ uuid.UUID) error {
@@ -38,8 +40,7 @@ func wireTwoFactorRepo(repo *fakeRepository, state *twoFactorState) {
 			return ErrTwoFactorNotFound
 		}
 		state.row.Enabled = true
-		now := time.Now()
-		state.row.ConfirmedAt = &now
+		state.row.ConfirmedAt = new(time.Now())
 		return nil
 	}
 	repo.deleteTwoFactor = func(_ context.Context, _ uuid.UUID) error {
@@ -76,16 +77,16 @@ func wireTwoFactorRepo(repo *fakeRepository, state *twoFactorState) {
 func TestTwoFactorSetupAndEnableFlow(t *testing.T) {
 	const password = "s3cret-password"
 	user := verifiedUser(t, password)
-	state := &twoFactorState{codes: map[string]bool{}}
+	state := new(twoFactorState{codes: map[string]bool{}})
 
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getAccountByUserID: func(_ context.Context, _ uuid.UUID) (identity.Account, error) {
 			return user.Accounts[0], nil
 		},
 		getUserByID: func(_ context.Context, _ uuid.UUID) (identity.User, error) {
 			return user, nil
 		},
-	}
+	})
 	wireTwoFactorRepo(repo, state)
 	svc := newTestService(repo, newMemStorage())
 	ctx := context.Background()
@@ -151,7 +152,7 @@ func TestTwoFactorSetupAndEnableFlow(t *testing.T) {
 // loginCapableRepo wires the minimum needed for Login/issueSession to work.
 func loginCapableRepo(t *testing.T, user identity.User, state *twoFactorState) *fakeRepository {
 	t.Helper()
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getAccountByEmail: func(_ context.Context, email string) (identity.User, error) {
 			if email != user.Email {
 				return identity.User{}, errors.New("not found")
@@ -173,7 +174,7 @@ func loginCapableRepo(t *testing.T, user identity.User, state *twoFactorState) *
 		createRefreshToken: func(_ context.Context, _ uuid.UUID, _ string, _, _ uuid.UUID, _, _ *string, _ time.Time) (uuid.UUID, error) {
 			return uuid.New(), nil
 		},
-	}
+	})
 	wireTwoFactorRepo(repo, state)
 	return repo
 }
@@ -184,11 +185,10 @@ func enabledTwoFactorState(t *testing.T, userID uuid.UUID) (*twoFactorState, str
 	if err != nil {
 		t.Fatalf("GenerateTOTPSecret: %v", err)
 	}
-	now := time.Now()
-	return &twoFactorState{
-		row:   &TwoFactor{UserID: userID, Secret: secret, Enabled: true, ConfirmedAt: &now},
+	return new(twoFactorState{
+		row:   new(TwoFactor{UserID: userID, Secret: secret, Enabled: true, ConfirmedAt: new(time.Now())}),
 		codes: map[string]bool{},
-	}, secret
+	}), secret
 }
 
 func TestLoginWithTwoFactorEnabled(t *testing.T) {
@@ -358,10 +358,10 @@ func TestLoginWithPendingSetupDoesNotRequireCode(t *testing.T) {
 	user := verifiedUser(t, password)
 	secret, _ := helpers.GenerateTOTPSecret()
 	// Row exists but was never confirmed: enabled = false.
-	state := &twoFactorState{
-		row:   &TwoFactor{UserID: user.ID, Secret: secret},
+	state := new(twoFactorState{
+		row:   new(TwoFactor{UserID: user.ID, Secret: secret}),
 		codes: map[string]bool{},
-	}
+	})
 	repo := loginCapableRepo(t, user, state)
 	svc := newTestService(repo, newMemStorage())
 

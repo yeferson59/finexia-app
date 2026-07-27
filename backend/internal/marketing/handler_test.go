@@ -38,13 +38,13 @@ func postWaitlist(t *testing.T, app *fiber.App, body string) (int, map[string]an
 func TestCreateWaitlistRoute(t *testing.T) {
 	t.Run("registers the email and returns the envelope", func(t *testing.T) {
 		var saved string
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			saveWaitlistEmail: func(_ context.Context, email string) error {
 				saved = email
 				return nil
 			},
-		}
-		mailer := &fakeMailer{}
+		})
+		mailer := new(fakeMailer{})
 		app := newTestApp(repo, mailer)
 
 		status, payload := postWaitlist(t, app, `{"email":"new@example.com"}`)
@@ -67,14 +67,14 @@ func TestCreateWaitlistRoute(t *testing.T) {
 	})
 
 	t.Run("maps a duplicate email to 409", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			// The repository translates the DB unique violation into this
 			// tagged sentinel; the fake stands in for that contract.
 			saveWaitlistEmail: func(context.Context, string) error {
 				return ErrWaitlistEmailExists
 			},
-		}
-		app := newTestApp(repo, &fakeMailer{})
+		})
+		app := newTestApp(repo, new(fakeMailer{}))
 
 		status, payload := postWaitlist(t, app, `{"email":"dup@example.com"}`)
 		if status != fiber.StatusConflict {
@@ -86,7 +86,7 @@ func TestCreateWaitlistRoute(t *testing.T) {
 	})
 
 	t.Run("rejects a malformed body", func(t *testing.T) {
-		app := newTestApp(&fakeRepository{}, &fakeMailer{})
+		app := newTestApp(new(fakeRepository{}), new(fakeMailer{}))
 
 		status, _ := postWaitlist(t, app, `{`)
 		if status != fiber.StatusBadRequest {
@@ -120,7 +120,7 @@ func (g fakeGuard) RequireAdmin() fiber.Handler { return g.handler(g.adminStatus
 func TestListWaitlistRoute(t *testing.T) {
 	newApp := func(repo Repository, guard fakeGuard) *fiber.App {
 		app := fiber.New()
-		New(Deps{Service: newService(repo, &fakeMailer{}), AuthMiddl: guard}).Routes(app)
+		New(Deps{Service: newService(repo, new(fakeMailer{})), AuthMiddl: guard}).Routes(app)
 		return app
 	}
 
@@ -139,7 +139,7 @@ func TestListWaitlistRoute(t *testing.T) {
 	}
 
 	t.Run("returns the paginated waitlist", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			listWaitlist: func(_ context.Context, offset, limit uint) ([]Waitlist, uint, error) {
 				if limit != 10 {
 					t.Errorf("limit = %d, want 10", limit)
@@ -149,7 +149,7 @@ func TestListWaitlistRoute(t *testing.T) {
 				}
 				return []Waitlist{{Email: "early@example.com"}}, 1, nil
 			},
-		}
+		})
 
 		status, payload := get(t, newApp(repo, fakeGuard{}))
 		if status != fiber.StatusOK {
@@ -167,10 +167,10 @@ func TestListWaitlistRoute(t *testing.T) {
 	})
 
 	t.Run("is gated by the shared guards", func(t *testing.T) {
-		if status, _ := get(t, newApp(&fakeRepository{}, fakeGuard{authStatus: fiber.StatusUnauthorized})); status != fiber.StatusUnauthorized {
+		if status, _ := get(t, newApp(new(fakeRepository{}), fakeGuard{authStatus: fiber.StatusUnauthorized})); status != fiber.StatusUnauthorized {
 			t.Errorf("status = %d, want 401 when RequireAuth rejects", status)
 		}
-		if status, _ := get(t, newApp(&fakeRepository{}, fakeGuard{adminStatus: fiber.StatusForbidden})); status != fiber.StatusForbidden {
+		if status, _ := get(t, newApp(new(fakeRepository{}), fakeGuard{adminStatus: fiber.StatusForbidden})); status != fiber.StatusForbidden {
 			t.Errorf("status = %d, want 403 when RequireAdmin rejects", status)
 		}
 	})
@@ -186,6 +186,6 @@ func TestListWaitlistRoute(t *testing.T) {
 			}
 		}()
 
-		New(Deps{Service: newService(&fakeRepository{}, &fakeMailer{})})
+		New(Deps{Service: newService(new(fakeRepository{}), new(fakeMailer{}))})
 	})
 }

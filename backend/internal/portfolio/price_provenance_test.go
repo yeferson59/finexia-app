@@ -36,8 +36,7 @@ func pricedEntry(ticker string, source PriceSource, price string, fetchedAt *tim
 		},
 	}
 	if price != "" {
-		p := money.MustMoneyFromString(price, money.USD)
-		entry.Asset.CurrentPrice = &p
+		entry.Asset.CurrentPrice = new(money.MustMoneyFromString(price, money.USD))
 	}
 
 	return entry
@@ -94,7 +93,7 @@ func TestPortfolioDetailReportsPriceProvenance(t *testing.T) {
 func TestSummaryCountsSurviveCurrencyConversion(t *testing.T) {
 	userID := uuid.New()
 
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]SummaryView, error) {
 			return []SummaryView{{
 				ID:                    uuid.New(),
@@ -116,7 +115,7 @@ func TestSummaryCountsSurviveCurrencyConversion(t *testing.T) {
 
 			return money.Decimal{}, ErrExchangeRateNotFound
 		},
-	}
+	})
 
 	got, err := newTestServices(repo, newMemStorage()).
 		GetPortfoliosSummaryInCurrency(context.Background(), userID, "COP")

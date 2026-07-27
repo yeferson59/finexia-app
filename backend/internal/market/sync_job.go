@@ -39,11 +39,11 @@ type SyncJob struct {
 }
 
 func NewSyncJob(service *Service, holdings Holdings, log logger.Logger) *SyncJob {
-	return &SyncJob{
+	return new(SyncJob{
 		service:  service,
 		holdings: holdings,
 		log:      log.With(logger.Str("scheduler", "market_sync")),
-	}
+	})
 }
 
 func (j *SyncJob) Name() string { return "market-sync" }

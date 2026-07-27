@@ -77,11 +77,11 @@ func TestNonOKStatusIsClassified(t *testing.T) {
 
 	for status, want := range tests {
 		c := newTestClient(func(*http.Request) (*http.Response, error) {
-			return &http.Response{
+			return new(http.Response{
 				StatusCode: status,
 				Body:       io.NopCloser(strings.NewReader("")),
 				Header:     make(http.Header),
-			}, nil
+			}), nil
 		})
 
 		_, err := c.FetchQuote(context.Background(), "AAPL")

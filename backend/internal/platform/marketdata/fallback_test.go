@@ -27,9 +27,9 @@ func (s *stubProvider) FetchExchangeRate(context.Context, string, string) (Excha
 
 func TestFallbackFetchQuote(t *testing.T) {
 	t.Run("returns the first successful provider and stops", func(t *testing.T) {
-		first := &stubProvider{quoteErr: errors.New("first down")}
-		second := &stubProvider{quote: QuoteResult{Price: "10.00"}}
-		third := &stubProvider{quote: QuoteResult{Price: "99.00"}}
+		first := new(stubProvider{quoteErr: errors.New("first down")})
+		second := new(stubProvider{quote: QuoteResult{Price: "10.00"}})
+		third := new(stubProvider{quote: QuoteResult{Price: "99.00"}})
 
 		res, err := NewFallback(first, second, third).FetchQuote(context.Background(), "AAPL")
 		if err != nil {
@@ -50,8 +50,8 @@ func TestFallbackFetchQuote(t *testing.T) {
 		errA := errors.New("provider A failed")
 		errB := errors.New("provider B failed")
 		f := NewFallback(
-			&stubProvider{quoteErr: errA},
-			&stubProvider{quoteErr: errB},
+			new(stubProvider{quoteErr: errA}),
+			new(stubProvider{quoteErr: errB}),
 		)
 
 		_, err := f.FetchQuote(context.Background(), "AAPL")
@@ -76,9 +76,9 @@ func TestFallbackFetchQuote(t *testing.T) {
 
 func TestFallbackFetchExchangeRate(t *testing.T) {
 	t.Run("returns the first successful provider and stops", func(t *testing.T) {
-		first := &stubProvider{rateErr: errors.New("first down")}
-		second := &stubProvider{rate: ExchangeRateResult{Rate: "1.08"}}
-		third := &stubProvider{rate: ExchangeRateResult{Rate: "9.99"}}
+		first := new(stubProvider{rateErr: errors.New("first down")})
+		second := new(stubProvider{rate: ExchangeRateResult{Rate: "1.08"}})
+		third := new(stubProvider{rate: ExchangeRateResult{Rate: "9.99"}})
 
 		res, err := NewFallback(first, second, third).FetchExchangeRate(context.Background(), "EUR", "USD")
 		if err != nil {
@@ -96,8 +96,8 @@ func TestFallbackFetchExchangeRate(t *testing.T) {
 		errA := errors.New("rate A failed")
 		errB := errors.New("rate B failed")
 		f := NewFallback(
-			&stubProvider{rateErr: errA},
-			&stubProvider{rateErr: errB},
+			new(stubProvider{rateErr: errA}),
+			new(stubProvider{rateErr: errB}),
 		)
 
 		_, err := f.FetchExchangeRate(context.Background(), "EUR", "USD")

@@ -10,10 +10,10 @@ import (
 
 func newTestClient(handler http.HandlerFunc) (*Client, *httptest.Server) {
 	server := httptest.NewServer(handler)
-	return &Client{
-		httpClient: &http.Client{Timeout: time.Second},
+	return new(Client{
+		httpClient: new(http.Client{Timeout: time.Second}),
 		baseURL:    server.URL,
-	}, server
+	}), server
 }
 
 func TestLocate(t *testing.T) {

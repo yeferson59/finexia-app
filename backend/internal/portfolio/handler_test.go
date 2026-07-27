@@ -81,11 +81,11 @@ func decodeEnvelope(t *testing.T, resp *http.Response) (bool, json.RawMessage) {
 }
 
 func TestHandlerGetPortfoliosRisks(t *testing.T) {
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getPortfoliosRisks: func(context.Context) ([]Risk, error) {
 			return []Risk{{ID: uuid.New(), Name: "conservative"}}, nil
 		},
-	}
+	})
 	app := newTestModule(t, repo, uuid.New(), "user")
 
 	resp := do(t, app, http.MethodGet, "/portfolios/risks")
@@ -108,14 +108,16 @@ func TestHandlerGetPortfoliosRisks(t *testing.T) {
 func TestHandlerGetPortfolios(t *testing.T) {
 	userID := uuid.New()
 	newApp := func(t *testing.T) *fiber.App {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getPortfoliosByUserID: func(_ context.Context, uid uuid.UUID) ([]Portfolio, error) {
 				if uid != userID {
 					t.Errorf("userID = %s, want %s", uid, userID)
 				}
+
 				return []Portfolio{{ID: uuid.New(), Name: "Growth"}}, nil
 			},
-		}
+		})
+
 		return newTestModule(t, repo, userID, "user")
 	}
 
@@ -148,7 +150,7 @@ func TestHandlerGetPortfolioByID(t *testing.T) {
 	portfolioID := uuid.New()
 
 	t.Run("found", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getPortfolioByID: func(_ context.Context, pid, uid uuid.UUID) (Portfolio, error) {
 				if pid != portfolioID || uid != userID {
 					t.Errorf("ids = %s/%s, want %s/%s", pid, uid, portfolioID, userID)
@@ -158,7 +160,7 @@ func TestHandlerGetPortfolioByID(t *testing.T) {
 			getEntriesByPortfolioID: func(context.Context, uuid.UUID) ([]Entry, error) {
 				return nil, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		resp := do(t, app, http.MethodGet, "/portfolios/"+portfolioID.String())
@@ -168,7 +170,7 @@ func TestHandlerGetPortfolioByID(t *testing.T) {
 	})
 
 	t.Run("invalid uuid returns 400", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 		resp := do(t, app, http.MethodGet, "/portfolios/not-a-uuid")
 		if resp.StatusCode != fiber.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", resp.StatusCode)
@@ -176,7 +178,7 @@ func TestHandlerGetPortfolioByID(t *testing.T) {
 	})
 
 	t.Run("not found maps to 404", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getPortfolioByID: func(context.Context, uuid.UUID, uuid.UUID) (Portfolio, error) {
 				return Portfolio{}, ErrPortfolioNotFound
 			},
@@ -185,7 +187,7 @@ func TestHandlerGetPortfolioByID(t *testing.T) {
 			getEntriesByPortfolioID: func(context.Context, uuid.UUID) ([]Entry, error) {
 				return nil, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		resp := do(t, app, http.MethodGet, "/portfolios/"+portfolioID.String())
@@ -198,14 +200,14 @@ func TestHandlerGetPortfolioByID(t *testing.T) {
 	// this message leads with "failed", which any message-based mapping would
 	// read as a 400.
 	t.Run("wrapped not found still maps to 404", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getPortfolioByID: func(context.Context, uuid.UUID, uuid.UUID) (Portfolio, error) {
 				return Portfolio{}, fmt.Errorf("failed to load portfolio: %w", ErrPortfolioNotFound)
 			},
 			getEntriesByPortfolioID: func(context.Context, uuid.UUID) ([]Entry, error) {
 				return nil, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		resp := do(t, app, http.MethodGet, "/portfolios/"+portfolioID.String())
@@ -219,7 +221,7 @@ func TestHandlerGetPortfoliosSummary(t *testing.T) {
 	userID := uuid.New()
 
 	t.Run("unsupported currency returns 400", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 		resp := do(t, app, http.MethodGet, "/portfolios/summary?currency=EUR")
 		if resp.StatusCode != fiber.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", resp.StatusCode)
@@ -227,14 +229,14 @@ func TestHandlerGetPortfoliosSummary(t *testing.T) {
 	})
 
 	t.Run("supported currency converts and returns 200", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]SummaryView, error) {
 				return []SummaryView{{
 					BaseCurrency: "USD", TotalMarketValue: "1000", TotalCostBase: "900",
 					TotalGainLoss: "100", TotalGainLossPct: "11.11",
 				}}, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		// USD == base: conversion is skipped, no exchange-rate lookup needed.
@@ -246,7 +248,7 @@ func TestHandlerGetPortfoliosSummary(t *testing.T) {
 }
 
 func TestHandlerRejectsMissingIdentity(t *testing.T) {
-	svc := newTestServices(&fakeRepository{}, newMemStorage())
+	svc := newTestServices(new(fakeRepository{}), newMemStorage())
 	noopLimiter := func(c fiber.Ctx) error { return c.Next() }
 	mod := newModule(Deps{
 		AuthMiddl: stubAuth{authenticated: false},

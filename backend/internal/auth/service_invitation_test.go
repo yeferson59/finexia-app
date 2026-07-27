@@ -14,7 +14,7 @@ import (
 
 func TestCreateInvitation_Success(t *testing.T) {
 	var capturedHash string
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getUserByEmail: notFound,
 		createInvitation: func(_ context.Context, email, name, role, tokenHash string, invitedBy *uuid.UUID, expiresAt time.Time) (Invitation, error) {
 			capturedHash = tokenHash
@@ -24,8 +24,8 @@ func TestCreateInvitation_Success(t *testing.T) {
 			}, nil
 		},
 		setWaitlistInvited: func(context.Context, string) error { return nil },
-	}
-	mailer := &fakeMailer{}
+	})
+	mailer := new(fakeMailer{})
 	svc := newTestServiceFull(repo, newMemStorage(), mailer)
 	svc.cfg.InvitationExpiry = 72 * time.Hour
 	svc.cfg.FrontendURL = "https://app.finexia.me"
@@ -62,12 +62,12 @@ func TestCreateInvitation_Success(t *testing.T) {
 }
 
 func TestCreateInvitation_RejectsExistingUser(t *testing.T) {
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getUserByEmail: func(context.Context, string) (identity.User, error) {
 			return identity.User{ID: uuid.New()}, nil
 		},
-	}
-	svc := newTestServiceFull(repo, newMemStorage(), &fakeMailer{})
+	})
+	svc := newTestServiceFull(repo, newMemStorage(), new(fakeMailer{}))
 
 	_, err := svc.CreateInvitation(context.Background(), "taken@example.com", "Taken", "customer", uuid.New())
 	if err == nil || !strings.Contains(err.Error(), "already exists") {
@@ -76,8 +76,8 @@ func TestCreateInvitation_RejectsExistingUser(t *testing.T) {
 }
 
 func TestCreateInvitation_RejectsBadRole(t *testing.T) {
-	repo := &fakeRepository{}
-	svc := newTestServiceFull(repo, newMemStorage(), &fakeMailer{})
+	repo := new(fakeRepository{})
+	svc := newTestServiceFull(repo, newMemStorage(), new(fakeMailer{}))
 
 	_, err := svc.CreateInvitation(context.Background(), "x@example.com", "X", "superadmin", uuid.New())
 	if err == nil || !strings.Contains(err.Error(), "invalid role") {
@@ -93,7 +93,7 @@ func TestAcceptInvitation_Success(t *testing.T) {
 	invID := uuid.New()
 
 	var acceptedName, acceptedHash string
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getInvitationByHash: func(_ context.Context, tokenHash string) (Invitation, error) {
 			if tokenHash != hash {
 				t.Errorf("service hashed token differently: %q != %q", tokenHash, hash)
@@ -110,8 +110,8 @@ func TestAcceptInvitation_Success(t *testing.T) {
 			acceptedName, acceptedHash = name, passwordHash
 			return identity.User{ID: uuid.New(), Email: email, Name: name}, nil
 		},
-	}
-	svc := newTestServiceFull(repo, newMemStorage(), &fakeMailer{})
+	})
+	svc := newTestServiceFull(repo, newMemStorage(), new(fakeMailer{}))
 
 	u, err := svc.AcceptInvitation(context.Background(), raw, "Jane Doe", "s3cretpass")
 	if err != nil {
@@ -130,14 +130,14 @@ func TestAcceptInvitation_Success(t *testing.T) {
 
 func TestAcceptInvitation_Expired(t *testing.T) {
 	raw, _, _ := generateRefreshToken()
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getInvitationByHash: func(context.Context, string) (Invitation, error) {
 			return Invitation{
 				ID: uuid.New(), Email: "old@example.com", Role: "customer",
 				ExpiresAt: time.Now().UTC().Add(-time.Hour),
 			}, nil
 		},
-	}
+	})
 	svc := newTestServiceFull(repo, newMemStorage(), &fakeMailer{})
 
 	_, err := svc.AcceptInvitation(context.Background(), raw, "", "s3cretpass")
@@ -149,14 +149,14 @@ func TestAcceptInvitation_Expired(t *testing.T) {
 func TestAcceptInvitation_Revoked(t *testing.T) {
 	raw, _, _ := generateRefreshToken()
 	revoked := time.Now().UTC().Add(-time.Minute)
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getInvitationByHash: func(context.Context, string) (Invitation, error) {
 			return Invitation{
 				ID: uuid.New(), Email: "revoked@example.com", Role: "customer",
 				ExpiresAt: time.Now().UTC().Add(time.Hour), RevokedAt: &revoked,
 			}, nil
 		},
-	}
+	})
 	svc := newTestServiceFull(repo, newMemStorage(), &fakeMailer{})
 
 	_, err := svc.AcceptInvitation(context.Background(), raw, "", "s3cretpass")

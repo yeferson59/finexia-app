@@ -126,7 +126,7 @@ func NewKeyring(keys, active string) (*Keyring, error) {
 		return nil, fmt.Errorf("%w: active version %d was not supplied", ErrUnknownKEK, activeVersion)
 	}
 
-	return &Keyring{keys: parsed, active: activeVersion}, nil
+	return new(Keyring{keys: parsed, active: activeVersion}), nil
 }
 
 // ActiveVersion reports the KEK version new seals are written under. Callers use

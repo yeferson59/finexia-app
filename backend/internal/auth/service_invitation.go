@@ -60,11 +60,7 @@ func (s *Service) CreateInvitation(ctx context.Context, email, name, role string
 		return Invitation{}, err
 	}
 
-	var inviter *uuid.UUID
-	if invitedBy != uuid.Nil {
-		inviter = &invitedBy
-	}
-
+	inviter := new(invitedBy)
 	expiresAt := time.Now().UTC().Add(s.cfg.InvitationExpiry)
 
 	inv, err := s.stores.Invitations.CreateInvitation(ctx, email, name, role, hash, inviter, expiresAt)

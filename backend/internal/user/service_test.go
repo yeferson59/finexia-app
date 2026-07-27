@@ -24,7 +24,7 @@ func TestUpdateCurrentUser(t *testing.T) {
 	newSvc := func(t *testing.T) (*Service, *identity.User) {
 		t.Helper()
 		var saved identity.User
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getUserByID: func(context.Context, uuid.UUID) (identity.User, error) {
 				return existing, nil
 			},
@@ -32,7 +32,7 @@ func TestUpdateCurrentUser(t *testing.T) {
 				saved = identity.User{ID: id, Name: name, PreferredCurrency: preferredCurrency, Image: image}
 				return saved, nil
 			},
-		}
+		})
 		return newService(repo, nil, logger.Noop(), Config{}), &saved
 	}
 
@@ -75,11 +75,12 @@ func TestUpdateCurrentUser(t *testing.T) {
 
 func TestUpdateUserRejectsDeletedUser(t *testing.T) {
 	deletedAt := time.Now()
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getUserByID: func(context.Context, uuid.UUID) (identity.User, error) {
 			return identity.User{ID: uuid.New(), DeletedAt: &deletedAt}, nil
 		},
-	}
+	})
+
 	svc := newService(repo, nil, logger.Noop(), Config{})
 
 	_, err := svc.UpdateUser(context.Background(), uuid.New(), "Name", "mail@example.com", "")

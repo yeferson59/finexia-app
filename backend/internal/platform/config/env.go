@@ -49,7 +49,7 @@ type Env struct {
 func (c *Config) LoadEnvs() *Env {
 	_ = godotenv.Load()
 
-	return &Env{
+	return new(Env{
 		Environment:        c.getString("ENVIRONMENT", "development"),
 		Port:               c.getString("PORT", "8080"),
 		PathMigration:      c.getString("PATH_MIGRATION", "file://internal/migrations"),
@@ -103,7 +103,7 @@ func (c *Config) LoadEnvs() *Env {
 		// How long a password-validated login may wait for its TOTP code
 		// before the user must start over.
 		TwoFactorPendingExpiry: c.getDuration("TWO_FACTOR_PENDING_EXPIRY", 5*time.Minute),
-	}
+	})
 }
 
 func (Config) getString(key, defaultValue string) string {

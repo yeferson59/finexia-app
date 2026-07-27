@@ -77,12 +77,12 @@ func TestHandlerCreatePortfolio(t *testing.T) {
 	riskID := uuid.New()
 
 	newApp := func(t *testing.T, created *Portfolio) *fiber.App {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			createPortfolio: func(_ context.Context, uid uuid.UUID, name, description, baseCurrency string, rid uuid.UUID, typePortfolio Type, _ money.Money, isDefault bool) (Portfolio, error) {
 				*created = Portfolio{ID: uuid.New(), UserID: uid, Name: name, Description: description, BaseCurrency: baseCurrency, RiskID: rid, Type: typePortfolio, IsDefault: isDefault}
 				return *created, nil
 			},
-		}
+		})
 		return newTestModule(t, repo, userID, "user")
 	}
 
@@ -105,7 +105,7 @@ func TestHandlerCreatePortfolio(t *testing.T) {
 	t.Run("rejects an unsupported type before touching the service", func(t *testing.T) {
 		// A nil createPortfolio hook panics if the handler calls through, so
 		// reaching a 400 proves validation short-circuits.
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		resp := doJSON(t, app, http.MethodPost, "/portfolios",
 			`{"name":"Growth","currency":"USD","type":"nonsense","riskId":"`+riskID.String()+`"}`)
@@ -115,7 +115,7 @@ func TestHandlerCreatePortfolio(t *testing.T) {
 	})
 
 	t.Run("requires a risk level", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		resp := doJSON(t, app, http.MethodPost, "/portfolios", `{"name":"Growth","currency":"USD","type":"stocks"}`)
 		if resp.StatusCode != fiber.StatusBadRequest {
@@ -124,7 +124,7 @@ func TestHandlerCreatePortfolio(t *testing.T) {
 	})
 
 	t.Run("rejects a malformed body", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		resp := doJSON(t, app, http.MethodPost, "/portfolios", `{`)
 		if resp.StatusCode != fiber.StatusBadRequest {
@@ -140,12 +140,12 @@ func TestHandlerUpdatePortfolio(t *testing.T) {
 
 	t.Run("updates the addressed portfolio", func(t *testing.T) {
 		var gotPortfolioID, gotRiskID uuid.UUID
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			updatePortfolio: func(_ context.Context, uid, pid uuid.UUID, name, _ string, _ Type, rid uuid.UUID, _ bool) (Portfolio, error) {
 				gotPortfolioID, gotRiskID = pid, rid
 				return Portfolio{ID: pid, UserID: uid, Name: name}, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		resp := doJSON(t, app, http.MethodPatch, "/portfolios/"+portfolioID.String(),
@@ -159,7 +159,7 @@ func TestHandlerUpdatePortfolio(t *testing.T) {
 	})
 
 	t.Run("rejects a non-uuid portfolio id", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		resp := doJSON(t, app, http.MethodPatch, "/portfolios/not-a-uuid", `{"riskId":"`+riskID.String()+`"}`)
 		if resp.StatusCode != fiber.StatusBadRequest {
@@ -168,7 +168,7 @@ func TestHandlerUpdatePortfolio(t *testing.T) {
 	})
 
 	t.Run("rejects a non-uuid risk id", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		resp := doJSON(t, app, http.MethodPatch, "/portfolios/"+portfolioID.String(), `{"riskId":"nope"}`)
 		if resp.StatusCode != fiber.StatusBadRequest {
@@ -181,14 +181,14 @@ func TestHandlerGetPortfolioTopTransaction(t *testing.T) {
 	userID := uuid.New()
 	portfolioID := uuid.New()
 
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getTopTransactionByPortfolio: func(_ context.Context, uid, pid uuid.UUID) (TopTransactionDTO, error) {
 			if uid != userID || pid != portfolioID {
 				t.Errorf("ids = %s/%s, want %s/%s", uid, pid, userID, portfolioID)
 			}
 			return TopTransactionDTO{AssetTicker: "AAPL"}, nil
 		},
-	}
+	})
 	app := newTestModule(t, repo, userID, "user")
 
 	resp := do(t, app, http.MethodGet, "/portfolios/"+portfolioID.String()+"/top-transaction")
@@ -212,12 +212,12 @@ func TestHandlerPlatformCRUD(t *testing.T) {
 	t.Run("creates a platform", func(t *testing.T) {
 		var gotType SourceType
 		var gotName string
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			createPlatform: func(_ context.Context, _ uuid.UUID, sourceType SourceType, name, description string) (InvestmentSource, error) {
 				gotType, gotName = sourceType, name
 				return InvestmentSource{ID: sourceID, Name: name, Description: description}, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		resp := doJSON(t, app, http.MethodPost, "/portfolios/sources", `{"name":"Interactive Brokers","type":"broker"}`)
@@ -234,7 +234,7 @@ func TestHandlerPlatformCRUD(t *testing.T) {
 	})
 
 	t.Run("rejects an unsupported source type", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		resp := doJSON(t, app, http.MethodPost, "/portfolios/sources", `{"name":"Mystery","type":"nonsense"}`)
 		if resp.StatusCode != fiber.StatusBadRequest {
@@ -271,12 +271,12 @@ func TestHandlerPlatformCRUD(t *testing.T) {
 
 	t.Run("updates a platform", func(t *testing.T) {
 		var gotSourceID uuid.UUID
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			updatePlatform: func(_ context.Context, _, sid uuid.UUID, name, _ string, _ SourceType, _ bool) (PlatformStats, error) {
 				gotSourceID = sid
 				return PlatformStats{ID: sid, Name: name}, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		resp := doJSON(t, app, http.MethodPatch, "/portfolios/sources/"+sourceID.String(), `{"name":"ibkr pro","isActive":true}`)
@@ -290,12 +290,12 @@ func TestHandlerPlatformCRUD(t *testing.T) {
 
 	t.Run("deletes a platform", func(t *testing.T) {
 		var deleted uuid.UUID
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			deletePlatform: func(_ context.Context, _, sid uuid.UUID) error {
 				deleted = sid
 				return nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		resp := do(t, app, http.MethodDelete, "/portfolios/sources/"+sourceID.String())
@@ -308,7 +308,7 @@ func TestHandlerPlatformCRUD(t *testing.T) {
 	})
 
 	t.Run("rejects a non-uuid platform id", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		if resp := do(t, app, http.MethodDelete, "/portfolios/sources/not-a-uuid"); resp.StatusCode != fiber.StatusBadRequest {
 			t.Errorf("DELETE status = %d, want 400", resp.StatusCode)
@@ -334,13 +334,13 @@ func TestHandlerTransactions(t *testing.T) {
 	t.Run("creates a transaction on an entry", func(t *testing.T) {
 		var gotEntryID uuid.UUID
 		var gotType TransactionType
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getUserPreferences: alertsOff,
 			createTransaction: func(_ context.Context, _, eid uuid.UUID, txnType TransactionType, _ money.Decimal, _ money.Money, currency string, _ money.Money, _ time.Time, _ string) (Transaction, error) {
 				gotEntryID, gotType = eid, txnType
 				return Transaction{ID: txnID, EntryID: eid, Type: txnType, Currency: currency}, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		body := `{"type":"buy","quantity":"10","price":"150.00","currency":"USD","transactionDate":"` + txnDate.Format(time.RFC3339) + `"}`
@@ -355,12 +355,12 @@ func TestHandlerTransactions(t *testing.T) {
 
 	t.Run("updates a transaction", func(t *testing.T) {
 		var gotTxnID uuid.UUID
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			updateTransaction: func(_ context.Context, _, tid uuid.UUID, txnType TransactionType, _ money.Decimal, _ money.Money, _ string, _ money.Money, _ time.Time, _ string) (Transaction, error) {
 				gotTxnID = tid
 				return Transaction{ID: tid, Type: txnType}, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		body := `{"type":"sell","quantity":"5","price":"160.00","currency":"USD","transactionDate":"` + txnDate.Format(time.RFC3339) + `"}`
@@ -374,7 +374,7 @@ func TestHandlerTransactions(t *testing.T) {
 	})
 
 	t.Run("rejects an unsupported transaction type", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		body := `{"type":"teleport","quantity":"1","price":"1.00","currency":"USD","transactionDate":"` + txnDate.Format(time.RFC3339) + `"}`
 		resp := doJSON(t, app, http.MethodPost, "/portfolios/entries/"+entryID.String()+"/transactions", body)
@@ -384,14 +384,14 @@ func TestHandlerTransactions(t *testing.T) {
 	})
 
 	t.Run("lists the transactions of an entry", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getTransactionsByEntryID: func(_ context.Context, uid, eid uuid.UUID) ([]Transaction, error) {
 				if uid != userID || eid != entryID {
 					t.Errorf("ids = %s/%s, want %s/%s", uid, eid, userID, entryID)
 				}
 				return []Transaction{{ID: txnID, EntryID: eid, Type: Buy}}, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		resp := do(t, app, http.MethodGet, "/portfolios/entries/"+entryID.String()+"/transactions")
@@ -402,7 +402,7 @@ func TestHandlerTransactions(t *testing.T) {
 
 	t.Run("lists the user's recent transactions", func(t *testing.T) {
 		var gotLimit int
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getRecentTransactionsByUserID: func(_ context.Context, uid uuid.UUID, limit int) ([]Transaction, error) {
 				gotLimit = limit
 				if uid != userID {
@@ -410,7 +410,7 @@ func TestHandlerTransactions(t *testing.T) {
 				}
 				return []Transaction{{ID: txnID, Type: Buy}}, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		resp := do(t, app, http.MethodGet, "/portfolios/transactions")
@@ -423,7 +423,7 @@ func TestHandlerTransactions(t *testing.T) {
 	})
 
 	t.Run("rejects a non-uuid entry id", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		resp := do(t, app, http.MethodGet, "/portfolios/entries/not-a-uuid/transactions")
 		if resp.StatusCode != fiber.StatusBadRequest {
@@ -434,14 +434,14 @@ func TestHandlerTransactions(t *testing.T) {
 
 func TestHandlerGetAssetAllocation(t *testing.T) {
 	userID := uuid.New()
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getAssetAllocationByUserID: func(_ context.Context, uid uuid.UUID) ([]AllocationItem, error) {
 			if uid != userID {
 				t.Errorf("userID = %s, want %s", uid, userID)
 			}
 			return []AllocationItem{{Category: EntryCategory("stocks"), MarketValue: "1000"}}, nil
 		},
-	}
+	})
 	app := newTestModule(t, repo, userID, "user")
 
 	resp := do(t, app, http.MethodGet, "/portfolios/allocation")
@@ -456,12 +456,12 @@ func TestHandlerGetPortfolioGrowth(t *testing.T) {
 
 	t.Run("aggregated growth defaults to the full history", func(t *testing.T) {
 		var gotHasSince bool
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
 				gotHasSince = hasSince
 				return nil, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		resp := do(t, app, http.MethodGet, "/portfolios/growth")
@@ -475,12 +475,12 @@ func TestHandlerGetPortfolioGrowth(t *testing.T) {
 
 	t.Run("a period query bounds the range", func(t *testing.T) {
 		var gotHasSince bool
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
 				gotHasSince = hasSince
 				return nil, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		if resp := do(t, app, http.MethodGet, "/portfolios/growth?period=1M"); resp.StatusCode != fiber.StatusOK {
@@ -493,12 +493,12 @@ func TestHandlerGetPortfolioGrowth(t *testing.T) {
 
 	t.Run("per-portfolio growth", func(t *testing.T) {
 		var gotPortfolioID uuid.UUID
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getPortfolioGrowthByPortfolioID: func(_ context.Context, _, pid uuid.UUID, _ bool, _ time.Time) ([]GrowthPoint, error) {
 				gotPortfolioID = pid
 				return nil, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		resp := do(t, app, http.MethodGet, "/portfolios/"+portfolioID.String()+"/growth")
@@ -523,7 +523,7 @@ func TestHandlerAssets(t *testing.T) {
 				return []market.Asset{{ID: assetID, Ticker: "AAPL"}}, nil
 			},
 		}
-		app := newTestModuleWithAssets(t, &fakeRepository{}, assets, userID, "user")
+		app := newTestModuleWithAssets(t, new(fakeRepository{}), assets, userID, "user")
 
 		resp := do(t, app, http.MethodGet, "/portfolios/assets?page=1&limit=10")
 		if resp.StatusCode != fiber.StatusOK {
@@ -545,7 +545,7 @@ func TestHandlerAssets(t *testing.T) {
 				return nil, nil
 			},
 		}
-		app := newTestModuleWithAssets(t, &fakeRepository{}, assets, userID, "admin")
+		app := newTestModuleWithAssets(t, new(fakeRepository{}), assets, userID, "admin")
 
 		if resp := do(t, app, http.MethodGet, "/portfolios/assets?page=1&limit=10"); resp.StatusCode != fiber.StatusOK {
 			t.Fatalf("status = %d, want 200", resp.StatusCode)
@@ -564,7 +564,7 @@ func TestHandlerAssets(t *testing.T) {
 				return nil, nil
 			},
 		}
-		app := newTestModuleWithAssets(t, &fakeRepository{}, assets, userID, "user")
+		app := newTestModuleWithAssets(t, new(fakeRepository{}), assets, userID, "user")
 
 		if resp := do(t, app, http.MethodGet, "/portfolios/assets?page=1&limit=10&search=apple"); resp.StatusCode != fiber.StatusOK {
 			t.Fatalf("status = %d, want 200", resp.StatusCode)
@@ -587,7 +587,7 @@ func TestHandlerAssets(t *testing.T) {
 		}
 		body := `{"price":"200.00"}`
 
-		app := newTestModuleWithAssets(t, &fakeRepository{}, assets, userID, "user")
+		app := newTestModuleWithAssets(t, new(fakeRepository{}), assets, userID, "user")
 		if resp := doJSON(t, app, http.MethodPatch, "/portfolios/assets/"+assetID.String()+"/price", body); resp.StatusCode != fiber.StatusForbidden {
 			t.Errorf("status = %d, want 403 for a non-admin", resp.StatusCode)
 		}
@@ -595,7 +595,7 @@ func TestHandlerAssets(t *testing.T) {
 			t.Error("the service was called despite the 403")
 		}
 
-		adminApp := newTestModuleWithAssets(t, &fakeRepository{}, assets, userID, "admin")
+		adminApp := newTestModuleWithAssets(t, new(fakeRepository{}), assets, userID, "admin")
 		if resp := doJSON(t, adminApp, http.MethodPatch, "/portfolios/assets/"+assetID.String()+"/price", body); resp.StatusCode != fiber.StatusOK {
 			t.Fatalf("status = %d, want 200 for an admin", resp.StatusCode)
 		}
@@ -622,12 +622,12 @@ func TestHandlerCreatePortfolioEntry(t *testing.T) {
 	t.Run("maps the asset type to an entry category", func(t *testing.T) {
 		var gotCategory EntryCategory
 		var gotType TransactionType
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			createPortfolioEntry: func(_ context.Context, _, pid, aid, sid uuid.UUID, txnType TransactionType, _ money.Decimal, _ money.Money, _ string, category EntryCategory, _ time.Time, _ string) (Entry, error) {
 				gotCategory, gotType = category, txnType
 				return Entry{ID: uuid.New(), PortfolioID: pid, AssetID: aid, SourceID: sid, Category: category}, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		resp := doJSON(t, app, http.MethodPost, "/portfolios/entries", body(string(market.Stock), "buy"))
@@ -644,12 +644,12 @@ func TestHandlerCreatePortfolioEntry(t *testing.T) {
 
 	t.Run("an empty transaction type defaults to buy", func(t *testing.T) {
 		var gotType TransactionType
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			createPortfolioEntry: func(_ context.Context, _, _, _, _ uuid.UUID, txnType TransactionType, _ money.Decimal, _ money.Money, _ string, _ EntryCategory, _ time.Time, _ string) (Entry, error) {
 				gotType = txnType
 				return Entry{ID: uuid.New()}, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		if resp := doJSON(t, app, http.MethodPost, "/portfolios/entries", body(string(market.Stock), "")); resp.StatusCode != fiber.StatusOK {
@@ -661,7 +661,7 @@ func TestHandlerCreatePortfolioEntry(t *testing.T) {
 	})
 
 	t.Run("rejects an unsupported transaction type", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		resp := doJSON(t, app, http.MethodPost, "/portfolios/entries", body(string(market.Stock), "teleport"))
 		if resp.StatusCode != fiber.StatusBadRequest {
@@ -675,7 +675,7 @@ func TestHandlerGetAssetTransactions(t *testing.T) {
 	portfolioID := uuid.New()
 
 	newApp := func(t *testing.T, total int) *fiber.App {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			countAssetTransactions: func(_ context.Context, _, _ uuid.UUID, _ string) (int, error) {
 				return total, nil
 			},
@@ -691,7 +691,7 @@ func TestHandlerGetAssetTransactions(t *testing.T) {
 				}
 				return []Transaction{{ID: uuid.New(), Type: Buy}}, nil
 			},
-		}
+		})
 		return newTestModule(t, repo, userID, "user")
 	}
 
@@ -713,14 +713,14 @@ func TestHandlerGetAssetTransactions(t *testing.T) {
 	})
 
 	t.Run("an empty result reports zero pages", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			countAssetTransactions: func(_ context.Context, _, _ uuid.UUID, _ string) (int, error) {
 				return 0, nil
 			},
 			getAssetTransactionsPaginated: func(_ context.Context, _, _ uuid.UUID, _ string, _, _ int) ([]Transaction, error) {
 				return nil, nil
 			},
-		}
+		})
 		app := newTestModule(t, repo, userID, "user")
 
 		resp := do(t, app, http.MethodGet,
@@ -739,7 +739,7 @@ func TestHandlerGetAssetTransactions(t *testing.T) {
 	})
 
 	t.Run("rejects a non-uuid portfolio id", func(t *testing.T) {
-		app := newTestModule(t, &fakeRepository{}, userID, "user")
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
 		resp := do(t, app, http.MethodGet, "/portfolios/not-a-uuid/assets/AAPL/transactions?page=1&limit=10")
 		if resp.StatusCode != fiber.StatusBadRequest {

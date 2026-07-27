@@ -98,7 +98,7 @@ func TestGetAssetTransactionsPaginated(t *testing.T) {
 	portfolioID := uuid.New()
 
 	var gotLimit, gotOffset int
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		countAssetTransactions: func(context.Context, uuid.UUID, uuid.UUID, string) (int, error) {
 			return 42, nil
 		},
@@ -106,7 +106,7 @@ func TestGetAssetTransactionsPaginated(t *testing.T) {
 			gotLimit, gotOffset = limit, offset
 			return []Transaction{{ID: uuid.New()}}, nil
 		},
-	}
+	})
 	svc := newTestServices(repo, newMemStorage())
 
 	txns, total, err := svc.GetAssetTransactionsPaginated(context.Background(), userID, portfolioID, "AAPL", 3, 10)
@@ -129,7 +129,7 @@ func TestGetPortfolioGrowthUsesPeriodFilter(t *testing.T) {
 	var gotHasSince bool
 	var gotSince time.Time
 
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getPortfolioGrowthByUserID: func(_ context.Context, uid uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error) {
 			if uid != userID {
 				t.Errorf("userID = %s, want %s", uid, userID)
@@ -140,7 +140,7 @@ func TestGetPortfolioGrowthUsesPeriodFilter(t *testing.T) {
 				{TotalValue: "110.00"},
 			}, nil
 		},
-	}
+	})
 	svc := newTestServices(repo, newMemStorage())
 
 	points, summary, err := svc.GetPortfolioGrowth(context.Background(), userID, "1M")
@@ -167,7 +167,7 @@ func TestGetPortfolioGrowthByIDScopesToPortfolio(t *testing.T) {
 	var gotUserID, gotPortfolioID uuid.UUID
 	var gotHasSince bool
 
-	repo := &fakeRepository{
+	repo := new(fakeRepository{
 		getPortfolioGrowthByPortfolioID: func(_ context.Context, uid, pid uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error) {
 			gotUserID, gotPortfolioID, gotHasSince = uid, pid, hasSince
 			return []GrowthPoint{
@@ -175,7 +175,7 @@ func TestGetPortfolioGrowthByIDScopesToPortfolio(t *testing.T) {
 				{TotalValue: "220.00"},
 			}, nil
 		},
-	}
+	})
 	svc := newTestServices(repo, newMemStorage())
 
 	points, summary, err := svc.GetPortfolioGrowthByID(context.Background(), userID, portfolioID, "ALL")

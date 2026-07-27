@@ -24,7 +24,7 @@ func TestSyncPortfolioSnapshots(t *testing.T) {
 		}
 		var calls []upsertCall
 
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getAllPortfolioSummaryRows: func(context.Context) ([]SnapshotRow, error) {
 				return rows, nil
 			},
@@ -32,7 +32,7 @@ func TestSyncPortfolioSnapshots(t *testing.T) {
 				calls = append(calls, upsertCall{portfolioID, snapshotDate, totalValue, currency})
 				return nil
 			},
-		}
+		})
 		storage := newMemStorage()
 		svc := newTestServices(repo, storage)
 
@@ -64,7 +64,7 @@ func TestSyncPortfolioSnapshots(t *testing.T) {
 			{PortfolioID: badID, TotalMarketValue: "1.00"},
 			{PortfolioID: uuid.New(), TotalMarketValue: "2.00"},
 		}
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getAllPortfolioSummaryRows: func(context.Context) ([]SnapshotRow, error) {
 				return rows, nil
 			},
@@ -74,7 +74,7 @@ func TestSyncPortfolioSnapshots(t *testing.T) {
 				}
 				return nil
 			},
-		}
+		})
 		svc := newTestServices(repo, newMemStorage())
 
 		count, errs := svc.SyncPortfolioSnapshots(context.Background())
@@ -87,11 +87,11 @@ func TestSyncPortfolioSnapshots(t *testing.T) {
 	})
 
 	t.Run("summary query failure aborts the sync", func(t *testing.T) {
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			getAllPortfolioSummaryRows: func(context.Context) ([]SnapshotRow, error) {
 				return nil, errors.New("view missing")
 			},
-		}
+		})
 		storage := newMemStorage()
 		svc := newTestServices(repo, storage)
 

@@ -15,12 +15,12 @@ func TestImportAssetsFromFile(t *testing.T) {
 			"BTC-USD,Bitcoin,crypto,,USD\n"
 
 		var upserted []string
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			upsertAsset: func(_ context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error) {
 				upserted = append(upserted, ticker)
 				return Asset{Ticker: ticker, Name: name, AssetType: assetType, Exchange: exchange, Currency: currency}, nil
 			},
-		}
+		})
 		svc := newTestServices(repo, newMemStorage())
 
 		result, err := svc.ImportAssetsFromFile(context.Background(), []byte(csv), "assets.csv", "")
@@ -46,7 +46,7 @@ func TestImportAssetsFromFile(t *testing.T) {
 
 	t.Run("missing required columns fail fast", func(t *testing.T) {
 		csv := "symbol,precio\nAAPL,100\n"
-		svc := newTestServices(&fakeRepository{}, newMemStorage())
+		svc := newTestServices(new(fakeRepository{}), newMemStorage())
 
 		_, err := svc.ImportAssetsFromFile(context.Background(), []byte(csv), "assets.csv", "")
 		if err == nil || !strings.Contains(err.Error(), "missing required columns") {
@@ -56,11 +56,11 @@ func TestImportAssetsFromFile(t *testing.T) {
 
 	t.Run("repository failures are reported per row without stopping the import", func(t *testing.T) {
 		csv := "ticker,name,assetType,currency\nAAPL,Apple Inc.,stock,USD\n"
-		repo := &fakeRepository{
+		repo := new(fakeRepository{
 			upsertAsset: func(context.Context, string, string, AssetType, string, string) (Asset, error) {
 				return Asset{}, errors.New("db write failed")
 			},
-		}
+		})
 		svc := newTestServices(repo, newMemStorage())
 
 		result, err := svc.ImportAssetsFromFile(context.Background(), []byte(csv), "assets.csv", "")
