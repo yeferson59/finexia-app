@@ -149,7 +149,7 @@ func TestEnvelopes(t *testing.T) {
 }
 
 func TestPaginationMetadata(t *testing.T) {
-	info := &paginate.PageInfo{Page: 2, Limit: 10, Offset: 10}
+	info := new(paginate.PageInfo{Page: 2, Limit: 10, Offset: 10})
 	meta := PaginationMetadata(info, 35, "itemsForPage", "totalItems")
 
 	if meta["totalPages"] != uint(4) {

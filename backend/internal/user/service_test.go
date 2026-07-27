@@ -23,18 +23,19 @@ func TestUpdateCurrentUser(t *testing.T) {
 
 	newSvc := func(t *testing.T) (*Service, *identity.User) {
 		t.Helper()
-		var saved identity.User
+		saved := new(identity.User{})
+
 		repo := new(fakeRepository{
 			getUserByID: func(context.Context, uuid.UUID) (identity.User, error) {
 				return existing, nil
 			},
 			updateUserProfile: func(_ context.Context, id uuid.UUID, name, preferredCurrency, image string) (identity.User, error) {
-				saved = identity.User{ID: id, Name: name, PreferredCurrency: preferredCurrency, Image: image}
+				*saved = identity.User{ID: id, Name: name, PreferredCurrency: preferredCurrency, Image: image}
 
-				return saved, nil
+				return *saved, nil
 			},
 		})
-		return newService(repo, nil, logger.Noop(), Config{}), &saved
+		return newService(repo, nil, logger.Noop(), Config{}), saved
 	}
 
 	t.Run("normalizes name and currency", func(t *testing.T) {

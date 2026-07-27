@@ -38,7 +38,7 @@ func New(apiKey string, httpClient *http.Client) *Client {
 		httpClient = marketdata.DefaultHTTPClient
 	}
 
-	return &Client{apiKey: apiKey, httpClient: httpClient}
+	return new(Client{apiKey: apiKey, httpClient: httpClient})
 }
 
 func (c *Client) get(ctx context.Context, path string, params url.Values, what string, out any) error {

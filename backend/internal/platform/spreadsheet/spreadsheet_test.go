@@ -59,13 +59,15 @@ func TestRowIsEmpty(t *testing.T) {
 
 func TestCellHelpers(t *testing.T) {
 	row := []string{" a ", "b"}
-	idx := 0
-	if CellAt(row, &idx) != "a" {
-		t.Errorf("CellAt trimmed = %q", CellAt(row, &idx))
+	idx := new(0)
+	if CellAt(row, idx) != "a" {
+		t.Errorf("CellAt trimmed = %q", CellAt(row, idx))
 	}
+
 	if CellAt(row, nil) != "" {
 		t.Error("CellAt(nil) should be empty")
 	}
+
 	if CellAtIdx(row, 1) != "b" || CellAtIdx(row, 9) != "" {
 		t.Error("CellAtIdx out-of-range should be empty")
 	}
