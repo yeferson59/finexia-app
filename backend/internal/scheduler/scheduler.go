@@ -126,7 +126,9 @@ type RegisterOption func(*jobConfig)
 // alone (see JobOptions). Replaces the old trailing JobOptions argument to
 // Register.
 func WithRetry(o JobOptions) RegisterOption {
-	return func(c *jobConfig) { c.retry = []JobOptions{o} }
+	return func(c *jobConfig) {
+		c.retry = []JobOptions{o}
+	}
 }
 
 // WithStore persists this job's next-run time to store, overriding the
@@ -135,7 +137,9 @@ func WithRetry(o JobOptions) RegisterOption {
 // scheduler keeps its default — or vice versa. Passing nil is equivalent to
 // WithoutStore.
 func WithStore(store StateStore) RegisterOption {
-	return func(c *jobConfig) { c.store, c.storeSet = store, true }
+	return func(c *jobConfig) {
+		c.store, c.storeSet = store, true
+	}
 }
 
 // WithoutStore makes this job ephemeral: its cadence is computed fresh from
@@ -143,7 +147,9 @@ func WithStore(store StateStore) RegisterOption {
 // has a default Store. Use it for jobs whose exact next-run doesn't need to
 // survive a restart.
 func WithoutStore() RegisterOption {
-	return func(c *jobConfig) { c.store, c.storeSet = nil, true }
+	return func(c *jobConfig) {
+		c.store, c.storeSet = nil, true
+	}
 }
 
 // defaultStoreTimeout bounds each StateStore call so a slow or unreachable

@@ -268,7 +268,8 @@ func (r *Runner) Execute(ctx context.Context, job Job, overrides ...JobOptions) 
 				logger.Str("job", job.Name()),
 				logger.Int("attempt", attempt),
 				logger.Int("total_attempts", totalAttempts),
-				logger.Dur("duration", duration))
+				logger.Dur("duration", duration),
+			)
 
 			return
 		}
@@ -280,7 +281,8 @@ func (r *Runner) Execute(ctx context.Context, job Job, overrides ...JobOptions) 
 			logger.Int("attempt", attempt),
 			logger.Int("total_attempts", totalAttempts),
 			logger.Dur("duration", duration),
-			logger.Err(err))
+			logger.Err(err),
+		)
 
 		if attempt < totalAttempts {
 			r.wait(ctx, opts.BackoffBase, opts.BackoffMax, attempt)
@@ -288,7 +290,9 @@ func (r *Runner) Execute(ctx context.Context, job Job, overrides ...JobOptions) 
 	}
 
 	if lastErr != nil && r.opts.OnError != nil {
-		r.safeCallback(ctx, "OnError", func() { r.opts.OnError(job.Name(), lastErr) })
+		r.safeCallback(ctx, "OnError", func() {
+			r.opts.OnError(job.Name(), lastErr)
+		})
 	}
 }
 
