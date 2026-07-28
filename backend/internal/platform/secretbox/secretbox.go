@@ -22,22 +22,21 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 )
 
-// keyLen is the AES-256 key size, required for both the KEK and every DEK.
-const keyLen = 32
-
-// aadSep joins the parts of a caller AAD. It is a control character, so it
-// cannot appear in the UUIDs and provider slugs that make up the AAD and the
-// encoding stays unambiguous.
-const aadSep = "\x1f"
-
-// dekAADPrefix domain-separates the DEK-wrapping layer from the payload layer,
-// so a wrapped DEK can never be opened as if it were a payload.
-const dekAADPrefix = "finexia/secretbox/dek/v"
+const (
+	// keyLen is the AES-256 key size, required for both the KEK and every DEK.
+	keyLen = 32
+	// aadSep joins the parts of a caller AAD. It is a control character, so it
+	// cannot appear in the UUIDs and provider slugs that make up the AAD and the
+	// encoding stays unambiguous.
+	aadSep = "\x1f"
+	// dekAADPrefix domain-separates the DEK-wrapping layer from the payload layer,
+	// so a wrapped DEK can never be opened as if it were a payload.
+	dekAADPrefix = "finexia/secretbox/dek/v"
+)
 
 var (
 	ErrNoKeys           = errors.New("secretbox: no KEK configured")
@@ -82,7 +81,7 @@ func NewKeyring(keys, active string) (*Keyring, error) {
 		return nil, ErrNoKeys
 	}
 
-	parsed := make(map[int][]byte)
+	parsed := make(map[int][]byte, strings.Count(keys, ","))
 
 	for entry := range strings.SplitSeq(keys, ",") {
 		entry = strings.TrimSpace(entry)
@@ -97,18 +96,20 @@ func NewKeyring(keys, active string) (*Keyring, error) {
 
 		version, err := strconv.Atoi(strings.TrimSpace(rawVersion))
 		if err != nil {
-			return nil, fmt.Errorf("%w: bad version %q", errMalformedKeysEnv, rawVersion)
+			return nil, errors.New(errMalformedKeysEnv.Error() + " bad version " + rawVersion)
 		}
+
 		if _, duplicate := parsed[version]; duplicate {
-			return nil, fmt.Errorf("secretbox: KEK version %d declared twice", version)
+			return nil, errors.New("secretbox: KEK version " + rawVersion + " declared twice")
 		}
 
 		key, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))
 		if err != nil {
-			return nil, fmt.Errorf("secretbox: KEK version %d is not valid base64: %w", version, err)
+			return nil, errors.New("secretbox: KEK version " + rawVersion + " is not valid base64: " + err.Error())
 		}
+
 		if len(key) != keyLen {
-			return nil, fmt.Errorf("%w: version %d has %d", errKeyLen, version, len(key))
+			return nil, errors.New(errKeyLen.Error() + ": version " + rawVersion + " has " + strconv.Itoa(len(key)))
 		}
 
 		parsed[version] = key
@@ -120,10 +121,11 @@ func NewKeyring(keys, active string) (*Keyring, error) {
 
 	activeVersion, err := strconv.Atoi(strings.TrimSpace(active))
 	if err != nil {
-		return nil, fmt.Errorf("secretbox: active KEK version %q is not a number", active)
+		return nil, errors.New("secretbox: active KEK version " + active + " is not a number")
 	}
+
 	if _, ok := parsed[activeVersion]; !ok {
-		return nil, fmt.Errorf("%w: active version %d was not supplied", ErrUnknownKEK, activeVersion)
+		return nil, errors.New(ErrUnknownKEK.Error() + ": active version " + active + " was not supplied")
 	}
 
 	return new(Keyring{keys: parsed, active: activeVersion}), nil
@@ -131,7 +133,9 @@ func NewKeyring(keys, active string) (*Keyring, error) {
 
 // ActiveVersion reports the KEK version new seals are written under. Callers use
 // it to decide which rows still need a Rewrap after a rotation.
-func (k *Keyring) ActiveVersion() int { return k.active }
+func (k *Keyring) ActiveVersion() int {
+	return k.active
+}
 
 // Seal encrypts plaintext under a fresh DEK and wraps that DEK under the active
 // KEK. aad binds the result to its owner: Open only succeeds when given the same
@@ -139,8 +143,9 @@ func (k *Keyring) ActiveVersion() int { return k.active }
 // row. Build it with AAD.
 func (k *Keyring) Seal(plaintext, aad []byte) (Sealed, error) {
 	dek := make([]byte, keyLen)
+
 	if _, err := rand.Read(dek); err != nil {
-		return Sealed{}, fmt.Errorf("secretbox: generate DEK: %w", err)
+		return Sealed{}, errors.New("secretbox: generate DEK: " + err.Error())
 	}
 	defer Zero(dek)
 
@@ -228,7 +233,7 @@ func (k *Keyring) Rewrap(s Sealed) (Sealed, error) {
 func (k *Keyring) wrapDEK(dek []byte, version int) ([]byte, error) {
 	kek, ok := k.keys[version]
 	if !ok {
-		return nil, fmt.Errorf("%w: %d", ErrUnknownKEK, version)
+		return nil, errors.New(ErrUnknownKEK.Error() + ": " + strconv.Itoa(version))
 	}
 
 	kekAEAD, err := newAEAD(kek)
@@ -248,7 +253,7 @@ func (k *Keyring) wrapDEK(dek []byte, version int) ([]byte, error) {
 func (k *Keyring) unwrapDEK(wrapped []byte, version int) ([]byte, error) {
 	kek, ok := k.keys[version]
 	if !ok {
-		return nil, fmt.Errorf("%w: %d", ErrUnknownKEK, version)
+		return nil, errors.New(ErrUnknownKEK.Error() + ": " + strconv.Itoa(version))
 	}
 
 	kekAEAD, err := newAEAD(kek)
@@ -287,12 +292,12 @@ func dekAAD(version int) []byte {
 func newAEAD(key []byte) (cipher.AEAD, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, fmt.Errorf("secretbox: new cipher: %w", err)
+		return nil, errors.New("secretbox: new cipher: " + err.Error())
 	}
 
 	aead, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, fmt.Errorf("secretbox: new GCM: %w", err)
+		return nil, errors.New("secretbox: new GCM: " + err.Error())
 	}
 
 	return aead, nil
@@ -301,7 +306,7 @@ func newAEAD(key []byte) (cipher.AEAD, error) {
 func newNonce(size int) ([]byte, error) {
 	nonce := make([]byte, size)
 	if _, err := rand.Read(nonce); err != nil {
-		return nil, fmt.Errorf("secretbox: generate nonce: %w", err)
+		return nil, errors.New("secretbox: generate nonce: " + err.Error())
 	}
 
 	return nonce, nil
