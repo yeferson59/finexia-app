@@ -1,11 +1,11 @@
 package portfolio
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"mime/multipart"
 
+	json "github.com/bytedance/sonic"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 
@@ -45,14 +45,14 @@ func parseImportForms(c fiber.Ctx) (*ImportMappingDTO, ImportDefaultsDTO, error)
 	if raw := c.FormValue("mapping"); raw != "" {
 		mapping = new(ImportMappingDTO{})
 
-		if err := json.Unmarshal([]byte(raw), mapping); err != nil {
+		if err := json.ConfigFastest.Unmarshal([]byte(raw), mapping); err != nil {
 			return nil, ImportDefaultsDTO{}, errors.New("invalid mapping: malformed JSON")
 		}
 	}
 
 	var defaults ImportDefaultsDTO
 	if raw := c.FormValue("defaults"); raw != "" {
-		if err := json.Unmarshal([]byte(raw), &defaults); err != nil {
+		if err := json.ConfigFastest.Unmarshal([]byte(raw), &defaults); err != nil {
 			return nil, ImportDefaultsDTO{}, errors.New("invalid defaults: malformed JSON")
 		}
 	}

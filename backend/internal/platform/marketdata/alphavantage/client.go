@@ -10,12 +10,12 @@ package alphavantage
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 
+	json "github.com/bytedance/sonic"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
 
@@ -69,8 +69,8 @@ func (c *Client) get(ctx context.Context, params url.Values, what string, out an
 
 	// Decode into a buffer first so the envelope can be classified before the
 	// caller's own decoding.
-	var raw json.RawMessage
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+	var raw json.NoCopyRawMessage
+	if err := json.ConfigFastest.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		return marketdata.Errorf(marketdata.AlphaVantage, c.apiKey, nil, "alphavantage: decode %s: %v", what, err)
 	}
 
@@ -87,7 +87,7 @@ func (c *Client) get(ctx context.Context, params url.Values, what string, out an
 
 // classify turns Alpha Vantage's 200-with-a-message replies into the sentinels
 // the credential store uses to decide whether a key is dead or just throttled.
-func (c *Client) classify(raw json.RawMessage, what string) error {
+func (c *Client) classify(raw json.NoCopyRawMessage, what string) error {
 	var envelope struct {
 		ErrorMessage string `json:"Error Message"`
 		Note         string `json:"Note"`

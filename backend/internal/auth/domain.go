@@ -6,10 +6,10 @@
 package auth
 
 import (
-	"encoding/json"
 	"errors"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 )
 
@@ -129,7 +129,7 @@ func (i Invitation) Status() string {
 // admin dashboard can render lifecycle badges without recomputing the rules.
 func (i Invitation) MarshalJSON() ([]byte, error) {
 	type alias Invitation
-	return json.Marshal(struct {
+	return sonic.ConfigFastest.Marshal(struct {
 		alias
 		Status string `json:"status"`
 	}{alias(i), i.Status()})

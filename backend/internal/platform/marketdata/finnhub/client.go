@@ -9,11 +9,12 @@ package finnhub
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	json "github.com/bytedance/sonic"
 
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
@@ -65,7 +66,7 @@ func (c *Client) get(ctx context.Context, path string, params url.Values, what s
 		return marketdata.Errorf(marketdata.Finnhub, c.apiKey, nil, "finnhub: %s: status %d", what, resp.StatusCode)
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+	if err := json.ConfigFastest.NewDecoder(resp.Body).Decode(out); err != nil {
 		return marketdata.Errorf(marketdata.Finnhub, c.apiKey, nil, "finnhub: decode %s: %v", what, err)
 	}
 

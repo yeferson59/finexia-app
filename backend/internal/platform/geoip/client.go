@@ -6,12 +6,13 @@ package geoip
 
 import (
 	"context"
-	"encoding/json"
 	"net"
 	"net/http"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/bytedance/sonic"
 )
 
 type Client struct {
@@ -57,7 +58,7 @@ func (c *Client) Locate(ctx context.Context, ip string) string {
 		Country string `json:"country"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil || !body.Success {
+	if err := sonic.ConfigFastest.NewDecoder(resp.Body).Decode(&body); err != nil || !body.Success {
 		return ""
 	}
 
