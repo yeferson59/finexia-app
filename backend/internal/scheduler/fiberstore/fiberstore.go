@@ -9,7 +9,7 @@ package fiberstore
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -32,7 +32,9 @@ type Option func(*Store)
 
 // WithPrefix overrides the default key prefix ("scheduler:next-run:").
 func WithPrefix(prefix string) Option {
-	return func(s *Store) { s.prefix = prefix }
+	return func(s *Store) {
+		s.prefix = prefix
+	}
 }
 
 // WithTTL sets an expiration on every persisted key. Defaults to 0 (no
@@ -41,7 +43,9 @@ func WithPrefix(prefix string) Option {
 // you specifically want stale entries (e.g. from a job that was removed
 // from the codebase) to eventually fall out of storage on their own.
 func WithTTL(ttl time.Duration) Option {
-	return func(s *Store) { s.ttl = ttl }
+	return func(s *Store) {
+		s.ttl = ttl
+	}
 }
 
 // New builds a Store backed by storage.
@@ -63,7 +67,7 @@ func (s *Store) key(jobName string) string {
 func (s *Store) LoadNextRun(ctx context.Context, jobName string) (time.Time, bool, error) {
 	raw, err := s.storage.GetWithContext(ctx, s.key(jobName))
 	if err != nil {
-		return time.Time{}, false, fmt.Errorf("fiberstore: get %q: %w", jobName, err)
+		return time.Time{}, false, errors.New("fiberstore: get " + jobName + ": " + err.Error())
 	}
 
 	if raw == nil {
@@ -72,7 +76,7 @@ func (s *Store) LoadNextRun(ctx context.Context, jobName string) (time.Time, boo
 
 	var next time.Time
 	if err := next.UnmarshalText(raw); err != nil {
-		return time.Time{}, false, fmt.Errorf("fiberstore: decode %q: %w", jobName, err)
+		return time.Time{}, false, errors.New("fiberstore: decode " + jobName + ": " + err.Error())
 	}
 
 	return next, true, nil
@@ -82,11 +86,11 @@ func (s *Store) LoadNextRun(ctx context.Context, jobName string) (time.Time, boo
 func (s *Store) SaveNextRun(ctx context.Context, jobName string, next time.Time) error {
 	raw, err := next.MarshalText()
 	if err != nil {
-		return fmt.Errorf("fiberstore: encode %q: %w", jobName, err)
+		return errors.New("fiberstore: encode " + jobName + ": " + err.Error())
 	}
 
 	if err := s.storage.SetWithContext(ctx, s.key(jobName), raw, s.ttl); err != nil {
-		return fmt.Errorf("fiberstore: set %q: %w", jobName, err)
+		return errors.New("fiberstore: set " + jobName + ": " + err.Error())
 	}
 
 	return nil
