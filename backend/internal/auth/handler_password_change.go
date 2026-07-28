@@ -22,8 +22,8 @@ func (h *handler) changePassword(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	var req ChangePasswordDTO
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[ChangePasswordDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 

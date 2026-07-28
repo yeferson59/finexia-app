@@ -20,9 +20,8 @@ func (h *handler) CreatePortfolioEntry(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	var req CreatePortfolioEntryRequestDTO
-
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[CreatePortfolioEntryRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
@@ -58,9 +57,8 @@ func (h *handler) UpdateAssetPrice(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid asset ID", err.Error())
 	}
 
-	var req UpdateAssetPriceRequestDTO
-
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[UpdateAssetPriceRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
@@ -149,8 +147,8 @@ func (h *handler) CreateTransaction(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid entry ID", err.Error())
 	}
 
-	var req CreateTransactionRequestDTO
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[CreateTransactionRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
@@ -165,8 +163,8 @@ func (h *handler) UpdateTransaction(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid transaction ID", err.Error())
 	}
 
-	var req UpdateTransactionRequestDTO
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[UpdateTransactionRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 

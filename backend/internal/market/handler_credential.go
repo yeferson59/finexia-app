@@ -35,8 +35,8 @@ func (h *handler) SaveCredential(c fiber.Ctx) error {
 
 	provider := ProviderID(c.Params("provider"))
 
-	var req SaveCredentialRequestDTO
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[SaveCredentialRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 

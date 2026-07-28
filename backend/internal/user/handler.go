@@ -54,9 +54,8 @@ func (h *handler) GetUserByID(c fiber.Ctx) error {
 }
 
 func (h *handler) CreateUser(c fiber.Ctx) error {
-	var createUserDto CreateDTO
-
-	if err := c.Bind().Body(&createUserDto); err != nil {
+	createUserDto, err := httpx.Bind[CreateDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "", err.Error())
 	}
 
@@ -74,9 +73,8 @@ func (h *handler) UpdateUser(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "", err.Error())
 	}
 
-	var updateUser UpdateDTO
-
-	if err := c.Bind().Body(&updateUser); err != nil {
+	updateUser, err := httpx.Bind[UpdateDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "", err.Error())
 	}
 
@@ -107,8 +105,8 @@ func (h *handler) BanUser(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	var req BanUserDTO
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[BanUserDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
@@ -144,8 +142,8 @@ func (h *handler) UpdateMe(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	var req UpdateProfileDTO
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[UpdateProfileDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
@@ -233,8 +231,8 @@ func (h *handler) UpdateMyPreferences(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	var req UpdatePreferencesDTO
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[UpdatePreferencesDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 

@@ -19,9 +19,8 @@ func newHandler(svc *Service) *handler {
 // createWaitlist serves the public sign-up, POST /marketing/waitlists
 // (docs/API.md §2.2).
 func (h *handler) createWaitlist(c fiber.Ctx) error {
-	var req waitlistRequest
-
-	if err := c.Bind().Body(&req); err != nil {
+	req, err := httpx.Bind[waitlistRequest](c)
+	if err != nil {
 		return httpx.BadRequest(c, "invalid email", "email is required and must be a valid email address")
 	}
 

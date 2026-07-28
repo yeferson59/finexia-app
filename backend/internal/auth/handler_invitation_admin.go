@@ -26,8 +26,8 @@ type InviteUserDTO struct {
 // createInvitation (admin) issues an invitation and emails the recipient a
 // single-use link to set their password.
 func (h *handler) createInvitation(c fiber.Ctx) error {
-	var req InviteUserDTO
-	if err := c.Bind().Body(&req); err != nil {
+	req, err := httpx.Bind[InviteUserDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "invalid request body", err.Error())
 	}
 

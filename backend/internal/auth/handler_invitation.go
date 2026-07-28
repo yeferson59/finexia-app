@@ -28,8 +28,8 @@ func (h *handler) validateInvitation(c fiber.Ctx) error {
 // acceptInvitation (public) provisions the account from a valid invitation and
 // the password the invitee chose.
 func (h *handler) acceptInvitation(c fiber.Ctx) error {
-	var req AcceptInvitationDTO
-	if err := c.Bind().Body(&req); err != nil {
+	req, err := httpx.Bind[AcceptInvitationDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "invalid request body", err.Error())
 	}
 

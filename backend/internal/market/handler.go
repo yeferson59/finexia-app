@@ -46,8 +46,8 @@ func (h *handler) CreateAsset(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid identity", err.Error())
 	}
 
-	var req CreateAssetRequestDTO
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[CreateAssetRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
@@ -82,8 +82,8 @@ func (h *handler) GetExchangeRates(c fiber.Ctx) error {
 }
 
 func (h *handler) CreateExchangeRate(c fiber.Ctx) error {
-	var req CreateExchangeRateRequestDTO
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[CreateExchangeRateRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
@@ -104,8 +104,8 @@ func (h *handler) UpdateExchangeRate(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid exchange rate ID", err.Error())
 	}
 
-	var req UpdateExchangeRateRequestDTO
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[UpdateExchangeRateRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 

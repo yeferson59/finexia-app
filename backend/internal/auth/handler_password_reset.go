@@ -12,8 +12,8 @@ import (
 // an account. The response is identical whether or not the email exists, so
 // the endpoint never confirms which addresses are registered.
 func (h *handler) requestPasswordReset(c fiber.Ctx) error {
-	var req RequestPasswordResetDTO
-	if err := c.Bind().Body(&req); err != nil {
+	req, err := httpx.Bind[RequestPasswordResetDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "invalid request body", "auth:passwordReset:request")
 	}
 
@@ -40,8 +40,8 @@ func (h *handler) validatePasswordReset(c fiber.Ctx) error {
 // confirmPasswordReset (public) consumes a valid token and sets the new
 // password, revoking every existing session.
 func (h *handler) confirmPasswordReset(c fiber.Ctx) error {
-	var req ConfirmPasswordResetDTO
-	if err := c.Bind().Body(&req); err != nil {
+	req, err := httpx.Bind[ConfirmPasswordResetDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "invalid request body", "auth:passwordReset:confirm")
 	}
 

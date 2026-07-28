@@ -90,9 +90,8 @@ func (h *handler) CreatePortfolio(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	var req CreatePortfolioRequestDTO
-
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[CreatePortfolioRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
@@ -143,8 +142,8 @@ func (h *handler) UpdatePortfolio(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid portfolio ID", err.Error())
 	}
 
-	var req UpdatePortfolioRequestDTO
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[UpdatePortfolioRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
@@ -172,9 +171,8 @@ func (h *handler) CreatePlatform(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	var req CreatePlatformRequestDTO
-
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[CreatePlatformRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
@@ -221,8 +219,8 @@ func (h *handler) UpdatePlatform(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid platform ID", err.Error())
 	}
 
-	var req UpdatePlatformRequestDTO
-	if err := c.Bind().JSON(&req); err != nil {
+	req, err := httpx.Bind[UpdatePlatformRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 

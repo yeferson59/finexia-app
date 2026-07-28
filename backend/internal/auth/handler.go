@@ -18,9 +18,8 @@ func newHandler(svc *Service, cfg Config) *handler {
 }
 
 func (h *handler) login(c fiber.Ctx) error {
-	var loginDto LoginRequestDTO
-
-	if err := c.Bind().Body(&loginDto); err != nil {
+	loginDto, err := httpx.Bind[LoginRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "invalid request body", "auth:login")
 	}
 
@@ -59,9 +58,8 @@ func (h *handler) register(c fiber.Ctx) error {
 			"Finexia is invite-only during the beta; ask an existing member for an invitation", "auth:register:disabled")
 	}
 
-	var registerDto RegisterRequestDTO
-
-	if err := c.Bind().Body(&registerDto); err != nil {
+	registerDto, err := httpx.Bind[RegisterRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "invalid request body", "auth:register")
 	}
 

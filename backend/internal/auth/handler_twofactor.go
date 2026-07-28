@@ -11,8 +11,8 @@ import (
 // twoFactorLogin finishes a login whose password already checked out but
 // whose account has 2FA enabled. Public endpoint, gated by the auth limiter.
 func (h *handler) twoFactorLogin(c fiber.Ctx) error {
-	var req TwoFactorLoginRequestDTO
-	if err := c.Bind().Body(&req); err != nil {
+	req, err := httpx.Bind[TwoFactorLoginRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "invalid request body", "auth:2fa:login")
 	}
 
@@ -66,8 +66,8 @@ func (h *handler) twoFactorSetup(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "invalid user id", "auth:2fa:setup")
 	}
 
-	var req TwoFactorSetupRequestDTO
-	if err := c.Bind().Body(&req); err != nil {
+	req, err := httpx.Bind[TwoFactorSetupRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "invalid request body", "auth:2fa:setup")
 	}
 
@@ -90,8 +90,8 @@ func (h *handler) twoFactorEnable(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "invalid user id", "auth:2fa:enable")
 	}
 
-	var req TwoFactorEnableRequestDTO
-	if err := c.Bind().Body(&req); err != nil {
+	req, err := httpx.Bind[TwoFactorEnableRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "invalid request body", "auth:2fa:enable")
 	}
 
@@ -119,8 +119,8 @@ func (h *handler) twoFactorDisable(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "invalid user id", "auth:2fa:disable")
 	}
 
-	var req TwoFactorDisableRequestDTO
-	if err := c.Bind().Body(&req); err != nil {
+	req, err := httpx.Bind[TwoFactorDisableRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "invalid request body", "auth:2fa:disable")
 	}
 
@@ -145,8 +145,8 @@ func (h *handler) twoFactorRecoveryCodes(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "invalid user id", "auth:2fa:recovery")
 	}
 
-	var req TwoFactorDisableRequestDTO
-	if err := c.Bind().Body(&req); err != nil {
+	req, err := httpx.Bind[TwoFactorDisableRequestDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "invalid request body", "auth:2fa:recovery")
 	}
 

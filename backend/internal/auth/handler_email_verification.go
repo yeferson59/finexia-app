@@ -13,8 +13,8 @@ import (
 // whether or not the email exists or is already verified, so the endpoint
 // never confirms which addresses are registered.
 func (h *handler) requestEmailVerification(c fiber.Ctx) error {
-	var req RequestEmailVerificationDTO
-	if err := c.Bind().Body(&req); err != nil {
+	req, err := httpx.Bind[RequestEmailVerificationDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "invalid request body", "auth:emailVerification:request")
 	}
 
@@ -41,8 +41,8 @@ func (h *handler) validateEmailVerification(c fiber.Ctx) error {
 // confirmEmailVerification (public) consumes a valid token and marks the
 // account's email as verified.
 func (h *handler) confirmEmailVerification(c fiber.Ctx) error {
-	var req ConfirmEmailVerificationDTO
-	if err := c.Bind().Body(&req); err != nil {
+	req, err := httpx.Bind[ConfirmEmailVerificationDTO](c)
+	if err != nil {
 		return httpx.BadRequest(c, "invalid request body", "auth:emailVerification:confirm")
 	}
 
