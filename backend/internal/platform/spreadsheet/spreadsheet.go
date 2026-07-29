@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"encoding/csv"
 	"errors"
-	"fmt"
 	"io"
 	"regexp"
 	"strings"
@@ -59,7 +58,7 @@ func ReadFile(data []byte, filename, sheet string) (Source, error) {
 
 	rows, err := f.GetRows(selected)
 	if err != nil {
-		return Source{}, fmt.Errorf("invalid spreadsheet: could not read sheet %q", selected)
+		return Source{}, errors.New("invalid spreadsheet: could not read sheet " + selected)
 	}
 
 	return Source{Sheets: sheets, Sheet: selected, Rows: rows}, nil
