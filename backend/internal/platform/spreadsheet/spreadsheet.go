@@ -32,6 +32,7 @@ func ReadFile(data []byte, filename, sheet string) (Source, error) {
 		if err != nil {
 			return Source{}, err
 		}
+
 		return Source{Sheets: []string{"CSV"}, Sheet: "CSV", Rows: rows}, nil
 	}
 
@@ -42,13 +43,16 @@ func ReadFile(data []byte, filename, sheet string) (Source, error) {
 	defer func() { _ = f.Close() }()
 
 	sheets := f.GetSheetList()
+
 	if len(sheets) == 0 {
 		return Source{}, errors.New("invalid spreadsheet: file has no sheets")
 	}
+
 	selected := sheets[0]
 	for _, s := range sheets {
 		if s == sheet {
 			selected = s
+
 			break
 		}
 	}
@@ -57,6 +61,7 @@ func ReadFile(data []byte, filename, sheet string) (Source, error) {
 	if err != nil {
 		return Source{}, fmt.Errorf("invalid spreadsheet: could not read sheet %q", selected)
 	}
+
 	return Source{Sheets: sheets, Sheet: selected, Rows: rows}, nil
 }
 
@@ -66,11 +71,13 @@ func parseCSV(data []byte) ([][]string, error) {
 	// Detect the delimiter from the first line: "classic" exports use ',',
 	// ';' (Excel with Spanish locale) or tabs.
 	firstLine := data
-	if i := bytes.IndexByte(data, '\n'); i >= 0 {
-		firstLine = data[:i]
+	if before, _, found := bytes.Cut(data, []byte("\n")); found {
+		firstLine = before
 	}
+
 	delimiter := ','
 	best := bytes.Count(firstLine, []byte{','})
+
 	for _, cand := range []byte{';', '\t'} {
 		if n := bytes.Count(firstLine, []byte{cand}); n > best {
 			best, delimiter = n, rune(cand)
@@ -88,11 +95,14 @@ func parseCSV(data []byte) ([][]string, error) {
 		if errors.Is(err, io.EOF) {
 			break
 		}
+
 		if err != nil {
 			return nil, errors.New("invalid spreadsheet: malformed CSV file")
 		}
+
 		rows = append(rows, record)
 	}
+
 	return rows, nil
 }
 
@@ -110,6 +120,7 @@ func NormKey(s string) string {
 	s = accentReplacer.Replace(strings.ToLower(strings.TrimSpace(s)))
 	s = nonWordSeparators.ReplaceAllString(s, " ")
 	s = multiSpace.ReplaceAllString(s, " ")
+
 	return strings.TrimSpace(s)
 }
 
@@ -120,6 +131,7 @@ func RowIsEmpty(row []string) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -129,6 +141,7 @@ func CellAt(row []string, idx *int) string {
 	if idx == nil || *idx < 0 || *idx >= len(row) {
 		return ""
 	}
+
 	return strings.TrimSpace(row[*idx])
 }
 
@@ -137,5 +150,6 @@ func CellAtIdx(row []string, idx int) string {
 	if idx < 0 || idx >= len(row) {
 		return ""
 	}
+
 	return strings.TrimSpace(row[idx])
 }
