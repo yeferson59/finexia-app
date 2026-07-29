@@ -40,35 +40,44 @@ func internalImports(t *testing.T, dir string) map[string][]string {
 		if err != nil {
 			return err
 		}
+
 		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
+
 		fset := token.NewFileSet()
+
 		f, perr := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
 		if perr != nil {
 			return perr
 		}
+
 		for _, spec := range f.Imports {
 			imp, uerr := strconv.Unquote(spec.Path.Value)
 			if uerr != nil {
 				return uerr
 			}
-			if strings.HasPrefix(imp, modulePath) {
-				byImporter[path] = append(byImporter[path], strings.TrimPrefix(imp, modulePath))
+
+			if after, found := strings.CutPrefix(imp, modulePath); found {
+				byImporter[path] = append(byImporter[path], after)
 			}
 		}
+
 		return nil
 	})
+
 	if err != nil {
 		t.Fatalf("walking %s: %v", root, err)
 	}
+
 	return byImporter
 }
 
 func firstSegment(pkg string) string {
-	if i := strings.IndexByte(pkg, '/'); i >= 0 {
-		return pkg[:i]
+	if before, _, found := strings.Cut(pkg, "/"); found {
+		return before
 	}
+
 	return pkg
 }
 
@@ -79,6 +88,7 @@ func TestPlatformStaysAKernel(t *testing.T) {
 	for file, imports := range internalImports(t, "platform") {
 		for _, imp := range imports {
 			seg := firstSegment(imp)
+
 			if domainSegments[seg] || seg == "identity" {
 				t.Errorf("%s imports internal/%s: platform must not depend on domain code", file, imp)
 			}
