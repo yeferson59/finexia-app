@@ -16,6 +16,7 @@ import (
 	"time"
 
 	json "github.com/bytedance/sonic"
+
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
 

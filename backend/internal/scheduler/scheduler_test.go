@@ -321,7 +321,7 @@ func TestScheduler_RegisterWithPerJobOverride(t *testing.T) {
 		},
 	}
 
-	//new(once{}) fires immediately, then never again during this test;
+	// new(once{}) fires immediately, then never again during this test;
 	// isolates the assertion to the retry override, not repeated triggers.
 	sched.Register(job, new(once{}), WithRetry(JobOptions{MaxRetries: Retries(0)}))
 	sched.Start()
