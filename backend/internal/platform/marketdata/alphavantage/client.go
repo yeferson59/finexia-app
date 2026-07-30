@@ -44,6 +44,7 @@ func New(apiKey string, httpClient *http.Client) *Client {
 // HTTP 200 and a JSON field, not a status code.
 func (c *Client) get(ctx context.Context, params url.Values, what string, out any) error {
 	params.Set("apikey", c.apiKey)
+
 	endpoint := baseURL + "?" + params.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
@@ -60,9 +61,11 @@ func (c *Client) get(ctx context.Context, params url.Values, what string, out an
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		return marketdata.Errorf(marketdata.AlphaVantage, c.apiKey, marketdata.ErrUnauthorized, "alphavantage: %s: status %d", what, resp.StatusCode)
 	}
+
 	if resp.StatusCode == http.StatusTooManyRequests {
 		return marketdata.Errorf(marketdata.AlphaVantage, c.apiKey, marketdata.ErrRateLimited, "alphavantage: %s: status %d", what, resp.StatusCode)
 	}
+
 	if resp.StatusCode != http.StatusOK {
 		return marketdata.Errorf(marketdata.AlphaVantage, c.apiKey, nil, "alphavantage: %s: status %d", what, resp.StatusCode)
 	}
@@ -93,8 +96,8 @@ func (c *Client) classify(raw json.NoCopyRawMessage, what string) error {
 		Note         string `json:"Note"`
 		Information  string `json:"Information"`
 	}
+
 	if err := json.Unmarshal(raw, &envelope); err != nil {
-		// Not an object with these fields; the caller's decode will judge it.
 		return nil
 	}
 
@@ -120,6 +123,7 @@ func (c *Client) FetchExchangeRate(ctx context.Context, from, to string) (market
 	}
 
 	params := url.Values{}
+
 	params.Set("function", "CURRENCY_EXCHANGE_RATE")
 	params.Set("from_currency", from)
 	params.Set("to_currency", to)
