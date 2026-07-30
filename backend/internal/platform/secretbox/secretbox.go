@@ -47,6 +47,37 @@ var (
 	errMalformedKeysEnv = errors.New(`secretbox: keys must be formatted as "version:base64,version:base64"`)
 )
 
+// annotated adds context to a sentinel while keeping it matchable with
+// errors.Is. It exists instead of fmt.Errorf because the message is built only
+// if somebody prints it: Open rejects an unknown or forged KEK version on a
+// path the caller usually just compares, so nothing is formatted there.
+type annotated struct {
+	err            error
+	prefix, suffix string
+}
+
+func (a *annotated) Error() string {
+	msg := a.err.Error()
+
+	if a.prefix != "" {
+		msg = a.prefix + ": " + msg
+	}
+	if a.suffix != "" {
+		msg += ": " + a.suffix
+	}
+
+	return msg
+}
+
+func (a *annotated) Unwrap() error { return a.err }
+
+// detailed reads as "<err>: <suffix>" and is how a sentinel gains its specifics.
+func detailed(err error, suffix string) error { return new(annotated{err: err, suffix: suffix}) }
+
+// prefixed reads as "<prefix>: <err>" and is how a cause from another package is
+// reported without losing it.
+func prefixed(prefix string, err error) error { return new(annotated{err: err, prefix: prefix}) }
+
 // Sealed is the storable form of a secret: everything except the KEK. The three
 // byte slices map one-to-one onto the wrapped_dek, nonce and ciphertext columns.
 type Sealed struct {
@@ -96,7 +127,7 @@ func NewKeyring(keys, active string) (*Keyring, error) {
 
 		version, err := strconv.Atoi(strings.TrimSpace(rawVersion))
 		if err != nil {
-			return nil, errors.New(errMalformedKeysEnv.Error() + " bad version " + rawVersion)
+			return nil, detailed(errMalformedKeysEnv, "bad version "+rawVersion)
 		}
 
 		if _, duplicate := parsed[version]; duplicate {
@@ -105,11 +136,11 @@ func NewKeyring(keys, active string) (*Keyring, error) {
 
 		key, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))
 		if err != nil {
-			return nil, errors.New("secretbox: KEK version " + rawVersion + " is not valid base64: " + err.Error())
+			return nil, prefixed("secretbox: KEK version "+rawVersion+" is not valid base64", err)
 		}
 
 		if len(key) != keyLen {
-			return nil, errors.New(errKeyLen.Error() + ": version " + rawVersion + " has " + strconv.Itoa(len(key)))
+			return nil, detailed(errKeyLen, "version "+rawVersion+" has "+strconv.Itoa(len(key)))
 		}
 
 		parsed[version] = key
@@ -125,7 +156,7 @@ func NewKeyring(keys, active string) (*Keyring, error) {
 	}
 
 	if _, ok := parsed[activeVersion]; !ok {
-		return nil, errors.New(ErrUnknownKEK.Error() + ": active version " + active + " was not supplied")
+		return nil, detailed(ErrUnknownKEK, "active version "+active+" was not supplied")
 	}
 
 	return new(Keyring{keys: parsed, active: activeVersion}), nil
@@ -145,7 +176,7 @@ func (k *Keyring) Seal(plaintext, aad []byte) (Sealed, error) {
 	dek := make([]byte, keyLen)
 
 	if _, err := rand.Read(dek); err != nil {
-		return Sealed{}, errors.New("secretbox: generate DEK: " + err.Error())
+		return Sealed{}, prefixed("secretbox: generate DEK", err)
 	}
 	defer Zero(dek)
 
@@ -233,7 +264,7 @@ func (k *Keyring) Rewrap(s Sealed) (Sealed, error) {
 func (k *Keyring) wrapDEK(dek []byte, version int) ([]byte, error) {
 	kek, ok := k.keys[version]
 	if !ok {
-		return nil, errors.New(ErrUnknownKEK.Error() + ": " + strconv.Itoa(version))
+		return nil, detailed(ErrUnknownKEK, strconv.Itoa(version))
 	}
 
 	kekAEAD, err := newAEAD(kek)
@@ -253,7 +284,7 @@ func (k *Keyring) wrapDEK(dek []byte, version int) ([]byte, error) {
 func (k *Keyring) unwrapDEK(wrapped []byte, version int) ([]byte, error) {
 	kek, ok := k.keys[version]
 	if !ok {
-		return nil, errors.New(ErrUnknownKEK.Error() + ": " + strconv.Itoa(version))
+		return nil, detailed(ErrUnknownKEK, strconv.Itoa(version))
 	}
 
 	kekAEAD, err := newAEAD(kek)
@@ -292,12 +323,12 @@ func dekAAD(version int) []byte {
 func newAEAD(key []byte) (cipher.AEAD, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, errors.New("secretbox: new cipher: " + err.Error())
+		return nil, prefixed("secretbox: new cipher", err)
 	}
 
 	aead, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, errors.New("secretbox: new GCM: " + err.Error())
+		return nil, prefixed("secretbox: new GCM", err)
 	}
 
 	return aead, nil
@@ -306,7 +337,7 @@ func newAEAD(key []byte) (cipher.AEAD, error) {
 func newNonce(size int) ([]byte, error) {
 	nonce := make([]byte, size)
 	if _, err := rand.Read(nonce); err != nil {
-		return nil, errors.New("secretbox: generate nonce: " + err.Error())
+		return nil, prefixed("secretbox: generate nonce", err)
 	}
 
 	return nonce, nil
