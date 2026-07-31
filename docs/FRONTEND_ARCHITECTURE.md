@@ -96,9 +96,11 @@ un barrel de JS no puede reexportar un side-effect de CSS.
 - **Superficie pública por `index.ts`.** No todo componente entra: los que solo
   usa otro componente de la misma feature se importan en relativo y no forman
   parte del contrato.
-- **Zod en el borde.** Toda form action valida con un schema de
-  `features/<x>/schemas.ts`. Los archivos subidos (avatar, imports de CSV) se
-  comprueban a mano: no hay nada que parsear, solo tipo y tamaño.
+- **Zod en el borde.** Toda form action que reciba campos valida con un schema
+  de `features/<x>/schemas.ts`. Dos excepciones, ambas por no tener nada que
+  parsear: los archivos subidos (avatar, imports de CSV), que se comprueban por
+  tipo y tamaño, y el `logout` del dashboard, que no lee ningún campo del
+  formulario —solo cookies—.
 - **Svelte 5 idiomático.** Runes (`$state`, `$derived`, `$props`, `$effect`) y
   snippets; el modo runes está forzado por configuración.
 - **Presupuesto de tamaño.** Ningún archivo de producción supera ~500 líneas y

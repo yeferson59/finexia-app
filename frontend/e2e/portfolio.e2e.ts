@@ -47,7 +47,12 @@ test.describe('portfolio detail', () => {
 		await page.click('#asset-search');
 		const suggestion = page.getByRole('option').filter({ hasText: 'AAPL' });
 		await expect(suggestion).toBeVisible();
-		await suggestion.click();
+		// La opción se elige en `mousedown` —antes del blur del input, para que la
+		// lista no se cierre antes de tiempo— y eso la saca del DOM en mitad del
+		// `click`: Playwright reintenta y se queda esperando a un elemento que ya
+		// no existe. Se dispara el mismo evento que escucha el componente.
+		await suggestion.dispatchEvent('mousedown');
+		await expect(suggestion).toBeHidden();
 
 		// Purchase details; the date picker defaults to today.
 		await page.fill('input[name="quantity"]', '5');
