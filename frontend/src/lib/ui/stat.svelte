@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { cn } from '$lib/utils';
+	import { cn } from '$lib/shared/css';
 
 	type Tone = 'default' | 'positive' | 'negative' | 'highlight';
 	type Align = 'left' | 'right';

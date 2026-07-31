@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { cn } from '$lib/utils';
+	import { cn } from '$lib/shared/css';
 
 	type Padding = 'none' | 'sm' | 'md' | 'lg';
 	type Variant = 'default' | 'elevated';

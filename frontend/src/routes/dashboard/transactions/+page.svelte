@@ -3,8 +3,8 @@
 	import PageHeader from '$lib/ui/page-header.svelte';
 	import Card from '$lib/ui/card.svelte';
 	import Pagination from '$lib/ui/pagination.svelte';
-	import { privacy } from '$lib/stores/privacy.svelte';
-	import { formatCalendarDate } from '$lib/utils';
+	import { privacy } from '$lib/shared/privacy.svelte';
+	import { formatCalendarDate } from '$lib/shared/format/date';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();

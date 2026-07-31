@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import DatePicker from '$lib/ui/date-picker.svelte';
 	import PageHeader from '$lib/ui/page-header.svelte';
-	import { todayLocalDateString } from '$lib/utils';
+	import { todayLocalDateString } from '$lib/shared/format/date';
 	import type { Asset, Platform } from '$lib/api/types';
 	import AssetCombobox from './asset-combobox.svelte';
 	import PortfolioEntryPlatformField from './portfolio-entry-platform-field.svelte';

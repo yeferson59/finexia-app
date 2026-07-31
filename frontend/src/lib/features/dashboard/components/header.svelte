@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { privacy } from '$lib/stores/privacy.svelte';
+	import { privacy } from '$lib/shared/privacy.svelte';
 
 	interface Props {
 		sidebarOpen?: boolean;

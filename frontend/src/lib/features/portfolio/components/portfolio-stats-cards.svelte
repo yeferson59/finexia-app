@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Card from '$lib/ui/card.svelte';
-	import { formatCalendarDate } from '$lib/utils';
+	import { formatCalendarDate } from '$lib/shared/format/date';
 	import { formatPct, type HoldingView, type TopTransaction } from '../portfolio';
 
 	let {

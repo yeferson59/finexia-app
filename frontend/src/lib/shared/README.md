@@ -9,11 +9,14 @@ Sustituye al antiguo cajón de sastre `lib/utils.ts`, repartido por tema.
 - `format/money.ts` — `formatCurrency()`.
 - `format/date.ts` — `formatCalendarDate()`, `todayLocalDateString()`.
 - `config/features.ts` — feature flags (`investments`, `selfRegistration`).
-- (Fase 5) `privacy.svelte.ts` — estado transversal de privacidad.
+- `privacy.svelte.ts` — modo oculto: enmascara importes en todo el dashboard.
+  Es estado transversal de verdad (lo consumen widgets del dashboard, el
+  detalle de portfolio y el de plataforma), por eso vive aquí y no en una
+  feature.
 
-`lib/utils.ts` sigue existiendo como re-export temporal de estos módulos para no
-tocar a todos los importadores en la Fase 1; se elimina cuando ya nadie importe
-`$lib/utils`.
+Cada módulo se importa por su ruta (`$lib/shared/format/date`): no hay barrel.
+El antiguo `lib/utils.ts` —el cajón de sastre que repartió la Fase 1— se
+eliminó en la Fase 7, igual que `lib/stores/`.
 
 ## Reglas de dependencia
 

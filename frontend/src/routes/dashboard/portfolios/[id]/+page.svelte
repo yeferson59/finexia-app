@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { PortfolioGrowth } from '$lib/features/dashboard';
-	import { privacy } from '$lib/stores/privacy.svelte';
+	import { privacy } from '$lib/shared/privacy.svelte';
 	import {
 		PortfolioEditForm,
 		PortfolioSummaryCards,

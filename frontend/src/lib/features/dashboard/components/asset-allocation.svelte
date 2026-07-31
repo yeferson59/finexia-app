@@ -1,6 +1,6 @@
 <script lang="ts">
 	import CardHeader from '$lib/ui/card-header.svelte';
-	import { privacy } from '$lib/stores/privacy.svelte';
+	import { privacy } from '$lib/shared/privacy.svelte';
 
 	function fmtMoney(value: number): string {
 		return privacy.money(

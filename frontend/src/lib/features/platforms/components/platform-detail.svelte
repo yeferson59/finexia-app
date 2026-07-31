@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import Card from '$lib/ui/card.svelte';
-	import { privacy } from '$lib/stores/privacy.svelte';
+	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatSourceType, type Platform } from '../platforms';
 	import PlatformEditForm from './platform-edit-form.svelte';
 	import PlatformDeleteDialog from './platform-delete-dialog.svelte';

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { todayLocalDateString } from '$lib/utils';
+	import { todayLocalDateString } from '$lib/shared/format/date';
 
 	interface Props {
 		name: string;

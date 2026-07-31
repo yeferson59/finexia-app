@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import DatePicker from '$lib/ui/date-picker.svelte';
-	import { todayLocalDateString } from '$lib/utils';
+	import { todayLocalDateString } from '$lib/shared/format/date';
 	import type { Holding, Transaction } from '$lib/api/types';
 	import AssetSellPanelHeader from './asset-sell-panel-header.svelte';
 
