@@ -227,6 +227,21 @@ export interface Asset {
 	isCurated?: boolean;
 }
 
+/**
+ * Resultado de un import masivo (`POST /assets/import`,
+ * `POST /exchange-rates/import`).
+ *
+ * Un import es parcial por diseño: las filas correctas entran aunque otras
+ * fallen, y por eso el resultado lleva las tres cuentas más el detalle por
+ * fila de lo que se quedó fuera.
+ */
+export interface ImportResult {
+	totalRows: number;
+	imported: number;
+	skipped: number;
+	errors: { row: number; message: string }[];
+}
+
 /** Tasa de cambio (`GET /exchange-rates`). */
 export interface ExchangeRate {
 	id: string;

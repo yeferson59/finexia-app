@@ -185,6 +185,25 @@ const assets = [
 	}
 ];
 
+const exchangeRates = [
+	{
+		id: '55555555-5555-4555-8555-555555555555',
+		fromCurrency: 'USD',
+		toCurrency: 'COP',
+		rate: '4123.456789',
+		rateDate: NOW,
+		createdAt: NOW
+	},
+	{
+		id: '66666666-6666-4666-8666-666666666666',
+		fromCurrency: 'EUR',
+		toCurrency: 'USD',
+		rate: '1.085',
+		rateDate: NOW,
+		createdAt: NOW
+	}
+];
+
 const importPreview = {
 	sheets: ['Hoja1'],
 	sheet: 'Hoja1',
@@ -446,6 +465,9 @@ const server = createServer(async (req, res) => {
 				)
 			: assets;
 		return send(res, 200, envelope(filtered));
+	}
+	if (route === 'GET /exchange-rates') {
+		return send(res, 200, envelope(exchangeRates));
 	}
 	if (route === 'POST /portfolios/entries') {
 		await readBody(req);

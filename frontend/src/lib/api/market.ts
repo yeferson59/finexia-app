@@ -17,6 +17,7 @@ import {
 import type {
 	Asset,
 	ExchangeRate,
+	ImportResult,
 	MarketCredential,
 	MarketProvider,
 	MarketSyncResult
@@ -70,8 +71,8 @@ export function createAsset(
 }
 
 /** `POST /assets/import` — import masivo de assets (multipart). */
-export function importAssets(event: ApiEvent, form: FormData): Promise<ApiResult<unknown>> {
-	return apiRequest<unknown>(event, '/assets/import', { method: 'POST', body: form });
+export function importAssets(event: ApiEvent, form: FormData): Promise<ApiResult<ImportResult>> {
+	return apiRequest<ImportResult>(event, '/assets/import', { method: 'POST', body: form });
 }
 
 /** `PATCH /portfolios/assets/:id/price` — fija el precio manual de un asset. */
@@ -112,8 +113,8 @@ export function createRate(
 }
 
 /** `POST /exchange-rates/import` — import masivo de tasas (multipart). */
-export function importRates(event: ApiEvent, form: FormData): Promise<ApiResult<unknown>> {
-	return apiRequest<unknown>(event, '/exchange-rates/import', { method: 'POST', body: form });
+export function importRates(event: ApiEvent, form: FormData): Promise<ApiResult<ImportResult>> {
+	return apiRequest<ImportResult>(event, '/exchange-rates/import', { method: 'POST', body: form });
 }
 
 /** `PATCH /exchange-rates/:id` — actualiza una tasa. */

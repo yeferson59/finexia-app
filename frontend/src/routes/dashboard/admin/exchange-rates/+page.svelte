@@ -1,35 +1,20 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import PageHeader from '$lib/ui/page-header.svelte';
-	import Card from '$lib/ui/card.svelte';
 	import Button from '$lib/ui/button.svelte';
+	import {
+		ExchangeRateCreateForm,
+		ExchangeRatesTable,
+		ImportCard,
+		type ImportResult
+	} from '$lib/features/admin';
 
 	import type { PageProps } from './$types';
 
 	const { data, form }: PageProps = $props();
 
-	interface ImportResult {
-		totalRows: number;
-		imported: number;
-		skipped: number;
-		errors: { row: number; message: string }[];
-	}
-
-	let updatingId = $state<string | null>(null);
-	let creating = $state(false);
-	let importing = $state(false);
 	let showCreateForm = $state(false);
 	let showImportForm = $state(false);
 	let createMessage = $state<string | null>(null);
-	let rateInputs = $state<Record<string, string>>({});
-
-	$effect(() => {
-		for (const rate of data.rates) {
-			if (!(rate.id in rateInputs)) {
-				rateInputs[rate.id] = rate.rate ?? '';
-			}
-		}
-	});
 
 	$effect(() => {
 		if (form?.createSuccess) {
@@ -43,20 +28,6 @@
 	});
 
 	const importResult = $derived((form?.importResult ?? null) as ImportResult | null);
-
-	function formatRate(rate: string): string {
-		const num = parseFloat(rate);
-		if (isNaN(num)) return rate;
-		return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
-	}
-
-	function formatDate(iso: string | null): string {
-		if (!iso) return '—';
-		return new Intl.DateTimeFormat('es', {
-			dateStyle: 'short',
-			timeStyle: 'short'
-		}).format(new Date(iso));
-	}
 </script>
 
 <svelte:head>
@@ -94,190 +65,24 @@
 </PageHeader>
 
 {#if showCreateForm}
-	<div class="create-form-wrap">
-		<Card padding="md">
-			<h2 class="form-title">Nueva tasa de cambio</h2>
-			<form
-				method="POST"
-				action="?/createRate"
-				use:enhance={() => {
-					creating = true;
-					return async ({ update }) => {
-						creating = false;
-						await update();
-					};
-				}}
-			>
-				<div class="form-grid">
-					<div class="form-field">
-						<label class="field-label" for="fromCurrency"
-							>Moneda origen <span class="required">*</span></label
-						>
-						<input
-							id="fromCurrency"
-							name="fromCurrency"
-							class="field-input"
-							placeholder="USD"
-							maxlength="3"
-							required
-						/>
-					</div>
-					<div class="form-field">
-						<label class="field-label" for="toCurrency"
-							>Moneda destino <span class="required">*</span></label
-						>
-						<input
-							id="toCurrency"
-							name="toCurrency"
-							class="field-input"
-							placeholder="COP"
-							maxlength="3"
-							required
-						/>
-					</div>
-					<div class="form-field">
-						<label class="field-label" for="rate">Tasa <span class="required">*</span></label>
-						<input
-							id="rate"
-							name="rate"
-							type="number"
-							class="field-input"
-							placeholder="4000.00"
-							min="0.00000001"
-							step="any"
-							required
-						/>
-					</div>
-				</div>
-				{#if form?.createError}
-					<p class="form-error">{form.createError}</p>
-				{/if}
-				<div class="form-actions">
-					<Button type="submit" loading={creating}>Crear tasa</Button>
-				</div>
-			</form>
-		</Card>
-	</div>
+	<ExchangeRateCreateForm error={form?.createError ?? ''} />
 {/if}
 
 {#if showImportForm}
-	<div class="create-form-wrap">
-		<Card padding="md">
-			<h2 class="form-title">Importar tasas desde CSV/Excel</h2>
-			<p class="import-hint">
-				El archivo debe tener columnas <code>fromCurrency</code>, <code>toCurrency</code> y
-				<code>rate</code>. Se admite .csv, .xlsx y .xls.
-			</p>
-			<form
-				method="POST"
-				action="?/importRates"
-				enctype="multipart/form-data"
-				use:enhance={() => {
-					importing = true;
-					return async ({ update }) => {
-						importing = false;
-						await update();
-					};
-				}}
-			>
-				<div class="import-row">
-					<input type="file" name="file" accept=".csv,.xlsx,.xls" class="field-input" required />
-					<Button type="submit" loading={importing}>Importar</Button>
-				</div>
-				{#if form?.importError}
-					<p class="form-error">{form.importError}</p>
-				{/if}
-			</form>
-			{#if importResult}
-				<div class="import-result">
-					<p class="import-summary">
-						{importResult.imported} de {importResult.totalRows} fila{importResult.totalRows === 1
-							? ''
-							: 's'} importada{importResult.imported === 1 ? '' : 's'}{importResult.skipped > 0
-							? `, ${importResult.skipped} omitida${importResult.skipped === 1 ? '' : 's'}`
-							: ''}.
-					</p>
-					{#if importResult.errors.length > 0}
-						<ul class="import-errors">
-							{#each importResult.errors as e (e.row)}
-								<li>Fila {e.row}: {e.message}</li>
-							{/each}
-						</ul>
-					{/if}
-				</div>
-			{/if}
-		</Card>
-	</div>
+	<ImportCard
+		title="Importar tasas desde CSV/Excel"
+		action="importRates"
+		error={form?.importError ?? ''}
+		result={importResult}
+	>
+		{#snippet hint()}
+			El archivo debe tener columnas <code>fromCurrency</code>, <code>toCurrency</code> y
+			<code>rate</code>. Se admite .csv, .xlsx y .xls.
+		{/snippet}
+	</ImportCard>
 {/if}
 
-<Card padding="none">
-	{#if data.rates.length === 0}
-		<p class="empty-state">No hay tasas de cambio en el sistema.</p>
-	{:else}
-		<div class="table-wrapper">
-			<table class="assets-table">
-				<thead>
-					<tr>
-						<th>Par</th>
-						<th>Tasa actual</th>
-						<th>Fecha de tasa</th>
-						<th>Actualizado</th>
-						<th>Nueva tasa</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each data.rates as rate (rate.id)}
-						{@const isUpdating = updatingId === rate.id}
-						{@const hasUpdateError = form?.updateError && form?.errorId === rate.id}
-						{@const hasUpdateSuccess = form?.updateSuccess && form?.updatedId === rate.id}
-						<tr class:row-success={hasUpdateSuccess}>
-							<td class="cell-ticker">
-								{rate.fromCurrency}/{rate.toCurrency}
-							</td>
-							<td class="cell-price">{formatRate(rate.rate)}</td>
-							<td class="cell-date">{formatDate(rate.rateDate)}</td>
-							<td class="cell-date">{formatDate(rate.createdAt)}</td>
-							<td class="cell-update">
-								<form
-									method="POST"
-									action="?/updateRate"
-									use:enhance={() => {
-										updatingId = rate.id;
-										return async ({ update }) => {
-											updatingId = null;
-											await update({ reset: false });
-										};
-									}}
-								>
-									<input type="hidden" name="id" value={rate.id} />
-									<div class="update-row">
-										<input
-											type="number"
-											name="rate"
-											class="price-input"
-											class:input-error={hasUpdateError}
-											bind:value={rateInputs[rate.id]}
-											min="0.00000001"
-											step="any"
-											placeholder="0.00"
-											required
-										/>
-										<Button type="submit" size="sm" variant="secondary" loading={isUpdating}>
-											OK
-										</Button>
-									</div>
-									{#if hasUpdateError}
-										<p class="row-error">{form.updateError}</p>
-									{/if}
-								</form>
-							</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
-	{/if}
-</Card>
+<ExchangeRatesTable rates={data.rates} {form} />
 
 <style>
 	.header-actions {
@@ -290,225 +95,5 @@
 		font-size: 0.82rem;
 		color: var(--green);
 		font-weight: 500;
-	}
-
-	.table-wrapper {
-		overflow-x: auto;
-	}
-
-	.assets-table {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 0.875rem;
-	}
-
-	.assets-table th {
-		font-family: var(--font-mono);
-		font-size: 0.625rem;
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.12em;
-		color: var(--text-dim);
-		padding: 0.875rem 1.25rem;
-		text-align: left;
-		border-bottom: 1px solid var(--border);
-		white-space: nowrap;
-	}
-
-	.assets-table td {
-		padding: 0.75rem 1.25rem;
-		color: var(--text-muted);
-		border-bottom: 1px solid var(--border);
-		vertical-align: middle;
-	}
-
-	.assets-table tbody tr:last-child td {
-		border-bottom: none;
-	}
-
-	.assets-table tbody tr:hover td {
-		background: var(--surface-2);
-	}
-
-	.row-success td {
-		background: rgba(76, 175, 80, 0.05) !important;
-	}
-
-	.cell-ticker {
-		font-family: var(--font-mono);
-		font-weight: 600;
-		color: var(--amber-light) !important;
-		font-size: 0.85rem;
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.cell-price {
-		font-family: var(--font-mono);
-		font-weight: 600;
-		color: var(--text) !important;
-		white-space: nowrap;
-	}
-
-	.cell-date {
-		font-family: var(--font-mono);
-		font-size: 0.78rem;
-		white-space: nowrap;
-	}
-
-	.cell-update {
-		min-width: 160px;
-	}
-
-	.update-row {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.price-input {
-		width: 90px;
-		padding: 0.4rem 0.6rem;
-		background: var(--surface-2);
-		border: 1px solid var(--border-strong);
-		border-radius: 6px;
-		color: var(--text);
-		font-family: var(--font-mono);
-		font-size: 0.82rem;
-		transition: border-color 0.2s ease;
-	}
-
-	.price-input:focus {
-		outline: none;
-		border-color: var(--amber);
-	}
-
-	.price-input.input-error {
-		border-color: var(--red);
-	}
-
-	.row-error {
-		font-size: 0.75rem;
-		color: var(--red);
-		margin: 0.25rem 0 0 0;
-	}
-
-	.create-form-wrap {
-		margin-bottom: 1.5rem;
-	}
-
-	.form-title {
-		font-size: 0.95rem;
-		font-weight: 600;
-		color: var(--text);
-		margin: 0 0 1.25rem 0;
-	}
-
-	.form-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-		gap: 1rem;
-		margin-bottom: 1rem;
-	}
-
-	.form-field {
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-	}
-
-	.field-label {
-		font-family: var(--font-mono);
-		font-size: 0.65rem;
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		color: var(--text-dim);
-	}
-
-	.required {
-		color: var(--red);
-	}
-
-	.field-input {
-		padding: 0.55rem 0.75rem;
-		background: var(--surface-2);
-		border: 1px solid var(--border-strong);
-		border-radius: 6px;
-		color: var(--text);
-		font-size: 0.875rem;
-		font-family: var(--font-body);
-		transition: border-color 0.2s ease;
-	}
-
-	.field-input:focus {
-		outline: none;
-		border-color: var(--amber);
-	}
-
-	.form-error {
-		font-size: 0.82rem;
-		color: var(--red);
-		margin: 0 0 0.75rem 0;
-	}
-
-	.form-actions {
-		display: flex;
-		justify-content: flex-end;
-	}
-
-	.empty-state {
-		text-align: center;
-		padding: 3rem;
-		color: var(--text-dim);
-		font-size: 0.9rem;
-	}
-
-	.import-hint {
-		font-size: 0.82rem;
-		color: var(--text-muted);
-		margin: 0 0 1rem 0;
-	}
-
-	.import-hint code {
-		font-family: var(--font-mono);
-		font-size: 0.78rem;
-		color: var(--amber-light);
-	}
-
-	.import-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
-
-	.import-row .field-input {
-		flex: 1;
-	}
-
-	.import-result {
-		margin-top: 1rem;
-		padding-top: 1rem;
-		border-top: 1px solid var(--border);
-	}
-
-	.import-summary {
-		font-size: 0.85rem;
-		color: var(--text);
-		margin: 0;
-	}
-
-	.import-errors {
-		margin: 0.6rem 0 0 0;
-		padding-left: 1.1rem;
-		font-size: 0.78rem;
-		color: var(--red);
-		max-height: 200px;
-		overflow-y: auto;
-	}
-
-	.import-errors li {
-		margin-bottom: 0.25rem;
 	}
 </style>
