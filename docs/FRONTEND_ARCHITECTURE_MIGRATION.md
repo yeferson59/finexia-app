@@ -485,21 +485,97 @@ del resto de features.
 Con esto, **ningún archivo de producción supera ~500 líneas** fuera del área que
 toca la Fase 6 (`settings/+page.svelte` y las tres páginas de `admin/`).
 
-### Fase 6 — Features restantes: `settings`, `admin`
+### Fase 6 — Features restantes: `settings`, `admin` ✅
 
-- [ ] `lib/features/settings/`: trocear `settings/+page.svelte` (1.146 líneas) en
-      secciones (perfil, seguridad/2FA, sesiones, preferencias, notificaciones).
-- [ ] `lib/features/admin/`: extraer componentes de `admin/users`, `admin/assets`,
-      `admin/exchange-rates` (595–671 líneas cada una); las tablas/paginación
-      comunes bajan a `lib/ui` si no tienen dominio.
-- [ ] Verificación estándar + E2E de settings y admin.
+- [x] `lib/features/settings/`: trocear `settings/+page.svelte` (**1.150 → 48**)
+      en secciones: `profile-section` (con `avatar-uploader` interno),
+      `appearance-section`, `password-section`, `two-factor-section` (con
+      `two-factor-setup` y `two-factor-manage` internos) y `sessions-section`.
+      `market-credentials`, que ya vivía suelta en la raíz de la feature, baja a
+      `components/` y entra en el `index.ts`.
+  - `settings.ts` centraliza el reparto del `form` entre secciones
+    (`actionSucceeded`, `actionError`, `actionData`, `issuedRecoveryCodes`) y los
+    helpers de sesiones (`describeDevice`, `formatSessionDate`,
+    `countOtherSessions`), con su `settings.spec.ts`.
+  - `schemas.ts` reúne los schemas Zod que estaban declarados dentro de cada
+    action de `+page.server.ts`, siguiendo la convención de `features/auth`
+    (el `+page.server.ts` sigue en `routes/`: es orquestación).
+      *(Verificación: `pnpm check` 0 errores, `pnpm lint`, 180 unit tests, 22 E2E.)*
+- [x] `lib/features/admin/`: extraer componentes de `admin/users` (**595 → 50**),
+      `admin/assets` (**586 → 95**) y `admin/exchange-rates` (**514 → 99**); la
+      tabla común baja a `lib/ui/data-table.svelte` (no tiene dominio: solo
+      scroll, cabecera y filas).
+  - Listados: `invitations-table`, `waitlist-table`, `users-table` (que se queda
+    su paginación de servidor, un GET con `?page=`), `assets-table` (con el
+    `Pagination` cliente de `lib/ui`) y `exchange-rates-table`.
+  - Formularios: `invite-user-form`, `asset-create-form`,
+    `exchange-rate-create-form` y `import-card`, este último compartido por las
+    dos pantallas de catálogo, que lo tenían copiado.
+  - `admin.ts` centraliza constantes (`ASSET_TYPES`, `INVITE_ROLES`,
+    `INVITATION_STATUS_LABELS`) y formateadores (`formatPrice`, `formatRate`,
+    `formatDay`, `formatDateTime`, `summarizeImport`), con su `admin.spec.ts`.
+  - `ImportResult` estaba declarado a mano en las dos páginas de catálogo: pasa
+    a `lib/api/types` y `importAssets`/`importRates` ya lo devuelven tipado.
+- [x] Verificación estándar + E2E de settings y admin. Las pantallas de activos
+      y tasas no tenían E2E (no estaban en el smoke de la Fase 0): se añadieron
+      tres casos a `admin.e2e.ts` y la ruta `GET /exchange-rates` al stub
+      `mock-api.mjs`.
+      *(`pnpm check` 0 errores, `pnpm lint`, 194 unit tests, 27 E2E.)*
+
+#### 6.1 Notas de la migración de `settings` y `admin`
+
+- **CSS compartido: componente contenedor con `:global` acotado, no hoja
+  global.** La Fase 4 resolvió el reparto de estilos de `auth` con un
+  `auth-forms.css` global porque sus clases eran exclusivas del área. Aquí no lo
+  eran: `.section`, `.hint`, `.feedback`, `.cell-email` o `.field-input` son
+  nombres genéricos, y `.section` significa cosas distintas en ajustes (padding
+  de tarjeta) y en admin (margen entre bloques). En vez de duplicarlos en cada
+  hijo o soltarlos al global, el chrome vive en un componente contenedor que
+  declara las reglas como `.wrapper :global(.clase)`: Svelte las compila con el
+  hash del contenedor (`.section.svelte-xxx .hint`), así que alcanzan a los
+  hijos pero no salen de ese bloque. Son cuatro: `settings-section`,
+  `admin-section`, `admin-form-card` y `admin-table-card`, todos internos.
+- **Un solo `form` repartido entre secciones.** La página de ajustes tiene once
+  form actions y un único `form`; cada sección tiene que quedarse solo con el
+  resultado de las suyas. El patrón `form?.action === 'x' && (form as {…})
+  .success` estaba repetido quince veces en la página: ahora son cuatro
+  funciones en `settings.ts`, probadas.
+- **Verificación de que el troceo no movió un píxel.** Además de los E2E, se
+  comprobó con un test temporal de Playwright que los estilos calculados de las
+  clases repartidas siguen siendo los mismos (padding de `.section`, `th`/`td`
+  de las tablas, `.field-input`, `.cell-*`, el `display:flex` propio del par de
+  divisas…). El test era una red de un solo uso para este PR y no se conserva.
+- **La tabla, a `lib/ui`.** `data-table.svelte` es el único sitio donde cambia
+  un nombre de clase: las tres tablas usaban `.users-table` / `.assets-table`
+  con reglas idénticas y ahora comparten `.data-table`. Las reglas de `th`/`td`
+  van con `:global` porque las celdas se escriben en el componente que usa la
+  tabla y llevan su scope, no el de `lib/ui`.
+- **Un `$effect` que dejó de hacer falta.** El formulario de invitación limpiaba
+  sus campos al terminar con éxito; como la página lo desmonta en ese mismo
+  caso, el componente vuelve vacío por sí solo. Se documenta aquí porque es una
+  línea de comportamiento que desaparece, no una mejora deliberada.
+
+**Presupuesto de tamaño al cerrar la Fase 6.** Ya no queda **ningún archivo de
+producción por encima de ~500 líneas** (la línea base de la Fase 0 tenía 13), y
+la única `+page.svelte` que pasa de ~300 es `dashboard/reports/+page.svelte`
+(461). Es la única página del dashboard que ninguna fase reclamó: se anota en la
+Fase 7, que es donde se valida ese presupuesto.
 
 ### Fase 7 — Demolición del legacy y blindaje de fronteras
 
 - [ ] Verificar que `src/components/` quedó vacío y **borrarlo**; eliminar el alias
       `$components` (y evaluar eliminar `$/*`) de `svelte.config.js`.
+      *(Al cerrar la Fase 6 el directorio ya no existe y nadie importa por
+      `$components`, pero los dos alias siguen declarados en `svelte.config.js`
+      —`$components/*` apuntando a una ruta que ya no existe— y hay que
+      quitarlos.)*
 - [ ] Eliminar `lib/utils.ts` y `lib/stores/` si quedaron reducidos a re-exports;
       `lib/index.ts` vacío también se borra.
+      *(`lib/utils.ts` son 16 líneas de re-exports que aún importan 22 archivos,
+      y `lib/stores/privacy.svelte.ts` lo consumen 12.)*
+- [ ] Trocear `dashboard/reports/+page.svelte` (461): es la única página que no
+      entró en ninguna feature de las Fases 3–6 y la única que sigue por encima
+      del presupuesto de ~300 líneas.
 - [ ] Blindar fronteras con ESLint (`import/no-restricted-paths` o
       `eslint-plugin-boundaries`):
   - [ ] `lib/ui` no importa de `lib/features` ni `lib/api`.
