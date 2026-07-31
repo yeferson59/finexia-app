@@ -40,7 +40,9 @@ export default defineConfig({
 				test: {
 					name: 'server',
 					environment: 'node',
-					include: ['src/**/*.{test,spec}.{js,ts}'],
+					// `e2e/**` entra por el spec que valida las fixtures del stub
+					// contra los schemas de la API; los `.e2e.ts` son de Playwright.
+					include: ['src/**/*.{test,spec}.{js,ts}', 'e2e/**/*.{test,spec}.{js,ts}'],
 					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
 				}
 			}

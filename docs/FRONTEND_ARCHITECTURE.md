@@ -23,13 +23,15 @@ frontend/src/
 └── lib/
     ├── api/          # capa de acceso al backend (server-only)
     │   ├── client.ts     # authedFetch/authedFetchSafe: auth, refresh y redirección
-    │   ├── types.ts      # contratos HTTP, espejo de docs/API.md
+    │   ├── schemas.ts    # contratos HTTP como schemas Zod, espejo de docs/API.md
+    │   ├── types.ts      # los tipos, derivados de los schemas con z.infer
     │   └── auth.ts · portfolio.ts · transactions.ts · platforms.ts ·
     │     market.ts · user.ts · marketing.ts
     │
     ├── features/     # un directorio por dominio funcional
     │   ├── admin/ · auth/ · dashboard/ · investments/ · landing/ · legal/ ·
-    │   │ platforms/ · portfolio/ · reports/ · settings/ · transactions/
+    │   │ notifications/ · platforms/ · portfolio/ · reports/ · settings/ ·
+    │   │ transactions/
     │   └── <feature>/
     │       ├── components/     # componentes del dominio
     │       ├── <feature>.ts    # helpers puros, constantes y tipos del dominio
@@ -39,7 +41,7 @@ frontend/src/
     │
     ├── ui/           # design system sin dominio (button, card, input, table…)
     ├── server/       # session.ts, testing.ts (server-only transversal)
-    └── shared/       # css.ts, format/, config/, privacy.svelte.ts
+    └── shared/       # css.ts, format/, config/, form.ts, privacy.svelte.ts
 ```
 
 Sin aliases propios: todo se importa por `$lib`, el estándar de SvelteKit.
@@ -77,9 +79,17 @@ un barrel de JS no puede reexportar un side-effect de CSS.
 
 ## 3. Convenciones
 
-- **Contratos del backend en un solo sitio.** `lib/api/types.ts` se mantiene a
-  mano contra [`API.md`](./API.md). Ninguna feature redeclara un shape del
-  backend: lo importa y, si le conviene, lo reexporta desde su módulo.
+- **Contratos del backend en un solo sitio.** `lib/api/schemas.ts` los define
+  como schemas Zod, mantenidos a mano contra [`API.md`](./API.md), y
+  `lib/api/types.ts` los deriva con `z.infer`: el tipo no puede desalinearse de
+  su schema. Ninguna feature redeclara un shape del backend: lo importa de
+  `types.ts` y, si le conviene, lo reexporta desde su módulo.
+- **El contrato se comprueba en desarrollo.** Los módulos de dominio pasan su
+  schema a `apiRequest`/`apiRequestSafe`, que en `dev` valida el `data` recibido
+  y avisa en consola con la ruta y el campo que falla. Nunca cambia el
+  resultado, y `import.meta.env.DEV` lo deja fuera del build de producción. Así
+  un backend que se sale del contrato se nota donde ocurre, y no tres
+  componentes más abajo como un `undefined`.
 - **`ApiResult<T>` en toda la capa de API.** Las funciones de dominio
   encapsulan path + método + parseo; devuelven la `Response` cruda solo para
   streams/proxies y para los flujos públicos de auth/marketing.
@@ -108,6 +118,7 @@ un barrel de JS no puede reexportar un side-effect de CSS.
 | Unit (node) | `*.spec.ts` junto al módulo | Helpers puros, schemas, capa de API, sesión. |
 | Componente (browser) | `*.svelte.spec.ts` | Render y comportamiento de componentes de `ui` y de features. |
 | E2E (Playwright) | `frontend/e2e/*.e2e.ts` | Flujos completos contra el stub `e2e/mocks/mock-api.mjs`, escrito contra `docs/API.md`. |
+| Contrato del stub | `e2e/mocks/contract.spec.ts` | Que las fixtures del stub cumplan los schemas de `lib/api`, para que la suite E2E no pase en verde sobre formas que el backend no envía. |
 
 ```bash
 cd frontend
@@ -124,7 +135,7 @@ pnpm test:e2e
 
 | Si es… | Va a… |
 |---|---|
-| Una llamada nueva al backend | `lib/api/<dominio>.ts` + su tipo en `lib/api/types.ts` |
+| Una llamada nueva al backend | `lib/api/<dominio>.ts` + su schema en `lib/api/schemas.ts` (el tipo sale solo) |
 | Un componente de un dominio | `lib/features/<feature>/components/` (y al `index.ts` solo si lo usa `routes/` u otra área) |
 | Un helper puro de un dominio | `lib/features/<feature>/<feature>.ts` con su spec |
 | La validación de un formulario | `lib/features/<feature>/schemas.ts` |

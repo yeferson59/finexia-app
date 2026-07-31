@@ -12,6 +12,15 @@ import type {
 	Risk,
 	TopTransaction
 } from './types';
+import {
+	allocationItemSchema,
+	portfolioDetailSchema,
+	portfolioGrowthSchema,
+	portfolioSummarySchema,
+	riskSchema,
+	topTransactionSchema
+} from './schemas';
+import { z } from 'zod';
 
 /** `GET /portfolios/summary` — resumen de los portfolios (opcionalmente en `currency`). */
 export function getSummaries(
@@ -19,22 +28,22 @@ export function getSummaries(
 	currency?: string
 ): Promise<ApiResult<PortfolioSummary[]>> {
 	const query = currency ? `?currency=${encodeURIComponent(currency)}` : '';
-	return apiRequestSafe<PortfolioSummary[]>(event, `/portfolios/summary${query}`);
+	return apiRequestSafe(event, `/portfolios/summary${query}`, {}, z.array(portfolioSummarySchema));
 }
 
 /** `GET /portfolios/:id` — detalle de un portfolio con sus holdings. */
 export function getPortfolio(event: ApiEvent, id: string): Promise<ApiResult<PortfolioDetail>> {
-	return apiRequestSafe<PortfolioDetail>(event, `/portfolios/${id}`);
+	return apiRequestSafe(event, `/portfolios/${id}`, {}, portfolioDetailSchema);
 }
 
 /** `GET /portfolios/risks` — catálogo de niveles de riesgo. */
 export function getRisks(event: ApiEvent): Promise<ApiResult<Risk[]>> {
-	return apiRequestSafe<Risk[]>(event, '/portfolios/risks');
+	return apiRequestSafe(event, '/portfolios/risks', {}, z.array(riskSchema));
 }
 
 /** `GET /portfolios/allocation` — asignación por categoría de activo. */
 export function getAllocation(event: ApiEvent): Promise<ApiResult<AllocationItem[]>> {
-	return apiRequestSafe<AllocationItem[]>(event, '/portfolios/allocation');
+	return apiRequestSafe(event, '/portfolios/allocation', {}, z.array(allocationItemSchema));
 }
 
 /** `GET /portfolios/growth` — crecimiento agregado (soporta `since`/`period`). */
@@ -46,7 +55,7 @@ export function getAggregateGrowth(
 	if (opts.since) params.set('since', opts.since);
 	if (opts.period) params.set('period', opts.period);
 	const query = params.toString() ? `?${params}` : '';
-	return apiRequestSafe<PortfolioGrowth>(event, `/portfolios/growth${query}`);
+	return apiRequestSafe(event, `/portfolios/growth${query}`, {}, portfolioGrowthSchema);
 }
 
 /** `GET /portfolios/:id/growth` — crecimiento de un portfolio. */
@@ -54,12 +63,12 @@ export function getPortfolioGrowth(
 	event: ApiEvent,
 	id: string
 ): Promise<ApiResult<PortfolioGrowth>> {
-	return apiRequestSafe<PortfolioGrowth>(event, `/portfolios/${id}/growth`);
+	return apiRequestSafe(event, `/portfolios/${id}/growth`, {}, portfolioGrowthSchema);
 }
 
 /** `GET /portfolios/:id/top-transaction` — mayor transacción del portfolio. */
 export function getTopTransaction(event: ApiEvent, id: string): Promise<ApiResult<TopTransaction>> {
-	return apiRequestSafe<TopTransaction>(event, `/portfolios/${id}/top-transaction`);
+	return apiRequestSafe(event, `/portfolios/${id}/top-transaction`, {}, topTransactionSchema);
 }
 
 /** `POST /portfolios` — crea un portfolio. */

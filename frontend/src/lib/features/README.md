@@ -1,7 +1,8 @@
 # `lib/features` — módulos por dominio funcional
 
 Un directorio por dominio (`auth/`, `portfolio/`, `dashboard/`, `transactions/`,
-`platforms/`, `investments/`, `settings/`, `admin/`, `landing/`, `legal/`). Aquí vive la lógica
+`platforms/`, `investments/`, `settings/`, `notifications/`, `admin/`,
+`reports/`, `landing/`, `legal/`). Aquí vive la lógica
 de negocio, los componentes de feature, los schemas Zod y el estado de cada
 dominio. `routes/` **solo orquesta**: loaders/actions delgados que llaman a
 `lib/api`, páginas que componen componentes de la feature.
@@ -38,9 +39,9 @@ importan por ruta relativa y no forman parte de la superficie pública.
 - Presupuesto de tamaño: una `+page.svelte` no supera ~300 líneas; ningún
   archivo de producción supera ~500. Si crece, extrae componentes aquí.
 
-> Estado: migración cerrada (Fase 7, 2026-07-31). Son once features: `admin`,
-> `auth`, `dashboard`, `investments`, `landing`, `legal`, `platforms`,
-> `portfolio`, `reports`, `settings` y `transactions`.
+> Estado: migración cerrada (Fase 7, 2026-07-31). Son doce features: `admin`,
+> `auth`, `dashboard`, `investments`, `landing`, `legal`, `notifications`,
+> `platforms`, `portfolio`, `reports`, `settings` y `transactions`.
 >
 > Las reglas de arriba **fallan el CI** desde `eslint.config.js`, no dependen de
 > que alguien las recuerde en la revisión. La foto completa de la arquitectura

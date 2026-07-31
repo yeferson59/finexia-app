@@ -665,7 +665,7 @@ las reglas que hay que respetar de aquí en adelante están en
       (`lib/api/types.ts`) alineada con `docs/API.md`.
 - [x] Ningún archivo de producción supera ~500 líneas; ninguna `+page.svelte`
       supera ~300. *(El mayor: `portfolio-entry-form` con 490; la página más
-      larga, `notifications` con 287.)*
+      larga, `portfolios` con 243.)*
 - [x] `src/components/` y el alias `$components` no existen; todo vive bajo `$lib`.
 - [x] Toda form action valida con un schema Zod de su feature. *(Salvo la
       comprobación de archivos subidos —avatar e imports—, que se queda como
@@ -683,8 +683,13 @@ las reglas que hay que respetar de aquí en adelante están en
 | `+page.svelte` > 300 líneas | 16 | **0** |
 | Archivos de `routes/` con `authedFetch` crudo | 24 | **0** |
 | Contratos del backend duplicados en `routes/` | 5 áreas | **0** |
-| Features | 0 | **11** |
+| Features | 0 | **12** |
 | Unit tests / E2E | 122 / 22 | **228 / 29** |
 
 La página que más adelgazó fue el detalle de un activo (2.014 → 120 líneas); la
 de ajustes pasó de 1.150 a 48 y el centro de reportes de 461 a 79.
+
+> Las dos deudas que abrió este cierre —`F4`, la página de notificaciones sin
+> feature propia, y `F5`, los contratos de la API mantenidos a mano— se
+> cerraron justo después; ver `TECH_DEBT.md` y la sección 3 de
+> [`FRONTEND_ARCHITECTURE.md`](./FRONTEND_ARCHITECTURE.md).

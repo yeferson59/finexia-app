@@ -9,6 +9,9 @@ Sustituye al antiguo cajón de sastre `lib/utils.ts`, repartido por tema.
 - `format/money.ts` — `formatCurrency()`.
 - `format/date.ts` — `formatCalendarDate()`, `todayLocalDateString()`.
 - `config/features.ts` — feature flags (`investments`, `selfRegistration`).
+- `form.ts` — reparto del `form` de una página entre sus secciones
+  (`actionSucceeded`, `actionError`, `actionData`), que usan ajustes y
+  notificaciones.
 - `privacy.svelte.ts` — modo oculto: enmascara importes en todo el dashboard.
   Es estado transversal de verdad (lo consumen widgets del dashboard, el
   detalle de portfolio y el de plataforma), por eso vive aquí y no en una

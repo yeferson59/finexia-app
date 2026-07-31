@@ -11,10 +11,12 @@ import {
 	type ApiResult
 } from './client';
 import type { PagedTransactions, UserTransaction } from './types';
+import { pagedTransactionsSchema, userTransactionSchema } from './schemas';
+import { z } from 'zod';
 
 /** `GET /portfolios/transactions` — transacciones recientes del usuario. */
 export function getRecent(event: ApiEvent): Promise<ApiResult<UserTransaction[]>> {
-	return apiRequestSafe<UserTransaction[]>(event, '/portfolios/transactions');
+	return apiRequestSafe(event, '/portfolios/transactions', {}, z.array(userTransactionSchema));
 }
 
 /** `GET /portfolios/:id/assets/:symbol/transactions` — transacciones paginadas de una posición. */
@@ -25,9 +27,11 @@ export function getAssetTransactions(
 	page: number,
 	limit: number
 ): Promise<ApiResult<PagedTransactions>> {
-	return apiRequestSafe<PagedTransactions>(
+	return apiRequestSafe(
 		event,
-		`/portfolios/${id}/assets/${symbol}/transactions?page=${page}&limit=${limit}`
+		`/portfolios/${id}/assets/${symbol}/transactions?page=${page}&limit=${limit}`,
+		{},
+		pagedTransactionsSchema
 	);
 }
 
