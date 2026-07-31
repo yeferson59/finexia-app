@@ -1,14 +1,20 @@
 import type { Actions, PageServerLoad } from './$types';
-import { z } from 'zod';
 import { fail } from '@sveltejs/kit';
 import * as user from '$lib/api/user';
 import * as market from '$lib/api/market';
 import type { ActiveSession, MarketCredential, TwoFactorStatus } from '$lib/api/types';
-
-const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-
-/** Proveedores para los que el backend acepta una clave. */
-const marketProviderSchema = z.enum(['finnhub', 'alphavantage']);
+import {
+	ALLOWED_AVATAR_TYPES,
+	MAX_AVATAR_BYTES,
+	changePasswordSchema,
+	enableTwoFactorSchema,
+	marketKeySchema,
+	marketProviderSchema,
+	profileSchema,
+	sessionIdSchema,
+	setupTwoFactorSchema,
+	twoFactorChallengeSchema
+} from '$lib/features/settings';
 
 export const load: PageServerLoad = async ({ locals, fetch, cookies }) => {
 	const event = { cookies, fetch };
@@ -37,16 +43,7 @@ export const actions = {
 	updateProfile: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 
-		const schema = z.object({
-			name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(254),
-			preferredCurrency: z
-				.string()
-				.length(3, 'La moneda debe ser un código de 3 caracteres')
-				.toUpperCase(),
-			image: z.string().optional()
-		});
-
-		const parsed = schema.safeParse({
+		const parsed = profileSchema.safeParse({
 			name: formData.get('name'),
 			preferredCurrency: formData.get('preferredCurrency'),
 			image: formData.get('image') || undefined
@@ -76,14 +73,14 @@ export const actions = {
 			return fail(400, { action: 'uploadAvatar', error: 'Selecciona una imagen para subir' });
 		}
 
-		if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+		if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
 			return fail(400, {
 				action: 'uploadAvatar',
 				error: 'Solo se permiten imágenes JPEG, PNG o WebP'
 			});
 		}
 
-		if (file.size > 5 * 1024 * 1024) {
+		if (file.size > MAX_AVATAR_BYTES) {
 			return fail(400, { action: 'uploadAvatar', error: 'La imagen no puede superar 5 MB' });
 		}
 
@@ -105,23 +102,7 @@ export const actions = {
 	changePassword: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 
-		const schema = z
-			.object({
-				currentPassword: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
-				// El login exige max 20; sin este límite el usuario podría fijar una
-				// contraseña con la que luego no puede iniciar sesión.
-				newPassword: z
-					.string()
-					.min(8, 'La nueva contraseña debe tener al menos 8 caracteres')
-					.max(20, 'La nueva contraseña no puede superar 20 caracteres'),
-				confirmPassword: z.string()
-			})
-			.refine((d) => d.newPassword === d.confirmPassword, {
-				message: 'Las contraseñas no coinciden',
-				path: ['confirmPassword']
-			});
-
-		const parsed = schema.safeParse({
+		const parsed = changePasswordSchema.safeParse({
 			currentPassword: formData.get('currentPassword'),
 			newPassword: formData.get('newPassword'),
 			confirmPassword: formData.get('confirmPassword')
@@ -149,7 +130,7 @@ export const actions = {
 		const formData = await request.formData();
 		const sessionId = formData.get('sessionId');
 
-		const parsed = z.uuid().safeParse(sessionId);
+		const parsed = sessionIdSchema.safeParse(sessionId);
 		if (!parsed.success) {
 			return fail(400, { action: 'revokeSession', error: 'Sesión inválida' });
 		}
@@ -168,11 +149,7 @@ export const actions = {
 
 	setup2fa: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
-		const parsed = z
-			.string()
-			.min(8, 'Ingresa tu contraseña actual')
-			.max(20)
-			.safeParse(formData.get('password'));
+		const parsed = setupTwoFactorSchema.safeParse(formData.get('password'));
 
 		if (!parsed.success) {
 			return fail(400, { action: 'setup2fa', error: parsed.error.issues[0].message });
@@ -198,12 +175,7 @@ export const actions = {
 
 	enable2fa: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
-		const parsed = z
-			.string()
-			.trim()
-			.min(6, 'Ingresa el código de 6 dígitos')
-			.max(20)
-			.safeParse(formData.get('code'));
+		const parsed = enableTwoFactorSchema.safeParse(formData.get('code'));
 
 		if (!parsed.success) {
 			return fail(400, { action: 'enable2fa', error: parsed.error.issues[0].message });
@@ -227,15 +199,10 @@ export const actions = {
 
 	disable2fa: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
-		const parsed = z
-			.object({
-				password: z.string().min(8, 'Ingresa tu contraseña actual').max(20),
-				code: z.string().trim().min(6, 'Ingresa un código válido').max(20)
-			})
-			.safeParse({
-				password: formData.get('password'),
-				code: formData.get('code')
-			});
+		const parsed = twoFactorChallengeSchema.safeParse({
+			password: formData.get('password'),
+			code: formData.get('code')
+		});
 
 		if (!parsed.success) {
 			return fail(400, { action: 'disable2fa', error: parsed.error.issues[0].message });
@@ -255,15 +222,10 @@ export const actions = {
 
 	regenerate2faCodes: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
-		const parsed = z
-			.object({
-				password: z.string().min(8, 'Ingresa tu contraseña actual').max(20),
-				code: z.string().trim().min(6, 'Ingresa un código válido').max(20)
-			})
-			.safeParse({
-				password: formData.get('password'),
-				code: formData.get('code')
-			});
+		const parsed = twoFactorChallengeSchema.safeParse({
+			password: formData.get('password'),
+			code: formData.get('code')
+		});
 
 		if (!parsed.success) {
 			return fail(400, { action: 'regenerate2faCodes', error: parsed.error.issues[0].message });
@@ -295,15 +257,10 @@ export const actions = {
 	saveMarketKey: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 
-		const parsed = z
-			.object({
-				provider: marketProviderSchema,
-				apiKey: z.string().trim().min(8, 'La clave es demasiado corta').max(256)
-			})
-			.safeParse({
-				provider: formData.get('provider'),
-				apiKey: formData.get('apiKey')
-			});
+		const parsed = marketKeySchema.safeParse({
+			provider: formData.get('provider'),
+			apiKey: formData.get('apiKey')
+		});
 
 		if (!parsed.success) {
 			return fail(400, {
