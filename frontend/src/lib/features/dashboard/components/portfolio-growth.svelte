@@ -1,7 +1,16 @@
 <script lang="ts">
 	import CardHeader from '$lib/ui/card-header.svelte';
 	import Stat from '$lib/ui/stat.svelte';
-	import { privacy } from '$lib/stores/privacy.svelte';
+	import { privacy } from '$lib/shared/privacy.svelte';
+	import {
+		PERIODS,
+		PLOT,
+		filterByPeriod,
+		growthScale,
+		toPlotX,
+		toPlotY,
+		type Period
+	} from '../dashboard';
 
 	import type { GrowthDataPoint, GrowthSummary } from '$lib/api/types';
 
@@ -10,35 +19,14 @@
 		summary = { firstDate: '', initialValue: '0', currentValue: '0', totalGrowthPct: '0' }
 	}: { data: GrowthDataPoint[]; summary: GrowthSummary } = $props();
 
-	type Period = '1M' | '3M' | '6M' | '1Y' | 'Todo';
 	let selectedPeriod = $state<Period>('Todo');
 
-	const periods: Period[] = ['1M', '3M', '6M', '1Y', 'Todo'];
-
-	function filterByPeriod(points: GrowthDataPoint[], period: Period): GrowthDataPoint[] {
-		if (period === 'Todo') return points;
-		const monthsMap: Record<Exclude<Period, 'Todo'>, number> = {
-			'1M': 1,
-			'3M': 3,
-			'6M': 6,
-			'1Y': 12
-		};
-		const now = new Date();
-		const cutoff = new Date(now.getFullYear(), now.getMonth() - monthsMap[period], now.getDate());
-		return points.filter((d) => new Date(d.date) >= cutoff);
-	}
+	const periods = PERIODS;
 
 	const filteredData = $derived(filterByPeriod(data, selectedPeriod));
 
-	// SVG dimensions
-	const padL = 52;
-	const padR = 20;
-	const padT = 20;
-	const padB = 32;
-	const svgW = 600;
-	const svgH = 240;
-	const plotW = svgW - padL - padR;
-	const plotH = svgH - padT - padB;
+	// Medidas del lienzo, compartidas con los helpers de `dashboard.ts`.
+	const { padL, padR, padT, plotH, svgW, svgH } = PLOT;
 
 	const values = $derived(
 		filteredData.map((d) => ({
@@ -48,19 +36,12 @@
 		}))
 	);
 
-	const allNums = $derived(values.flatMap((v) => [v.mv, v.cb]));
-	const yMin = $derived(allNums.length > 0 ? Math.min(...allNums) * 0.97 : 0);
-	const yMax = $derived(allNums.length > 0 ? Math.max(...allNums) * 1.03 : 1);
-	const yRange = $derived(yMax - yMin || 1);
+	const scale = $derived(growthScale(values.flatMap((v) => [v.mv, v.cb])));
+	const yMax = $derived(scale.yMax);
+	const yRange = $derived(scale.yRange);
 
-	function toX(i: number, n: number): number {
-		if (n <= 1) return padL + plotW / 2;
-		return padL + (i / (n - 1)) * plotW;
-	}
-
-	function toY(v: number): number {
-		return padT + plotH - ((v - yMin) / yRange) * plotH;
-	}
+	const toX = toPlotX;
+	const toY = (v: number) => toPlotY(v, scale);
 
 	const mvPoints = $derived(
 		values.map((v, i) => `${toX(i, values.length)},${toY(v.mv)}`).join(' ')

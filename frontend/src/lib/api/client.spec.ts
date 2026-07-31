@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { z } from 'zod';
 import { isRedirect } from '@sveltejs/kit';
 import { apiRequest, apiRequestSafe, authedFetch, authedFetchSafe } from './client';
 import { ACCESS_COOKIE, REFRESH_COOKIE } from '$lib/server/session';
@@ -213,5 +214,51 @@ describe('apiRequestSafe', () => {
 		}
 
 		expect(isRedirect(thrown)).toBe(true);
+	});
+});
+
+describe('validación del contrato en desarrollo', () => {
+	/** Contrato mínimo, con un campo obligatorio y otro opcional. */
+	const schema = z.object({ id: z.string(), name: z.string().optional() });
+
+	it('no dice nada cuando la respuesta cumple el contrato', async () => {
+		const cookies = createMockCookies({ [ACCESS_COOKIE]: 'access-1' });
+		const fetch = vi.fn().mockResolvedValue(jsonResponse({ success: true, data: { id: 'p1' } }));
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+		await apiRequest({ cookies, fetch }, '/portfolios/p1', {}, schema);
+
+		expect(warn).not.toHaveBeenCalled();
+		warn.mockRestore();
+	});
+
+	it('avisa con la ruta y el campo cuando el backend se sale del contrato', async () => {
+		const cookies = createMockCookies({ [ACCESS_COOKIE]: 'access-1' });
+		const fetch = vi.fn().mockResolvedValue(jsonResponse({ success: true, data: { id: 42 } }));
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+		const res = await apiRequest({ cookies, fetch }, '/portfolios/p1', {}, schema);
+
+		expect(warn).toHaveBeenCalledTimes(1);
+		const message = warn.mock.calls[0][0] as string;
+		expect(message).toContain('/portfolios/p1');
+		expect(message).toContain('id');
+		// El aviso no cambia el resultado: la respuesta se devuelve igual.
+		expect(res.data).toEqual({ id: 42 });
+		warn.mockRestore();
+	});
+
+	it('no valida una respuesta de error, que no trae `data`', async () => {
+		const cookies = createMockCookies({ [ACCESS_COOKIE]: 'access-1' });
+		const fetch = vi
+			.fn()
+			.mockResolvedValue(jsonResponse({ success: false, message: 'nope' }, { status: 500 }));
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+		const res = await apiRequestSafe({ cookies, fetch }, '/portfolios/p1', {}, schema);
+
+		expect(res.ok).toBe(false);
+		expect(warn).not.toHaveBeenCalled();
+		warn.mockRestore();
 	});
 });

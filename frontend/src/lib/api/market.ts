@@ -17,10 +17,18 @@ import {
 import type {
 	Asset,
 	ExchangeRate,
+	ImportResult,
 	MarketCredential,
 	MarketProvider,
 	MarketSyncResult
 } from './types';
+import {
+	assetSchema,
+	exchangeRateSchema,
+	marketCredentialSchema,
+	marketSyncResultSchema
+} from './schemas';
+import { z } from 'zod';
 
 // --- Assets ---------------------------------------------------------------
 
@@ -31,7 +39,12 @@ export function getAssets(
 ): Promise<ApiResult<Asset[]>> {
 	const page = opts.page ?? 1;
 	const limit = opts.limit ?? 100;
-	return apiRequestSafe<Asset[]>(event, `/portfolios/assets?page=${page}&limit=${limit}`);
+	return apiRequestSafe(
+		event,
+		`/portfolios/assets?page=${page}&limit=${limit}`,
+		{},
+		z.array(assetSchema)
+	);
 }
 
 /**
@@ -70,8 +83,8 @@ export function createAsset(
 }
 
 /** `POST /assets/import` — import masivo de assets (multipart). */
-export function importAssets(event: ApiEvent, form: FormData): Promise<ApiResult<unknown>> {
-	return apiRequest<unknown>(event, '/assets/import', { method: 'POST', body: form });
+export function importAssets(event: ApiEvent, form: FormData): Promise<ApiResult<ImportResult>> {
+	return apiRequest<ImportResult>(event, '/assets/import', { method: 'POST', body: form });
 }
 
 /** `PATCH /portfolios/assets/:id/price` — fija el precio manual de un asset. */
@@ -96,7 +109,12 @@ export function getExchangeRates(
 ): Promise<ApiResult<ExchangeRate[]>> {
 	const page = opts.page ?? 1;
 	const limit = opts.limit ?? 100;
-	return apiRequestSafe<ExchangeRate[]>(event, `/exchange-rates?page=${page}&limit=${limit}`);
+	return apiRequestSafe(
+		event,
+		`/exchange-rates?page=${page}&limit=${limit}`,
+		{},
+		z.array(exchangeRateSchema)
+	);
 }
 
 /** `POST /exchange-rates` — crea una tasa. */
@@ -112,8 +130,8 @@ export function createRate(
 }
 
 /** `POST /exchange-rates/import` — import masivo de tasas (multipart). */
-export function importRates(event: ApiEvent, form: FormData): Promise<ApiResult<unknown>> {
-	return apiRequest<unknown>(event, '/exchange-rates/import', { method: 'POST', body: form });
+export function importRates(event: ApiEvent, form: FormData): Promise<ApiResult<ImportResult>> {
+	return apiRequest<ImportResult>(event, '/exchange-rates/import', { method: 'POST', body: form });
 }
 
 /** `PATCH /exchange-rates/:id` — actualiza una tasa. */
@@ -138,7 +156,7 @@ export function updateRate(
  * caracteres y su estado. No hay endpoint que devuelva una clave guardada.
  */
 export function getMarketCredentials(event: ApiEvent): Promise<ApiResult<MarketCredential[]>> {
-	return apiRequestSafe<MarketCredential[]>(event, '/market/credentials');
+	return apiRequestSafe(event, '/market/credentials', {}, z.array(marketCredentialSchema));
 }
 
 /**
@@ -186,5 +204,5 @@ export function deleteMarketCredential(
  * cartera grande puede volver incompleta; el resto lo recoge el job diario.
  */
 export function syncMarketData(event: ApiEvent): Promise<ApiResult<MarketSyncResult>> {
-	return apiRequest<MarketSyncResult>(event, '/market/sync', { method: 'POST' });
+	return apiRequest(event, '/market/sync', { method: 'POST' }, marketSyncResultSchema);
 }

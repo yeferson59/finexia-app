@@ -1,23 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { LAUNCH_DATE, countdownBetween, type Countdown } from '../landing';
 
-	let countdown = $state({ days: '00', hours: '00', mins: '00', secs: '00' });
-
-	function pad(n: number) {
-		return String(n).padStart(2, '0');
-	}
+	let countdown = $state<Countdown>({ days: '00', hours: '00', mins: '00', secs: '00' });
 
 	onMount(() => {
-		const target = new Date('2026-10-01T09:00:00').getTime();
-		function tick() {
-			const diff = Math.max(0, target - Date.now());
-			countdown = {
-				days: pad(Math.floor(diff / 86400000)),
-				hours: pad(Math.floor((diff % 86400000) / 3600000)),
-				mins: pad(Math.floor((diff % 3600000) / 60000)),
-				secs: pad(Math.floor((diff % 60000) / 1000))
-			};
-		}
+		const target = new Date(LAUNCH_DATE).getTime();
+		const tick = () => (countdown = countdownBetween(target, Date.now()));
 		tick();
 		const id = setInterval(tick, 1000);
 		return () => clearInterval(id);

@@ -4,6 +4,7 @@
 // without a real Go backend or database. Playwright starts it via the
 // `webServer` array in playwright.config.ts and points BASE_API at it.
 import { createServer } from 'node:http';
+import { pathToFileURL } from 'node:url';
 
 const PORT = Number(process.env.MOCK_API_PORT ?? 4174);
 const API_PREFIX = '/api/v1';
@@ -69,7 +70,7 @@ const ACCOUNTS = {
 	}
 };
 
-const holdings = [
+export const holdings = [
 	{
 		id: IDS.entry,
 		assetId: IDS.assetAapl,
@@ -88,7 +89,7 @@ const holdings = [
 	}
 ];
 
-const portfolioSummary = (displayCurrency = 'USD') => [
+export const portfolioSummary = (displayCurrency = 'USD') => [
 	{
 		id: IDS.portfolio,
 		name: 'Cartera Principal',
@@ -108,7 +109,7 @@ const portfolioSummary = (displayCurrency = 'USD') => [
 	}
 ];
 
-const transactions = [
+export const transactions = [
 	{
 		id: 'txn-1',
 		entryId: IDS.entry,
@@ -139,7 +140,7 @@ const transactions = [
 	}
 ];
 
-const growth = {
+export const growth = {
 	points: [
 		{
 			date: '2026-05-01',
@@ -164,7 +165,7 @@ const growth = {
 	}
 };
 
-const assets = [
+export const assets = [
 	{
 		id: IDS.assetAapl,
 		ticker: 'AAPL',
@@ -172,7 +173,9 @@ const assets = [
 		assetType: 'stock',
 		exchange: 'NASDAQ',
 		currency: 'USD',
-		currentPrice: { value: '190.00', currency: 'USD' }
+		currentPrice: { value: '190.00', currency: 'USD' },
+		priceUpdatedAt: NOW,
+		isCurated: true
 	},
 	{
 		id: IDS.assetBtc,
@@ -181,7 +184,44 @@ const assets = [
 		assetType: 'crypto',
 		exchange: '',
 		currency: 'USD',
-		currentPrice: { value: '65000.00', currency: 'USD' }
+		currentPrice: { value: '65000.00', currency: 'USD' },
+		// Aportado por el usuario y sin precio manual fechado.
+		priceUpdatedAt: null,
+		isCurated: false
+	}
+];
+
+// Plataforma completa: el contrato la devuelve con sus contadores, no solo con
+// el nombre que necesita el selector del formulario de alta.
+export const sources = [
+	{
+		id: IDS.platform,
+		name: 'Broker Demo',
+		description: 'Bróker de prueba e2e',
+		sourceType: 'broker',
+		isActive: true,
+		investments: 1,
+		totalValue: '1900.00',
+		createdAt: NOW
+	}
+];
+
+export const exchangeRates = [
+	{
+		id: '55555555-5555-4555-8555-555555555555',
+		fromCurrency: 'USD',
+		toCurrency: 'COP',
+		rate: '4123.456789',
+		rateDate: NOW,
+		createdAt: NOW
+	},
+	{
+		id: '66666666-6666-4666-8666-666666666666',
+		fromCurrency: 'EUR',
+		toCurrency: 'USD',
+		rate: '1.085',
+		rateDate: NOW,
+		createdAt: NOW
 	}
 ];
 
@@ -344,6 +384,17 @@ const server = createServer(async (req, res) => {
 	}
 
 	// ---- Users ----
+	if (route === 'GET /users/me/preferences') {
+		return send(
+			res,
+			200,
+			envelope({ userId: account.session.userId, emailAlerts: true, weeklySummary: false })
+		);
+	}
+	if (route === 'PATCH /users/me/preferences') {
+		const body = JSON.parse((await readBody(req)).toString() || '{}');
+		return send(res, 200, envelope({ userId: account.session.userId, ...body }));
+	}
 	if (route === 'PATCH /users/me') {
 		const body = JSON.parse((await readBody(req)).toString() || '{}');
 		return send(res, 200, envelope({ ...account.user, ...body }));
@@ -436,7 +487,7 @@ const server = createServer(async (req, res) => {
 		return send(res, 200, envelope(growth));
 	}
 	if (route === 'GET /portfolios/sources') {
-		return send(res, 200, envelope([{ id: IDS.platform, name: 'Broker Demo', isActive: true }]));
+		return send(res, 200, envelope(sources));
 	}
 	if (route === 'GET /portfolios/assets') {
 		const search = (url.searchParams.get('search') ?? '').toLowerCase();
@@ -446,6 +497,9 @@ const server = createServer(async (req, res) => {
 				)
 			: assets;
 		return send(res, 200, envelope(filtered));
+	}
+	if (route === 'GET /exchange-rates') {
+		return send(res, 200, envelope(exchangeRates));
 	}
 	if (route === 'POST /portfolios/entries') {
 		await readBody(req);
@@ -509,6 +563,10 @@ const server = createServer(async (req, res) => {
 	return send(res, 404, errorEnvelope(`no mock for ${route}`));
 });
 
-server.listen(PORT, () => {
-	console.log(`mock backend listening on http://127.0.0.1:${PORT}${API_PREFIX}`);
-});
+// Solo escucha cuando se ejecuta como programa (así lo arranca Playwright);
+// importarlo desde un test trae las fixtures sin abrir un puerto.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+	server.listen(PORT, () => {
+		console.log(`mock backend listening on http://127.0.0.1:${PORT}${API_PREFIX}`);
+	});
+}

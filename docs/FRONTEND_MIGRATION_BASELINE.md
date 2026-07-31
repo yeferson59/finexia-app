@@ -62,3 +62,23 @@ find src -type f \( -name '*.svelte' -o -name '*.ts' \) \
 - **Contrato**: `docs/API.md` existe (Fase 0 del backend, 2026-07-13) y cubre
   todos los endpoints que consume el frontend; el stub de e2e se escribió
   contra ese documento.
+
+## 4. Estado al cerrar la migración
+
+Comparación contra el snapshot de arriba, con los mismos comandos
+(**2026-07-31**). Las cifras de la sección 1 y 2 se dejan intactas: son la línea
+base histórica.
+
+| Métrica | Línea base (Fase 0) | Fase 6 | Fase 7 (cierre) |
+|---|---:|---:|---:|
+| Archivos de producción > 500 líneas | 13 | 0 | **0** |
+| `+page.svelte` > 300 líneas | 16 | 1 | **0** |
+| Archivos de `routes/` que importan `authedFetch` | 24 | 0 | **0** |
+| Archivos de `routes/` que importan `zod` | 14 | 8 | **0** |
+| `src/components/` | 31 componentes | no existe | no existe |
+| Aliases propios en `svelte.config.js` | 2 | 2 | **0** |
+| Unit tests / E2E | 122 / 22 (cierre de la Fase 1) | 194 / 27 | **228 / 29** |
+
+Las reglas de dependencia ya no dependen de que alguien las recuerde: están en
+`eslint.config.js` y fallan el CI. La estructura final y las convenciones se
+documentan en [`FRONTEND_ARCHITECTURE.md`](./FRONTEND_ARCHITECTURE.md).

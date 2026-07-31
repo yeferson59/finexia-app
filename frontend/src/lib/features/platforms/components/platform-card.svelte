@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { privacy } from '$lib/stores/privacy.svelte';
+	import { privacy } from '$lib/shared/privacy.svelte';
 
 	interface PlatformCardData {
 		id: string;

@@ -7,6 +7,7 @@ import {
 	refreshAccessToken,
 	type SessionEvent
 } from '$lib/server/session';
+import type { ZodType } from 'zod';
 import type { ApiEnvelope } from './types';
 
 type AuthedEvent = SessionEvent;
@@ -125,10 +126,46 @@ export interface ApiResult<T> {
 	action?: string;
 }
 
+/**
+ * Comprueba el `data` recibido contra el contrato **solo en desarrollo**.
+ *
+ * Los tipos de `types.ts` se derivan de estos mismos schemas, así que un
+ * backend que deja de cumplirlos no rompe la compilación: el `undefined`
+ * aparece tres componentes más abajo, o no aparece en absoluto. Esto lo
+ * convierte en un aviso en el momento y en el sitio donde ocurre.
+ *
+ * Nunca cambia el resultado: si el contrato falla, la respuesta se devuelve
+ * igual. `import.meta.env.DEV` es una constante de compilación, así que en el
+ * build de producción esta función queda vacía y el schema ni se ejecuta.
+ */
+function checkContract<T>(path: string, data: unknown, schema?: ZodType<T>): void {
+	if (!import.meta.env.DEV || !schema || data === null || data === undefined) return;
+
+	const parsed = schema.safeParse(data);
+	if (parsed.success) return;
+
+	const issues = parsed.error.issues
+		.slice(0, 5)
+		.map((i) => `  · ${i.path.join('.') || '(raíz)'}: ${i.message}`)
+		.join('\n');
+
+	console.warn(
+		`[api] La respuesta de ${path} no cumple el contrato de lib/api/schemas.ts:\n${issues}` +
+			(parsed.error.issues.length > 5 ? `\n  · … y ${parsed.error.issues.length - 5} más` : '')
+	);
+}
+
 /** Parses the standard envelope into an {@link ApiResult}. */
-async function toResult<T>(res: Response | null): Promise<ApiResult<T>> {
+async function toResult<T>(
+	res: Response | null,
+	path: string,
+	schema?: ZodType<T>
+): Promise<ApiResult<T>> {
 	if (!res) return { ok: false, status: 0, success: false, data: null };
 	const body = (await res.json().catch(() => ({}) as ApiEnvelope<T>)) as ApiEnvelope<T>;
+
+	if (res.ok) checkContract(path, body.data, schema);
+
 	return {
 		ok: res.ok,
 		status: res.status,
@@ -143,13 +180,17 @@ async function toResult<T>(res: Response | null): Promise<ApiResult<T>> {
 /**
  * {@link authedFetch} + envelope parse. Redirects to `/auth` on an
  * unrecoverable 401 (throws the redirect, like `authedFetch`).
+ *
+ * `schema` es opcional y solo se usa en desarrollo, para avisar si el backend
+ * se sale del contrato; ver {@link checkContract}.
  */
 export async function apiRequest<T>(
 	event: AuthedEvent,
 	path: string,
-	init: RequestInit = {}
+	init: RequestInit = {},
+	schema?: ZodType<T>
 ): Promise<ApiResult<T>> {
-	return toResult<T>(await authedFetch(event, path, init));
+	return toResult<T>(await authedFetch(event, path, init), path, schema);
 }
 
 /**
@@ -160,7 +201,8 @@ export async function apiRequest<T>(
 export async function apiRequestSafe<T>(
 	event: AuthedEvent,
 	path: string,
-	init: RequestInit = {}
+	init: RequestInit = {},
+	schema?: ZodType<T>
 ): Promise<ApiResult<T>> {
-	return toResult<T>(await authedFetchSafe(event, path, init));
+	return toResult<T>(await authedFetchSafe(event, path, init), path, schema);
 }

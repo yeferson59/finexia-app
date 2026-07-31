@@ -1,6 +1,27 @@
-# sv
+# Finexia — frontend (SvelteKit)
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Proyecto creado con [`sv`](https://github.com/sveltejs/cli).
+
+## Arquitectura
+
+**Antes de tocar código, lee [`docs/FRONTEND_ARCHITECTURE.md`](../docs/FRONTEND_ARCHITECTURE.md):**
+describe la organización por features, la capa de API tipada y las reglas de
+dependencia entre capas. Esas reglas están automatizadas en `eslint.config.js`,
+así que romperlas falla el CI.
+
+En corto: `routes/` solo orquesta (loaders que llaman a `lib/api` y páginas que
+componen componentes de una feature); la lógica de negocio vive en
+`lib/features/<feature>/` y el acceso al backend en `lib/api/`.
+
+## Comprobaciones
+
+```sh
+pnpm check          # svelte-check + tsc
+pnpm lint           # prettier + eslint (incluye las reglas de frontera)
+pnpm check:arch     # presupuesto de tamaño, `routes/` y restos del legacy
+pnpm test:unit -- --run
+pnpm test:e2e       # Playwright contra el stub e2e/mocks/mock-api.mjs
+```
 
 ## Creating a project
 

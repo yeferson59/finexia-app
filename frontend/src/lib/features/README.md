@@ -1,7 +1,8 @@
 # `lib/features` — módulos por dominio funcional
 
 Un directorio por dominio (`auth/`, `portfolio/`, `dashboard/`, `transactions/`,
-`platforms/`, `investments/`, `settings/`, `admin/`, `landing/`, `legal/`). Aquí vive la lógica
+`platforms/`, `investments/`, `settings/`, `notifications/`, `admin/`,
+`reports/`, `landing/`, `legal/`). Aquí vive la lógica
 de negocio, los componentes de feature, los schemas Zod y el estado de cada
 dominio. `routes/` **solo orquesta**: loaders/actions delgados que llaman a
 `lib/api`, páginas que componen componentes de la feature.
@@ -38,9 +39,13 @@ importan por ruta relativa y no forman parte de la superficie pública.
 - Presupuesto de tamaño: una `+page.svelte` no supera ~300 líneas; ningún
   archivo de producción supera ~500. Si crece, extrae componentes aquí.
 
-> Estado: Fases 3, 4 y 5 completas — `landing`, `legal`, `auth`, `dashboard`,
-> `platforms`, `portfolio`, `transactions` e `investments` ya migradas. Faltan
-> `settings` y `admin` (Fase 6). Las features siguen el patrón validado en la
-> retrospectiva del piloto (sección 3.1 de
-> `docs/FRONTEND_ARCHITECTURE_MIGRATION.md`; ver también las notas de `auth` en
-> la 4.1 y el cierre de la Fase 5 en la 5.2).
+> Estado: migración cerrada (Fase 7, 2026-07-31). Son doce features: `admin`,
+> `auth`, `dashboard`, `investments`, `landing`, `legal`, `notifications`,
+> `platforms`, `portfolio`, `reports`, `settings` y `transactions`.
+>
+> Las reglas de arriba **fallan el CI** desde `eslint.config.js`, no dependen de
+> que alguien las recuerde en la revisión. La foto completa de la arquitectura
+> está en `docs/FRONTEND_ARCHITECTURE.md`; el porqué de cada decisión, en
+> `docs/FRONTEND_ARCHITECTURE_MIGRATION.md` (retrospectiva del piloto en 3.1,
+> notas de `auth` en 4.1, cierre de la Fase 5 en 5.2, reparto de CSS con
+> contenedores `:global` en 6.1 y cierre en 7.1).

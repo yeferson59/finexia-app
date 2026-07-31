@@ -1,6 +1,8 @@
 <script lang="ts">
 	import CardHeader from '$lib/ui/card-header.svelte';
-	import { privacy } from '$lib/stores/privacy.svelte';
+	import { privacy } from '$lib/shared/privacy.svelte';
+	import { buildSlices, toAssetEntries } from '../dashboard';
+	import type { AllocationItem } from '$lib/api/types';
 
 	function fmtMoney(value: number): string {
 		return privacy.money(
@@ -12,92 +14,9 @@
 		);
 	}
 
-	interface AllocationItem {
-		category: string;
-		marketValue: string;
-		percent: number;
-	}
-
-	interface AssetEntry {
-		name: string;
-		value: number;
-		percent: number;
-		color: string;
-	}
-
 	const { allocation = [] }: { allocation: AllocationItem[] } = $props();
 
-	const categoryLabels: Record<string, string> = {
-		stocks: 'Acciones',
-		etfs: 'ETFs',
-		cryptos: 'Crypto',
-		bonds: 'Bonos',
-		cash: 'Efectivo',
-		real_estates: 'Inmuebles',
-		commodities: 'Commodities',
-		others: 'Otros'
-	};
-
-	const categoryColors: Record<string, string> = {
-		stocks: '#d4912a',
-		etfs: '#22c97e',
-		cryptos: '#6b8cef',
-		bonds: '#b988e0',
-		cash: '#8a8780',
-		real_estates: '#e0885a',
-		commodities: '#e0c15a',
-		others: '#5ab4e0'
-	};
-
-	const assets = $derived<AssetEntry[]>(
-		allocation.map((item) => ({
-			name: categoryLabels[item.category] ?? item.category,
-			value: parseFloat(item.marketValue || '0'),
-			percent: item.percent,
-			color: categoryColors[item.category] ?? '#5ab4e0'
-		}))
-	);
-
-	function polarToCartesian(angle: number, radius: number, cx = 100, cy = 100) {
-		const radians = (angle - 90) * (Math.PI / 180);
-		return {
-			x: cx + radius * Math.cos(radians),
-			y: cy + radius * Math.sin(radians)
-		};
-	}
-
-	function generatePieSlice(
-		percent: number,
-		startAngle: number
-	): { d: string; startAngle: number; endAngle: number } {
-		const cx = 100;
-		const cy = 100;
-		const radius = 75;
-		const endAngle = startAngle + (percent / 100) * 360;
-		const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-
-		const startPoint = polarToCartesian(startAngle, radius, cx, cy);
-		const endPoint = polarToCartesian(endAngle, radius, cx, cy);
-
-		const d = [
-			`M ${cx} ${cy}`,
-			`L ${startPoint.x} ${startPoint.y}`,
-			`A ${radius} ${radius} 0 ${largeArc} 1 ${endPoint.x} ${endPoint.y}`,
-			'Z'
-		].join(' ');
-
-		return { d, startAngle, endAngle };
-	}
-
-	function buildSlices(items: AssetEntry[]) {
-		let angle = 0;
-		return items.map((asset) => {
-			const slice = generatePieSlice(asset.percent, angle);
-			angle = slice.endAngle;
-			return { ...asset, ...slice };
-		});
-	}
-
+	const assets = $derived(toAssetEntries(allocation));
 	const slices = $derived(buildSlices(assets));
 
 	const totalPct = $derived(allocation.reduce((acc, item) => acc + item.percent, 0));

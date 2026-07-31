@@ -12,11 +12,9 @@ const config = {
 		// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.
 		// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
 		// See https://svelte.dev/docs/kit/adapters for more information about adapters.
-		adapter: adapter({ bodySize: 5 * 1024 * 1024 }),
-		alias: {
-			'$components/*': './src/components/*',
-			'$/*': './src/*'
-		}
+		// Sin aliases propios: todo el código compartido vive bajo `$lib`, el
+		// alias estándar de SvelteKit (ver docs/FRONTEND_ARCHITECTURE.md).
+		adapter: adapter({ bodySize: 5 * 1024 * 1024 })
 	}
 };
 

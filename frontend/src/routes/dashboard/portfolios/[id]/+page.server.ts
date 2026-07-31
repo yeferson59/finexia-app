@@ -1,8 +1,8 @@
-import z from 'zod';
 import { error, fail } from '@sveltejs/kit';
 import * as portfolio from '$lib/api/portfolio';
 import type { Actions, PageServerLoad } from './$types';
 import type { PortfolioGrowth, Risk, TopTransaction } from '$lib/api/types';
+import { portfolioUpdateSchema } from '$lib/features/portfolio';
 
 export const load: PageServerLoad = async ({ cookies, fetch, params }) => {
 	const event = { cookies, fetch };
@@ -47,21 +47,13 @@ export const actions: Actions = {
 			success,
 			error: zodError,
 			data
-		} = await z
-			.object({
-				name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-				description: z.string().optional().default(''),
-				type: z.string().min(1),
-				riskId: z.string().uuid(),
-				isDefault: z.coerce.boolean()
-			})
-			.safeParseAsync({
-				name: formData.get('name'),
-				description: formData.get('description'),
-				type: formData.get('type'),
-				riskId: formData.get('riskId'),
-				isDefault: formData.get('isDefault')
-			});
+		} = await portfolioUpdateSchema.safeParseAsync({
+			name: formData.get('name'),
+			description: formData.get('description'),
+			type: formData.get('type'),
+			riskId: formData.get('riskId'),
+			isDefault: formData.get('isDefault')
+		});
 
 		if (!success) {
 			return fail(400, { action: 'updatePortfolio', success: false, error: zodError.message });

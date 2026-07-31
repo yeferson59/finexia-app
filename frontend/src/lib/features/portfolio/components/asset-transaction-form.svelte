@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import DatePicker from '$lib/ui/date-picker.svelte';
-	import { formatCalendarDate, todayLocalDateString } from '$lib/utils';
+	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
 	import type { Holding } from '$lib/api/types';
 	import { TRANSACTION_TYPES, priceLabelFor, txnModeFor } from '../asset';
 

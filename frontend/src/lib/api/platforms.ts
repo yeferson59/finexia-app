@@ -3,10 +3,12 @@
  */
 import { apiRequest, apiRequestSafe, type ApiEvent, type ApiResult } from './client';
 import type { Platform } from './types';
+import { platformSchema } from './schemas';
+import { z } from 'zod';
 
 /** `GET /portfolios/sources` — plataformas del usuario. */
 export function getSources(event: ApiEvent): Promise<ApiResult<Platform[]>> {
-	return apiRequestSafe<Platform[]>(event, '/portfolios/sources');
+	return apiRequestSafe(event, '/portfolios/sources', {}, z.array(platformSchema));
 }
 
 /** `POST /portfolios/sources` — crea una plataforma. */

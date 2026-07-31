@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import PageHeader from '$lib/ui/page-header.svelte';
 	import Pagination from '$lib/ui/pagination.svelte';
-	import { privacy } from '$lib/stores/privacy.svelte';
+	import { privacy } from '$lib/shared/privacy.svelte';
 	import { PortfolioCard, formatPct } from '$lib/features/portfolio';
 	import type { PageProps } from './$types';
 

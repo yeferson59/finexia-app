@@ -14,3 +14,4 @@ export { default as PlatformDetail } from './components/platform-detail.svelte';
 export { default as PlatformAddForm } from './components/platform-add-form.svelte';
 
 export * from './platforms';
+export * from './schemas';

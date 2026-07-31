@@ -1,23 +1,17 @@
-import z from 'zod';
 import type { Actions } from './$types';
 import { redirect } from '@sveltejs/kit';
 import * as platforms from '$lib/api/platforms';
+import { platformCreateSchema } from '$lib/features/platforms';
 
 export const actions = {
 	default: async ({ request, cookies, fetch }) => {
 		const formData = await request.formData();
 
-		const { success, error, data } = await z
-			.object({
-				name: z.coerce.string().min(2),
-				description: z.coerce.string().optional(),
-				type: z.coerce.string().min(2)
-			})
-			.safeParseAsync({
-				name: formData.get('name'),
-				description: formData.get('description'),
-				type: formData.get('type')
-			});
+		const { success, error, data } = await platformCreateSchema.safeParseAsync({
+			name: formData.get('name'),
+			description: formData.get('description'),
+			type: formData.get('type')
+		});
 
 		if (!success) {
 			return { error: error.message };

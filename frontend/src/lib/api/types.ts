@@ -1,17 +1,59 @@
 /**
  * Contratos HTTP compartidos con el backend.
  *
- * Única fuente de verdad de los shapes que devuelve la API, mantenida a mano
- * contra `docs/API.md`. Antes de la Fase 2 estos tipos vivían duplicados en los
- * loaders/actions de `routes/`; aquí se centralizan para que un cambio de
- * contrato se refleje en un solo lugar.
+ * Única fuente de verdad de los shapes que devuelve la API: los tipos se
+ * **derivan** de los schemas de `schemas.ts` con `z.infer`, así que un cambio de
+ * contrato se escribe una sola vez y no puede desalinearse del schema con el
+ * que la capa de API valida en desarrollo.
+ *
+ * Este módulo sigue siendo el sitio del que todo el mundo importa los tipos
+ * (`import type { Asset } from '$lib/api/types'`), que en compilación se borran.
+ * Quien necesite el schema en tiempo de ejecución lo importa de `schemas.ts`.
  */
+
+import type { z } from 'zod';
+import type {
+	activeSessionSchema,
+	allocationItemSchema,
+	assetPriceSchema,
+	assetSchema,
+	exchangeRateSchema,
+	growthDataPointSchema,
+	growthSummarySchema,
+	holdingSchema,
+	importResultSchema,
+	invitationItemSchema,
+	marketCredentialSchema,
+	marketPriceSchema,
+	marketProviderSchema,
+	marketRateSchema,
+	marketSyncResultSchema,
+	pageMetaSchema,
+	pagedTransactionsSchema,
+	platformSchema,
+	portfolioDetailSchema,
+	portfolioGrowthSchema,
+	portfolioSummarySchema,
+	riskSchema,
+	topTransactionSchema,
+	transactionSchema,
+	twoFactorStatusSchema,
+	userItemSchema,
+	userPreferencesSchema,
+	userTransactionSchema,
+	waitlistItemSchema
+} from './schemas';
 
 // ---------------------------------------------------------------------------
 // Sobre de respuesta y paginación (§1.1 y §1.5 de docs/API.md)
 // ---------------------------------------------------------------------------
 
-/** Sobre estándar que envuelve toda respuesta JSON del backend. */
+/**
+ * Sobre estándar que envuelve toda respuesta JSON del backend.
+ *
+ * No se deriva de un schema porque es genérico sobre `data` y solo se usa para
+ * tipar el parseo del sobre en `client.ts`; lo que se valida es el `data`.
+ */
 export interface ApiEnvelope<T = unknown> {
 	success: boolean;
 	message?: string;
@@ -22,18 +64,8 @@ export interface ApiEnvelope<T = unknown> {
 	timestamp?: string;
 }
 
-/**
- * Bloque de metadatos de las rutas paginadas. Conserva nombres históricos por
- * área (`usersForPage`/`totalUsers`, …) accesibles vía índice.
- */
-export interface PageMeta {
-	currentPage: number;
-	totalPages: number;
-	previous: boolean;
-	next: boolean;
-	offset?: number;
-	[key: string]: number | boolean | undefined;
-}
+/** Bloque de metadatos de las rutas paginadas. */
+export type PageMeta = z.infer<typeof pageMetaSchema>;
 
 /** `data` de una ruta paginada: lista de items + metadatos. */
 export interface Paginated<T> {
@@ -45,305 +77,102 @@ export interface Paginated<T> {
 // Portfolios
 // ---------------------------------------------------------------------------
 
-/**
- * Resumen de un portfolio (`GET /portfolios/summary`). Superset de los subconjuntos
- * que antes tipaban por separado el dashboard, el layout de portfolios y el
- * selector de import; `displayCurrency` solo llega cuando se pide `?currency=`.
- */
-export interface PortfolioSummary {
-	id: string;
-	name: string;
-	description?: string;
-	type: string;
-	baseCurrency: string;
-	displayCurrency?: string;
-	isDefault?: boolean;
-	riskId?: string;
-	riskName: string;
-	totalPositions: number;
-	totalCostBase: string;
-	totalMarketValue: string;
-	totalGainLoss: string;
-	totalGainLossPct: string;
-	createdAt?: string;
-}
+/** Resumen de un portfolio (`GET /portfolios/summary`). */
+export type PortfolioSummary = z.infer<typeof portfolioSummarySchema>;
 
 /** Posición dentro de un portfolio (holdings de `GET /portfolios/:id`). */
-export interface Holding {
-	id: string;
-	assetId: string;
-	ticker: string;
-	name: string;
-	assetType: string;
-	exchange: string;
-	currency: string;
-	quantity: string;
-	price: string;
-	marketPrice: string;
-	costCurrency: string;
-	category: string;
-	entryDate: string;
-	notes: string;
-}
+export type Holding = z.infer<typeof holdingSchema>;
 
 /** Detalle completo de un portfolio (`GET /portfolios/:id`). */
-export interface PortfolioDetail {
-	id: string;
-	userId: string;
-	name: string;
-	description: string;
-	type: string;
-	baseCurrency: string;
-	isDefault: boolean;
-	riskId: string;
-	riskName: string;
-	createdAt: string;
-	updatedAt: string;
-	holdings: Holding[];
-}
+export type PortfolioDetail = z.infer<typeof portfolioDetailSchema>;
 
 /** Nivel de riesgo del catálogo (`GET /portfolios/risks`). */
-export interface Risk {
-	id: string;
-	name: string;
-	description: string;
-}
+export type Risk = z.infer<typeof riskSchema>;
 
 /** Asignación por categoría de activo (`GET /portfolios/allocation`). */
-export interface AllocationItem {
-	category: string;
-	marketValue: string;
-	percent: number;
-}
+export type AllocationItem = z.infer<typeof allocationItemSchema>;
 
 /** Mayor transacción de un portfolio (`GET /portfolios/:id/top-transaction`). */
-export interface TopTransaction {
-	value: string;
-	type: string;
-	currency: string;
-	assetTicker: string;
-	assetName: string;
-	transactionDate: string;
-}
+export type TopTransaction = z.infer<typeof topTransactionSchema>;
 
 /** Punto de la serie de crecimiento. */
-export interface GrowthDataPoint {
-	date: string;
-	totalValue: string;
-	totalCostBase: string;
-	gainLoss: string;
-	gainLossPct: string;
-}
+export type GrowthDataPoint = z.infer<typeof growthDataPointSchema>;
 
 /** Resumen agregado de la serie de crecimiento. */
-export interface GrowthSummary {
-	firstDate: string;
-	initialValue: string;
-	currentValue: string;
-	totalGrowthPct: string;
-}
+export type GrowthSummary = z.infer<typeof growthSummarySchema>;
 
 /** Crecimiento (`GET /portfolios/growth` y `GET /portfolios/:id/growth`). */
-export interface PortfolioGrowth {
-	points: GrowthDataPoint[];
-	summary: GrowthSummary;
-}
+export type PortfolioGrowth = z.infer<typeof portfolioGrowthSchema>;
 
 // ---------------------------------------------------------------------------
 // Transacciones
 // ---------------------------------------------------------------------------
 
 /** Transacción de una posición (`GET /portfolios/:id/assets/:symbol/transactions`). */
-export interface Transaction {
-	id: string;
-	entryId: string;
-	type: string;
-	quantity: string;
-	price: string;
-	currency: string;
-	fees: string;
-	transactionDate: string;
-	notes: string;
-	createdAt: string;
-}
+export type Transaction = z.infer<typeof transactionSchema>;
 
 /** Transacción del usuario con datos del activo (`GET /portfolios/transactions`). */
-export interface UserTransaction extends Transaction {
-	assetTicker: string;
-	assetName: string;
-}
+export type UserTransaction = z.infer<typeof userTransactionSchema>;
 
 /** `data` de las transacciones paginadas por asset. */
-export interface PagedTransactions {
-	data: Transaction[];
-	total: number;
-	page: number;
-	limit: number;
-	totalPages: number;
-}
+export type PagedTransactions = z.infer<typeof pagedTransactionsSchema>;
 
 // ---------------------------------------------------------------------------
 // Plataformas / fuentes
 // ---------------------------------------------------------------------------
 
 /** Plataforma / fuente (`GET /portfolios/sources`). */
-export interface Platform {
-	id: string;
-	name: string;
-	description: string;
-	sourceType: string;
-	/** Alias histórico de `sourceType` en algunas vistas/formularios. */
-	type?: string;
-	isActive: boolean;
-	investments: number;
-	totalValue: string;
-	createdAt: string;
-}
+export type Platform = z.infer<typeof platformSchema>;
 
 // ---------------------------------------------------------------------------
 // Assets y tasas de cambio (mercado)
 // ---------------------------------------------------------------------------
 
 /** Precio de un asset. */
-export interface AssetPrice {
-	value: string;
-	currency: string;
-}
+export type AssetPrice = z.infer<typeof assetPriceSchema>;
 
 /** Asset del catálogo (`GET /portfolios/assets`). */
-export interface Asset {
-	id: string;
-	ticker: string;
-	name: string;
-	assetType: string;
-	currency: string;
-	exchange?: string;
-	currentPrice: AssetPrice | null;
-	priceUpdatedAt: string | null;
-	/**
-	 * `true` si lo curó el operador y lo ve todo el mundo; `false` si lo aportó
-	 * un usuario, en cuyo caso solo lo ven quienes lo aportaron (API §2.8).
-	 */
-	isCurated?: boolean;
-}
+export type Asset = z.infer<typeof assetSchema>;
+
+/** Resultado de un import masivo (`POST /assets/import`, `POST /exchange-rates/import`). */
+export type ImportResult = z.infer<typeof importResultSchema>;
 
 /** Tasa de cambio (`GET /exchange-rates`). */
-export interface ExchangeRate {
-	id: string;
-	fromCurrency: string;
-	toCurrency: string;
-	rate: string;
-	rateDate: string;
-	createdAt: string;
-}
+export type ExchangeRate = z.infer<typeof exchangeRateSchema>;
 
 // ---------------------------------------------------------------------------
 // Usuarios, preferencias, sesiones y 2FA
 // ---------------------------------------------------------------------------
 
 /** Usuario en el listado de administración (`GET /users`). */
-export interface UserItem {
-	id: string;
-	name: string;
-	email: string;
-	emailVerified: boolean;
-	createdAt: string;
-	bannedAt: string | null;
-	role: { name: string };
-}
+export type UserItem = z.infer<typeof userItemSchema>;
 
 /** Invitación (`GET /users/invitations`). */
-export interface InvitationItem {
-	id: string;
-	email: string;
-	name: string;
-	role: string;
-	status: 'pending' | 'expired' | 'accepted' | 'revoked';
-	expiresAt: string;
-	createdAt: string;
-}
+export type InvitationItem = z.infer<typeof invitationItemSchema>;
 
 /** Entrada de la waitlist (`GET /users/waitlist`). */
-export interface WaitlistItem {
-	id: string;
-	email: string;
-	status: 'pending' | 'invited' | 'registered';
-	invitedAt: string | null;
-	createdAt: string;
-}
+export type WaitlistItem = z.infer<typeof waitlistItemSchema>;
 
 /** Preferencias del usuario (`GET /users/me/preferences`). */
-export interface UserPreferences {
-	userId: string;
-	emailAlerts: boolean;
-	weeklySummary: boolean;
-}
+export type UserPreferences = z.infer<typeof userPreferencesSchema>;
 
 /** Sesión activa del usuario (`GET /auth/sessions`). */
-export interface ActiveSession {
-	id: string;
-	ipAddress: string | null;
-	userAgent: string | null;
-	location: string | null;
-	createdAt: string;
-	lastActiveAt: string;
-	expiresAt: string;
-	current: boolean;
-}
+export type ActiveSession = z.infer<typeof activeSessionSchema>;
 
 /** Estado de la verificación en dos pasos (`GET /auth/2fa`). */
-export interface TwoFactorStatus {
-	enabled: boolean;
-	pendingSetup: boolean;
-	recoveryCodesLeft: number;
-}
+export type TwoFactorStatus = z.infer<typeof twoFactorStatusSchema>;
 
 /** Proveedor de datos de mercado para el que se puede aportar una clave. */
-export type MarketProvider = 'finnhub' | 'alphavantage';
+export type MarketProvider = z.infer<typeof marketProviderSchema>;
 
-/**
- * Estado de una clave de proveedor del usuario (`GET /market/credentials`).
- *
- * No hay campo para la clave, y es deliberado: una vez guardada solo se puede
- * reemplazar o borrar, nunca leer. `last4` existe para que la UI pueda
- * identificarla sin tenerla.
- */
-export interface MarketCredential {
-	provider: MarketProvider;
-	last4: string;
-	status: 'active' | 'invalid' | 'rate_limited';
-	lastVerifiedAt: string | null;
-	lastError?: string;
-	createdAt: string;
-	updatedAt: string;
-}
+/** Estado de una clave de proveedor del usuario (`GET /market/credentials`). */
+export type MarketCredential = z.infer<typeof marketCredentialSchema>;
 
 /** Un precio que trajo la clave del propio usuario (`POST /market/sync`). */
-export interface MarketPrice {
-	assetId: string;
-	ticker: string;
-	price: string;
-	source: MarketProvider;
-	fetchedAt: string;
-}
+export type MarketPrice = z.infer<typeof marketPriceSchema>;
 
 /** Una tasa de cambio que trajo la clave del propio usuario. */
-export interface MarketRate {
-	fromCurrency: string;
-	toCurrency: string;
-	rate: string;
-	source: MarketProvider;
-	fetchedAt: string;
-}
+export type MarketRate = z.infer<typeof marketRateSchema>;
 
-/**
- * Resultado de `POST /market/sync`.
- *
- * Las dos mitades van nombradas porque sincronizar no es solo precios: sin tasa
- * de cambio una posición en otra moneda no se puede valorar, y una respuesta
- * con precios pero sin tasas ha hecho medio trabajo.
- */
-export interface MarketSyncResult {
-	prices: MarketPrice[];
-	rates: MarketRate[];
-}
+/** Resultado de `POST /market/sync`. */
+export type MarketSyncResult = z.infer<typeof marketSyncResultSchema>;

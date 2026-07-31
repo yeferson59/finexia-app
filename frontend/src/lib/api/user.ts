@@ -13,12 +13,22 @@ import type {
 	UserPreferences,
 	WaitlistItem
 } from './types';
+import {
+	activeSessionSchema,
+	invitationItemSchema,
+	paginatedSchema,
+	twoFactorStatusSchema,
+	userItemSchema,
+	userPreferencesSchema,
+	waitlistItemSchema
+} from './schemas';
+import { z } from 'zod';
 
 // --- Perfil / preferencias del usuario ------------------------------------
 
 /** `GET /users/me/preferences` — preferencias del usuario. */
 export function getPreferences(event: ApiEvent): Promise<ApiResult<UserPreferences>> {
-	return apiRequestSafe<UserPreferences>(event, '/users/me/preferences');
+	return apiRequestSafe(event, '/users/me/preferences', {}, userPreferencesSchema);
 }
 
 /** `PATCH /users/me/preferences` — actualiza las preferencias. */
@@ -74,7 +84,12 @@ export function getUsers(
 ): Promise<ApiResult<Paginated<UserItem>>> {
 	const page = opts.page ?? 1;
 	const limit = opts.limit ?? 20;
-	return apiRequestSafe<Paginated<UserItem>>(event, `/users?page=${page}&limit=${limit}`);
+	return apiRequestSafe(
+		event,
+		`/users?page=${page}&limit=${limit}`,
+		{},
+		paginatedSchema(userItemSchema)
+	);
 }
 
 /** `GET /users/invitations` — listado paginado de invitaciones (admin). */
@@ -84,9 +99,11 @@ export function getInvitations(
 ): Promise<ApiResult<Paginated<InvitationItem>>> {
 	const page = opts.page ?? 1;
 	const limit = opts.limit ?? 50;
-	return apiRequestSafe<Paginated<InvitationItem>>(
+	return apiRequestSafe(
 		event,
-		`/users/invitations?page=${page}&limit=${limit}`
+		`/users/invitations?page=${page}&limit=${limit}`,
+		{},
+		paginatedSchema(invitationItemSchema)
 	);
 }
 
@@ -97,9 +114,11 @@ export function getWaitlist(
 ): Promise<ApiResult<Paginated<WaitlistItem>>> {
 	const page = opts.page ?? 1;
 	const limit = opts.limit ?? 50;
-	return apiRequestSafe<Paginated<WaitlistItem>>(
+	return apiRequestSafe(
 		event,
-		`/users/waitlist?page=${page}&limit=${limit}`
+		`/users/waitlist?page=${page}&limit=${limit}`,
+		{},
+		paginatedSchema(waitlistItemSchema)
 	);
 }
 
@@ -147,12 +166,12 @@ export function banUser(
 
 /** `GET /auth/sessions` — sesiones activas del usuario. */
 export function getSessions(event: ApiEvent): Promise<ApiResult<ActiveSession[]>> {
-	return apiRequestSafe<ActiveSession[]>(event, '/auth/sessions');
+	return apiRequestSafe(event, '/auth/sessions', {}, z.array(activeSessionSchema));
 }
 
 /** `GET /auth/2fa` — estado de la verificación en dos pasos. */
 export function getTwoFactorStatus(event: ApiEvent): Promise<ApiResult<TwoFactorStatus>> {
-	return apiRequestSafe<TwoFactorStatus>(event, '/auth/2fa');
+	return apiRequestSafe(event, '/auth/2fa', {}, twoFactorStatusSchema);
 }
 
 /** `DELETE /auth/sessions/:id` — revoca una sesión. */

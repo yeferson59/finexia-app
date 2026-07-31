@@ -3,8 +3,8 @@
 	import CardHeader from '$lib/ui/card-header.svelte';
 	import Stat from '$lib/ui/stat.svelte';
 	import CurrencyToggle from './currency-toggle.svelte';
-	import { privacy } from '$lib/stores/privacy.svelte';
-	import { formatCurrency } from '$lib/utils';
+	import { privacy } from '$lib/shared/privacy.svelte';
+	import { formatCurrency } from '$lib/shared/format/money';
 
 	interface PortfolioSummary {
 		id: string;

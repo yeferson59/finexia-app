@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import CardHeader from '$lib/ui/card-header.svelte';
-	import { privacy } from '$lib/stores/privacy.svelte';
-	import { formatCalendarDate } from '$lib/utils';
+	import { privacy } from '$lib/shared/privacy.svelte';
+	import { formatCalendarDate } from '$lib/shared/format/date';
 
 	function fmtMoney(value: number): string {
 		return privacy.money(

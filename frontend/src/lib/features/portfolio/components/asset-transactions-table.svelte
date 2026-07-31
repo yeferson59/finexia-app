@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { formatCalendarDate } from '$lib/utils';
+	import { formatCalendarDate } from '$lib/shared/format/date';
 	import type { Transaction } from '$lib/api/types';
 	import { TYPE_LABEL, TYPE_STYLE, type TxnMeta } from '../asset';
 

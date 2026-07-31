@@ -1,8 +1,8 @@
 import type { Actions, PageServerLoad } from './$types';
-import { z } from 'zod';
 import { fail } from '@sveltejs/kit';
 import * as user from '$lib/api/user';
 import type { UserPreferences } from '$lib/api/types';
+import { notificationPreferencesSchema } from '$lib/features/notifications';
 
 export const load: PageServerLoad = async ({ cookies, fetch }) => {
 	const prefsRes = await user.getPreferences({ cookies, fetch });
@@ -17,12 +17,7 @@ export const actions = {
 	updatePreferences: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 
-		const schema = z.object({
-			emailAlerts: z.coerce.boolean(),
-			weeklySummary: z.coerce.boolean()
-		});
-
-		const parsed = schema.safeParse({
+		const parsed = notificationPreferencesSchema.safeParse({
 			emailAlerts: formData.get('emailAlerts'),
 			weeklySummary: formData.get('weeklySummary')
 		});

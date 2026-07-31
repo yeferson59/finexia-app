@@ -11,13 +11,27 @@ aquí.
   `apiRequest`/`apiRequestSafe` y el tipo `ApiResult<T>` (vista tipada y plana
   del response: `ok`, `status`, `success`, `data`, `message`, `details`,
   `action`) sobre los que se construyen los módulos de dominio.
-- `types.ts` — contratos compartidos con el backend, espejo de `docs/API.md`.
-  Única fuente de verdad de los shapes de la API (`ApiEnvelope`, `PageMeta`,
-  `Paginated`, `PortfolioSummary`, `Holding`, `Transaction`, `Asset`, …).
+- `schemas.ts` — los contratos como schemas Zod, mantenidos a mano contra
+  `docs/API.md`. **Fuente de verdad de los shapes de la API.**
+- `types.ts` — los tipos, derivados de esos schemas con `z.infer`
+  (`PageMeta`, `PortfolioSummary`, `Holding`, `Transaction`, `Asset`, …), más el
+  sobre genérico `ApiEnvelope`. Es el módulo del que todo el mundo importa los
+  tipos; los schemas solo los necesita quien valide en tiempo de ejecución.
 - Módulos por dominio (`auth.ts`, `portfolio.ts`, `transactions.ts`,
   `platforms.ts`, `market.ts`, `user.ts`, `marketing.ts`): funciones tipadas que
   encapsulan `path + método + parseo` y devuelven `ApiResult<T>` (o la `Response`
   cruda para streams/proxies y los flujos públicos de `auth`/`marketing`).
+
+## Validación del contrato en desarrollo
+
+Cada lectura pasa su schema a `apiRequest`/`apiRequestSafe`. En `dev` —y solo
+ahí: `import.meta.env.DEV` lo elimina del build— se valida el `data` recibido y
+se avisa por consola con la ruta y el campo que falla. El resultado no cambia:
+es un aviso, no un corte. Sin esto, un backend que se sale del contrato no
+rompe nada hasta que un `undefined` llega a un componente.
+
+Las fixtures del stub de e2e se validan contra estos mismos schemas en
+`e2e/mocks/contract.spec.ts`.
 
 ## Convención de retorno
 

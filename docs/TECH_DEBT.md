@@ -36,10 +36,18 @@ alias deprecado
 
 > Mismas reglas, para la migración del frontend
 > ([`FRONTEND_ARCHITECTURE_MIGRATION.md`](./FRONTEND_ARCHITECTURE_MIGRATION.md)).
-> Priorizar al cerrar la Fase 7.
+>
+> **Estado (2026-07-31):** las cinco entradas están resueltas. F1–F3 al cerrar
+> la Fase 7; F4 y F5, que se abrieron en ese mismo cierre, justo después.
+> La arquitectura resultante se documenta en
+> [`FRONTEND_ARCHITECTURE.md`](./FRONTEND_ARCHITECTURE.md) y sus reglas de
+> dependencia ya no son una convención escrita: fallan el CI desde
+> `eslint.config.js`.
 
 | # | Detectado en | Descripción | Propuesta |
 |---|---|---|---|
 | F1 | Fase 5 (revisión) | **Resuelto.** Los seis componentes por encima de ~500 líneas se trocearon extrayendo bloques cuyo CSS era **exclusivo** (no hizo falta ni hoja global ni prefijos de clase, así que el HTML renderizado no cambia): `login-register` 747→383 (`auth-brand-panel`, `auth-social-buttons`), `hero` 568→90 (`hero-countdown`, `hero-waitlist`, `hero-preview-cards`), `portfolio-add-form` 587→391 (`portfolio-risk-picker`, `portfolio-goal-fieldset`), `portfolio-entry-form` 574→490 (`portfolio-entry-platform-field`), `import-mapping-step` 546→366 (`import-preview-table` + `transactions.ts` con las constantes de tipo/categoría) y `asset-sell-panel` 501→443 (`asset-sell-panel-header`). Ningún archivo de producción supera ya las ~500 líneas fuera del área de la Fase 6 (`settings`, `admin`). | — |
-| F2 | Fase 5 (revisión) | `src/components/` ya no existe, pero `svelte.config.js` sigue declarando el alias `$components/*` apuntando a ese directorio. Nadie lo usa (`grep` limpio). | Borrar el alias en la Fase 7, junto con la evaluación de `$/*`. |
-| F3 | Fase 5 (revisión) | Los widgets migrados a `features/` siguen importando `privacy` de `$lib/stores/privacy` y los formatters de `$lib/utils`, que la Fase 1 dejó como re-exports temporales. | Completar la relocalización a `lib/shared` en la Fase 7 (ya está en su checklist). |
+| F2 | Fase 5 (revisión) | **Resuelto (2026-07-31).** `svelte.config.js` se quedó sin bloque `alias`: `$components/*` apuntaba a un directorio inexistente y `$/*` no lo usaba nadie. Todo el código compartido se importa por `$lib`, el alias estándar de SvelteKit. | — |
+| F3 | Fase 5 (revisión) | **Resuelto (2026-07-31).** `lib/utils.ts` y `lib/stores/` desaparecieron: los 20 importadores de los formatters pasan a `lib/shared/format/*` y `lib/shared/css`, y `privacy.svelte.ts` vive en `lib/shared/` con sus 12 importadores. `utils.spec.ts` se partió en un spec junto a cada módulo. | — |
+| F4 | Fase 7 (cierre) | **Resuelto (2026-07-31).** `lib/features/notifications/` con los dos canales (`email-preferences`, `in-app-alerts`) sobre un `notification-section` interno; la página baja de 287 a 38 líneas y el schema de preferencias vuelve a la feature. De paso, el reparto del `form` entre secciones (`actionSucceeded`/`actionError`/`actionData`), que era de `settings` y la página copiaba a mano, bajó a `lib/shared/form`. El stub de e2e no servía `/users/me/preferences`, así que la pantalla nunca se había ejercitado entera: se añadieron las dos rutas y `notifications.e2e.ts`. | — |
+| F5 | Fase 7 (cierre) | **Resuelto (2026-07-31).** El backend no publica OpenAPI, así que la fuente de verdad se movió al propio frontend: `lib/api/schemas.ts` define los contratos como schemas Zod y `types.ts` los deriva con `z.infer`, de modo que schema y tipo no pueden desalinearse (lo comprueba el compilador en cada llamada de `lib/api`). Con ellos, la capa de API **valida en desarrollo** lo que responde el backend y avisa en consola con la ruta y el campo; en producción `import.meta.env.DEV` deja la comprobación fuera del build. Además, las fixtures del stub de e2e se validan contra esos mismos schemas en un unit test (`e2e/mocks/contract.spec.ts`): tenía dos que no cumplían el contrato —el catálogo de activos sin `priceUpdatedAt` y las plataformas sin más que `id`/`name`/`isActive`—, así que la suite pasaba en verde sobre formas que el backend real no envía. | Si algún día hay OpenAPI, generar `schemas.ts` desde el spec en vez de mantenerlo a mano. |
