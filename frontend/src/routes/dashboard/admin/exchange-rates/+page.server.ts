@@ -2,6 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import * as market from '$lib/api/market';
 import { fail } from '@sveltejs/kit';
 import type { ExchangeRate } from '$lib/api/types';
+import { rateCreateSchema, rateUpdateSchema } from '$lib/features/admin';
 
 export const load: PageServerLoad = async ({ cookies, fetch }) => {
 	const res = await market.getExchangeRates({ cookies, fetch }, { page: 1, limit: 100 });
@@ -14,15 +15,18 @@ export const load: PageServerLoad = async ({ cookies, fetch }) => {
 export const actions = {
 	createRate: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
-		const fromCurrency = (fd.get('fromCurrency') as string | null)?.trim().toUpperCase();
-		const toCurrency = (fd.get('toCurrency') as string | null)?.trim().toUpperCase();
-		const rate = fd.get('rate') as string | null;
 
-		if (!fromCurrency || !toCurrency || !rate) {
-			return fail(400, { createError: 'Moneda origen, destino y tasa son requeridos' });
+		const parsed = rateCreateSchema.safeParse({
+			fromCurrency: fd.get('fromCurrency') ?? '',
+			toCurrency: fd.get('toCurrency') ?? '',
+			rate: fd.get('rate') ?? ''
+		});
+
+		if (!parsed.success) {
+			return fail(400, { createError: parsed.error.issues[0].message });
 		}
 
-		const res = await market.createRate({ cookies, fetch }, { fromCurrency, toCurrency, rate });
+		const res = await market.createRate({ cookies, fetch }, parsed.data);
 
 		if (!res.ok) {
 			return fail(res.status, {
@@ -51,25 +55,25 @@ export const actions = {
 
 	updateRate: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
-		const id = fd.get('id') as string;
-		const rate = fd.get('rate') as string;
+		const id = (fd.get('id') as string | null) ?? '';
+		// Igual que el precio de un activo: al backend viaja el texto original.
+		const rateStr = (fd.get('rate') as string | null) ?? '';
 
-		if (!id) return fail(400, { updateError: 'ID de tasa requerido', errorId: id });
+		const parsed = rateUpdateSchema.safeParse({ id, rate: rateStr });
 
-		const value = parseFloat(rate);
-		if (isNaN(value) || value <= 0) {
-			return fail(400, { updateError: 'Tasa inválida', errorId: id });
+		if (!parsed.success) {
+			return fail(400, { updateError: parsed.error.issues[0].message, errorId: id });
 		}
 
-		const res = await market.updateRate({ cookies, fetch }, id, { rate });
+		const res = await market.updateRate({ cookies, fetch }, parsed.data.id, { rate: rateStr });
 
 		if (!res.ok) {
 			return fail(res.status, {
 				updateError: res.details ?? 'No se pudo actualizar la tasa',
-				errorId: id
+				errorId: parsed.data.id
 			});
 		}
 
-		return { updateSuccess: true, updatedId: id };
+		return { updateSuccess: true, updatedId: parsed.data.id };
 	}
 } satisfies Actions;

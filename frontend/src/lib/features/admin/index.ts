@@ -20,3 +20,4 @@ export { default as ExchangeRatesTable } from './components/exchange-rates-table
 export { default as ImportCard } from './components/import-card.svelte';
 
 export * from './admin';
+export * from './schemas';

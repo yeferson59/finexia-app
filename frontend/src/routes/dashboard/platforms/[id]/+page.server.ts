@@ -1,7 +1,7 @@
-import z from 'zod';
 import { error, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import * as platforms from '$lib/api/platforms';
+import { platformUpdateSchema } from '$lib/features/platforms';
 
 export const load: PageServerLoad = async ({ params, parent }) => {
 	const { platforms } = await parent();
@@ -23,21 +23,12 @@ export const actions: Actions = {
 			success,
 			error: zodError,
 			data
-		} = await z
-			.object({
-				name: z.string().min(2),
-				description: z.string().optional().default(''),
-				type: z.string().min(2),
-				// El <select> envía "true"/"false" como string; z.coerce.boolean()
-				// convertiría "false" en true, así que se compara explícitamente.
-				isActive: z.enum(['true', 'false']).transform((v) => v === 'true')
-			})
-			.safeParseAsync({
-				name: formData.get('name'),
-				description: formData.get('description'),
-				type: formData.get('type'),
-				isActive: formData.get('isActive')
-			});
+		} = await platformUpdateSchema.safeParseAsync({
+			name: formData.get('name'),
+			description: formData.get('description'),
+			type: formData.get('type'),
+			isActive: formData.get('isActive')
+		});
 
 		if (!success) {
 			return { success: false, error: zodError.message };

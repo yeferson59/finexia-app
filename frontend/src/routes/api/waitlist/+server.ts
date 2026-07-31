@@ -1,9 +1,7 @@
 import { joinWaitlist } from '$lib/api/marketing';
 import { json, redirect } from '@sveltejs/kit';
-import z from 'zod';
+import { waitlistEmailSchema } from '$lib/features/landing';
 import type { RequestHandler } from './$types';
-
-const emailSchema = z.email();
 
 // Waitlist signup lives in its own endpoint (instead of a page action) so the
 // landing page can be prerendered as static HTML. The JS path (use:enhance in
@@ -12,7 +10,7 @@ const emailSchema = z.email();
 export const POST: RequestHandler = async ({ request, fetch }) => {
 	const wantsJson = (request.headers.get('accept') ?? '').includes('application/json');
 	const formData = await request.formData();
-	const parsed = await emailSchema.safeParseAsync(formData.get('email'));
+	const parsed = await waitlistEmailSchema.safeParseAsync(formData.get('email'));
 
 	if (!parsed.success) {
 		const message = 'Correo electrónico inválido';

@@ -2,6 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import * as market from '$lib/api/market';
 import { fail } from '@sveltejs/kit';
 import type { Asset } from '$lib/api/types';
+import { assetCreateSchema, assetPriceSchema } from '$lib/features/admin';
 
 export const load: PageServerLoad = async ({ cookies, fetch }) => {
 	const res = await market.getAssets({ cookies, fetch }, { page: 1, limit: 100 });
@@ -14,20 +15,20 @@ export const load: PageServerLoad = async ({ cookies, fetch }) => {
 export const actions = {
 	createAsset: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
-		const ticker = (fd.get('ticker') as string | null)?.trim().toUpperCase();
-		const name = (fd.get('name') as string | null)?.trim();
-		const assetType = fd.get('assetType') as string | null;
-		const exchange = (fd.get('exchange') as string | null)?.trim() ?? '';
-		const currency = (fd.get('currency') as string | null)?.trim().toUpperCase();
 
-		if (!ticker || !name || !assetType || !currency) {
-			return fail(400, { createError: 'Ticker, nombre, tipo y moneda son requeridos' });
+		const parsed = assetCreateSchema.safeParse({
+			ticker: fd.get('ticker') ?? '',
+			name: fd.get('name') ?? '',
+			assetType: fd.get('assetType') ?? '',
+			currency: fd.get('currency') ?? '',
+			exchange: fd.get('exchange') ?? ''
+		});
+
+		if (!parsed.success) {
+			return fail(400, { createError: parsed.error.issues[0].message });
 		}
 
-		const res = await market.createAsset(
-			{ cookies, fetch },
-			{ ticker, name, assetType, exchange, currency }
-		);
+		const res = await market.createAsset({ cookies, fetch }, parsed.data);
 
 		if (!res.ok) {
 			// `details` lo pone el binder del backend; los errores de dominio
@@ -58,28 +59,32 @@ export const actions = {
 
 	updatePrice: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
-		const id = fd.get('id') as string;
-		const priceStr = fd.get('price') as string;
-		const currency = (fd.get('currency') as string) || 'USD';
+		const id = (fd.get('id') as string | null) ?? '';
+		// El texto tal cual lo escribió el admin es lo que viaja al backend; el
+		// schema solo comprueba que sea un número positivo.
+		const priceStr = (fd.get('price') as string | null) ?? '';
 
-		if (!id) return fail(400, { updateError: 'ID de activo requerido', errorId: id });
+		const parsed = assetPriceSchema.safeParse({
+			id,
+			price: priceStr,
+			currency: fd.get('currency') ?? 'USD'
+		});
 
-		const price = parseFloat(priceStr);
-		if (isNaN(price) || price <= 0) {
-			return fail(400, { updateError: 'Precio inválido', errorId: id });
+		if (!parsed.success) {
+			return fail(400, { updateError: parsed.error.issues[0].message, errorId: id });
 		}
 
-		const res = await market.updateAssetPrice({ cookies, fetch }, id, {
-			price: { value: priceStr, currency }
+		const res = await market.updateAssetPrice({ cookies, fetch }, parsed.data.id, {
+			price: { value: priceStr, currency: parsed.data.currency }
 		});
 
 		if (!res.ok) {
 			return fail(res.status, {
 				updateError: res.details ?? 'No se pudo actualizar el precio',
-				errorId: id
+				errorId: parsed.data.id
 			});
 		}
 
-		return { updateSuccess: true, updatedId: id };
+		return { updateSuccess: true, updatedId: parsed.data.id };
 	}
 } satisfies Actions;

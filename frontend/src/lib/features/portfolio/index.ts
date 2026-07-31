@@ -26,3 +26,4 @@ export { default as AssetTransactionHistory } from './components/asset-transacti
 
 export * from './portfolio';
 export * from './asset';
+export * from './schemas';

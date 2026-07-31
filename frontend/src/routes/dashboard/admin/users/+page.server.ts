@@ -2,6 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import * as user from '$lib/api/user';
 import { fail } from '@sveltejs/kit';
 import type { PageMeta } from '$lib/api/types';
+import { inviteUserSchema, rowIdSchema } from '$lib/features/admin';
 
 const DEFAULT_META: PageMeta = { currentPage: 1, totalPages: 1, previous: false, next: false };
 
@@ -28,19 +29,19 @@ export const load: PageServerLoad = async ({ cookies, fetch, url }) => {
 	};
 };
 
-const ROLES = new Set(['customer', 'admin']);
-
 export const actions = {
 	inviteUser: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
-		const email = (fd.get('email') as string | null)?.trim();
-		const name = (fd.get('name') as string | null)?.trim() ?? '';
-		const role = ((fd.get('role') as string | null)?.trim() || 'customer').toLowerCase();
 
-		if (!email) return fail(400, { error: 'El correo es requerido' });
-		if (!ROLES.has(role)) return fail(400, { error: 'Rol inválido' });
+		const parsed = inviteUserSchema.safeParse({
+			email: fd.get('email') ?? '',
+			name: fd.get('name') ?? '',
+			role: fd.get('role') ?? ''
+		});
 
-		const res = await user.inviteUser({ cookies, fetch }, { email, name, role });
+		if (!parsed.success) return fail(400, { error: parsed.error.issues[0].message });
+
+		const res = await user.inviteUser({ cookies, fetch }, parsed.data);
 
 		if (!res.ok) {
 			return fail(res.status, {
@@ -48,64 +49,65 @@ export const actions = {
 			});
 		}
 
-		return { success: true, invited: email };
+		return { success: true, invited: parsed.data.email };
 	},
 
 	resendInvitation: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
-		const id = fd.get('id') as string;
-		if (!id) return fail(400, { inviteError: 'ID requerido', inviteId: '' });
+		const parsed = rowIdSchema.safeParse(fd.get('id') ?? '');
+		if (!parsed.success) return fail(400, { inviteError: 'ID requerido', inviteId: '' });
 
-		const res = await user.resendInvitation({ cookies, fetch }, id);
+		const res = await user.resendInvitation({ cookies, fetch }, parsed.data);
 		if (!res.ok) {
 			return fail(res.status, {
 				inviteError: res.details ?? 'No se pudo reenviar la invitación',
-				inviteId: id
+				inviteId: parsed.data
 			});
 		}
-		return { inviteSuccess: true, inviteId: id, inviteAction: 'resent' as const };
+		return { inviteSuccess: true, inviteId: parsed.data, inviteAction: 'resent' as const };
 	},
 
 	revokeInvitation: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
-		const id = fd.get('id') as string;
-		if (!id) return fail(400, { inviteError: 'ID requerido', inviteId: '' });
+		const parsed = rowIdSchema.safeParse(fd.get('id') ?? '');
+		if (!parsed.success) return fail(400, { inviteError: 'ID requerido', inviteId: '' });
 
-		const res = await user.revokeInvitation({ cookies, fetch }, id);
+		const res = await user.revokeInvitation({ cookies, fetch }, parsed.data);
 		if (!res.ok) {
 			return fail(res.status, {
 				inviteError: res.details ?? 'No se pudo revocar la invitación',
-				inviteId: id
+				inviteId: parsed.data
 			});
 		}
-		return { inviteSuccess: true, inviteId: id, inviteAction: 'revoked' as const };
+		return { inviteSuccess: true, inviteId: parsed.data, inviteAction: 'revoked' as const };
 	},
 
 	deleteUser: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
-		const id = fd.get('id') as string;
-		if (!id) return fail(400, { error: 'ID de usuario requerido' });
+		const parsed = rowIdSchema.safeParse(fd.get('id') ?? '');
+		if (!parsed.success) return fail(400, { error: 'ID de usuario requerido' });
 
-		const res = await user.deleteUser({ cookies, fetch }, id);
+		const res = await user.deleteUser({ cookies, fetch }, parsed.data);
 		if (!res.ok) return fail(res.status, { error: 'No se pudo eliminar el usuario' });
 		return { success: true };
 	},
 
 	banUser: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
-		const id = fd.get('id') as string;
+		const parsed = rowIdSchema.safeParse(fd.get('id') ?? '');
 		const ban = fd.get('ban') === 'true';
-		if (!id) return fail(400, { banError: 'ID requerido', banId: '' });
 
-		const res = await user.banUser({ cookies, fetch }, id, { ban });
+		if (!parsed.success) return fail(400, { banError: 'ID requerido', banId: '' });
+
+		const res = await user.banUser({ cookies, fetch }, parsed.data, { ban });
 
 		if (!res.ok) {
 			return fail(res.status, {
 				banError: res.details ?? 'No se pudo actualizar el estado',
-				banId: id
+				banId: parsed.data
 			});
 		}
 
-		return { banSuccess: true, banId: id, banned: ban };
+		return { banSuccess: true, banId: parsed.data, banned: ban };
 	}
 } satisfies Actions;

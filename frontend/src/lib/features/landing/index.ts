@@ -17,3 +17,4 @@ export { default as Faq } from './components/faq.svelte';
 export { default as FinalCta } from './components/final-cta.svelte';
 export { default as Footer } from './components/footer.svelte';
 export { default as Brand } from './components/brand.svelte';
+export * from './schemas';

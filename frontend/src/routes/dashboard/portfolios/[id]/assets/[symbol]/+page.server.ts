@@ -1,8 +1,8 @@
-import { z } from 'zod';
 import * as portfolio from '$lib/api/portfolio';
 import * as transactions from '$lib/api/transactions';
 import type { PageServerLoad, Actions } from './$types';
 import type { Holding, Transaction } from '$lib/api/types';
+import { transactionCreateSchema, transactionUpdateSchema } from '$lib/features/portfolio';
 
 export interface TxnMeta {
 	total: number;
@@ -60,21 +60,11 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 	return { entries, transactions: transactionsList, portfolioTotalValue, txnMeta };
 };
 
-const txnSchema = z.object({
-	type: z.string().min(1),
-	quantity: z.coerce.number().positive(),
-	price: z.coerce.number().min(0),
-	currency: z.string().default('USD'),
-	fees: z.coerce.number().min(0).default(0),
-	transactionDate: z.coerce.date(),
-	notes: z.string().optional()
-});
-
 export const actions: Actions = {
 	createTransaction: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 
-		const { success, error, data } = await txnSchema.extend({ entryId: z.uuid() }).safeParseAsync({
+		const { success, error, data } = await transactionCreateSchema.safeParseAsync({
 			entryId: formData.get('entryId'),
 			type: formData.get('type'),
 			quantity: formData.get('quantity'),
@@ -109,7 +99,7 @@ export const actions: Actions = {
 	editTransaction: async ({ request, fetch, cookies }) => {
 		const formData = await request.formData();
 
-		const { success, error, data } = await txnSchema.extend({ txnId: z.uuid() }).safeParseAsync({
+		const { success, error, data } = await transactionUpdateSchema.safeParseAsync({
 			txnId: formData.get('txnId'),
 			type: formData.get('type'),
 			quantity: formData.get('quantity'),
