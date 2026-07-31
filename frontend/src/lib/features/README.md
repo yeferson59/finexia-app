@@ -38,12 +38,13 @@ importan por ruta relativa y no forman parte de la superficie pública.
 - Presupuesto de tamaño: una `+page.svelte` no supera ~300 líneas; ningún
   archivo de producción supera ~500. Si crece, extrae componentes aquí.
 
-> Estado: Fases 3 a 6 completas — las diez features están migradas (`landing`,
-> `legal`, `auth`, `dashboard`, `platforms`, `portfolio`, `transactions`,
-> `investments`, `settings` y `admin`). Queda la Fase 7: borrar los alias
-> heredados, blindar las fronteras con ESLint y trocear
-> `dashboard/reports/+page.svelte`, la única página que no entró en ninguna
-> feature. Las features siguen el patrón validado en la retrospectiva del piloto
-> (sección 3.1 de `docs/FRONTEND_ARCHITECTURE_MIGRATION.md`; ver también las
-> notas de `auth` en la 4.1, el cierre de la Fase 5 en la 5.2 y el reparto de
-> CSS con contenedores `:global` de la 6.1).
+> Estado: migración cerrada (Fase 7, 2026-07-31). Son once features: `admin`,
+> `auth`, `dashboard`, `investments`, `landing`, `legal`, `platforms`,
+> `portfolio`, `reports`, `settings` y `transactions`.
+>
+> Las reglas de arriba **fallan el CI** desde `eslint.config.js`, no dependen de
+> que alguien las recuerde en la revisión. La foto completa de la arquitectura
+> está en `docs/FRONTEND_ARCHITECTURE.md`; el porqué de cada decisión, en
+> `docs/FRONTEND_ARCHITECTURE_MIGRATION.md` (retrospectiva del piloto en 3.1,
+> notas de `auth` en 4.1, cierre de la Fase 5 en 5.2, reparto de CSS con
+> contenedores `:global` en 6.1 y cierre en 7.1).

@@ -63,23 +63,22 @@ find src -type f \( -name '*.svelte' -o -name '*.ts' \) \
   todos los endpoints que consume el frontend; el stub de e2e se escribió
   contra ese documento.
 
-## 4. Estado al cerrar la Fase 6
+## 4. Estado al cerrar la migración
 
 Comparación contra el snapshot de arriba, con los mismos comandos
 (**2026-07-31**). Las cifras de la sección 1 y 2 se dejan intactas: son la línea
 base histórica.
 
-| Métrica | Línea base (Fase 0) | Al cerrar la Fase 6 |
-|---|---:|---:|
-| Archivos de producción > 500 líneas | 13 | **0** |
-| `+page.svelte` > 300 líneas | 16 | **1** (`dashboard/reports`, 461) |
-| Archivos de `routes/` que importan `authedFetch` | 24 | **0** |
-| `src/components/` | 31 componentes | ya no existe |
-| Unit tests / E2E | 122 / 22 (cierre de la Fase 1) | 194 / 27 |
+| Métrica | Línea base (Fase 0) | Fase 6 | Fase 7 (cierre) |
+|---|---:|---:|---:|
+| Archivos de producción > 500 líneas | 13 | 0 | **0** |
+| `+page.svelte` > 300 líneas | 16 | 1 | **0** |
+| Archivos de `routes/` que importan `authedFetch` | 24 | 0 | **0** |
+| Archivos de `routes/` que importan `zod` | 14 | 8 | **0** |
+| `src/components/` | 31 componentes | no existe | no existe |
+| Aliases propios en `svelte.config.js` | 2 | 2 | **0** |
+| Unit tests / E2E | 122 / 22 (cierre de la Fase 1) | 194 / 27 | **228 / 29** |
 
-Lo que sigue pendiente para la Fase 7: los alias `$components/*` y `$/*` siguen
-declarados en `svelte.config.js` (el primero apunta a un directorio que ya no
-existe), `lib/utils.ts` (16 líneas de re-exports, 22 importadores) y
-`lib/stores/privacy.svelte.ts` (12 importadores) siguen en pie, no hay reglas
-ESLint de fronteras, y `dashboard/reports/+page.svelte` es la única página que
-ninguna fase reclamó.
+Las reglas de dependencia ya no dependen de que alguien las recuerde: están en
+`eslint.config.js` y fallan el CI. La estructura final y las convenciones se
+documentan en [`FRONTEND_ARCHITECTURE.md`](./FRONTEND_ARCHITECTURE.md).

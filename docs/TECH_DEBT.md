@@ -36,10 +36,17 @@ alias deprecado
 
 > Mismas reglas, para la migración del frontend
 > ([`FRONTEND_ARCHITECTURE_MIGRATION.md`](./FRONTEND_ARCHITECTURE_MIGRATION.md)).
-> Priorizar al cerrar la Fase 7.
+>
+> **Estado (2026-07-31):** las tres entradas están resueltas al cerrar la Fase 7.
+> La arquitectura resultante se documenta en
+> [`FRONTEND_ARCHITECTURE.md`](./FRONTEND_ARCHITECTURE.md) y sus reglas de
+> dependencia ya no son una convención escrita: fallan el CI desde
+> `eslint.config.js`.
 
 | # | Detectado en | Descripción | Propuesta |
 |---|---|---|---|
 | F1 | Fase 5 (revisión) | **Resuelto.** Los seis componentes por encima de ~500 líneas se trocearon extrayendo bloques cuyo CSS era **exclusivo** (no hizo falta ni hoja global ni prefijos de clase, así que el HTML renderizado no cambia): `login-register` 747→383 (`auth-brand-panel`, `auth-social-buttons`), `hero` 568→90 (`hero-countdown`, `hero-waitlist`, `hero-preview-cards`), `portfolio-add-form` 587→391 (`portfolio-risk-picker`, `portfolio-goal-fieldset`), `portfolio-entry-form` 574→490 (`portfolio-entry-platform-field`), `import-mapping-step` 546→366 (`import-preview-table` + `transactions.ts` con las constantes de tipo/categoría) y `asset-sell-panel` 501→443 (`asset-sell-panel-header`). Ningún archivo de producción supera ya las ~500 líneas fuera del área de la Fase 6 (`settings`, `admin`). | — |
-| F2 | Fase 5 (revisión) | `src/components/` ya no existe, pero `svelte.config.js` sigue declarando el alias `$components/*` apuntando a ese directorio. Nadie lo usa (`grep` limpio). | Borrar el alias en la Fase 7, junto con la evaluación de `$/*`. |
-| F3 | Fase 5 (revisión) | Los widgets migrados a `features/` siguen importando `privacy` de `$lib/stores/privacy` y los formatters de `$lib/utils`, que la Fase 1 dejó como re-exports temporales. | Completar la relocalización a `lib/shared` en la Fase 7 (ya está en su checklist). |
+| F2 | Fase 5 (revisión) | **Resuelto (2026-07-31).** `svelte.config.js` se quedó sin bloque `alias`: `$components/*` apuntaba a un directorio inexistente y `$/*` no lo usaba nadie. Todo el código compartido se importa por `$lib`, el alias estándar de SvelteKit. | — |
+| F3 | Fase 5 (revisión) | **Resuelto (2026-07-31).** `lib/utils.ts` y `lib/stores/` desaparecieron: los 20 importadores de los formatters pasan a `lib/shared/format/*` y `lib/shared/css`, y `privacy.svelte.ts` vive en `lib/shared/` con sus 12 importadores. `utils.spec.ts` se partió en un spec junto a cada módulo. | — |
+| F4 | Fase 7 (cierre) | La página de notificaciones (287 líneas) es la única del dashboard que no tiene componentes propios en una feature: solo su schema vive en `features/settings`. Está bajo el presupuesto de tamaño, así que no bloquea nada. | Si crece, darle su propia feature o repartir sus secciones en `features/settings`. |
+| F5 | Fase 7 (cierre) | `lib/api/types.ts` se mantiene a mano contra `docs/API.md`. Cada cambio de contrato del backend exige acordarse de tocarlo, y nada lo verifica. | Cuando el backend publique OpenAPI, evaluar generar los tipos y dejar `types.ts` como capa de adaptación. |

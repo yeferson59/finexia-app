@@ -1,5 +1,11 @@
 # Plan de migración de arquitectura — Frontend (SvelteKit)
 
+> ✅ **Migración cerrada el 2026-07-31** (Fases 0 a 7). Este documento se
+> conserva como registro de cómo se hizo y por qué se decidió cada cosa; para
+> trabajar sobre el código de hoy, la referencia es
+> [`FRONTEND_ARCHITECTURE.md`](./FRONTEND_ARCHITECTURE.md). El resultado contra
+> la línea base está en la sección 6.
+
 > **Objetivo:** evolucionar el frontend desde una organización por tipo de archivo
 > (`components/`, `routes/` con lógica embebida) hacia una **arquitectura modular por
 > features** con una **capa de API tipada por dominio**, de forma **incremental**
@@ -561,32 +567,78 @@ la única `+page.svelte` que pasa de ~300 es `dashboard/reports/+page.svelte`
 (461). Es la única página del dashboard que ninguna fase reclamó: se anota en la
 Fase 7, que es donde se valida ese presupuesto.
 
-### Fase 7 — Demolición del legacy y blindaje de fronteras
+### Fase 7 — Demolición del legacy y blindaje de fronteras ✅
 
-- [ ] Verificar que `src/components/` quedó vacío y **borrarlo**; eliminar el alias
+- [x] Verificar que `src/components/` quedó vacío y **borrarlo**; eliminar el alias
       `$components` (y evaluar eliminar `$/*`) de `svelte.config.js`.
-      *(Al cerrar la Fase 6 el directorio ya no existe y nadie importa por
-      `$components`, pero los dos alias siguen declarados en `svelte.config.js`
-      —`$components/*` apuntando a una ruta que ya no existe— y hay que
-      quitarlos.)*
-- [ ] Eliminar `lib/utils.ts` y `lib/stores/` si quedaron reducidos a re-exports;
+      *(El directorio ya no existía al cerrar la Fase 5; en esta se quitaron los
+      dos alias —`$components/*` apuntaba a una ruta inexistente y `$/*` no lo
+      usaba nadie—, así que `svelte.config.js` se queda sin bloque `alias`.)*
+- [x] Eliminar `lib/utils.ts` y `lib/stores/` si quedaron reducidos a re-exports;
       `lib/index.ts` vacío también se borra.
-      *(`lib/utils.ts` son 16 líneas de re-exports que aún importan 22 archivos,
-      y `lib/stores/privacy.svelte.ts` lo consumen 12.)*
-- [ ] Trocear `dashboard/reports/+page.svelte` (461): es la única página que no
-      entró en ninguna feature de las Fases 3–6 y la única que sigue por encima
-      del presupuesto de ~300 líneas.
-- [ ] Blindar fronteras con ESLint (`import/no-restricted-paths` o
+      *(Los 20 importadores de `$lib/utils` pasan a `lib/shared/css` y
+      `lib/shared/format/*`, y `utils.spec.ts` se parte en un spec junto a cada
+      módulo; `privacy.svelte.ts` sube a `lib/shared/` con sus 12 importadores.)*
+- [x] Trocear `dashboard/reports/+page.svelte` (**461 → 79**): la única página que
+      no entró en ninguna feature de las Fases 3–6.
+      *(`lib/features/reports/` con los cuatro paneles sobre un `report-panel`
+      interno; `reports.ts` se queda además los cálculos que vivían dentro del
+      loader —calendario, estadísticas y proyección—, que no tenían ninguna
+      prueba y ahora tienen 17. La página tampoco tenía E2E: `reports.e2e.ts`.)*
+- [x] Blindar fronteras con ESLint (`import/no-restricted-paths` o
       `eslint-plugin-boundaries`):
-  - [ ] `lib/ui` no importa de `lib/features` ni `lib/api`.
-  - [ ] Una feature no importa de otra feature.
-  - [ ] `routes/` no importa internals de features (solo `index.ts`) ni
+      *(Se hizo con `no-restricted-imports`, la regla del core, por directorio:
+      expresa las cuatro reglas sin añadir ninguna dependencia. Ver 7.1.)*
+  - [x] `lib/ui` no importa de `lib/features` ni `lib/api`.
+  - [x] Una feature no importa de otra feature.
+  - [x] `routes/` no importa internals de features (solo `index.ts`) ni
         `lib/api/client` directo (solo módulos de dominio).
-- [ ] Comparar contra la línea base de Fase 0: cero loaders con `authedFetch`
+  - [x] Además: `lib/shared` no importa de nadie y `lib/api` no depende de la UI.
+- [x] Comparar contra la línea base de Fase 0: cero loaders con `authedFetch`
       crudo, y ningún `.svelte`/`.ts` de producción > ~500 líneas.
-- [ ] Actualizar `frontend/README.md` (o crear `docs/FRONTEND_ARCHITECTURE.md`) con
+      *(→ [`FRONTEND_MIGRATION_BASELINE.md`](./FRONTEND_MIGRATION_BASELINE.md) §4.)*
+- [x] Centralizar en `features/<x>/schemas.ts` los schemas Zod que seguían
+      declarados dentro de las actions (portfolio, platforms, landing) y **dar
+      validación Zod a las tres pantallas de admin**, que validaban a mano.
+      *(No estaba en el checklist original, pero es el último criterio de éxito
+      que quedaba sin cumplir. `routes/` ya no importa `zod`.)*
+- [x] Actualizar `frontend/README.md` (o crear `docs/FRONTEND_ARCHITECTURE.md`) con
       la estructura final y las reglas de dependencia.
-- [ ] Revisión final de `docs/TECH_DEBT.md`.
+      *(→ [`FRONTEND_ARCHITECTURE.md`](./FRONTEND_ARCHITECTURE.md), enlazado
+      desde el README del frontend.)*
+- [x] Revisión final de `docs/TECH_DEBT.md`. *(F1, F2 y F3 cerradas.)*
+
+#### 7.1 Notas del cierre
+
+- **Fronteras sin dependencias nuevas.** El plan proponía
+  `import/no-restricted-paths` o `eslint-plugin-boundaries`; bastó
+  `no-restricted-imports`, que ya viene con ESLint, aplicada con un bloque
+  `files` por capa. La clave es que dentro de una feature todo se importa en
+  relativo: un `$lib/features/...` escrito desde `lib/features/**` solo puede
+  ser una feature vecina, así que la regla «feature ↛ feature» se reduce a
+  prohibir ese prefijo (más `../../*`, la forma relativa de saltar de vecina).
+  Cada una de las seis reglas se comprobó con una violación deliberada —también
+  dentro de un `.svelte`— antes de borrarla: una regla de frontera que no
+  dispara es peor que no tenerla.
+- **La excepción del CSS, ahora explícita.** `import '$lib/features/landing/landing.css'`
+  se salta la regla de «solo `index.ts`» y estaba documentado desde la Fase 3.
+  Ahora es una negación en el propio patrón de ESLint (`!$lib/features/*/*.css`),
+  de modo que la excepción vive donde se aplica.
+- **Los cálculos de reportes salieron del loader.** `+page.server.ts` tenía 110
+  líneas de estadística (rentabilidad mes a mes, drawdown, volatilidad
+  anualizada, CAGR) sin una sola prueba. Al bajarlas a `reports.ts` se pudieron
+  cubrir: entre otras cosas fijan que la proyección se abstiene con menos de
+  medio año de historial o con un CAGR inverosímil, que era una decisión de
+  producto enterrada en un `if`.
+- **Validación de archivos, la excepción a «toda action valida con Zod».** El
+  avatar de ajustes y los imports de CSV comprueban `instanceof File`, tipo y
+  tamaño a mano. Un `File` no tiene nada que parsear y cada comprobación tiene
+  su propio mensaje; envolverlo en Zod solo cambiaría dónde se escribe el `if`.
+- **Números que viajan como texto.** Al pasar a Zod el ajuste de precios y
+  tasas del admin, el valor sigue enviándose al backend tal cual lo escribió el
+  usuario: el schema valida que sea un número positivo, pero mandar
+  `parsed.data.price` convertiría `190.00` en `190`. Es el tipo de detalle que
+  una migración «mecánica» rompe sin enterarse.
 
 ---
 
@@ -603,14 +655,36 @@ Fase 7, que es donde se valida ese presupuesto.
 
 ## 5. Criterios de éxito
 
-- [ ] `routes/` contiene solo orquestación: ningún loader declara interfaces de la
+Todos cumplidos al cerrar la Fase 7 (**2026-07-31**). La estructura resultante y
+las reglas que hay que respetar de aquí en adelante están en
+[`FRONTEND_ARCHITECTURE.md`](./FRONTEND_ARCHITECTURE.md).
+
+- [x] `routes/` contiene solo orquestación: ningún loader declara interfaces de la
       API ni llama a `authedFetch` directamente.
-- [ ] Existe una única fuente de verdad de los contratos del backend
+- [x] Existe una única fuente de verdad de los contratos del backend
       (`lib/api/types.ts`) alineada con `docs/API.md`.
-- [ ] Ningún archivo de producción supera ~500 líneas; ninguna `+page.svelte`
-      supera ~300.
-- [ ] `src/components/` y el alias `$components` no existen; todo vive bajo `$lib`.
-- [ ] Toda form action valida con un schema Zod de su feature.
-- [ ] Las reglas de dependencia (ui ↛ features, feature ↛ feature, routes → solo
+- [x] Ningún archivo de producción supera ~500 líneas; ninguna `+page.svelte`
+      supera ~300. *(El mayor: `portfolio-entry-form` con 490; la página más
+      larga, `notifications` con 287.)*
+- [x] `src/components/` y el alias `$components` no existen; todo vive bajo `$lib`.
+- [x] Toda form action valida con un schema Zod de su feature. *(Salvo la
+      comprobación de archivos subidos —avatar e imports—, que se queda como
+      comprobación directa de `File`; ver 7.1.)*
+- [x] Las reglas de dependencia (ui ↛ features, feature ↛ feature, routes → solo
       `index.ts`) están automatizadas en ESLint y fallan el CI.
-- [ ] Suite completa en verde: `pnpm check && pnpm lint && pnpm test`.
+- [x] Suite completa en verde: `pnpm check && pnpm lint && pnpm test`.
+      *(0 errores, 228 unit tests y 29 E2E.)*
+
+## 6. Resultado
+
+| | Línea base (Fase 0) | Al cerrar la Fase 7 |
+|---|---:|---:|
+| Archivos de producción > 500 líneas | 13 | **0** |
+| `+page.svelte` > 300 líneas | 16 | **0** |
+| Archivos de `routes/` con `authedFetch` crudo | 24 | **0** |
+| Contratos del backend duplicados en `routes/` | 5 áreas | **0** |
+| Features | 0 | **11** |
+| Unit tests / E2E | 122 / 22 | **228 / 29** |
+
+La página que más adelgazó fue el detalle de un activo (2.014 → 120 líneas); la
+de ajustes pasó de 1.150 a 48 y el centro de reportes de 461 a 79.
