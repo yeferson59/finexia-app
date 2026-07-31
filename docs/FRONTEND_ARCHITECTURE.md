@@ -126,12 +126,20 @@ un barrel de JS no puede reexportar un side-effect de CSS.
 cd frontend
 pnpm check          # svelte-check + tsc
 pnpm lint           # prettier + eslint (incluye las reglas de frontera)
+pnpm check:arch     # presupuesto de tamaño, `routes/` y restos del legacy
 pnpm test:unit -- --run
 pnpm test:e2e
 ```
 
-`.github/workflows/frontend-ci.yml` ejecuta las cuatro en cada PR que toque
+`.github/workflows/frontend-ci.yml` ejecuta las cinco en cada PR que toque
 `frontend/**`.
+
+**`check:arch`** (`scripts/check-architecture.mjs`) cubre lo que ESLint no puede
+expresar: el presupuesto de tamaño, que `routes/` no declare schemas Zod ni
+llame al cliente HTTP, que no reaparezcan los caminos del legacy
+(`$components`, `$lib/utils`, `$lib/stores`) y que cada feature tenga su
+`index.ts` con los componentes en `components/`. Eran una foto en
+`FRONTEND_MIGRATION_BASELINE.md`; ahora fallan el CI.
 
 ## 5. Dónde poner código nuevo
 

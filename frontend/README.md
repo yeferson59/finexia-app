@@ -18,6 +18,7 @@ componen componentes de una feature); la lógica de negocio vive en
 ```sh
 pnpm check          # svelte-check + tsc
 pnpm lint           # prettier + eslint (incluye las reglas de frontera)
+pnpm check:arch     # presupuesto de tamaño, `routes/` y restos del legacy
 pnpm test:unit -- --run
 pnpm test:e2e       # Playwright contra el stub e2e/mocks/mock-api.mjs
 ```

@@ -52,6 +52,9 @@ jobs:
       - name: Lint (prettier + eslint)
         run: pnpm lint
 
+      - name: Arquitectura (tamaño, routes/ y legacy)
+        run: pnpm check:arch
+
       - name: Unit tests
         run: pnpm test:unit -- --run
 
