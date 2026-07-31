@@ -58,17 +58,6 @@ export const twoFactorChallengeSchema = z.object({
 	code: otpCode
 });
 
-/**
- * Preferencias de notificación (`routes/dashboard/notifications`).
- *
- * Viven aquí y no en una feature propia porque son parte del mismo perfil de
- * usuario que edita la página de ajustes, y las escribe el mismo endpoint.
- */
-export const notificationPreferencesSchema = z.object({
-	emailAlerts: z.coerce.boolean(),
-	weeklySummary: z.coerce.boolean()
-});
-
 /** Proveedores para los que el backend acepta una clave. */
 export const marketProviderSchema = z.enum(['finnhub', 'alphavantage']);
 

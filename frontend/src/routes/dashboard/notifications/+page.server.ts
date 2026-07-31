@@ -2,7 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import * as user from '$lib/api/user';
 import type { UserPreferences } from '$lib/api/types';
-import { notificationPreferencesSchema } from '$lib/features/settings';
+import { notificationPreferencesSchema } from '$lib/features/notifications';
 
 export const load: PageServerLoad = async ({ cookies, fetch }) => {
 	const prefsRes = await user.getPreferences({ cookies, fetch });

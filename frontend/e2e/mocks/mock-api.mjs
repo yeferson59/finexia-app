@@ -363,6 +363,17 @@ const server = createServer(async (req, res) => {
 	}
 
 	// ---- Users ----
+	if (route === 'GET /users/me/preferences') {
+		return send(
+			res,
+			200,
+			envelope({ userId: account.session.userId, emailAlerts: true, weeklySummary: false })
+		);
+	}
+	if (route === 'PATCH /users/me/preferences') {
+		const body = JSON.parse((await readBody(req)).toString() || '{}');
+		return send(res, 200, envelope({ userId: account.session.userId, ...body }));
+	}
 	if (route === 'PATCH /users/me') {
 		const body = JSON.parse((await readBody(req)).toString() || '{}');
 		return send(res, 200, envelope({ ...account.user, ...body }));

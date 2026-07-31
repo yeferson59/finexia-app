@@ -2,37 +2,19 @@
  * Helpers y tipos del dominio `settings`.
  *
  * La página de ajustes es un montón de formularios independientes que comparten
- * un solo `form` de SvelteKit: cada acción devuelve `{ action: '<nombre>', … }` y
- * cada sección tiene que decidir si ese resultado es suyo. Ese reparto vivía
- * repetido como `$derived(form?.action === 'x' && (form as {…}).success)` en la
- * página; aquí se centraliza para que las secciones no repitan el cast.
+ * un solo `form` de SvelteKit. El reparto de ese `form` entre secciones no tiene
+ * nada de ajustes —lo hace igual la página de notificaciones—, así que vive en
+ * `lib/shared/form`; aquí se reexporta con el nombre que usan las secciones.
  */
 
 import type { ActiveSession } from '$lib/api/types';
+import type { ActionForm } from '$lib/shared/form';
 
 export type { ActiveSession, MarketCredential, TwoFactorStatus } from '$lib/api/types';
+export { actionSucceeded, actionError, actionData } from '$lib/shared/form';
 
 /** `form` de la página de ajustes, sin tipar por acción. */
-export type SettingsForm = Record<string, unknown> | null | undefined;
-
-/** `true` si `form` es el resultado correcto de esa acción. */
-export function actionSucceeded(form: SettingsForm, action: string): boolean {
-	return form?.action === action && form?.success === true;
-}
-
-/** Mensaje de error de esa acción, o cadena vacía si el `form` no es suyo. */
-export function actionError(form: SettingsForm, action: string): string {
-	return form?.action === action ? ((form?.error as string) ?? '') : '';
-}
-
-/**
- * Campo del resultado de una acción concreta, solo si esa acción tuvo éxito.
- * Sirve para los datos que devuelven las acciones (`imageUrl`, `secret`,
- * `recoveryCodes`…) sin volver a comprobar `action` + `success` en cada sitio.
- */
-export function actionData<T>(form: SettingsForm, action: string, field: string): T | undefined {
-	return actionSucceeded(form, action) ? (form?.[field] as T | undefined) : undefined;
-}
+export type SettingsForm = ActionForm;
 
 /**
  * Códigos de recuperación recién emitidos.
