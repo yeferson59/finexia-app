@@ -49,12 +49,7 @@ func run(ctx context.Context, envs *config.Env, log logger.Logger) error {
 	}
 	defer dbPool.Close()
 
-	storageCache := cache.Connect(envs.CacheURL)
-	defer func() {
-		if err := storageCache.Close(); err != nil {
-			log.With(logger.Str("cmd", "run")).Fatal(ctx, "failed to close cache store: "+err.Error())
-		}
-	}()
+	client := cache.Conn(envs.RedisHost, envs.RedisPort, envs.RedisPassword, envs.RedisDB)
 
 	s3Client, err := objectstore.Connect(ctx, envs.AWSAccessKeyID, envs.AWSDefaultRegion, envs.AWSEndpointURL, envs.AWSSecretAccessKey)
 	if err != nil {
@@ -78,7 +73,7 @@ func run(ctx context.Context, envs *config.Env, log logger.Logger) error {
 	application, err := app.New(app.Deps{
 		Envs:    envs,
 		DB:      dbPool,
-		Storage: storageCache,
+		Cache:   client,
 		S3:      s3Client,
 		Mail:    mailService,
 		Keyring: keyring,
