@@ -3,12 +3,13 @@
 package cache
 
 import (
-	"github.com/gofiber/storage/redis/v3"
+	"context"
+
+	fibeRedis "github.com/gofiber/storage/redis/v3"
+	"github.com/redis/go-redis/v9"
 )
 
 // Connect opens a Redis-backed fiber.Storage against url.
-func Connect(url string) *redis.Storage {
-	return redis.New(redis.Config{
-		URL: url,
-	})
+func Storage(ctx context.Context, conn redis.UniversalClient) *fibeRedis.Storage {
+	return fibeRedis.NewFromConnection(conn)
 }
