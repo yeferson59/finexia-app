@@ -38,10 +38,12 @@ func Str(key, val string) Field {
 
 func Err(err error) Field {
 	f := Field{kind: fieldErr, key: "error"}
+
 	if err != nil {
 		f.strVal = err.Error()
 		f.anyVal = err
 	}
+
 	return f
 }
 

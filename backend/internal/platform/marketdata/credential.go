@@ -51,7 +51,9 @@ type Credential struct {
 }
 
 // String keeps the key out of explicit stringification.
-func (c Credential) String() string { return string(c.Provider) + ":" + redacted }
+func (c Credential) String() string {
+	return string(c.Provider) + ":" + redacted
+}
 
 // Format makes every fmt verb render the redacted form, including %#v.
 //

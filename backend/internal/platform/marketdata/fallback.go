@@ -21,7 +21,9 @@ func NewFallback(providers ...Provider) *FallbackProvider {
 // Providers exposes the chain in the order it will be tried. Under BYO-key the
 // order decides which of a user's personal quotas is spent first, so it is
 // worth asserting on.
-func (f *FallbackProvider) Providers() []Provider { return f.providers }
+func (f *FallbackProvider) Providers() []Provider {
+	return f.providers
+}
 
 func (f *FallbackProvider) FetchQuote(ctx context.Context, symbol string) (QuoteResult, error) {
 	var errs []error
@@ -30,19 +32,24 @@ func (f *FallbackProvider) FetchQuote(ctx context.Context, symbol string) (Quote
 		if err == nil {
 			return result, nil
 		}
+
 		errs = append(errs, err)
 	}
+
 	return QuoteResult{}, errors.Join(errs...)
 }
 
 func (f *FallbackProvider) FetchExchangeRate(ctx context.Context, from, to string) (ExchangeRateResult, error) {
 	var errs []error
+
 	for _, p := range f.providers {
 		result, err := p.FetchExchangeRate(ctx, from, to)
 		if err == nil {
 			return result, nil
 		}
+
 		errs = append(errs, err)
 	}
+
 	return ExchangeRateResult{}, errors.Join(errs...)
 }

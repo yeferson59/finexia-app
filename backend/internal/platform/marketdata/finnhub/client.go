@@ -49,6 +49,7 @@ func (c *Client) get(ctx context.Context, path string, params url.Values, what s
 	if err != nil {
 		return marketdata.Errorf(marketdata.Finnhub, c.apiKey, nil, "finnhub: build request %s: %v", what, err)
 	}
+
 	req.Header.Set(tokenHeader, c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
@@ -73,13 +74,15 @@ func (c *Client) get(ctx context.Context, path string, params url.Values, what s
 	return nil
 }
 
+type resultQuote struct {
+	C float64 `json:"c"` // current price
+}
+
 // FetchQuote retrieves the current price for a stock, ETF, or bond via the
 // Finnhub /quote endpoint. A zero price means the symbol is not covered, which
 // lets the fallback chain move on to the next provider.
 func (c *Client) FetchQuote(ctx context.Context, symbol string) (marketdata.QuoteResult, error) {
-	var result struct {
-		C float64 `json:"c"` // current price
-	}
+	var result resultQuote
 
 	params := url.Values{}
 	params.Set("symbol", symbol)
@@ -99,15 +102,17 @@ func (c *Client) FetchQuote(ctx context.Context, symbol string) (marketdata.Quot
 	}, nil
 }
 
+type resultExchange struct {
+	Quote map[string]float64 `json:"quote"`
+}
+
 // FetchExchangeRate retrieves the rate between two fiat currencies via the
 // Finnhub /forex/rates endpoint. Crypto pairs are not served here and return
 // ErrUnsupported, allowing the fallback chain to continue.
 func (c *Client) FetchExchangeRate(ctx context.Context, from, to string) (marketdata.ExchangeRateResult, error) {
 	what := from + "/" + to
 
-	var result struct {
-		Quote map[string]float64 `json:"quote"`
-	}
+	var result resultExchange
 
 	params := url.Values{}
 	params.Set("base", from)

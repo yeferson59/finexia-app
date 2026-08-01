@@ -41,6 +41,7 @@ func New(httpClient *http.Client) *Factory {
 // failed".
 func (f *Factory) For(creds []marketdata.Credential) (marketdata.Provider, error) {
 	byProvider := make(map[marketdata.ProviderName]string, len(creds))
+
 	for _, cred := range creds {
 		if cred.APIKey != "" && cred.Provider.IsValid() {
 			byProvider[cred.Provider] = cred.APIKey
@@ -48,6 +49,7 @@ func (f *Factory) For(creds []marketdata.Credential) (marketdata.Provider, error
 	}
 
 	chain := make([]marketdata.Provider, 0, len(byProvider))
+
 	for _, name := range marketdata.SupportedProviders {
 		apiKey, ok := byProvider[name]
 		if !ok {

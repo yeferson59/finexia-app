@@ -89,14 +89,16 @@ func (c *Client) get(ctx context.Context, params url.Values, what string, out an
 	return nil
 }
 
+type clasifyEnvelope struct {
+	ErrorMessage string `json:"Error Message"`
+	Note         string `json:"Note"`
+	Information  string `json:"Information"`
+}
+
 // classify turns Alpha Vantage's 200-with-a-message replies into the sentinels
 // the credential store uses to decide whether a key is dead or just throttled.
 func (c *Client) classify(raw json.NoCopyRawMessage, what string) error {
-	var envelope struct {
-		ErrorMessage string `json:"Error Message"`
-		Note         string `json:"Note"`
-		Information  string `json:"Information"`
-	}
+	var envelope clasifyEnvelope
 
 	if err := json.Unmarshal(raw, &envelope); err != nil {
 		return nil
@@ -116,12 +118,14 @@ func (c *Client) classify(raw json.NoCopyRawMessage, what string) error {
 	}
 }
 
+type envelopExchange struct {
+	Data map[string]string `json:"Realtime Currency Exchange Rate"`
+}
+
 func (c *Client) FetchExchangeRate(ctx context.Context, from, to string) (marketdata.ExchangeRateResult, error) {
 	what := fmt.Sprintf("%s/%s", from, to)
 
-	var envelope struct {
-		Data map[string]string `json:"Realtime Currency Exchange Rate"`
-	}
+	var envelope envelopExchange
 
 	params := url.Values{}
 

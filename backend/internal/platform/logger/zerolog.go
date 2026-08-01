@@ -137,5 +137,6 @@ func (l *zeroLogger) With(fields ...Field) Logger {
 			c = c.Interface(f.key, f.anyVal)
 		}
 	}
+
 	return new(zeroLogger{c.Logger()})
 }

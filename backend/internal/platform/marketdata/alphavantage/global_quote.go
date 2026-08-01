@@ -8,10 +8,12 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
 
+type envelopeQuote struct {
+	Data map[string]string `json:"Global Quote"`
+}
+
 func (c *Client) FetchQuote(ctx context.Context, symbol string) (marketdata.QuoteResult, error) {
-	var envelope struct {
-		Data map[string]string `json:"Global Quote"`
-	}
+	var envelope envelopeQuote
 
 	params := url.Values{}
 	params.Set("function", "GLOBAL_QUOTE")

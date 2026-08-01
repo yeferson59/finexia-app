@@ -15,6 +15,13 @@ import (
 	"github.com/bytedance/sonic"
 )
 
+var body struct {
+	Success bool   `json:"success"`
+	City    string `json:"city"`
+	Region  string `json:"region"`
+	Country string `json:"country"`
+}
+
 type Client struct {
 	httpClient *http.Client
 	baseURL    string
@@ -51,22 +58,17 @@ func (c *Client) Locate(ctx context.Context, ip string) string {
 		return ""
 	}
 
-	var body struct {
-		Success bool   `json:"success"`
-		City    string `json:"city"`
-		Region  string `json:"region"`
-		Country string `json:"country"`
-	}
-
 	if err := sonic.ConfigFastest.NewDecoder(resp.Body).Decode(&body); err != nil || !body.Success {
 		return ""
 	}
 
 	parts := make([]string, 0, 3)
+
 	for _, part := range []string{body.City, body.Region, body.Country} {
 		if part = strings.TrimSpace(part); part != "" && !slices.Contains(parts, part) {
 			parts = append(parts, part)
 		}
 	}
+
 	return strings.Join(parts, ", ")
 }
