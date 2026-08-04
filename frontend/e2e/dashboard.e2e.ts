@@ -23,11 +23,15 @@ test.describe('dashboard charts', () => {
 	test('la asignación de activos enlaza leyenda y porción', async ({ page }) => {
 		await login(page);
 
-		const legendEntry = page.getByRole('button', { name: /stock/ });
+		// El fixture reparte el patrimonio entre cinco categorías.
+		const legendEntry = page.getByRole('button', { name: /^Acciones/ });
 		await expect(legendEntry).toBeVisible();
 
 		await legendEntry.click();
 		await expect(legendEntry).toHaveAttribute('aria-pressed', 'true');
+
+		// Al fijar una categoría, el centro del donut deja de mostrar el total.
+		await expect(page.locator('.hole-label')).toHaveText('ACCIONES');
 	});
 });
 
@@ -45,5 +49,10 @@ test.describe('dashboard', () => {
 		// Portfolio summary and recent activity fed by the API fixtures.
 		await expect(page.getByText('Cartera Principal').first()).toBeVisible();
 		await expect(page.getByText('AAPL').first()).toBeVisible();
+
+		// Los tres portafolios del fixture, con su tipo ya traducido.
+		await expect(page.getByRole('link', { name: 'Cripto' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Reserva' })).toBeVisible();
+		await expect(page.getByText('Acciones & ETFs')).toBeVisible();
 	});
 });

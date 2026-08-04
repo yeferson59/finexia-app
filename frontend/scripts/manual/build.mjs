@@ -15,6 +15,7 @@
  * así que no añade ninguna herramienta nueva ni en local ni en CI.
  */
 import { chromium } from 'playwright';
+import { format, resolveConfig } from 'prettier';
 import { copyFileSync, readFileSync, rmSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import {
@@ -80,10 +81,9 @@ copyFileSync(PDF_DOCS, PDF_STATIC);
 const bytes = statSync(PDF_DOCS).size;
 const hash = sourceHash();
 
-mkdirSync(dirname(META), { recursive: true });
-writeFileSync(
-	META,
-	`// GENERADO por \`pnpm manual:build\` — no editar a mano.
+// El archivo generado entra en `pnpm lint`, que ejecuta `prettier --check`:
+// se formatea aquí para que el build no deje el repositorio en rojo.
+const metaSource = `// GENERADO por \`pnpm manual:build\` — no editar a mano.
 //
 // Describe el PDF que hay en \`static/manual-usuario.pdf\`. \`sourceHash\` es la
 // huella del manual y sus capturas: \`pnpm check:manual\` la recalcula y falla
@@ -105,19 +105,21 @@ export interface ManualMeta {
 }
 
 export const manual: ManualMeta = ${JSON.stringify(
-		{
-			version,
-			date,
-			bytes,
-			generatedAt: new Date().toISOString(),
-			sourceHash: hash,
-			sections
-		},
-		null,
-		'\t'
-	).replace(/\n/g, '\n')};
-`
-);
+	{
+		version,
+		date,
+		bytes,
+		generatedAt: new Date().toISOString(),
+		sourceHash: hash,
+		sections
+	},
+	null,
+	'\t'
+)};
+`;
+
+mkdirSync(dirname(META), { recursive: true });
+writeFileSync(META, await format(metaSource, { ...(await resolveConfig(META)), filepath: META }));
 
 const mb = (bytes / 1024 / 1024).toFixed(1);
 console.log(`manual:build — v${version} (${date}), ${sections.length} secciones, ${mb} MB`);

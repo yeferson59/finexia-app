@@ -28,6 +28,8 @@ test.describe('transactions', () => {
 		});
 
 		await expect(page.getByRole('heading', { name: 'Asigna tus columnas' })).toBeVisible();
-		await expect(page.getByText('2 listas para importar')).toBeVisible();
+		await expect(page.getByText('6 listas para importar')).toBeVisible();
+		// Las filas que no se pueden interpretar se anuncian antes de confirmar.
+		await expect(page.getByText('2 con errores')).toBeVisible();
 	});
 });

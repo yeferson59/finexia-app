@@ -15,6 +15,7 @@
 	import Stat from '$lib/ui/stat.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
+	import { formatPortfolioType } from '$lib/shared/format/portfolio-type';
 
 	interface PortfolioSummary {
 		id: string;
@@ -104,7 +105,7 @@
 							<a href={resolve(`/dashboard/portfolios/${s.id}`)} class="name">{s.name}</a>
 							<span class="currency">{rowCurrency} · {s.totalPositions} pos.</span>
 						</th>
-						<td class="col-type"><span class="type-badge">{s.type}</span></td>
+						<td class="col-type"><span class="type-badge">{formatPortfolioType(s.type)}</span></td>
 						<td class="num dim col-invested">{fmtMoney(costBase, rowCurrency)}</td>
 						<td class="num">{fmtMoney(marketValue, rowCurrency)}</td>
 						<td class="num gain-cell" class:positive={isUp} class:negative={!isUp}>

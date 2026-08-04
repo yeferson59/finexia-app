@@ -385,7 +385,7 @@ En esta pantalla:
 - Si el libro tiene varias hojas, elige la **Hoja** correcta (al cambiarla, la aplicación vuelve a sugerir la asignación).
 - Asigna cada dato a una columna de tu archivo. Los campos **Fecha**, **Ticker/Símbolo**, **Cantidad** y **Precio** son obligatorios (marcados con `*`); **Tipo de operación**, **Nombre del activo**, **Comisiones**, **Moneda**, **Categoría** y **Notas** son opcionales — puedes dejarlos en **"— No usar —"**.
 - En **Valores por defecto** defines lo que se aplicará a las filas donde tu archivo no tenga ese dato: tipo de operación, moneda, categoría y formato de fecha (con detección automática).
-- La **vista previa** resume el resultado con contadores (p. ej. "48 filas · 46 listas para importar · 2 con errores (se omitirán)") y muestra las primeras filas interpretadas: las válidas con ✓ y las que se omitirán con ✗ y el **motivo del error** (fecha no reconocida, precio vacío…), para que puedas corregir tu archivo si lo deseas.
+- La **vista previa** resume el resultado con contadores —en el ejemplo de arriba, "8 filas · 6 listas para importar · 2 con errores (se omitirán)"— y muestra las filas interpretadas: las válidas con ✓ y las que se omitirán con ✗ y el **motivo del error** en la columna **Detalle** (fecha no reconocida, precio vacío…), para que puedas corregir tu archivo si lo deseas.
 
 ### 10.3 Paso 3 — Resultado
 
@@ -408,7 +408,7 @@ La sección **Reportes** ("Gestiona y descarga documentos financieros de tu cuen
 
 ### 11.1 Reportes en pantalla
 
-- **Rentabilidad mensual (%):** calendario con el porcentaje de ganancia o pérdida de cada mes, un panel por año. Arriba de cada panel está el **acumulado del año**, y debajo la **leyenda de la escala de color** (de rojo intenso para caídas de más del 1 % a verde intenso para subidas del 2 % o más). Los meses sin dato aparecen con un guion.
+- **Rentabilidad mensual (%):** calendario con el porcentaje de ganancia o pérdida de cada mes, un panel por año (verás tantos paneles como años cubra tu historial). Arriba de cada panel está el **acumulado del año**, y debajo la **leyenda de la escala de color** (de rojo intenso para caídas de más del 1 % a verde intenso para subidas del 2 % o más). Los meses sin dato aparecen con un guion.
 - **Estadísticas clave:** métricas de riesgo del portafolio, como el **Max Drawdown** (la mayor caída desde un máximo) y la **Volatilidad**.
 - **Proyección de crecimiento:** estimación a cinco años calculada extrapolando el crecimiento anual compuesto (CAGR) de tu propio historial. Cada año muestra su valor proyectado y el eje vertical su escala. **No es una previsión de mercado**, y por eso la aplicación se abstiene de mostrarla cuando tienes menos de seis meses de historial o cuando el ritmo de crecimiento es tan extremo que proyectarlo daría cifras absurdas.
 

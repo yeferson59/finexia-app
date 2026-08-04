@@ -19,7 +19,12 @@ const rel = (path) => relative(ROOT, path);
 if (!existsSync(META)) {
 	problems.push(`falta ${rel(META)}: nunca se ejecutó \`pnpm manual:build\``);
 } else {
-	const recorded = /sourceHash":\s*"([a-f0-9]+)"/.exec(readFileSync(META, 'utf8'))?.[1];
+	// El archivo lo escribe el build y luego pasa por prettier, que puede quitar
+	// las comillas de la clave o cambiarlas de dobles a simples: la expresión
+	// admite las dos formas para no romperse por el formato.
+	const recorded = /sourceHash["']?\s*:\s*["']([a-f0-9]+)["']/.exec(
+		readFileSync(META, 'utf8')
+	)?.[1];
 	const current = sourceHash();
 
 	if (!recorded) {

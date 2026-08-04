@@ -35,9 +35,12 @@
 <style>
 	/* La rejilla es de la página; el padding de los dos paneles que aloja viaja
 	   con ella porque los renderiza `report-panel`, en la feature. */
+	/* `align-items: start` para que el panel de estadísticas no se estire hasta
+	   el alto de la gráfica y deje media tarjeta vacía. */
 	.insights-grid {
 		display: grid;
 		grid-template-columns: 1fr 2fr;
+		align-items: start;
 		gap: 1rem;
 		margin-bottom: 1rem;
 	}

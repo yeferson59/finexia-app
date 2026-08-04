@@ -50,18 +50,22 @@
 
 	const yTicks = $derived(scale.ticks.map((value) => ({ value, y: toY(value) })));
 
-	// Como mucho seis etiquetas en el eje horizontal: más se solapan.
-	const xLabels = $derived(
-		points.length === 0
-			? []
-			: points
-					.map((p, i) => ({ i, date: p.date }))
-					.filter(({ i }) => {
-						const n = points.length;
-						if (n <= 6) return true;
-						return i % Math.ceil(n / 6) === 0 || i === n - 1;
-					})
-	);
+	/*
+	 * Hasta seis etiquetas, repartidas por igual entre el primer punto y el
+	 * último. Tomarlas cada `n/6` dejaba la penúltima pegada a la última —con 70
+	 * puntos caían a nueve de distancia— y los dos textos se solapaban.
+	 */
+	const X_LABELS = 6;
+	const xLabels = $derived.by(() => {
+		const n = points.length;
+		if (n === 0) return [];
+		if (n <= X_LABELS) return points.map((p, i) => ({ i, date: p.date }));
+
+		const indices = Array.from({ length: X_LABELS }, (_, k) =>
+			Math.round((k * (n - 1)) / (X_LABELS - 1))
+		);
+		return [...new Set(indices)].map((i) => ({ i, date: points[i].date }));
+	});
 
 	const activePoint = $derived(active === null ? null : (points[active] ?? null));
 

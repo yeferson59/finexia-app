@@ -20,79 +20,79 @@ export interface ManualMeta {
 }
 
 export const manual: ManualMeta = {
-	"version": "1.3",
-	"date": "Agosto 2026",
-	"bytes": 2344116,
-	"generatedAt": "2026-08-04T01:50:15.862Z",
-	"sourceHash": "57b358a052965027e298f0c2027075a5ea6ade9cc88b9a8a128d05d3a3bc73b4",
-	"sections": [
+	version: '1.3',
+	date: 'Agosto 2026',
+	bytes: 2665225,
+	generatedAt: '2026-08-04T13:35:59.798Z',
+	sourceHash: 'daa6b4584a99271c8df8ba3fc1175ea2db658e17d58cfb74b9ef09632a4c5947',
+	sections: [
 		{
-			"number": 1,
-			"title": "Introducción"
+			number: 1,
+			title: 'Introducción'
 		},
 		{
-			"number": 2,
-			"title": "Requisitos y acceso"
+			number: 2,
+			title: 'Requisitos y acceso'
 		},
 		{
-			"number": 3,
-			"title": "Primeros pasos: registro e inicio de sesión"
+			number: 3,
+			title: 'Primeros pasos: registro e inicio de sesión'
 		},
 		{
-			"number": 4,
-			"title": "Interfaz general de la aplicación"
+			number: 4,
+			title: 'Interfaz general de la aplicación'
 		},
 		{
-			"number": 5,
-			"title": "Dashboard (panel principal)"
+			number: 5,
+			title: 'Dashboard (panel principal)'
 		},
 		{
-			"number": 6,
-			"title": "Portafolios"
+			number: 6,
+			title: 'Portafolios'
 		},
 		{
-			"number": 7,
-			"title": "Posiciones y activos"
+			number: 7,
+			title: 'Posiciones y activos'
 		},
 		{
-			"number": 8,
-			"title": "Plataformas"
+			number: 8,
+			title: 'Plataformas'
 		},
 		{
-			"number": 9,
-			"title": "Transacciones"
+			number: 9,
+			title: 'Transacciones'
 		},
 		{
-			"number": 10,
-			"title": "Importación masiva de transacciones (Excel/CSV)"
+			number: 10,
+			title: 'Importación masiva de transacciones (Excel/CSV)'
 		},
 		{
-			"number": 11,
-			"title": "Reportes y exportaciones"
+			number: 11,
+			title: 'Reportes y exportaciones'
 		},
 		{
-			"number": 12,
-			"title": "Notificaciones"
+			number: 12,
+			title: 'Notificaciones'
 		},
 		{
-			"number": 13,
-			"title": "Configuración de la cuenta"
+			number: 13,
+			title: 'Configuración de la cuenta'
 		},
 		{
-			"number": 14,
-			"title": "Seguridad: 2FA y sesiones"
+			number: 14,
+			title: 'Seguridad: 2FA y sesiones'
 		},
 		{
-			"number": 15,
-			"title": "Preguntas frecuentes (FAQ)"
+			number: 15,
+			title: 'Preguntas frecuentes (FAQ)'
 		},
 		{
-			"number": 16,
-			"title": "Solución de problemas"
+			number: 16,
+			title: 'Solución de problemas'
 		},
 		{
-			"number": 17,
-			"title": "Glosario"
+			number: 17,
+			title: 'Glosario'
 		}
 	]
 };

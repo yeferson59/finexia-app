@@ -11,17 +11,39 @@ const API_PREFIX = '/api/v1';
 
 export const PASSWORD = 'Password123!';
 
-const IDS = {
-	portfolio: '11111111-1111-4111-8111-111111111111',
-	assetAapl: '22222222-2222-4222-8222-222222222222',
-	assetBtc: '22222222-2222-4222-8222-222222222223',
-	platform: '33333333-3333-4333-8333-333333333333',
-	risk: '44444444-4444-4444-8444-444444444444',
-	entry: '55555555-5555-4555-8555-555555555555'
-};
+// Las fixtures viven aparte: describen una cuenta completa y las usan tanto
+// esta suite como el generador de capturas del manual (`pnpm manual:shots`).
+import {
+	FUTURE,
+	IDS,
+	NOW,
+	allocation,
+	assets,
+	exchangeRates,
+	growth,
+	growthFor,
+	holdings,
+	importPreview,
+	PORTFOLIOS,
+	portfolioSummary,
+	risks,
+	sources,
+	topTransaction,
+	transactions
+} from './fixtures.mjs';
 
-const NOW = '2026-07-01T00:00:00Z';
-const FUTURE = '2027-01-01T00:00:00Z';
+// Se reexportan para `contract.spec.ts`, que valida las fixtures contra los
+// schemas Zod de los que salen los tipos de la aplicación.
+export {
+	assets,
+	exchangeRates,
+	growth,
+	holdings,
+	portfolioSummary,
+	sources,
+	transactions,
+	allocation
+};
 
 const ACCOUNTS = {
 	'user@finexia.test': {
@@ -68,218 +90,6 @@ const ACCOUNTS = {
 			createdAt: NOW
 		}
 	}
-};
-
-export const holdings = [
-	{
-		id: IDS.entry,
-		assetId: IDS.assetAapl,
-		ticker: 'AAPL',
-		name: 'Apple Inc.',
-		assetType: 'stock',
-		exchange: 'NASDAQ',
-		currency: 'USD',
-		quantity: '10',
-		price: '150.00',
-		marketPrice: '190.00',
-		costCurrency: 'USD',
-		category: 'stock',
-		entryDate: '2026-05-01',
-		notes: ''
-	}
-];
-
-export const portfolioSummary = (displayCurrency = 'USD') => [
-	{
-		id: IDS.portfolio,
-		name: 'Cartera Principal',
-		description: 'Portafolio de prueba e2e',
-		type: 'personal',
-		baseCurrency: 'USD',
-		displayCurrency,
-		isDefault: true,
-		riskId: IDS.risk,
-		riskName: 'Moderado',
-		totalPositions: 1,
-		totalCostBase: '1500.00',
-		totalMarketValue: '1900.00',
-		totalGainLoss: '400.00',
-		totalGainLossPct: '26.67',
-		createdAt: NOW
-	}
-];
-
-export const transactions = [
-	{
-		id: 'txn-1',
-		entryId: IDS.entry,
-		type: 'buy',
-		quantity: '10',
-		price: '150.00',
-		currency: 'USD',
-		fees: '1.00',
-		transactionDate: '2026-05-01T00:00:00Z',
-		notes: '',
-		createdAt: '2026-05-01T00:00:00Z',
-		assetTicker: 'AAPL',
-		assetName: 'Apple Inc.'
-	},
-	{
-		id: 'txn-2',
-		entryId: IDS.entry,
-		type: 'sell',
-		quantity: '0.01',
-		price: '65000.00',
-		currency: 'USD',
-		fees: '2.00',
-		transactionDate: '2026-06-01T00:00:00Z',
-		notes: '',
-		createdAt: '2026-06-01T00:00:00Z',
-		assetTicker: 'BTC',
-		assetName: 'Bitcoin'
-	}
-];
-
-export const growth = {
-	points: [
-		{
-			date: '2026-05-01',
-			totalValue: '1500.00',
-			totalCostBase: '1500.00',
-			gainLoss: '0',
-			gainLossPct: '0'
-		},
-		{
-			date: '2026-06-01',
-			totalValue: '1900.00',
-			totalCostBase: '1500.00',
-			gainLoss: '400.00',
-			gainLossPct: '26.67'
-		}
-	],
-	summary: {
-		firstDate: '2026-05-01',
-		initialValue: '1500.00',
-		currentValue: '1900.00',
-		totalGrowthPct: '26.67'
-	}
-};
-
-export const assets = [
-	{
-		id: IDS.assetAapl,
-		ticker: 'AAPL',
-		name: 'Apple Inc.',
-		assetType: 'stock',
-		exchange: 'NASDAQ',
-		currency: 'USD',
-		currentPrice: { value: '190.00', currency: 'USD' },
-		priceUpdatedAt: NOW,
-		isCurated: true
-	},
-	{
-		id: IDS.assetBtc,
-		ticker: 'BTC',
-		name: 'Bitcoin',
-		assetType: 'crypto',
-		exchange: '',
-		currency: 'USD',
-		currentPrice: { value: '65000.00', currency: 'USD' },
-		// Aportado por el usuario y sin precio manual fechado.
-		priceUpdatedAt: null,
-		isCurated: false
-	}
-];
-
-// Plataforma completa: el contrato la devuelve con sus contadores, no solo con
-// el nombre que necesita el selector del formulario de alta.
-export const sources = [
-	{
-		id: IDS.platform,
-		name: 'Broker Demo',
-		description: 'Bróker de prueba e2e',
-		sourceType: 'broker',
-		isActive: true,
-		investments: 1,
-		totalValue: '1900.00',
-		createdAt: NOW
-	}
-];
-
-export const exchangeRates = [
-	{
-		id: '55555555-5555-4555-8555-555555555555',
-		fromCurrency: 'USD',
-		toCurrency: 'COP',
-		rate: '4123.456789',
-		rateDate: NOW,
-		createdAt: NOW
-	},
-	{
-		id: '66666666-6666-4666-8666-666666666666',
-		fromCurrency: 'EUR',
-		toCurrency: 'USD',
-		rate: '1.085',
-		rateDate: NOW,
-		createdAt: NOW
-	}
-];
-
-const importPreview = {
-	sheets: ['Hoja1'],
-	sheet: 'Hoja1',
-	headerRow: 1,
-	headers: ['Fecha', 'Tipo', 'Ticker', 'Cantidad', 'Precio'],
-	suggestedMapping: {
-		date: 0,
-		type: 1,
-		ticker: 2,
-		assetName: null,
-		quantity: 3,
-		price: 4,
-		fees: null,
-		currency: null,
-		category: null,
-		notes: null
-	},
-	missingFields: [],
-	totalRows: 2,
-	validRows: 2,
-	invalidRows: 0,
-	rows: [
-		{
-			rowNumber: 2,
-			raw: ['2026-05-01', 'buy', 'AAPL', '10', '150'],
-			date: '2026-05-01',
-			type: 'buy',
-			ticker: 'AAPL',
-			assetName: 'Apple Inc.',
-			quantity: '10',
-			price: '150',
-			fees: '',
-			currency: 'USD',
-			category: 'stock',
-			notes: '',
-			valid: true,
-			errors: []
-		},
-		{
-			rowNumber: 3,
-			raw: ['2026-06-01', 'sell', 'BTC', '0.01', '65000'],
-			date: '2026-06-01',
-			type: 'sell',
-			ticker: 'BTC',
-			assetName: 'Bitcoin',
-			quantity: '0.01',
-			price: '65000',
-			fees: '',
-			currency: 'USD',
-			category: 'crypto',
-			notes: '',
-			valid: true,
-			errors: []
-		}
-	]
 };
 
 function envelope(data, message = 'ok') {
@@ -468,11 +278,7 @@ const server = createServer(async (req, res) => {
 
 	// ---- Portfolios ----
 	if (route === 'GET /portfolios/risks') {
-		return send(
-			res,
-			200,
-			envelope([{ id: IDS.risk, name: 'Moderado', description: 'Riesgo moderado' }])
-		);
+		return send(res, 200, envelope(risks));
 	}
 	if (route === 'GET /portfolios/summary') {
 		return send(res, 200, envelope(portfolioSummary(url.searchParams.get('currency') ?? 'USD')));
@@ -481,10 +287,13 @@ const server = createServer(async (req, res) => {
 		return send(res, 200, envelope(transactions));
 	}
 	if (route === 'GET /portfolios/allocation') {
-		return send(res, 200, envelope([{ category: 'stock', marketValue: '1900.00', percent: 100 }]));
+		return send(res, 200, envelope(allocation));
 	}
-	if (route === 'GET /portfolios/growth' || route === `GET /portfolios/${IDS.portfolio}/growth`) {
+	if (route === 'GET /portfolios/growth') {
 		return send(res, 200, envelope(growth));
+	}
+	if (req.method === 'GET' && /^\/portfolios\/[0-9a-f-]{36}\/growth$/.test(path)) {
+		return send(res, 200, envelope(growthFor(path.split('/')[2])));
 	}
 	if (route === 'GET /portfolios/sources') {
 		return send(res, 200, envelope(sources));
@@ -521,42 +330,32 @@ const server = createServer(async (req, res) => {
 			envelope({ data: rows, total: rows.length, page: 1, limit: 20, totalPages: 1 })
 		);
 	}
-	if (route === `GET /portfolios/${IDS.portfolio}/top-transaction`) {
-		return send(
-			res,
-			200,
-			envelope({
-				value: '1500.00',
-				type: 'buy',
-				currency: 'USD',
-				assetTicker: 'AAPL',
-				assetName: 'Apple Inc.',
-				transactionDate: '2026-05-01T00:00:00Z'
-			})
-		);
-	}
-	if (route === `GET /portfolios/${IDS.portfolio}`) {
-		return send(
-			res,
-			200,
-			envelope({
-				id: IDS.portfolio,
-				userId: account.session.userId,
-				name: 'Cartera Principal',
-				description: 'Portafolio de prueba e2e',
-				type: 'personal',
-				baseCurrency: 'USD',
-				isDefault: true,
-				riskId: IDS.risk,
-				riskName: 'Moderado',
-				createdAt: NOW,
-				updatedAt: NOW,
-				holdings
-			})
-		);
+	if (req.method === 'GET' && /^\/portfolios\/[0-9a-f-]{36}\/top-transaction$/.test(path)) {
+		const top = topTransaction(path.split('/')[2]);
+		if (!top) return send(res, 404, errorEnvelope('no transactions'));
+		return send(res, 200, envelope(top));
 	}
 	if (req.method === 'GET' && /^\/portfolios\/[0-9a-f-]{36}$/.test(path)) {
-		return send(res, 404, errorEnvelope('portfolio not found'));
+		const portfolio = PORTFOLIOS.find((p) => p.id === path.split('/')[2]);
+		if (!portfolio) return send(res, 404, errorEnvelope('portfolio not found'));
+		return send(
+			res,
+			200,
+			envelope({
+				id: portfolio.id,
+				userId: account.session.userId,
+				name: portfolio.name,
+				description: portfolio.description,
+				type: portfolio.type,
+				baseCurrency: 'USD',
+				isDefault: portfolio.isDefault,
+				riskId: portfolio.riskId,
+				riskName: portfolio.riskName,
+				createdAt: NOW,
+				updatedAt: NOW,
+				holdings: portfolio.holdings
+			})
+		);
 	}
 
 	await readBody(req);

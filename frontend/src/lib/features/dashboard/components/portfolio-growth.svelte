@@ -76,9 +76,25 @@
 		return privacy.money(`$${v.toFixed(0)}`);
 	}
 
+	/*
+	 * Con más de un año a la vista, día y mes no bastan: el eje repetía "1 de
+	 * jun" para dos junios distintos. El año solo aparece cuando hace falta,
+	 * para no recargar los rangos cortos.
+	 */
+	const spansYears = $derived(
+		points.length > 1 && points[0].date.slice(0, 4) !== points[points.length - 1].date.slice(0, 4)
+	);
+
+	/*
+	 * En rangos largos el eje pasa a "mes año" y suelta el día: con
+	 * "01 de jun de 25" las seis etiquetas se pisaban unas a otras, y a esa
+	 * escala el día no aporta nada —el detalle exacto lo da el cursor—.
+	 */
 	function fmtDate(iso: string): string {
 		const d = new Date(iso + 'T00:00:00');
-		return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
+		return spansYears
+			? d.toLocaleDateString('es-CO', { month: 'short', year: '2-digit' })
+			: d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
 	}
 
 	function fmtLongDate(iso: string): string {
