@@ -25,10 +25,26 @@
 	<div class="faq">
 		{#each faqs as faq, i (faq.q)}
 			<div class="faq-item reveal" class:open={openFaqIndex === i}>
-				<button class="faq-q" onclick={() => toggleFaq(i)}>
-					{faq.q}<span class="plus" aria-hidden="true"></span>
-				</button>
-				<div class="faq-a"><p>{faq.a}</p></div>
+				<h3>
+					<button
+						id="faq-q-{i}"
+						class="faq-q"
+						type="button"
+						aria-expanded={openFaqIndex === i}
+						aria-controls="faq-a-{i}"
+						onclick={() => toggleFaq(i)}
+					>
+						{faq.q}<span class="plus" aria-hidden="true"></span>
+					</button>
+				</h3>
+				<!--
+					La respuesta se abre con grid-template-rows 0fr → 1fr en vez de con
+					un max-height fijo: así el alto lo decide el texto y una respuesta
+					larga no queda recortada en pantallas estrechas.
+				-->
+				<div id="faq-a-{i}" class="faq-a" role="region" aria-labelledby="faq-q-{i}">
+					<div class="faq-a-inner"><p>{faq.a}</p></div>
+				</div>
 			</div>
 		{/each}
 	</div>
@@ -41,6 +57,11 @@
 	}
 	.faq-item {
 		border-bottom: 1px solid var(--border);
+	}
+	.faq-item h3 {
+		margin: 0;
+		font-weight: inherit;
+		font-size: inherit;
 	}
 	.faq-q {
 		width: 100%;
@@ -57,6 +78,10 @@
 		font-weight: 300;
 		font-size: 18px;
 		color: var(--text);
+		transition: color 0.2s;
+	}
+	.faq-q:hover {
+		color: var(--amber-light);
 	}
 	.plus {
 		flex-shrink: 0;
@@ -91,21 +116,29 @@
 		opacity: 0;
 	}
 	.faq-a {
-		max-height: 0;
+		display: grid;
+		grid-template-rows: 0fr;
+		transition: grid-template-rows 0.35s ease;
+	}
+	.faq-item.open .faq-a {
+		grid-template-rows: 1fr;
+	}
+	.faq-a-inner {
 		overflow: hidden;
-		transition:
-			max-height 0.35s ease,
-			padding 0.35s ease;
 	}
 	.faq-a p {
 		font-size: 15px;
 		color: var(--text-muted);
 		line-height: 1.68;
 		font-weight: 300;
-		padding: 0 40px 4px 0;
+		padding: 0 40px 24px 0;
 	}
-	.faq-item.open .faq-a {
-		max-height: 280px;
-		padding-bottom: 24px;
+
+	@media (prefers-reduced-motion: reduce) {
+		.faq-a,
+		.plus,
+		.plus::after {
+			transition: none;
+		}
 	}
 </style>

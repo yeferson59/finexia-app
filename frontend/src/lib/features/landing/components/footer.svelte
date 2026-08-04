@@ -10,8 +10,10 @@
 	<div class="wrap foot">
 		<Brand iconSize={26} nameSize={18} />
 		<nav class="foot-links">
+			<a href="{home}#producto">El producto</a>
 			<a href="{home}#beneficios">Beneficios</a>
 			<a href="{home}#como-funciona">Cómo funciona</a>
+			<a href="{home}#seguridad">Seguridad</a>
 			<a href="{home}#faq">Preguntas</a>
 			<a href="{home}#waitlist">Lista de espera</a>
 		</nav>

@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import Card from '$lib/ui/card.svelte';
 	import CardHeader from '$lib/ui/card-header.svelte';
+	import EmptyState from '$lib/ui/empty-state.svelte';
 	import Stat from '$lib/ui/stat.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
@@ -48,20 +50,27 @@
 	<CardHeader eyebrow="Resumen" title="Portafolios" />
 
 	{#if summaries.length === 0}
-		<div class="empty-state">
-			<svg
-				width="48"
-				height="48"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="1.5"
-			>
-				<rect x="2" y="3" width="20" height="14" rx="2" />
-				<path d="M8 21h8M12 17v4" />
-			</svg>
-			<p>Sin portafolios registrados</p>
-		</div>
+		<EmptyState
+			title="Sin portafolios registrados"
+			description="Crea tu primer portafolio para agrupar los activos que tienes en cada plataforma."
+		>
+			{#snippet icon()}
+				<svg
+					width="48"
+					height="48"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+				>
+					<rect x="2" y="3" width="20" height="14" rx="2" />
+					<path d="M8 21h8M12 17v4" />
+				</svg>
+			{/snippet}
+			{#snippet action()}
+				<a href={resolve('/dashboard/portfolios/add')} class="empty-cta">Crear portafolio</a>
+			{/snippet}
+		</EmptyState>
 	{:else}
 		<div class="portfolio-list">
 			<div class="list-header">
@@ -108,20 +117,24 @@
 </Card>
 
 <style>
-	.empty-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.75rem;
-		padding: 3rem 2rem;
-		color: rgba(236, 234, 229, 0.4);
-		text-align: center;
+	.empty-cta {
+		display: inline-block;
+		padding: 0.6rem 1.2rem;
+		border: 1px solid rgba(212, 145, 42, 0.35);
+		border-radius: 6px;
+		background: rgba(212, 145, 42, 0.08);
+		color: var(--amber-light);
+		font-size: 0.82rem;
+		font-weight: 600;
+		text-decoration: none;
+		transition:
+			background 0.2s ease,
+			border-color 0.2s ease;
 	}
 
-	.empty-state p {
-		margin: 0;
-		font-size: 0.9rem;
+	.empty-cta:hover {
+		background: rgba(212, 145, 42, 0.14);
+		border-color: rgba(212, 145, 42, 0.55);
 	}
 
 	.portfolio-list {

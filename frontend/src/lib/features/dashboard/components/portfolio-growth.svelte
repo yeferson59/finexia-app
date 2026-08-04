@@ -1,5 +1,6 @@
 <script lang="ts">
 	import CardHeader from '$lib/ui/card-header.svelte';
+	import EmptyState from '$lib/ui/empty-state.svelte';
 	import Stat from '$lib/ui/stat.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import {
@@ -143,12 +144,11 @@
 	</div>
 
 	{#if filteredData.length < 2}
-		<div class="empty-chart">
-			<p>
-				El gráfico se mostrará aquí a medida que el sistema registre capturas diarias del
-				portafolio.
-			</p>
-		</div>
+		<EmptyState
+			bordered
+			title="Aún no hay suficiente historial"
+			description="El gráfico se dibuja a medida que el sistema registra las capturas diarias de tu portafolio."
+		/>
 	{:else}
 		<svg class="chart" viewBox="0 0 {svgW} {svgH}" preserveAspectRatio="xMidYMid meet">
 			<defs>
@@ -344,16 +344,6 @@
 
 	.legend-line.gray {
 		border-top: 1.5px dashed rgba(236, 234, 229, 0.28);
-	}
-
-	.empty-chart {
-		padding: 3rem 2rem;
-		text-align: center;
-		color: var(--text-dim);
-		font-size: 0.82rem;
-		border: 1px dashed var(--border);
-		border-radius: 8px;
-		line-height: 1.6;
 	}
 
 	@media (max-width: 768px) {

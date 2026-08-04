@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import CardHeader from '$lib/ui/card-header.svelte';
+	import EmptyState from '$lib/ui/empty-state.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { buildSlices, toAssetEntries } from '../dashboard';
 	import type { AllocationItem } from '$lib/api/types';
@@ -26,21 +28,25 @@
 	<CardHeader eyebrow="Distribución" title="Asignación de Activos" />
 
 	{#if allocation.length === 0}
-		<div class="empty-state">
-			<svg
-				width="48"
-				height="48"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="1.5"
-			>
-				<circle cx="12" cy="12" r="10" />
-				<path d="M12 2a10 10 0 0 1 10 10" />
-				<path d="M12 12L2 12" />
-			</svg>
-			<p>Sin posiciones registradas</p>
-		</div>
+		<EmptyState
+			title="Sin posiciones registradas"
+			description="Añade activos a un portafolio y verás aquí cómo se reparte tu patrimonio."
+		>
+			{#snippet icon()}
+				<svg
+					width="48"
+					height="48"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+				>
+					<circle cx="12" cy="12" r="10" />
+					<path d="M12 2a10 10 0 0 1 10 10" />
+					<path d="M12 12L2 12" />
+				</svg>
+			{/snippet}
+		</EmptyState>
 	{:else}
 		<div class="pie-container">
 			<svg class="pie-chart" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
@@ -100,7 +106,7 @@
 	{/if}
 
 	<div class="card-footer">
-		<button class="footer-button">Rebalancear portafolio</button>
+		<a href={resolve('/dashboard/portfolios')} class="footer-button">Gestionar portafolios</a>
 	</div>
 </div>
 
@@ -114,23 +120,6 @@
 		display: flex;
 		flex-direction: column;
 		height: 100%;
-	}
-
-	.empty-state {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.75rem;
-		padding: 2rem;
-		color: rgba(236, 234, 229, 0.4);
-		text-align: center;
-	}
-
-	.empty-state p {
-		margin: 0;
-		font-size: 0.9rem;
 	}
 
 	.pie-container {
@@ -205,6 +194,7 @@
 	}
 
 	.footer-button {
+		display: block;
 		width: 100%;
 		padding: 0.75rem 1.5rem;
 		background: transparent;
@@ -213,6 +203,8 @@
 		border-radius: 6px;
 		font-weight: 600;
 		font-size: 0.85rem;
+		text-align: center;
+		text-decoration: none;
 		cursor: pointer;
 		transition:
 			background 0.2s ease,

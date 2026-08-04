@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Card from '$lib/ui/card.svelte';
+	import EmptyState from '$lib/ui/empty-state.svelte';
 	import { formatPct, type HoldingView } from '../portfolio';
 
 	let {
@@ -56,22 +57,28 @@
 				{/each}
 			</div>
 		{:else}
-			<div class="empty-holdings">
-				<p class="empty-text">Este portafolio aún no tiene activos.</p>
-				<button onclick={onAddAsset} class="btn-add-asset">
-					<svg
-						width="18"
-						height="18"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path d="M12 5v14M5 12h14" />
-					</svg>
-					Agregar tu primer activo
-				</button>
-			</div>
+			<EmptyState
+				bordered
+				class="empty-holdings"
+				title="Este portafolio aún no tiene activos"
+				description="Registra lo que tienes en cada plataforma para ver su peso y su rendimiento."
+			>
+				{#snippet action()}
+					<button onclick={onAddAsset} class="btn-add-asset">
+						<svg
+							width="18"
+							height="18"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path d="M12 5v14M5 12h14" />
+						</svg>
+						Agregar tu primer activo
+					</button>
+				{/snippet}
+			</EmptyState>
 		{/if}
 	</div>
 </Card>
@@ -104,22 +111,12 @@
 		gap: 0.75rem;
 	}
 
-	.empty-holdings {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 1rem;
-		padding: 2.5rem 1.5rem;
+	/* The class lands on `empty-state`'s root, outside this component's markup,
+	   so it needs :global to survive Svelte's style scoping. */
+	.holdings :global(.empty-holdings) {
 		border-radius: 12px;
+		border-color: rgba(212, 145, 42, 0.25);
 		background: rgba(255, 255, 255, 0.022);
-		border: 1px dashed rgba(212, 145, 42, 0.25);
-		text-align: center;
-	}
-
-	.empty-text {
-		margin: 0;
-		font-size: 0.95rem;
-		color: rgba(236, 234, 229, 0.6);
 	}
 
 	.btn-add-asset {

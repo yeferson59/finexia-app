@@ -14,8 +14,10 @@
 		Ticker,
 		Header,
 		Hero,
+		ProductTour,
 		Benefits,
 		HowItWorks,
+		Trust,
 		Metrics,
 		Faq,
 		FinalCta,
@@ -32,6 +34,18 @@
 		{
 			q: '¿Tiene algún costo unirse ahora?',
 			a: 'No. Unirse a la lista de espera es totalmente gratuito y sin compromiso. Solo necesitamos tu correo para avisarte el día del lanzamiento.'
+		},
+		{
+			q: '¿Qué podré hacer desde el panel?',
+			a: 'Ver tu patrimonio agregado y su evolución, crear portafolios con su meta y su perfil de riesgo, registrar cada movimiento (compras, ventas, dividendos, intereses, traspasos y comisiones), consultar la distribución de tus activos y descargar reportes de resumen, resultados y riesgo.'
+		},
+		{
+			q: '¿Tengo que registrar mis movimientos uno a uno?',
+			a: 'Puedes hacerlo así, o importar un CSV de tu plataforma. El asistente te deja emparejar las columnas de tu archivo con los campos de Finexia y ver una vista previa antes de confirmar nada.'
+		},
+		{
+			q: '¿Puedo llevarme mis datos si dejo de usar Finexia?',
+			a: 'Sí. Desde el centro de reportes descargas tu resumen mensual, tu estado de resultados y tu informe de riesgo en XLSX, sin trámites ni permisos que pedir.'
 		},
 		{
 			q: '¿Finexia se conecta a mis brokers o plataformas?',
@@ -133,14 +147,20 @@
 <Ticker />
 <Header />
 
-<main>
+<main id="contenido">
 	<Hero />
+
+	<div class="wrap"><div class="divider"></div></div>
+	<ProductTour />
 
 	<div class="wrap"><div class="divider"></div></div>
 	<Benefits />
 
 	<div class="wrap"><div class="divider"></div></div>
 	<HowItWorks />
+
+	<div class="wrap"><div class="divider"></div></div>
+	<Trust />
 
 	<div class="wrap"><div class="divider"></div></div>
 	<Metrics />

@@ -48,6 +48,7 @@
 	{type}
 	{onclick}
 	disabled={disabled || loading}
+	aria-busy={loading || undefined}
 	class={cn(
 		variantClasses[variant],
 		sizeClasses[size],

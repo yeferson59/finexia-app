@@ -104,6 +104,144 @@
 	border-radius: 8px;
 }
 
+/*
+ * Maquetas del recorrido "Dentro de Finexia" (`product-tour*.svelte`).
+ *
+ * Las cuatro vistas comparten el mismo lenguaje de paneles, tablas y cifras que
+ * el dashboard real; las clases viven aquí, en global, para no repetir el mismo
+ * bloque de CSS en cada componente de vista.
+ */
+.mk-card {
+	padding: 16px 18px;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.022);
+	min-width: 0;
+}
+
+.mk-eyebrow {
+	font-family: var(--font-mono);
+	font-size: 9px;
+	font-weight: 500;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--text-dim);
+}
+
+.mk-title {
+	margin-top: 4px;
+	font-family: var(--font-display);
+	font-weight: 500;
+	font-size: 15px;
+	letter-spacing: -0.01em;
+	color: var(--text);
+}
+
+.mk-stats {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 14px;
+}
+
+.mk-stat-label {
+	font-family: var(--font-mono);
+	font-size: 9px;
+	font-weight: 500;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-dim);
+}
+
+.mk-stat-value {
+	margin-top: 5px;
+	font-family: var(--font-mono);
+	font-weight: 600;
+	font-size: 15px;
+	letter-spacing: -0.01em;
+	font-variant-numeric: tabular-nums;
+	color: var(--text);
+}
+
+.mk-up {
+	color: var(--green);
+}
+
+.mk-dn {
+	color: var(--red);
+}
+
+.mk-amber {
+	color: var(--amber-light);
+}
+
+.mk-row {
+	display: grid;
+	align-items: center;
+	gap: 12px;
+	padding: 9px 0;
+	border-top: 1px solid var(--border);
+	font-size: 11.5px;
+	color: var(--text-muted);
+}
+
+.mk-row.mk-head {
+	border-top: none;
+	font-family: var(--font-mono);
+	font-size: 8.5px;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-dim);
+	padding-bottom: 6px;
+}
+
+.mk-num {
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+	color: var(--text);
+}
+
+.mk-pill {
+	justify-self: start;
+	padding: 3px 8px;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: var(--surface);
+	font-family: var(--font-mono);
+	font-size: 9px;
+	letter-spacing: 0.06em;
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+
+.mk-bar {
+	height: 3px;
+	border-radius: 2px;
+	background: rgba(255, 255, 255, 0.07);
+	overflow: hidden;
+}
+
+.mk-bar > span {
+	display: block;
+	height: 100%;
+	border-radius: 2px;
+	background: var(--amber);
+}
+
+@media (max-width: 560px) {
+	.mk-card {
+		padding: 13px 14px;
+	}
+
+	.mk-stats {
+		gap: 10px;
+	}
+
+	.mk-stat-value {
+		font-size: 13px;
+	}
+}
+
 /* Scroll reveal — toggled to `.in` by the IntersectionObserver in +page.svelte */
 .reveal {
 	opacity: 0;
