@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import CardHeader from '$lib/ui/card-header.svelte';
+	import EmptyState from '$lib/ui/empty-state.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCalendarDate } from '$lib/shared/format/date';
 
@@ -76,7 +77,15 @@
 
 	<div class="activity-list">
 		{#if transactions.length === 0}
-			<p class="empty-state">Sin actividad reciente.</p>
+			<EmptyState
+				size="sm"
+				title="Sin actividad reciente"
+				description="Tus compras, ventas y dividendos aparecerán aquí en cuanto los registres."
+			>
+				{#snippet action()}
+					<a href={resolve('/dashboard/transactions/import')} class="empty-cta">Importar CSV</a>
+				{/snippet}
+			</EmptyState>
 		{:else}
 			{#each transactions as tx (tx.id)}
 				{@const meta = getActivityMeta(tx.type)}
@@ -176,11 +185,25 @@
 		max-height: 400px;
 	}
 
-	.empty-state {
-		font-size: 0.875rem;
-		color: var(--text-muted);
-		text-align: center;
-		padding: 2rem 0;
+	.empty-cta {
+		display: inline-block;
+		padding: 0.55rem 1.1rem;
+		border: 1px solid var(--border-strong);
+		border-radius: 6px;
+		color: var(--text);
+		font-size: 0.8rem;
+		font-weight: 600;
+		text-decoration: none;
+		transition:
+			background 0.2s ease,
+			border-color 0.2s ease,
+			color 0.2s ease;
+	}
+
+	.empty-cta:hover {
+		background: rgba(212, 145, 42, 0.06);
+		border-color: rgba(212, 145, 42, 0.4);
+		color: var(--amber-light);
 	}
 
 	.activity-item {

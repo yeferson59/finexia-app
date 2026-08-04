@@ -5,6 +5,7 @@
 		PerformanceCalendars,
 		ReportDownloads
 	} from '$lib/features/reports';
+	import PageHeader from '$lib/ui/page-header.svelte';
 
 	import type { PageProps } from './$types';
 
@@ -16,10 +17,11 @@
 	<meta name="description" content="Centro de reportes financieros y extractos" />
 </svelte:head>
 
-<header class="page-header">
-	<h1 class="page-title">Reportes</h1>
-	<p class="page-subtitle">Gestiona y descarga documentos financieros de tu cuenta.</p>
-</header>
+<PageHeader
+	eyebrow="Documentos"
+	title="Reportes"
+	subtitle="Gestiona y descarga documentos financieros de tu cuenta."
+/>
 
 <PerformanceCalendars calendars={data.performanceCalendars} />
 
@@ -31,31 +33,14 @@
 <ReportDownloads />
 
 <style>
-	.page-header {
-		margin-bottom: 2rem;
-		padding-bottom: 1.5rem;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.page-title {
-		margin: 0 0 0.5rem;
-		font-size: 2.35rem;
-		font-weight: 300;
-		color: var(--text);
-		font-family: var(--font-display);
-		letter-spacing: -0.02em;
-	}
-
-	.page-subtitle {
-		margin: 0;
-		color: rgba(236, 234, 229, 0.62);
-	}
-
 	/* La rejilla es de la página; el padding de los dos paneles que aloja viaja
 	   con ella porque los renderiza `report-panel`, en la feature. */
+	/* `align-items: start` para que el panel de estadísticas no se estire hasta
+	   el alto de la gráfica y deje media tarjeta vacía. */
 	.insights-grid {
 		display: grid;
 		grid-template-columns: 1fr 2fr;
+		align-items: start;
 		gap: 1rem;
 		margin-bottom: 1rem;
 	}
@@ -68,12 +53,6 @@
 	@media (max-width: 1024px) {
 		.insights-grid {
 			grid-template-columns: 1fr;
-		}
-	}
-
-	@media (max-width: 768px) {
-		.page-title {
-			font-size: 1.85rem;
 		}
 	}
 </style>

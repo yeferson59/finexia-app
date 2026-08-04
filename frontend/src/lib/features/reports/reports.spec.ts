@@ -81,7 +81,7 @@ describe('buildKeyStatistics', () => {
 			point('2026-03-31', '900')
 		]);
 
-		expect(drawdown).toEqual({ label: 'Max Drawdown', value: '-25.0%' });
+		expect(drawdown).toEqual({ label: 'Max Drawdown', value: '-25,0%' });
 	});
 
 	it('no da volatilidad con menos de tres retornos mensuales', () => {
@@ -98,7 +98,7 @@ describe('buildKeyStatistics', () => {
 			point('2026-04-30', '1150')
 		]);
 
-		expect(stats[1].value).toMatch(/^\d+\.\d%$/);
+		expect(stats[1].value).toMatch(/^\d+,\d%$/);
 		expect(stats[1].value).not.toBe('N/A');
 	});
 

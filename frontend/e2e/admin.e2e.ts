@@ -24,9 +24,9 @@ test.describe('admin', () => {
 
 		const row = page.locator('tr', { hasText: 'AAPL' });
 		await expect(row.getByText('Apple Inc.')).toBeVisible();
-		await expect(row.getByText('$190.00')).toBeVisible();
+		await expect(row.getByText('$214.35')).toBeVisible();
 		// El precio manual se edita en la propia fila.
-		await expect(row.locator('input[name="price"]')).toHaveValue('190.00');
+		await expect(row.locator('input[name="price"]')).toHaveValue('214.35');
 	});
 
 	test('opens the asset create and import forms', async ({ page }) => {

@@ -2,7 +2,8 @@
 	import Badge from '$lib/ui/badge.svelte';
 	import ProgressBar from '$lib/ui/progress-bar.svelte';
 	import type { PortfolioSummary } from '$lib/api/types';
-	import { formatPortfolioType, formatPct, riskTone } from '../portfolio';
+	import { formatPortfolioType } from '$lib/shared/format/portfolio-type';
+	import { formatPct, riskTone } from '../portfolio';
 
 	let {
 		portfolio,

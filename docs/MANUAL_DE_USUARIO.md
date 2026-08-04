@@ -1,7 +1,7 @@
 # Manual de Usuario — FINEXIA
 
-**Versión del documento:** 1.2
-**Fecha:** Julio 2026
+**Versión del documento:** 1.3
+**Fecha:** Agosto 2026
 **Aplicación:** Finexia — Plataforma de gestión y seguimiento de portafolios de inversión
 
 ---
@@ -56,7 +56,7 @@ La aplicación es **responsive**: funciona tanto en computadoras de escritorio c
 
 ### 2.2 Página de inicio (landing) y lista de espera
 
-Al visitar la dirección pública de Finexia sin haber iniciado sesión verás la página de presentación, con la descripción del producto, sus beneficios, preguntas frecuentes y las páginas legales (Términos, Privacidad y Cookies).
+Al visitar la dirección pública de Finexia sin haber iniciado sesión verás la página de presentación. Además de la descripción del producto y sus beneficios, incluye un recorrido por las cuatro vistas del panel (**El producto**), las garantías de seguridad de la plataforma (**Seguridad**), las preguntas frecuentes y las páginas legales (Términos, Privacidad y Cookies). En pantallas pequeñas el menú se abre con el botón de la esquina superior derecha.
 
 ![Página de inicio de Finexia con el formulario de acceso anticipado](img/manual/01-landing.png)
 
@@ -141,6 +141,7 @@ Es el menú de navegación. Sus secciones son:
 | **Transacciones** | Historial de operaciones e importación desde Excel/CSV |
 | **Reportes** | Estadísticas, calendario de rendimiento y descargas en Excel |
 | **Notificaciones** | Preferencias de avisos por correo y en la app |
+| **Guía de usuario** | Este manual, para consultarlo en pantalla o descargarlo |
 | **Configuración** | Perfil, apariencia, contraseña, 2FA, sesiones y claves de datos de mercado |
 
 En la parte inferior de la barra lateral está el botón **Cerrar Sesión**.
@@ -161,6 +162,22 @@ Para navegar, pulsa el **botón de menú** (las tres líneas de la esquina super
 
 Todas las funciones descritas en este manual están disponibles también desde el móvil.
 
+### 4.5 La guía de usuario dentro de la aplicación
+
+No hace falta buscar este manual fuera de Finexia: la entrada **Guía de usuario** del menú lateral lo abre dentro de la propia aplicación.
+
+![Página de la guía de usuario con la ficha del documento y el índice de secciones](img/manual/17-guia.png)
+
+La página muestra la **versión** y la **fecha** del documento que se está sirviendo, junto con su tamaño, y ofrece tres formas de usarlo:
+
+- **Ver la guía aquí** — la abre incrustada en la página, sin salir de la aplicación.
+- **Abrir en una pestaña nueva** — útil para consultarla mientras trabajas en otra sección.
+- **Descargar PDF** — la guarda en tu equipo para leerla sin conexión.
+
+Debajo aparece el **índice de secciones**, con la misma numeración que este documento, para saber de un vistazo dónde está cada cosa.
+
+> **Sobre la versión que ves:** el PDF se genera a partir del manual del repositorio y la aplicación comprueba en cada integración que el archivo publicado corresponde al texto vigente. Si la fecha que ves es antigua, es porque el manual no ha cambiado desde entonces, no porque se haya quedado sin actualizar.
+
 ---
 
 ## 5. Dashboard (panel principal)
@@ -172,12 +189,22 @@ El Dashboard es la primera pantalla tras iniciar sesión y ofrece una fotografí
 Sus bloques principales son:
 
 - **Patrimonio Neto:** el valor total de todos tus portafolios, con la ganancia acumulada en importe y porcentaje, el número de portafolios y de posiciones. Con el selector de moneda (p. ej. **USD/COP**) puedes ver el total consolidado en la moneda que prefieras.
-- **Crecimiento del portafolio:** gráfica de evolución de tu patrimonio que compara el **valor de mercado** con el **capital invertido**. Puedes cambiar el periodo mostrado (1M, 3M, 6M, 1Y o Todo) y ver la ganancia total, el crecimiento desde la creación y el valor actual.
-- **Portafolios:** tabla resumen con cada portafolio, su tipo, valor actual, importe invertido y ganancia/pérdida (en verde si es positiva, en rojo si es negativa), junto con los totales.
+- **Crecimiento del portafolio:** gráfica de evolución de tu patrimonio que compara el **valor de mercado** (línea continua ámbar) con el **capital invertido** (línea discontinua). Puedes cambiar el periodo mostrado (1M, 3M, 6M, 1Y o Todo) y ver la ganancia total, el crecimiento desde la creación y el valor actual.
+- **Portafolios:** tabla resumen con cada portafolio, su tipo, valor actual, importe invertido y ganancia/pérdida (en verde si es positiva, en rojo si es negativa), junto con los totales. El nombre de cada fila lleva a su detalle.
 - **Asignación de Activos:** gráfica de dona con la distribución porcentual de tu dinero entre tipos de activos (acciones, ETF, criptomonedas, fondos…).
 - **Actividad Reciente:** las últimas compras y ventas registradas, con acceso a **Ver todo** y a **Descargar extracto**.
 
-> **Consejo:** si acabas de crear tu cuenta, el Dashboard aparecerá vacío. Sigue este orden para empezar: (1) registra tus **Plataformas**, (2) crea un **Portafolio**, (3) añade **posiciones** y (4) registra o importa tus **transacciones**.
+### 5.1 Consultar un día concreto en la gráfica
+
+La gráfica de crecimiento no es solo una imagen: **pasa el cursor por encima** y una línea vertical marcará el día bajo el ratón. Justo encima de la gráfica aparecerá su detalle: la fecha, el **valor de mercado**, el **capital invertido** y la **ganancia** de ese día.
+
+Si prefieres el teclado, pulsa **Tab** hasta llegar a la gráfica y recórrela con las **flechas izquierda y derecha**; **Inicio** y **Fin** saltan al primer y último día, y **Esc** quita la selección. Cada punto se anuncia en voz alta, de modo que la gráfica también se puede leer con un lector de pantalla.
+
+### 5.2 Leer la asignación de activos
+
+En la dona, al señalar una porción —o su entrada en la leyenda— el resto se atenúa y el centro pasa a mostrar **esa categoría** con su porcentaje, en lugar del total. La leyenda funciona igual con el teclado y con un clic: cada entrada indica el importe y el peso de esa categoría dentro de tu patrimonio.
+
+> **Consejo:** si acabas de crear tu cuenta, el Dashboard aparecerá vacío. Cada bloque te dirá qué falta y te ofrecerá el siguiente paso (crear un portafolio, importar transacciones…). El orden recomendado es: (1) registra tus **Plataformas**, (2) crea un **Portafolio**, (3) añade **posiciones** y (4) registra o importa tus **transacciones**.
 
 ---
 
@@ -358,7 +385,7 @@ En esta pantalla:
 - Si el libro tiene varias hojas, elige la **Hoja** correcta (al cambiarla, la aplicación vuelve a sugerir la asignación).
 - Asigna cada dato a una columna de tu archivo. Los campos **Fecha**, **Ticker/Símbolo**, **Cantidad** y **Precio** son obligatorios (marcados con `*`); **Tipo de operación**, **Nombre del activo**, **Comisiones**, **Moneda**, **Categoría** y **Notas** son opcionales — puedes dejarlos en **"— No usar —"**.
 - En **Valores por defecto** defines lo que se aplicará a las filas donde tu archivo no tenga ese dato: tipo de operación, moneda, categoría y formato de fecha (con detección automática).
-- La **vista previa** resume el resultado con contadores (p. ej. "48 filas · 46 listas para importar · 2 con errores (se omitirán)") y muestra las primeras filas interpretadas: las válidas con ✓ y las que se omitirán con ✗ y el **motivo del error** (fecha no reconocida, precio vacío…), para que puedas corregir tu archivo si lo deseas.
+- La **vista previa** resume el resultado con contadores —en el ejemplo de arriba, "8 filas · 6 listas para importar · 2 con errores (se omitirán)"— y muestra las filas interpretadas: las válidas con ✓ y las que se omitirán con ✗ y el **motivo del error** en la columna **Detalle** (fecha no reconocida, precio vacío…), para que puedas corregir tu archivo si lo deseas.
 
 ### 10.3 Paso 3 — Resultado
 
@@ -381,9 +408,9 @@ La sección **Reportes** ("Gestiona y descarga documentos financieros de tu cuen
 
 ### 11.1 Reportes en pantalla
 
-- **Performance Calendar (%):** calendario de rendimiento con el porcentaje de ganancia o pérdida de cada mes, agrupado por año. Los meses en verde fueron positivos y los meses en rojo, negativos, para identificar de un vistazo los mejores y peores tramos.
-- **Key Statistics:** estadísticas clave del portafolio, como el **Max Drawdown** (la mayor caída desde un máximo) y la **Volatilidad**.
-- **Growth Projection:** proyección de crecimiento estimada a futuro según la evolución de tu portafolio.
+- **Rentabilidad mensual (%):** calendario con el porcentaje de ganancia o pérdida de cada mes, un panel por año (verás tantos paneles como años cubra tu historial). Arriba de cada panel está el **acumulado del año**, y debajo la **leyenda de la escala de color** (de rojo intenso para caídas de más del 1 % a verde intenso para subidas del 2 % o más). Los meses sin dato aparecen con un guion.
+- **Estadísticas clave:** métricas de riesgo del portafolio, como el **Max Drawdown** (la mayor caída desde un máximo) y la **Volatilidad**.
+- **Proyección de crecimiento:** estimación a cinco años calculada extrapolando el crecimiento anual compuesto (CAGR) de tu propio historial. Cada año muestra su valor proyectado y el eje vertical su escala. **No es una previsión de mercado**, y por eso la aplicación se abstiene de mostrarla cuando tienes menos de seis meses de historial o cuando el ritmo de crecimiento es tan extremo que proyectarlo daría cifras absurdas.
 
 ### 11.2 Descargas en Excel (XLSX)
 
@@ -520,6 +547,12 @@ Sí. La interfaz es adaptable; en pantallas pequeñas el menú lateral se abre d
 **¿Cómo exporto mis datos?**
 Desde **Reportes** puedes descargar en Excel el resumen mensual, el estado de resultados (transacciones) y las métricas de riesgo y volatilidad.
 
+**¿Dónde encuentro este manual?**
+En **Guía de usuario**, en el menú lateral. Puedes leerlo dentro de la aplicación, abrirlo en una pestaña nueva o descargar el PDF (ver sección 4.5).
+
+**¿Puedo usar la aplicación solo con el teclado?**
+Sí. Los menús, formularios y tablas se recorren con **Tab**, y la gráfica de crecimiento del Dashboard admite las flechas para ir día a día (sección 5.1).
+
 ---
 
 ## 16. Solución de problemas
@@ -553,6 +586,7 @@ Si el problema persiste, contacta con el equipo de soporte de Finexia.
 | **Asignación** | Porcentaje que representa un activo o tipo de activo dentro del total |
 | **ROI** | *Return on Investment*: retorno sobre la inversión, en porcentaje |
 | **Max Drawdown** | La mayor caída porcentual del valor desde un máximo anterior |
+| **CAGR** | *Compound Annual Growth Rate*: ritmo de crecimiento anual compuesto; es la base de la proyección |
 | **Volatilidad** | Medida de la variabilidad del valor de un activo o portafolio |
 | **2FA / TOTP** | Verificación en dos pasos con códigos temporales de 6 dígitos |
 | **Códigos de recuperación** | Códigos de un solo uso para acceder si pierdes tu aplicación de autenticación |

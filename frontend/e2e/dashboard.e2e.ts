@@ -1,6 +1,58 @@
 import { expect, test } from '@playwright/test';
 import { login } from './helpers';
 
+test.describe('dashboard charts', () => {
+	test('la gráfica de crecimiento se recorre con el teclado', async ({ page }) => {
+		await login(page);
+
+		const chart = page.getByRole('slider', {
+			name: 'Recorrer la gráfica de crecimiento del portafolio'
+		});
+		await expect(chart).toBeVisible();
+		await expect(page.getByText(/Pasa el cursor por la gráfica/)).toBeVisible();
+
+		await chart.focus();
+		await chart.press('End');
+
+		// El punto señalado se anuncia y además se pinta en el detalle de arriba.
+		await expect(chart).toHaveAttribute('aria-valuetext', /valor \$/);
+		await expect(page.getByText(/^Invertido \$/)).toBeVisible();
+		await expect(page.getByText(/^Ganancia [+−]\$/)).toBeVisible();
+	});
+
+	test('la gráfica ofrece sus dos series como tabla para el lector de pantalla', async ({
+		page
+	}) => {
+		await login(page);
+
+		const series = page.getByRole('table', {
+			name: /Valor de mercado y capital invertido del portafolio/
+		});
+		await expect(series.getByRole('columnheader', { name: 'Valor de mercado' })).toBeAttached();
+		await expect(series.getByRole('columnheader', { name: 'Capital invertido' })).toBeAttached();
+
+		// Cada fila se identifica con la fecha completa: el eje abrevia a mes y
+		// año en los rangos largos, y así varias filas se llamarían igual.
+		const firstRow = series.getByRole('rowheader').first();
+		await expect(firstRow).toHaveText(/^\d{2} de \p{L}+ de \d{4}$/u);
+		await expect(firstRow.locator('time')).toHaveAttribute('datetime', /^\d{4}-\d{2}-\d{2}$/);
+	});
+
+	test('la asignación de activos enlaza leyenda y porción', async ({ page }) => {
+		await login(page);
+
+		// El fixture reparte el patrimonio entre cinco categorías.
+		const legendEntry = page.getByRole('button', { name: /^Acciones/ });
+		await expect(legendEntry).toBeVisible();
+
+		await legendEntry.click();
+		await expect(legendEntry).toHaveAttribute('aria-pressed', 'true');
+
+		// Al fijar una categoría, el centro del donut deja de mostrar el total.
+		await expect(page.locator('.hole-label')).toHaveText('ACCIONES');
+	});
+});
+
 test.describe('dashboard', () => {
 	test('renders the main widgets with data from the backend', async ({ page }) => {
 		await login(page);
@@ -15,5 +67,10 @@ test.describe('dashboard', () => {
 		// Portfolio summary and recent activity fed by the API fixtures.
 		await expect(page.getByText('Cartera Principal').first()).toBeVisible();
 		await expect(page.getByText('AAPL').first()).toBeVisible();
+
+		// Los tres portafolios del fixture, con su tipo ya traducido.
+		await expect(page.getByRole('link', { name: 'Cripto' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Reserva' })).toBeVisible();
+		await expect(page.getByText('Acciones & ETFs')).toBeVisible();
 	});
 });

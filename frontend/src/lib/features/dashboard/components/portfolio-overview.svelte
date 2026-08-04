@@ -1,9 +1,21 @@
 <script lang="ts">
+	/*
+	 * Resumen de portafolios del dashboard.
+	 *
+	 * Era una rejilla de `div` con pinta de tabla: quien la recorre con lector de
+	 * pantalla oía una fila de textos sueltos, sin saber a qué columna
+	 * correspondía cada cifra. Ahora es una `<table>` de verdad, con cabeceras
+	 * asociadas y el nombre del portafolio como cabecera de su fila.
+	 */
+	import { resolve } from '$app/paths';
 	import Card from '$lib/ui/card.svelte';
 	import CardHeader from '$lib/ui/card-header.svelte';
+	import DataTable from '$lib/ui/data-table.svelte';
+	import EmptyState from '$lib/ui/empty-state.svelte';
 	import Stat from '$lib/ui/stat.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
+	import { formatPortfolioType } from '$lib/shared/format/portfolio-type';
 
 	interface PortfolioSummary {
 		id: string;
@@ -48,52 +60,62 @@
 	<CardHeader eyebrow="Resumen" title="Portafolios" />
 
 	{#if summaries.length === 0}
-		<div class="empty-state">
-			<svg
-				width="48"
-				height="48"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="1.5"
-			>
-				<rect x="2" y="3" width="20" height="14" rx="2" />
-				<path d="M8 21h8M12 17v4" />
-			</svg>
-			<p>Sin portafolios registrados</p>
-		</div>
+		<EmptyState
+			title="Sin portafolios registrados"
+			description="Crea tu primer portafolio para agrupar los activos que tienes en cada plataforma."
+		>
+			{#snippet icon()}
+				<svg
+					width="48"
+					height="48"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+				>
+					<rect x="2" y="3" width="20" height="14" rx="2" />
+					<path d="M8 21h8M12 17v4" />
+				</svg>
+			{/snippet}
+			{#snippet action()}
+				<a href={resolve('/dashboard/portfolios/add')} class="empty-cta">Crear portafolio</a>
+			{/snippet}
+		</EmptyState>
 	{:else}
-		<div class="portfolio-list">
-			<div class="list-header">
-				<span>Nombre</span>
-				<span>Tipo</span>
-				<span class="align-right">Valor actual</span>
-				<span class="align-right">Invertido</span>
-				<span class="align-right">Ganancia/Pérdida</span>
-			</div>
-
-			{#each summaries as s (s.id)}
-				{@const gainLoss = parseFloat(s.totalGainLoss || '0')}
-				{@const marketValue = parseFloat(s.totalMarketValue || '0')}
-				{@const costBase = parseFloat(s.totalCostBase || '0')}
-				{@const pct = parseFloat(s.totalGainLossPct || '0')}
-				{@const isUp = gainLoss >= 0}
-				{@const rowCurrency = s.displayCurrency || s.baseCurrency}
-				<div class="list-row">
-					<div class="portfolio-name">
-						<span class="name">{s.name}</span>
-						<span class="currency">{rowCurrency}</span>
-					</div>
-					<span class="type-badge">{s.type}</span>
-					<span class="align-right mono">{fmtMoney(marketValue, rowCurrency)}</span>
-					<span class="align-right mono dim">{fmtMoney(costBase, rowCurrency)}</span>
-					<div class="align-right gain-cell" class:positive={isUp} class:negative={!isUp}>
-						<span class="mono">{isUp ? '+' : '−'}{fmtMoney(Math.abs(gainLoss), rowCurrency)}</span>
-						<span class="pct">{isUp ? '+' : ''}{fmtPct(pct)}%</span>
-					</div>
-				</div>
-			{/each}
-		</div>
+		<DataTable class="portfolio-table" caption="Tus portafolios, con su valor actual y su ganancia">
+			<thead>
+				<tr>
+					<th scope="col">Nombre</th>
+					<th scope="col" class="col-type">Tipo</th>
+					<th scope="col" class="num col-invested">Invertido</th>
+					<th scope="col" class="num">Valor actual</th>
+					<th scope="col" class="num">Ganancia/Pérdida</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each summaries as s (s.id)}
+					{@const gainLoss = parseFloat(s.totalGainLoss || '0')}
+					{@const marketValue = parseFloat(s.totalMarketValue || '0')}
+					{@const costBase = parseFloat(s.totalCostBase || '0')}
+					{@const pct = parseFloat(s.totalGainLossPct || '0')}
+					{@const isUp = gainLoss >= 0}
+					{@const rowCurrency = s.displayCurrency || s.baseCurrency}
+					<tr>
+						<th scope="row" class="name-cell">
+							<a href={resolve(`/dashboard/portfolios/${s.id}`)} class="name">{s.name}</a>
+							<span class="currency">{rowCurrency} · {s.totalPositions} pos.</span>
+						</th>
+						<td class="col-type"><span class="type-badge">{formatPortfolioType(s.type)}</span></td>
+						<td class="num dim col-invested">{fmtMoney(costBase, rowCurrency)}</td>
+						<td class="num">{fmtMoney(marketValue, rowCurrency)}</td>
+						<td class="num gain-cell" class:positive={isUp} class:negative={!isUp}>
+							<span>{isUp ? '+' : '−'}{fmtMoney(Math.abs(gainLoss), rowCurrency)}</span>
+							<span class="pct">{isUp ? '+' : ''}{fmtPct(pct)}%</span>
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</DataTable>
 	{/if}
 
 	<div class="chart-stats">
@@ -108,78 +130,58 @@
 </Card>
 
 <style>
-	.empty-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.75rem;
-		padding: 3rem 2rem;
-		color: rgba(236, 234, 229, 0.4);
-		text-align: center;
-	}
-
-	.empty-state p {
-		margin: 0;
-		font-size: 0.9rem;
-	}
-
-	.portfolio-list {
-		margin-bottom: 1.5rem;
-		overflow-x: auto;
-	}
-
-	.list-header {
-		display: grid;
-		grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(
-				0,
-				1.2fr
-			);
-		gap: 1rem;
-		padding: 0.5rem 1rem;
-		font-size: 0.72rem;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: rgba(236, 234, 229, 0.45);
+	.empty-cta {
+		display: inline-block;
+		padding: 0.6rem 1.2rem;
+		border: 1px solid rgba(212, 145, 42, 0.35);
+		border-radius: 6px;
+		background: rgba(212, 145, 42, 0.08);
+		color: var(--amber-light);
+		font-size: 0.82rem;
 		font-weight: 600;
-		border-bottom: 1px solid var(--border);
-		margin-bottom: 0.25rem;
+		text-decoration: none;
+		transition:
+			background 0.2s ease,
+			border-color 0.2s ease;
 	}
 
-	.list-row {
-		display: grid;
-		grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(
-				0,
-				1.2fr
-			);
-		gap: 1rem;
-		padding: 0.9rem 1rem;
-		border-radius: 8px;
-		transition: background 0.2s ease;
-		align-items: center;
+	.empty-cta:hover {
+		background: rgba(212, 145, 42, 0.14);
+		border-color: rgba(212, 145, 42, 0.55);
 	}
 
-	.list-row:hover {
-		background: rgba(255, 255, 255, 0.03);
+	:global(.portfolio-table) {
+		margin-bottom: 1.5rem;
 	}
 
-	.portfolio-name {
-		display: flex;
-		flex-direction: column;
-		gap: 0.2rem;
-		min-width: 0;
+	/* La cabecera de fila es un `th`; hay que devolverle el aspecto de celda. */
+	.name-cell {
+		font-family: var(--font-body);
+		font-size: 0.875rem;
+		font-weight: 400;
+		letter-spacing: normal;
+		text-transform: none;
+		color: var(--text);
+		padding: 0.75rem 1.25rem;
+		white-space: normal;
 	}
 
 	.name {
+		display: block;
 		font-weight: 600;
 		color: var(--text);
-		font-size: 0.9rem;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		text-decoration: none;
+		overflow-wrap: anywhere;
+		transition: color 0.2s ease;
+	}
+
+	.name:hover {
+		color: var(--amber-light);
 	}
 
 	.currency {
+		display: block;
+		margin-top: 0.2rem;
 		font-size: 0.72rem;
 		color: rgba(236, 234, 229, 0.45);
 		text-transform: uppercase;
@@ -194,45 +196,25 @@
 		font-weight: 600;
 	}
 
-	.align-right {
-		text-align: right;
-	}
-
-	.mono {
-		font-family: var(--font-mono);
-		font-variant-numeric: tabular-nums;
-		font-size: 0.85rem;
-	}
-
 	.dim {
 		color: rgba(236, 234, 229, 0.55);
 	}
 
 	.gain-cell {
-		display: flex;
-		flex-direction: column;
-		gap: 0.15rem;
-		min-width: 0;
+		white-space: nowrap;
 	}
 
-	.gain-cell .mono {
-		overflow-wrap: anywhere;
+	.gain-cell .pct {
+		display: block;
+		font-size: 0.72rem;
 	}
 
-	.gain-cell.positive .mono,
-	.gain-cell.positive .pct {
+	.gain-cell.positive {
 		color: var(--green);
 	}
 
-	.gain-cell.negative .mono,
-	.gain-cell.negative .pct {
+	.gain-cell.negative {
 		color: var(--red);
-	}
-
-	.pct {
-		font-family: var(--font-mono);
-		font-size: 0.72rem;
-		font-variant-numeric: tabular-nums;
 	}
 
 	.chart-stats {
@@ -243,14 +225,10 @@
 		border-top: 1px solid var(--border);
 	}
 
+	/* En pantallas estrechas la tabla ya hace scroll horizontal; ocultar las dos
+	   columnas secundarias evita que lo necesite para lo esencial. */
 	@media (max-width: 1024px) {
-		.list-header,
-		.list-row {
-			grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr);
-		}
-
-		.list-header :nth-child(4),
-		.list-row :nth-child(4) {
+		.col-invested {
 			display: none;
 		}
 
@@ -260,18 +238,7 @@
 	}
 
 	@media (max-width: 768px) {
-		.list-header {
-			display: none;
-		}
-
-		.list-row {
-			grid-template-columns: minmax(0, 1fr) minmax(0, auto);
-			grid-template-rows: auto auto;
-		}
-
-		.list-row :nth-child(2),
-		.list-row :nth-child(3),
-		.list-row :nth-child(4) {
+		.col-type {
 			display: none;
 		}
 

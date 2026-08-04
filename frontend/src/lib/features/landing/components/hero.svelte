@@ -6,6 +6,11 @@
 
 <section class="hero wrap">
 	<div class="hero-left">
+		<div class="hero-badge reveal">
+			<span class="pulse" aria-hidden="true"></span>
+			Acceso anticipado · Lanzamiento el 1 de octubre de 2026
+		</div>
+
 		<h1 class="hero-title reveal">
 			Todo tu patrimonio,<br /><em>en tu mapa.</em>
 		</h1>
@@ -17,6 +22,12 @@
 		<HeroCountdown />
 
 		<HeroWaitlist />
+
+		<ul class="hero-proof reveal">
+			<li>Sin credenciales de tu broker</li>
+			<li>Sin tarjeta</li>
+			<li>Tus datos, exportables</li>
+		</ul>
 	</div>
 
 	<HeroPreviewCards />
@@ -35,6 +46,72 @@
 		display: flex;
 		flex-direction: column;
 		align-items: flex-start;
+	}
+
+	.hero-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 9px;
+		padding: 6px 14px;
+		border: 1px solid var(--border-strong);
+		border-radius: 999px;
+		background: var(--surface);
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+	}
+
+	.pulse {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--green);
+		box-shadow: 0 0 0 0 rgba(34, 201, 126, 0.5);
+		animation: pulse 2.4s ease-out infinite;
+	}
+
+	@keyframes pulse {
+		70% {
+			box-shadow: 0 0 0 7px rgba(34, 201, 126, 0);
+		}
+		100% {
+			box-shadow: 0 0 0 0 rgba(34, 201, 126, 0);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.pulse {
+			animation: none;
+		}
+	}
+
+	.hero-proof {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px 20px;
+		margin: 22px 0 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.hero-proof li {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		font-size: 12.5px;
+		color: var(--text-dim);
+	}
+
+	.hero-proof li::before {
+		content: '';
+		width: 12px;
+		height: 12px;
+		flex-shrink: 0;
+		background: var(--green);
+		mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E")
+			center / contain no-repeat;
 	}
 
 	.hero-title {

@@ -109,6 +109,25 @@ export function buildPerformanceCalendars(points: GrowthDataPoint[]): Performanc
  * La volatilidad necesita al menos tres retornos mensuales para significar
  * algo; con menos se muestra `N/A` en vez de un número engañoso.
  */
+/** Varianza poblacional de una serie de retornos. */
+function variance(values: number[]): number {
+	const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+	return values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length;
+}
+
+/**
+ * Porcentaje con coma decimal. El resto de cifras de la aplicación usan
+ * `Intl` con la configuración de es-CO; estas dos se escapaban con un punto.
+ */
+function formatPercent(value: number): string {
+	return (
+		new Intl.NumberFormat('es-CO', {
+			minimumFractionDigits: 1,
+			maximumFractionDigits: 1
+		}).format(value) + '%'
+	);
+}
+
 export function buildKeyStatistics(points: GrowthDataPoint[]): KeyStat[] {
 	if (points.length === 0) return [];
 
@@ -133,13 +152,11 @@ export function buildKeyStatistics(points: GrowthDataPoint[]): KeyStat[] {
 
 	let volatilityStr = 'N/A';
 	if (returns.length >= 3) {
-		const mean = returns.reduce((s, r) => s + r, 0) / returns.length;
-		const variance = returns.reduce((s, r) => s + (r - mean) ** 2, 0) / returns.length;
-		volatilityStr = `${(Math.sqrt(variance) * Math.sqrt(12)).toFixed(1)}%`;
+		volatilityStr = formatPercent(Math.sqrt(variance(returns)) * Math.sqrt(12));
 	}
 
 	return [
-		{ label: 'Max Drawdown', value: `${maxDrawdown.toFixed(1)}%` },
+		{ label: 'Max Drawdown', value: formatPercent(maxDrawdown) },
 		{ label: 'Volatilidad', value: volatilityStr }
 	];
 }

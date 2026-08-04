@@ -10,47 +10,53 @@
 	let { statistics }: Props = $props();
 </script>
 
-<ReportPanel class="stats-card" title="Key Statistics">
-	<div class="stats-list">
-		{#if statistics.length > 0}
+<ReportPanel class="stats-card" title="Estadísticas clave">
+	{#if statistics.length > 0}
+		<!-- Etiqueta y valor son un par: `dl` los relaciona, dos `p` no. -->
+		<dl class="stats-list">
 			{#each statistics as stat (stat.label)}
 				<div class="stat-row">
-					<p>{stat.label}</p>
-					<p>{stat.value}</p>
+					<dt>{stat.label}</dt>
+					<dd>{stat.value}</dd>
 				</div>
 			{/each}
-		{:else}
-			<p class="empty-text">Sin datos</p>
-		{/if}
-	</div>
+		</dl>
+	{:else}
+		<p class="empty-text">Sin datos</p>
+	{/if}
 </ReportPanel>
 
 <style>
 	.stats-list {
 		display: grid;
 		gap: 0.45rem;
+		margin: 0;
 	}
 
 	.stat-row {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		gap: 0.75rem;
 		background: rgba(255, 255, 255, 0.022);
 		padding: 0.6rem 0.75rem;
 		border-radius: 8px;
 	}
 
-	.stat-row p {
+	.stat-row dt,
+	.stat-row dd {
 		margin: 0;
 		font-size: 0.8rem;
 	}
 
-	.stat-row p:first-child {
+	.stat-row dt {
 		color: rgba(236, 234, 229, 0.62);
 	}
 
-	.stat-row p:last-child {
+	.stat-row dd {
+		font-family: var(--font-mono);
 		font-weight: 700;
+		font-variant-numeric: tabular-nums;
 		color: var(--amber-light);
 	}
 </style>

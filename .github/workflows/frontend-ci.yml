@@ -55,6 +55,11 @@ jobs:
       - name: Arquitectura (tamaño, routes/ y legacy)
         run: pnpm check:arch
 
+      # El manual y su PDF son dos archivos: sin esto es fácil corregir una
+      # sección y seguir publicando el PDF viejo durante meses.
+      - name: Guía de usuario (PDF al día)
+        run: pnpm check:manual
+
       - name: Unit tests
         run: pnpm test:unit -- --run
 
