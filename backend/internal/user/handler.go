@@ -15,11 +15,12 @@ import (
 )
 
 type handler struct {
-	service *Service
+	service  *Service
+	sessions sessionRevoker
 }
 
-func newHandler(svc *Service) *handler {
-	return new(handler{svc})
+func newHandler(svc *Service, sessions sessionRevoker) *handler {
+	return new(handler{svc, sessions})
 }
 
 func (h *handler) GetListUsers(c fiber.Ctx) error {
@@ -96,6 +97,12 @@ func (h *handler) DeleteUser(c fiber.Ctx) error {
 		return httpx.FromDomain(c, err, "", "users:delete")
 	}
 
+	// The delete is a soft one: the row stays, so every session and refresh
+	// token pointing at it stays valid too unless they are closed here.
+	if _, err := h.sessions.RevokeAllSessions(c, userID); err != nil {
+		return httpx.FromDomain(c, err, "", "users:delete:sessions")
+	}
+
 	return httpx.Success(c, fiber.StatusNoContent, "", "", "")
 }
 
@@ -112,6 +119,15 @@ func (h *handler) BanUser(c fiber.Ctx) error {
 
 	if err := h.service.BanUser(c, userID, req.Ban); err != nil {
 		return httpx.FromDomain(c, err, "Error updating ban status", "users:ban")
+	}
+
+	// Banning is meant to cut access off now, not at the next token expiry, so
+	// the user's live sessions and refresh-token families go with the flag.
+	// Unbanning leaves them closed: the user logs in again.
+	if req.Ban {
+		if _, err := h.sessions.RevokeAllSessions(c, userID); err != nil {
+			return httpx.FromDomain(c, err, "Error updating ban status", "users:ban:sessions")
+		}
 	}
 
 	msg := "User banned"

@@ -134,6 +134,15 @@ func (s *Service) Login(ctx context.Context, email, password, ipAddress, userAge
 		return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid credentials"))
 	}
 
+	// A ban has to be enforced here, on the way in. Everything downstream of
+	// this point mints a session and a refresh-token family that would keep
+	// renewing itself for JWT_REFRESH_DURATION, so an admin's ban would have
+	// amounted to nothing more than a flag in a table. Checked after the
+	// password so it stays invisible to anyone who cannot already log in.
+	if user.BannedAt != nil {
+		return LoginInternalDTO{}, ErrAccountDisabled
+	}
+
 	s.clearLoginFailures(ctx, email)
 
 	// Two-factor gate: with a confirmed 2FA enrollment the password alone

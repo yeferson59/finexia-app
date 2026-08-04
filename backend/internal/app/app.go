@@ -110,6 +110,21 @@ func New(deps Deps) (*App, error) {
 		ProxyHeader:     fiber.HeaderXForwardedFor,
 		TrustProxy:      deps.Envs.TrustProxy,
 		BodyLimit:       bodyLimit,
+		// Without this, Fiber returns the X-Forwarded-For header *verbatim*
+		// from c.IP() whenever the immediate peer is trusted — which, with the
+		// private/loopback ranges trusted below, is every request in a
+		// containerised deployment. The header is written by the client, so
+		// c.IP() would be an attacker-chosen string: rotating it per request
+		// gives each one its own bucket in every IP-keyed rate limiter (the
+		// global 60/min and the 10/15min on the auth routes), which is what
+		// stands between the public login, password-reset and email-verification
+		// endpoints and unlimited credential stuffing, mail bombing, and
+		// lockout-based denial of service against every account at once.
+		//
+		// With validation on, Fiber walks the forwarded chain right-to-left,
+		// skips the proxies trusted below, and returns the first address that
+		// is actually outside them.
+		EnableIPValidation: true,
 		TrustProxyConfig: fiber.TrustProxyConfig{
 			Loopback:  true,
 			LinkLocal: true,
@@ -243,6 +258,7 @@ func (a *App) buildModules() *modules {
 	userModule := user.New(user.Deps{
 		Service:   userService,
 		AuthMiddl: authModule,
+		Sessions:  authModule.Service(),
 		Limiter:   userLimiter,
 	})
 	// market and portfolio need each other's services, so market is built in
@@ -293,7 +309,17 @@ func (a *App) buildModules() *modules {
 
 // mountRoutes installs the global middleware chain and each module's routes.
 func (a *App) mountRoutes(mods *modules) {
-	a.fiber.Use(httpx.Recovery(), httpx.CORS(a.deps.Envs.CORSOrigin, true), httpx.Helmet(), httpx.RequestID(), httpx.ResponseTime(), httpx.Logger(), httpx.RateLimiter(60, 1*time.Minute, false))
+	a.fiber.Use(httpx.Recovery())
+
+	// CORS_ENABLED was read from the environment and then ignored, so an
+	// operator who set it to false still got cross-origin responses with
+	// credentials allowed. Honour it: off means no Access-Control-* headers at
+	// all, which is the correct posture for a same-origin deployment.
+	if a.deps.Envs.CORSEnabled {
+		a.fiber.Use(httpx.CORS(a.deps.Envs.CORSOrigin, true))
+	}
+
+	a.fiber.Use(httpx.Helmet(), httpx.RequestID(), httpx.ResponseTime(), httpx.Logger(), httpx.RateLimiter(60, 1*time.Minute, false))
 
 	mods.health.Routes(a.fiber)
 	mods.market.Routes(a.fiber)

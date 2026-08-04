@@ -35,6 +35,10 @@ func (h *handler) login(c fiber.Ctx) error {
 			return httpx.ErrorAction(c, fiber.StatusForbidden, "email not verified", "verify your email before logging in", "auth:login:unverified")
 		}
 
+		if errors.Is(err, ErrAccountDisabled) {
+			return httpx.ErrorAction(c, fiber.StatusForbidden, "account disabled", "this account has been suspended; contact support", "auth:login:disabled")
+		}
+
 		return httpx.FromDomain(c, err, "failed to login", "auth:login")
 	}
 

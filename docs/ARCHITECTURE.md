@@ -362,6 +362,29 @@ Referencia completa en `backend/.env.example`; se leen en
 desarrollo salvo las tres que el proceso necesita para existir: `DATABASE_URL`,
 `JWT_SECRET` y `MARKET_KEK_KEYS`.
 
+### `JWT_SECRET`
+
+Firma todos los tokens de acceso (HS256). **No tiene valor por defecto y el
+proceso no arranca sin ella** (`config.Env.Validate`, llamada desde
+`cmd/api/main.go`). Un valor de reserva significaría que cualquiera que haya
+leído este repositorio puede emitir un token para cualquier `id` y cualquier
+`role` —incluido `admin`— contra un despliegue que simplemente olvidó definir
+la variable.
+
+`Validate` rechaza cuatro casos, no solo el vacío:
+
+- ausente o solo espacios;
+- de menos de 32 caracteres, que no llegan a los 256 bits del digest;
+- que contenga un marcador de posición conocido (`changeme`, `jwt-secret`,
+  `your-256-bit-secret`…), porque lo que aparece en un despliegue real es el
+  marcador **rellenado** hasta que la regla de longitud dejó de quejarse;
+- con menos de 8 caracteres distintos, que es como se cuela una cadena corta
+  repetida: `secretsecretsecretsecretsecretsecret` mide 36 y tiene cinco.
+
+Se genera con `openssl rand -base64 48`. Rotarla invalida todos los tokens de
+acceso en vuelo; los usuarios vuelven a autenticarse con su cookie de refresco,
+que no se firma con esta clave.
+
 ### `MARKET_KEK_KEYS` y `MARKET_KEK_ACTIVE`
 
 Son las claves que envuelven las claves de proveedor de cada usuario. Formato:

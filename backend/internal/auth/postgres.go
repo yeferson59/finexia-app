@@ -53,10 +53,14 @@ func (r *PostgresRepository) GetAccountByEmail(ctx context.Context, email string
 	var account identity.Account
 	var user identity.User
 
-	if err := r.db.QueryRow(ctx, "SELECT u.id, u.name, u.email_verified, a.id, a.provider_id, a.account_id, a.password, r.name FROM users u JOIN accounts a ON u.id = a.user_id JOIN roles r ON u.role_id = r.id WHERE u.email = $1 AND u.deleted_at IS NULL", email).Scan(
+	// banned_at travels with the row rather than being filtered out in the
+	// WHERE clause: Login has to compare the password before it may react to a
+	// ban, otherwise "this address is banned" becomes an unauthenticated oracle.
+	if err := r.db.QueryRow(ctx, "SELECT u.id, u.name, u.email_verified, u.banned_at, a.id, a.provider_id, a.account_id, a.password, r.name FROM users u JOIN accounts a ON u.id = a.user_id JOIN roles r ON u.role_id = r.id WHERE u.email = $1 AND u.deleted_at IS NULL", email).Scan(
 		&user.ID,
 		&user.Name,
 		&user.EmailVerified,
+		&user.BannedAt,
 		&account.ID,
 		&account.ProviderID,
 		&account.AccountID,
