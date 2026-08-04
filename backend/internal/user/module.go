@@ -1,8 +1,11 @@
 package user
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
@@ -31,6 +34,11 @@ type ServiceDeps struct {
 type Deps struct {
 	Service   *Service
 	AuthMiddl authMiddleware
+	// Sessions closes out the live sessions of a user this module bans or
+	// deletes. The session and refresh-token tables belong to auth, so the
+	// capability is injected the same way the route guards are; satisfied by
+	// *auth.Service, which exists by the time this half of the module is built.
+	Sessions sessionRevoker
 	// Limiter is the per-user rate limiter applied to the /users routes. The
 	// module registers in the public zone, so it applies this and its own
 	// RequireAuth itself.
@@ -40,6 +48,14 @@ type Deps struct {
 type authMiddleware interface {
 	RequireAuth() fiber.Handler
 	RequireAdmin() fiber.Handler
+}
+
+// sessionRevoker is the slice of the auth module this one needs to make a ban
+// or a deletion effective immediately. Without it both operations would only
+// write a column: every access token already issued keeps validating, and the
+// refresh cookie keeps rotating, for as long as the token lifetimes allow.
+type sessionRevoker interface {
+	RevokeAllSessions(ctx context.Context, userID uuid.UUID) (int64, error)
 }
 
 type Module struct {
@@ -69,10 +85,13 @@ func New(deps Deps) *Module {
 	if deps.AuthMiddl == nil {
 		panic("user.New: Deps.AuthMiddl is required — every /users route is guarded by it")
 	}
+	if deps.Sessions == nil {
+		panic("user.New: Deps.Sessions is required — a ban that leaves live sessions running is not a ban")
+	}
 
 	return new(Module{
 		service:   deps.Service,
-		handler:   newHandler(deps.Service),
+		handler:   newHandler(deps.Service, deps.Sessions),
 		authMiddl: deps.AuthMiddl,
 		limiter:   httpx.OrPassThrough(deps.Limiter),
 	})

@@ -204,7 +204,14 @@ func (f *fakeRepository) GetUserByEmail(ctx context.Context, email string) (iden
 	return f.getUserByEmail(ctx, email)
 }
 
+// GetUserByID defaults to an active account rather than panicking on a nil
+// hook. Every session-issuing path reads it now to enforce bans and deletions,
+// so a nil hook would only mean "this scenario is not about account state" —
+// the scenarios that are about it set the hook and return BannedAt/DeletedAt.
 func (f *fakeRepository) GetUserByID(ctx context.Context, id uuid.UUID) (identity.User, error) {
+	if f.getUserByID == nil {
+		return identity.User{ID: id}, nil
+	}
 	return f.getUserByID(ctx, id)
 }
 

@@ -204,6 +204,20 @@ func (s *Service) RefreshToken(ctx context.Context, rawToken, ipAddress, userAge
 		sessionID = rt.SessionID
 	}
 
+	// Neither branch above reads the users table — the cached one performs no
+	// database work at all — so without this the refresh cookie of a banned or
+	// soft-deleted user would keep minting fresh access tokens for the rest of
+	// the family's lifetime (JWT_REFRESH_DURATION, 30 days by default), long
+	// after every other path stopped honouring them. The family is revoked so
+	// the cookie stops being useful immediately rather than being re-presented
+	// every 15 minutes.
+	if disabled, err := s.accountDisabled(ctx, userID); err != nil {
+		return LoginInternalDTO{}, err
+	} else if disabled {
+		s.revokeRefreshFamily(ctx, familyID)
+		return LoginInternalDTO{}, httpx.AsBadRequest(errors.New("invalid refresh token"))
+	}
+
 	// Rotation: mark current token as used before issuing new pair
 	if err := s.stores.RefreshTokens.MarkRefreshTokenUsed(ctx, tokenID); err != nil {
 		return LoginInternalDTO{}, err
@@ -268,6 +282,38 @@ func (s *Service) RefreshToken(ctx context.Context, rawToken, ipAddress, userAge
 		RawRefreshToken:  rawNew,
 		RefreshExpiresAt: refreshExpiresAt,
 	}, nil
+}
+
+// accountDisabled reports whether the user has been banned or soft-deleted.
+//
+// It fails closed on a lookup error, which is why it returns that error rather
+// than folding it into the boolean: skipping the check because the database
+// hiccuped would hand a revoked account a working session, and a refresh that
+// errors out is retried by the client a moment later.
+func (s *Service) accountDisabled(ctx context.Context, userID uuid.UUID) (bool, error) {
+	user, err := s.stores.Users.GetUserByID(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+
+	return user.BannedAt != nil || user.DeletedAt != nil, nil
+}
+
+// RevokeAllSessions terminates every session the user has, purging the cached
+// access tokens and refresh-token families along with them. It is what makes a
+// ban or a deletion take effect at once instead of at the next token expiry,
+// and it is exposed for the user module (which owns those two operations but
+// not the session tables) to call through its own interface.
+func (s *Service) RevokeAllSessions(ctx context.Context, userID uuid.UUID) (int64, error) {
+	sessions, err := s.stores.Sessions.ListSessionsByUserID(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	if len(sessions) == 0 {
+		return 0, nil
+	}
+
+	return s.revokeSessions(ctx, userID, sessions)
 }
 
 func (s *Service) Logout(ctx context.Context, userID uuid.UUID, accessToken, rawRefreshToken string) error {

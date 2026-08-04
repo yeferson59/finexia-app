@@ -36,6 +36,13 @@ func main() {
 // run creates the infrastructure and hands it to the composition root; all
 // application wiring lives in internal/app.
 func run(ctx context.Context, envs *config.Env, log logger.Logger) error {
+	// Before anything is connected: a missing or guessable JWT_SECRET means
+	// every access token this process would issue is forgeable by anyone, so
+	// it stops the boot rather than degrading silently.
+	if err := envs.Validate(); err != nil {
+		return err
+	}
+
 	dbPool, err := database.Connect(ctx, envs.DatabaseURL)
 	if err != nil {
 		return errors.New("failed to connect to database: " + err.Error())

@@ -143,7 +143,11 @@ func (r *PostgresRepository) GetSessionByToken(ctx context.Context, token string
 	var user identity.User
 	var session identity.Session
 
-	if err := r.db.QueryRow(ctx, "SELECT u.id, u.email_verified, r.name, s.expires_at, s.token FROM users u JOIN sessions s ON s.user_id = u.id JOIN roles r ON u.role_id = r.id WHERE s.token = $1", token).Scan(
+	// The user-state filter is the point of this query, not decoration: it is
+	// the only database read on the access-token validation path, so a session
+	// belonging to a banned or soft-deleted user has to stop resolving here or
+	// that user keeps every privilege they had until the token expires.
+	if err := r.db.QueryRow(ctx, "SELECT u.id, u.email_verified, r.name, s.expires_at, s.token FROM users u JOIN sessions s ON s.user_id = u.id JOIN roles r ON u.role_id = r.id WHERE s.token = $1 AND u.deleted_at IS NULL AND u.banned_at IS NULL", token).Scan(
 		&user.ID,
 		&user.EmailVerified,
 		&user.Role.Name,

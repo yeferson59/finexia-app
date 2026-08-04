@@ -1,6 +1,8 @@
 package marketing
 
 import (
+	"time"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -90,7 +92,12 @@ func (m *Module) Service() *Service {
 func (m *Module) Routes(router fiber.Router) {
 	waitlists := router.Group("/marketing")
 
-	waitlists.Post("/waitlists", m.handler.createWaitlist)
+	// The one public, unauthenticated write in this module, and it sends an
+	// email to whatever address it is given — so it carries the same tight
+	// limiter as the auth endpoints rather than only the global 60/min. Without
+	// it, a single client can point the confirmation mail at an arbitrary
+	// inbox 60 times a minute and burn the mail provider's quota doing it.
+	waitlists.Post("/waitlists", httpx.RateLimiter(5, 15*time.Minute, true), m.handler.createWaitlist)
 
 	router.Get("/users/waitlist",
 		m.authMiddl.RequireAuth(), m.limiter, m.authMiddl.RequireAdmin(),

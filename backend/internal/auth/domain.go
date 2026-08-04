@@ -18,6 +18,12 @@ import (
 // resend-verification flow instead of a generic credentials error.
 var ErrAccountUnverified = errors.New("invalid account")
 
+// ErrAccountDisabled signals that the account exists and the credentials were
+// correct, but an administrator has banned it or deleted it. It is deliberately
+// raised only after the password check: an account's disabled state must not be
+// something an anonymous caller can probe by submitting a bare email.
+var ErrAccountDisabled = errors.New("account disabled")
+
 // ErrEmailAlreadyExists signals a registration attempt with an email that is
 // already tied to an account. Unlike password reset / email verification
 // requests (which never confirm whether an address exists), registration is
