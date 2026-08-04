@@ -171,6 +171,7 @@
 			active={activeIndex}
 			formatAbbrev={fmtAbbrev}
 			formatDate={fmtDate}
+			formatFullDate={fmtLongDate}
 			formatMoney={fmtMoney}
 			onactivate={(index) => (activeIndex = index)}
 		/>

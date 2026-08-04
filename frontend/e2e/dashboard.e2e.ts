@@ -20,6 +20,24 @@ test.describe('dashboard charts', () => {
 		await expect(page.getByText(/^Ganancia [+−]\$/)).toBeVisible();
 	});
 
+	test('la gráfica ofrece sus dos series como tabla para el lector de pantalla', async ({
+		page
+	}) => {
+		await login(page);
+
+		const series = page.getByRole('table', {
+			name: /Valor de mercado y capital invertido del portafolio/
+		});
+		await expect(series.getByRole('columnheader', { name: 'Valor de mercado' })).toBeAttached();
+		await expect(series.getByRole('columnheader', { name: 'Capital invertido' })).toBeAttached();
+
+		// Cada fila se identifica con la fecha completa: el eje abrevia a mes y
+		// año en los rangos largos, y así varias filas se llamarían igual.
+		const firstRow = series.getByRole('rowheader').first();
+		await expect(firstRow).toHaveText(/^\d{2} de \p{L}+ de \d{4}$/u);
+		await expect(firstRow.locator('time')).toHaveAttribute('datetime', /^\d{4}-\d{2}-\d{2}$/);
+	});
+
 	test('la asignación de activos enlaza leyenda y porción', async ({ page }) => {
 		await login(page);
 

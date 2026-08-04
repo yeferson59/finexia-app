@@ -23,15 +23,31 @@
 		scale: GrowthScale;
 		/** Índice fijado por el usuario; `null` cuando no hay ninguno. */
 		active: number | null;
+		/** Etiqueta corta del eje vertical. */
 		formatAbbrev: (value: number) => string;
+		/** Etiqueta del eje horizontal; se abrevia y puede repetirse entre puntos. */
 		formatDate: (iso: string) => string;
+		/**
+		 * Fecha completa de un punto. La tabla oculta necesita una fecha que
+		 * identifique la fila sin ambigüedad: `formatDate` abrevia a mes y año en
+		 * los rangos largos, así que allí varias filas se llamarían igual.
+		 */
+		formatFullDate: (iso: string) => string;
 		/** Texto para el lector de pantalla y la tabla oculta. */
 		formatMoney: (value: number) => string;
 		onactivate: (index: number | null) => void;
 	}
 
-	let { points, scale, active, formatAbbrev, formatDate, formatMoney, onactivate }: Props =
-		$props();
+	let {
+		points,
+		scale,
+		active,
+		formatAbbrev,
+		formatDate,
+		formatFullDate,
+		formatMoney,
+		onactivate
+	}: Props = $props();
 
 	const { padL, padR, padT, plotH, svgW, svgH } = PLOT;
 
@@ -171,17 +187,24 @@
 		{/if}
 	</svg>
 
-	<!-- Los mismos datos, para quien no puede leer el SVG. -->
+	<!-- Los mismos datos que dibuja el SVG, con las dos series y la fecha
+	     completa: es la única vía de acceso para quien no puede leer la gráfica,
+	     así que no puede quedarse corta respecto a lo que promete el título. -->
 	<table class="sr-only">
 		<caption>Valor de mercado y capital invertido del portafolio, por fecha</caption>
 		<thead>
-			<tr><th scope="col">Fecha</th><th scope="col">Valor de mercado</th></tr>
+			<tr>
+				<th scope="col">Fecha</th>
+				<th scope="col">Valor de mercado</th>
+				<th scope="col">Capital invertido</th>
+			</tr>
 		</thead>
 		<tbody>
 			{#each points as point (point.date)}
 				<tr>
-					<td>{formatDate(point.date)}</td>
+					<th scope="row"><time datetime={point.date}>{formatFullDate(point.date)}</time></th>
 					<td>{formatMoney(point.mv)}</td>
+					<td>{formatMoney(point.cb)}</td>
 				</tr>
 			{/each}
 		</tbody>
