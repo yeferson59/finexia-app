@@ -2,14 +2,13 @@
 	import CardHeader from '$lib/ui/card-header.svelte';
 	import EmptyState from '$lib/ui/empty-state.svelte';
 	import Stat from '$lib/ui/stat.svelte';
+	import GrowthChart from './growth-chart.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import {
 		PERIODS,
-		PLOT,
 		filterByPeriod,
 		growthScale,
-		toPlotX,
-		toPlotY,
+		type GrowthPoint,
 		type Period
 	} from '../dashboard';
 
@@ -21,15 +20,14 @@
 	}: { data: GrowthDataPoint[]; summary: GrowthSummary } = $props();
 
 	let selectedPeriod = $state<Period>('Todo');
+	/** Punto bajo el cursor (ratón o teclado); `null` cuando no hay ninguno. */
+	let activeIndex = $state<number | null>(null);
 
 	const periods = PERIODS;
 
 	const filteredData = $derived(filterByPeriod(data, selectedPeriod));
 
-	// Medidas del lienzo, compartidas con los helpers de `dashboard.ts`.
-	const { padL, padR, padT, plotH, svgW, svgH } = PLOT;
-
-	const values = $derived(
+	const points = $derived<GrowthPoint[]>(
 		filteredData.map((d) => ({
 			mv: parseFloat(d.totalValue || '0'),
 			cb: parseFloat(d.totalCostBase || '0'),
@@ -37,55 +35,23 @@
 		}))
 	);
 
-	const scale = $derived(growthScale(values.flatMap((v) => [v.mv, v.cb])));
-	const yMax = $derived(scale.yMax);
-	const yRange = $derived(scale.yRange);
+	const scale = $derived(growthScale(points.flatMap((p) => [p.mv, p.cb])));
 
-	const toX = toPlotX;
-	const toY = (v: number) => toPlotY(v, scale);
+	const activePoint = $derived(activeIndex === null ? null : (points[activeIndex] ?? null));
+	const activeGain = $derived(activePoint ? activePoint.mv - activePoint.cb : 0);
 
-	const mvPoints = $derived(
-		values.map((v, i) => `${toX(i, values.length)},${toY(v.mv)}`).join(' ')
-	);
-	const cbPoints = $derived(
-		values.map((v, i) => `${toX(i, values.length)},${toY(v.cb)}`).join(' ')
-	);
-	const mvFill = $derived(
-		values.length < 2
-			? ''
-			: `${mvPoints} ${toX(values.length - 1, values.length)},${padT + plotH} ${toX(0, values.length)},${padT + plotH}`
-	);
-
-	// Y-axis ticks
-	const yTicks = $derived(
-		Array.from({ length: 5 }, (_, i) => {
-			const frac = i / 4;
-			const val = yMax - frac * yRange;
-			const y = padT + frac * plotH;
-			return { y, label: fmtAbbrev(val) };
-		})
-	);
-
-	// X-axis labels (max 6 evenly spaced)
-	const xLabels = $derived(
-		values.length === 0
-			? []
-			: values
-					.map((v, i) => ({ i, date: v.date }))
-					.filter(({ i }) => {
-						const n = values.length;
-						if (n <= 6) return true;
-						const step = Math.ceil(n / 6);
-						return i % step === 0 || i === n - 1;
-					})
-	);
-
-	// Summary metrics
+	// Métricas del resumen (la foto completa, no la del punto señalado).
 	const currentVal = $derived(parseFloat(summary.currentValue || '0'));
 	const initialVal = $derived(parseFloat(summary.initialValue || '0'));
 	const totalGrowthPct = $derived(parseFloat(summary.totalGrowthPct || '0'));
 	const absoluteGain = $derived(currentVal - initialVal);
 	const isPositive = $derived(absoluteGain >= 0);
+
+	/** Al cambiar de periodo el índice anterior ya no señala al mismo día. */
+	function selectPeriod(period: Period) {
+		selectedPeriod = period;
+		activeIndex = null;
+	}
 
 	function fmt(v: number): string {
 		return new Intl.NumberFormat('es-CO', {
@@ -98,16 +64,26 @@
 		return privacy.money('$' + fmt(v));
 	}
 
+	/*
+	 * Etiquetas del eje. Entre 1.000 y 10.000 hace falta un decimal: redondeando
+	 * a miles, una serie de 1.500 a 1.900 pintaba "$2k" en las cinco marcas.
+	 */
 	function fmtAbbrev(v: number): string {
 		const abs = Math.abs(v);
 		if (abs >= 1_000_000) return privacy.money(`$${(v / 1_000_000).toFixed(1)}M`);
-		if (abs >= 1_000) return privacy.money(`$${(v / 1_000).toFixed(0)}k`);
+		if (abs >= 10_000) return privacy.money(`$${(v / 1_000).toFixed(0)}k`);
+		if (abs >= 1_000) return privacy.money(`$${(v / 1_000).toFixed(1)}k`);
 		return privacy.money(`$${v.toFixed(0)}`);
 	}
 
 	function fmtDate(iso: string): string {
 		const d = new Date(iso + 'T00:00:00');
 		return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
+	}
+
+	function fmtLongDate(iso: string): string {
+		const d = new Date(iso + 'T00:00:00');
+		return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
 	}
 </script>
 
@@ -121,7 +97,7 @@
 					aria-selected={selectedPeriod === p}
 					class="period-btn"
 					class:active={selectedPeriod === p}
-					onclick={() => (selectedPeriod = p)}>{p}</button
+					onclick={() => selectPeriod(p)}>{p}</button
 				>
 			{/each}
 		</div>
@@ -143,93 +119,45 @@
 		<Stat label="Valor actual" tone="highlight" value={fmtMoney(currentVal)} />
 	</div>
 
-	{#if filteredData.length < 2}
+	{#if points.length < 2}
 		<EmptyState
 			bordered
 			title="Aún no hay suficiente historial"
 			description="El gráfico se dibuja a medida que el sistema registra las capturas diarias de tu portafolio."
 		/>
 	{:else}
-		<svg class="chart" viewBox="0 0 {svgW} {svgH}" preserveAspectRatio="xMidYMid meet">
-			<defs>
-				<linearGradient id="growthGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-					<stop offset="0%" style="stop-color: var(--amber); stop-opacity: 0.18" />
-					<stop offset="100%" style="stop-color: var(--amber); stop-opacity: 0" />
-				</linearGradient>
-			</defs>
-
-			<!-- Grid lines -->
-			{#each yTicks as tick (tick.y)}
-				<line
-					x1={padL}
-					y1={tick.y}
-					x2={svgW - padR}
-					y2={tick.y}
-					stroke="var(--border)"
-					stroke-width="1"
-				/>
-				<text
-					x={padL - 5}
-					y={tick.y + 4}
-					text-anchor="end"
-					fill="rgba(236,234,229,0.38)"
-					font-size="9"
-					font-family="var(--font-mono)">{tick.label}</text
-				>
-			{/each}
-
-			<!-- Market value fill -->
-			{#if mvFill}
-				<polygon points={mvFill} fill="url(#growthGradient)" />
+		<!-- El detalle del punto señalado. Sin `aria-live`: la gráfica es un
+		     `slider` y su `aria-valuetext` ya lo anuncia; duplicarlo aquí haría
+		     que el lector de pantalla lo dijera dos veces. -->
+		<p class="readout">
+			{#if activePoint}
+				<span class="readout-date">{fmtLongDate(activePoint.date)}</span>
+				<span class="readout-item">
+					<i class="swatch value"></i>Valor <b>{fmtMoney(activePoint.mv)}</b>
+				</span>
+				<span class="readout-item">
+					<i class="swatch cost"></i>Invertido <b>{fmtMoney(activePoint.cb)}</b>
+				</span>
+				<span class="readout-item" class:up={activeGain >= 0} class:down={activeGain < 0}>
+					Ganancia <b>{activeGain >= 0 ? '+' : '−'}{fmtMoney(Math.abs(activeGain))}</b>
+				</span>
+			{:else}
+				<span class="readout-hint">
+					Pasa el cursor por la gráfica —o enfócala y usa las flechas— para ver el detalle de cada
+					día.
+				</span>
 			{/if}
+		</p>
 
-			<!-- Cost base line (dashed gray) -->
-			<polyline
-				points={cbPoints}
-				fill="none"
-				stroke="rgba(236,234,229,0.28)"
-				stroke-width="1.5"
-				stroke-dasharray="6 4"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			/>
-
-			<!-- Market value line (solid amber) -->
-			<polyline
-				points={mvPoints}
-				fill="none"
-				stroke="var(--amber)"
-				stroke-width="2.5"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			/>
-
-			<!-- Last point circle -->
-			{#if values.length > 0}
-				{@const lx = toX(values.length - 1, values.length)}
-				{@const ly = toY(values[values.length - 1].mv)}
-				<circle
-					cx={lx}
-					cy={ly}
-					r="4"
-					fill="var(--amber-light)"
-					stroke="rgba(0,0,0,0.35)"
-					stroke-width="1.5"
-				/>
-			{/if}
-
-			<!-- X-axis labels -->
-			{#each xLabels as { i, date } (i)}
-				<text
-					x={toX(i, values.length)}
-					y={padT + plotH + 20}
-					text-anchor="middle"
-					fill="rgba(236,234,229,0.38)"
-					font-size="9"
-					font-family="var(--font-mono)">{fmtDate(date)}</text
-				>
-			{/each}
-		</svg>
+		<GrowthChart
+			{points}
+			{scale}
+			active={activeIndex}
+			formatAbbrev={fmtAbbrev}
+			formatDate={fmtDate}
+			formatMoney={fmtMoney}
+			onactivate={(index) => (activeIndex = index)}
+		/>
 
 		<div class="legend">
 			<div class="legend-item">
@@ -312,15 +240,69 @@
 		border-bottom: 1px solid var(--border);
 	}
 
-	.chart {
-		width: 100%;
-		display: block;
-		margin-bottom: 0.75rem;
+	/* Alto fijo: el detalle aparece y desaparece sin mover la gráfica. */
+	.readout {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem 1.25rem;
+		min-height: 2.4rem;
+		margin: 0 0 0.5rem;
+		font-size: 0.78rem;
+		color: var(--text-muted);
+	}
+
+	.readout-date {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--text-dim);
+	}
+
+	.readout-item {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+
+	.readout-item b {
+		font-family: var(--font-mono);
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+		color: var(--text);
+	}
+
+	.readout-item.up b {
+		color: var(--green);
+	}
+
+	.readout-item.down b {
+		color: var(--red);
+	}
+
+	.swatch {
+		width: 10px;
+		height: 2px;
+		border-radius: 1px;
+	}
+
+	.swatch.value {
+		background: var(--amber);
+	}
+
+	.swatch.cost {
+		background: rgba(236, 234, 229, 0.4);
+	}
+
+	.readout-hint {
+		color: var(--text-dim);
 	}
 
 	.legend {
 		display: flex;
 		gap: 1.5rem;
+		margin-top: 0.75rem;
 		font-size: 0.72rem;
 		font-family: var(--font-mono);
 		color: var(--text-dim);
@@ -360,6 +342,10 @@
 		.card-top {
 			flex-direction: column;
 			align-items: flex-start;
+		}
+
+		.readout {
+			min-height: 3.4rem;
 		}
 	}
 </style>

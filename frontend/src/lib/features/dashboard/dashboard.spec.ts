@@ -5,6 +5,7 @@ import {
 	filterByPeriod,
 	generatePieSlice,
 	growthScale,
+	nearestIndex,
 	polarToCartesian,
 	toAssetEntries,
 	toPlotX,
@@ -94,18 +95,63 @@ describe('filterByPeriod', () => {
 });
 
 describe('growthScale', () => {
-	it('deja aire por arriba y por abajo de la serie', () => {
-		const { yMin, yMax } = growthScale([100, 200]);
-		expect(yMin).toBeCloseTo(97);
-		expect(yMax).toBeCloseTo(206);
+	it('redondea el dominio hacia fuera sin recortar la serie', () => {
+		const { yMin, yMax } = growthScale([137, 892]);
+		expect(yMin).toBeLessThanOrEqual(137);
+		expect(yMax).toBeGreaterThanOrEqual(892);
+	});
+
+	it('da marcas en números redondos, todas múltiplos del mismo paso', () => {
+		const { ticks } = growthScale([100, 200]);
+		expect(ticks).toEqual([200, 180, 160, 140, 120, 100]);
+	});
+
+	it('ordena las marcas de mayor a menor y cubre el dominio entero', () => {
+		const { ticks, yMin, yMax } = growthScale([1234, 98765]);
+		expect(ticks[0]).toBe(yMax);
+		expect(ticks[ticks.length - 1]).toBe(yMin);
+		expect([...ticks].sort((a, b) => b - a)).toEqual(ticks);
 	});
 
 	it('no divide por cero con una serie plana', () => {
-		expect(growthScale([100, 100]).yRange).not.toBe(0);
+		const scale = growthScale([100, 100]);
+		expect(scale.yRange).not.toBe(0);
+		expect(scale.yMin).toBeLessThan(100);
+		expect(scale.yMax).toBeGreaterThan(100);
+	});
+
+	it('no divide por cero con una serie plana en cero', () => {
+		expect(growthScale([0, 0]).yRange).not.toBe(0);
 	});
 
 	it('da una escala neutra sin datos', () => {
-		expect(growthScale([])).toEqual({ yMin: 0, yMax: 1, yRange: 1 });
+		const scale = growthScale([]);
+		expect(scale.yMin).toBe(0);
+		expect(scale.yMax).toBe(1);
+		expect(scale.yRange).toBe(1);
+	});
+
+	it('ignora los valores no finitos en vez de romper la escala', () => {
+		const scale = growthScale([100, Number.NaN, 200, Number.POSITIVE_INFINITY]);
+		expect(Number.isFinite(scale.yMin)).toBe(true);
+		expect(Number.isFinite(scale.yMax)).toBe(true);
+	});
+});
+
+describe('nearestIndex', () => {
+	it('devuelve el punto bajo el cursor', () => {
+		expect(nearestIndex(PLOT.padL, 5)).toBe(0);
+		expect(nearestIndex(PLOT.padL + PLOT.plotW, 5)).toBe(4);
+		expect(nearestIndex(PLOT.padL + PLOT.plotW / 2, 5)).toBe(2);
+	});
+
+	it('recorta a los extremos cuando el cursor sale del lienzo', () => {
+		expect(nearestIndex(-500, 5)).toBe(0);
+		expect(nearestIndex(5000, 5)).toBe(4);
+	});
+
+	it('con un solo punto siempre devuelve ese punto', () => {
+		expect(nearestIndex(1234, 1)).toBe(0);
 	});
 });
 

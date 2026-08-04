@@ -146,14 +146,93 @@ export function filterByPeriod(
 	return points.filter((d) => new Date(d.date) >= cutoff);
 }
 
+/** Punto de la serie de crecimiento, ya convertido a números. */
+export interface GrowthPoint {
+	date: string;
+	/** Valor de mercado. */
+	mv: number;
+	/** Capital invertido (coste). */
+	cb: number;
+}
+
+/** Escala vertical de la gráfica, con las marcas del eje ya calculadas. */
+export interface GrowthScale {
+	yMin: number;
+	yMax: number;
+	yRange: number;
+	/** Marcas del eje, de mayor a menor; todas múltiplos del mismo paso. */
+	ticks: number[];
+}
+
 /**
- * Escala vertical de la gráfica, con un 3 % de aire arriba y abajo para que la
- * línea no toque los bordes. Sin datos, una escala neutra que no divide por 0.
+ * Redondea un número al 1, 2, 5 o 10 más cercano de su magnitud. Es lo que
+ * separa un eje con marcas de 25.000 de uno con marcas de 27.431,66.
  */
-export function growthScale(values: number[]): { yMin: number; yMax: number; yRange: number } {
-	const yMin = values.length > 0 ? Math.min(...values) * 0.97 : 0;
-	const yMax = values.length > 0 ? Math.max(...values) * 1.03 : 1;
-	return { yMin, yMax, yRange: yMax - yMin || 1 };
+function niceNum(range: number, round: boolean): number {
+	if (!Number.isFinite(range) || range <= 0) return 1;
+	const exponent = Math.floor(Math.log10(range));
+	const fraction = range / 10 ** exponent;
+	let nice: number;
+	if (round) {
+		if (fraction < 1.5) nice = 1;
+		else if (fraction < 3) nice = 2;
+		else if (fraction < 7) nice = 5;
+		else nice = 10;
+	} else {
+		if (fraction <= 1) nice = 1;
+		else if (fraction <= 2) nice = 2;
+		else if (fraction <= 5) nice = 5;
+		else nice = 10;
+	}
+	return nice * 10 ** exponent;
+}
+
+/** Marcas objetivo del eje; el paso redondeado puede dar una o dos más. */
+const GROWTH_TICKS = 5;
+
+/** Quita la basura decimal que deja sumar el paso en coma flotante. */
+const clean = (v: number) => Number(v.toFixed(10));
+
+function scaleFrom(min: number, max: number): GrowthScale {
+	const step = niceNum((max - min) / (GROWTH_TICKS - 1), true);
+	const yMin = Math.floor(min / step) * step;
+	const yMax = Math.ceil(max / step) * step;
+	const yRange = yMax - yMin || step;
+
+	const ticks: number[] = [];
+	for (let value = yMax; value >= yMin - step / 2; value -= step) ticks.push(clean(value));
+
+	return { yMin: clean(yMin), yMax: clean(yMax), yRange: clean(yRange), ticks };
+}
+
+/**
+ * Escala vertical de la gráfica. El dominio se redondea hacia fuera hasta un
+ * paso "bonito", de modo que las marcas del eje caen en números legibles y la
+ * serie sigue cabiendo entera. Sin datos, una escala neutra que no divide por 0.
+ */
+export function growthScale(values: number[]): GrowthScale {
+	const finite = values.filter((v) => Number.isFinite(v));
+	if (finite.length === 0) return scaleFrom(0, 1);
+
+	const min = Math.min(...finite);
+	const max = Math.max(...finite);
+	// Serie plana: abre una ventana alrededor del valor para que la línea quede
+	// centrada en vez de pegada a un borde, y el rango nunca sea 0.
+	if (min === max) {
+		const pad = Math.abs(min) * 0.05 || 1;
+		return scaleFrom(min - pad, max + pad);
+	}
+	return scaleFrom(min, max);
+}
+
+/**
+ * Índice del punto más cercano a una posición horizontal del lienzo. Es lo que
+ * convierte el ratón (o las flechas del teclado) en un punto de la serie.
+ */
+export function nearestIndex(x: number, n: number): number {
+	if (n <= 1) return 0;
+	const ratio = (x - PLOT.padL) / PLOT.plotW;
+	return Math.min(n - 1, Math.max(0, Math.round(ratio * (n - 1))));
 }
 
 /** Posición horizontal del punto `i` de `n`; con un solo punto, centrado. */
