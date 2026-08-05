@@ -73,6 +73,30 @@ type CatalogView struct {
 	All      bool
 }
 
+// NormalizeCurrencyCode validates a currency against gofinance's ISO 4217
+// table and returns its canonical code. Length alone was never the test that
+// mattered: every amount this module stores is read back as a money.Money, and
+// money.CurrencyFromISOCode is what has to accept the code for that to work.
+// A three-letter string it rejects — "DOL", "ABC" — reaches the database fine
+// and then costs the asset its price, because scanAssetCurrentPrice below
+// gives up on exactly the same lookup.
+//
+// It is exported because the portfolio importer writes assets through the same
+// path and needs the same answer.
+func NormalizeCurrencyCode(raw string) (string, bool) {
+	cur, err := money.CurrencyFromISOCode(raw)
+	if err != nil {
+		return "", false
+	}
+
+	code, err := cur.GetCurrencyISOCode()
+	if err != nil {
+		return "", false
+	}
+
+	return code, true
+}
+
 // scanAssetCurrentPrice attaches the current price (stored as a string) to an
 // asset, ignoring malformed values.
 func scanAssetCurrentPrice(asset *Asset, priceStr *string) {

@@ -85,6 +85,8 @@ func (r *PostgresRepository) GetPortfoliosByUserID(ctx context.Context, userID u
 			return nil, err
 		}
 
+		retagCurrency(portfolio.PriceValue, portfolio.BaseCurrency)
+
 		portfolios = append(portfolios, portfolio)
 	}
 
@@ -108,6 +110,8 @@ func (r *PostgresRepository) CreatePortfolio(ctx context.Context, userID uuid.UU
 	); err != nil {
 		return Portfolio{}, err
 	}
+
+	retagCurrency(portfolio.PriceValue, portfolio.BaseCurrency)
 
 	return portfolio, nil
 }
@@ -144,6 +148,8 @@ func (r *PostgresRepository) GetPortfolioByID(ctx context.Context, portfolioID, 
 		}
 		return Portfolio{}, err
 	}
+
+	retagCurrency(portfolio.PriceValue, portfolio.BaseCurrency)
 
 	return portfolio, nil
 }
@@ -184,6 +190,8 @@ func (r *PostgresRepository) UpdatePortfolio(ctx context.Context, userID, portfo
 	); err != nil {
 		return Portfolio{}, err
 	}
+
+	retagCurrency(portfolio.PriceValue, portfolio.BaseCurrency)
 
 	return portfolio, nil
 }

@@ -2,7 +2,6 @@ package portfolio
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -87,7 +86,10 @@ func (s *Service) sendTransactionAlert(userID, entryID uuid.UUID, txn Transactio
 
 	qty := txn.Quantity.String()
 	priceStr := txn.Price.String()
-	totalStr := fmt.Sprintf("%.2f", txn.Quantity.InexactFloat64()*txn.Price.InexactFloat64())
+	// The line total stays on the money type all the way to the string: going
+	// through float64 lost cents on prices with more than a couple of decimals,
+	// which is every crypto fill.
+	totalStr := txn.Price.MulDecimal(txn.Quantity).RoundBank(2).StringFixed(2)
 
 	data := mail.ActivityAlertData{
 		UserName:        usr.Name,

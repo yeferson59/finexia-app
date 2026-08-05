@@ -1,11 +1,10 @@
 package portfolio
 
 import (
-	"math"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
@@ -159,19 +158,35 @@ type AllocationItemDTO struct {
 	Percent     float64 `json:"percent"`
 }
 
+// NewAllocationResponse turns each category's market value into its share of
+// the whole. Both the sum and the division run on gofinance's decimal engine —
+// summing the categories in float64 drifted against the total the same rows add
+// up to in Postgres, and the shares could miss 100% by more than the rounding
+// alone accounts for.
 func NewAllocationResponse(items []AllocationItem) []AllocationItemDTO {
-	var total float64
-	for _, item := range items {
-		v, _ := strconv.ParseFloat(item.MarketValue, 64)
-		total += v
+	values := make([]decimal.Decimal, len(items))
+	total := decimal.Zero
+	for i, item := range items {
+		v, err := decimal.NewFromString(item.MarketValue)
+		if err != nil {
+			v = decimal.Zero
+		}
+		values[i] = v
+		total = total.Add(v)
 	}
 
 	result := make([]AllocationItemDTO, 0, len(items))
-	for _, item := range items {
-		v, _ := strconv.ParseFloat(item.MarketValue, 64)
+	for i, item := range items {
 		var pct float64
-		if total > 0 {
-			pct = math.Round((v/total)*10000) / 100
+		if total.IsPos() {
+			// Scale to a percentage before dividing: Div fixes the result's
+			// precision, so dividing first spends those digits on the 0.xx
+			// fraction and throws away the ones the percentage is read at.
+			if share, err := values[i].Mul(oneHundred).Div(total); err == nil {
+				// RoundHAZ is half-away-from-zero, the mode math.Round used
+				// here and the one a reader expects of a displayed percentage.
+				pct = share.RoundHAZ(2).InexactFloat64()
+			}
 		}
 		result = append(result, AllocationItemDTO{
 			Category:    string(item.Category),

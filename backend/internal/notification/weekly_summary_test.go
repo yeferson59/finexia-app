@@ -213,3 +213,90 @@ func TestSendWeeklySummaryEmails(t *testing.T) {
 		}
 	})
 }
+
+// The digest's arithmetic runs on gofinance's decimal engine and returns.ROI
+// rather than float64, so long runs of positions no longer drift from the
+// figures the same rows produce in SQL.
+
+func TestWeeklySummaryArithmetic(t *testing.T) {
+	send := func(t *testing.T, summaries []portfolio.SummaryView) mail.WeeklySummaryData {
+		t.Helper()
+		users := new(fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
+			return []identity.User{{ID: uuid.New(), Name: "Ada", Email: "ada@example.com"}}, nil
+		}})
+		ports := new(fakePortfolioReader{getSummary: func(context.Context, uuid.UUID) ([]portfolio.SummaryView, error) {
+			return summaries, nil
+		}})
+		mailer := new(fakeMailer{})
+		sent, errs := newTestService(users, ports, mailer).SendWeeklySummaryEmails(context.Background())
+		if sent != 1 || len(errs) != 0 {
+			t.Fatalf("sent/errs = %d/%v, want 1/none", sent, errs)
+		}
+		return mailer.weekly[0].Data
+	}
+
+	t.Run("many positions sum exactly", func(t *testing.T) {
+		// 0.07 is not representable in binary; summing it a hundred times in
+		// float64 lands on 7.000000000000005, not 7.
+		summaries := make([]portfolio.SummaryView, 0, 100)
+		for range 100 {
+			summaries = append(summaries, portfolio.SummaryView{
+				Name: "P", BaseCurrency: "USD",
+				TotalMarketValue: "0.07", TotalGainLoss: "0.00", TotalGainLossPct: "0.00",
+			})
+		}
+
+		data := send(t, summaries)
+		if data.TotalValue != "7.00" {
+			t.Errorf("TotalValue = %q, want 7.00", data.TotalValue)
+		}
+	})
+
+	t.Run("holdings that net out to their cost report no return", func(t *testing.T) {
+		// Value equals gain, so the cost base is zero: returns.ROI refuses it
+		// rather than dividing by it.
+		data := send(t, []portfolio.SummaryView{{
+			Name: "P", BaseCurrency: "USD",
+			TotalMarketValue: "500.00", TotalGainLoss: "500.00", TotalGainLossPct: "0.00",
+		}})
+		if data.TotalGainLossPct != "0.00" {
+			t.Errorf("TotalGainLossPct = %q, want 0.00", data.TotalGainLossPct)
+		}
+	})
+
+	t.Run("a total wiped out to zero reports no return", func(t *testing.T) {
+		data := send(t, []portfolio.SummaryView{{
+			Name: "P", BaseCurrency: "USD",
+			TotalMarketValue: "0", TotalGainLoss: "0", TotalGainLossPct: "0",
+		}})
+		if data.TotalGainLossPct != "0.00" || data.TotalValue != "0.00" {
+			t.Errorf("data = %+v, want zeroes", data)
+		}
+	})
+
+	t.Run("an unparsable figure counts as zero instead of breaking the digest", func(t *testing.T) {
+		data := send(t, []portfolio.SummaryView{
+			{Name: "Broken", BaseCurrency: "USD", TotalMarketValue: "n/a", TotalGainLoss: "n/a", TotalGainLossPct: "n/a"},
+			{Name: "Fine", BaseCurrency: "USD", TotalMarketValue: "100.00", TotalGainLoss: "10.00", TotalGainLossPct: "11.11"},
+		})
+		if data.TotalValue != "100.00" || data.TotalGainLoss != "10.00" {
+			t.Errorf("totals = %q/%q, want 100.00/10.00", data.TotalValue, data.TotalGainLoss)
+		}
+		if data.Portfolios[0].TotalMarketValue != "0.00 USD" {
+			t.Errorf("broken row = %q, want '0.00 USD'", data.Portfolios[0].TotalMarketValue)
+		}
+	})
+
+	t.Run("figures are rendered with two decimals", func(t *testing.T) {
+		data := send(t, []portfolio.SummaryView{{
+			Name: "P", BaseCurrency: "COP",
+			TotalMarketValue: "4123456.789", TotalGainLoss: "1.005", TotalGainLossPct: "0.5",
+		}})
+		if data.Portfolios[0].TotalMarketValue != "4123456.79 COP" {
+			t.Errorf("market value = %q, want '4123456.79 COP'", data.Portfolios[0].TotalMarketValue)
+		}
+		if data.Portfolios[0].TotalGainLossPct != "0.50" {
+			t.Errorf("pct = %q, want 0.50", data.Portfolios[0].TotalGainLossPct)
+		}
+	})
+}

@@ -76,8 +76,8 @@ func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, 
 			return nil, err
 		}
 		txn.Quantity = decimal.MustFromString(quantity)
-		txn.Price = money.MustMoneyFromString(price, money.USD)
-		txn.Fees = money.MustMoneyFromString(fees, money.USD)
+		txn.Price = moneyOf(price, txn.Currency)
+		txn.Fees = moneyOf(fees, txn.Currency)
 		txns = append(txns, txn)
 	}
 	return txns, nil
@@ -162,8 +162,8 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 			return nil, err
 		}
 		txn.Quantity = decimal.MustFromString(quantity)
-		txn.Price = money.MustMoneyFromString(price, money.USD)
-		txn.Fees = money.MustMoneyFromString(fees, money.USD)
+		txn.Price = moneyOf(price, txn.Currency)
+		txn.Fees = moneyOf(fees, txn.Currency)
 		txns = append(txns, txn)
 	}
 	return txns, nil
@@ -219,8 +219,8 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 			return nil, err
 		}
 		txn.Quantity = decimal.MustFromString(quantity)
-		txn.Price = money.MustMoneyFromString(price, money.USD)
-		txn.Fees = money.MustMoneyFromString(fees, money.USD)
+		txn.Price = moneyOf(price, txn.Currency)
+		txn.Fees = moneyOf(fees, txn.Currency)
 		txns = append(txns, txn)
 	}
 	return txns, nil
@@ -264,8 +264,8 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 	}
 
 	txn.Quantity = decimal.MustFromString(quantityValue)
-	txn.Price = money.MustMoneyFromString(priceValue, money.USD)
-	txn.Fees = money.MustMoneyFromString(feesValue, money.USD)
+	txn.Price = moneyOf(priceValue, txn.Currency)
+	txn.Fees = moneyOf(feesValue, txn.Currency)
 	return txn, nil
 }
 
@@ -309,8 +309,8 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 		return Transaction{}, err
 	}
 	txn.Quantity = decimal.MustFromString(quantityValue)
-	txn.Price = money.MustMoneyFromString(priceValue, money.USD)
-	txn.Fees = money.MustMoneyFromString(feesValue, money.USD)
+	txn.Price = moneyOf(priceValue, txn.Currency)
+	txn.Fees = moneyOf(feesValue, txn.Currency)
 	return txn, nil
 }
 
