@@ -166,55 +166,28 @@ func TestGetPortfoliosSummary(t *testing.T) {
 func TestGetPortfoliosSummaryInCurrency(t *testing.T) {
 	userID := uuid.New()
 
-	t.Run("same currency skips conversion but still sets DisplayCurrency", func(t *testing.T) {
-		repo := new(fakeRepository{
-			getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]SummaryView, error) {
-				return []SummaryView{{
-					BaseCurrency: "USD", TotalMarketValue: "1000", TotalCostBase: "900",
-					TotalGainLoss: "100", TotalGainLossPct: "11.11",
-				}}, nil
-			},
-			getExchangeRateByPair: func(context.Context, string, string) (money.Decimal, error) {
-				t.Error("no rate lookup expected when currencies match")
-				return money.Decimal{}, errors.New("unexpected call")
-			},
-		})
-		svc := newTestServices(repo, newMemStorage())
+	usd := SummaryView{
+		BaseCurrency: "USD", TotalMarketValue: "1000", TotalCostBase: "900",
+		TotalGainLoss: "100", TotalGainLossPct: "11.11",
+	}
 
-		got, err := svc.GetPortfoliosSummaryInCurrency(context.Background(), userID, "USD")
-		if err != nil {
-			t.Fatalf("GetPortfoliosSummaryInCurrency: %v", err)
+	t.Run("same currency skips conversion but still sets DisplayCurrency", func(t *testing.T) {
+		// The empty rate table would fail any lookup; asserting on the recorded
+		// lookups is what proves none was attempted in the first place.
+		got := convertSummary(t, userID, usd, "USD", summaryRates{})
+
+		if len(got.lookups) != 0 {
+			t.Errorf("rate lookups = %v, want none when currencies match", got.lookups)
 		}
-		if len(got) != 1 || got[0].DisplayCurrency != "USD" || got[0].TotalMarketValue != "1000" {
-			t.Errorf("summaries = %+v", got)
+		s := got.first(t)
+		if s.DisplayCurrency != "USD" || s.TotalMarketValue != "1000" {
+			t.Errorf("summary = %+v", s)
 		}
 	})
 
 	t.Run("converts totals with the direct rate and leaves the percentage untouched", func(t *testing.T) {
-		repo := new(fakeRepository{
-			getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]SummaryView, error) {
-				return []SummaryView{{
-					BaseCurrency: "USD", TotalMarketValue: "1000", TotalCostBase: "900",
-					TotalGainLoss: "100", TotalGainLossPct: "11.11",
-				}}, nil
-			},
-			getExchangeRateByPair: func(_ context.Context, from, to string) (money.Decimal, error) {
-				if from == "USD" && to == "COP" {
-					return mustDecimal(t, "4000"), nil
-				}
-				return money.Decimal{}, errors.New("exchange rate not found")
-			},
-		})
-		svc := newTestServices(repo, newMemStorage())
+		s := convertSummary(t, userID, usd, "COP", summaryRates{"USD/COP": "4000"}).first(t)
 
-		got, err := svc.GetPortfoliosSummaryInCurrency(context.Background(), userID, "COP")
-		if err != nil {
-			t.Fatalf("GetPortfoliosSummaryInCurrency: %v", err)
-		}
-		if len(got) != 1 {
-			t.Fatalf("summaries = %+v, want one", got)
-		}
-		s := got[0]
 		if s.DisplayCurrency != "COP" {
 			t.Errorf("DisplayCurrency = %s, want COP", s.DisplayCurrency)
 		}
@@ -227,44 +200,25 @@ func TestGetPortfoliosSummaryInCurrency(t *testing.T) {
 	})
 
 	t.Run("falls back to the inverse rate when only the opposite pair is synced", func(t *testing.T) {
-		repo := new(fakeRepository{
-			getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]SummaryView, error) {
-				return []SummaryView{{
-					BaseCurrency: "COP", TotalMarketValue: "4000000", TotalCostBase: "0",
-					TotalGainLoss: "0", TotalGainLossPct: "0",
-				}}, nil
-			},
-			getExchangeRateByPair: func(_ context.Context, from, to string) (money.Decimal, error) {
-				if from == "USD" && to == "COP" {
-					return mustDecimal(t, "4000"), nil
-				}
-				return money.Decimal{}, errors.New("exchange rate not found")
-			},
-		})
-		svc := newTestServices(repo, newMemStorage())
-
-		got, err := svc.GetPortfoliosSummaryInCurrency(context.Background(), userID, "USD")
-		if err != nil {
-			t.Fatalf("GetPortfoliosSummaryInCurrency: %v", err)
+		cop := SummaryView{
+			BaseCurrency: "COP", TotalMarketValue: "4000000", TotalCostBase: "0",
+			TotalGainLoss: "0", TotalGainLossPct: "0",
 		}
-		if got[0].TotalMarketValue != "1000" {
-			t.Errorf("TotalMarketValue = %s, want 1000", got[0].TotalMarketValue)
+
+		s := convertSummary(t, userID, cop, "USD", summaryRates{"USD/COP": "4000"}).first(t)
+
+		if s.TotalMarketValue != "1000" {
+			t.Errorf("TotalMarketValue = %s, want 1000", s.TotalMarketValue)
 		}
 	})
 
 	t.Run("propagates an error when no rate connects the pair", func(t *testing.T) {
-		repo := new(fakeRepository{
-			getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]SummaryView, error) {
-				return []SummaryView{{BaseCurrency: "EUR", TotalMarketValue: "100"}}, nil
-			},
-			getExchangeRateByPair: func(context.Context, string, string) (money.Decimal, error) {
-				return money.Decimal{}, errors.New("exchange rate not found")
-			},
-		})
-		svc := newTestServices(repo, newMemStorage())
+		eur := SummaryView{BaseCurrency: "EUR", TotalMarketValue: "100"}
 
-		if _, err := svc.GetPortfoliosSummaryInCurrency(context.Background(), userID, "COP"); !errors.Is(err, ErrExchangeRateUnavailable) {
-			t.Errorf("err = %v, want ErrExchangeRateUnavailable", err)
+		got := convertSummary(t, userID, eur, "COP", summaryRates{})
+
+		if !errors.Is(got.err, ErrExchangeRateUnavailable) {
+			t.Errorf("err = %v, want ErrExchangeRateUnavailable", got.err)
 		}
 	})
 }

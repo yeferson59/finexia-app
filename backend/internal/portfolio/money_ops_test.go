@@ -76,73 +76,42 @@ func TestConvertSummaryTotalsRoundsToTheTargetCurrency(t *testing.T) {
 	userID := uuid.New()
 
 	t.Run("converted totals are rounded to the display currency precision", func(t *testing.T) {
-		repo := new(fakeRepository{
-			getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]SummaryView, error) {
-				return []SummaryView{{
-					BaseCurrency: "USD", TotalMarketValue: "1234.56", TotalCostBase: "1000.00",
-					TotalGainLoss: "234.56", TotalGainLossPct: "23.46",
-				}}, nil
-			},
-			getExchangeRateByPair: func(_ context.Context, from, to string) (money.Decimal, error) {
-				if from == "USD" && to == "COP" {
-					return mustDecimal(t, "4123.4567"), nil
-				}
-				return money.Decimal{}, errors.New("exchange rate not found")
-			},
-		})
-		svc := newTestServices(repo, newMemStorage())
-
-		got, err := svc.GetPortfoliosSummaryInCurrency(context.Background(), userID, "COP")
-		if err != nil {
-			t.Fatalf("GetPortfoliosSummaryInCurrency: %v", err)
+		summary := SummaryView{
+			BaseCurrency: "USD", TotalMarketValue: "1234.56", TotalCostBase: "1000.00",
+			TotalGainLoss: "234.56", TotalGainLossPct: "23.46",
 		}
+
+		s := convertSummary(t, userID, summary, "COP", summaryRates{"USD/COP": "4123.4567"}).first(t)
 
 		// 1234.56 * 4123.4567 = 5090654.703552 — the raw product runs to six
 		// decimals; money.Convert rounds it to the two COP minor units.
-		if got[0].TotalMarketValue != "5090654.7" {
-			t.Errorf("TotalMarketValue = %q, want 5090654.7", got[0].TotalMarketValue)
+		if s.TotalMarketValue != "5090654.7" {
+			t.Errorf("TotalMarketValue = %q, want 5090654.7", s.TotalMarketValue)
 		}
-		if got[0].TotalCostBase != "4123456.7" {
-			t.Errorf("TotalCostBase = %q, want 4123456.7", got[0].TotalCostBase)
+		if s.TotalCostBase != "4123456.7" {
+			t.Errorf("TotalCostBase = %q, want 4123456.7", s.TotalCostBase)
 		}
 	})
 
 	t.Run("a loss keeps its sign through the conversion", func(t *testing.T) {
-		repo := new(fakeRepository{
-			getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]SummaryView, error) {
-				return []SummaryView{{
-					BaseCurrency: "USD", TotalMarketValue: "900", TotalCostBase: "1000",
-					TotalGainLoss: "-100", TotalGainLossPct: "-10",
-				}}, nil
-			},
-			getExchangeRateByPair: func(_ context.Context, from, to string) (money.Decimal, error) {
-				if from == "USD" && to == "COP" {
-					return mustDecimal(t, "4000"), nil
-				}
-				return money.Decimal{}, errors.New("exchange rate not found")
-			},
-		})
-		svc := newTestServices(repo, newMemStorage())
-
-		got, err := svc.GetPortfoliosSummaryInCurrency(context.Background(), userID, "COP")
-		if err != nil {
-			t.Fatalf("GetPortfoliosSummaryInCurrency: %v", err)
+		summary := SummaryView{
+			BaseCurrency: "USD", TotalMarketValue: "900", TotalCostBase: "1000",
+			TotalGainLoss: "-100", TotalGainLossPct: "-10",
 		}
-		if got[0].TotalGainLoss != "-400000" {
-			t.Errorf("TotalGainLoss = %q, want -400000", got[0].TotalGainLoss)
+
+		s := convertSummary(t, userID, summary, "COP", summaryRates{"USD/COP": "4000"}).first(t)
+
+		if s.TotalGainLoss != "-400000" {
+			t.Errorf("TotalGainLoss = %q, want -400000", s.TotalGainLoss)
 		}
 	})
 
 	t.Run("a currency gofinance does not know is a bad request, not a 500", func(t *testing.T) {
-		repo := new(fakeRepository{
-			getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]SummaryView, error) {
-				return []SummaryView{{BaseCurrency: "ZZZ", TotalMarketValue: "100"}}, nil
-			},
-		})
-		svc := newTestServices(repo, newMemStorage())
+		summary := SummaryView{BaseCurrency: "ZZZ", TotalMarketValue: "100"}
 
-		_, err := svc.GetPortfoliosSummaryInCurrency(context.Background(), userID, "USD")
-		if err == nil {
+		got := convertSummary(t, userID, summary, "USD", summaryRates{})
+
+		if got.err == nil {
 			t.Fatal("want an error for an unknown base currency")
 		}
 	})

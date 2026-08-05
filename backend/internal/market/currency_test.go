@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
@@ -76,7 +77,7 @@ func TestCreateExchangeRateValidatesItsInput(t *testing.T) {
 
 	t.Run("an unknown source currency is rejected", func(t *testing.T) {
 		svc := newSvc()
-		_, err := svc.CreateExchangeRate(context.Background(), "ABC", "USD", money.MustFromString("4000"))
+		_, err := svc.CreateExchangeRate(context.Background(), "ABC", "USD", decimal.MustFromString("4000"))
 		if !errors.Is(err, errExchangeRateCurrencyInvalid) {
 			t.Errorf("err = %v, want errExchangeRateCurrencyInvalid", err)
 		}
@@ -87,7 +88,7 @@ func TestCreateExchangeRateValidatesItsInput(t *testing.T) {
 
 	t.Run("an unknown target currency is rejected", func(t *testing.T) {
 		svc := newSvc()
-		_, err := svc.CreateExchangeRate(context.Background(), "USD", "ZZZ", money.MustFromString("4000"))
+		_, err := svc.CreateExchangeRate(context.Background(), "USD", "ZZZ", decimal.MustFromString("4000"))
 		if !errors.Is(err, errExchangeRateCurrencyInvalid) {
 			t.Errorf("err = %v, want errExchangeRateCurrencyInvalid", err)
 		}
@@ -96,7 +97,7 @@ func TestCreateExchangeRateValidatesItsInput(t *testing.T) {
 	for _, rate := range []string{"0", "-1", "-4000.5"} {
 		t.Run("rate "+rate+" is rejected", func(t *testing.T) {
 			svc := newSvc()
-			_, err := svc.CreateExchangeRate(context.Background(), "USD", "COP", money.MustFromString(rate))
+			_, err := svc.CreateExchangeRate(context.Background(), "USD", "COP", decimal.MustFromString(rate))
 			if !errors.Is(err, errExchangeRateInvalid) {
 				t.Errorf("err = %v, want errExchangeRateInvalid", err)
 			}
@@ -108,7 +109,7 @@ func TestCreateExchangeRateValidatesItsInput(t *testing.T) {
 
 	t.Run("a valid pair is stored in its canonical spelling", func(t *testing.T) {
 		svc := newSvc()
-		got, err := svc.CreateExchangeRate(context.Background(), " usd ", "cop", money.MustFromString("4123.45"))
+		got, err := svc.CreateExchangeRate(context.Background(), " usd ", "cop", decimal.MustFromString("4123.45"))
 		if err != nil {
 			t.Fatalf("CreateExchangeRate: %v", err)
 		}
@@ -126,7 +127,7 @@ func TestUpdateExchangeRateRejectsUnusableRates(t *testing.T) {
 
 	// The fake leaves UpdateExchangeRateByID unstubbed, so reaching it would
 	// panic — the assertion is that validation returns first.
-	_, err := svc.UpdateExchangeRate(context.Background(), [16]byte{}, money.MustFromString("0"))
+	_, err := svc.UpdateExchangeRate(context.Background(), [16]byte{}, decimal.MustFromString("0"))
 	if !errors.Is(err, errExchangeRateInvalid) {
 		t.Errorf("err = %v, want errExchangeRateInvalid", err)
 	}
