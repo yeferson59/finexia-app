@@ -233,6 +233,55 @@ func TestWeeklySummaryRendersTheWeeklyChange(t *testing.T) {
 		}
 	})
 
+	t.Run("each portfolio row shows its own movement above its all-time return", func(t *testing.T) {
+		var got capturedEmail
+		s := newTestService(t, http.StatusOK, &got)
+
+		data := base
+		data.HasWeekChange = true
+		data.WeekChangeValue = "+42.50"
+		data.WeekChangePct = "+4.02"
+		data.WeekChangeColor = "#22c97e"
+		data.WeekChangeSince = "29 jul"
+		data.Portfolios = []WeeklySummaryPortfolio{{
+			Name: "Acciones USA", Type: "stocks",
+			TotalMarketValue: "8200.30 USD", TotalGainLossPct: "19.40", GainLossColor: "#22c97e",
+			HasWeekChange: true, WeekChangeValue: "+150.20", WeekChangePct: "+1.87", WeekChangeColor: "#22c97e",
+		}}
+
+		if err := s.SendWeeklySummary("ada@example.com", data); err != nil {
+			t.Fatalf("SendWeeklySummary: %v", err)
+		}
+		body := visibleText(got.req.Html)
+		for _, want := range []string{"+150.20", "(+1.87%)", "19.40% total", "· variación desde el 29 jul"} {
+			if !strings.Contains(body, want) {
+				t.Errorf("rendered HTML missing %q", want)
+			}
+		}
+	})
+
+	t.Run("a portfolio with no history keeps its all-time return as the coloured figure", func(t *testing.T) {
+		var got capturedEmail
+		s := newTestService(t, http.StatusOK, &got)
+
+		data := base
+		data.Portfolios = []WeeklySummaryPortfolio{{
+			Name: "Cripto", Type: "cryptos",
+			TotalMarketValue: "4250.50 USD", TotalGainLossPct: "-3.10", GainLossColor: "#e05a5a",
+		}}
+
+		if err := s.SendWeeklySummary("ada@example.com", data); err != nil {
+			t.Fatalf("SendWeeklySummary: %v", err)
+		}
+		body := visibleText(got.req.Html)
+		if strings.Contains(body, "% total") {
+			t.Error("without a weekly figure the return should not be demoted to a caption")
+		}
+		if !strings.Contains(body, "-3.10%") {
+			t.Error("rendered HTML missing the all-time return")
+		}
+	})
+
 	t.Run("an amount without a usable percentage omits the parenthesis", func(t *testing.T) {
 		var got capturedEmail
 		s := newTestService(t, http.StatusOK, &got)

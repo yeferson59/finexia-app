@@ -72,6 +72,15 @@ type WeeklySummaryPortfolio struct {
 	TotalGainLoss    string
 	TotalGainLossPct string
 	GainLossColor    string
+
+	// Movement since the previous weekly summary, on the same terms as the
+	// account-wide fields on WeeklySummaryData: signed figures, and a false
+	// HasWeekChange for a portfolio that did not exist a week ago. When it is
+	// false the row falls back to showing the all-time return on its own.
+	HasWeekChange   bool
+	WeekChangeValue string
+	WeekChangePct   string
+	WeekChangeColor string
 }
 
 type WeeklySummaryData struct {

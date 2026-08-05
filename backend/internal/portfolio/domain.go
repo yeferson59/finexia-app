@@ -384,15 +384,13 @@ type GrowthSummary struct {
 	TotalGrowthPct string
 }
 
-// TotalValuePoint is what every portfolio a user owns was worth on one
-// snapshot date. Date is carried alongside the amount because the snapshot
-// found is the most recent one on or before the date asked for, not
+// PortfolioValuePoint is what one portfolio was worth on one snapshot date,
+// in its own base currency. Date is carried alongside the amount because the
+// snapshot found is the most recent one on or before the date asked for, not
 // necessarily that date itself — a caller reporting "since last week" has to
 // be able to say which day it actually compared against.
-//
-// TotalValue sums portfolios in their own base currencies, the same way the
-// growth series does.
-type TotalValuePoint struct {
-	Date       time.Time
-	TotalValue string
+type PortfolioValuePoint struct {
+	PortfolioID uuid.UUID
+	Date        time.Time
+	TotalValue  string
 }

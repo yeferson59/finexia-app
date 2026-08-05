@@ -2,11 +2,9 @@ package portfolio
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 func (r *PostgresRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]SnapshotRow, error) {
@@ -66,42 +64,49 @@ func (r *PostgresRepository) UpsertPortfolioSnapshot(
 	return err
 }
 
-// GetTotalValueAsOf returns what the user's portfolios were worth together on
-// the most recent snapshot date at or before asOf, and which date that was.
+// GetPortfolioValuesAsOf returns what each of the user's portfolios was worth
+// at its most recent snapshot on or before asOf, and which date that was.
 //
 // It looks backwards rather than at asOf exactly because the snapshot job can
 // miss a day — an outage, a deploy — and a comparison against a day that was
 // never snapshotted would report the whole portfolio as having appeared out of
 // nowhere. Taking the latest snapshot before the cutoff instead widens the
-// window rather than inventing a number.
+// window rather than inventing a number, which is why the date comes back with
+// the amount.
 //
-// SyncPortfolioSnapshots writes every portfolio under one date per run, so
-// summing a single snapshot_date covers all of them.
+// DISTINCT ON gives one row per portfolio, so a caller can report each
+// portfolio's own movement and sum the same figures for the account total —
+// the parts then add up to the whole by construction.
 //
-// Returns ErrSnapshotNotFound when the user has no snapshot that old, which is
-// the normal state for an account in its first week.
-func (r *PostgresRepository) GetTotalValueAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) (TotalValuePoint, error) {
-	var point TotalValuePoint
-
-	err := r.db.QueryRow(ctx, `
-		SELECT ps.snapshot_date, SUM(ps.total_value)::text
+// A portfolio with no snapshot that old is simply absent from the result: it
+// did not exist a week ago, so there is nothing to compare it against. An
+// empty result means the whole account has no history yet, the normal state
+// in its first week.
+func (r *PostgresRepository) GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT DISTINCT ON (ps.portfolio_id)
+			ps.portfolio_id, ps.snapshot_date, ps.total_value::text
 		FROM portfolio_snapshots ps
 		JOIN portfolios p ON p.id = ps.portfolio_id
 		WHERE p.user_id = $1
 		  AND ps.snapshot_date <= $2::date
-		GROUP BY ps.snapshot_date
-		ORDER BY ps.snapshot_date DESC
-		LIMIT 1
-	`, userID, asOf).Scan(&point.Date, &point.TotalValue)
+		ORDER BY ps.portfolio_id, ps.snapshot_date DESC
+	`, userID, asOf)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return TotalValuePoint{}, ErrSnapshotNotFound
-		}
+		return nil, err
+	}
+	defer rows.Close()
 
-		return TotalValuePoint{}, err
+	points := make([]PortfolioValuePoint, 0)
+	for rows.Next() {
+		var point PortfolioValuePoint
+		if err := rows.Scan(&point.PortfolioID, &point.Date, &point.TotalValue); err != nil {
+			return nil, err
+		}
+		points = append(points, point)
 	}
 
-	return point, nil
+	return points, rows.Err()
 }
 
 func (r *PostgresRepository) GetPortfolioGrowthByUserID(

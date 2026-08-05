@@ -34,10 +34,10 @@ type user interface {
 
 type port interface {
 	GetPortfoliosSummary(ctx context.Context, userID uuid.UUID) ([]portfolio.SummaryView, error)
-	// GetTotalValueAsOf gives the digest the figure to compare this week's
-	// total against. It reports portfolio.ErrSnapshotNotFound when the account
-	// has no history that far back.
-	GetTotalValueAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) (portfolio.TotalValuePoint, error)
+	// GetPortfolioValuesAsOf gives the digest the figures this week's are
+	// compared against, one per portfolio. Portfolios with no history that far
+	// back are simply absent.
+	GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]portfolio.PortfolioValuePoint, error)
 }
 
 type m interface {
@@ -82,7 +82,13 @@ func (s *Service) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
 			continue
 		}
 
+		// One lookup covers both the per-portfolio rows and the account total:
+		// the total's baseline is the sum of the same figures, so what the rows
+		// say adds up to what the headline says.
+		baseline := s.weekBaseline(ctx, u.ID, now)
+
 		totalValue, totalGain := decimal.Zero, decimal.Zero
+		baseTotal, baseCount := decimal.Zero, 0
 		portfolios := make([]mail.WeeklySummaryPortfolio, 0, len(summaries))
 
 		for _, p := range summaries {
@@ -97,14 +103,22 @@ func (s *Service) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
 				color = lossColor
 			}
 
-			portfolios = append(portfolios, mail.WeeklySummaryPortfolio{
+			row := mail.WeeklySummaryPortfolio{
 				Name:             p.Name,
 				Type:             string(p.Type),
 				TotalMarketValue: fixed(mv) + " " + p.BaseCurrency,
 				TotalGainLoss:    fixed(gl),
 				TotalGainLossPct: fixed(glp),
 				GainLossColor:    color,
-			})
+			}
+
+			if was, ok := baseline.values[p.ID]; ok {
+				baseTotal = baseTotal.Add(was)
+				baseCount++
+				applyChange(mv, was, &row.HasWeekChange, &row.WeekChangeValue, &row.WeekChangePct, &row.WeekChangeColor)
+			}
+
+			portfolios = append(portfolios, row)
 		}
 
 		color := gainColor
@@ -123,7 +137,10 @@ func (s *Service) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
 			WeekLabel:        weekLabel,
 		}
 
-		s.applyWeekChange(ctx, u.ID, totalValue, now, &data)
+		if baseCount > 0 {
+			applyChange(totalValue, baseTotal, &data.HasWeekChange, &data.WeekChangeValue, &data.WeekChangePct, &data.WeekChangeColor)
+			data.WeekChangeSince = formatDay(baseline.date)
+		}
 
 		if err := s.m.SendWeeklySummary(u.Email, data); err != nil {
 			errs = append(errs, fmt.Errorf("user %s: %w", u.ID, err))
@@ -139,48 +156,74 @@ func (s *Service) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
 // against. The job runs weekly, so a week back is the previous digest's figure.
 const digestPeriod = 7 * 24 * time.Hour
 
-// applyWeekChange fills in how the user's total moved since the last digest.
+// weekBaseline is what each portfolio was worth at the last digest, keyed by
+// portfolio, plus the day those figures come from.
+type weekBaseline struct {
+	values map[uuid.UUID]decimal.Decimal
+	date   time.Time
+}
+
+// weekBaseline reads the values this week's figures are compared against.
 //
-// The comparison is against the stored daily snapshot from a week ago, not
+// The comparison is against the stored daily snapshots from a week ago, not
 // against anything the mailer remembers, so a digest that failed to send — or
 // a user who enabled the summary midway — still gets a truthful "since" date
 // instead of a gap.
 //
-// A missing baseline leaves HasWeekChange false and the block hidden: an
-// account in its first week has nothing to compare against, and showing 0.00%
-// would claim the portfolio stood still when it simply was not being watched
-// yet. A lookup that fails for any other reason is treated the same way —
-// the digest is worth sending without the comparison.
-func (s *Service) applyWeekChange(ctx context.Context, userID uuid.UUID, totalValue decimal.Decimal, now time.Time, data *mail.WeeklySummaryData) {
-	previous, err := s.port.GetTotalValueAsOf(ctx, userID, now.Add(-digestPeriod))
+// A lookup that fails returns an empty baseline rather than an error: the
+// digest is worth sending without the comparison. Callers then leave
+// HasWeekChange false and the blocks stay hidden, because an account with no
+// history has nothing to compare against and a 0.00% would claim the portfolio
+// stood still when it simply was not being watched yet.
+//
+// The date reported is the most recent one across the portfolios found. They
+// share a date in practice — SyncPortfolioSnapshots writes them in one pass —
+// but a portfolio that missed a day would otherwise date the whole digest to
+// its own older snapshot.
+func (s *Service) weekBaseline(ctx context.Context, userID uuid.UUID, now time.Time) weekBaseline {
+	out := weekBaseline{values: map[uuid.UUID]decimal.Decimal{}}
+
+	points, err := s.port.GetPortfolioValuesAsOf(ctx, userID, now.Add(-digestPeriod))
 	if err != nil {
-		return
+		return out
 	}
 
-	before := amount(previous.TotalValue)
-	change := totalValue.Sub(before)
+	for _, point := range points {
+		out.values[point.PortfolioID] = amount(point.TotalValue)
+		if point.Date.After(out.date) {
+			out.date = point.Date
+		}
+	}
 
-	data.HasWeekChange = true
-	data.WeekChangeValue = signed(change)
-	data.WeekChangeSince = formatDay(previous.Date)
+	return out
+}
 
-	data.WeekChangeColor = gainColor
+// applyChange fills in one movement — a portfolio row's or the account's —
+// from what a figure is worth now and what it was worth at the baseline.
+//
+// The percentage is returns.ROI: the same "profit over amount invested" as the
+// all-time figure, with last week's value standing in for the amount invested.
+// ROI refuses a non-positive base, which is exactly the case where a
+// percentage means nothing — there was no value to grow from, so any gain is
+// an infinite one — and the pct is then left empty. The absolute change still
+// says what happened.
+func applyChange(now, before decimal.Decimal, has *bool, value, pct, color *string) {
+	change := now.Sub(before)
+
+	*has = true
+	*value = signed(change)
+
+	*color = gainColor
 	if change.IsNeg() {
-		data.WeekChangeColor = lossColor
+		*color = lossColor
 	}
 
-	// returns.ROI measures the move against what was there to move: it is the
-	// same "profit over amount invested" as the overall figure, with last
-	// week's total standing in for the amount invested. It refuses a
-	// non-positive base, which is exactly the case where a percentage has no
-	// meaning — the portfolios were worth nothing a week ago, so any gain is
-	// an infinite one. The absolute change above still says what happened.
-	roi, err := returns.ROI(money.FromDecimal(before, digestUnit), money.FromDecimal(totalValue, digestUnit))
+	roi, err := returns.ROI(money.FromDecimal(before, digestUnit), money.FromDecimal(now, digestUnit))
 	if err != nil {
 		return
 	}
 
-	data.WeekChangePct = signed(roi.Mul(oneHundred))
+	*pct = signed(roi.Mul(oneHundred))
 }
 
 // signed renders a movement with an explicit sign, so a gain reads as "+12.50"

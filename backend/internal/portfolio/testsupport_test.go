@@ -86,7 +86,7 @@ type fakeRepository struct {
 	upsertPortfolioSnapshot         func(ctx context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, currency, totalGainLoss, totalGainLossPct string) error
 	getPortfolioGrowthByUserID      func(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
 	getPortfolioGrowthByPortfolioID func(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
-	getTotalValueAsOf               func(ctx context.Context, userID uuid.UUID, asOf time.Time) (TotalValuePoint, error)
+	getPortfolioValuesAsOf          func(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error)
 	getExchangeRateByPair           func(ctx context.Context, from, to string) (money.Decimal, error)
 	getUserExchangeRateByPair       func(ctx context.Context, userID uuid.UUID, from, to string) (money.Decimal, error)
 	getHeldAssetIDs                 func(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
@@ -203,11 +203,11 @@ func (f *fakeRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context, us
 	return f.getPortfolioGrowthByPortfolioID(ctx, userID, portfolioID, hasSince, since)
 }
 
-func (f *fakeRepository) GetTotalValueAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) (TotalValuePoint, error) {
-	if f.getTotalValueAsOf == nil {
-		return TotalValuePoint{}, ErrSnapshotNotFound
+func (f *fakeRepository) GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error) {
+	if f.getPortfolioValuesAsOf == nil {
+		return nil, nil
 	}
-	return f.getTotalValueAsOf(ctx, userID, asOf)
+	return f.getPortfolioValuesAsOf(ctx, userID, asOf)
 }
 
 func (f *fakeRepository) GetExchangeRateByPair(ctx context.Context, from, to string) (money.Decimal, error) {
