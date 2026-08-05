@@ -34,6 +34,10 @@ type user interface {
 
 type port interface {
 	GetPortfoliosSummary(ctx context.Context, userID uuid.UUID) ([]portfolio.SummaryView, error)
+	// GetTotalValueAsOf gives the digest the figure to compare this week's
+	// total against. It reports portfolio.ErrSnapshotNotFound when the account
+	// has no history that far back.
+	GetTotalValueAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) (portfolio.TotalValuePoint, error)
 }
 
 type m interface {
@@ -119,6 +123,8 @@ func (s *Service) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
 			WeekLabel:        weekLabel,
 		}
 
+		s.applyWeekChange(ctx, u.ID, totalValue, now, &data)
+
 		if err := s.m.SendWeeklySummary(u.Email, data); err != nil {
 			errs = append(errs, fmt.Errorf("user %s: %w", u.ID, err))
 			continue
@@ -127,6 +133,77 @@ func (s *Service) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
 	}
 
 	return sent, errs
+}
+
+// digestPeriod is how far back the digest looks for the value it compares
+// against. The job runs weekly, so a week back is the previous digest's figure.
+const digestPeriod = 7 * 24 * time.Hour
+
+// applyWeekChange fills in how the user's total moved since the last digest.
+//
+// The comparison is against the stored daily snapshot from a week ago, not
+// against anything the mailer remembers, so a digest that failed to send — or
+// a user who enabled the summary midway — still gets a truthful "since" date
+// instead of a gap.
+//
+// A missing baseline leaves HasWeekChange false and the block hidden: an
+// account in its first week has nothing to compare against, and showing 0.00%
+// would claim the portfolio stood still when it simply was not being watched
+// yet. A lookup that fails for any other reason is treated the same way —
+// the digest is worth sending without the comparison.
+func (s *Service) applyWeekChange(ctx context.Context, userID uuid.UUID, totalValue decimal.Decimal, now time.Time, data *mail.WeeklySummaryData) {
+	previous, err := s.port.GetTotalValueAsOf(ctx, userID, now.Add(-digestPeriod))
+	if err != nil {
+		return
+	}
+
+	before := amount(previous.TotalValue)
+	change := totalValue.Sub(before)
+
+	data.HasWeekChange = true
+	data.WeekChangeValue = signed(change)
+	data.WeekChangeSince = formatDay(previous.Date)
+
+	data.WeekChangeColor = gainColor
+	if change.IsNeg() {
+		data.WeekChangeColor = lossColor
+	}
+
+	// returns.ROI measures the move against what was there to move: it is the
+	// same "profit over amount invested" as the overall figure, with last
+	// week's total standing in for the amount invested. It refuses a
+	// non-positive base, which is exactly the case where a percentage has no
+	// meaning — the portfolios were worth nothing a week ago, so any gain is
+	// an infinite one. The absolute change above still says what happened.
+	roi, err := returns.ROI(money.FromDecimal(before, digestUnit), money.FromDecimal(totalValue, digestUnit))
+	if err != nil {
+		return
+	}
+
+	data.WeekChangePct = signed(roi.Mul(oneHundred))
+}
+
+// signed renders a movement with an explicit sign, so a gain reads as "+12.50"
+// rather than as an amount that could be either.
+func signed(d decimal.Decimal) string {
+	out := fixed(d)
+	if !d.IsNeg() {
+		return "+" + out
+	}
+
+	return out
+}
+
+// spanishMonths are the abbreviations used to date the comparison. Go's own
+// month names are English, and the digest is written in Spanish.
+var spanishMonths = [...]string{
+	"ene", "feb", "mar", "abr", "may", "jun",
+	"jul", "ago", "sep", "oct", "nov", "dic",
+}
+
+// formatDay renders a snapshot date as "29 jul".
+func formatDay(t time.Time) string {
+	return fmt.Sprintf("%d %s", t.Day(), spanishMonths[int(t.Month())-1])
 }
 
 // amount reads one figure off a portfolio summary. The summaries arrive as

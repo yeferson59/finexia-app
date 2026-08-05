@@ -2,6 +2,7 @@ package mail
 
 import (
 	"encoding/json"
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -153,4 +154,104 @@ func TestSendWeeklySummary(t *testing.T) {
 			t.Errorf("rendered HTML missing %q", want)
 		}
 	}
+}
+
+// visibleText undoes the entity escaping html/template applies (a leading "+"
+// becomes "&#43;", which every mail client renders back as "+"), so the
+// assertions below read the text a subscriber sees rather than the wire form.
+func visibleText(rendered string) string {
+	return html.UnescapeString(rendered)
+}
+
+func TestWeeklySummaryRendersTheWeeklyChange(t *testing.T) {
+	base := WeeklySummaryData{
+		UserName:         "Ada",
+		TotalValue:       "1100.00",
+		TotalGainLoss:    "50.00",
+		TotalGainLossPct: "4.76",
+		GainLossColor:    "#22c97e",
+		WeekLabel:        "Semana 31 — 2026",
+		DashboardURL:     "http://localhost:8080/dashboard",
+	}
+
+	t.Run("a gain shows the amount, the percentage and the day compared against", func(t *testing.T) {
+		var got capturedEmail
+		s := newTestService(t, http.StatusOK, &got)
+
+		data := base
+		data.HasWeekChange = true
+		data.WeekChangeValue = "+42.50"
+		data.WeekChangePct = "+4.02"
+		data.WeekChangeColor = "#22c97e"
+		data.WeekChangeSince = "29 jul"
+
+		if err := s.SendWeeklySummary("ada@example.com", data); err != nil {
+			t.Fatalf("SendWeeklySummary: %v", err)
+		}
+		body := visibleText(got.req.Html)
+		for _, want := range []string{"+42.50", "(+4.02%)", "Desde el 29 jul"} {
+			if !strings.Contains(body, want) {
+				t.Errorf("rendered HTML missing %q", want)
+			}
+		}
+	})
+
+	t.Run("a loss carries its own sign", func(t *testing.T) {
+		var got capturedEmail
+		s := newTestService(t, http.StatusOK, &got)
+
+		data := base
+		data.HasWeekChange = true
+		data.WeekChangeValue = "-118.20"
+		data.WeekChangePct = "-9.71"
+		data.WeekChangeColor = "#e05a5a"
+		data.WeekChangeSince = "29 jul"
+
+		if err := s.SendWeeklySummary("ada@example.com", data); err != nil {
+			t.Fatalf("SendWeeklySummary: %v", err)
+		}
+		body := visibleText(got.req.Html)
+		for _, want := range []string{"-118.20", "(-9.71%)", "#e05a5a"} {
+			if !strings.Contains(body, want) {
+				t.Errorf("rendered HTML missing %q", want)
+			}
+		}
+	})
+
+	t.Run("without a baseline the block is left out entirely", func(t *testing.T) {
+		var got capturedEmail
+		s := newTestService(t, http.StatusOK, &got)
+
+		if err := s.SendWeeklySummary("ada@example.com", base); err != nil {
+			t.Fatalf("SendWeeklySummary: %v", err)
+		}
+		if strings.Contains(got.req.Html, "Desde el") {
+			t.Error("the weekly change block should be hidden with no baseline")
+		}
+		if !strings.Contains(got.req.Html, "1100.00") {
+			t.Error("the rest of the digest should still render")
+		}
+	})
+
+	t.Run("an amount without a usable percentage omits the parenthesis", func(t *testing.T) {
+		var got capturedEmail
+		s := newTestService(t, http.StatusOK, &got)
+
+		data := base
+		data.HasWeekChange = true
+		data.WeekChangeValue = "+1100.00"
+		data.WeekChangeColor = "#22c97e"
+		data.WeekChangeSince = "29 jul"
+
+		if err := s.SendWeeklySummary("ada@example.com", data); err != nil {
+			t.Fatalf("SendWeeklySummary: %v", err)
+		}
+		body := visibleText(got.req.Html)
+		if !strings.Contains(body, "+1100.00") {
+			t.Error("rendered HTML missing the change amount")
+		}
+		if strings.Contains(body, "()") || strings.Contains(body, "(%)") {
+			t.Error("an empty percentage should not render an empty parenthesis")
+		}
+	})
 }

@@ -22,4 +22,9 @@ var (
 	ErrTransactionNotFound       = httpx.AsNotFound(errors.New("transaction not found"))
 	ErrPortfolioOrSourceNotFound = httpx.AsNotFound(errors.New("portfolio or source not found"))
 	ErrExchangeRateNotFound      = httpx.AsNotFound(errors.New("exchange rate not found"))
+	// ErrSnapshotNotFound means no daily snapshot exists as far back as the
+	// caller asked. It is an ordinary state for an account in its first week,
+	// not a failure, so callers comparing against a past value are expected to
+	// handle it rather than propagate it.
+	ErrSnapshotNotFound = httpx.AsNotFound(errors.New("portfolio snapshot not found"))
 )

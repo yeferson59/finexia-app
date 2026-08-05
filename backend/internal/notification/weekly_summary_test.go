@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -21,13 +22,24 @@ func (f *fakeUserReader) GetUsersWithWeeklySummary(ctx context.Context) ([]ident
 	return f.getUsers(ctx)
 }
 
-// fakePortfolioReader stubs the per-user portfolio summaries.
+// fakePortfolioReader stubs the per-user portfolio summaries and the past
+// total the weekly change is measured against.
 type fakePortfolioReader struct {
 	getSummary func(ctx context.Context, userID uuid.UUID) ([]portfolio.SummaryView, error)
+	// getTotalValueAsOf is optional: left unset, the account reads as having
+	// no history, which is what an unstubbed test wants.
+	getTotalValueAsOf func(ctx context.Context, userID uuid.UUID, asOf time.Time) (portfolio.TotalValuePoint, error)
 }
 
 func (f *fakePortfolioReader) GetPortfoliosSummary(ctx context.Context, userID uuid.UUID) ([]portfolio.SummaryView, error) {
 	return f.getSummary(ctx, userID)
+}
+
+func (f *fakePortfolioReader) GetTotalValueAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) (portfolio.TotalValuePoint, error) {
+	if f.getTotalValueAsOf == nil {
+		return portfolio.TotalValuePoint{}, portfolio.ErrSnapshotNotFound
+	}
+	return f.getTotalValueAsOf(ctx, userID, asOf)
 }
 
 // sentWeekly records one SendWeeklySummary call.
@@ -299,4 +311,182 @@ func TestWeeklySummaryArithmetic(t *testing.T) {
 			t.Errorf("pct = %q, want 0.50", data.Portfolios[0].TotalGainLossPct)
 		}
 	})
+}
+
+func TestWeeklySummaryWeekOverWeekChange(t *testing.T) {
+	userID := uuid.New()
+
+	// send runs the digest with a stubbed baseline and returns the email data.
+	send := func(t *testing.T, summaries []portfolio.SummaryView, baseline func(context.Context, uuid.UUID, time.Time) (portfolio.TotalValuePoint, error)) mail.WeeklySummaryData {
+		t.Helper()
+		users := new(fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
+			return []identity.User{{ID: userID, Name: "Ada", Email: "ada@example.com"}}, nil
+		}})
+		ports := new(fakePortfolioReader{
+			getSummary: func(context.Context, uuid.UUID) ([]portfolio.SummaryView, error) {
+				return summaries, nil
+			},
+			getTotalValueAsOf: baseline,
+		})
+		mailer := new(fakeMailer{})
+		sent, errs := newTestService(users, ports, mailer).SendWeeklySummaryEmails(context.Background())
+		if sent != 1 || len(errs) != 0 {
+			t.Fatalf("sent/errs = %d/%v, want 1/none", sent, errs)
+		}
+		return mailer.weekly[0].Data
+	}
+
+	oneWeek := []portfolio.SummaryView{{
+		Name: "Growth", BaseCurrency: "USD",
+		TotalMarketValue: "1100.00", TotalGainLoss: "50.00", TotalGainLossPct: "4.76",
+	}}
+
+	lastMonday := time.Date(2026, time.July, 29, 0, 0, 0, 0, time.UTC)
+
+	t.Run("a week that gained reports the amount, the percentage and the date", func(t *testing.T) {
+		data := send(t, oneWeek, func(context.Context, uuid.UUID, time.Time) (portfolio.TotalValuePoint, error) {
+			return portfolio.TotalValuePoint{Date: lastMonday, TotalValue: "1000.00"}, nil
+		})
+
+		if !data.HasWeekChange {
+			t.Fatal("HasWeekChange = false, want the comparison to be shown")
+		}
+		if data.WeekChangeValue != "+100.00" {
+			t.Errorf("WeekChangeValue = %q, want +100.00", data.WeekChangeValue)
+		}
+		if data.WeekChangePct != "+10.00" {
+			t.Errorf("WeekChangePct = %q, want +10.00", data.WeekChangePct)
+		}
+		if data.WeekChangeColor != gainColor {
+			t.Errorf("WeekChangeColor = %q, want the gain color", data.WeekChangeColor)
+		}
+		if data.WeekChangeSince != "29 jul" {
+			t.Errorf("WeekChangeSince = %q, want '29 jul'", data.WeekChangeSince)
+		}
+	})
+
+	t.Run("a week that lost value reports a negative amount in the loss color", func(t *testing.T) {
+		data := send(t, oneWeek, func(context.Context, uuid.UUID, time.Time) (portfolio.TotalValuePoint, error) {
+			return portfolio.TotalValuePoint{Date: lastMonday, TotalValue: "1250.00"}, nil
+		})
+
+		if data.WeekChangeValue != "-150.00" {
+			t.Errorf("WeekChangeValue = %q, want -150.00", data.WeekChangeValue)
+		}
+		if data.WeekChangePct != "-12.00" {
+			t.Errorf("WeekChangePct = %q, want -12.00", data.WeekChangePct)
+		}
+		if data.WeekChangeColor != lossColor {
+			t.Errorf("WeekChangeColor = %q, want the loss color", data.WeekChangeColor)
+		}
+	})
+
+	t.Run("a flat week reports zero rather than hiding the comparison", func(t *testing.T) {
+		data := send(t, oneWeek, func(context.Context, uuid.UUID, time.Time) (portfolio.TotalValuePoint, error) {
+			return portfolio.TotalValuePoint{Date: lastMonday, TotalValue: "1100.00"}, nil
+		})
+
+		if !data.HasWeekChange {
+			t.Fatal("a week with no movement is still a real comparison")
+		}
+		if data.WeekChangeValue != "+0.00" || data.WeekChangePct != "+0.00" {
+			t.Errorf("change = %q/%q, want +0.00/+0.00", data.WeekChangeValue, data.WeekChangePct)
+		}
+	})
+
+	t.Run("an account with no history hides the comparison", func(t *testing.T) {
+		data := send(t, oneWeek, func(context.Context, uuid.UUID, time.Time) (portfolio.TotalValuePoint, error) {
+			return portfolio.TotalValuePoint{}, portfolio.ErrSnapshotNotFound
+		})
+
+		if data.HasWeekChange {
+			t.Error("HasWeekChange = true, want the block hidden with no baseline")
+		}
+		if data.TotalValue != "1100.00" {
+			t.Errorf("the rest of the digest should still be built, got TotalValue %q", data.TotalValue)
+		}
+	})
+
+	t.Run("a baseline lookup failure does not stop the digest", func(t *testing.T) {
+		data := send(t, oneWeek, func(context.Context, uuid.UUID, time.Time) (portfolio.TotalValuePoint, error) {
+			return portfolio.TotalValuePoint{}, errors.New("snapshots table on fire")
+		})
+
+		if data.HasWeekChange {
+			t.Error("a failed lookup should leave the comparison out")
+		}
+		if data.TotalValue != "1100.00" {
+			t.Errorf("TotalValue = %q, want the digest sent anyway", data.TotalValue)
+		}
+	})
+
+	t.Run("starting from nothing shows the amount but no percentage", func(t *testing.T) {
+		// The portfolios were worth nothing a week ago, so the move is not a
+		// percentage of anything — returns.ROI refuses the division and the
+		// amount stands on its own.
+		data := send(t, oneWeek, func(context.Context, uuid.UUID, time.Time) (portfolio.TotalValuePoint, error) {
+			return portfolio.TotalValuePoint{Date: lastMonday, TotalValue: "0"}, nil
+		})
+
+		if !data.HasWeekChange || data.WeekChangeValue != "+1100.00" {
+			t.Errorf("WeekChangeValue = %q, want +1100.00", data.WeekChangeValue)
+		}
+		if data.WeekChangePct != "" {
+			t.Errorf("WeekChangePct = %q, want it empty when there is no base", data.WeekChangePct)
+		}
+	})
+
+	t.Run("the baseline is looked up a week back", func(t *testing.T) {
+		var asked time.Time
+		before := time.Now()
+		send(t, oneWeek, func(_ context.Context, uid uuid.UUID, asOf time.Time) (portfolio.TotalValuePoint, error) {
+			if uid != userID {
+				t.Errorf("userID = %s, want %s", uid, userID)
+			}
+			asked = asOf
+			return portfolio.TotalValuePoint{Date: lastMonday, TotalValue: "1000.00"}, nil
+		})
+
+		want := before.Add(-digestPeriod)
+		if diff := asked.Sub(want); diff < -time.Minute || diff > time.Minute {
+			t.Errorf("asOf = %v, want ~%v (a week back)", asked, want)
+		}
+	})
+
+	t.Run("the comparison uses exact decimals, not float64", func(t *testing.T) {
+		// 0.07 a hundred times is 7 exactly; in float64 it is 7.000000000000005,
+		// which would report a change of -0.00 against a 7.00 baseline.
+		summaries := make([]portfolio.SummaryView, 0, 100)
+		for range 100 {
+			summaries = append(summaries, portfolio.SummaryView{
+				Name: "P", BaseCurrency: "USD",
+				TotalMarketValue: "0.07", TotalGainLoss: "0.00", TotalGainLossPct: "0.00",
+			})
+		}
+
+		data := send(t, summaries, func(context.Context, uuid.UUID, time.Time) (portfolio.TotalValuePoint, error) {
+			return portfolio.TotalValuePoint{Date: lastMonday, TotalValue: "7.00"}, nil
+		})
+
+		if data.WeekChangeValue != "+0.00" {
+			t.Errorf("WeekChangeValue = %q, want +0.00", data.WeekChangeValue)
+		}
+	})
+}
+
+func TestFormatDay(t *testing.T) {
+	cases := []struct {
+		date time.Time
+		want string
+	}{
+		{time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC), "1 ene"},
+		{time.Date(2026, time.July, 29, 0, 0, 0, 0, time.UTC), "29 jul"},
+		{time.Date(2026, time.December, 31, 0, 0, 0, 0, time.UTC), "31 dic"},
+	}
+
+	for _, tc := range cases {
+		if got := formatDay(tc.date); got != tc.want {
+			t.Errorf("formatDay(%v) = %q, want %q", tc.date, got, tc.want)
+		}
+	}
 }

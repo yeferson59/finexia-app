@@ -178,6 +178,14 @@ func (s *Service) UpdatePortfolio(ctx context.Context, userID, portfolioID uuid.
 	return s.repo.UpdatePortfolio(ctx, userID, portfolioID, name, description, portfolioType, riskID, isDefault)
 }
 
+// GetTotalValueAsOf returns what the user's portfolios were worth together at
+// the last snapshot on or before asOf. It reports ErrSnapshotNotFound when the
+// account has no history that far back — a caller comparing against a past
+// value is expected to fall back to showing none.
+func (s *Service) GetTotalValueAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) (TotalValuePoint, error) {
+	return s.repo.GetTotalValueAsOf(ctx, userID, asOf)
+}
+
 func (s *Service) GetPortfolioGrowth(ctx context.Context, userID uuid.UUID, period string) ([]GrowthPoint, GrowthSummary, error) {
 	hasSince, since := parsePeriod(period)
 	points, err := s.repo.GetPortfolioGrowthByUserID(ctx, userID, hasSince, since)

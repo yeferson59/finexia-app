@@ -2,9 +2,11 @@ package portfolio
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 func (r *PostgresRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]SnapshotRow, error) {
@@ -62,6 +64,44 @@ func (r *PostgresRepository) UpsertPortfolioSnapshot(
 			total_gain_loss_pct = EXCLUDED.total_gain_loss_pct
 	`, portfolioID, snapshotDate, totalValue, currency, totalGainLoss, totalGainLossPct)
 	return err
+}
+
+// GetTotalValueAsOf returns what the user's portfolios were worth together on
+// the most recent snapshot date at or before asOf, and which date that was.
+//
+// It looks backwards rather than at asOf exactly because the snapshot job can
+// miss a day — an outage, a deploy — and a comparison against a day that was
+// never snapshotted would report the whole portfolio as having appeared out of
+// nowhere. Taking the latest snapshot before the cutoff instead widens the
+// window rather than inventing a number.
+//
+// SyncPortfolioSnapshots writes every portfolio under one date per run, so
+// summing a single snapshot_date covers all of them.
+//
+// Returns ErrSnapshotNotFound when the user has no snapshot that old, which is
+// the normal state for an account in its first week.
+func (r *PostgresRepository) GetTotalValueAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) (TotalValuePoint, error) {
+	var point TotalValuePoint
+
+	err := r.db.QueryRow(ctx, `
+		SELECT ps.snapshot_date, SUM(ps.total_value)::text
+		FROM portfolio_snapshots ps
+		JOIN portfolios p ON p.id = ps.portfolio_id
+		WHERE p.user_id = $1
+		  AND ps.snapshot_date <= $2::date
+		GROUP BY ps.snapshot_date
+		ORDER BY ps.snapshot_date DESC
+		LIMIT 1
+	`, userID, asOf).Scan(&point.Date, &point.TotalValue)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return TotalValuePoint{}, ErrSnapshotNotFound
+		}
+
+		return TotalValuePoint{}, err
+	}
+
+	return point, nil
 }
 
 func (r *PostgresRepository) GetPortfolioGrowthByUserID(
