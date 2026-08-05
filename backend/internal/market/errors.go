@@ -36,6 +36,14 @@ var (
 	ErrAssetQuotaExceeded = httpx.AsTooManyRequests(fmt.Errorf("has añadido demasiados activos nuevos en las últimas 24 horas (máximo %d)", maxContributedAssetsPerDay))
 )
 
+// Exchange rate input errors. The admin endpoints validate through the same
+// ISO 4217 table and positivity rule the spreadsheet importer uses, so a rate
+// that no conversion could apply is rejected where it is entered.
+var (
+	errExchangeRateCurrencyInvalid = httpx.AsBadRequest(errors.New("la moneda debe ser un código ISO 4217 válido"))
+	errExchangeRateInvalid         = httpx.AsBadRequest(errors.New("la tasa de cambio debe ser mayor que 0"))
+)
+
 // assetFailureDetail returns the message only when this package authored it.
 // Anything else — a driver error, a constraint name — is replaced, so a failed
 // insert cannot echo the schema back over the wire.

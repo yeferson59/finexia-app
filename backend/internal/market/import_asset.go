@@ -89,7 +89,9 @@ func (s *Service) ImportAssetsFromFile(ctx context.Context, data []byte, filenam
 			}
 		}
 
-		if len(currency) != 3 {
+		if code, ok := NormalizeCurrencyCode(currency); ok {
+			currency = code
+		} else {
 			rowErrs = append(rowErrs, fmt.Sprintf("moneda inválida: %q", currency))
 		}
 

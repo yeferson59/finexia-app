@@ -20,9 +20,37 @@ func (s *Service) GetExchangeRates(ctx context.Context, offset, limit uint) ([]E
 }
 
 func (s *Service) CreateExchangeRate(ctx context.Context, from, to string, rate money.Decimal) (ExchangeRate, error) {
-	return s.repo.UpsertExchangeRate(ctx, from, to, rate, time.Now())
+	fromCode, ok := NormalizeCurrencyCode(from)
+	if !ok {
+		return ExchangeRate{}, errExchangeRateCurrencyInvalid
+	}
+	toCode, ok := NormalizeCurrencyCode(to)
+	if !ok {
+		return ExchangeRate{}, errExchangeRateCurrencyInvalid
+	}
+	if err := validRate(rate); err != nil {
+		return ExchangeRate{}, err
+	}
+
+	return s.repo.UpsertExchangeRate(ctx, fromCode, toCode, rate, time.Now())
 }
 
 func (s *Service) UpdateExchangeRate(ctx context.Context, id uuid.UUID, rate money.Decimal) (ExchangeRate, error) {
+	if err := validRate(rate); err != nil {
+		return ExchangeRate{}, err
+	}
+
 	return s.repo.UpdateExchangeRateByID(ctx, id, rate)
+}
+
+// validRate rejects a rate money.Convert would refuse. gofinance returns
+// ErrInvalidExchangeRate for anything not strictly positive, and the spreadsheet
+// importer already screens rows on the same rule; storing one through the admin
+// endpoint only moved the failure to the portfolios that later convert with it.
+func validRate(rate money.Decimal) error {
+	if !rate.IsPos() {
+		return errExchangeRateInvalid
+	}
+
+	return nil
 }

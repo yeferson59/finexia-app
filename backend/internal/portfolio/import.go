@@ -234,47 +234,15 @@ func buildImportRow(
 		}
 	} else if qty, err := parseDecimal(qtyRaw); err != nil {
 		errs = append(errs, fmt.Sprintf("cantidad no numérica: %q", qtyRaw))
-	} else if qty.InexactFloat64() < 0 || (quantityRequired(txnType) && qty.IsZero()) {
+	} else if qty.IsNeg() || (quantityRequired(txnType) && qty.IsZero()) {
 		errs = append(errs, fmt.Sprintf("la cantidad debe ser mayor que 0: %q", qtyRaw))
 	} else {
 		entity.Quantity = qty
 		dto.Quantity = qty.String()
 	}
 
-	// Price.
-	priceRaw := spreadsheet.CellAt(row, mapping.Price)
-	if priceRaw == "" {
-		if txnType == Buy || txnType == Sell {
-			errs = append(errs, "el precio está vacío")
-		} else {
-			entity.Price = money.FromDecimal(decimal.Zero, money.USD)
-			dto.Price = "0"
-		}
-	} else if price, err := parseDecimal(priceRaw); err != nil {
-		errs = append(errs, fmt.Sprintf("precio no numérico: %q", priceRaw))
-	} else if price.InexactFloat64() < 0 {
-		errs = append(errs, fmt.Sprintf("el precio no puede ser negativo: %q", priceRaw))
-	} else {
-		entity.Price = money.FromDecimal(price, money.USD)
-		dto.Price = price.String()
-	}
-
-	// Fees (optional).
-	feesRaw := spreadsheet.CellAt(row, mapping.Fees)
-	entity.Fees = money.FromDecimal(decimal.Zero, money.USD)
-	dto.Fees = "0"
-	if feesRaw != "" {
-		if fees, err := parseDecimal(feesRaw); err != nil {
-			errs = append(errs, fmt.Sprintf("comisión no numérica: %q", feesRaw))
-		} else if fees.InexactFloat64() < 0 {
-			errs = append(errs, fmt.Sprintf("la comisión no puede ser negativa: %q", feesRaw))
-		} else {
-			entity.Fees = money.FromDecimal(fees, money.USD)
-			dto.Fees = fees.String()
-		}
-	}
-
-	// Currency.
+	// Currency. Resolved before the amounts below so each one is tagged with
+	// the currency it was actually settled in rather than a blanket USD.
 	currency := defaults.Currency
 	if curRaw := spreadsheet.CellAt(row, mapping.Currency); curRaw != "" {
 		if cur, ok := normalizeCurrency(curRaw); ok {
@@ -285,6 +253,43 @@ func buildImportRow(
 	}
 	entity.Currency = currency
 	dto.Currency = currency
+	// normalizeCurrency and applyImportDefaults both validate against
+	// gofinance's ISO 4217 table, so this lookup only ever falls back for a row
+	// whose currency cell was rejected above and already carries an error.
+	unit := currencyOf(currency)
+
+	// Price.
+	priceRaw := spreadsheet.CellAt(row, mapping.Price)
+	if priceRaw == "" {
+		if txnType == Buy || txnType == Sell {
+			errs = append(errs, "el precio está vacío")
+		} else {
+			entity.Price = money.FromDecimal(decimal.Zero, unit)
+			dto.Price = "0"
+		}
+	} else if price, err := parseDecimal(priceRaw); err != nil {
+		errs = append(errs, fmt.Sprintf("precio no numérico: %q", priceRaw))
+	} else if price.IsNeg() {
+		errs = append(errs, fmt.Sprintf("el precio no puede ser negativo: %q", priceRaw))
+	} else {
+		entity.Price = money.FromDecimal(price, unit)
+		dto.Price = price.String()
+	}
+
+	// Fees (optional).
+	feesRaw := spreadsheet.CellAt(row, mapping.Fees)
+	entity.Fees = money.FromDecimal(decimal.Zero, unit)
+	dto.Fees = "0"
+	if feesRaw != "" {
+		if fees, err := parseDecimal(feesRaw); err != nil {
+			errs = append(errs, fmt.Sprintf("comisión no numérica: %q", feesRaw))
+		} else if fees.IsNeg() {
+			errs = append(errs, fmt.Sprintf("la comisión no puede ser negativa: %q", feesRaw))
+		} else {
+			entity.Fees = money.FromDecimal(fees, unit)
+			dto.Fees = fees.String()
+		}
+	}
 
 	// Category / asset type.
 	assetType, _ := market.NormalizeAssetType(defaults.Category)

@@ -61,6 +61,14 @@ func (s *Service) GetConversionRate(ctx context.Context, userID uuid.UUID, from,
 	return fromToUSD.Mul(usdToTarget), nil
 }
 
+// usableRate reports whether a stored rate is one money.Convert would accept.
+// gofinance treats a zero or negative rate as invalid (ErrInvalidExchangeRate),
+// so screening it here lets a corrupt row fall through to the other directions
+// below and, failing those, surface as the same 404 as a missing rate.
+func usableRate(rate money.Decimal) bool {
+	return rate.IsPos()
+}
+
 // pairRate resolves a single pair directly, falling back to inverting the
 // opposite direction if that's what was fetched.
 //
@@ -71,15 +79,12 @@ func (s *Service) pairRate(ctx context.Context, userID uuid.UUID, from, to strin
 		return decimal.One, nil
 	}
 
-	if rate, err := s.storedRate(ctx, userID, from, to); err == nil {
+	if rate, err := s.storedRate(ctx, userID, from, to); err == nil && usableRate(rate) {
 		return rate, nil
 	}
 
 	rate, err := s.storedRate(ctx, userID, to, from)
-	if err != nil {
-		return money.Decimal{}, ErrExchangeRateUnavailable
-	}
-	if rate.IsZero() {
+	if err != nil || !usableRate(rate) {
 		return money.Decimal{}, ErrExchangeRateUnavailable
 	}
 

@@ -60,10 +60,14 @@ func (s *Service) ImportExchangeRatesFromFile(ctx context.Context, data []byte, 
 		rateRaw := spreadsheet.CellAtIdx(row, cols["rate"])
 
 		var rowErrs []string
-		if len(from) != 3 {
+		if code, ok := NormalizeCurrencyCode(from); ok {
+			from = code
+		} else {
 			rowErrs = append(rowErrs, fmt.Sprintf("moneda origen inválida: %q", from))
 		}
-		if len(to) != 3 {
+		if code, ok := NormalizeCurrencyCode(to); ok {
+			to = code
+		} else {
 			rowErrs = append(rowErrs, fmt.Sprintf("moneda destino inválida: %q", to))
 		}
 

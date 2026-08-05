@@ -99,8 +99,12 @@
                 <tr>
                   <td style="padding:22px 24px;">
                     <p style="font-family:'JetBrains Mono',Courier New,monospace;font-size:9px;font-weight:500;letter-spacing:0.18em;text-transform:uppercase;color:#555250;margin:0 0 8px 0;">Valor total del portafolio</p>
-                    <p style="font-family:'Fraunces',Georgia,serif;font-weight:500;font-size:32px;color:#eceae5;margin:0 0 16px 0;letter-spacing:-0.025em;">{{.TotalValue}}</p>
-                    <div style="height:1px;background-color:#1e2023;margin-bottom:16px;"></div>
+                    <p style="font-family:'Fraunces',Georgia,serif;font-weight:500;font-size:32px;color:#eceae5;margin:0 0 6px 0;letter-spacing:-0.025em;">{{.TotalValue}}</p>
+                    {{if .HasWeekChange}}
+                    <p style="font-family:'Outfit',Arial,sans-serif;font-size:15px;font-weight:500;color:{{.WeekChangeColor}};margin:0 0 3px 0;">{{.WeekChangeValue}}{{if .WeekChangePct}} <span style="font-family:'JetBrains Mono',Courier New,monospace;font-size:13px;">({{.WeekChangePct}}%)</span>{{end}}</p>
+                    <p style="font-family:'JetBrains Mono',Courier New,monospace;font-size:9px;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;color:#555250;margin:0;">Desde el {{.WeekChangeSince}}</p>
+                    {{end}}
+                    <div style="height:1px;background-color:#1e2023;margin:16px 0;"></div>
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                       <tr>
                         <td width="50%">
@@ -123,7 +127,7 @@
           {{if .Portfolios}}
           <tr>
             <td class="wrap-pad" style="padding:8px 32px 28px;">
-              <p style="font-family:'JetBrains Mono',Courier New,monospace;font-size:9.5px;font-weight:500;letter-spacing:0.22em;text-transform:uppercase;color:#d4912a;margin:0 0 14px 0;">Tus portafolios</p>
+              <p style="font-family:'JetBrains Mono',Courier New,monospace;font-size:9.5px;font-weight:500;letter-spacing:0.22em;text-transform:uppercase;color:#d4912a;margin:0 0 14px 0;">Tus portafolios{{if .HasWeekChange}} <span style="color:#555250;letter-spacing:0.14em;">· variación desde el {{.WeekChangeSince}}</span>{{end}}</p>
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border:1px solid #1e2023;border-radius:8px;overflow:hidden;">
                 {{range $i, $p := .Portfolios}}
                 <tr>
@@ -136,7 +140,12 @@
                         </td>
                         <td valign="middle" align="right">
                           <p style="font-family:'Outfit',Arial,sans-serif;font-size:14px;font-weight:500;color:#eceae5;margin:0 0 2px 0;">{{$p.TotalMarketValue}}</p>
+                          {{if $p.HasWeekChange}}
+                          <p style="font-family:'JetBrains Mono',Courier New,monospace;font-size:11px;font-weight:500;color:{{$p.WeekChangeColor}};margin:0 0 2px 0;">{{$p.WeekChangeValue}}{{if $p.WeekChangePct}} ({{$p.WeekChangePct}}%){{end}}</p>
+                          <p style="font-family:'JetBrains Mono',Courier New,monospace;font-size:9.5px;color:#555250;margin:0;">{{$p.TotalGainLossPct}}% total</p>
+                          {{else}}
                           <p style="font-family:'JetBrains Mono',Courier New,monospace;font-size:10px;color:{{$p.GainLossColor}};margin:0;">{{$p.TotalGainLossPct}}%</p>
+                          {{end}}
                         </td>
                       </tr>
                     </table>

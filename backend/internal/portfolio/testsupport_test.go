@@ -40,6 +40,63 @@ func mustDecimal(t *testing.T, s string) money.Decimal {
 	return d
 }
 
+// summaryRates is a stubbed rate table keyed "FROM/TO", matching how rates are
+// actually stored: one direction only, with the service inverting or hopping
+// through USD to reach the rest.
+type summaryRates map[string]string
+
+// summaryConversion is what running the display-currency conversion over one
+// stubbed summary produced, including the rate lookups the service performed
+// so a caller can assert on those too.
+type summaryConversion struct {
+	summaries []SummaryView
+	lookups   []string
+	err       error
+}
+
+// convertSummary runs GetPortfoliosSummaryInCurrency over a single stubbed
+// summary. Every display-currency scenario needs the same two stubs and
+// differs only in the figures it asserts on, so they share this rather than
+// each rebuilding the repository around them.
+func convertSummary(t *testing.T, userID uuid.UUID, summary SummaryView, target string, rates summaryRates) summaryConversion {
+	t.Helper()
+
+	out := summaryConversion{}
+	repo := new(fakeRepository{
+		getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]SummaryView, error) {
+			return []SummaryView{summary}, nil
+		},
+		getExchangeRateByPair: func(_ context.Context, from, to string) (money.Decimal, error) {
+			pair := from + "/" + to
+			out.lookups = append(out.lookups, pair)
+			if raw, ok := rates[pair]; ok {
+				return mustDecimal(t, raw), nil
+			}
+			return money.Decimal{}, ErrExchangeRateNotFound
+		},
+	})
+
+	svc := newTestServices(repo, newMemStorage())
+	out.summaries, out.err = svc.GetPortfoliosSummaryInCurrency(context.Background(), userID, target)
+
+	return out
+}
+
+// first returns the single summary the conversion was run over, failing the
+// test if the call errored or returned anything but one row.
+func (c summaryConversion) first(t *testing.T) SummaryView {
+	t.Helper()
+
+	if c.err != nil {
+		t.Fatalf("GetPortfoliosSummaryInCurrency: %v", c.err)
+	}
+	if len(c.summaries) != 1 {
+		t.Fatalf("summaries = %+v, want one", c.summaries)
+	}
+
+	return c.summaries[0]
+}
+
 // waitFor polls cond until it returns true or the deadline expires. Used to
 // synchronise with the fire-and-forget alert goroutine.
 func waitFor(t *testing.T, timeout time.Duration, cond func() bool) bool {
@@ -86,6 +143,7 @@ type fakeRepository struct {
 	upsertPortfolioSnapshot         func(ctx context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, currency, totalGainLoss, totalGainLossPct string) error
 	getPortfolioGrowthByUserID      func(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
 	getPortfolioGrowthByPortfolioID func(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
+	getPortfolioValuesAsOf          func(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error)
 	getExchangeRateByPair           func(ctx context.Context, from, to string) (money.Decimal, error)
 	getUserExchangeRateByPair       func(ctx context.Context, userID uuid.UUID, from, to string) (money.Decimal, error)
 	getHeldAssetIDs                 func(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
@@ -200,6 +258,13 @@ func (f *fakeRepository) GetPortfolioGrowthByUserID(ctx context.Context, userID 
 
 func (f *fakeRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error) {
 	return f.getPortfolioGrowthByPortfolioID(ctx, userID, portfolioID, hasSince, since)
+}
+
+func (f *fakeRepository) GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error) {
+	if f.getPortfolioValuesAsOf == nil {
+		return nil, nil
+	}
+	return f.getPortfolioValuesAsOf(ctx, userID, asOf)
 }
 
 func (f *fakeRepository) GetExchangeRateByPair(ctx context.Context, from, to string) (money.Decimal, error) {

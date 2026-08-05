@@ -196,6 +196,12 @@ func normalizeTxnType(raw string) (TransactionType, bool) {
 	return "", false
 }
 
+// normalizeCurrency resolves a spreadsheet cell to an ISO 4217 code. The
+// symbol table comes first because a symbol is ambiguous on its own ("$" is
+// half the Americas) and the mapping below is the deliberate choice; anything
+// else is checked against gofinance's ISO 4217 table, so a three-letter run
+// that merely looks like a code ("ABC", or the "USD" inside a word) no longer
+// gets imported as a currency the rest of the app cannot price.
 func normalizeCurrency(raw string) (string, bool) {
 	s := strings.ToUpper(strings.TrimSpace(raw))
 	if s == "" {
@@ -204,8 +210,20 @@ func normalizeCurrency(raw string) (string, bool) {
 	if code, ok := currencySymbols[s]; ok {
 		return code, true
 	}
-	if code := currencyCodeRe.FindString(s); code != "" {
-		return code, true
+	// Every three-letter run is a candidate, not just the first: a cell reading
+	// "Precio (COP)" starts with "PRE", which the old first-match rule imported
+	// as the currency. Checking each against the ISO table finds the real code
+	// and rejects a cell that holds none.
+	for _, code := range currencyCodeRe.FindAllString(s, -1) {
+		cur, err := money.CurrencyFromISOCode(code)
+		if err != nil {
+			continue
+		}
+		// Round-trip through the table so the stored code is the canonical
+		// spelling rather than whatever the cell happened to contain.
+		if iso, err := cur.GetCurrencyISOCode(); err == nil {
+			return iso, true
+		}
 	}
 	return "", false
 }

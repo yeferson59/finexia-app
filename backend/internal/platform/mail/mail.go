@@ -72,6 +72,15 @@ type WeeklySummaryPortfolio struct {
 	TotalGainLoss    string
 	TotalGainLossPct string
 	GainLossColor    string
+
+	// Movement since the previous weekly summary, on the same terms as the
+	// account-wide fields on WeeklySummaryData: signed figures, and a false
+	// HasWeekChange for a portfolio that did not exist a week ago. When it is
+	// false the row falls back to showing the all-time return on its own.
+	HasWeekChange   bool
+	WeekChangeValue string
+	WeekChangePct   string
+	WeekChangeColor string
 }
 
 type WeeklySummaryData struct {
@@ -83,6 +92,24 @@ type WeeklySummaryData struct {
 	Portfolios       []WeeklySummaryPortfolio
 	DashboardURL     string
 	WeekLabel        string
+
+	// Movement since the previous weekly summary. HasWeekChange is false for
+	// an account with no history to compare against — its first digest — and
+	// the template hides the whole block rather than showing a zero that would
+	// read as "nothing moved".
+	//
+	// WeekChangeValue and WeekChangePct carry their own sign ("+1250.00",
+	// "-3.42"). WeekChangePct is empty when the comparison had nothing to
+	// divide by, i.e. the portfolios were worth nothing a week ago; the
+	// absolute change is still shown in that case.
+	HasWeekChange   bool
+	WeekChangeValue string
+	WeekChangePct   string
+	WeekChangeColor string
+	// WeekChangeSince names the day actually compared against, which is the
+	// last day snapshotted on or before a week ago — not always exactly seven
+	// days back.
+	WeekChangeSince string
 }
 
 func New(apiKey, from string) (*Service, error) {

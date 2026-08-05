@@ -83,7 +83,7 @@ func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfo
 		}
 
 		entry.Quantity = decimal.MustFromString(quantity)
-		entry.Price = money.MustMoneyFromString(price, money.USD)
+		entry.Price = moneyOf(price, entry.CostCurrency)
 
 		entries = append(entries, entry)
 	}
@@ -185,7 +185,7 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 	}
 
 	entry.Quantity = decimal.MustFromString(quantityValue)
-	entry.Price = money.MustMoneyFromString(priceValue, money.USD)
+	entry.Price = moneyOf(priceValue, entry.CostCurrency)
 
 	return entry, nil
 }

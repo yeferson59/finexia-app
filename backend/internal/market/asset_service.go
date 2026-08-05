@@ -125,9 +125,11 @@ func normalizeAssetInput(ticker, name string, assetType AssetType, exchange, cur
 		return assetInput{}, errAssetTypeInvalid
 	}
 
-	if len(in.currency) != 3 {
+	code, ok := NormalizeCurrencyCode(in.currency)
+	if !ok {
 		return assetInput{}, errAssetCurrencyInvalid
 	}
+	in.currency = code
 
 	return in, nil
 }
