@@ -15,7 +15,10 @@ func TestPut(t *testing.T) {
 	ctx := t.Context()
 	client := path(t)
 
-	client.Put(ctx, "testing.png", "images/png", []byte("nada"))
+	err := client.Put(ctx, "testing.png", "images/png", []byte("nada"))
+	if err != nil {
+		t.FailNow()
+	}
 }
 
 func TestGet(t *testing.T) {
@@ -35,7 +38,9 @@ func TestGet(t *testing.T) {
 		t.FailNow()
 	}
 
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	data, err := io.ReadAll(file)
 	if err != nil {
