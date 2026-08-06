@@ -1,75 +1,22 @@
 package app
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/platform/secretbox"
 )
-
-// memStorage is a minimal in-memory fiber.Storage so wiring needs no Redis.
-type memStorage struct {
-	mu    sync.Mutex
-	items map[string][]byte
-}
-
-func (s *memStorage) GetWithContext(_ context.Context, key string) ([]byte, error) {
-	return s.Get(key)
-}
-
-func (s *memStorage) Get(key string) ([]byte, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.items[key], nil
-}
-
-func (s *memStorage) SetWithContext(_ context.Context, key string, val []byte, exp time.Duration) error {
-	return s.Set(key, val, exp)
-}
-
-func (s *memStorage) Set(key string, val []byte, _ time.Duration) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.items == nil {
-		s.items = map[string][]byte{}
-	}
-	s.items[key] = append([]byte(nil), val...)
-	return nil
-}
-
-func (s *memStorage) DeleteWithContext(_ context.Context, key string) error {
-	return s.Delete(key)
-}
-
-func (s *memStorage) Delete(key string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.items, key)
-	return nil
-}
-
-func (s *memStorage) ResetWithContext(_ context.Context) error { return s.Reset() }
-
-func (s *memStorage) Reset() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.items = map[string][]byte{}
-	return nil
-}
-
-func (s *memStorage) Close() error { return nil }
 
 // TestNewValidatesRequiredDeps checks that New fails fast with a clear error
 // when a required dependency is missing, instead of panicking later in wire().
@@ -114,7 +61,7 @@ func TestAppWiresAndRoutes(t *testing.T) {
 			CORSOrigin:         []string{"http://localhost:5173"},
 		}),
 		DB:      pool,
-		Storage: new(memStorage{}),
+		Cache:   &redis.Client{},
 		S3:      nil,
 		Mail:    mailService,
 		Keyring: testKeyring(t),

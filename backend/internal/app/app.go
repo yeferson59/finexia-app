@@ -13,6 +13,8 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v3"
+	goredis "github.com/redis/go-redis/v9"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/yeferson59/finexia-app/internal/auth"
@@ -20,6 +22,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/market"
 	"github.com/yeferson59/finexia-app/internal/marketing"
 	"github.com/yeferson59/finexia-app/internal/notification"
+	"github.com/yeferson59/finexia-app/internal/platform/cache"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/geoip"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
@@ -27,7 +30,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata/providers"
-	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
+	s3Store "github.com/yeferson59/finexia-app/internal/platform/objectstore/s3"
 	"github.com/yeferson59/finexia-app/internal/platform/secretbox"
 	"github.com/yeferson59/finexia-app/internal/portfolio"
 	"github.com/yeferson59/finexia-app/internal/scheduler"
@@ -47,11 +50,11 @@ const (
 // Deps carries the already-connected infrastructure the App composes. main
 // owns creating (and closing) these; App only wires them.
 type Deps struct {
-	Envs    *config.Env
-	DB      *pgxpool.Pool
-	Storage fiber.Storage
-	S3      *s3.Client
-	Mail    *mail.Service
+	Envs  *config.Env
+	DB    *pgxpool.Pool
+	Cache *goredis.Client
+	S3    *s3.Client
+	Mail  *mail.Service
 	// Keyring seals the market-data API keys users bring. Required: without it
 	// the market module cannot store a credential at all.
 	Keyring *secretbox.Keyring
@@ -68,7 +71,7 @@ func (d Deps) validate() error {
 		return errors.New("app: Deps.Envs is required")
 	case d.DB == nil:
 		return errors.New("app: Deps.DB is required")
-	case d.Storage == nil:
+	case d.Cache == nil:
 		return errors.New("app: Deps.Storage is required")
 	case d.Mail == nil:
 		return errors.New("app: Deps.Mail is required")
@@ -84,6 +87,7 @@ func (d Deps) validate() error {
 type App struct {
 	fiber    *fiber.App
 	deps     Deps
+	storage  fiber.Storage
 	schedule *scheduler.Scheduler
 }
 
@@ -140,6 +144,8 @@ func New(deps Deps) (*App, error) {
 // the listener stops or ctx is cancelled (e.g. on SIGINT/SIGTERM), in which
 // case it shuts down the HTTP server and the schedulers cleanly.
 func (a *App) Run(ctx context.Context) error {
+	a.storage = cache.Storage(ctx, a.deps.Cache)
+
 	a.wire(ctx)
 
 	// stopped signals that Listen has returned (e.g. a bind error), so the
@@ -210,6 +216,7 @@ func (a *App) wire(ctx context.Context) {
 // factory, geoip, per-user rate limiter) and every domain module, respecting
 // their dependency order.
 func (a *App) buildModules() *modules {
+
 	// Market data is BYO-key: there is no process-wide provider to build here
 	// because the application holds no provider credentials. The factory
 	// assembles a chain per sync run from the calling user's own keys.
@@ -232,14 +239,14 @@ func (a *App) buildModules() *modules {
 	})
 	userService := user.NewService(user.ServiceDeps{
 		DB:    a.deps.DB,
-		Store: objectstore.NewS3Store(a.deps.S3, a.deps.Envs.AWSS3BucketName),
+		Store: s3Store.New(a.deps.S3, a.deps.Envs.AWSS3BucketName),
 		Log:   a.deps.Log,
 		Cfg:   userConfig(a.deps.Envs),
 	})
 	authModule := auth.New(auth.Deps{
 		DB:      a.deps.DB,
 		Cfg:     authConfig(a.deps.Envs),
-		Storage: a.deps.Storage,
+		Storage: a.storage,
 		Mail:    a.deps.Mail,
 		Geo:     geo,
 		Log:     a.deps.Log,
@@ -267,7 +274,7 @@ func (a *App) buildModules() *modules {
 	// portfolio's holdings, which the per-user BYO-key sync needs.
 	marketService := market.NewService(market.ServiceDeps{
 		DB:        a.deps.DB,
-		Storage:   a.deps.Storage,
+		Storage:   a.storage,
 		Log:       a.deps.Log,
 		Providers: priceProviders,
 		Keyring:   a.deps.Keyring,
@@ -275,7 +282,7 @@ func (a *App) buildModules() *modules {
 	portfolioModule := portfolio.New(portfolio.Deps{
 		DB:        a.deps.DB,
 		Cfg:       portfolioConfig(a.deps.Envs),
-		Storage:   a.deps.Storage,
+		Storage:   a.storage,
 		Mail:      a.deps.Mail,
 		User:      userService,
 		Assets:    marketService,
@@ -350,7 +357,7 @@ func (a *App) startScheduler(ctx context.Context, mods *modules) {
 	a.schedule = scheduler.NewScheduler(runner)
 
 	// Redis-backed store, opted into per job via WithStore below.
-	persistent := fiberstore.New(a.deps.Storage)
+	persistent := fiberstore.New(a.storage)
 
 	a.registerJobs(a.schedule, mods, persistent)
 }

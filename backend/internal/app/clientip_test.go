@@ -61,7 +61,6 @@ func probeApp(t *testing.T) string {
 			TrustProxy:         true,
 		}),
 		DB:      pool,
-		Storage: new(memStorage{}),
 		Mail:    mailService,
 		Keyring: testKeyring(t),
 		Log:     logger.Noop(),

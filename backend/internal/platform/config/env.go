@@ -16,7 +16,10 @@ type Env struct {
 	Port               string
 	PathMigration      string
 	DatabaseURL        string
-	CacheURL           string
+	RedisHost          string
+	RedisPort          string
+	RedisPassword      string
+	RedisDB            int
 	JWTSecret          string
 	JWTAccessDuration  time.Duration
 	JWTRefreshDuration time.Duration
@@ -56,13 +59,16 @@ func (c *Config) LoadEnvs() *Env {
 		Port:          c.getString("PORT", "8080"),
 		PathMigration: c.getString("PATH_MIGRATION", "file://internal/migrations"),
 		DatabaseURL:   c.getString("DATABASE_URL", ""),
-		CacheURL:      c.getString("CACHE_URL", ""),
 		// No default. The secret signs every access token, so a fallback value
 		// would let anyone who has read this repository mint a token for any
 		// user id and any role — including "admin" — against a deployment that
 		// simply forgot to set the variable. Validate makes the process refuse
 		// to start instead, the same treatment MARKET_KEK_KEYS already gets.
 		JWTSecret:          c.getString("JWT_SECRET", ""),
+		RedisHost:          c.getString("REDIS_HOST", "localhost"),
+		RedisPort:          c.getString("REDIS_PORT", "6379"),
+		RedisPassword:      c.getString("REDIS_PASSWORD", ""),
+		RedisDB:            c.getInt("REDIS_DB", 0),
 		JWTAccessDuration:  c.getDuration("JWT_ACCESS_DURATION", 15*time.Minute),
 		JWTRefreshDuration: c.getDuration("JWT_REFRESH_DURATION", 30*24*time.Hour),
 		RefreshGracePeriod: c.getDuration("JWT_REFRESH_GRACE_PERIOD", 30*time.Second),
