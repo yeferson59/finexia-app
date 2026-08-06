@@ -23,7 +23,7 @@ require (
 	github.com/rs/zerolog v1.35.1
 	github.com/xuri/excelize/v2 v2.11.0
 	github.com/yeferson59/gofinance/v2 v2.1.0
-	github.com/yeferson59/goratelimit v0.1.0
+	github.com/yeferson59/goratelimit v0.2.0
 	golang.org/x/crypto v0.54.0
 	golang.org/x/sync v0.22.0
 )
