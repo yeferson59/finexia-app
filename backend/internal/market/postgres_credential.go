@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
@@ -208,7 +209,7 @@ func (r *PostgresRepository) UpsertUserAssetPrice(ctx context.Context, userID, a
 }
 
 // UpsertUserExchangeRate stores a rate against the user whose key fetched it.
-func (r *PostgresRepository) UpsertUserExchangeRate(ctx context.Context, userID uuid.UUID, from, to string, rate money.Decimal, source ProviderID, fetchedAt time.Time) error {
+func (r *PostgresRepository) UpsertUserExchangeRate(ctx context.Context, userID uuid.UUID, from, to string, rate decimal.Decimal, source ProviderID, fetchedAt time.Time) error {
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO user_exchange_rates (user_id, from_currency, to_currency, rate, source, fetched_at)
 		VALUES ($1, $2, $3, $4::numeric, $5, $6)

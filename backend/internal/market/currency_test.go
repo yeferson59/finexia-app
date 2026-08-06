@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/yeferson59/gofinance/v2/decimal"
-	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // Currency codes and exchange rates are now validated against the same
@@ -67,7 +66,7 @@ func TestCreateExchangeRateValidatesItsInput(t *testing.T) {
 	newSvc := func() *Service {
 		upsertCalled = false
 		repo := new(fakeRepository{
-			upsertExchangeRate: func(_ context.Context, from, to string, rate money.Decimal, _ time.Time) (ExchangeRate, error) {
+			upsertExchangeRate: func(_ context.Context, from, to string, rate decimal.Decimal, _ time.Time) (ExchangeRate, error) {
 				upsertCalled = true
 				return ExchangeRate{FromCurrency: from, ToCurrency: to, Rate: rate}, nil
 			},

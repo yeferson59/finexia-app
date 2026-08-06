@@ -28,11 +28,11 @@ type UserAssetPrice struct {
 
 // UserExchangeRate is the same idea for a currency pair.
 type UserExchangeRate struct {
-	FromCurrency string        `json:"fromCurrency"`
-	ToCurrency   string        `json:"toCurrency"`
-	Rate         money.Decimal `json:"rate"`
-	Source       ProviderID    `json:"source"`
-	FetchedAt    time.Time     `json:"fetchedAt"`
+	FromCurrency string          `json:"fromCurrency"`
+	ToCurrency   string          `json:"toCurrency"`
+	Rate         decimal.Decimal `json:"rate"`
+	Source       ProviderID      `json:"source"`
+	FetchedAt    time.Time       `json:"fetchedAt"`
 }
 
 // SyncAssetsForUser refreshes the given assets using the user's own keys and

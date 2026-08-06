@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
@@ -493,7 +494,7 @@ func TestCreatePortfolioEntry(t *testing.T) {
 
 	t.Run("forwards all fields", func(t *testing.T) {
 		repo := new(fakeRepository{
-			createPortfolioEntry: func(_ context.Context, uid, pid, aid, sid uuid.UUID, txnType TransactionType, quantity money.Decimal, p money.Money, costCurrency string, category EntryCategory, ed time.Time, notes string) (Entry, error) {
+			createPortfolioEntry: func(_ context.Context, uid, pid, aid, sid uuid.UUID, txnType TransactionType, quantity decimal.Decimal, p money.Money, costCurrency string, category EntryCategory, ed time.Time, notes string) (Entry, error) {
 				if uid != userID || pid != portfolioID || aid != assetID || sid != sourceID {
 					t.Error("IDs not forwarded correctly")
 				}
@@ -519,7 +520,7 @@ func TestCreatePortfolioEntry(t *testing.T) {
 
 	t.Run("repository error returns zero entry", func(t *testing.T) {
 		repo := new(fakeRepository{
-			createPortfolioEntry: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, TransactionType, money.Decimal, money.Money, string, EntryCategory, time.Time, string) (Entry, error) {
+			createPortfolioEntry: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, TransactionType, decimal.Decimal, money.Money, string, EntryCategory, time.Time, string) (Entry, error) {
 				return Entry{}, errors.New("asset not found")
 			},
 		})
@@ -595,7 +596,7 @@ func TestUpdateTransaction(t *testing.T) {
 	date := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
 
 	repo := new(fakeRepository{
-		updateTransaction: func(_ context.Context, uid, tid uuid.UUID, txnType TransactionType, quantity money.Decimal, p money.Money, currency string, f money.Money, transactionDate time.Time, notes string) (Transaction, error) {
+		updateTransaction: func(_ context.Context, uid, tid uuid.UUID, txnType TransactionType, quantity decimal.Decimal, p money.Money, currency string, f money.Money, transactionDate time.Time, notes string) (Transaction, error) {
 			if uid != userID || tid != txnID {
 				t.Error("IDs not forwarded correctly")
 			}
@@ -625,7 +626,7 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 
 	newTxnRepo := func() *fakeRepository {
 		return new(fakeRepository{
-			createTransaction: func(_ context.Context, uid, eid uuid.UUID, txnType TransactionType, quantity money.Decimal, p money.Money, currency string, f money.Money, transactionDate time.Time, notes string) (Transaction, error) {
+			createTransaction: func(_ context.Context, uid, eid uuid.UUID, txnType TransactionType, quantity decimal.Decimal, p money.Money, currency string, f money.Money, transactionDate time.Time, notes string) (Transaction, error) {
 				return Transaction{
 					ID: uuid.New(), EntryID: eid, Type: txnType,
 					Quantity: quantity, Price: p, Currency: currency,
@@ -748,7 +749,7 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 
 	t.Run("repository error is returned and no alert goes out", func(t *testing.T) {
 		repo := new(fakeRepository{
-			createTransaction: func(context.Context, uuid.UUID, uuid.UUID, TransactionType, money.Decimal, money.Money, string, money.Money, time.Time, string) (Transaction, error) {
+			createTransaction: func(context.Context, uuid.UUID, uuid.UUID, TransactionType, decimal.Decimal, money.Money, string, money.Money, time.Time, string) (Transaction, error) {
 				return Transaction{}, errors.New("entry not found")
 			},
 		})

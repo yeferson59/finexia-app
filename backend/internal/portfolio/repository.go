@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
@@ -40,11 +41,11 @@ type PlatformStore interface {
 // also moved to market; portfolio reads assets through its AssetReader
 // interface, not this repository.
 type RateStore interface {
-	GetExchangeRateByPair(ctx context.Context, from, to string) (money.Decimal, error)
+	GetExchangeRateByPair(ctx context.Context, from, to string) (decimal.Decimal, error)
 	// GetUserExchangeRateByPair reads the rate the user's own key fetched.
 	// Under BYO-key it is consulted before the shared table, which now only
 	// holds admin-entered rows.
-	GetUserExchangeRateByPair(ctx context.Context, userID uuid.UUID, from, to string) (money.Decimal, error)
+	GetUserExchangeRateByPair(ctx context.Context, userID uuid.UUID, from, to string) (decimal.Decimal, error)
 }
 
 // HoldingsStore answers what the per-user market sync needs to know: which
@@ -63,15 +64,15 @@ type CurrencyPair struct{ From, To string }
 
 // TransactionStore persists portfolio entries and their transactions.
 type TransactionStore interface {
-	CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType TransactionType, quantity money.Decimal, price money.Money, costCurrency string, category EntryCategory, entryDate time.Time, notes string) (Entry, error)
+	CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency string, category EntryCategory, entryDate time.Time, notes string) (Entry, error)
 	GetEntryWithAsset(ctx context.Context, entryID uuid.UUID) (Entry, error)
 	GetTransactionsByEntryID(ctx context.Context, userID, entryID uuid.UUID) ([]Transaction, error)
 	CountAssetTransactions(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error)
 	GetAssetTransactionsPaginated(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, limit, offset int) ([]Transaction, error)
 	GetRecentTransactionsByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]Transaction, error)
 	GetAssetAllocationByUserID(ctx context.Context, userID uuid.UUID) ([]AllocationItem, error)
-	CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
-	UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
+	CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
+	UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
 	ImportEntryTransactions(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []ImportTransactionRow) (int, error)
 }
 

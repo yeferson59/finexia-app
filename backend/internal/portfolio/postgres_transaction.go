@@ -226,7 +226,7 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 	return txns, nil
 }
 
-func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
+func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
 	var owned bool
 	if err := r.db.QueryRow(ctx, `
 		SELECT EXISTS (
@@ -269,7 +269,7 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 	return txn, nil
 }
 
-func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity money.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
+func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
 	var txn Transaction
 	var quantityValue, priceValue, feesValue string
 	err := r.db.QueryRow(ctx, `

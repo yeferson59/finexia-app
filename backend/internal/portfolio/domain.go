@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
@@ -248,7 +249,7 @@ type Entry struct {
 	PortfolioID  uuid.UUID        `json:"portfolioId"`
 	AssetID      uuid.UUID        `json:"assetId"`
 	SourceID     uuid.UUID        `json:"sourceId"`
-	Quantity     money.Decimal    `json:"quantity"`
+	Quantity     decimal.Decimal  `json:"quantity"`
 	Price        money.Money      `json:"price"`
 	CostCurrency string           `json:"costCurrency"`
 	Category     EntryCategory    `json:"category"`
@@ -270,7 +271,7 @@ type Transaction struct {
 	ID              uuid.UUID       `json:"id"`
 	EntryID         uuid.UUID       `json:"entryId"`
 	Type            TransactionType `json:"type"`
-	Quantity        money.Decimal   `json:"quantity"`
+	Quantity        decimal.Decimal `json:"quantity"`
 	Price           money.Money     `json:"price"`
 	Currency        string          `json:"currency"`
 	Fees            money.Money     `json:"fees"`
@@ -290,7 +291,7 @@ type ImportTransactionRow struct {
 	AssetType market.AssetType
 	Category  EntryCategory
 	Type      TransactionType
-	Quantity  money.Decimal
+	Quantity  decimal.Decimal
 	Price     money.Money
 	Fees      money.Money
 	Currency  string

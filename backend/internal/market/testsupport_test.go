@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
@@ -28,7 +29,7 @@ type fakeRepository struct {
 	// BYO-key, in which case those methods panic like any other unstubbed one.
 	creds *credentialStore
 
-	upsertExchangeRate func(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (ExchangeRate, error)
+	upsertExchangeRate func(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error)
 
 	updateAssetPrice    func(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error)
 	upsertAsset         func(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error)
@@ -39,7 +40,7 @@ type fakeRepository struct {
 	searchAssets        func(ctx context.Context, view CatalogView, search string, offset, limit uint) ([]Asset, error)
 }
 
-func (f *fakeRepository) UpsertExchangeRate(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (ExchangeRate, error) {
+func (f *fakeRepository) UpsertExchangeRate(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error) {
 	return f.upsertExchangeRate(ctx, from, to, rate, rateDate)
 }
 
@@ -249,7 +250,7 @@ type credentialStore struct {
 	sealed map[uuid.UUID][]sealedCredential
 	meta   map[string]Credential
 	prices map[string]money.Money
-	rates  map[string]money.Decimal
+	rates  map[string]decimal.Decimal
 }
 
 func newCredentialStore() *credentialStore {
@@ -257,7 +258,7 @@ func newCredentialStore() *credentialStore {
 		sealed: map[uuid.UUID][]sealedCredential{},
 		meta:   map[string]Credential{},
 		prices: map[string]money.Money{},
-		rates:  map[string]money.Decimal{},
+		rates:  map[string]decimal.Decimal{},
 	})
 }
 
@@ -356,7 +357,7 @@ func (c *credentialStore) priceOf(userID, assetID uuid.UUID) (money.Money, bool)
 	return p, ok
 }
 
-func (c *credentialStore) UpsertUserExchangeRate(_ context.Context, userID uuid.UUID, from, to string, rate money.Decimal, _ ProviderID, _ time.Time) error {
+func (c *credentialStore) UpsertUserExchangeRate(_ context.Context, userID uuid.UUID, from, to string, rate decimal.Decimal, _ ProviderID, _ time.Time) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.rates[userID.String()+"/"+from+to] = rate
@@ -477,6 +478,6 @@ func (f *fakeRepository) UpsertUserAssetPrice(ctx context.Context, userID, asset
 	return f.creds.UpsertUserAssetPrice(ctx, userID, assetID, price, currency, source, fetchedAt)
 }
 
-func (f *fakeRepository) UpsertUserExchangeRate(ctx context.Context, userID uuid.UUID, from, to string, rate money.Decimal, source ProviderID, fetchedAt time.Time) error {
+func (f *fakeRepository) UpsertUserExchangeRate(ctx context.Context, userID uuid.UUID, from, to string, rate decimal.Decimal, source ProviderID, fetchedAt time.Time) error {
 	return f.creds.UpsertUserExchangeRate(ctx, userID, from, to, rate, source, fetchedAt)
 }

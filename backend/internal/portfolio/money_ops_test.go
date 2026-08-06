@@ -131,11 +131,11 @@ func TestGetConversionRateRejectsUnusableRates(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name+" is reported as unavailable", func(t *testing.T) {
 			repo := new(fakeRepository{
-				getExchangeRateByPair: func(_ context.Context, from, to string) (money.Decimal, error) {
+				getExchangeRateByPair: func(_ context.Context, from, to string) (decimal.Decimal, error) {
 					if from == "USD" && to == "COP" {
 						return mustDecimal(t, tc.rate), nil
 					}
-					return money.Decimal{}, errors.New("exchange rate not found")
+					return decimal.Decimal{}, errors.New("exchange rate not found")
 				},
 			})
 			svc := newTestServices(repo, newMemStorage())
@@ -148,14 +148,14 @@ func TestGetConversionRateRejectsUnusableRates(t *testing.T) {
 
 	t.Run("a corrupt direct rate falls through to the inverse", func(t *testing.T) {
 		repo := new(fakeRepository{
-			getExchangeRateByPair: func(_ context.Context, from, to string) (money.Decimal, error) {
+			getExchangeRateByPair: func(_ context.Context, from, to string) (decimal.Decimal, error) {
 				switch {
 				case from == "USD" && to == "COP":
 					return mustDecimal(t, "0"), nil
 				case from == "COP" && to == "USD":
 					return mustDecimal(t, "0.00025"), nil
 				}
-				return money.Decimal{}, errors.New("exchange rate not found")
+				return decimal.Decimal{}, errors.New("exchange rate not found")
 			},
 		})
 		svc := newTestServices(repo, newMemStorage())

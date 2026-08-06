@@ -5,14 +5,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type Repository interface {
 	// Exchange rates
-	UpsertExchangeRate(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (ExchangeRate, error)
+	UpsertExchangeRate(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error)
 	GetExchangeRates(ctx context.Context, offset, limit uint) ([]ExchangeRate, error)
-	UpdateExchangeRateByID(ctx context.Context, id uuid.UUID, rate money.Decimal) (ExchangeRate, error)
+	UpdateExchangeRateByID(ctx context.Context, id uuid.UUID, rate decimal.Decimal) (ExchangeRate, error)
 
 	// Assets (catalog owned by this module; portfolio reads them via AssetReader)
 	GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, error)
@@ -52,5 +53,5 @@ type CredentialStore interface {
 	UsersWithCredentials(ctx context.Context) ([]uuid.UUID, error)
 
 	UpsertUserAssetPrice(ctx context.Context, userID, assetID uuid.UUID, price money.Money, currency string, source ProviderID, fetchedAt time.Time) error
-	UpsertUserExchangeRate(ctx context.Context, userID uuid.UUID, from, to string, rate money.Decimal, source ProviderID, fetchedAt time.Time) error
+	UpsertUserExchangeRate(ctx context.Context, userID uuid.UUID, from, to string, rate decimal.Decimal, source ProviderID, fetchedAt time.Time) error
 }

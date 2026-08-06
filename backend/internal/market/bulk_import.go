@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/yeferson59/gofinance/v2/decimal"
-	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/platform/spreadsheet"
 )
@@ -19,8 +18,8 @@ import (
 var decimalCleanRe = regexp.MustCompile(`[^0-9,.\-()]`)
 
 // parseDecimal converts human spreadsheet numbers ("1.234,56", "$ 1,234.56",
-// "(120.50)") into a money.Decimal.
-func parseDecimal(raw string) (money.Decimal, error) {
+// "(120.50)") into a decimal.Decimal.
+func parseDecimal(raw string) (decimal.Decimal, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
 		return decimal.Zero, errors.New("empty value")

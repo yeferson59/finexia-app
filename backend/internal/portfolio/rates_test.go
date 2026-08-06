@@ -6,11 +6,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yeferson59/gofinance/v2/decimal"
-	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // rate is a shorthand for the decimal values these tables hold.
-func rate(t *testing.T, v string) money.Decimal {
+func rate(t *testing.T, v string) decimal.Decimal {
 	t.Helper()
 
 	d, err := decimal.NewFromString(v)
@@ -26,14 +25,14 @@ func TestGetConversionRate(t *testing.T) {
 
 	t.Run("the user's own rate wins over the shared one", func(t *testing.T) {
 		repo := new(fakeRepository{
-			getUserExchangeRateByPair: func(_ context.Context, _ uuid.UUID, from, to string) (money.Decimal, error) {
+			getUserExchangeRateByPair: func(_ context.Context, _ uuid.UUID, from, to string) (decimal.Decimal, error) {
 				if from == "USD" && to == "COP" {
 					return rate(t, "4100"), nil
 				}
 
-				return money.Decimal{}, ErrExchangeRateNotFound
+				return decimal.Decimal{}, ErrExchangeRateNotFound
 			},
-			getExchangeRateByPair: func(context.Context, string, string) (money.Decimal, error) {
+			getExchangeRateByPair: func(context.Context, string, string) (decimal.Decimal, error) {
 				return rate(t, "3900"), nil
 			},
 		})
@@ -52,12 +51,12 @@ func TestGetConversionRate(t *testing.T) {
 
 	t.Run("it falls back to the shared, admin-entered rate", func(t *testing.T) {
 		repo := new(fakeRepository{
-			getExchangeRateByPair: func(_ context.Context, from, to string) (money.Decimal, error) {
+			getExchangeRateByPair: func(_ context.Context, from, to string) (decimal.Decimal, error) {
 				if from == "USD" && to == "COP" {
 					return rate(t, "3900"), nil
 				}
 
-				return money.Decimal{}, ErrExchangeRateNotFound
+				return decimal.Decimal{}, ErrExchangeRateNotFound
 			},
 		})
 
@@ -72,12 +71,12 @@ func TestGetConversionRate(t *testing.T) {
 
 	t.Run("the opposite direction is inverted", func(t *testing.T) {
 		repo := new(fakeRepository{
-			getExchangeRateByPair: func(_ context.Context, from, to string) (money.Decimal, error) {
+			getExchangeRateByPair: func(_ context.Context, from, to string) (decimal.Decimal, error) {
 				if from == "USD" && to == "COP" {
 					return rate(t, "4000"), nil
 				}
 
-				return money.Decimal{}, ErrExchangeRateNotFound
+				return decimal.Decimal{}, ErrExchangeRateNotFound
 			},
 		})
 
@@ -99,7 +98,7 @@ func TestGetConversionRate(t *testing.T) {
 
 	t.Run("an unrelated pair is resolved through USD", func(t *testing.T) {
 		repo := new(fakeRepository{
-			getExchangeRateByPair: func(_ context.Context, from, to string) (money.Decimal, error) {
+			getExchangeRateByPair: func(_ context.Context, from, to string) (decimal.Decimal, error) {
 				switch {
 				case from == "EUR" && to == "USD":
 					return rate(t, "1.1"), nil
@@ -107,7 +106,7 @@ func TestGetConversionRate(t *testing.T) {
 					return rate(t, "4000"), nil
 				}
 
-				return money.Decimal{}, ErrExchangeRateNotFound
+				return decimal.Decimal{}, ErrExchangeRateNotFound
 			},
 		})
 
@@ -135,8 +134,8 @@ func TestGetConversionRate(t *testing.T) {
 	// not a wrong number.
 	t.Run("no rate anywhere is reported, not guessed", func(t *testing.T) {
 		repo := new(fakeRepository{
-			getExchangeRateByPair: func(context.Context, string, string) (money.Decimal, error) {
-				return money.Decimal{}, ErrExchangeRateNotFound
+			getExchangeRateByPair: func(context.Context, string, string) (decimal.Decimal, error) {
+				return decimal.Decimal{}, ErrExchangeRateNotFound
 			},
 		})
 

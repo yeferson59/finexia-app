@@ -6,7 +6,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/yeferson59/gofinance/v2/decimal"
-	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // GetExchangeRateByPair looks up the stored rate for one direction of a
@@ -14,7 +13,7 @@ import (
 // stored, never USD->EUR); callers needing the reverse direction should
 // invert the returned rate themselves. Read-only: writing/syncing exchange
 // rates is owned by the market module.
-func (r *PostgresRepository) GetExchangeRateByPair(ctx context.Context, from, to string) (money.Decimal, error) {
+func (r *PostgresRepository) GetExchangeRateByPair(ctx context.Context, from, to string) (decimal.Decimal, error) {
 	var rateStr string
 	err := r.db.QueryRow(ctx, `
 		SELECT rate::text
@@ -22,9 +21,9 @@ func (r *PostgresRepository) GetExchangeRateByPair(ctx context.Context, from, to
 	`, from, to).Scan(&rateStr)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return money.Decimal{}, ErrExchangeRateNotFound
+			return decimal.Decimal{}, ErrExchangeRateNotFound
 		}
-		return money.Decimal{}, err
+		return decimal.Decimal{}, err
 	}
 
 	return decimal.MustFromString(rateStr), nil

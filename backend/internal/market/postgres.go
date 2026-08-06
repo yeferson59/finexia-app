@@ -9,7 +9,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/yeferson59/gofinance/v2/decimal"
-	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type PostgresRepository struct {
@@ -20,7 +19,7 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 	return new(PostgresRepository{db})
 }
 
-func (r *PostgresRepository) UpsertExchangeRate(ctx context.Context, from, to string, rate money.Decimal, rateDate time.Time) (ExchangeRate, error) {
+func (r *PostgresRepository) UpsertExchangeRate(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error) {
 	var er ExchangeRate
 	var rateStr string
 
@@ -80,7 +79,7 @@ func (r *PostgresRepository) GetExchangeRates(ctx context.Context, offset, limit
 // shared one (portfolio.GetExchangeRateByPair). This module writes the shared
 // table on behalf of an admin; it no longer reads a single row out of it.
 
-func (r *PostgresRepository) UpdateExchangeRateByID(ctx context.Context, id uuid.UUID, rate money.Decimal) (ExchangeRate, error) {
+func (r *PostgresRepository) UpdateExchangeRateByID(ctx context.Context, id uuid.UUID, rate decimal.Decimal) (ExchangeRate, error) {
 	var er ExchangeRate
 	var rateStr string
 

@@ -112,7 +112,7 @@ func (r *PostgresRepository) GetEntryWithAsset(ctx context.Context, entryID uuid
 	return entry, nil
 }
 
-func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType TransactionType, quantity money.Decimal, price money.Money, costCurrency string, category EntryCategory, entryDate time.Time, notes string) (Entry, error) {
+func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency string, category EntryCategory, entryDate time.Time, notes string) (Entry, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return Entry{}, err

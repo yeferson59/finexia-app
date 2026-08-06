@@ -108,12 +108,12 @@ func TestSummaryCountsSurviveCurrencyConversion(t *testing.T) {
 				PositionsAtCost:       1,
 			}}, nil
 		},
-		getUserExchangeRateByPair: func(_ context.Context, _ uuid.UUID, from, to string) (money.Decimal, error) {
+		getUserExchangeRateByPair: func(_ context.Context, _ uuid.UUID, from, to string) (decimal.Decimal, error) {
 			if from == "USD" && to == "COP" {
 				return rate(t, "4000"), nil
 			}
 
-			return money.Decimal{}, ErrExchangeRateNotFound
+			return decimal.Decimal{}, ErrExchangeRateNotFound
 		},
 	})
 

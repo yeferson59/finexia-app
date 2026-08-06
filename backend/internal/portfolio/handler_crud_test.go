@@ -11,6 +11,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/market"
@@ -336,7 +337,7 @@ func TestHandlerTransactions(t *testing.T) {
 		var gotType TransactionType
 		repo := new(fakeRepository{
 			getUserPreferences: alertsOff,
-			createTransaction: func(_ context.Context, _, eid uuid.UUID, txnType TransactionType, _ money.Decimal, _ money.Money, currency string, _ money.Money, _ time.Time, _ string) (Transaction, error) {
+			createTransaction: func(_ context.Context, _, eid uuid.UUID, txnType TransactionType, _ decimal.Decimal, _ money.Money, currency string, _ money.Money, _ time.Time, _ string) (Transaction, error) {
 				gotEntryID, gotType = eid, txnType
 				return Transaction{ID: txnID, EntryID: eid, Type: txnType, Currency: currency}, nil
 			},
@@ -356,7 +357,7 @@ func TestHandlerTransactions(t *testing.T) {
 	t.Run("updates a transaction", func(t *testing.T) {
 		var gotTxnID uuid.UUID
 		repo := new(fakeRepository{
-			updateTransaction: func(_ context.Context, _, tid uuid.UUID, txnType TransactionType, _ money.Decimal, _ money.Money, _ string, _ money.Money, _ time.Time, _ string) (Transaction, error) {
+			updateTransaction: func(_ context.Context, _, tid uuid.UUID, txnType TransactionType, _ decimal.Decimal, _ money.Money, _ string, _ money.Money, _ time.Time, _ string) (Transaction, error) {
 				gotTxnID = tid
 				return Transaction{ID: tid, Type: txnType}, nil
 			},
@@ -623,7 +624,7 @@ func TestHandlerCreatePortfolioEntry(t *testing.T) {
 		var gotCategory EntryCategory
 		var gotType TransactionType
 		repo := new(fakeRepository{
-			createPortfolioEntry: func(_ context.Context, _, pid, aid, sid uuid.UUID, txnType TransactionType, _ money.Decimal, _ money.Money, _ string, category EntryCategory, _ time.Time, _ string) (Entry, error) {
+			createPortfolioEntry: func(_ context.Context, _, pid, aid, sid uuid.UUID, txnType TransactionType, _ decimal.Decimal, _ money.Money, _ string, category EntryCategory, _ time.Time, _ string) (Entry, error) {
 				gotCategory, gotType = category, txnType
 				return Entry{ID: uuid.New(), PortfolioID: pid, AssetID: aid, SourceID: sid, Category: category}, nil
 			},
@@ -645,7 +646,7 @@ func TestHandlerCreatePortfolioEntry(t *testing.T) {
 	t.Run("an empty transaction type defaults to buy", func(t *testing.T) {
 		var gotType TransactionType
 		repo := new(fakeRepository{
-			createPortfolioEntry: func(_ context.Context, _, _, _, _ uuid.UUID, txnType TransactionType, _ money.Decimal, _ money.Money, _ string, _ EntryCategory, _ time.Time, _ string) (Entry, error) {
+			createPortfolioEntry: func(_ context.Context, _, _, _, _ uuid.UUID, txnType TransactionType, _ decimal.Decimal, _ money.Money, _ string, _ EntryCategory, _ time.Time, _ string) (Entry, error) {
 				gotType = txnType
 				return Entry{ID: uuid.New()}, nil
 			},
