@@ -9,6 +9,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/yeferson59/finexia-app/internal/platform/cache"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
@@ -61,6 +62,7 @@ func probeApp(t *testing.T) string {
 			TrustProxy:         true,
 		}),
 		DB:      pool,
+		Cache:   cache.Conn("127.0.0.1", "1", "", 0),
 		Mail:    mailService,
 		Keyring: testKeyring(t),
 		Log:     logger.Noop(),

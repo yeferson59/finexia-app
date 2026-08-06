@@ -72,7 +72,7 @@ func (d Deps) validate() error {
 	case d.DB == nil:
 		return errors.New("app: Deps.DB is required")
 	case d.Cache == nil:
-		return errors.New("app: Deps.Storage is required")
+		return errors.New("app: Deps.Cache is required")
 	case d.Mail == nil:
 		return errors.New("app: Deps.Mail is required")
 	case d.Keyring == nil:
@@ -144,8 +144,6 @@ func New(deps Deps) (*App, error) {
 // the listener stops or ctx is cancelled (e.g. on SIGINT/SIGTERM), in which
 // case it shuts down the HTTP server and the schedulers cleanly.
 func (a *App) Run(ctx context.Context) error {
-	a.storage = cache.Storage(ctx, a.deps.Cache)
-
 	a.wire(ctx)
 
 	// stopped signals that Listen has returned (e.g. a bind error), so the
@@ -206,7 +204,15 @@ type modules struct {
 // can exercise the composed router without opening a listener. It runs the
 // three ordered steps of the composition root: build the modules, mount
 // their routes, then start the schedulers.
+//
+// The shared fiber.Storage is adapted from the Redis connection here rather
+// than in Run because everything below depends on it — sessions, the market
+// cache, the scheduler's persisted next-run times — so deriving it anywhere
+// Run-only would leave every other caller of wire composing against a nil
+// storage.
 func (a *App) wire(ctx context.Context) {
+	a.storage = cache.Storage(ctx, a.deps.Cache)
+
 	mods := a.buildModules()
 	a.mountRoutes(mods)
 	a.startScheduler(ctx, mods)
