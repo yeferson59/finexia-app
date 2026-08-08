@@ -52,7 +52,7 @@ func run(ctx context.Context, envs *config.Env, log logger.Logger) error {
 	client := cache.Conn(envs.RedisHost, envs.RedisPort, envs.RedisPassword, envs.RedisDB)
 	defer func() {
 		if err := client.Close(); err != nil {
-			log.Error(ctx, "failed to close redis")
+			log.Error(ctx, "failed to close redis: "+err.Error())
 		}
 	}()
 
