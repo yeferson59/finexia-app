@@ -85,33 +85,35 @@ func (m *Module) Service() *Service {
 func (m *Module) Routes(router fiber.Router) {
 	auth := router.Group("/auth")
 
-	auth.Post("/register", m.authLimiter(), m.handler.register)
-	auth.Post("/login", m.authLimiter(), m.handler.login)
-	auth.Post("/refresh", m.authLimiter(), m.handler.refresh)
+	authLimiter := httpx.AuthLimiter()
+
+	auth.Post("/register", authLimiter, m.handler.register)
+	auth.Post("/login", authLimiter, m.handler.login)
+	auth.Post("/refresh", authLimiter, m.handler.refresh)
 
 	// Public second step of a 2FA login: exchanges the short-lived pending
 	// token plus a TOTP/recovery code for a session. Rate-limited to blunt
 	// code guessing on top of the per-token attempt counter.
-	auth.Post("/2fa/login", m.authLimiter(), m.handler.twoFactorLogin)
+	auth.Post("/2fa/login", authLimiter, m.handler.twoFactorLogin)
 
 	// Public invitation flow: validate a token, then accept it by setting a
 	// password. Rate-limited to blunt token guessing.
-	auth.Get("/invitations", m.authLimiter(), m.handler.validateInvitation)
-	auth.Post("/invitations/accept", m.authLimiter(), m.handler.acceptInvitation)
+	auth.Get("/invitations", authLimiter, m.handler.validateInvitation)
+	auth.Post("/invitations/accept", authLimiter, m.handler.acceptInvitation)
 
 	// Public password recovery flow: request a reset link, validate its
 	// token, then confirm with a new password. Rate-limited to blunt both
 	// mail-bombing an address and token guessing.
-	auth.Post("/password-reset", m.authLimiter(), m.handler.requestPasswordReset)
-	auth.Get("/password-reset", m.authLimiter(), m.handler.validatePasswordReset)
-	auth.Post("/password-reset/confirm", m.authLimiter(), m.handler.confirmPasswordReset)
+	auth.Post("/password-reset", authLimiter, m.handler.requestPasswordReset)
+	auth.Get("/password-reset", authLimiter, m.handler.validatePasswordReset)
+	auth.Post("/password-reset/confirm", authLimiter, m.handler.confirmPasswordReset)
 
 	// Public email verification flow: (re)send a link, validate its token,
 	// then confirm to mark the email verified. Rate-limited to blunt both
 	// mail-bombing an address and token guessing.
-	auth.Post("/verify-email", m.authLimiter(), m.handler.requestEmailVerification)
-	auth.Get("/verify-email", m.authLimiter(), m.handler.validateEmailVerification)
-	auth.Post("/verify-email/confirm", m.authLimiter(), m.handler.confirmEmailVerification)
+	auth.Post("/verify-email", authLimiter, m.handler.requestEmailVerification)
+	auth.Get("/verify-email", authLimiter, m.handler.validateEmailVerification)
+	auth.Post("/verify-email/confirm", authLimiter, m.handler.confirmEmailVerification)
 
 	auth.Use(m.RequireAuth())
 
@@ -143,7 +145,7 @@ func (m *Module) Routes(router fiber.Router) {
 // composition root mounts auth before user, which is what keeps the static
 // paths from being captured by GET/PATCH /users/:id.
 func (m *Module) userRoutes(router fiber.Router) {
-	requireAuth, requireAdmin := m.RequireAuth(), m.RequireAdmin()
+	requireAuth, requireAdmin := m.RequireAuth(), httpx.RequireAdmin()
 
 	router.Patch("/users/me/password", requireAuth, m.limiter, m.handler.changePassword)
 

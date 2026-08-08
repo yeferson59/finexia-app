@@ -18,7 +18,6 @@ import (
 // satisfied by *auth.Module.
 type authMiddleware interface {
 	RequireAuth() fiber.Handler
-	RequireAdmin() fiber.Handler
 }
 
 // ServiceDeps is the infrastructure the use cases need; no domain module
@@ -100,6 +99,5 @@ func (m *Module) Routes(router fiber.Router) {
 	waitlists.Post("/waitlists", httpx.RateLimiter(5, 15*time.Minute, true), m.handler.createWaitlist)
 
 	router.Get("/users/waitlist",
-		m.authMiddl.RequireAuth(), m.limiter, m.authMiddl.RequireAdmin(),
-		paginate.New(), m.handler.listWaitlist)
+		m.authMiddl.RequireAuth(), m.limiter, paginate.New(), m.handler.listWaitlist)
 }

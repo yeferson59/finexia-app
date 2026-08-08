@@ -35,7 +35,6 @@ type Deps struct {
 
 type authMiddleware interface {
 	RequireAuth() fiber.Handler
-	RequireAdmin() fiber.Handler
 }
 
 // AssetReader is the slice of the market module the portfolio HTTP handlers
@@ -134,7 +133,7 @@ func (m *Module) Routes(router fiber.Router) {
 	portfolios.Get("/assets", paginate.New(), m.handler.GetAssets)
 	// Admin guard inline per route (never group.Use) so unmatched paths under
 	// the group fall through to a 404 instead of a 403.
-	portfolios.Patch("/assets/:id/price", m.authMiddl.RequireAdmin(), m.handler.UpdateAssetPrice)
+	portfolios.Patch("/assets/:id/price", httpx.RequireAdmin(), m.handler.UpdateAssetPrice)
 	portfolios.Get("/growth", m.handler.GetPortfolioGrowth)
 	portfolios.Get("/export/summary", m.handler.ExportSummary)
 	portfolios.Get("/export/transactions", m.handler.ExportTransactions)

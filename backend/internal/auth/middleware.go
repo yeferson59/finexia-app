@@ -1,9 +1,6 @@
 package auth
 
 import (
-	"slices"
-	"time"
-
 	jwtware "github.com/gofiber/contrib/v3/jwt"
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
@@ -52,34 +49,4 @@ func (m *Module) RequireAuth() fiber.Handler {
 			return c.Next()
 		},
 	})
-}
-
-// RequireRole allows only requests whose authenticated role matches one of the
-// given roles. Must be placed after RequireAuth in the handler chain.
-func (m *Module) RequireRole(roles ...string) fiber.Handler {
-	return func(c fiber.Ctx) error {
-		role, _ := c.Locals(httpx.LocalRole).(string)
-
-		if slices.Contains(roles, role) {
-			return c.Next()
-		}
-
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"success": false,
-			"message": "Forbidden",
-			"details": "insufficient privileges",
-		})
-	}
-}
-
-// RequireAdmin is a convenience wrapper that only allows the "admin" role.
-func (m *Module) RequireAdmin() fiber.Handler {
-	return m.RequireRole(httpx.RoleAdmin)
-}
-
-// authLimiter rate-limits the public auth endpoints (credential guessing,
-// token guessing, mail bombing). Deliberately tighter than the per-user
-// limiter: these routes are reachable without a session.
-func (m *Module) authLimiter() fiber.Handler {
-	return httpx.RateLimiter(10, 15*time.Minute, true)
 }

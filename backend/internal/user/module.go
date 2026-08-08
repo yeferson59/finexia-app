@@ -47,7 +47,6 @@ type Deps struct {
 
 type authMiddleware interface {
 	RequireAuth() fiber.Handler
-	RequireAdmin() fiber.Handler
 }
 
 // sessionRevoker is the slice of the auth module this one needs to make a ban
@@ -123,7 +122,7 @@ func (m *Module) Routes(router fiber.Router) {
 
 	// Admin guards go inline per route (never group.Use) so unmatched
 	// /users/* requests fall through to a 404 instead of a 403.
-	admin := m.authMiddl.RequireAdmin()
+	admin := httpx.RequireAdmin()
 	users.Get("", admin, paginate.New(), m.handler.GetListUsers)
 	users.Post("", admin, m.handler.CreateUser)
 

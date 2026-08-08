@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -90,4 +91,30 @@ func OrPassThrough(h fiber.Handler) fiber.Handler {
 	}
 
 	return func(c fiber.Ctx) error { return c.Next() }
+}
+
+// RequireRole allows only requests whose authenticated role matches one of the
+// given roles. Must be placed after RequireAuth in the handler chain.
+func RequireRole(roles ...string) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		role, _ := c.Locals(LocalRole).(string)
+
+		if slices.Contains(roles, role) {
+			return c.Next()
+		}
+
+		return Forbidden(c, "Forbidden", "insufficient privileges")
+	}
+}
+
+// RequireAdmin is a convenience wrapper that only allows the "admin" role.
+func RequireAdmin() fiber.Handler {
+	return RequireRole(RoleAdmin)
+}
+
+// AuthLimiter rate-limits the public auth endpoints (credential guessing,
+// token guessing, mail bombing). Deliberately tighter than the per-user
+// limiter: these routes are reachable without a session.
+func AuthLimiter() fiber.Handler {
+	return RateLimiter(10, 15*time.Minute, true)
 }

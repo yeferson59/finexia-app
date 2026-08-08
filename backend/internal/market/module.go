@@ -59,7 +59,6 @@ type Module struct {
 
 type authMiddleware interface {
 	RequireAuth() fiber.Handler
-	RequireAdmin() fiber.Handler
 }
 
 // NewService builds the module's use cases. It is constructed before portfolio,
@@ -101,7 +100,7 @@ func (m *Module) Routes(router fiber.Router) {
 
 	assests.Use(m.authMiddl.RequireAuth(), m.limiter)
 
-	admin := m.authMiddl.RequireAdmin()
+	admin := httpx.RequireAdmin()
 
 	// Open to every user. An admin's call curates the row for everybody; anybody
 	// else's contributes one visible to them alone, capped per day, and never

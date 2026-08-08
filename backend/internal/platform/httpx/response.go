@@ -54,6 +54,10 @@ func InternalServerError(c fiber.Ctx, message, details string) error {
 	return Error(c, fiber.StatusInternalServerError, message, details)
 }
 
+func Forbidden(c fiber.Ctx, message, details string) error {
+	return Error(c, fiber.StatusForbidden, message, details)
+}
+
 // FromDomain maps a service error to an HTTP status and writes an error
 // envelope carrying an action code (docs/API.md §1.2). The status comes from
 // the error's typed Kind — domains tag their errors via httpx.AsNotFound and
