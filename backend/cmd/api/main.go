@@ -50,6 +50,11 @@ func run(ctx context.Context, envs *config.Env, log logger.Logger) error {
 	defer dbPool.Close()
 
 	client := cache.Conn(envs.RedisHost, envs.RedisPort, envs.RedisPassword, envs.RedisDB)
+	defer func() {
+		if err := client.Close(); err != nil {
+			log.Error(ctx, "failed to close redis")
+		}
+	}()
 
 	s3Client, err := objectstore.Connect(ctx, envs.AWSAccessKeyID, envs.AWSDefaultRegion, envs.AWSEndpointURL, envs.AWSSecretAccessKey)
 	if err != nil {
