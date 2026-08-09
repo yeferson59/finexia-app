@@ -6,32 +6,7 @@ import {
 	clearSessionCookies,
 	refreshAccessToken
 } from '$lib/server/session';
-
-type SessionResponse = {
-	data: {
-		user: {
-			name: string;
-			email: string;
-			emailVerified: boolean;
-			image: string;
-			role: string;
-			preferredCurrency: string;
-			createdAt: string;
-			updatedAt: string;
-		};
-		session: {
-			id: string;
-			userId: string;
-			expiresAt: string;
-			ipAddress: string | null;
-			userAgent: string | null;
-			createdAt: string;
-		};
-	};
-	success: boolean;
-	message: string;
-	details: string;
-};
+import type { SessionResponse } from '$lib/server/types';
 
 // Private areas must never be indexed even if a URL leaks past robots.txt.
 const PRIVATE_PREFIXES = ['/dashboard', '/auth'];
@@ -50,10 +25,7 @@ function needsSession(pathname: string): boolean {
 	return PRIVATE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-async function resolveSession(
-	event: Parameters<Handle>[0]['event'],
-	accessToken: string
-): Promise<boolean> {
+async function resolveSession(event: Parameters<Handle>[0]['event'], accessToken: string) {
 	const res = await event.fetch(`${env.BASE_API}/auth/session`, {
 		headers: { Authorization: `Bearer ${accessToken}` }
 	});
@@ -61,11 +33,14 @@ async function resolveSession(
 	if (!res.ok) return false;
 
 	const { data, success }: SessionResponse = await res.json();
+
 	if (success) {
 		event.locals.user = data.user;
 		event.locals.session = data.session;
+
 		return true;
 	}
+
 	return false;
 }
 
@@ -89,8 +64,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 					clearSessionCookies(event.cookies);
 				}
 			} else if (!valid) {
-				// Token inválido sin refresh token disponible — eliminar para evitar
-				// que acciones de formulario envíen un token expirado al backend.
 				event.cookies.delete(ACCESS_COOKIE, { path: '/' });
 			}
 		} else if (refreshToken) {

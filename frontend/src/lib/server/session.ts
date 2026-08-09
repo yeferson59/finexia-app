@@ -1,6 +1,7 @@
 import { env } from '$env/dynamic/private';
 import { dev } from '$app/environment';
 import type { Cookies } from '@sveltejs/kit';
+import type { RefreshResult, SessionEvent } from './types';
 
 export const ACCESS_COOKIE = 'access_token_finexia';
 export const REFRESH_COOKIE = 'refresh_token';
@@ -10,25 +11,12 @@ const ACCESS_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 // backend default JWT_REFRESH_DURATION (30 days).
 const DEFAULT_REFRESH_MAX_AGE = 60 * 60 * 24 * 30;
 
-export type SessionEvent = {
-	cookies: Cookies;
-	fetch: typeof fetch;
-};
-
-type RefreshResult = {
-	accessToken: string;
-	refreshToken: string | null;
-	refreshMaxAge: number | null;
-};
-
 /**
  * Extracts the rotated refresh token (and its real Max-Age) from a backend
  * response, so the cookie the frontend re-issues expires in step with the
  * backend's configured JWT_REFRESH_DURATION instead of a hardcoded value.
  */
-export function parseRefreshSetCookie(
-	response: Response
-): { value: string; maxAge: number | null } | null {
+export function parseRefreshSetCookie(response: Response) {
 	const setCookies =
 		typeof response.headers.getSetCookie === 'function'
 			? response.headers.getSetCookie()
@@ -45,7 +33,7 @@ export function parseRefreshSetCookie(
 	return null;
 }
 
-export function setAccessCookie(cookies: Cookies, token: string): void {
+export function setAccessCookie(cookies: Cookies, token: string) {
 	cookies.set(ACCESS_COOKIE, token, {
 		path: '/',
 		httpOnly: true,
@@ -55,7 +43,7 @@ export function setAccessCookie(cookies: Cookies, token: string): void {
 	});
 }
 
-export function setRefreshCookie(cookies: Cookies, token: string, maxAge: number | null): void {
+export function setRefreshCookie(cookies: Cookies, token: string, maxAge: number | null) {
 	cookies.set(REFRESH_COOKIE, token, {
 		path: '/',
 		httpOnly: true,
@@ -65,7 +53,7 @@ export function setRefreshCookie(cookies: Cookies, token: string, maxAge: number
 	});
 }
 
-export function clearSessionCookies(cookies: Cookies): void {
+export function clearSessionCookies(cookies: Cookies) {
 	cookies.delete(ACCESS_COOKIE, { path: '/' });
 	cookies.delete(REFRESH_COOKIE, { path: '/' });
 }
@@ -78,10 +66,7 @@ export function clearSessionCookies(cookies: Cookies): void {
 // request then sets its own cookies from the shared result.
 const inFlightRefreshes = new Map<string, Promise<RefreshResult | null>>();
 
-async function performRefresh(
-	event: SessionEvent,
-	refreshToken: string
-): Promise<RefreshResult | null> {
+async function performRefresh(event: SessionEvent, refreshToken: string) {
 	const res = await event.fetch(`${env.BASE_API}/auth/refresh`, {
 		method: 'POST',
 		headers: { Cookie: `${REFRESH_COOKIE}=${refreshToken}` }
@@ -114,11 +99,9 @@ async function performRefresh(
  * cookies). Network errors and backend 5xx responses are thrown, NOT returned
  * as `null`: a transient outage must never be treated as an invalid session.
  */
-export async function refreshAccessToken(
-	event: SessionEvent,
-	refreshToken: string
-): Promise<string | null> {
+export async function refreshAccessToken(event: SessionEvent, refreshToken: string) {
 	let pending = inFlightRefreshes.get(refreshToken);
+
 	if (!pending) {
 		pending = performRefresh(event, refreshToken).finally(() => {
 			inFlightRefreshes.delete(refreshToken);

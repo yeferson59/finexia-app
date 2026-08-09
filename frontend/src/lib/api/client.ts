@@ -4,9 +4,9 @@ import {
 	ACCESS_COOKIE,
 	REFRESH_COOKIE,
 	clearSessionCookies,
-	refreshAccessToken,
-	type SessionEvent
+	refreshAccessToken
 } from '$lib/server/session';
+import type { SessionEvent } from '$lib/server/types';
 import type { ZodType } from 'zod';
 import type { ApiEnvelope } from './types';
 
@@ -20,7 +20,7 @@ export type ApiEvent = SessionEvent;
  * `env.BASE_API`, so no loader/action constructs backend paths by hand (public
  * endpoints and logout, which can't use {@link authedFetch}, go through here).
  */
-export function apiUrl(path: string): string {
+export function apiUrl(path: string) {
 	return `${env.BASE_API}${path}`;
 }
 
@@ -29,7 +29,7 @@ function doFetch(
 	path: string,
 	init: RequestInit,
 	accessToken: string | undefined
-): Promise<Response> {
+) {
 	return event.fetch(`${env.BASE_API}${path}`, {
 		...init,
 		headers: {
@@ -50,11 +50,7 @@ function doFetch(
  * the session has expired — and a still-valid refresh token is never discarded
  * over a transient 401.
  */
-export async function authedFetch(
-	event: AuthedEvent,
-	path: string,
-	init: RequestInit = {}
-): Promise<Response> {
+export async function authedFetch(event: AuthedEvent, path: string, init: RequestInit = {}) {
 	let accessToken = event.cookies.get(ACCESS_COOKIE);
 
 	// Without an access token the backend answers 400 (missing JWT), not 401,
@@ -91,11 +87,7 @@ export async function authedFetch(
  * throwing, for loaders that want to degrade gracefully (e.g. dashboard widgets)
  * when the backend is unreachable. A 401 still redirects to `/auth`.
  */
-export async function authedFetchSafe(
-	event: AuthedEvent,
-	path: string,
-	init: RequestInit = {}
-): Promise<Response | null> {
+export async function authedFetchSafe(event: AuthedEvent, path: string, init: RequestInit = {}) {
 	try {
 		return await authedFetch(event, path, init);
 	} catch (err) {
@@ -138,7 +130,7 @@ export interface ApiResult<T> {
  * igual. `import.meta.env.DEV` es una constante de compilación, así que en el
  * build de producción esta función queda vacía y el schema ni se ejecuta.
  */
-function checkContract<T>(path: string, data: unknown, schema?: ZodType<T>): void {
+function checkContract<T>(path: string, data: unknown, schema?: ZodType<T>) {
 	if (!import.meta.env.DEV || !schema || data === null || data === undefined) return;
 
 	const parsed = schema.safeParse(data);
@@ -156,11 +148,7 @@ function checkContract<T>(path: string, data: unknown, schema?: ZodType<T>): voi
 }
 
 /** Parses the standard envelope into an {@link ApiResult}. */
-async function toResult<T>(
-	res: Response | null,
-	path: string,
-	schema?: ZodType<T>
-): Promise<ApiResult<T>> {
+async function toResult<T>(res: Response | null, path: string, schema?: ZodType<T>) {
 	if (!res) return { ok: false, status: 0, success: false, data: null };
 	const body = (await res.json().catch(() => ({}) as ApiEnvelope<T>)) as ApiEnvelope<T>;
 
@@ -189,7 +177,7 @@ export async function apiRequest<T>(
 	path: string,
 	init: RequestInit = {},
 	schema?: ZodType<T>
-): Promise<ApiResult<T>> {
+) {
 	return toResult<T>(await authedFetch(event, path, init), path, schema);
 }
 
@@ -203,6 +191,6 @@ export async function apiRequestSafe<T>(
 	path: string,
 	init: RequestInit = {},
 	schema?: ZodType<T>
-): Promise<ApiResult<T>> {
+) {
 	return toResult<T>(await authedFetchSafe(event, path, init), path, schema);
 }

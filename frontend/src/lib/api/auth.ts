@@ -12,7 +12,7 @@ import { apiUrl } from './client';
 type Fetch = typeof fetch;
 
 /** POST con cuerpo JSON al backend, sin autenticación. */
-function postJson(fetchFn: Fetch, path: string, body: unknown): Promise<Response> {
+function postJson(fetchFn: Fetch, path: string, body: unknown) {
 	return fetchFn(apiUrl(path), {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
@@ -21,46 +21,37 @@ function postJson(fetchFn: Fetch, path: string, body: unknown): Promise<Response
 }
 
 /** `POST /auth/login`. */
-export function login(
-	fetchFn: Fetch,
-	body: { email: string; password: string }
-): Promise<Response> {
+export function login(fetchFn: Fetch, body: { email: string; password: string }) {
 	return postJson(fetchFn, '/auth/login', body);
 }
 
 /** `POST /auth/2fa/login` — segundo paso del login 2FA. */
-export function twoFactorLogin(
-	fetchFn: Fetch,
-	body: { token: string; code: string }
-): Promise<Response> {
+export function twoFactorLogin(fetchFn: Fetch, body: { token: string; code: string }) {
 	return postJson(fetchFn, '/auth/2fa/login', body);
 }
 
 /** `POST /auth/register`. */
-export function register(fetchFn: Fetch, body: Record<string, unknown>): Promise<Response> {
+export function register(fetchFn: Fetch, body: Record<string, unknown>) {
 	return postJson(fetchFn, '/auth/register', body);
 }
 
 /** `POST /auth/password-reset` — solicita el enlace de recuperación. */
-export function requestPasswordReset(fetchFn: Fetch, email: string): Promise<Response> {
+export function requestPasswordReset(fetchFn: Fetch, email: string) {
 	return postJson(fetchFn, '/auth/password-reset', { email });
 }
 
 /** `GET /auth/password-reset?token=` — valida un token de reset. */
-export function validatePasswordResetToken(fetchFn: Fetch, token: string): Promise<Response> {
+export function validatePasswordResetToken(fetchFn: Fetch, token: string) {
 	return fetchFn(apiUrl(`/auth/password-reset?token=${encodeURIComponent(token)}`));
 }
 
 /** `POST /auth/password-reset/confirm` — confirma el reset con nueva contraseña. */
-export function confirmPasswordReset(
-	fetchFn: Fetch,
-	body: { token: string; password: string }
-): Promise<Response> {
+export function confirmPasswordReset(fetchFn: Fetch, body: { token: string; password: string }) {
 	return postJson(fetchFn, '/auth/password-reset/confirm', body);
 }
 
 /** `GET /auth/invitations?token=` — valida un token de invitación. */
-export function validateInvitation(fetchFn: Fetch, token: string): Promise<Response> {
+export function validateInvitation(fetchFn: Fetch, token: string) {
 	return fetchFn(apiUrl(`/auth/invitations?token=${encodeURIComponent(token)}`));
 }
 
@@ -68,22 +59,22 @@ export function validateInvitation(fetchFn: Fetch, token: string): Promise<Respo
 export function acceptInvitation(
 	fetchFn: Fetch,
 	body: { token: string; name: string; password: string }
-): Promise<Response> {
+) {
 	return postJson(fetchFn, '/auth/invitations/accept', body);
 }
 
 /** `POST /auth/verify-email` — (re)envía el enlace de verificación. */
-export function requestEmailVerification(fetchFn: Fetch, email: string): Promise<Response> {
+export function requestEmailVerification(fetchFn: Fetch, email: string) {
 	return postJson(fetchFn, '/auth/verify-email', { email });
 }
 
 /** `GET /auth/verify-email?token=` — valida un token de verificación. */
-export function validateEmailVerificationToken(fetchFn: Fetch, token: string): Promise<Response> {
+export function validateEmailVerificationToken(fetchFn: Fetch, token: string) {
 	return fetchFn(apiUrl(`/auth/verify-email?token=${encodeURIComponent(token)}`));
 }
 
 /** `POST /auth/verify-email/confirm` — marca el email como verificado. */
-export function confirmEmailVerification(fetchFn: Fetch, token: string): Promise<Response> {
+export function confirmEmailVerification(fetchFn: Fetch, token: string) {
 	return postJson(fetchFn, '/auth/verify-email/confirm', { token });
 }
 
@@ -95,7 +86,7 @@ export function confirmEmailVerification(fetchFn: Fetch, token: string): Promise
 export function logout(
 	fetchFn: Fetch,
 	tokens: { accessToken: string; refreshToken?: string; refreshCookieName: string }
-): Promise<Response> {
+) {
 	return fetchFn(apiUrl('/auth/logout'), {
 		method: 'POST',
 		headers: {
