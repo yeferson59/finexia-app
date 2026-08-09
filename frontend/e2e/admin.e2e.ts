@@ -63,6 +63,28 @@ test.describe('admin', () => {
 		await expect(page.locator('#fromCurrency')).toBeVisible();
 	});
 
+	// El resalte del hover se pinta sobre el fondo de cada `td`, así que una
+	// celda más baja que su fila lo deja mordido. Es lo que hacía un
+	// `display: flex` sobre la primera celda: en flex un `td` deja de ser celda
+	// de tabla y se encoge a su contenido. Se comprueba la geometría porque el
+	// síntoma es visual pero la causa se mide.
+	test('every cell fills its row, so the hover highlight is unbroken', async ({ page }) => {
+		await login(page, ADMIN_EMAIL);
+		await page.goto('/dashboard/admin/exchange-rates');
+
+		const mismatches = await page.evaluate(() =>
+			[...document.querySelectorAll('tbody tr')].flatMap((row) => {
+				const rowHeight = row.getBoundingClientRect().height;
+
+				return [...row.querySelectorAll('td')]
+					.filter((td) => Math.abs(td.getBoundingClientRect().height - rowHeight) > 0.5)
+					.map((td) => `${td.className}: ${td.getBoundingClientRect().height} vs ${rowHeight}`);
+			})
+		);
+
+		expect(mismatches).toEqual([]);
+	});
+
 	test('refreshes the shared rates from the public feed', async ({ page }) => {
 		await login(page, ADMIN_EMAIL);
 		await page.goto('/dashboard/admin/exchange-rates');

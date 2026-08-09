@@ -104,12 +104,14 @@
 	{/if}
 </AdminTableCard>
 
-<style>
-	/* El par va en una celda con dos textos, a diferencia del ticker suelto de
-	   la tabla de activos. */
-	.cell-ticker {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-</style>
+<!--
+	Sin estilos propios: `.cell-ticker` ya lo pinta `AdminTableCard`, igual que
+	en la tabla de activos.
+
+	Aquí hubo un `display: flex` sobre el `<td>`, de cuando el par eran dos
+	textos sueltos en la misma celda. Un `td` en flex deja de ser celda de tabla
+	y su alto pasa a ser el de su contenido en vez del de la fila: medía 45 px
+	contra los 64 px de sus vecinas, así que su fondo y su borde inferior se
+	quedaban cortos y el resalte del hover aparecía mordido en la primera
+	columna.
+-->
