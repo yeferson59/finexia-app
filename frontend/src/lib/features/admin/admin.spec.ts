@@ -5,6 +5,8 @@ import {
 	formatRate,
 	invitationStatusLabel,
 	invitationStatusTone,
+	rateSourceLabel,
+	rateSourceTone,
 	summarizeImport
 } from './admin';
 
@@ -49,6 +51,23 @@ describe('formatRate', () => {
 
 	it('devuelve el valor tal cual si no es un número', () => {
 		expect(formatRate('sin dato')).toBe('sin dato');
+	});
+});
+
+describe('origen de una tasa compartida', () => {
+	it('traduce los orígenes conocidos y deja pasar los demás', () => {
+		expect(rateSourceLabel('manual')).toBe('Manual');
+		expect(rateSourceLabel('dolarapi')).toBe('TRM (automática)');
+		// Una fuente que añada el backend sin tocar esto se enseña tal cual, en
+		// vez de dejar la celda vacía.
+		expect(rateSourceLabel('otra-fuente')).toBe('otra-fuente');
+	});
+
+	// El tono es lo que distingue de un vistazo las filas que el job va a pisar
+	// en el próximo refresco de las que no.
+	it('destaca las automáticas frente a las escritas a mano', () => {
+		expect(rateSourceTone('manual')).toBe('neutral');
+		expect(rateSourceTone('dolarapi')).toBe('amber');
 	});
 });
 

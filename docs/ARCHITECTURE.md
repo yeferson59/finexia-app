@@ -28,7 +28,7 @@ backend/
     │   ├── config/  logger/  database/  cache/  objectstore/
     │   ├── mail/  geoip/  httpx/         # httpx: middlewares genéricos + envelope de respuesta
     │   ├── spreadsheet/                  # lectura genérica de CSV/XLSX (compartida por los importers)
-    │   ├── marketdata/                   # provider de precios (BYO-key) + alphavantage/finnhub + fallback + providers/
+    │   ├── marketdata/                   # provider de precios (BYO-key) + alphavantage/finnhub + fallback + providers/ + dolarapi (feed público, sin clave)
     │   └── secretbox/                    # cifrado de sobre de las claves que aportan los usuarios
     ├── identity/                # tipos compartidos (User, Account, Session, Role) — sin lógica
     │
@@ -263,6 +263,18 @@ vez al arrancar, y todo error de proveedor pasa por `marketdata.Errorf`, que
 depura la clave del mensaje — Alpha Vantage solo la acepta en el query string y
 los errores de transporte de Go citan la URL completa.
 
+**La excepción es lo que no cuesta clave.** La restricción de arriba se apoya
+entera en la clave: es el plan personal de alguien lo que no se puede
+redistribuir. Una fuente que no pide credencial, publica un dato oficial y no
+impone condiciones queda fuera de ese razonamiento, y se lee una vez para
+todos. `marketdata/dolarapi` es la primera: trae la TRM —la tasa oficial
+USD/COP— y su resultado va a la tabla compartida `exchange_rates`, no a la del
+usuario. Por eso no pasa por la `Factory`, que se arma desde credenciales, sino
+por su propia interfaz (`marketdata.PublicRateSource`) y su propio job
+(`market.PublicRatesJob`, cada hora). Sin esto, un usuario sin clave no tenía
+USD→COP y el dashboard no podía enseñarse en pesos; la tasa del propio usuario
+sigue ganando cuando la hay, así que esto es un suelo, no un reemplazo.
+
 **El catálogo dejó de ser del operador.** La fila de `assets` no lleva dato
 licenciado —solo ticker, nombre, tipo, mercado y moneda—, así que no hay razón
 para duplicarla por usuario: sigue siendo compartida, y lo que se añadió es
@@ -311,7 +323,7 @@ logger, env) y llama a `app.New(deps).Run(ctx)`. `internal/app`:
    rutas bajo el gate global,
 4. registra todos los cron jobs en el `scheduler.Scheduler` genérico
    (`auth.CleanupJob`, `portfolio.SnapshotJob`, `market.SyncJob`,
-   `notification.WeeklySummaryScheduler`).
+   `market.PublicRatesJob`, `notification.WeeklySummaryScheduler`).
 
 `market.SyncJob` sustituyó a los dos jobs globales de precios y tasas: sin
 clave de operador no hay nada global que sincronizar, así que recorre los

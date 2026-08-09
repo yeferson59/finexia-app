@@ -73,4 +73,18 @@ test.describe('dashboard', () => {
 		await expect(page.getByRole('link', { name: 'Reserva' })).toBeVisible();
 		await expect(page.getByText('Acciones & ETFs')).toBeVisible();
 	});
+
+	// Enseñar la tasa es el motivo de que la aplicación la traiga: una cifra en
+	// pesos que nadie puede cuadrar con su banco no sirve de mucho.
+	test('enseña la tasa con la que convierte al cambiar de moneda', async ({ page }) => {
+		await login(page);
+
+		// En dólares no hay conversión que enseñar, así que la línea no está.
+		await expect(page.getByText(/^1\s/)).toBeHidden();
+
+		await page.getByRole('tab', { name: 'COP' }).click();
+
+		await expect(page.getByText('1 USD = 4.123,46 COP')).toBeVisible();
+		await expect(page.getByText(/TRM · dolarapi\.com/)).toBeVisible();
+	});
 });

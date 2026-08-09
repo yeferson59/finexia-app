@@ -10,10 +10,19 @@ import (
 )
 
 type Repository interface {
-	// Exchange rates
+	// Exchange rates. The three below are the operator's: they write
+	// ManualRateSource, because an admin endpoint or a spreadsheet is what
+	// produced the number.
 	UpsertExchangeRate(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error)
 	GetExchangeRates(ctx context.Context, offset, limit uint) ([]ExchangeRate, error)
 	UpdateExchangeRateByID(ctx context.Context, id uuid.UUID, rate decimal.Decimal) (ExchangeRate, error)
+	// UpsertPublicExchangeRate is the refresh job's, and stays a separate method
+	// rather than a source argument on the one above: the callers are not
+	// interchangeable. An operator writing a pair the feed also publishes is
+	// making a temporary correction that the next refresh replaces, and keeping
+	// the two writes apart is what makes that visible in the code instead of
+	// hidden in an argument.
+	UpsertPublicExchangeRate(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time, source ProviderID) (ExchangeRate, error)
 
 	// Assets (catalog owned by this module; portfolio reads them via AssetReader)
 	GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, error)

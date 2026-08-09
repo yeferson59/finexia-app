@@ -31,6 +31,14 @@ type ServiceDeps struct {
 	// process-wide Provider any more: under BYO-key the application holds no
 	// provider credentials of its own.
 	Providers marketdata.Factory
+	// PublicRates is the keyless feed behind the shared exchange rates. It sits
+	// beside Providers rather than inside it because it is the one source that
+	// needs no credential, which is also why what it returns may be served to
+	// every user instead of only the one who paid for it.
+	//
+	// Optional: leave it nil and the shared rates stay whatever an admin
+	// entered, which is what they were before the feed existed.
+	PublicRates marketdata.PublicRateSource
 	// Keyring seals and opens those keys.
 	Keyring *secretbox.Keyring
 }
@@ -64,7 +72,7 @@ type authMiddleware interface {
 // NewService builds the module's use cases. It is constructed before portfolio,
 // which consumes it.
 func NewService(deps ServiceDeps) *Service {
-	return newService(NewPostgresRepository(deps.DB), deps.Storage, deps.Providers, deps.Keyring, deps.Log)
+	return newService(NewPostgresRepository(deps.DB), deps.Storage, deps.Providers, deps.PublicRates, deps.Keyring, deps.Log)
 }
 
 // New completes the module with its HTTP surface. deps.Service must be the
@@ -117,8 +125,17 @@ func (m *Module) Routes(router fiber.Router) {
 	exchangeRates.Use(m.authMiddl.RequireAuth(), m.limiter)
 
 	exchangeRates.Get("", admin, paginate.New(), m.handler.GetExchangeRates)
+	// Open to every signed-in user: the shared rates are what their own figures
+	// are converted with, and the feed that fills them is public data fetched
+	// with no key. Registered before the parametric PATCH below only by
+	// convention — the methods differ, so Fiber cannot confuse the two.
+	exchangeRates.Get("/latest", m.handler.GetLatestExchangeRates)
 	exchangeRates.Post("", admin, m.handler.CreateExchangeRate)
 	exchangeRates.Post("/import", admin, m.handler.ImportExchangeRates)
+	// Admin-only and outbound, so it carries the credential limiter rather than
+	// the group's: it is the one route here that makes a request to a third
+	// party, and the tighter gate is what stops it being used to hammer one.
+	exchangeRates.Post("/refresh", admin, m.credLimiter, m.handler.RefreshExchangeRates)
 	exchangeRates.Patch("/:id", admin, m.handler.UpdateExchangeRate)
 
 	// BYO-key. Every route here acts on the caller's own keys and holdings —

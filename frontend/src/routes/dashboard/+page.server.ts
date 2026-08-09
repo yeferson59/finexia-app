@@ -14,21 +14,25 @@ import type {
 
 const SUPPORTED_CURRENCIES = ['USD', 'COP'];
 
+// La moneda desde la que se convierte: las tasas compartidas se guardan en una
+// sola dirección (USD → X) y es la que publica el feed público.
+const BASE_CURRENCY = 'USD';
+
 export const load: PageServerLoad = async ({ cookies, fetch, url }) => {
 	const event = { cookies, fetch };
 
 	const requestedCurrency = url.searchParams.get('currency')?.toUpperCase() ?? '';
 	const currency = SUPPORTED_CURRENCIES.includes(requestedCurrency) ? requestedCurrency : 'USD';
 
-	const [transactionsRes, summaryRes, allocationRes, growthRes, credentialsRes] = await Promise.all(
-		[
+	const [transactionsRes, summaryRes, allocationRes, growthRes, credentialsRes, ratesRes] =
+		await Promise.all([
 			transactions.getRecent(event),
 			portfolio.getSummaries(event, currency),
 			portfolio.getAllocation(event),
 			portfolio.getAggregateGrowth(event),
-			market.getMarketCredentials(event)
-		]
-	);
+			market.getMarketCredentials(event),
+			market.getLatestExchangeRates(event)
+		]);
 
 	const recentTransactions: UserTransaction[] =
 		transactionsRes.ok && transactionsRes.success && Array.isArray(transactionsRes.data)
@@ -57,12 +61,24 @@ export const load: PageServerLoad = async ({ cookies, fetch, url }) => {
 	const hasUsableKey = credentials === null || credentials.some((c) => c.status !== 'invalid');
 	const hasBrokenKey = credentials !== null && credentials.length > 0 && !hasUsableKey;
 
+	// La tasa con la que se convierten las cifras de arriba, para poder
+	// enseñarla junto a ellas. Solo interesa el par entre la moneda base de la
+	// aplicación y la que se está mostrando: viéndola en USD no hay conversión
+	// que enseñar. Si no hay tasa —o el backend no contesta— se omite la línea
+	// en vez de inventar un valor.
+	const rates = ratesRes.ok && ratesRes.success ? (ratesRes.data ?? []) : [];
+	const displayRate =
+		currency === BASE_CURRENCY
+			? null
+			: (rates.find((r) => r.fromCurrency === BASE_CURRENCY && r.toCurrency === currency) ?? null);
+
 	return {
 		recentTransactions,
 		portfolioSummaries,
 		allocation,
 		portfolioGrowth,
 		currency,
+		displayRate,
 		hasUsableKey,
 		hasBrokenKey
 	};

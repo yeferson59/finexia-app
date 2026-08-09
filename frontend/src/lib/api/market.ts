@@ -117,6 +117,17 @@ export function getExchangeRates(
 	);
 }
 
+/**
+ * `GET /exchange-rates/latest` — las tasas compartidas, sin paginar.
+ *
+ * A diferencia del listado de arriba no es de administración: las llena un feed
+ * público sin clave (la TRM oficial para USD/COP), así que cualquier usuario
+ * puede ver con qué se están convirtiendo sus propias cifras.
+ */
+export function getLatestExchangeRates(event: ApiEvent): Promise<ApiResult<ExchangeRate[]>> {
+	return apiRequestSafe(event, '/exchange-rates/latest', {}, z.array(exchangeRateSchema));
+}
+
 /** `POST /exchange-rates` — crea una tasa. */
 export function createRate(
 	event: ApiEvent,
@@ -127,6 +138,24 @@ export function createRate(
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(body)
 	});
+}
+
+/**
+ * `POST /exchange-rates/refresh` — relee el feed público ahora (admin).
+ *
+ * El job horario es lo que mantiene las tasas al día; esto cubre los dos
+ * momentos que su cadencia no alcanza: un despliegue recién creado, que espera
+ * un intervalo entero hasta la primera ejecución, y un administrador que
+ * necesita la tasa de hoy ya. Sobrescribe los pares que el feed cubre, incluida
+ * una tasa escrita a mano.
+ */
+export function refreshExchangeRates(event: ApiEvent): Promise<ApiResult<ExchangeRate[]>> {
+	return apiRequestSafe(
+		event,
+		'/exchange-rates/refresh',
+		{ method: 'POST' },
+		z.array(exchangeRateSchema)
+	);
 }
 
 /** `POST /exchange-rates/import` — import masivo de tasas (multipart). */

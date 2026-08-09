@@ -37,6 +37,20 @@ export const actions = {
 		return { createSuccess: true };
 	},
 
+	refreshRates: async ({ cookies, fetch }) => {
+		const res = await market.refreshExchangeRates({ cookies, fetch });
+
+		if (!res.ok) {
+			return fail(res.status, {
+				refreshError: res.details ?? 'No se pudo actualizar desde el feed público'
+			});
+		}
+
+		// El número de pares que volvieron es lo único que hace falta para el
+		// aviso; la tabla ya se recarga sola con el `load` que dispara la acción.
+		return { refreshSuccess: true, refreshedCount: Array.isArray(res.data) ? res.data.length : 0 };
+	},
+
 	importRates: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
 		const file = fd.get('file');

@@ -3,8 +3,10 @@
 	import CardHeader from '$lib/ui/card-header.svelte';
 	import Stat from '$lib/ui/stat.svelte';
 	import CurrencyToggle from './currency-toggle.svelte';
+	import ExchangeRateNote from './exchange-rate-note.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
+	import type { ExchangeRate } from '$lib/api/types';
 
 	interface PortfolioSummary {
 		id: string;
@@ -16,8 +18,16 @@
 		totalPositions: number;
 	}
 
-	const { summaries = [], currency = 'USD' }: { summaries: PortfolioSummary[]; currency?: string } =
-		$props();
+	const {
+		summaries = [],
+		currency = 'USD',
+		displayRate = null
+	}: {
+		summaries: PortfolioSummary[];
+		currency?: string;
+		/** Tasa con la que están convertidas estas cifras; `null` si no hay conversión que enseñar. */
+		displayRate?: ExchangeRate | null;
+	} = $props();
 
 	function fmtMoney(value: number): string {
 		return privacy.money(formatCurrency(value, currency));
@@ -40,7 +50,15 @@
 <div class="net-worth-card">
 	<CardHeader eyebrow="Patrimonio total" title="Patrimonio Neto">
 		{#snippet action()}
-			<CurrencyToggle {currency} />
+			<!--
+				Apilados y alineados a la derecha: `.card-header-action` es un div
+				normal, así que sin este contenedor el selector se estiraría al ancho
+				que ocupe la línea de la tasa.
+			-->
+			<div class="currency-controls">
+				<CurrencyToggle {currency} />
+				<ExchangeRateNote rate={displayRate} />
+			</div>
 		{/snippet}
 	</CardHeader>
 
@@ -107,6 +125,12 @@
 
 	.net-worth-card > * {
 		position: relative;
+	}
+
+	.currency-controls {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
 	}
 
 	.net-worth-content {

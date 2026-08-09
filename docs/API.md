@@ -292,15 +292,46 @@ entera, porque modera lo que aportan los usuarios.
 
 | Método | Path | Acceso | Descripción |
 |---|---|---|---|
-| GET | `/exchange-rates` | usuario, paginada | Lista tasas |
+| GET | `/exchange-rates` | admin, paginada | Lista tasas |
+| GET | `/exchange-rates/latest` | usuario | Tasas compartidas vigentes, sin paginar |
 | POST | `/exchange-rates` | admin | Crea tasa |
 | POST | `/exchange-rates/import` | admin | Import masivo |
+| POST | `/exchange-rates/refresh` | admin, limitado | Relee el feed público ahora |
 | PATCH | `/exchange-rates/:id` | admin | Actualiza tasa |
 
-> Esta tabla contiene solo tasas introducidas por el operador. Las que trae la
-> clave de un usuario van a `user_exchange_rates` y únicamente él las ve.
-> `POST /exchange-rates/sync` y `POST /exchange-rates/:id/sync` fueron
-> retiradas por el mismo motivo que las de assets.
+Cada fila lleva un campo `source` que dice quién la puso:
+
+- `manual` — la escribió un administrador (`POST`, `PATCH`) o vino de una hoja
+  importada. Es el valor por defecto de la columna, así que lo llevan también
+  todas las filas anteriores a que existiera el feed.
+- `dolarapi` — la publicó el feed público de [dolarapi.com](https://dolarapi.com).
+  Hoy es un solo par, **USD → COP a la TRM**, la tasa oficial que publica la
+  Superintendencia Financiera.
+
+> Las tasas que trae la clave de un usuario siguen yendo a
+> `user_exchange_rates` y únicamente él las ve; una conversión consulta primero
+> la suya y solo después esta tabla. `POST /exchange-rates/sync` y
+> `POST /exchange-rates/:id/sync` fueron retiradas por el mismo motivo que las
+> de assets.
+
+Lo que sí puede estar aquí, y es la novedad, es una tasa que trajo la
+aplicación: el feed no pide clave, publica un dato oficial y no impone
+condiciones de redistribución, así que una sola lectura sirve para todos los
+usuarios. Eso es justo lo que esta tabla es, y por eso la restricción de la
+migración 000018 —que vació esta tabla— no le aplica: lo que no se puede
+compartir es lo que pagó la clave de alguien.
+
+El job `public-exchange-rates` la refresca cada hora. Un despliegue recién
+creado espera ese intervalo antes de tener tasa, porque la primera ejecución de
+un `Every` persistido cae un intervalo por delante; `POST /exchange-rates/refresh`
+existe para no esperarla.
+
+Un refresco **sobrescribe** el par que toca, incluida una tasa introducida a
+mano. Es la precedencia buscada: la alternativa —respetar las filas manuales—
+dejaría el par clavado a un número escrito a mano para siempre, porque no hay
+endpoint para borrarlo y devolvérselo al feed. Corregir a mano un par que el
+feed cubre es corregirlo hasta el siguiente refresco, y `source` es lo que hace
+eso visible.
 
 ### 2.10 Datos de mercado — BYO-key (JWT)
 

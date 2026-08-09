@@ -29,6 +29,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata/dolarapi"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata/providers"
 	s3Store "github.com/yeferson59/finexia-app/internal/platform/objectstore/s3"
 	"github.com/yeferson59/finexia-app/internal/platform/secretbox"
@@ -45,6 +46,10 @@ const (
 
 	// bodyLimit caps request bodies at 10 MiB.
 	bodyLimit = 10 * 1024 * 1024
+
+	// publicRatesInterval is how often the shared exchange rates are re-read
+	// from the public feed.
+	publicRatesInterval = time.Hour
 )
 
 // Deps carries the already-connected infrastructure the App composes. main
@@ -228,6 +233,17 @@ func (a *App) buildModules() *modules {
 	// assembles a chain per sync run from the calling user's own keys.
 	priceProviders := providers.New(marketdata.DefaultHTTPClient)
 
+	// The one exception, and it is an exception because it needs no key: the
+	// public TRM feed. Nothing about it is per-user, so it is built once here
+	// and its result is stored in the shared exchange_rates table rather than
+	// against whoever triggered the fetch.
+	//
+	// It gets its own HTTP client (nil takes the package default) rather than
+	// the shared one: it is an hourly background fetch to a host nothing else
+	// here talks to, so every run pays a cold connect and needs a longer
+	// deadline than a request a user is waiting on.
+	publicRates := dolarapi.New(nil)
+
 	geo := geoip.New()
 	userLimiter := httpx.KeyedRateLimiter(200, 1*time.Minute, func(c fiber.Ctx) string {
 		userID := c.Locals(httpx.LocalUserID).(string)
@@ -279,11 +295,12 @@ func (a *App) buildModules() *modules {
 	// consumes for the asset catalog, then the module with its routes and with
 	// portfolio's holdings, which the per-user BYO-key sync needs.
 	marketService := market.NewService(market.ServiceDeps{
-		DB:        a.deps.DB,
-		Storage:   a.storage,
-		Log:       a.deps.Log,
-		Providers: priceProviders,
-		Keyring:   a.deps.Keyring,
+		DB:          a.deps.DB,
+		Storage:     a.storage,
+		Log:         a.deps.Log,
+		Providers:   priceProviders,
+		PublicRates: publicRates,
+		Keyring:     a.deps.Keyring,
 	})
 	portfolioModule := portfolio.New(portfolio.Deps{
 		DB:        a.deps.DB,
@@ -393,6 +410,18 @@ func (a *App) registerJobs(sched *scheduler.Scheduler, mods *modules, persistent
 			MaxRetries: scheduler.Retries(0),
 		}),
 	)
+
+	// The shared exchange rates come from a keyless public feed, so this job is
+	// the opposite of the one above in every way that matters to scheduling: no
+	// user's quota is spent, one fetch serves everybody, and a retry costs
+	// nothing. Hence a short cadence and the Runner's default retry policy.
+	//
+	// Hourly rather than daily even though the TRM only moves once a day: the
+	// interval is also how long a fresh deployment waits before it has any rate
+	// at all, since the first run of a persisted Every is a full interval out.
+	// POST /exchange-rates/refresh covers that gap when an operator does not
+	// want to wait.
+	sched.Register(market.NewPublicRatesJob(mods.market.Service(), a.deps.Log), scheduler.Every{Interval: publicRatesInterval}, scheduler.WithStore(persistent))
 
 	// Persistent (Redis): resume across restarts and catch up on runs missed
 	// while the process was down.

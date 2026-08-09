@@ -310,6 +310,23 @@ const server = createServer(async (req, res) => {
 	if (route === 'GET /exchange-rates') {
 		return send(res, 200, envelope(exchangeRates));
 	}
+	// Sin paginar y abierto a cualquier usuario, a diferencia del listado de
+	// arriba: lo pide el dashboard para enseñar con qué se convierten sus cifras.
+	if (route === 'GET /exchange-rates/latest') {
+		return send(res, 200, envelope(exchangeRates));
+	}
+	// Devuelve solo lo que publica el feed, que es lo que el backend responde:
+	// las tasas que acaba de reescribir, no la tabla entera.
+	if (route === 'POST /exchange-rates/refresh') {
+		return send(
+			res,
+			200,
+			envelope(
+				exchangeRates.filter((r) => r.source === 'dolarapi'),
+				'exchange rates refreshed'
+			)
+		);
+	}
 	if (route === 'POST /portfolios/entries') {
 		await readBody(req);
 		return send(res, 201, envelope({ id: IDS.entry }, 'entry created'));

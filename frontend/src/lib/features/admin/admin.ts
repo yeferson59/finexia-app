@@ -111,6 +111,29 @@ export function formatRate(rate: string): string {
 	return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 }
 
+/**
+ * Quién puso una tasa compartida (`exchange_rates.source`).
+ *
+ * Importa porque las dos procedencias se comportan distinto: un refresco del
+ * feed sobrescribe el par que toca, incluida una tasa escrita a mano, así que
+ * un administrador necesita ver cuáles va a pisar antes de escribir una.
+ *
+ * `dolarapi` es la TRM: es lo único que el backend publica desde ese feed.
+ */
+export const RATE_SOURCE_LABELS: Record<string, string> = {
+	manual: 'Manual',
+	dolarapi: 'TRM (automática)'
+};
+
+export function rateSourceLabel(source: string): string {
+	return RATE_SOURCE_LABELS[source] ?? source;
+}
+
+/** Automática en ámbar, manual en neutro: distingue lo que el job va a pisar. */
+export function rateSourceTone(source: string): BadgeTone {
+	return source === 'manual' ? 'neutral' : 'amber';
+}
+
 /** Resumen en una línea de un import masivo, con los plurales resueltos. */
 export function summarizeImport(result: ImportResult): string {
 	const rows = `fila${result.totalRows === 1 ? '' : 's'}`;

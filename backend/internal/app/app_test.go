@@ -134,6 +134,34 @@ func TestAppWiresAndRoutes(t *testing.T) {
 		t.Errorf("GET /users/invitations = %d, want 401 with an invalid token", status)
 	}
 
+	// The 401s above stop at the JWT gate, so on their own they say nothing
+	// about the role guard sitting behind it. That is how the waitlist listing
+	// — every sign-up's email address — lost its admin guard in a refactor and
+	// stayed open to any signed-in user without a test noticing.
+	//
+	// The composition root cannot mint a valid token here, so what is asserted
+	// is the wiring rather than a live response: the admin routes must carry a
+	// handler after the gate. Their own module tests cover the behaviour.
+	assertGuarded := func(method, path string, want int) {
+		t.Helper()
+		for _, stack := range a.fiber.Stack() {
+			for _, route := range stack {
+				if route.Method == method && route.Path == path {
+					if len(route.Handlers) < want {
+						t.Errorf("%s %s has %d handlers, want at least %d (auth gate, limiter, role guard, handler)", method, path, len(route.Handlers), want)
+					}
+
+					return
+				}
+			}
+		}
+
+		t.Errorf("%s %s is not registered", method, path)
+	}
+
+	// RequireAuth + limiter + RequireAdmin + paginate + handler.
+	assertGuarded(fiber.MethodGet, "/users/waitlist", 5)
+
 	// The avatar route (docs/API.md §2.3) is public: without a token the
 	// request must get past the JWT gate and reach the handler chain.
 	if status := request("GET", "/users/0b7f9c7e-1111-4222-8333-444455556666/avatar"); status == fiber.StatusBadRequest || status == fiber.StatusUnauthorized {

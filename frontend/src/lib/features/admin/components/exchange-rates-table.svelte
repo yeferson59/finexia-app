@@ -1,10 +1,17 @@
 <script lang="ts">
 	/** Tasas de cambio compartidas, con ajuste manual fila a fila. */
 	import { enhance } from '$app/forms';
+	import Badge from '$lib/ui/badge.svelte';
 	import Button from '$lib/ui/button.svelte';
 	import DataTable from '$lib/ui/data-table.svelte';
 	import AdminTableCard from './admin-table-card.svelte';
-	import { formatDateTime, formatRate, type ExchangeRate } from '../admin';
+	import {
+		formatDateTime,
+		formatRate,
+		rateSourceLabel,
+		rateSourceTone,
+		type ExchangeRate
+	} from '../admin';
 
 	interface Props {
 		rates: ExchangeRate[];
@@ -35,6 +42,7 @@
 				<tr>
 					<th>Par</th>
 					<th>Tasa actual</th>
+					<th>Origen</th>
 					<th>Fecha de tasa</th>
 					<th>Actualizado</th>
 					<th>Nueva tasa</th>
@@ -50,6 +58,9 @@
 							{rate.fromCurrency}/{rate.toCurrency}
 						</td>
 						<td class="cell-price">{formatRate(rate.rate)}</td>
+						<td>
+							<Badge tone={rateSourceTone(rate.source)}>{rateSourceLabel(rate.source)}</Badge>
+						</td>
 						<td class="cell-date">{formatDateTime(rate.rateDate)}</td>
 						<td class="cell-date">{formatDateTime(rate.createdAt)}</td>
 						<td class="cell-update">

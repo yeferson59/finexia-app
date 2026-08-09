@@ -52,8 +52,23 @@ test.describe('admin', () => {
 		await expect(row.getByText('4,123.456789')).toBeVisible();
 		await expect(row.locator('input[name="rate"]')).toHaveValue('4123.456789');
 
+		// El origen distingue las filas que el feed reescribe cada hora de las
+		// que sobreviven a un refresco, que es lo que un admin necesita saber
+		// antes de corregir una a mano.
+		await expect(row.getByText('TRM (automática)')).toBeVisible();
+		await expect(page.locator('tr', { hasText: 'EUR/USD' }).getByText('Manual')).toBeVisible();
+
 		await page.getByRole('button', { name: '+ Nueva Tasa' }).click();
 		await expect(page.getByRole('heading', { name: 'Nueva tasa de cambio' })).toBeVisible();
 		await expect(page.locator('#fromCurrency')).toBeVisible();
+	});
+
+	test('refreshes the shared rates from the public feed', async ({ page }) => {
+		await login(page, ADMIN_EMAIL);
+		await page.goto('/dashboard/admin/exchange-rates');
+
+		await page.getByRole('button', { name: 'Actualizar desde el feed' }).click();
+
+		await expect(page.getByText('1 tasa actualizada desde el feed.')).toBeVisible();
 	});
 });

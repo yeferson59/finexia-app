@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v3"
+
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 func newTestApp(repo Repository, mail Mailer) *fiber.App {
@@ -95,24 +97,33 @@ func TestCreateWaitlistRoute(t *testing.T) {
 	})
 }
 
-// fakeGuard stands in for *auth.Module: RequireAuth/RequireAdmin either let
-// the request through or answer with the status the real guards would.
+// fakeGuard stands in for *auth.Module. It is the only guard this module
+// injects, and it plays the part the real one does: reject the request, or let
+// it through having written the locals the JWT gate writes.
+//
+// role is one of those locals rather than a second status field, because the
+// admin check is httpx.RequireAdmin — it reads the role out of the locals and
+// is not injected. A guard that answered 403 by itself would let the route drop
+// that check without a test noticing, which is exactly what happened once.
 type fakeGuard struct {
-	authStatus  int
-	adminStatus int
+	authStatus int
+	role       string
 }
 
-func (g fakeGuard) handler(status int) fiber.Handler {
+func (g fakeGuard) RequireAuth() fiber.Handler {
 	return func(c fiber.Ctx) error {
-		if status != 0 {
-			return c.SendStatus(status)
+		if g.authStatus != 0 {
+			return c.SendStatus(g.authStatus)
 		}
+
+		c.Locals(httpx.LocalRole, g.role)
+
 		return c.Next()
 	}
 }
 
-func (g fakeGuard) RequireAuth() fiber.Handler  { return g.handler(g.authStatus) }
-func (g fakeGuard) RequireAdmin() fiber.Handler { return g.handler(g.adminStatus) }
+// adminGuard is the caller the listing is meant for.
+var adminGuard = fakeGuard{role: httpx.RoleAdmin}
 
 // TestListWaitlistRoute covers the admin listing this module serves even
 // though the path stays /users/waitlist: the route carries its own guards
@@ -138,7 +149,7 @@ func TestListWaitlistRoute(t *testing.T) {
 		return resp.StatusCode, payload
 	}
 
-	t.Run("returns the paginated waitlist", func(t *testing.T) {
+	t.Run("returns the paginated waitlist to an admin", func(t *testing.T) {
 		repo := new(fakeRepository{
 			listWaitlist: func(_ context.Context, offset, limit uint) ([]Waitlist, uint, error) {
 				if limit != 10 {
@@ -151,7 +162,7 @@ func TestListWaitlistRoute(t *testing.T) {
 			},
 		})
 
-		status, payload := get(t, newApp(repo, fakeGuard{}))
+		status, payload := get(t, newApp(repo, adminGuard))
 		if status != fiber.StatusOK {
 			t.Fatalf("status = %d, want 200", status)
 		}
@@ -166,12 +177,44 @@ func TestListWaitlistRoute(t *testing.T) {
 		}
 	})
 
+	// The waitlist is the email address of everybody who ever signed up, so
+	// what is being guarded is reaching the handler at all — not the status
+	// code, which a later refactor could keep while the read went through.
+	//
+	// The repository records that instead of being left unstubbed. An unstubbed
+	// fake panics on the nil hook, and a panic in a Fiber handler takes the
+	// whole test binary down: the package reports one crash and no results,
+	// which is how this route stayed unguarded through two commits.
 	t.Run("is gated by the shared guards", func(t *testing.T) {
-		if status, _ := get(t, newApp(new(fakeRepository{}), fakeGuard{authStatus: fiber.StatusUnauthorized})); status != fiber.StatusUnauthorized {
-			t.Errorf("status = %d, want 401 when RequireAuth rejects", status)
+		cases := []struct {
+			name  string
+			guard fakeGuard
+			want  int
+		}{
+			{"no session", fakeGuard{authStatus: fiber.StatusUnauthorized}, fiber.StatusUnauthorized},
+			// The case the route actually lost: signed in, but not an admin.
+			{"signed in as a plain user", fakeGuard{role: "user"}, fiber.StatusForbidden},
+			{"signed in with no role at all", fakeGuard{}, fiber.StatusForbidden},
 		}
-		if status, _ := get(t, newApp(new(fakeRepository{}), fakeGuard{adminStatus: fiber.StatusForbidden})); status != fiber.StatusForbidden {
-			t.Errorf("status = %d, want 403 when RequireAdmin rejects", status)
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				reached := false
+				repo := new(fakeRepository{
+					listWaitlist: func(context.Context, uint, uint) ([]Waitlist, uint, error) {
+						reached = true
+
+						return nil, 0, nil
+					},
+				})
+
+				if status, _ := get(t, newApp(repo, tc.guard)); status != tc.want {
+					t.Errorf("status = %d, want %d", status, tc.want)
+				}
+				if reached {
+					t.Error("the handler read the waitlist; the guards must stop the request before it")
+				}
+			})
 		}
 	})
 

@@ -29,7 +29,9 @@ type fakeRepository struct {
 	// BYO-key, in which case those methods panic like any other unstubbed one.
 	creds *credentialStore
 
-	upsertExchangeRate func(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error)
+	upsertExchangeRate       func(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error)
+	upsertPublicExchangeRate func(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time, source ProviderID) (ExchangeRate, error)
+	getExchangeRates         func(ctx context.Context, offset, limit uint) ([]ExchangeRate, error)
 
 	updateAssetPrice    func(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error)
 	upsertAsset         func(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error)
@@ -42,6 +44,14 @@ type fakeRepository struct {
 
 func (f *fakeRepository) UpsertExchangeRate(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error) {
 	return f.upsertExchangeRate(ctx, from, to, rate, rateDate)
+}
+
+func (f *fakeRepository) UpsertPublicExchangeRate(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time, source ProviderID) (ExchangeRate, error) {
+	return f.upsertPublicExchangeRate(ctx, from, to, rate, rateDate, source)
+}
+
+func (f *fakeRepository) GetExchangeRates(ctx context.Context, offset, limit uint) ([]ExchangeRate, error) {
+	return f.getExchangeRates(ctx, offset, limit)
 }
 
 func (f *fakeRepository) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error) {
@@ -195,7 +205,21 @@ func mustUSD(t *testing.T, amount string) money.Money {
 }
 
 func newTestServices(repo Repository, storage *memStorage) *Service {
-	return newService(repo, storage, nil, testKeyring(), logger.Noop())
+	return newService(repo, storage, nil, nil, testKeyring(), logger.Noop())
+}
+
+// fakePublicRateSource stands in for the keyless feed. It takes no credential,
+// like the real one, so there is nothing to fake but the answer.
+type fakePublicRateSource struct {
+	rates []marketdata.PublicRate
+	err   error
+	calls int
+}
+
+func (f *fakePublicRateSource) FetchRates(context.Context) ([]marketdata.PublicRate, error) {
+	f.calls++
+
+	return f.rates, f.err
 }
 
 // fakeFactory stands in for marketdata/providers. It ignores the keys and

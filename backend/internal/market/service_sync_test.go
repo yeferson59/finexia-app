@@ -30,7 +30,7 @@ func newBYOFixture(t *testing.T, repo *fakeRepository, provider marketdata.Provi
 	factory := new(fakeFactory{provider: provider})
 
 	return new(byoFixture{
-		svc:     newService(repo, newMemStorage(), factory, ring, logger.Noop()),
+		svc:     newService(repo, newMemStorage(), factory, nil, ring, logger.Noop()),
 		creds:   creds,
 		factory: factory,
 		ring:    ring,

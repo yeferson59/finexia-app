@@ -98,6 +98,11 @@ func (m *Module) Routes(router fiber.Router) {
 	// inbox 60 times a minute and burn the mail provider's quota doing it.
 	waitlists.Post("/waitlists", httpx.RateLimiter(5, 15*time.Minute, true), m.handler.createWaitlist)
 
+	// The admin guard is httpx's, not the injected middleware's: the role is
+	// already in the locals the JWT gate wrote, so checking it needs nothing
+	// from auth and every other module reads it the same way. Only RequireAuth
+	// has to be injected, because only it can validate a token.
 	router.Get("/users/waitlist",
-		m.authMiddl.RequireAuth(), m.limiter, paginate.New(), m.handler.listWaitlist)
+		m.authMiddl.RequireAuth(), m.limiter, httpx.RequireAdmin(),
+		paginate.New(), m.handler.listWaitlist)
 }

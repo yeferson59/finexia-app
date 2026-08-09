@@ -385,6 +385,8 @@ export const sources = [
 	}
 ];
 
+// `source` reproduce el reparto real: el feed público solo publica USD/COP (la
+// TRM), y todo lo demás lo escribió un administrador.
 export const exchangeRates = [
 	{
 		id: '66666666-6666-4666-8666-666666666661',
@@ -392,6 +394,7 @@ export const exchangeRates = [
 		toCurrency: 'COP',
 		rate: '4123.456789',
 		rateDate: NOW,
+		source: 'dolarapi',
 		createdAt: NOW
 	},
 	{
@@ -400,6 +403,7 @@ export const exchangeRates = [
 		toCurrency: 'USD',
 		rate: '1.085',
 		rateDate: NOW,
+		source: 'manual',
 		createdAt: NOW
 	},
 	{
@@ -408,6 +412,7 @@ export const exchangeRates = [
 		toCurrency: 'USD',
 		rate: '1.272',
 		rateDate: NOW,
+		source: 'manual',
 		createdAt: NOW
 	}
 ];

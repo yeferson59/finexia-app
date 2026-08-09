@@ -30,7 +30,11 @@
 <MarketKeyNotice hasUsableKey={data.hasUsableKey} hasBrokenKey={data.hasBrokenKey} />
 
 <section class="net-worth-section" aria-labelledby="dashboard-title">
-	<NetWorthCard summaries={data.portfolioSummaries} currency={data.currency} />
+	<NetWorthCard
+		summaries={data.portfolioSummaries}
+		currency={data.currency}
+		displayRate={data.displayRate}
+	/>
 </section>
 
 <section class="growth-section" aria-label="Crecimiento del portafolio">

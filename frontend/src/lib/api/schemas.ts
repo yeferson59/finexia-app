@@ -245,6 +245,11 @@ export const exchangeRateSchema = z.object({
 	toCurrency: z.string(),
 	rate: z.string(),
 	rateDate: z.string(),
+	// Quién puso la tasa: `manual` si la escribió un administrador (o vino de
+	// una hoja importada) y el nombre de la fuente si la publicó un feed
+	// público. Con `.default` para que una respuesta anterior a la columna, sin
+	// el campo, siga validando en vez de tumbar la pantalla de administración.
+	source: z.string().default('manual'),
 	createdAt: z.string()
 });
 

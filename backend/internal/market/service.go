@@ -42,18 +42,24 @@ type Service struct {
 	storage fiber.Storage
 	// providers builds a chain from a user's own keys, per sync run.
 	providers marketdata.Factory
+	// publicRates is the keyless feed behind the shared exchange rates. It is
+	// not part of the chain above and cannot be: that one is assembled from
+	// credentials, and this source takes none. Optional — a deployment without
+	// it keeps the admin-entered rates and nothing else.
+	publicRates marketdata.PublicRateSource
 	// keyring seals and opens those keys.
 	keyring *secretbox.Keyring
 	log     logger.Logger
 }
 
-func newService(repo Repository, storage fiber.Storage, providers marketdata.Factory, keyring *secretbox.Keyring, log logger.Logger) *Service {
+func newService(repo Repository, storage fiber.Storage, providers marketdata.Factory, publicRates marketdata.PublicRateSource, keyring *secretbox.Keyring, log logger.Logger) *Service {
 	return new(Service{
-		repo:      repo,
-		storage:   storage,
-		providers: providers,
-		keyring:   keyring,
-		log:       log,
+		repo:        repo,
+		storage:     storage,
+		providers:   providers,
+		publicRates: publicRates,
+		keyring:     keyring,
+		log:         log,
 	})
 }
 

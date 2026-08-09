@@ -24,18 +24,55 @@ func (r *PostgresRepository) UpsertExchangeRate(ctx context.Context, from, to st
 	var rateStr string
 
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO exchange_rates (from_currency, to_currency, rate, rate_date, fetched_at)
-		VALUES ($1, $2, $3::numeric, $4::date, NOW())
+		INSERT INTO exchange_rates (from_currency, to_currency, rate, rate_date, source, fetched_at)
+		VALUES ($1, $2, $3::numeric, $4::date, $5, NOW())
 		ON CONFLICT (from_currency, to_currency)
-		DO UPDATE SET rate = EXCLUDED.rate, rate_date = EXCLUDED.rate_date, fetched_at = NOW()
-		RETURNING id, from_currency, to_currency, rate::text, rate_date, fetched_at
-	`, from, to, rate.String(), rateDate).Scan(
+		DO UPDATE SET rate = EXCLUDED.rate, rate_date = EXCLUDED.rate_date, source = EXCLUDED.source, fetched_at = NOW()
+		RETURNING id, from_currency, to_currency, rate::text, rate_date, source, fetched_at
+	`, from, to, rate.String(), rateDate, ManualRateSource).Scan(
 		&er.ID,
 		&er.FromCurrency,
 		&er.ToCurrency,
 		&rateStr,
 		&er.RateDate,
+		&er.Source,
 		&er.CreatedAt, // fetched_at mapped to CreatedAt; table has no separate created_at/updated_at
+	)
+	if err != nil {
+		return ExchangeRate{}, err
+	}
+
+	er.Rate = decimal.MustFromString(rateStr)
+	return er, nil
+}
+
+// UpsertPublicExchangeRate writes a rate a keyless feed published, stamping the
+// row with the feed that produced it.
+//
+// It overwrites whatever the pair held, including a rate an operator typed.
+// That is the intended precedence and the alternative is worse: a DO UPDATE
+// that skipped manual rows would pin the pair to a hand-entered number
+// permanently, and there is no endpoint to delete one and hand the pair back to
+// the feed. An operator correcting a pair the feed covers is correcting it
+// until the next refresh, and the source column is what makes that legible.
+func (r *PostgresRepository) UpsertPublicExchangeRate(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time, source ProviderID) (ExchangeRate, error) {
+	var er ExchangeRate
+	var rateStr string
+
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO exchange_rates (from_currency, to_currency, rate, rate_date, source, fetched_at)
+		VALUES ($1, $2, $3::numeric, $4::date, $5, NOW())
+		ON CONFLICT (from_currency, to_currency)
+		DO UPDATE SET rate = EXCLUDED.rate, rate_date = EXCLUDED.rate_date, source = EXCLUDED.source, fetched_at = NOW()
+		RETURNING id, from_currency, to_currency, rate::text, rate_date, source, fetched_at
+	`, from, to, rate.String(), rateDate, string(source)).Scan(
+		&er.ID,
+		&er.FromCurrency,
+		&er.ToCurrency,
+		&rateStr,
+		&er.RateDate,
+		&er.Source,
+		&er.CreatedAt,
 	)
 	if err != nil {
 		return ExchangeRate{}, err
@@ -47,7 +84,7 @@ func (r *PostgresRepository) UpsertExchangeRate(ctx context.Context, from, to st
 
 func (r *PostgresRepository) GetExchangeRates(ctx context.Context, offset, limit uint) ([]ExchangeRate, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, from_currency, to_currency, rate::text, rate_date, fetched_at
+		SELECT id, from_currency, to_currency, rate::text, rate_date, source, fetched_at
 		FROM exchange_rates
 		ORDER BY from_currency, to_currency, rate_date DESC
 		LIMIT $1 OFFSET $2
@@ -62,7 +99,7 @@ func (r *PostgresRepository) GetExchangeRates(ctx context.Context, offset, limit
 		var er ExchangeRate
 		var rateStr string
 
-		if err := rows.Scan(&er.ID, &er.FromCurrency, &er.ToCurrency, &rateStr, &er.RateDate, &er.CreatedAt); err != nil {
+		if err := rows.Scan(&er.ID, &er.FromCurrency, &er.ToCurrency, &rateStr, &er.RateDate, &er.Source, &er.CreatedAt); err != nil {
 			return nil, err
 		}
 
@@ -83,12 +120,15 @@ func (r *PostgresRepository) UpdateExchangeRateByID(ctx context.Context, id uuid
 	var er ExchangeRate
 	var rateStr string
 
+	// The edit also claims the row for the operator. Leaving source alone would
+	// label a hand-typed number with the feed that no longer produced it, which
+	// is the one thing the column exists to prevent.
 	err := r.db.QueryRow(ctx, `
 		UPDATE exchange_rates
-		SET rate = $2::numeric, fetched_at = NOW()
+		SET rate = $2::numeric, source = $3, fetched_at = NOW()
 		WHERE id = $1
-		RETURNING id, from_currency, to_currency, rate::text, rate_date, fetched_at
-	`, id, rate.String()).Scan(&er.ID, &er.FromCurrency, &er.ToCurrency, &rateStr, &er.RateDate, &er.CreatedAt)
+		RETURNING id, from_currency, to_currency, rate::text, rate_date, source, fetched_at
+	`, id, rate.String(), ManualRateSource).Scan(&er.ID, &er.FromCurrency, &er.ToCurrency, &rateStr, &er.RateDate, &er.Source, &er.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ExchangeRate{}, ErrExchangeRateNotFound

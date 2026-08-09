@@ -81,6 +81,37 @@ func (h *handler) GetExchangeRates(c fiber.Ctx) error {
 	return httpx.OK(c, "", "", rates)
 }
 
+// GetLatestExchangeRates serves the shared rates to any signed-in user, where
+// the listing above stays admin-only.
+//
+// The two answer different questions and only one of them is administration:
+// this is the dashboard asking what a dollar is worth so it can label the
+// figures it already converts, and the rates it returns are public data the
+// application fetched without anybody's key. Gating it behind the admin role
+// would hide from users the provenance of numbers they are being shown.
+func (h *handler) GetLatestExchangeRates(c fiber.Ctx) error {
+	rates, err := h.service.GetLatestExchangeRates(c)
+	if err != nil {
+		return httpx.FromDomain(c, err, "", "")
+	}
+
+	return httpx.OK(c, "", "", rates)
+}
+
+// RefreshExchangeRates pulls the public feed on demand.
+//
+// The scheduled job is what keeps the rates current; this exists for the two
+// moments the cadence cannot cover — a fresh deployment, whose first scheduled
+// run is a full interval away, and an operator who needs today's rate now.
+func (h *handler) RefreshExchangeRates(c fiber.Ctx) error {
+	rates, err := h.service.RefreshPublicRates(c)
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error refreshing exchange rates", "Could not refresh the public exchange rates")
+	}
+
+	return httpx.OK(c, "Exchange rates refreshed", "Public exchange rates refreshed successfully", rates)
+}
+
 func (h *handler) CreateExchangeRate(c fiber.Ctx) error {
 	req, err := httpx.Bind[CreateExchangeRateRequestDTO](c)
 	if err != nil {
