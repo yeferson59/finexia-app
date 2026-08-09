@@ -6,10 +6,7 @@
 
 <section class="hero wrap">
 	<div class="hero-left">
-		<div class="hero-badge reveal">
-			<span class="pulse" aria-hidden="true"></span>
-			Acceso anticipado · Lanzamiento el 1 de octubre de 2026
-		</div>
+		<div class="hero-badge reveal">Acceso anticipado · Lanzamiento el 1 de octubre de 2026</div>
 
 		<h1 class="hero-title reveal">
 			Todo tu patrimonio,<br /><em>en tu mapa.</em>
@@ -61,30 +58,6 @@
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		color: var(--text-muted);
-	}
-
-	.pulse {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--green);
-		box-shadow: 0 0 0 0 rgba(34, 201, 126, 0.5);
-		animation: pulse 2.4s ease-out infinite;
-	}
-
-	@keyframes pulse {
-		70% {
-			box-shadow: 0 0 0 7px rgba(34, 201, 126, 0);
-		}
-		100% {
-			box-shadow: 0 0 0 0 rgba(34, 201, 126, 0);
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.pulse {
-			animation: none;
-		}
 	}
 
 	.hero-proof {
