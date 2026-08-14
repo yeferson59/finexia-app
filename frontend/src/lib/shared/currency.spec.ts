@@ -4,7 +4,8 @@ import {
 	SUPPORTED_CURRENCIES,
 	isSupportedCurrency,
 	partitionByCurrency,
-	resolveDisplayCurrency
+	resolveDisplayCurrency,
+	type RowInCurrency
 } from './currency';
 
 describe('isSupportedCurrency', () => {
@@ -70,7 +71,8 @@ describe('partitionByCurrency', () => {
 	// Un backend que no informe la moneda deja los importes tal cual venían, que
 	// es lo que la página ya asumía: contarlos fuera vaciaría los totales.
 	it('assumes a row with no currency at all is already in the target', () => {
-		const { converted, unconverted } = partitionByCurrency([{ id: 'a' }], 'USD');
+		const rows: (RowInCurrency & { id: string })[] = [{ id: 'a' }];
+		const { converted, unconverted } = partitionByCurrency(rows, 'USD');
 
 		expect(converted).toHaveLength(1);
 		expect(unconverted).toHaveLength(0);
