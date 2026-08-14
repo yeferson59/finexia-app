@@ -249,6 +249,16 @@ type HoldingResponseDTO struct {
 	// Under BYO-key a sync can take hours and is capped per request, so a
 	// price's age is part of reading it.
 	PriceUpdatedAt *time.Time `json:"priceUpdatedAt"`
+	// CostBasisBase and MarketValueBase are quantity × price and
+	// quantity × market price, converted to the portfolio's BaseCurrency. They
+	// are the only figures here a client may add across holdings: Price and
+	// MarketPrice stay in Currency/CostCurrency, which differ per position.
+	CostBasisBase   string `json:"costBasisBase"`
+	MarketValueBase string `json:"marketValueBase"`
+	// FXConverted is false when no rate connected this position's currency to
+	// the base one. The two totals above then hold native amounts, and a client
+	// that sums them is adding different currencies — say so instead.
+	FXConverted bool `json:"fxConverted"`
 }
 
 // PortfolioDetailResponseDTO is the payload returned for a single portfolio,
@@ -334,22 +344,25 @@ func NewPortfolioDetailResponse(p Portfolio) PortfolioDetailResponseDTO {
 		}
 
 		holdings = append(holdings, HoldingResponseDTO{
-			ID:             entry.ID,
-			AssetID:        entry.AssetID,
-			Ticker:         entry.Asset.Ticker,
-			Name:           entry.Asset.Name,
-			AssetType:      string(entry.Asset.AssetType),
-			Exchange:       entry.Asset.Exchange,
-			Currency:       entry.Asset.Currency,
-			Quantity:       entry.Quantity.String(),
-			Price:          entry.Price.String(),
-			MarketPrice:    marketPrice,
-			CostCurrency:   entry.CostCurrency,
-			Category:       string(entry.Category),
-			EntryDate:      entry.EntryDate,
-			Notes:          entry.Notes,
-			PriceSource:    string(entry.PriceSource),
-			PriceUpdatedAt: entry.Asset.PriceUpdatedAt,
+			ID:              entry.ID,
+			AssetID:         entry.AssetID,
+			Ticker:          entry.Asset.Ticker,
+			Name:            entry.Asset.Name,
+			AssetType:       string(entry.Asset.AssetType),
+			Exchange:        entry.Asset.Exchange,
+			Currency:        entry.Asset.Currency,
+			Quantity:        entry.Quantity.String(),
+			Price:           entry.Price.String(),
+			MarketPrice:     marketPrice,
+			CostCurrency:    entry.CostCurrency,
+			Category:        string(entry.Category),
+			EntryDate:       entry.EntryDate,
+			Notes:           entry.Notes,
+			PriceSource:     string(entry.PriceSource),
+			PriceUpdatedAt:  entry.Asset.PriceUpdatedAt,
+			CostBasisBase:   entry.CostBasisBase.String(),
+			MarketValueBase: entry.MarketValueBase.String(),
+			FXConverted:     entry.FXConverted,
 		})
 	}
 

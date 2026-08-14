@@ -7,16 +7,23 @@
 		transactions,
 		txnMeta,
 		sellingTxnId = null,
-		formatCurrency,
+		formatAmount,
 		onEdit,
-		onToggleSell
+		onToggleSell,
+		onDelete
 	}: {
 		transactions: Transaction[];
 		txnMeta: TxnMeta;
 		sellingTxnId?: string | null;
-		formatCurrency: (value: number, decimals?: number) => string;
+		/**
+		 * Cada fila se formatea con la moneda de su propia transacción: una
+		 * compra liquidada en EUR no es la misma cifra con el símbolo de la
+		 * moneda base delante.
+		 */
+		formatAmount: (value: number, currency: string) => string;
 		onEdit: (txn: Transaction) => void;
 		onToggleSell: (txn: Transaction) => void;
+		onDelete: (txn: Transaction) => void;
 	} = $props();
 
 	const currentPage = $derived(txnMeta.page);
@@ -57,9 +64,9 @@
 				</p>
 				<p class="date">{fmtDate(txn.transactionDate)}</p>
 				<p class="qty">{qty.toLocaleString('es-CO', { maximumFractionDigits: 8 })}</p>
-				<p class="price">{formatCurrency(price)}</p>
-				<p class="fees">{fees > 0 ? formatCurrency(fees) : '—'}</p>
-				<p class="total">{formatCurrency(total, 0)}</p>
+				<p class="price">{formatAmount(price, txn.currency)}</p>
+				<p class="fees">{fees > 0 ? formatAmount(fees, txn.currency) : '—'}</p>
+				<p class="total">{formatAmount(total, txn.currency)}</p>
 				<p class="notes">{txn.notes || '—'}</p>
 				<p class="cell-action">
 					<button
@@ -78,6 +85,26 @@
 						>
 							<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
 							<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+						</svg>
+					</button>
+					<button
+						type="button"
+						class="btn-delete-row"
+						onclick={() => onDelete(txn)}
+						aria-label="Eliminar transacción"
+					>
+						<svg
+							width="13"
+							height="13"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2.5"
+						>
+							<polyline points="3 6 5 6 21 6" />
+							<path
+								d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+							/>
 						</svg>
 					</button>
 					{#if isBuyLot}
@@ -144,7 +171,7 @@
 
 	.table-header {
 		display: grid;
-		grid-template-columns: 110px 100px 1fr 1fr 1fr 1fr 1fr 120px;
+		grid-template-columns: 110px 100px 1fr 1fr 1fr 1fr 1fr 165px;
 		gap: 1rem;
 		padding: 0.75rem 1rem;
 		background: rgba(0, 0, 0, 0.2);
@@ -159,7 +186,7 @@
 
 	.table-row {
 		display: grid;
-		grid-template-columns: 110px 100px 1fr 1fr 1fr 1fr 1fr 120px;
+		grid-template-columns: 110px 100px 1fr 1fr 1fr 1fr 1fr 165px;
 		gap: 1rem;
 		padding: 1rem;
 		border-bottom: 1px solid var(--border);
@@ -175,6 +202,7 @@
 	.cell-action {
 		display: flex;
 		justify-content: flex-end;
+		gap: 0.35rem;
 	}
 
 	.btn-sell-row {
@@ -308,6 +336,26 @@
 		background: rgba(212, 145, 42, 0.1);
 		border-color: var(--amber);
 		color: var(--amber);
+	}
+
+	.btn-delete-row {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.28rem 0.5rem;
+		border: 1.5px solid rgba(224, 90, 90, 0.3);
+		border-radius: 6px;
+		background: transparent;
+		color: rgba(224, 90, 90, 0.6);
+		cursor: pointer;
+		transition: all 0.2s ease;
+		flex-shrink: 0;
+	}
+
+	.btn-delete-row:hover {
+		background: rgba(224, 90, 90, 0.12);
+		border-color: var(--red);
+		color: var(--red);
 	}
 
 	.pagination {

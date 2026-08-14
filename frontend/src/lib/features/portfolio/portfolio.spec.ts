@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { groupHoldings, computeTypeBreakdown, formatPct, type RawHolding } from './portfolio';
 
+// Un portafolio en USD: los totales en moneda base coinciden con
+// cantidad × precio porque no hay conversión de por medio.
 const raw: RawHolding[] = [
 	{
 		ticker: 'AAPL',
@@ -8,7 +10,11 @@ const raw: RawHolding[] = [
 		assetType: 'stock',
 		quantity: '10',
 		price: '100',
-		marketPrice: '150'
+		marketPrice: '150',
+		currency: 'USD',
+		costBasisBase: '1000',
+		marketValueBase: '1500',
+		fxConverted: true
 	},
 	// Same ticker in another platform: must aggregate.
 	{
@@ -17,7 +23,11 @@ const raw: RawHolding[] = [
 		assetType: 'stock',
 		quantity: '5',
 		price: '120',
-		marketPrice: '150'
+		marketPrice: '150',
+		currency: 'USD',
+		costBasisBase: '600',
+		marketValueBase: '750',
+		fxConverted: true
 	},
 	{
 		ticker: 'BTC',
@@ -25,7 +35,11 @@ const raw: RawHolding[] = [
 		assetType: 'crypto',
 		quantity: '1',
 		price: '20000',
-		marketPrice: '25000'
+		marketPrice: '25000',
+		currency: 'USD',
+		costBasisBase: '20000',
+		marketValueBase: '25000',
+		fxConverted: true
 	}
 ];
 
@@ -50,6 +64,75 @@ describe('groupHoldings', () => {
 
 	it('returns an empty array for no entries', () => {
 		expect(groupHoldings([])).toEqual([]);
+	});
+
+	// Una posición en EUR dentro de un portafolio en USD: los totales vienen
+	// convertidos y son los que hay que sumar; el precio unitario se queda en
+	// euros porque es lo que cotiza.
+	it('uses the converted totals, not quantity times the native price', () => {
+		const [holding] = groupHoldings([
+			{
+				ticker: 'MC.FR',
+				name: 'LVMH',
+				assetType: 'stock',
+				quantity: '2',
+				price: '100',
+				marketPrice: '110',
+				currency: 'EUR',
+				costBasisBase: '220',
+				marketValueBase: '242',
+				fxConverted: true
+			}
+		]);
+
+		expect(holding.costBasis).toBe(220);
+		expect(holding.value).toBe(242);
+		expect(holding.marketPrice).toBe(110);
+		expect(holding.currency).toBe('EUR');
+	});
+
+	// Sin tasa, los importes llegan sin convertir: la fila se pinta igual pero
+	// queda marcada para que la vista avise en vez de sumar monedas distintas.
+	it('flags a group as unconverted when any of its entries lacked a rate', () => {
+		const [holding] = groupHoldings([
+			{
+				ticker: 'MC.FR',
+				name: 'LVMH',
+				assetType: 'stock',
+				quantity: '2',
+				price: '100',
+				marketPrice: '110',
+				currency: 'EUR',
+				costBasisBase: '200',
+				marketValueBase: '220',
+				fxConverted: false
+			}
+		]);
+
+		expect(holding.fxConverted).toBe(false);
+	});
+
+	// Contra un backend anterior a estos campos no hay nada que avisar: se
+	// vuelve al cálculo nativo y la fila no se marca como sospechosa.
+	it('falls back to the native calculation when the base totals are absent', () => {
+		const [holding] = groupHoldings([
+			{
+				ticker: 'AAPL',
+				name: 'Apple',
+				assetType: 'stock',
+				quantity: '3',
+				price: '100',
+				marketPrice: '150',
+				currency: 'USD',
+				costBasisBase: undefined,
+				marketValueBase: undefined,
+				fxConverted: undefined
+			}
+		]);
+
+		expect(holding.costBasis).toBe(300);
+		expect(holding.value).toBe(450);
+		expect(holding.fxConverted).toBe(true);
 	});
 });
 

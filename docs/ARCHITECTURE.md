@@ -28,7 +28,7 @@ backend/
     │   ├── config/  logger/  database/  cache/  objectstore/
     │   ├── mail/  geoip/  httpx/         # httpx: middlewares genéricos + envelope de respuesta
     │   ├── spreadsheet/                  # lectura genérica de CSV/XLSX (compartida por los importers)
-    │   ├── marketdata/                   # provider de precios (BYO-key) + alphavantage/finnhub + fallback + providers/ + dolarapi (feed público, sin clave)
+    │   ├── marketdata/                   # provider de precios (BYO-key) + alphavantage/finnhub + fallback + providers/ + dolarapi y ecb (feeds públicos, sin clave)
     │   └── secretbox/                    # cifrado de sobre de las claves que aportan los usuarios
     ├── identity/                # tipos compartidos (User, Account, Session, Role) — sin lógica
     │
@@ -267,13 +267,21 @@ los errores de transporte de Go citan la URL completa.
 entera en la clave: es el plan personal de alguien lo que no se puede
 redistribuir. Una fuente que no pide credencial, publica un dato oficial y no
 impone condiciones queda fuera de ese razonamiento, y se lee una vez para
-todos. `marketdata/dolarapi` es la primera: trae la TRM —la tasa oficial
-USD/COP— y su resultado va a la tabla compartida `exchange_rates`, no a la del
-usuario. Por eso no pasa por la `Factory`, que se arma desde credenciales, sino
-por su propia interfaz (`marketdata.PublicRateSource`) y su propio job
-(`market.PublicRatesJob`, cada hora). Sin esto, un usuario sin clave no tenía
-USD→COP y el dashboard no podía enseñarse en pesos; la tasa del propio usuario
-sigue ganando cuando la hay, así que esto es un suelo, no un reemplazo.
+todos. Hay dos: `marketdata/dolarapi` trae la TRM —la tasa oficial USD/COP— y
+`marketdata/ecb` las tasas de referencia del euro, de las que se derivan
+USD ↔ EUR, GBP, CHF, JPY, CAD, AUD, CNY, MXN y BRL. Sus resultados van a la
+tabla compartida `exchange_rates`, no a la del usuario. Por eso no pasan por la
+`Factory`, que se arma desde credenciales, sino por su propia interfaz
+(`marketdata.PublicRateSource`) y su propio job (`market.PublicRatesJob`, cada
+hora). Se combinan con `marketdata.PublicRateSources`, que los suma en vez de
+encadenarlos: ninguno cubre lo del otro, así que no hay nada a lo que hacer
+fallback, y un feed caído no puede silenciar al resto.
+
+Sin esto, un usuario sin clave no tenía USD→COP y el dashboard no podía
+enseñarse en pesos, ni tenía tasa alguna para una posición cotizada en euros
+—que entonces no se podía convertir a la moneda base de su portafolio—. La tasa
+del propio usuario sigue ganando cuando la hay, así que esto es un suelo, no un
+reemplazo.
 
 **El catálogo dejó de ser del operador.** La fila de `assets` no lleva dato
 licenciado —solo ticker, nombre, tipo, mercado y moneda—, así que no hay razón

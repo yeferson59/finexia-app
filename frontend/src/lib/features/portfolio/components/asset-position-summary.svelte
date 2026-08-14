@@ -4,9 +4,20 @@
 
 	let {
 		position,
-		formatCurrency
-	}: { position: AssetPosition; formatCurrency: (value: number, decimals?: number) => string } =
-		$props();
+		formatAmount
+	}: {
+		position: AssetPosition;
+		formatAmount: (value: number, currency: string, decimals?: number) => string;
+	} = $props();
+
+	// Cada tarjeta lleva la moneda en la que está medida: el promedio en la de
+	// coste, el precio actual en la de cotización del activo, y los totales en
+	// la base del portafolio, que es la única en la que se pueden sumar.
+	const avgCost = $derived(formatAmount(position.averageCost, position.costCurrency));
+	const marketPrice = $derived(formatAmount(position.marketPrice, position.currency));
+	const totalCost = $derived(formatAmount(position.totalCost, position.baseCurrency, 0));
+	const totalValue = $derived(formatAmount(position.totalValue, position.baseCurrency, 0));
+	const gainLoss = $derived(formatAmount(position.gainLoss, position.baseCurrency, 0));
 </script>
 
 <section class="panel">
@@ -25,28 +36,32 @@
 
 		<article class="metric-card">
 			<p class="metric-label">Precio promedio</p>
-			<p class="metric-value">{formatCurrency(position.averageCost)}</p>
+			<p class="metric-value">{avgCost}</p>
+			<p class="metric-currency">{position.costCurrency}</p>
 		</article>
 
 		<article class="metric-card">
 			<p class="metric-label">Precio actual</p>
-			<p class="metric-value">{formatCurrency(position.marketPrice)}</p>
+			<p class="metric-value">{marketPrice}</p>
+			<p class="metric-currency">{position.currency}</p>
 		</article>
 
 		<article class="metric-card">
 			<p class="metric-label">Costo total</p>
-			<p class="metric-value">{formatCurrency(position.totalCost, 0)}</p>
+			<p class="metric-value">{totalCost}</p>
+			<p class="metric-currency">{position.baseCurrency}</p>
 		</article>
 
 		<article class="metric-card">
 			<p class="metric-label">Valor de mercado</p>
-			<p class="metric-value">{formatCurrency(position.totalValue, 0)}</p>
+			<p class="metric-value">{totalValue}</p>
+			<p class="metric-currency">{position.baseCurrency}</p>
 		</article>
 
 		<article class="metric-card gain">
 			<p class="metric-label">Ganancia / Pérdida</p>
 			<p class="metric-value {position.gainLoss >= 0 ? 'positive' : 'negative'}">
-				{formatCurrency(position.gainLoss, 0)}
+				{gainLoss}
 			</p>
 			<p class="metric-pct {position.gainLoss >= 0 ? 'positive' : 'negative'}">
 				{formatPct(position.gainLossPercent)}
@@ -127,6 +142,14 @@
 		font-size: 0.7rem;
 		color: rgba(236, 234, 229, 0.4);
 		margin-left: 0.25rem;
+	}
+
+	.metric-currency {
+		margin: 0.3rem 0 0;
+		font-size: 0.7rem;
+		letter-spacing: 0.5px;
+		color: rgba(236, 234, 229, 0.35);
+		font-family: var(--font-mono);
 	}
 
 	.metric-pct {

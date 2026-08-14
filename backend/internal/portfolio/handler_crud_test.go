@@ -374,6 +374,52 @@ func TestHandlerTransactions(t *testing.T) {
 		}
 	})
 
+	t.Run("deletes a transaction", func(t *testing.T) {
+		var gotUserID, gotTxnID uuid.UUID
+		repo := new(fakeRepository{
+			deleteTransaction: func(_ context.Context, uid, tid uuid.UUID) error {
+				gotUserID, gotTxnID = uid, tid
+				return nil
+			},
+		})
+		app := newTestModule(t, repo, userID, "user")
+
+		resp := do(t, app, http.MethodDelete, "/portfolios/transactions/"+txnID.String())
+		if resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		// The caller's id reaches the repository: ownership is enforced inside
+		// the DELETE, so dropping it there would delete anybody's row.
+		if gotUserID != userID || gotTxnID != txnID {
+			t.Errorf("ids = %s/%s, want %s/%s", gotUserID, gotTxnID, userID, txnID)
+		}
+	})
+
+	// Somebody else's transaction and one that never existed are the same
+	// answer: the DELETE matches no row and the repository reports not found.
+	t.Run("deleting a transaction the user does not own answers 404", func(t *testing.T) {
+		repo := new(fakeRepository{
+			deleteTransaction: func(context.Context, uuid.UUID, uuid.UUID) error {
+				return ErrTransactionNotFound
+			},
+		})
+		app := newTestModule(t, repo, userID, "user")
+
+		resp := do(t, app, http.MethodDelete, "/portfolios/transactions/"+txnID.String())
+		if resp.StatusCode != fiber.StatusNotFound {
+			t.Fatalf("status = %d, want 404", resp.StatusCode)
+		}
+	})
+
+	t.Run("rejects a non-uuid transaction id on delete", func(t *testing.T) {
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
+
+		resp := do(t, app, http.MethodDelete, "/portfolios/transactions/not-a-uuid")
+		if resp.StatusCode != fiber.StatusBadRequest {
+			t.Fatalf("status = %d, want 400", resp.StatusCode)
+		}
+	})
+
 	t.Run("rejects an unsupported transaction type", func(t *testing.T) {
 		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 

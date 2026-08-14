@@ -265,6 +265,20 @@ type Entry struct {
 	// resolves through the same preference. Only the queries that resolve it
 	// populate this; elsewhere it is empty.
 	PriceSource PriceSource `json:"priceSource,omitempty"`
+	// CostBasisBase and MarketValueBase are this position's totals expressed in
+	// the portfolio's base currency — the only form in which positions bought in
+	// different currencies can be added up. Quantity, Price and
+	// Asset.CurrentPrice stay in their native currencies: those are per-unit
+	// figures and converting them would round a fractional share's price to the
+	// base currency's two decimals.
+	//
+	// Filled by valueEntriesInBase; empty on the queries that don't call it.
+	CostBasisBase   money.Money `json:"costBasisBase,omitzero"`
+	MarketValueBase money.Money `json:"marketValueBase,omitzero"`
+	// FXConverted reports whether both totals above really are in the base
+	// currency. It is false when a rate was missing, in which case they hold the
+	// native amounts unconverted and any sum across currencies is meaningless.
+	FXConverted bool `json:"fxConverted,omitempty"`
 }
 
 type Transaction struct {

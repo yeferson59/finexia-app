@@ -36,6 +36,11 @@
 	const totalGainLossPct = $derived(totalCost > 0 ? (totalGainLoss / totalCost) * 100 : 0);
 	const baseCurrency = $derived(portfolio?.baseCurrency?.trim() || 'USD');
 
+	// Posiciones que el backend no pudo convertir por falta de tasa: sus
+	// importes están en su moneda nativa, así que los totales de arriba mezclan
+	// monedas y hay que decirlo en vez de presentarlos como comparables.
+	const unconverted = $derived(holdings.filter((h) => !h.fxConverted));
+
 	const capitalPct = $derived(totalValue > 0 ? (totalCost / totalValue) * 100 : 0);
 	const gainPct = $derived(totalValue > 0 ? (totalGainLoss / totalValue) * 100 : 0);
 	const bestHolding = $derived(
@@ -113,6 +118,13 @@
 	/>
 {/if}
 
+{#if unconverted.length > 0}
+	<p class="alert alert-warning">
+		Sin tasa de cambio para {unconverted.map((h) => `${h.symbol} (${h.currency})`).join(', ')}: esos
+		importes van sin convertir a {baseCurrency}, así que los totales de abajo mezclan monedas.
+	</p>
+{/if}
+
 <PortfolioSummaryCards
 	{totalValue}
 	{totalCost}
@@ -166,6 +178,14 @@
 		background: rgba(239, 68, 68, 0.12);
 		border: 1px solid rgba(239, 68, 68, 0.3);
 		color: var(--red);
+	}
+
+	.alert-warning {
+		margin-top: 0;
+		background: rgba(212, 145, 42, 0.1);
+		border: 1px solid rgba(212, 145, 42, 0.3);
+		color: rgba(236, 234, 229, 0.8);
+		line-height: 1.5;
 	}
 
 	.growth-section {

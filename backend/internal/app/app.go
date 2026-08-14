@@ -30,6 +30,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata/dolarapi"
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata/ecb"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata/providers"
 	s3Store "github.com/yeferson59/finexia-app/internal/platform/objectstore/s3"
 	"github.com/yeferson59/finexia-app/internal/platform/secretbox"
@@ -233,16 +234,23 @@ func (a *App) buildModules() *modules {
 	// assembles a chain per sync run from the calling user's own keys.
 	priceProviders := providers.New(marketdata.DefaultHTTPClient)
 
-	// The one exception, and it is an exception because it needs no key: the
-	// public TRM feed. Nothing about it is per-user, so it is built once here
-	// and its result is stored in the shared exchange_rates table rather than
-	// against whoever triggered the fetch.
+	// The exceptions, and they are exceptions because they need no key: the
+	// public rate feeds. Nothing about them is per-user, so they are built once
+	// here and their results are stored in the shared exchange_rates table
+	// rather than against whoever triggered the fetch.
 	//
-	// It gets its own HTTP client (nil takes the package default) rather than
-	// the shared one: it is an hourly background fetch to a host nothing else
+	// Two feeds, read as one, because neither covers the other's ground: the
+	// TRM is Colombia's official USD/COP and quotes nothing else, while the ECB
+	// publishes the euro reference rates every other pair in this catalog is
+	// derived from. Without the second, a user without their own provider key
+	// had no rate at all for a euro-quoted holding and their position could not
+	// be converted.
+	//
+	// Each gets its own HTTP client (nil takes the package default) rather than
+	// the shared one: these are hourly background fetches to hosts nothing else
 	// here talks to, so every run pays a cold connect and needs a longer
 	// deadline than a request a user is waiting on.
-	publicRates := dolarapi.New(nil)
+	publicRates := marketdata.PublicRateSources{dolarapi.New(nil), ecb.New(nil)}
 
 	geo := geoip.New()
 	userLimiter := httpx.KeyedRateLimiter(200, 1*time.Minute, func(c fiber.Ctx) string {

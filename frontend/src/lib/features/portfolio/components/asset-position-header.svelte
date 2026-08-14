@@ -3,9 +3,15 @@
 
 	let {
 		position,
-		formatCurrency
-	}: { position: AssetPosition; formatCurrency: (value: number, decimals?: number) => string } =
-		$props();
+		formatAmount
+	}: {
+		position: AssetPosition;
+		formatAmount: (value: number, currency: string, decimals?: number) => string;
+	} = $props();
+
+	// El precio de mercado se cotiza en la moneda del activo, no en la del
+	// portafolio: MC.FR vale 461,65 € y pintarlo como dólares es otro precio.
+	const marketPrice = $derived(formatAmount(position.marketPrice, position.currency));
 </script>
 
 <div class="header-section">
@@ -17,8 +23,8 @@
 		</div>
 
 		<div class="price-display">
-			<p class="current-price">{formatCurrency(position.marketPrice)}</p>
-			<p class="price-label">Precio de mercado</p>
+			<p class="current-price">{marketPrice}</p>
+			<p class="price-label">Precio de mercado · {position.currency}</p>
 		</div>
 	</div>
 </div>

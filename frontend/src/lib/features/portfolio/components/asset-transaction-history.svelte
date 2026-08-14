@@ -7,6 +7,7 @@
 	import AssetSellPanel from './asset-sell-panel.svelte';
 	import AssetTransactionsTable from './asset-transactions-table.svelte';
 	import AssetTransactionEditModal from './asset-transaction-edit-modal.svelte';
+	import AssetTransactionDeleteDialog from './asset-transaction-delete-dialog.svelte';
 
 	let {
 		portfolioId,
@@ -16,7 +17,8 @@
 		txnMeta,
 		marketPrice,
 		form,
-		formatCurrency
+		formatCurrency,
+		formatAmount
 	}: {
 		portfolioId: string;
 		symbol: string;
@@ -25,12 +27,16 @@
 		txnMeta: TxnMeta;
 		marketPrice: number | undefined;
 		form: AssetActionResult | null;
+		/** Importes de la posición, en la moneda de coste. */
 		formatCurrency: (value: number, decimals?: number) => string;
+		/** Importes de una transacción, en la moneda de esa transacción. */
+		formatAmount: (value: number, currency: string) => string;
 	} = $props();
 
 	let showAddForm = $state(false);
 	let sellFromTxn = $state<Transaction | null>(null);
 	let editingTxn = $state<Transaction | null>(null);
+	let deletingTxn = $state<Transaction | null>(null);
 
 	const formError = $derived(form?.success === false);
 	const currentPage = $derived(txnMeta.page);
@@ -93,14 +99,23 @@
 		{transactions}
 		{txnMeta}
 		sellingTxnId={sellFromTxn?.id ?? null}
-		{formatCurrency}
+		{formatAmount}
 		onEdit={(txn) => (editingTxn = txn)}
 		onToggleSell={(txn) => (sellFromTxn = sellFromTxn?.id === txn.id ? null : txn)}
+		onDelete={(txn) => (deletingTxn = txn)}
 	/>
 </section>
 
 {#if editingTxn}
 	<AssetTransactionEditModal transaction={editingTxn} onClose={() => (editingTxn = null)} />
+{/if}
+
+{#if deletingTxn}
+	<AssetTransactionDeleteDialog
+		transaction={deletingTxn}
+		{formatAmount}
+		onClose={() => (deletingTxn = null)}
+	/>
 {/if}
 
 <style>

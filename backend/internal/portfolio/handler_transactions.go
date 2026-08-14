@@ -173,6 +173,24 @@ func (h *handler) UpdateTransaction(c fiber.Ctx) error {
 	}, "Error updating transaction", "Could not update transaction", "Transaction updated", "Transaction updated successfully")
 }
 
+func (h *handler) DeleteTransaction(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	txnID, err := httpx.ParamUUID(c, "txnId")
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid transaction ID", err.Error())
+	}
+
+	if err := h.service.DeleteTransaction(c, userID, txnID); err != nil {
+		return httpx.FromDomain(c, err, "Error deleting transaction", "Could not delete transaction")
+	}
+
+	return httpx.OK(c, "Transaction deleted", "Transaction deleted successfully", nil)
+}
+
 func (h *handler) GetAssets(c fiber.Ctx) error {
 	paginateInfo, ok := paginate.FromContext(c)
 	if !ok {

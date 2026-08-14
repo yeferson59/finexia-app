@@ -56,6 +56,12 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID
 	return s.repo.UpdateTransaction(ctx, userID, txnID, txnType, quantity, price, currency, fees, transactionDate, notes)
 }
 
+// DeleteTransaction removes a transaction the user owns. No activity alert is
+// sent: those announce trades, and undoing a mistyped one is not a trade.
+func (s *Service) DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID) error {
+	return s.repo.DeleteTransaction(ctx, userID, txnID)
+}
+
 func (s *Service) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
 	txn, err := s.repo.CreateTransaction(ctx, userID, entryID, txnType, quantity, price, currency, fees, transactionDate, notes)
 	if err != nil {

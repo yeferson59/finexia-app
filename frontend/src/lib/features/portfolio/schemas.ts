@@ -61,3 +61,6 @@ export const transactionCreateSchema = transactionSchema.extend({ entryId: z.uui
 
 /** Edición de una transacción ya registrada. */
 export const transactionUpdateSchema = transactionSchema.extend({ txnId: z.uuid() });
+
+/** Borrado de una transacción: solo hace falta identificarla. */
+export const transactionDeleteSchema = z.object({ txnId: z.uuid() });

@@ -62,6 +62,16 @@ export function updateTransaction(
 }
 
 /**
+ * `DELETE /portfolios/transactions/:txnId` — borra una transacción.
+ *
+ * La posición se recalcula sola en la base y queda en cantidad 0 si era la
+ * última, así que no hay que tocar nada más desde aquí.
+ */
+export function deleteTransaction(event: ApiEvent, txnId: string): Promise<ApiResult<unknown>> {
+	return apiRequest<unknown>(event, `/portfolios/transactions/${txnId}`, { method: 'DELETE' });
+}
+
+/**
  * `POST /portfolios/transactions/import/preview` — preview del import.
  * Reenvía el multipart tal cual y devuelve la `Response` cruda (el endpoint la
  * proxya con su status hacia el navegador).

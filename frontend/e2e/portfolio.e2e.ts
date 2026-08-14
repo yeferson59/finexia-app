@@ -36,6 +36,27 @@ test.describe('portfolio detail', () => {
 		await expect(page.getByRole('button', { name: 'Confirmar Venta Total' })).toBeVisible();
 	});
 
+	// Borrar una transacción es irreversible y el botón vive en una tabla de
+	// filas casi idénticas, así que pasa por una confirmación que dice cuál se
+	// va a borrar y qué le ocurre a la posición.
+	test('asset detail deletes a transaction after confirming', async ({ page }) => {
+		await login(page);
+		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}/assets/AAPL`);
+
+		await page.getByRole('button', { name: 'Eliminar transacción' }).first().click();
+
+		const dialog = page.getByRole('dialog', { name: 'Eliminar transacción' });
+		await expect(dialog).toBeVisible();
+		await expect(dialog).toContainText('la cantidad pasa a 0');
+
+		await dialog.getByRole('button', { name: 'Eliminar' }).click();
+
+		// Al confirmar, el diálogo se cierra y la página se recarga con lo que
+		// responda el backend.
+		await expect(dialog).toBeHidden();
+		await expect(page.getByRole('heading', { name: 'Historial de Transacciones' })).toBeVisible();
+	});
+
 	test('adds an entry through the add-asset form', async ({ page }) => {
 		await login(page);
 		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}/add`);

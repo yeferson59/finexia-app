@@ -79,7 +79,17 @@ export const holdingSchema = z.object({
 	costCurrency: z.string(),
 	category: z.string(),
 	entryDate: z.string(),
-	notes: z.string()
+	notes: z.string(),
+	// Totales ya convertidos a la moneda base del portafolio: los únicos
+	// importes del holding que se pueden sumar entre posiciones, porque `price`
+	// y `marketPrice` vienen cada uno en su propia moneda. `fxConverted: false`
+	// significa que faltó la tasa y los dos totales están sin convertir.
+	//
+	// Opcionales para tolerar un backend anterior a estos campos: quien los
+	// consume vuelve al cálculo nativo cuando no llegan.
+	costBasisBase: z.string().optional(),
+	marketValueBase: z.string().optional(),
+	fxConverted: z.boolean().optional()
 });
 
 /** Detalle completo de un portfolio (`GET /portfolios/:id`). */

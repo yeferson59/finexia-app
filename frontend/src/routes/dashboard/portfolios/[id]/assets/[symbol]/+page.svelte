@@ -19,18 +19,31 @@
 
 	// Métricas de la posición a partir de los agregados de las entradas
 	// (exactas con independencia de la paginación de transacciones).
-	const position = $derived(computePosition(entries, data.portfolioTotalValue));
+	const position = $derived(
+		computePosition(entries, data.portfolioTotalValue, data.baseCurrency ?? 'USD')
+	);
 
-	function formatCurrency(value: number, decimals = 2): string {
+	/**
+	 * En esta ficha conviven tres monedas —la de coste, la de cotización del
+	 * activo y la base del portafolio— y cada cifra tiene que llevar la suya:
+	 * pintar un precio en EUR con el símbolo del dólar era el origen de la
+	 * confusión que este cambio corrige.
+	 */
+	function formatAmount(value: number, currency: string, decimals = 2): string {
 		return privacy.money(
 			new Intl.NumberFormat('es-CO', {
 				style: 'currency',
-				currency: position?.costCurrency || 'USD',
+				currency: currency || 'USD',
 				currencyDisplay: 'narrowSymbol',
 				minimumFractionDigits: decimals,
 				maximumFractionDigits: decimals
 			}).format(value)
 		);
+	}
+
+	/** Importes por unidad de la posición: van en la moneda de coste. */
+	function formatCurrency(value: number, decimals = 2): string {
+		return formatAmount(value, position?.costCurrency || 'USD', decimals);
 	}
 
 	function goBack() {
@@ -63,9 +76,16 @@
 			<p>No se encontraron entradas para <strong>{params.symbol}</strong> en este portafolio.</p>
 		</div>
 	{:else}
-		<AssetPositionHeader {position} {formatCurrency} />
+		{#if !position.fxConverted}
+			<p class="fx-warning">
+				No hay tasa {position.currency} → {position.baseCurrency} disponible: los totales se muestran
+				sin convertir, así que no son comparables con el resto del portafolio.
+			</p>
+		{/if}
 
-		<AssetPositionSummary {position} {formatCurrency} />
+		<AssetPositionHeader {position} {formatAmount} />
+
+		<AssetPositionSummary {position} {formatAmount} />
 
 		<AssetInfoPanel {position} transactionsCount={txnMeta.total} />
 
@@ -78,6 +98,7 @@
 			marketPrice={position.marketPrice}
 			{form}
 			{formatCurrency}
+			{formatAmount}
 		/>
 	{/if}
 </div>
@@ -108,6 +129,17 @@
 	.btn-back:hover {
 		background: var(--border);
 		border-color: var(--amber);
+	}
+
+	.fx-warning {
+		margin: 0 0 1.5rem;
+		padding: 0.85rem 1.1rem;
+		border: 1px solid rgba(224, 90, 90, 0.35);
+		border-radius: 10px;
+		background: rgba(224, 90, 90, 0.08);
+		color: rgba(236, 234, 229, 0.8);
+		font-size: 0.88rem;
+		line-height: 1.5;
 	}
 
 	.empty-state {

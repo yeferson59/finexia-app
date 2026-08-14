@@ -91,6 +91,11 @@ function holding(ticker, quantity, price, entryDate, notes = '') {
 		price: money(price),
 		marketPrice: money(marketPrice),
 		costCurrency: 'USD',
+		// Totales en la moneda base del portafolio. Aquí todo está en USD, así
+		// que coinciden con cantidad × precio; el backend los envía siempre.
+		costBasisBase: money(quantity * price),
+		marketValueBase: money(quantity * marketPrice),
+		fxConverted: true,
 		category,
 		entryDate,
 		notes
@@ -312,7 +317,10 @@ const MOVEMENTS = [
 
 export const transactions = MOVEMENTS.map(
 	([date, type, ticker, quantity, price, fees, notes], index) => ({
-		id: `txn-${index + 1}`,
+		// El backend identifica las transacciones con UUID, y las acciones que
+		// las editan o borran lo validan como tal: un `txn-1` no llegaría nunca
+		// a la API.
+		id: `66666666-6666-4666-8666-6666666666${String(index + 1).padStart(2, '0')}`,
 		entryId: entryIdOf(ticker),
 		type,
 		quantity,

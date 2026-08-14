@@ -207,6 +207,7 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 | GET | `/portfolios/entries/:entryId/transactions` | usuario | Transacciones de una posición |
 | POST | `/portfolios/entries/:entryId/transactions` | usuario | Crea transacción |
 | PUT | `/portfolios/transactions/:txnId` | usuario | Actualiza transacción |
+| DELETE | `/portfolios/transactions/:txnId` | usuario | Elimina transacción; la posición se recalcula sola y queda en cantidad 0 si era la última |
 | GET | `/portfolios/sources` | usuario | Lista plataformas |
 | PATCH | `/portfolios/sources/:id` | usuario | Actualiza plataforma |
 | DELETE | `/portfolios/sources/:id` | usuario | Elimina plataforma |
@@ -250,6 +251,32 @@ agregado por portfolio: `positionsPricedOwn`, `positionsPricedManual` y
 `positionsAtCost`, que **suman exactamente `totalPositions`**. Sirven para
 avisar de que un total solo está parcialmente valorado a mercado. No son
 importes: `?currency=` convierte los totales y deja estos tres intactos.
+
+#### Moneda de los holdings
+
+Una posición arrastra hasta tres monedas: la base del portfolio, la de coste
+(`costCurrency`, en la que se liquidó la compra) y la del activo (`currency`, en
+la que cotiza). Sumar los importes crudos de dos posiciones en monedas distintas
+no significa nada, y restar un valor de mercado en EUR de un coste en USD
+significa menos todavía. Por eso cada holding de `GET /portfolios/:id` trae sus
+totales ya convertidos a `baseCurrency`:
+
+| Campo | Valor |
+|---|---|
+| `costBasisBase` | `quantity × price` convertido a la moneda base |
+| `marketValueBase` | `quantity × marketPrice` convertido a la moneda base (a coste si `priceSource` es `cost`) |
+| `fxConverted` | `false` si faltaba la tasa; los dos importes vienen entonces **sin convertir**, en su moneda nativa |
+
+Son los únicos campos del holding que un cliente puede sumar entre posiciones.
+`price` y `marketPrice` siguen siendo por unidad y en su moneda nativa: se
+convierten importes, nunca precios unitarios, porque redondear a los dos
+decimales de la moneda destino destruiría el precio de una fracción de acción o
+de una cripto.
+
+Con `fxConverted: false` la posición se muestra, pero cualquier total que la
+incluya está mezclando monedas: hay que decirlo en pantalla en vez de sumar. Las
+tasas son datos BYO-key (§2.10), así que la ausencia se resuelve sincronizando
+con la clave del propio usuario, no reintentando.
 
 ### 2.8 Assets (JWT; *admin* donde se indica)
 
@@ -304,9 +331,24 @@ Cada fila lleva un campo `source` que dice quién la puso:
 - `manual` — la escribió un administrador (`POST`, `PATCH`) o vino de una hoja
   importada. Es el valor por defecto de la columna, así que lo llevan también
   todas las filas anteriores a que existiera el feed.
-- `dolarapi` — la publicó el feed público de [dolarapi.com](https://dolarapi.com).
-  Hoy es un solo par, **USD → COP a la TRM**, la tasa oficial que publica la
+- `dolarapi` — la publicó el feed público de [dolarapi.com](https://dolarapi.com):
+  un solo par, **USD → COP a la TRM**, la tasa oficial que publica la
   Superintendencia Financiera.
+- `ecb` — la derivó el feed de [referencia del BCE](https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml),
+  que publica cada día hábil cuánto vale un euro en cada divisa. De ahí salen
+  **USD ↔ X** para EUR, GBP, CHF, JPY, CAD, AUD, CNY, MXN y BRL.
+
+Los dos feeds se leen juntos porque ninguno cubre lo del otro: el BCE no cotiza
+el peso colombiano y dolarapi no cotiza nada más. Que uno esté caído no impide
+guardar lo que publicó el otro; el fallo se reporta y los pares del feed caído
+conservan su valor anterior.
+
+Las tasas del BCE se anclan al dólar y en las dos direcciones a propósito. Al
+dólar porque es la divisa por la que salta la conversión cuando no hay par
+directo (`GetConversionRate` prueba directo, inverso y salto por USD), así que
+USD ↔ X deja cualquier par de esa lista a dos saltos. En las dos direcciones
+porque la vista `portfolio_summary` busca el par tal cual está escrito y no lo
+invierte.
 
 > Las tasas que trae la clave de un usuario siguen yendo a
 > `user_exchange_rates` y únicamente él las ve; una conversión consulta primero

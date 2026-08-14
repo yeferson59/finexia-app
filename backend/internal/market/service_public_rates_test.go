@@ -165,6 +165,25 @@ func TestRefreshPublicRates(t *testing.T) {
 		}
 	})
 
+	// The source is several feeds read as one, so a fetch can come back as
+	// rates *and* an error. The pairs one feed owns must not be dropped because
+	// another feed is down — that is the whole reason they are read together.
+	t.Run("stores what a partial fetch published", func(t *testing.T) {
+		feed := new(fakePublicRateSource{
+			rates: []marketdata.PublicRate{{From: "USD", To: "COP", Rate: "3157.43", Source: marketdata.DolarAPI, AsOf: asOf}},
+			err:   errors.New("ecb: reference rates: status 503"),
+		})
+		svc, written := newPublicRatesFixture(feed)
+
+		stored, err := svc.RefreshPublicRates(context.Background())
+		if err == nil {
+			t.Error("expected the failed feed to be reported")
+		}
+		if len(stored) != 1 || len(*written) != 1 {
+			t.Fatalf("stored %d rates and wrote %d rows, want the pair the working feed published", len(stored), len(*written))
+		}
+	})
+
 	t.Run("reports a deployment with no feed wired", func(t *testing.T) {
 		svc, _ := newPublicRatesFixture(nil)
 

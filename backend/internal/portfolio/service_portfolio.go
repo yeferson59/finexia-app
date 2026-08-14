@@ -156,7 +156,10 @@ func (s *Service) GetPortfolio(ctx context.Context, userID, portfolioID uuid.UUI
 		return Portfolio{}, err
 	}
 
-	portfolio.Entries = entries
+	// Positions arrive in their own currencies; the caller needs totals it can
+	// add up, so they are valued in the portfolio's base currency before the
+	// response is built.
+	portfolio.Entries = s.valueEntriesInBase(ctx, userID, portfolio.BaseCurrency, entries)
 
 	return portfolio, nil
 }

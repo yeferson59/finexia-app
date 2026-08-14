@@ -347,6 +347,11 @@ const server = createServer(async (req, res) => {
 			envelope({ data: rows, total: rows.length, page: 1, limit: 20, totalPages: 1 })
 		);
 	}
+	// El backend responde 200 con `data: null`; la posición la recalcula la
+	// base, así que no hay nada que devolver.
+	if (req.method === 'DELETE' && /^\/portfolios\/transactions\/[0-9a-f-]{36}$/.test(path)) {
+		return send(res, 200, envelope(null, 'transaction deleted'));
+	}
 	if (req.method === 'GET' && /^\/portfolios\/[0-9a-f-]{36}\/top-transaction$/.test(path)) {
 		const top = topTransaction(path.split('/')[2]);
 		if (!top) return send(res, 404, errorEnvelope('no transactions'));

@@ -60,7 +60,14 @@ export function priceLabelFor(type: string): string {
 	return 'Monto de la comisión';
 }
 
-/** Métricas agregadas de la posición en un activo. */
+/**
+ * Métricas agregadas de la posición en un activo.
+ *
+ * Conviven tres monedas y conviene no confundirlas: `averageCost` está en
+ * `costCurrency` (la de la compra), `marketPrice` en `currency` (la de
+ * cotización del activo) y los totales (`totalCost`, `totalValue`, `gainLoss`)
+ * en `baseCurrency`, que es la única en la que se pueden sumar y restar.
+ */
 export interface AssetPosition {
 	ticker: string;
 	name: string;
@@ -68,6 +75,7 @@ export interface AssetPosition {
 	exchange: string;
 	currency: string;
 	costCurrency: string;
+	baseCurrency: string;
 	marketPrice: number;
 	totalQty: number;
 	totalCost: number;
@@ -76,31 +84,42 @@ export interface AssetPosition {
 	gainLoss: number;
 	gainLossPercent: number;
 	allocation: number;
+	/** `false` si faltó la tasa: los totales están sin convertir. */
+	fxConverted: boolean;
 }
 
 /**
  * Calcula la posición a partir de las entradas del activo. Usa los agregados
  * mantenidos por el backend, así que es exacta con independencia de la
  * paginación de transacciones.
+ *
+ * `portfolioTotalValue` tiene que venir en la misma moneda base que los
+ * importes de las entradas; si no, la asignación compara peras con manzanas.
  */
 export function computePosition(
 	entries: Holding[],
-	portfolioTotalValue: number
+	portfolioTotalValue: number,
+	baseCurrency = 'USD'
 ): AssetPosition | null {
 	if (entries.length === 0) return null;
 
 	const first = entries[0];
 
 	const totalQty = entries.reduce((s, e) => s + (parseFloat(e.quantity) || 0), 0);
+	// El precio promedio es por unidad y se queda en la moneda de coste: es lo
+	// que se compara contra el precio de mercado que muestra la ficha.
 	const rawCost = entries.reduce(
 		(s, e) => s + (parseFloat(e.quantity) || 0) * (parseFloat(e.price) || 0),
 		0
 	);
 	const averageCost = totalQty > 0 ? rawCost / totalQty : 0;
-	const totalCost = rawCost;
 
 	const marketPrice = parseFloat(first.marketPrice) || averageCost;
-	const totalValue = totalQty * marketPrice;
+
+	// Los totales, en cambio, se toman ya convertidos a la moneda base: restar
+	// un valor de mercado en EUR de un coste en USD daba un ROI inventado.
+	const totalCost = sumBase(entries, 'costBasisBase', rawCost);
+	const totalValue = sumBase(entries, 'marketValueBase', totalQty * marketPrice);
 	const gainLoss = totalValue - totalCost;
 	const gainLossPercent = totalCost > 0 ? (gainLoss / totalCost) * 100 : 0;
 	const allocation = portfolioTotalValue > 0 ? (totalValue / portfolioTotalValue) * 100 : 0;
@@ -112,6 +131,7 @@ export function computePosition(
 		exchange: first.exchange,
 		currency: first.currency,
 		costCurrency: first.costCurrency,
+		baseCurrency,
 		marketPrice,
 		totalQty,
 		totalCost,
@@ -119,8 +139,32 @@ export function computePosition(
 		totalValue,
 		gainLoss,
 		gainLossPercent,
-		allocation
+		allocation,
+		// Ausente (backend anterior) no es lo mismo que `false`: solo se avisa
+		// cuando el backend afirma que faltó la tasa.
+		fxConverted: entries.every((e) => e.fxConverted ?? true)
 	};
+}
+
+/**
+ * Suma un importe en moneda base de todas las entradas, volviendo al cálculo
+ * nativo si el backend no envía el campo (versión anterior).
+ */
+function sumBase(
+	entries: Holding[],
+	field: 'costBasisBase' | 'marketValueBase',
+	nativeFallback: number
+): number {
+	let total = 0;
+	for (const entry of entries) {
+		const raw = entry[field];
+		if (raw === undefined || raw === '') return nativeFallback;
+		const parsed = parseFloat(raw);
+		if (!Number.isFinite(parsed)) return nativeFallback;
+		total += parsed;
+	}
+
+	return total;
 }
 
 /** Metadatos de paginación de las transacciones del activo. */
@@ -135,5 +179,6 @@ export interface TxnMeta {
 export interface AssetActionResult {
 	success?: boolean;
 	edited?: boolean;
+	deleted?: boolean;
 	error?: string;
 }

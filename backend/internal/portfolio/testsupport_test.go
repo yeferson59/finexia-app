@@ -138,6 +138,7 @@ type fakeRepository struct {
 	getAssetAllocationByUserID      func(ctx context.Context, userID uuid.UUID) ([]AllocationItem, error)
 	createTransaction               func(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
 	updateTransaction               func(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
+	deleteTransaction               func(ctx context.Context, userID, txnID uuid.UUID) error
 	importEntryTransactions         func(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []ImportTransactionRow) (int, error)
 	getAllPortfolioSummaryRows      func(ctx context.Context) ([]SnapshotRow, error)
 	upsertPortfolioSnapshot         func(ctx context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, currency, totalGainLoss, totalGainLossPct string) error
@@ -238,6 +239,10 @@ func (f *fakeRepository) CreateTransaction(ctx context.Context, userID, entryID 
 
 func (f *fakeRepository) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
 	return f.updateTransaction(ctx, userID, txnID, txnType, quantity, price, currency, fees, transactionDate, notes)
+}
+
+func (f *fakeRepository) DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID) error {
+	return f.deleteTransaction(ctx, userID, txnID)
 }
 
 func (f *fakeRepository) ImportEntryTransactions(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []ImportTransactionRow) (int, error) {

@@ -52,13 +52,17 @@ func (s *Service) RefreshPublicRates(ctx context.Context) ([]ExchangeRate, error
 		return nil, ErrPublicRatesUnavailable
 	}
 
-	published, err := s.publicRates.FetchRates(ctx)
-	if err != nil {
-		return nil, err
+	// A partial fetch comes back as rates *and* an error: the source is several
+	// feeds read as one (marketdata.PublicRateSources), and one of them being
+	// down is no reason to drop the pairs the others published. Only an empty
+	// result is a failed refresh.
+	published, fetchErr := s.publicRates.FetchRates(ctx)
+	if len(published) == 0 {
+		return nil, fetchErr
 	}
 
 	stored := make([]ExchangeRate, 0, len(published))
-	var errs []error
+	errs := []error{fetchErr}
 
 	for _, pr := range published {
 		rate, err := s.storePublicRate(ctx, pr)

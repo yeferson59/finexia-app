@@ -2,7 +2,11 @@ import * as portfolio from '$lib/api/portfolio';
 import * as transactions from '$lib/api/transactions';
 import type { PageServerLoad, Actions } from './$types';
 import type { Holding, Transaction } from '$lib/api/types';
-import { transactionCreateSchema, transactionUpdateSchema } from '$lib/features/portfolio';
+import {
+	transactionCreateSchema,
+	transactionDeleteSchema,
+	transactionUpdateSchema
+} from '$lib/features/portfolio';
 
 export interface TxnMeta {
 	total: number;
@@ -32,14 +36,21 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 			entries: [] as Holding[],
 			transactions: [] as Transaction[],
 			portfolioTotalValue: 0,
+			baseCurrency: 'USD',
 			txnMeta: DEFAULT_META
 		};
 	}
 
 	const allHoldings: Holding[] = response.data.holdings ?? [];
 	const entries = allHoldings.filter((h) => h.ticker === params.symbol);
+	const baseCurrency = response.data.baseCurrency?.trim() || 'USD';
 
+	// El denominador de la asignación se suma en moneda base; hacerlo con los
+	// precios nativos mezclaba EUR con USD y daba porcentajes imposibles.
 	const portfolioTotalValue = allHoldings.reduce((sum, h) => {
+		if (h.marketValueBase !== undefined && h.marketValueBase !== '') {
+			return sum + (parseFloat(h.marketValueBase) || 0);
+		}
 		const qty = parseFloat(h.quantity) || 0;
 		const mp = parseFloat(h.marketPrice) || parseFloat(h.price) || 0;
 		return sum + qty * mp;
@@ -57,7 +68,7 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 			}
 		: DEFAULT_META;
 
-	return { entries, transactions: transactionsList, portfolioTotalValue, txnMeta };
+	return { entries, transactions: transactionsList, portfolioTotalValue, baseCurrency, txnMeta };
 };
 
 export const actions: Actions = {
@@ -129,5 +140,27 @@ export const actions: Actions = {
 		}
 
 		return { success: response.success, edited: true };
+	},
+
+	// Borrar una transacción deja la posición recalculada por la base (en 0 si
+	// era la última), así que basta con recargar la página al volver.
+	deleteTransaction: async ({ request, fetch, cookies }) => {
+		const formData = await request.formData();
+
+		const { success, error, data } = await transactionDeleteSchema.safeParseAsync({
+			txnId: formData.get('txnId')
+		});
+
+		if (!success) {
+			return { success: false, deleted: true, error: error.message };
+		}
+
+		const response = await transactions.deleteTransaction({ cookies, fetch }, data.txnId);
+
+		if (!response.ok) {
+			return { success: false, deleted: true, error: response.message ?? response.action };
+		}
+
+		return { success: response.success, deleted: true };
 	}
 };

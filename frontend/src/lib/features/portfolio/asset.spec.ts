@@ -55,6 +55,59 @@ describe('computePosition', () => {
 		// sin valor total de portafolio no se puede calcular asignación
 		expect(position?.allocation).toBe(0);
 	});
+
+	// El caso que motivó el cambio: activo en EUR dentro de un portafolio en
+	// USD. Los totales y el ROI salen de los importes convertidos; el promedio
+	// y el precio de mercado siguen siendo por unidad y en su moneda.
+	it('keeps unit prices native and totals in the base currency', () => {
+		const position = computePosition(
+			[
+				holding({
+					ticker: 'MC.FR',
+					currency: 'EUR',
+					costCurrency: 'EUR',
+					quantity: '2',
+					price: '100',
+					marketPrice: '110',
+					costBasisBase: '220',
+					marketValueBase: '242',
+					fxConverted: true
+				})
+			],
+			1000,
+			'USD'
+		);
+
+		expect(position?.averageCost).toBe(100);
+		expect(position?.marketPrice).toBe(110);
+		expect(position?.totalCost).toBe(220);
+		expect(position?.totalValue).toBe(242);
+		expect(position?.gainLoss).toBe(22);
+		expect(position?.gainLossPercent).toBeCloseTo(10, 6);
+		expect(position?.allocation).toBeCloseTo(24.2, 6);
+		expect(position?.baseCurrency).toBe('USD');
+		expect(position?.currency).toBe('EUR');
+	});
+
+	it('reports the position as unconverted when a rate was missing', () => {
+		const position = computePosition(
+			[holding({ costBasisBase: '200', marketValueBase: '220', fxConverted: false })],
+			1000,
+			'USD'
+		);
+
+		expect(position?.fxConverted).toBe(false);
+	});
+
+	// Sin los campos (backend anterior) se vuelve al cálculo nativo y no se
+	// marca nada: no hay evidencia de que falte ninguna tasa.
+	it('falls back to the native totals when the base amounts are absent', () => {
+		const position = computePosition([holding({ quantity: '10', price: '100' })], 1000, 'USD');
+
+		expect(position?.totalCost).toBe(1000);
+		expect(position?.totalValue).toBe(1500);
+		expect(position?.fxConverted).toBe(true);
+	});
 });
 
 describe('txnModeFor', () => {

@@ -50,7 +50,16 @@ export const ASSET_TYPE_COLORS: Record<string, string> = {
  */
 export type RawHolding = Pick<
 	Holding,
-	'ticker' | 'name' | 'assetType' | 'quantity' | 'price' | 'marketPrice'
+	| 'ticker'
+	| 'name'
+	| 'assetType'
+	| 'quantity'
+	| 'price'
+	| 'marketPrice'
+	| 'currency'
+	| 'costBasisBase'
+	| 'marketValueBase'
+	| 'fxConverted'
 >;
 
 /** Holding agregado por ticker, listo para pintar. */
@@ -59,12 +68,33 @@ export interface HoldingView {
 	name: string;
 	assetType: string;
 	quantity: number;
+	/** Precio de mercado por unidad, en la moneda del activo (`currency`). */
 	marketPrice: number;
+	currency: string;
+	/** Coste y valor en la moneda base del portafolio: sumables entre filas. */
 	costBasis: number;
 	value: number;
 	gainLoss: number;
 	gainLossPct: number;
 	allocation: number;
+	/**
+	 * `false` si alguna de las posiciones agrupadas no pudo convertirse por
+	 * falta de tasa: sus importes están en su moneda nativa y el total que las
+	 * incluya mezcla monedas.
+	 */
+	fxConverted: boolean;
+}
+
+/**
+ * Importe en moneda base que envía el backend, con vuelta al cálculo nativo
+ * (`cantidad × precio`) cuando el campo no viene. Solo coinciden si la posición
+ * ya estaba en la moneda base; en cualquier otro caso el fallback es la mezcla
+ * de monedas que estos campos vinieron a resolver, y `fxConverted` lo delata.
+ */
+function baseAmount(raw: string | undefined, nativeFallback: number): number {
+	if (raw === undefined || raw === '') return nativeFallback;
+	const parsed = parseFloat(raw);
+	return Number.isFinite(parsed) ? parsed : nativeFallback;
 }
 
 export interface TypeBreakdownSlice {
@@ -91,8 +121,14 @@ export function groupHoldings(list: RawHolding[]): HoldingView[] {
 		const quantity = parseFloat(h.quantity) || 0;
 		const costPrice = parseFloat(h.price) || 0;
 		const marketPrice = parseFloat(h.marketPrice) || costPrice;
-		const costBasis = quantity * costPrice;
-		const value = quantity * marketPrice;
+		// Los totales se toman convertidos: sumar `cantidad × precio` de una
+		// posición en EUR con una en USD da un número sin significado.
+		const costBasis = baseAmount(h.costBasisBase, quantity * costPrice);
+		const value = baseAmount(h.marketValueBase, quantity * marketPrice);
+		// Ausente (backend anterior) no es lo mismo que `false`: solo se avisa
+		// cuando el backend afirma que faltó la tasa, para no marcar como
+		// sospechoso un portafolio de una sola moneda.
+		const fxConverted = h.fxConverted ?? true;
 
 		const existing = grouped[h.ticker];
 		if (existing) {
@@ -102,6 +138,7 @@ export function groupHoldings(list: RawHolding[]): HoldingView[] {
 			existing.gainLoss = existing.value - existing.costBasis;
 			existing.gainLossPct =
 				existing.costBasis > 0 ? (existing.gainLoss / existing.costBasis) * 100 : 0;
+			existing.fxConverted &&= fxConverted;
 		} else {
 			grouped[h.ticker] = {
 				symbol: h.ticker,
@@ -109,11 +146,13 @@ export function groupHoldings(list: RawHolding[]): HoldingView[] {
 				assetType: h.assetType,
 				quantity,
 				marketPrice,
+				currency: h.currency,
 				costBasis,
 				value,
 				gainLoss: value - costBasis,
 				gainLossPct: costBasis > 0 ? ((value - costBasis) / costBasis) * 100 : 0,
-				allocation: 0
+				allocation: 0,
+				fxConverted
 			};
 		}
 	}

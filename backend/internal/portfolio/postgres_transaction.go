@@ -314,6 +314,34 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 	return txn, nil
 }
 
+// DeleteTransaction removes one transaction the caller owns. The position it
+// belonged to is left in place with quantity 0 if it was the last one:
+// trg_recalculate_avg_cost (migration 000023) recomputes the entry from what
+// remains, so nothing here has to touch portfolio_entries.
+//
+// Ownership is enforced in the WHERE clause rather than by a prior read, so a
+// transaction id belonging to somebody else is indistinguishable from one that
+// does not exist — both delete no rows and answer 404.
+func (r *PostgresRepository) DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID) error {
+	tag, err := r.db.Exec(ctx, `
+		DELETE FROM transactions
+		WHERE id = $1
+		  AND entry_id IN (
+			SELECT pe.id FROM portfolio_entries pe
+			JOIN portfolios p ON p.id = pe.portfolio_id
+			WHERE p.user_id = $2
+		  )
+	`, txnID, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrTransactionNotFound
+	}
+
+	return nil
+}
+
 // ImportEntryTransactions persists a batch of validated spreadsheet rows in a
 // single database transaction: each row resolves (or creates) its asset,
 // upserts the portfolio position and inserts the transaction, so a mid-batch
