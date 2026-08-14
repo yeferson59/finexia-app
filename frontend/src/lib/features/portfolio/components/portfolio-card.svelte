@@ -74,8 +74,8 @@
 	{#if unconverted > 0}
 		<p class="fx-note">
 			{unconverted}
-			{unconverted === 1 ? 'posición sin tasa' : 'posiciones sin tasa'} de cambio: el valor suma
-			monedas distintas.
+			{unconverted === 1 ? 'posición sin tasa' : 'posiciones sin tasa'} de cambio: el valor suma monedas
+			distintas.
 		</p>
 	{/if}
 
