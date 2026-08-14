@@ -330,6 +330,14 @@ type Snapshot struct {
 type AllocationItem struct {
 	Category    EntryCategory `json:"category"`
 	MarketValue string        `json:"marketValue"`
+	// Currency is what MarketValue is expressed in — the caller's requested
+	// display currency, or their stored preference. Every category in one
+	// response carries the same one: that is what makes the shares add up.
+	Currency string `json:"currency"`
+	// PositionsUnconverted counts the positions in this category that had no
+	// rate to Currency. They are included at face value, so a non-zero count
+	// means this category's total mixes currencies.
+	PositionsUnconverted int64 `json:"positionsUnconverted"`
 }
 
 // PlatformStats is the result of joining investment_sources with portfolio_entries stats.

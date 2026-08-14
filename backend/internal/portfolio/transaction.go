@@ -48,8 +48,10 @@ func (s *Service) GetRecentUserTransactions(ctx context.Context, userID uuid.UUI
 	return s.repo.GetRecentTransactionsByUserID(ctx, userID, limit)
 }
 
-func (s *Service) GetAssetAllocation(ctx context.Context, userID uuid.UUID) ([]AllocationItem, error) {
-	return s.repo.GetAssetAllocationByUserID(ctx, userID)
+// GetAssetAllocation totals the user's holdings per category in one currency.
+// An empty targetCurrency reports in the user's stored preference.
+func (s *Service) GetAssetAllocation(ctx context.Context, userID uuid.UUID, targetCurrency string) ([]AllocationItem, error) {
+	return s.repo.GetAssetAllocationByUserID(ctx, userID, targetCurrency)
 }
 
 func (s *Service) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {

@@ -481,20 +481,59 @@ func TestHandlerTransactions(t *testing.T) {
 
 func TestHandlerGetAssetAllocation(t *testing.T) {
 	userID := uuid.New()
-	repo := new(fakeRepository{
-		getAssetAllocationByUserID: func(_ context.Context, uid uuid.UUID) ([]AllocationItem, error) {
-			if uid != userID {
-				t.Errorf("userID = %s, want %s", uid, userID)
-			}
-			return []AllocationItem{{Category: EntryCategory("stocks"), MarketValue: "1000"}}, nil
-		},
-	})
-	app := newTestModule(t, repo, userID, "user")
 
-	resp := do(t, app, http.MethodGet, "/portfolios/allocation")
-	if resp.StatusCode != fiber.StatusOK {
-		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	newApp := func(t *testing.T, gotCurrency *string) *fiber.App {
+		t.Helper()
+		repo := new(fakeRepository{
+			getAssetAllocationByUserID: func(_ context.Context, uid uuid.UUID, currency string) ([]AllocationItem, error) {
+				if uid != userID {
+					t.Errorf("userID = %s, want %s", uid, userID)
+				}
+				*gotCurrency = currency
+
+				return []AllocationItem{{Category: EntryCategory("stocks"), MarketValue: "1000", Currency: "USD"}}, nil
+			},
+		})
+
+		return newTestModule(t, repo, userID, "user")
 	}
+
+	// Omitted means "the user's own preference", resolved further down. The
+	// handler must pass the absence through rather than pick a currency here.
+	t.Run("passes no currency through when none is asked for", func(t *testing.T) {
+		var gotCurrency string
+
+		resp := do(t, newApp(t, &gotCurrency), http.MethodGet, "/portfolios/allocation")
+		if resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		if gotCurrency != "" {
+			t.Errorf("currency = %q, want it left empty", gotCurrency)
+		}
+	})
+
+	t.Run("normalises the requested currency", func(t *testing.T) {
+		var gotCurrency string
+
+		resp := do(t, newApp(t, &gotCurrency), http.MethodGet, "/portfolios/allocation?currency=cop")
+		if resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		if gotCurrency != "COP" {
+			t.Errorf("currency = %q, want COP", gotCurrency)
+		}
+	})
+
+	// Same rule as the summary's ?currency=: an unsupported code is rejected
+	// rather than silently ignored, which would answer in another currency.
+	t.Run("rejects an unsupported currency", func(t *testing.T) {
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
+
+		resp := do(t, app, http.MethodGet, "/portfolios/allocation?currency=JPY")
+		if resp.StatusCode != fiber.StatusBadRequest {
+			t.Fatalf("status = %d, want 400", resp.StatusCode)
+		}
+	})
 }
 
 func TestHandlerGetPortfolioGrowth(t *testing.T) {

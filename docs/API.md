@@ -200,7 +200,7 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 | GET | `/portfolios/transactions` | usuario | Transacciones recientes |
 | POST | `/portfolios/transactions/import/preview` | usuario | Preview del import (multipart `file`, `sheet`, `mapping`, `defaults`) |
 | POST | `/portfolios/transactions/import` | usuario | Import masivo (además `portfolioId`, `sourceId`; `mapping` obligatorio) |
-| GET | `/portfolios/allocation` | usuario | Asignación de activos |
+| GET | `/portfolios/allocation` | usuario | Asignación de activos por categoría (soporta `?currency=`) |
 | POST | `/portfolios` | usuario | Crea portfolio |
 | POST | `/portfolios/sources` | usuario | Crea plataforma/fuente |
 | POST | `/portfolios/entries` | usuario | Crea posición (entry) |
@@ -269,6 +269,19 @@ aplicación (`GetConversionRate`): tasa propia antes que compartida, inversa si
 solo se guardó la dirección contraria, y salto por USD si no hay par directo.
 Dos capas con la misma regla evitan el caso más confuso — un aviso en una
 pantalla contradiciendo un total en otra.
+
+#### Moneda de la asignación
+
+`GET /portfolios/allocation` suma por categoría **todos** los portfolios del
+usuario, que pueden estar denominados en monedas distintas, así que siempre
+responde convertido: `?currency=` acepta lo mismo que el resumen (`USD`, `COP`)
+y, si se omite, se usa la moneda preferida de la cuenta. No hay modo «sin
+convertir» — un reparto porcentual sobre una suma de euros y dólares no
+significa nada, que es lo que devolvía antes.
+
+Cada elemento lleva `currency` —la misma para todos, que es lo que hace
+comparables los `percent`— y `positionsUnconverted`, con el mismo significado
+que en el resumen: posiciones incluidas a valor nominal por no haber tasa.
 
 #### Moneda de los holdings
 

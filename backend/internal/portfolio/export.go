@@ -20,7 +20,9 @@ func (h *handler) ExportSummary(c fiber.Ctx) error {
 		return httpx.FromDomain(c, err, "Error generating report", "Could not retrieve portfolio data")
 	}
 
-	allocationItems, err := h.service.GetAssetAllocation(c, userID)
+	// No currency asked for: the spreadsheet reports in the user's own
+	// preference, the same default the allocation endpoint applies.
+	allocationItems, err := h.service.GetAssetAllocation(c, userID, "")
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error generating report", "Could not retrieve allocation data")
 	}

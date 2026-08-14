@@ -83,20 +83,61 @@ func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, 
 	return txns, nil
 }
 
-func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, userID uuid.UUID) ([]AllocationItem, error) {
+// GetAssetAllocationByUserID totals what the user holds per category, in one
+// currency. The allocation spans every portfolio they own, and those can be
+// denominated differently, so without conversion the shares were computed from
+// a sum of euros and dollars — a percentage of nothing.
+//
+// targetCurrency is the currency to report in; empty means the user's own
+// preference, which is the account-level answer to the same question and what
+// the dashboard falls back to. Conversion goes through fx_rate (migration
+// 000024), the same resolution the rest of the app uses: the user's own rate,
+// then the shared one, inverted or hopped through USD as needed.
+//
+// A position with no rate is still counted, at face value, and reported in
+// PositionsUnconverted — the same choice the summary and the holdings make.
+// Dropping it would understate the category; hiding that it was not converted
+// is what this is fixing.
+func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, userID uuid.UUID, targetCurrency string) ([]AllocationItem, error) {
+	// The sum is rounded to the scale every money column here keeps. Postgres
+	// adds the scales of what it multiplies, so quantity × price × rate reaches
+	// thirty-odd decimals, and the decimal engine that parses this text back in
+	// NewAllocationResponse caps at nineteen: past it the value read as zero and
+	// the category's share silently collapsed.
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			pe.category,
-			COALESCE(SUM(pe.quantity::numeric * COALESCE(uap.price::numeric, a.current_price::numeric, pe.price::numeric)), 0)::text AS market_value
+			ROUND(COALESCE(SUM(pe.quantity::numeric * v.price * COALESCE(fx.rate, 1)), 0), 8)::text AS market_value,
+			target.code,
+			COUNT(DISTINCT pe.asset_id) FILTER (WHERE fx.rate IS NULL)::bigint AS positions_unconverted
 		FROM portfolio_entries pe
 		JOIN portfolios p ON p.id = pe.portfolio_id
-		JOIN assets a ON a.id = pe.asset_id
+		JOIN users u      ON u.id = p.user_id
+		JOIN assets a     ON a.id = pe.asset_id
 		LEFT JOIN user_asset_prices uap ON uap.asset_id = a.id AND uap.user_id = p.user_id
+		CROSS JOIN LATERAL (
+			SELECT COALESCE(NULLIF($2::text, ''), u.preferred_currency) AS code
+		) target
+		-- The price and the currency it is quoted in have to be chosen together:
+		-- a position with no market price is carried at cost, and that amount is
+		-- in the cost currency, not in the asset's.
+		CROSS JOIN LATERAL (
+			SELECT
+				COALESCE(uap.price::numeric, a.current_price::numeric, pe.price::numeric) AS price,
+				CASE
+					WHEN COALESCE(uap.price, a.current_price) IS NOT NULL
+						THEN COALESCE(a.currency, pe.cost_currency)
+					ELSE pe.cost_currency
+				END AS currency
+		) v
+		CROSS JOIN LATERAL (
+			SELECT fx_rate(p.user_id, v.currency, target.code) AS rate
+		) fx
 		WHERE p.user_id = $1
 		  AND pe.quantity::numeric > 0
-		GROUP BY pe.category
-		ORDER BY COALESCE(SUM(pe.quantity::numeric * COALESCE(uap.price::numeric, a.current_price::numeric, pe.price::numeric)), 0) DESC
-	`, userID)
+		GROUP BY pe.category, target.code
+		ORDER BY ROUND(COALESCE(SUM(pe.quantity::numeric * v.price * COALESCE(fx.rate, 1)), 0), 8) DESC
+	`, userID, targetCurrency)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +146,7 @@ func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, use
 	result := make([]AllocationItem, 0)
 	for rows.Next() {
 		var item AllocationItem
-		if err := rows.Scan(&item.Category, &item.MarketValue); err != nil {
+		if err := rows.Scan(&item.Category, &item.MarketValue, &item.Currency, &item.PositionsUnconverted); err != nil {
 			return nil, err
 		}
 		result = append(result, item)

@@ -575,13 +575,13 @@ func TestTransactionQueries(t *testing.T) {
 
 	t.Run("GetAssetAllocation", func(t *testing.T) {
 		repo := new(fakeRepository{
-			getAssetAllocationByUserID: func(context.Context, uuid.UUID) ([]AllocationItem, error) {
+			getAssetAllocationByUserID: func(context.Context, uuid.UUID, string) ([]AllocationItem, error) {
 				return []AllocationItem{{Category: Stocks, MarketValue: "750.00"}}, nil
 			},
 		})
 		svc := newTestServices(repo, newMemStorage())
 
-		got, err := svc.GetAssetAllocation(context.Background(), userID)
+		got, err := svc.GetAssetAllocation(context.Background(), userID, "")
 		if err != nil || len(got) != 1 || got[0].Category != Stocks {
 			t.Fatalf("GetAssetAllocation = %+v, %v", got, err)
 		}

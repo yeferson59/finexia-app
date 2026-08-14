@@ -123,7 +123,12 @@ export const riskSchema = z.object({
 export const allocationItemSchema = z.object({
 	category: z.string(),
 	marketValue: z.string(),
-	percent: z.number()
+	percent: z.number(),
+	// Moneda en la que están todos los `marketValue` de la respuesta, y
+	// posiciones de esta categoría que no pudieron convertirse a ella.
+	// Opcionales para tolerar un backend anterior.
+	currency: z.string().optional(),
+	positionsUnconverted: z.number().optional()
 });
 
 /** Mayor transacción de un portfolio (`GET /portfolios/:id/top-transaction`). */

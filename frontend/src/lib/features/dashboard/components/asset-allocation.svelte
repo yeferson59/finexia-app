@@ -12,6 +12,7 @@
 	import CardHeader from '$lib/ui/card-header.svelte';
 	import EmptyState from '$lib/ui/empty-state.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
+	import { formatCurrency } from '$lib/shared/format/money';
 	import { buildSlices, toAssetEntries } from '../dashboard';
 	import type { AllocationItem } from '$lib/api/types';
 
@@ -34,14 +35,19 @@
 	const totalValue = $derived(assets.reduce((acc, asset) => acc + asset.value, 0));
 	const active = $derived(assets.find((asset) => asset.name === activeName) ?? null);
 
+	// Todas las categorías vienen en la misma moneda —es lo que hace que los
+	// porcentajes signifiquen algo—, así que basta con leerla de la primera.
+	const currency = $derived(allocation[0]?.currency ?? 'USD');
+
+	// Posiciones que el backend no pudo convertir a esa moneda: siguen sumadas
+	// con su importe nativo, así que el reparto de abajo mezcla monedas y hay
+	// que decirlo en vez de presentarlo como un porcentaje limpio.
+	const unconverted = $derived(
+		allocation.reduce((acc, item) => acc + (item.positionsUnconverted ?? 0), 0)
+	);
+
 	function fmtMoney(value: number): string {
-		return privacy.money(
-			'$' +
-				new Intl.NumberFormat('es-CO', {
-					minimumFractionDigits: 2,
-					maximumFractionDigits: 2
-				}).format(value)
-		);
+		return privacy.money(formatCurrency(value, currency));
 	}
 
 	function fmtPct(value: number): string {
@@ -138,6 +144,14 @@
 			<span>Total repartido</span>
 			<b>{fmtMoney(totalValue)}</b>
 		</p>
+
+		{#if unconverted > 0}
+			<p class="fx-note">
+				{unconverted}
+				{unconverted === 1 ? 'posición sin tasa' : 'posiciones sin tasa'} de cambio a {currency}: su
+				importe va sin convertir, así que el reparto mezcla monedas.
+			</p>
+		{/if}
 	{/if}
 
 	<div class="card-footer">
@@ -146,6 +160,17 @@
 </div>
 
 <style>
+	.fx-note {
+		margin: 0.5rem 0 0;
+		padding: 0.5rem 0.7rem;
+		border: 1px solid rgba(212, 145, 42, 0.3);
+		border-radius: 8px;
+		background: rgba(212, 145, 42, 0.08);
+		color: rgba(236, 234, 229, 0.75);
+		font-size: 0.78rem;
+		line-height: 1.4;
+	}
+
 	.asset-card {
 		background: var(--surface);
 		border: 1px solid var(--border-strong);

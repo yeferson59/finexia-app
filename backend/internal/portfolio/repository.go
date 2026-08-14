@@ -70,7 +70,7 @@ type TransactionStore interface {
 	CountAssetTransactions(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error)
 	GetAssetTransactionsPaginated(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, limit, offset int) ([]Transaction, error)
 	GetRecentTransactionsByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]Transaction, error)
-	GetAssetAllocationByUserID(ctx context.Context, userID uuid.UUID) ([]AllocationItem, error)
+	GetAssetAllocationByUserID(ctx context.Context, userID uuid.UUID, targetCurrency string) ([]AllocationItem, error)
 	CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
 	UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
 	DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID) error

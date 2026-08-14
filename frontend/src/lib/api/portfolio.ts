@@ -42,8 +42,15 @@ export function getRisks(event: ApiEvent): Promise<ApiResult<Risk[]>> {
 }
 
 /** `GET /portfolios/allocation` — asignación por categoría de activo. */
-export function getAllocation(event: ApiEvent): Promise<ApiResult<AllocationItem[]>> {
-	return apiRequestSafe(event, '/portfolios/allocation', {}, z.array(allocationItemSchema));
+export function getAllocation(
+	event: ApiEvent,
+	currency?: string
+): Promise<ApiResult<AllocationItem[]>> {
+	// Sin `currency` el backend responde en la preferencia del usuario; el
+	// dashboard manda la suya para que el donut y los totales de al lado estén
+	// en la misma moneda.
+	const query = currency ? `?currency=${encodeURIComponent(currency)}` : '';
+	return apiRequestSafe(event, `/portfolios/allocation${query}`, {}, z.array(allocationItemSchema));
 }
 
 /** `GET /portfolios/growth` — crecimiento agregado (soporta `since`/`period`). */

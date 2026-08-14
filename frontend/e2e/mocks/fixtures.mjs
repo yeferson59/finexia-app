@@ -195,7 +195,11 @@ export const allocation = (() => {
 		.map(([category, value]) => ({
 			category,
 			marketValue: money(value),
-			percent: Number(((value / TOTAL_VALUE) * 100).toFixed(2))
+			percent: Number(((value / TOTAL_VALUE) * 100).toFixed(2)),
+			// El backend responde el reparto en una sola moneda y dice cuál es;
+			// aquí todo está en USD, así que no hay nada sin convertir.
+			currency: 'USD',
+			positionsUnconverted: 0
 		}));
 })();
 

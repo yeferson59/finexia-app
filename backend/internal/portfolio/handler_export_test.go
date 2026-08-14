@@ -62,7 +62,7 @@ func TestHandlerExportSummary(t *testing.T) {
 				TotalGainLoss: "100", TotalGainLossPct: "11.11",
 			}}, nil
 		},
-		getAssetAllocationByUserID: func(context.Context, uuid.UUID) ([]AllocationItem, error) {
+		getAssetAllocationByUserID: func(context.Context, uuid.UUID, string) ([]AllocationItem, error) {
 			return []AllocationItem{{Category: Stocks, MarketValue: "1000"}}, nil
 		},
 	})

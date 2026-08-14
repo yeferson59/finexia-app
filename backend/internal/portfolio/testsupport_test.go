@@ -135,7 +135,7 @@ type fakeRepository struct {
 	countAssetTransactions          func(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error)
 	getAssetTransactionsPaginated   func(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, limit, offset int) ([]Transaction, error)
 	getRecentTransactionsByUserID   func(ctx context.Context, userID uuid.UUID, limit int) ([]Transaction, error)
-	getAssetAllocationByUserID      func(ctx context.Context, userID uuid.UUID) ([]AllocationItem, error)
+	getAssetAllocationByUserID      func(ctx context.Context, userID uuid.UUID, targetCurrency string) ([]AllocationItem, error)
 	createTransaction               func(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
 	updateTransaction               func(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
 	deleteTransaction               func(ctx context.Context, userID, txnID uuid.UUID) error
@@ -229,8 +229,8 @@ func (f *fakeRepository) GetRecentTransactionsByUserID(ctx context.Context, user
 	return f.getRecentTransactionsByUserID(ctx, userID, limit)
 }
 
-func (f *fakeRepository) GetAssetAllocationByUserID(ctx context.Context, userID uuid.UUID) ([]AllocationItem, error) {
-	return f.getAssetAllocationByUserID(ctx, userID)
+func (f *fakeRepository) GetAssetAllocationByUserID(ctx context.Context, userID uuid.UUID, targetCurrency string) ([]AllocationItem, error) {
+	return f.getAssetAllocationByUserID(ctx, userID, targetCurrency)
 }
 
 func (f *fakeRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {

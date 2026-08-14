@@ -76,7 +76,18 @@ func (h *handler) GetAssetAllocation(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	items, err := h.service.GetAssetAllocation(c, userID)
+	// Same contract as the summary's ?currency=, because the dashboard shows
+	// the two side by side and a donut in dollars beside totals in pesos is a
+	// worse answer than either. Omitted falls back to the user's stored
+	// preference rather than to no conversion at all: these categories are
+	// summed across portfolios that may be denominated differently, so there is
+	// no such thing as an unconverted total here.
+	currency := strings.ToUpper(strings.TrimSpace(c.Query("currency")))
+	if currency != "" && !IsSupportedDisplayCurrency(currency) {
+		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+strings.Join(SupportedDisplayCurrencies, ", "))
+	}
+
+	items, err := h.service.GetAssetAllocation(c, userID, currency)
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error retrieving asset allocation", "Could not retrieve asset allocation")
 	}

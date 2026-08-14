@@ -28,7 +28,7 @@ export const load: PageServerLoad = async ({ cookies, fetch, url }) => {
 		await Promise.all([
 			transactions.getRecent(event),
 			portfolio.getSummaries(event, currency),
-			portfolio.getAllocation(event),
+			portfolio.getAllocation(event, currency),
 			portfolio.getAggregateGrowth(event),
 			market.getMarketCredentials(event),
 			market.getLatestExchangeRates(event)

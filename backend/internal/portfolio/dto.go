@@ -156,6 +156,13 @@ type AllocationItemDTO struct {
 	Category    string  `json:"category"`
 	MarketValue string  `json:"marketValue"`
 	Percent     float64 `json:"percent"`
+	// Currency is what MarketValue is in — the same for every item, which is
+	// what makes Percent meaningful.
+	Currency string `json:"currency"`
+	// PositionsUnconverted counts the positions in this category that had no
+	// rate to Currency and are therefore included at face value. Non-zero means
+	// this slice, and the share computed from it, mix currencies.
+	PositionsUnconverted int64 `json:"positionsUnconverted"`
 }
 
 // NewAllocationResponse turns each category's market value into its share of
@@ -189,9 +196,11 @@ func NewAllocationResponse(items []AllocationItem) []AllocationItemDTO {
 			}
 		}
 		result = append(result, AllocationItemDTO{
-			Category:    string(item.Category),
-			MarketValue: item.MarketValue,
-			Percent:     pct,
+			Category:             string(item.Category),
+			MarketValue:          item.MarketValue,
+			Percent:              pct,
+			Currency:             item.Currency,
+			PositionsUnconverted: item.PositionsUnconverted,
 		})
 	}
 	return result
