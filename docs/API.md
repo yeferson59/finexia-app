@@ -252,6 +252,24 @@ agregado por portfolio: `positionsPricedOwn`, `positionsPricedManual` y
 avisar de que un total solo está parcialmente valorado a mercado. No son
 importes: `?currency=` convierte los totales y deja estos tres intactos.
 
+Junto a ellos viaja `positionsUnconverted`, que cuenta las posiciones cuyos
+importes **no** están en `baseCurrency` porque ninguna tasa conectaba su moneda
+con ella. Siguen sumadas en los totales con su importe nativo —descartarlas
+subestimaría el portfolio, y es la misma decisión que toma `fxConverted` en los
+holdings—, así que un valor > 0 significa que `totalCostBase` y
+`totalMarketValue` están sumando monedas distintas y hay que decirlo en pantalla
+en vez de presentarlos como comparables. No particiona los otros tres: una
+posición puede estar valorada con la clave de su dueño y aun así sin convertir.
+
+Hasta la migración 000024 esto no se podía saber: cuando faltaba la tasa la
+vista multiplicaba por **1**, de modo que el resumen afirmaba en silencio que un
+euro es un dólar. Esa migración también sustituye las búsquedas de tasa en línea
+por la función SQL `fx_rate()`, que resuelve el par con la misma regla que la
+aplicación (`GetConversionRate`): tasa propia antes que compartida, inversa si
+solo se guardó la dirección contraria, y salto por USD si no hay par directo.
+Dos capas con la misma regla evitan el caso más confuso — un aviso en una
+pantalla contradiciendo un total en otra.
+
 #### Moneda de los holdings
 
 Una posición arrastra hasta tres monedas: la base del portfolio, la de coste

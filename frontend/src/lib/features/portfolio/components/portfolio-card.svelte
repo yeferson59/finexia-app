@@ -21,6 +21,11 @@
 	const marketValue = $derived(parseFloat(portfolio.totalMarketValue) || 0);
 	const gainLoss = $derived(parseFloat(portfolio.totalGainLoss) || 0);
 	const gainLossPct = $derived(parseFloat(portfolio.totalGainLossPct) || 0);
+
+	// Posiciones que el backend no pudo convertir: siguen contando en el valor
+	// de arriba con su importe nativo, así que el total mezcla monedas y hay
+	// que decirlo en la tarjeta en vez de dejarlo pasar por comparable.
+	const unconverted = $derived(portfolio.positionsUnconverted ?? 0);
 </script>
 
 <button
@@ -65,6 +70,14 @@
 			<p class="value {gainLoss >= 0 ? 'positive' : 'negative'}">{formatPct(gainLossPct)}</p>
 		</div>
 	</div>
+
+	{#if unconverted > 0}
+		<p class="fx-note">
+			{unconverted}
+			{unconverted === 1 ? 'posición sin tasa' : 'posiciones sin tasa'} de cambio: el valor suma
+			monedas distintas.
+		</p>
+	{/if}
 
 	<ProgressBar
 		value={allocation}
@@ -160,6 +173,17 @@
 
 	.metric .value.negative {
 		color: var(--red);
+	}
+
+	.fx-note {
+		margin: 0;
+		padding: 0.5rem 0.7rem;
+		border: 1px solid rgba(212, 145, 42, 0.3);
+		border-radius: 8px;
+		background: rgba(212, 145, 42, 0.08);
+		color: rgba(236, 234, 229, 0.75);
+		font-size: 0.78rem;
+		line-height: 1.4;
 	}
 
 	.card-header-right {

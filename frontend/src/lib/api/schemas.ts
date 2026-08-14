@@ -61,7 +61,11 @@ export const portfolioSummarySchema = z.object({
 	totalMarketValue: z.string(),
 	totalGainLoss: z.string(),
 	totalGainLossPct: z.string(),
-	createdAt: z.string().optional()
+	createdAt: z.string().optional(),
+	// Posiciones cuyos importes no están en la moneda base porque no había
+	// tasa: siguen sumadas en los totales, así que un valor > 0 significa que
+	// los totales mezclan monedas. Opcional para tolerar un backend anterior.
+	positionsUnconverted: z.number().optional()
 });
 
 /** Posición dentro de un portfolio (holdings de `GET /portfolios/:id`). */

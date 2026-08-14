@@ -177,6 +177,9 @@ export const portfolioSummary = (displayCurrency = 'USD') =>
 			totalMarketValue: money(value),
 			totalGainLoss: money(gain),
 			totalGainLossPct: (cost > 0 ? (gain / cost) * 100 : 0).toFixed(2),
+			// Todas las posiciones del fixture están en USD, la moneda base, así
+			// que no hay ninguna que convertir ni de la que avisar.
+			positionsUnconverted: 0,
 			createdAt: NOW
 		};
 	});

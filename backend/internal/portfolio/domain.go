@@ -373,6 +373,13 @@ type SummaryView struct {
 	PositionsPricedOwn    int64 `json:"positionsPricedOwn"`
 	PositionsPricedManual int64 `json:"positionsPricedManual"`
 	PositionsAtCost       int64 `json:"positionsAtCost"`
+	// PositionsUnconverted counts the positions whose amounts are not in
+	// BaseCurrency because no rate connected their currency to it. They are
+	// still included in the totals at face value, so a non-zero count means
+	// those totals add different currencies together — a client has to say so
+	// rather than present them as comparable. It cuts across the three counts
+	// above: a position can be priced by its owner's key and still unconverted.
+	PositionsUnconverted int64 `json:"positionsUnconverted"`
 }
 
 type SnapshotRow struct {

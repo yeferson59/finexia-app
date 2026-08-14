@@ -106,6 +106,7 @@ func TestSummaryCountsSurviveCurrencyConversion(t *testing.T) {
 				PositionsPricedOwn:    6,
 				PositionsPricedManual: 3,
 				PositionsAtCost:       1,
+				PositionsUnconverted:  2,
 			}}, nil
 		},
 		getUserExchangeRateByPair: func(_ context.Context, _ uuid.UUID, from, to string) (decimal.Decimal, error) {
@@ -140,5 +141,12 @@ func TestSummaryCountsSurviveCurrencyConversion(t *testing.T) {
 	// They partition the positions, so a client can trust the arithmetic.
 	if sum := summary.PositionsPricedOwn + summary.PositionsPricedManual + summary.PositionsAtCost; sum != summary.TotalPositions {
 		t.Errorf("counts sum to %d, want totalPositions = %d", sum, summary.TotalPositions)
+	}
+
+	// The unconverted count is a count too, and it cuts across the three above
+	// rather than partitioning anything: converting the display currency must
+	// leave it exactly as the view reported it.
+	if summary.PositionsUnconverted != 2 {
+		t.Errorf("positionsUnconverted = %d, want 2 unchanged by conversion", summary.PositionsUnconverted)
 	}
 }
