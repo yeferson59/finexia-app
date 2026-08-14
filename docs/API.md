@@ -179,7 +179,7 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 | DELETE | `/users/invitations/:id` | admin | Revoca invitación |
 | GET | `/users/waitlist` | admin, paginada | Lista la waitlist |
 | GET | `/users/me` | usuario | Perfil propio |
-| PATCH | `/users/me` | usuario | Actualiza perfil propio |
+| PATCH | `/users/me` | usuario | Actualiza perfil propio (`preferredCurrency`, §2.7) |
 | POST | `/users/me/avatar` | usuario | Sube avatar |
 | GET | `/users/me/preferences` | usuario | Preferencias propias |
 | PATCH | `/users/me/preferences` | usuario | Actualiza preferencias |
@@ -270,14 +270,56 @@ solo se guardó la dirección contraria, y salto por USD si no hay par directo.
 Dos capas con la misma regla evitan el caso más confuso — un aviso en una
 pantalla contradiciendo un total en otra.
 
+#### Conversión parcial del resumen
+
+Con `?currency=`, cada portfolio se convierte por separado y trae
+`displayCurrency` —la moneda en la que están sus totales— y `fxConverted`, que
+dice si esa es la que se pidió. Un portfolio cuya moneda base no conecta con la
+solicitada **no falla la petición**: se devuelve con sus totales intactos,
+`displayCurrency` igual a `baseCurrency` y `fxConverted: false`.
+
+Antes ese caso daba 404 para la lista entera, de modo que un solo portfolio en
+una moneda que nadie cotiza vaciaba el panel completo. La contrapartida es que
+el cliente tiene que mirar el campo: las filas con `fxConverted: false` se
+pueden mostrar —con su propia moneda al lado— pero **no se pueden sumar** con
+las demás. El frontend las excluye de los agregados y dice cuántas quedaron
+fuera.
+
+#### Moneda de la cuenta
+
+`preferredCurrency` (en `PATCH /users/me`) es la moneda en la que la cuenta ve
+sus totales: es lo que usan el panel y el listado de portfolios cuando no se
+pide otra cosa, y lo que `?currency=` omitido resuelve en la asignación.
+
+No admite cualquier código ISO, sino los que la aplicación puede **convertir**,
+que es una lista bastante más corta:
+
+```
+USD, COP, EUR, GBP, CHF, JPY, CAD, AUD, CNY, MXN, BRL
+```
+
+Es exactamente lo que publican contra el USD las dos fuentes públicas sin clave
+—el feed de referencia del BCE y la TRM de dolarapi (§ Tasas)—, así que la
+conversión funciona para cualquier cuenta y no solo para una que haya traído su
+propia clave de mercado. Un código fuera de la lista responde **400** diciendo
+cuáles valen, en vez de guardarse y quedar en nada: la preferencia decide qué
+pares pide el sync, así que una moneda sin fuente detrás dejaría a la cuenta
+pidiendo un par inexistente y con cifras que nadie puede convertir.
+
+La misma lista es la que aceptan los `?currency=` del resumen, la asignación y
+las transacciones. Ampliarla es un cambio en un solo sitio
+(`internal/platform/currency`) en cuanto una fuente publique el par contra USD;
+el sync deriva los pares que trae de lo que cada usuario tiene y prefiere
+(`GetRequiredCurrencyPairs`), no de una lista fija.
+
 #### Moneda de la asignación
 
 `GET /portfolios/allocation` suma por categoría **todos** los portfolios del
 usuario, que pueden estar denominados en monedas distintas, así que siempre
-responde convertido: `?currency=` acepta lo mismo que el resumen (`USD`, `COP`)
-y, si se omite, se usa la moneda preferida de la cuenta. No hay modo «sin
-convertir» — un reparto porcentual sobre una suma de euros y dólares no
-significa nada, que es lo que devolvía antes.
+responde convertido: `?currency=` acepta lo mismo que el resumen y, si se omite,
+se usa la moneda preferida de la cuenta. No hay modo «sin convertir» — un
+reparto porcentual sobre una suma de euros y dólares no significa nada, que es
+lo que devolvía antes.
 
 Cada elemento lleva `currency` —la misma para todos, que es lo que hace
 comparables los `percent`— y `positionsUnconverted`, con el mismo significado

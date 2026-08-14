@@ -283,6 +283,22 @@ enseñarse en pesos, ni tenía tasa alguna para una posición cotizada en euros
 del propio usuario sigue ganando cuando la hay, así que esto es un suelo, no un
 reemplazo.
 
+**Ese suelo es el que define qué monedas existen para la aplicación.**
+`internal/platform/currency` lista las once que estas dos fuentes alcanzan, y es
+la misma lista para dos cosas que antes iban por separado: la moneda preferida
+de la cuenta y el `?currency=` de los endpoints. Tenerlas separadas era lo que
+hacía que el ajuste de perfil no sirviera de nada — el perfil aceptaba
+cualquier código de tres letras y el panel solo entendía dos, así que una
+preferencia que no fuera USD o COP se guardaba y se ignoraba. El criterio de la
+lista es «hay una tasa que llega hasta aquí», no «es una moneda de verdad»: el
+peso argentino es ISO 4217 válido y no está, porque ninguna fuente lo publica y
+un portafolio en pesos argentinos solo podría mostrarse sin convertir.
+
+Vive en `platform` y no en `portfolio` porque tiene dos dueños: `portfolio`
+valida con ella la moneda de visualización y `user` la del perfil. El frontend
+lleva una copia en `lib/shared/currency.ts` para poder pintar el selector sin
+pedirla por red; manda la de Go, que es la que rechaza la petición.
+
 **El catálogo dejó de ser del operador.** La fila de `assets` no lleva dato
 licenciado —solo ticker, nombre, tipo, mercado y moneda—, así que no hay razón
 para duplicarla por usuario: sigue siendo compartida, y lo que se añadió es
