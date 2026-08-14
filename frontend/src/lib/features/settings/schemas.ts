@@ -7,6 +7,7 @@
  */
 
 import { z } from 'zod';
+import { SUPPORTED_CURRENCIES } from '$lib/shared/currency';
 
 /**
  * El login exige `max(20)`: sin ese límite aquí el usuario podría fijar una
@@ -17,12 +18,23 @@ const password = z.string().min(8, 'La contraseña debe tener al menos 8 caracte
 /** Código del autenticador o de recuperación. */
 const otpCode = z.string().trim().min(6, 'Ingresa un código válido').max(20);
 
+/**
+ * La moneda preferida no es una etiqueta: es a la que el panel convierte todos
+ * los totales y para la que el sync pide tasas. Un código sin tasa detrás lo
+ * rechaza el backend, así que se valida contra la misma lista en vez de aceptar
+ * tres letras cualesquiera y enterarse por un 400.
+ */
 export const profileSchema = z.object({
 	name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(254),
 	preferredCurrency: z
 		.string()
-		.length(3, 'La moneda debe ser un código de 3 caracteres')
-		.toUpperCase(),
+		.trim()
+		.toUpperCase()
+		.pipe(
+			z.enum(SUPPORTED_CURRENCIES, {
+				message: `Moneda no admitida: elige una de ${SUPPORTED_CURRENCIES.join(', ')}`
+			})
+		),
 	image: z.string().optional()
 });
 

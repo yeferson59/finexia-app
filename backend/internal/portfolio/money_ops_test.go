@@ -106,13 +106,28 @@ func TestConvertSummaryTotalsRoundsToTheTargetCurrency(t *testing.T) {
 		}
 	})
 
-	t.Run("a currency gofinance does not know is a bad request, not a 500", func(t *testing.T) {
+	// A base currency gofinance cannot parse is stored data, not caller input:
+	// there is no amount to convert, so the portfolio is reported as it stands
+	// instead of failing the whole request over one bad row.
+	t.Run("a base currency gofinance does not know is left unconverted", func(t *testing.T) {
 		summary := SummaryView{BaseCurrency: "ZZZ", TotalMarketValue: "100"}
 
-		got := convertSummary(t, userID, summary, "USD", summaryRates{})
+		s := convertSummary(t, userID, summary, "USD", summaryRates{}).first(t)
+
+		if s.FXConverted || s.TotalMarketValue != "100" || s.DisplayCurrency != "ZZZ" {
+			t.Errorf("summary = %+v, want the stored totals flagged unconverted", s)
+		}
+	})
+
+	// The target, by contrast, is what the caller asked for: an unknown one is
+	// their mistake to hear about, and the handler's list already rejects it.
+	t.Run("an unknown display currency is a bad request, not a 500", func(t *testing.T) {
+		summary := SummaryView{BaseCurrency: "USD", TotalMarketValue: "100"}
+
+		got := convertSummary(t, userID, summary, "ZZZ", summaryRates{})
 
 		if got.err == nil {
-			t.Fatal("want an error for an unknown base currency")
+			t.Fatal("want an error for an unknown display currency")
 		}
 	})
 }

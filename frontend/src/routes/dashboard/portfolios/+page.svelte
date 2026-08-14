@@ -4,28 +4,37 @@
 	import PageHeader from '$lib/ui/page-header.svelte';
 	import Pagination from '$lib/ui/pagination.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
+	import { FALLBACK_CURRENCY, partitionByCurrency } from '$lib/shared/currency';
 	import { PortfolioCard, formatPct } from '$lib/features/portfolio';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
 
 	const portfolios = $derived(data.portfolios ?? []);
+	/** Moneda de la cuenta: en ella pide el layout los resúmenes ya convertidos. */
+	const displayCurrency = $derived(data.currency ?? FALLBACK_CURRENCY);
 
 	const PER_PAGE = 9;
 	let page = $state(1);
 	const pagedPortfolios = $derived(portfolios.slice((page - 1) * PER_PAGE, page * PER_PAGE));
 
-	// Totales agregados de todos los portafolios
+	// Los totales de arriba son sumas, así que solo pueden incluir lo que está
+	// en la misma moneda. Un portafolio sin tasa hacia ella se sigue listando
+	// —con su propio importe, que la tarjeta etiqueta— pero no entra en la suma.
+	const split = $derived(partitionByCurrency(portfolios, displayCurrency));
+	const counted = $derived(split.converted);
+	const excluded = $derived(split.unconverted.length);
+
 	const totalMarketValue = $derived(
-		portfolios.reduce((s, p) => s + (parseFloat(p.totalMarketValue) || 0), 0)
+		counted.reduce((s, p) => s + (parseFloat(p.totalMarketValue) || 0), 0)
 	);
 	const totalCostBase = $derived(
-		portfolios.reduce((s, p) => s + (parseFloat(p.totalCostBase) || 0), 0)
+		counted.reduce((s, p) => s + (parseFloat(p.totalCostBase) || 0), 0)
 	);
 	const totalGainLoss = $derived(totalMarketValue - totalCostBase);
 	const totalGainLossPct = $derived(totalCostBase > 0 ? (totalGainLoss / totalCostBase) * 100 : 0);
 
-	function fmt(value: number, currency = 'USD'): string {
+	function fmt(value: number, currency: string = displayCurrency): string {
 		return privacy.money(
 			new Intl.NumberFormat('es-CO', {
 				style: 'currency',
@@ -44,10 +53,13 @@
 		goto(resolve('/dashboard/portfolios/add'));
 	}
 
-	// Peso de cada portafolio sobre el valor de mercado total (barra de progreso)
-	function allocation(marketValue: string): number {
-		const v = parseFloat(marketValue) || 0;
-		return totalMarketValue > 0 ? (v / totalMarketValue) * 100 : 0;
+	// Peso de cada portafolio sobre el valor de mercado total (barra de progreso).
+	// Un portafolio que no entró en el total tampoco tiene peso sobre él: su
+	// importe está en otra moneda y el cociente no significaría nada.
+	function allocation(p: (typeof portfolios)[number]): number {
+		if (!counted.includes(p) || totalMarketValue <= 0) return 0;
+
+		return ((parseFloat(p.totalMarketValue) || 0) / totalMarketValue) * 100;
 	}
 </script>
 
@@ -103,6 +115,14 @@
 	</article>
 </section>
 
+{#if excluded > 0}
+	<p class="fx-note">
+		{excluded === 1 ? 'Un portafolio queda' : `${excluded} portafolios quedan`} fuera de estos totales:
+		no hay tasa para pasarlo{excluded === 1 ? '' : 's'} a {displayCurrency}. Cada tarjeta muestra su
+		importe en su propia moneda.
+	</p>
+{/if}
+
 <section class="portfolios-section">
 	<h2 class="section-title">Tus Portafolios</h2>
 
@@ -110,7 +130,7 @@
 		{#each pagedPortfolios as portfolio (portfolio.id)}
 			<PortfolioCard
 				{portfolio}
-				allocation={allocation(portfolio.totalMarketValue)}
+				allocation={allocation(portfolio)}
 				formatCurrency={fmt}
 				onOpen={openPortfolio}
 			/>
@@ -149,6 +169,19 @@
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 1rem;
 		margin-bottom: 3rem;
+	}
+
+	/* Mismo aviso de "falta una tasa" que las tarjetas y el panel. Sube el
+	   margen inferior de las tarjetas para quedar pegado a ellas. */
+	.fx-note {
+		margin: -2rem 0 3rem;
+		padding: 0.5rem 0.7rem;
+		border: 1px solid rgba(212, 145, 42, 0.3);
+		border-radius: 8px;
+		background: rgba(212, 145, 42, 0.08);
+		color: rgba(236, 234, 229, 0.75);
+		font-size: 0.78rem;
+		line-height: 1.4;
 	}
 
 	.summary-card {

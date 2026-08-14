@@ -6,6 +6,8 @@ Sustituye al antiguo cajón de sastre `lib/utils.ts`, repartido por tema.
 ## Contenido
 
 - `css.ts` — `cn()`, combinación condicional de clases.
+- `currency.ts` — `SUPPORTED_CURRENCIES` y `resolveDisplayCurrency()`: en qué
+  monedas puede expresar dinero la app, copia de la lista que valida el backend.
 - `format/money.ts` — `formatCurrency()`.
 - `format/date.ts` — `formatCalendarDate()`, `todayLocalDateString()`.
 - `config/features.ts` — feature flags (`investments`, `selfRegistration`).

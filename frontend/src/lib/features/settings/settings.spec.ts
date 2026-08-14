@@ -5,6 +5,7 @@ import {
 	formatSessionDate,
 	issuedRecoveryCodes
 } from './settings';
+import { profileSchema } from './schemas';
 import type { ActiveSession } from '$lib/api/types';
 
 describe('issuedRecoveryCodes', () => {
@@ -81,5 +82,24 @@ describe('countOtherSessions', () => {
 
 	it('vale 0 sin sesiones cargadas', () => {
 		expect(countOtherSessions(undefined)).toBe(0);
+	});
+});
+
+describe('profileSchema', () => {
+	const parse = (preferredCurrency: string) =>
+		profileSchema.safeParse({ name: 'Jane Doe', preferredCurrency });
+
+	it('normaliza la moneda antes de validarla', () => {
+		const parsed = parse('  eur ');
+		expect(parsed.success && parsed.data.preferredCurrency).toBe('EUR');
+	});
+
+	// La moneda preferida es a la que el panel convierte todos los totales: una
+	// sin tasa detrás la rechaza el backend, así que se corta aquí y con un
+	// mensaje que dice cuáles valen, en vez de esperar al 400.
+	it('rechaza una moneda que la app no puede convertir', () => {
+		const parsed = parse('ARS');
+		expect(parsed.success).toBe(false);
+		expect(parsed.success === false && parsed.error.issues[0].message).toContain('USD');
 	});
 });

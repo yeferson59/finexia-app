@@ -213,13 +213,30 @@ func TestGetPortfoliosSummaryInCurrency(t *testing.T) {
 		}
 	})
 
-	t.Run("propagates an error when no rate connects the pair", func(t *testing.T) {
-		eur := SummaryView{BaseCurrency: "EUR", TotalMarketValue: "100"}
+	// One unreachable pair must not take the list down with it: the dashboard
+	// asks for a display currency on every load, so a single portfolio in a
+	// currency nothing quotes would otherwise blank out all the others.
+	t.Run("leaves a portfolio in its own currency when no rate connects the pair", func(t *testing.T) {
+		eur := SummaryView{BaseCurrency: "EUR", TotalMarketValue: "100", TotalCostBase: "80", TotalGainLoss: "20"}
 
-		got := convertSummary(t, userID, eur, "COP", summaryRates{})
+		s := convertSummary(t, userID, eur, "COP", summaryRates{}).first(t)
 
-		if !errors.Is(got.err, ErrExchangeRateUnavailable) {
-			t.Errorf("err = %v, want ErrExchangeRateUnavailable", got.err)
+		if s.FXConverted {
+			t.Error("FXConverted = true, want false when the rate is missing")
+		}
+		if s.DisplayCurrency != "EUR" {
+			t.Errorf("DisplayCurrency = %s, want the untouched base EUR", s.DisplayCurrency)
+		}
+		if s.TotalMarketValue != "100" || s.TotalCostBase != "80" || s.TotalGainLoss != "20" {
+			t.Errorf("totals = %+v, want them left as stored", s)
+		}
+	})
+
+	t.Run("marks a successful conversion as converted", func(t *testing.T) {
+		s := convertSummary(t, userID, usd, "COP", summaryRates{"USD/COP": "4000"}).first(t)
+
+		if !s.FXConverted {
+			t.Error("FXConverted = false, want true after converting")
 		}
 	})
 }

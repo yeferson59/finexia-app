@@ -82,7 +82,7 @@ test.describe('dashboard', () => {
 		// En dólares no hay conversión que enseñar, así que la línea no está.
 		await expect(page.getByText(/^1\s/)).toBeHidden();
 
-		await page.getByRole('tab', { name: 'COP' }).click();
+		await page.getByLabel('Moneda de visualización').selectOption('COP');
 
 		await expect(page.getByText('1 USD = 4.123,46 COP')).toBeVisible();
 		await expect(page.getByText(/TRM · dolarapi\.com/)).toBeVisible();

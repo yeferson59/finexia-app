@@ -5,6 +5,7 @@ import * as portfolio from '$lib/api/portfolio';
 import * as transactions from '$lib/api/transactions';
 import * as market from '$lib/api/market';
 import { ACCESS_COOKIE, REFRESH_COOKIE, clearSessionCookies } from '$lib/server/session';
+import { resolveDisplayCurrency } from '$lib/shared/currency';
 import type {
 	AllocationItem,
 	PortfolioGrowth,
@@ -12,17 +13,21 @@ import type {
 	UserTransaction
 } from '$lib/api/types';
 
-const SUPPORTED_CURRENCIES = ['USD', 'COP'];
-
 // La moneda desde la que se convierte: las tasas compartidas se guardan en una
 // sola dirección (USD → X) y es la que publica el feed público.
 const BASE_CURRENCY = 'USD';
 
-export const load: PageServerLoad = async ({ cookies, fetch, url }) => {
+export const load: PageServerLoad = async ({ cookies, fetch, url, locals }) => {
 	const event = { cookies, fetch };
 
-	const requestedCurrency = url.searchParams.get('currency')?.toUpperCase() ?? '';
-	const currency = SUPPORTED_CURRENCIES.includes(requestedCurrency) ? requestedCurrency : 'USD';
+	// Sin `?currency=` manda la moneda de la cuenta: es lo que el usuario eligió
+	// en ajustes y el único sitio donde esa preferencia se aplica sola. El
+	// parámetro sigue existiendo para mirar el panel en otra moneda sin cambiar
+	// la preferencia.
+	const currency = resolveDisplayCurrency(
+		url.searchParams.get('currency'),
+		locals.user?.preferredCurrency
+	);
 
 	const [transactionsRes, summaryRes, allocationRes, growthRes, credentialsRes, ratesRes] =
 		await Promise.all([

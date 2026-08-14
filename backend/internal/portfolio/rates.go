@@ -3,23 +3,23 @@ package portfolio
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/yeferson59/gofinance/v2/decimal"
 
+	"github.com/yeferson59/finexia-app/internal/platform/currency"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 // SupportedDisplayCurrencies lists the currencies a user can pick to view
-// their portfolio totals in. Kept intentionally small for now; extending it is
-// enough on its own — the sync derives the pairs it fetches from what each user
-// actually holds and prefers (GetRequiredCurrencyPairs), not from a fixed list.
-var SupportedDisplayCurrencies = []string{"USD", "COP"}
+// their portfolio totals in. It is the application-wide set, shared with the
+// account's preferred currency: a currency the profile accepts but ?currency=
+// rejects is a preference the dashboard would have to ignore.
+var SupportedDisplayCurrencies = currency.Supported
 
-func IsSupportedDisplayCurrency(currency string) bool {
-	return slices.Contains(SupportedDisplayCurrencies, currency)
+func IsSupportedDisplayCurrency(code string) bool {
+	return currency.IsSupported(code)
 }
 
 // ErrExchangeRateUnavailable means no stored rate (direct, inverse, or via a

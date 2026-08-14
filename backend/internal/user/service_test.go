@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -53,6 +54,21 @@ func TestUpdateCurrentUser(t *testing.T) {
 		}
 		if saved.Image != "new.png" {
 			t.Errorf("saved image = %q, want new.png", saved.Image)
+		}
+	})
+
+	// The preferred currency drives what the dashboard converts totals into and
+	// which pairs the market-data sync fetches, so a code with no rate behind it
+	// has to be refused here rather than stored and quietly ignored later.
+	t.Run("rejects a currency the app cannot convert to", func(t *testing.T) {
+		svc, saved := newSvc(t)
+
+		_, err := svc.UpdateCurrentUser(context.Background(), userID, "Jane", "ARS", "")
+		if !errors.Is(err, ErrUnsupportedCurrency) {
+			t.Fatalf("err = %v, want ErrUnsupportedCurrency", err)
+		}
+		if saved.PreferredCurrency != "" {
+			t.Errorf("saved currency = %q, want nothing written", saved.PreferredCurrency)
 		}
 	})
 

@@ -15,6 +15,7 @@
 	import Stat from '$lib/ui/stat.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
+	import { FALLBACK_CURRENCY, partitionByCurrency } from '$lib/shared/currency';
 	import { formatPortfolioType } from '$lib/shared/format/portfolio-type';
 
 	interface PortfolioSummary {
@@ -30,17 +31,26 @@
 		totalGainLossPct: string;
 	}
 
-	const { summaries = [], currency = 'USD' }: { summaries: PortfolioSummary[]; currency?: string } =
-		$props();
+	const {
+		summaries = [],
+		currency = FALLBACK_CURRENCY
+	}: { summaries: PortfolioSummary[]; currency?: string } = $props();
+
+	// Cada fila se pinta en su propia moneda, así que la tabla admite mezcla; el
+	// pie no, porque son sumas. Lo que no está en `currency` se queda fuera y se
+	// avisa debajo, en vez de sumar euros con dólares.
+	const split = $derived(partitionByCurrency(summaries, currency));
+	const counted = $derived(split.converted);
+	const excluded = $derived(split.unconverted.length);
 
 	const totalInvested = $derived(
-		summaries.reduce((acc, s) => acc + parseFloat(s.totalCostBase || '0'), 0)
+		counted.reduce((acc, s) => acc + parseFloat(s.totalCostBase || '0'), 0)
 	);
 	const totalValue = $derived(
-		summaries.reduce((acc, s) => acc + parseFloat(s.totalMarketValue || '0'), 0)
+		counted.reduce((acc, s) => acc + parseFloat(s.totalMarketValue || '0'), 0)
 	);
 	const totalGainLoss = $derived(
-		summaries.reduce((acc, s) => acc + parseFloat(s.totalGainLoss || '0'), 0)
+		counted.reduce((acc, s) => acc + parseFloat(s.totalGainLoss || '0'), 0)
 	);
 	const totalGainLossPct = $derived(totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0);
 
@@ -127,9 +137,27 @@
 			value="{totalGainLoss >= 0 ? '+' : ''}{fmtPct(totalGainLossPct)}%"
 		/>
 	</div>
+	{#if excluded > 0}
+		<p class="fx-note">
+			{excluded === 1 ? 'Un portafolio queda' : `${excluded} portafolios quedan`} fuera de estos totales:
+			no hay tasa para pasarlo{excluded === 1 ? '' : 's'} a {currency}.
+		</p>
+	{/if}
 </Card>
 
 <style>
+	/* Mismo aviso que la tarjeta de portafolio y el patrimonio neto. */
+	.fx-note {
+		margin: 0.9rem 0 0;
+		padding: 0.5rem 0.7rem;
+		border: 1px solid rgba(212, 145, 42, 0.3);
+		border-radius: 8px;
+		background: rgba(212, 145, 42, 0.08);
+		color: rgba(236, 234, 229, 0.75);
+		font-size: 0.78rem;
+		line-height: 1.4;
+	}
+
 	.empty-cta {
 		display: inline-block;
 		padding: 0.6rem 1.2rem;

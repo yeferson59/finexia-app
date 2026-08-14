@@ -169,6 +169,9 @@ export const portfolioSummary = (displayCurrency = 'USD') =>
 			type: p.type,
 			baseCurrency: 'USD',
 			displayCurrency,
+			// El backend marca cada resumen con si pudo convertirlo: lo que no
+			// puede se queda en su moneda y no entra en las sumas de la página.
+			fxConverted: true,
 			isDefault: p.isDefault,
 			riskId: p.riskId,
 			riskName: p.riskName,

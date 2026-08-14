@@ -18,6 +18,10 @@
 		onOpen: (id: string) => void;
 	} = $props();
 
+	// La moneda real del importe: la de visualización si el backend pudo
+	// convertirlo, y si no la propia del portafolio. Etiquetarlo siempre con
+	// `baseCurrency` ponía el símbolo equivocado en cuanto hubo conversión.
+	const rowCurrency = $derived(portfolio.displayCurrency || portfolio.baseCurrency);
 	const marketValue = $derived(parseFloat(portfolio.totalMarketValue) || 0);
 	const gainLoss = $derived(parseFloat(portfolio.totalGainLoss) || 0);
 	const gainLossPct = $derived(parseFloat(portfolio.totalGainLossPct) || 0);
@@ -57,7 +61,7 @@
 	<div class="card-metrics">
 		<div class="metric">
 			<p class="label">Valor</p>
-			<p class="value">{formatCurrency(marketValue, portfolio.baseCurrency)}</p>
+			<p class="value">{formatCurrency(marketValue, rowCurrency)}</p>
 		</div>
 
 		<div class="metric">

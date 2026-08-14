@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
+	"github.com/yeferson59/finexia-app/internal/platform/currency"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
@@ -105,8 +106,17 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, userID uuid.UUID, name,
 	if strings.TrimSpace(name) != "" {
 		existing.Name = helpers.NormalizateNames(name)
 	}
+	// The preferred currency is not a label: it is what the dashboard converts
+	// every total into, and what the market-data sync fetches pairs for. A code
+	// outside the supported set has no rate behind it, so accepting one would
+	// leave the account with figures that cannot be converted and a sync asking
+	// providers for a pair that does not exist.
 	if strings.TrimSpace(preferredCurrency) != "" {
-		existing.PreferredCurrency = strings.ToUpper(strings.TrimSpace(preferredCurrency))
+		code := currency.Normalize(preferredCurrency)
+		if !currency.IsSupported(code) {
+			return identity.User{}, fmt.Errorf("%w %q: must be one of %s", ErrUnsupportedCurrency, code, currency.List())
+		}
+		existing.PreferredCurrency = code
 	}
 	if strings.TrimSpace(image) != "" {
 		existing.Image = image

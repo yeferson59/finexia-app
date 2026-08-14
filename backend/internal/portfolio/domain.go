@@ -373,6 +373,13 @@ type SummaryView struct {
 	// equals BaseCurrency unless the caller requested conversion to another
 	// currency (see Service.GetPortfoliosSummaryInCurrency).
 	DisplayCurrency string `json:"displayCurrency"`
+	// FXConverted reports whether the totals are in the currency the caller
+	// asked for. It is false only when a display conversion was requested and no
+	// rate connected BaseCurrency to it, in which case the totals stayed in
+	// BaseCurrency: DisplayCurrency always says which currency they are in, and
+	// this says whether that is the one requested. Without it a list where one
+	// portfolio converted and another did not looks uniform, and gets summed.
+	FXConverted bool `json:"fxConverted"`
 	// The three counts below partition TotalPositions by where each position's
 	// price came from (see PriceSource). They are what tells a client how much
 	// of TotalMarketValue is an actual market value: when PositionsAtCost is

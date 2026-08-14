@@ -82,22 +82,32 @@ func (s *Service) GetPortfoliosSummaryInCurrency(ctx context.Context, userID uui
 	return summaries, nil
 }
 
+// convertSummaryTotals restates one portfolio's totals in targetCurrency.
+//
+// A portfolio it cannot convert is left in its own currency and returned with
+// FXConverted false, rather than failing the request. The alternative — one
+// unreachable pair turning the whole list into a 404 — is the wrong trade for a
+// dashboard that now always asks for a display currency: a portfolio in a
+// currency no source quotes would blank out every other portfolio with it. The
+// same call is what holdings already make (see valueEntriesInBase).
 func (s *Service) convertSummaryTotals(ctx context.Context, userID uuid.UUID, summary SummaryView, targetCurrency string) (SummaryView, error) {
 	// Both ends go through gofinance's ISO 4217 table rather than being carried
 	// as bare strings: money.Convert is what does the arithmetic below, and it
 	// needs the target currency to know how many minor units to round to.
 	from, err := money.CurrencyFromISOCode(summary.BaseCurrency)
 	if err != nil {
-		return SummaryView{}, httpx.AsBadRequest(fmt.Errorf("unknown portfolio currency %q: %w", summary.BaseCurrency, err))
+		return unconvertedSummary(summary), nil
 	}
 	to, err := money.CurrencyFromISOCode(targetCurrency)
 	if err != nil {
+		// The target is the caller's own input, validated at the handler; an
+		// unknown one here is a bad request, not a portfolio the app can't price.
 		return SummaryView{}, httpx.AsBadRequest(fmt.Errorf("unknown display currency %q: %w", targetCurrency, err))
 	}
 
 	rate, err := s.GetConversionRate(ctx, userID, summary.BaseCurrency, targetCurrency)
 	if err != nil {
-		return SummaryView{}, err
+		return unconvertedSummary(summary), nil
 	}
 
 	// money.Convert re-tags the amount with the target currency and rounds
@@ -115,20 +125,33 @@ func (s *Service) convertSummaryTotals(ctx context.Context, userID uuid.UUID, su
 		return converted.String(), nil
 	}
 
-	var convErr error
-	if summary.TotalCostBase, convErr = convert(summary.TotalCostBase); convErr != nil {
-		return SummaryView{}, convErr
+	// All three are converted before any is stored back, so a failure halfway
+	// cannot leave a summary whose cost is in one currency and whose market
+	// value is in another — the one shape no client could describe correctly.
+	cost, costErr := convert(summary.TotalCostBase)
+	value, valueErr := convert(summary.TotalMarketValue)
+	gain, gainErr := convert(summary.TotalGainLoss)
+	if costErr != nil || valueErr != nil || gainErr != nil {
+		return unconvertedSummary(summary), nil
 	}
-	if summary.TotalMarketValue, convErr = convert(summary.TotalMarketValue); convErr != nil {
-		return SummaryView{}, convErr
-	}
-	if summary.TotalGainLoss, convErr = convert(summary.TotalGainLoss); convErr != nil {
-		return SummaryView{}, convErr
-	}
+
+	summary.TotalCostBase = cost
+	summary.TotalMarketValue = value
+	summary.TotalGainLoss = gain
 	// TotalGainLossPct is a ratio, not a money amount — currency-invariant.
 
 	summary.DisplayCurrency = targetCurrency
+	summary.FXConverted = true
 	return summary, nil
+}
+
+// unconvertedSummary hands back the totals as they were stored, in the
+// portfolio's own currency, flagged so the client shows them for what they are
+// instead of mixing them into a total in another currency.
+func unconvertedSummary(summary SummaryView) SummaryView {
+	summary.DisplayCurrency = summary.BaseCurrency
+	summary.FXConverted = false
+	return summary
 }
 
 func (s *Service) GetPortfolio(ctx context.Context, userID, portfolioID uuid.UUID) (Portfolio, error) {

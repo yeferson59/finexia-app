@@ -53,6 +53,10 @@ export const portfolioSummarySchema = z.object({
 	type: z.string(),
 	baseCurrency: z.string(),
 	displayCurrency: z.string().optional(),
+	// `false` cuando se pidió `?currency=` y no había tasa: los totales se
+	// quedaron en `baseCurrency` en vez de fallar la petición entera, así que
+	// esta fila no se puede sumar con las demás. Opcional por el backend previo.
+	fxConverted: z.boolean().optional(),
 	isDefault: z.boolean().optional(),
 	riskId: z.string().optional(),
 	riskName: z.string(),

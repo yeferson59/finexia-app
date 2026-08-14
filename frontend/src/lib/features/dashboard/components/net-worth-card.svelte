@@ -6,11 +6,14 @@
 	import ExchangeRateNote from './exchange-rate-note.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
+	import { FALLBACK_CURRENCY, partitionByCurrency } from '$lib/shared/currency';
 	import type { ExchangeRate } from '$lib/api/types';
 
 	interface PortfolioSummary {
 		id: string;
 		name: string;
+		baseCurrency?: string;
+		displayCurrency?: string;
 		totalMarketValue: string;
 		totalCostBase: string;
 		totalGainLoss: string;
@@ -20,7 +23,7 @@
 
 	const {
 		summaries = [],
-		currency = 'USD',
+		currency = FALLBACK_CURRENCY,
 		displayRate = null
 	}: {
 		summaries: PortfolioSummary[];
@@ -33,16 +36,23 @@
 		return privacy.money(formatCurrency(value, currency));
 	}
 
+	// Un portafolio que el backend no pudo convertir viene en su propia moneda.
+	// Sumarlo aquí daría un patrimonio que no está en ninguna: se deja fuera y
+	// se dice cuántos faltan, que es un total honesto en vez de uno inventado.
+	const split = $derived(partitionByCurrency(summaries, currency));
+	const counted = $derived(split.converted);
+	const excluded = $derived(split.unconverted.length);
+
 	const netWorth = $derived(
-		summaries.reduce((acc, s) => acc + parseFloat(s.totalMarketValue || '0'), 0)
+		counted.reduce((acc, s) => acc + parseFloat(s.totalMarketValue || '0'), 0)
 	);
 	const totalGainLoss = $derived(
-		summaries.reduce((acc, s) => acc + parseFloat(s.totalGainLoss || '0'), 0)
+		counted.reduce((acc, s) => acc + parseFloat(s.totalGainLoss || '0'), 0)
 	);
 	const totalCostBase = $derived(
-		summaries.reduce((acc, s) => acc + parseFloat(s.totalCostBase || '0'), 0)
+		counted.reduce((acc, s) => acc + parseFloat(s.totalCostBase || '0'), 0)
 	);
-	const totalPositions = $derived(summaries.reduce((acc, s) => acc + (s.totalPositions ?? 0), 0));
+	const totalPositions = $derived(counted.reduce((acc, s) => acc + (s.totalPositions ?? 0), 0));
 	const gainLossPct = $derived(totalCostBase > 0 ? (totalGainLoss / totalCostBase) * 100 : 0);
 	const isIncreasing = $derived(totalGainLoss >= 0);
 </script>
@@ -67,7 +77,7 @@
 			<h1 class="amount">
 				{fmtMoney(netWorth)}
 			</h1>
-			{#if summaries.length > 0}
+			{#if counted.length > 0}
 				<p class="amount-delta" class:positive={isIncreasing} class:negative={!isIncreasing}>
 					{isIncreasing ? '+' : '−'}{fmtMoney(Math.abs(totalGainLoss))}
 					· {new Intl.NumberFormat('es-CO', {
@@ -75,13 +85,23 @@
 						maximumFractionDigits: 2
 					}).format(Math.abs(gainLossPct))}% total
 				</p>
+			{:else if summaries.length > 0}
+				<p class="amount-delta neutral">Ningún portafolio se puede convertir a {currency}</p>
 			{:else}
 				<p class="amount-delta neutral">Sin portafolios registrados</p>
+			{/if}
+			{#if excluded > 0 && counted.length > 0}
+				<p class="fx-note">
+					{excluded === 1
+						? 'Falta 1 portafolio: no hay tasa para pasarlo a'
+						: `Faltan ${excluded} portafolios: no hay tasa para pasarlos a`}
+					{currency}.
+				</p>
 			{/if}
 		</div>
 
 		<div class="metric-stats">
-			<Stat label="Portafolios" value={String(summaries.length)} />
+			<Stat label="Portafolios" value={String(counted.length)} />
 			<Stat label="Posiciones" tone="highlight" value={String(totalPositions)} />
 			<Stat
 				label="Ganancia"
@@ -176,6 +196,19 @@
 
 	.amount-delta.neutral {
 		color: rgba(236, 234, 229, 0.5);
+	}
+
+	/* Mismo aviso que la tarjeta de portafolio, para que "falta una tasa" se
+	   reconozca igual en el panel y en el listado. */
+	.fx-note {
+		margin: 0.6rem 0 0;
+		padding: 0.5rem 0.7rem;
+		border: 1px solid rgba(212, 145, 42, 0.3);
+		border-radius: 8px;
+		background: rgba(212, 145, 42, 0.08);
+		color: rgba(236, 234, 229, 0.75);
+		font-size: 0.78rem;
+		line-height: 1.4;
 	}
 
 	.metric-stats {

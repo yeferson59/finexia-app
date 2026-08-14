@@ -10,4 +10,4 @@
 	<meta name="description" content="Crea un nuevo portafolio de inversiones personalizado" />
 </svelte:head>
 
-<PortfolioAddForm risks={data.risks} />
+<PortfolioAddForm risks={data.risks} defaultCurrency={data.user?.preferredCurrency} />

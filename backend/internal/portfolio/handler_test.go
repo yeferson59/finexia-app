@@ -220,9 +220,11 @@ func TestHandlerGetPortfolioByID(t *testing.T) {
 func TestHandlerGetPortfoliosSummary(t *testing.T) {
 	userID := uuid.New()
 
+	// ARS is a real ISO code with no rate source behind it, which is what the
+	// supported set is about: being convertible, not being a valid currency.
 	t.Run("unsupported currency returns 400", func(t *testing.T) {
 		app := newTestModule(t, new(fakeRepository{}), userID, "user")
-		resp := do(t, app, http.MethodGet, "/portfolios/summary?currency=EUR")
+		resp := do(t, app, http.MethodGet, "/portfolios/summary?currency=ARS")
 		if resp.StatusCode != fiber.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", resp.StatusCode)
 		}

@@ -2,12 +2,21 @@
 	import PortfolioRiskPicker from './portfolio-risk-picker.svelte';
 	import PortfolioGoalFieldset from './portfolio-goal-fieldset.svelte';
 	import { enhance } from '$app/forms';
+	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import PageHeader from '$lib/ui/page-header.svelte';
+	import { SUPPORTED_CURRENCIES, resolveDisplayCurrency } from '$lib/shared/currency';
 	import { PORTFOLIO_TYPES } from '../portfolio';
 
-	let { risks }: { risks: { id: string; name: string; description: string }[] } = $props();
+	let {
+		risks,
+		/** Moneda de la cuenta: el arranque más probable para un portafolio nuevo. */
+		defaultCurrency
+	}: {
+		risks: { id: string; name: string; description: string }[];
+		defaultCurrency?: string;
+	} = $props();
 
 	interface FormData {
 		name: string;
@@ -24,7 +33,8 @@
 		description: '',
 		type: 'stocks_etfs',
 		riskLevel: '',
-		currency: 'USD',
+		// Semilla, no vínculo: a partir de aquí manda lo que elija el usuario.
+		currency: untrack(() => resolveDisplayCurrency(defaultCurrency)),
 		targetAmount: '',
 		isDefault: false
 	});
@@ -33,7 +43,9 @@
 	let submitSuccess = $state(false);
 	let errors: Record<string, string> = $state({});
 
-	const currencies = ['USD', 'COP', 'EUR', 'MXN', 'ARS'];
+	// Solo las que la app sabe convertir. La lista anterior ofrecía ARS, que
+	// ninguna fuente cotiza: un portafolio así quedaba siempre sin convertir.
+	const currencies = SUPPORTED_CURRENCIES;
 
 	function handleCancel() {
 		goto(resolve('/dashboard/portfolios'));

@@ -66,7 +66,10 @@ func (r *PostgresRepository) GetPortfoliosSummaryByUserID(ctx context.Context, u
 		); err != nil {
 			return nil, err
 		}
+		// Nothing was asked to be converted here, so the totals are in the
+		// currency the caller gets told about: that counts as converted.
 		item.DisplayCurrency = item.BaseCurrency
+		item.FXConverted = true
 		result = append(result, item)
 	}
 	return result, nil

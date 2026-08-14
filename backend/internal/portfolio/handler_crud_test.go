@@ -529,7 +529,7 @@ func TestHandlerGetAssetAllocation(t *testing.T) {
 	t.Run("rejects an unsupported currency", func(t *testing.T) {
 		app := newTestModule(t, new(fakeRepository{}), userID, "user")
 
-		resp := do(t, app, http.MethodGet, "/portfolios/allocation?currency=JPY")
+		resp := do(t, app, http.MethodGet, "/portfolios/allocation?currency=ARS")
 		if resp.StatusCode != fiber.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", resp.StatusCode)
 		}
