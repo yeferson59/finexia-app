@@ -91,6 +91,28 @@ func TestBuildGrowthSummary(t *testing.T) {
 			t.Errorf("TotalGrowthPct = %q, want 0.00 when starting from zero", got.TotalGrowthPct)
 		}
 	})
+
+	// Opening a portfolio moves the value without earning anything, so the two
+	// readings have to disagree: the series grows 300% while the position is
+	// down. Reporting only the first number is what made the card claim a profit
+	// on a portfolio at a loss.
+	t.Run("carries the latest point's profit alongside the value growth", func(t *testing.T) {
+		points := []GrowthPoint{
+			{TotalValue: "249.00", TotalCostBase: "240.00", GainLoss: "9.00", GainLossPct: "3.75"},
+			{TotalValue: "996.14", TotalCostBase: "1339.02", GainLoss: "-342.88", GainLossPct: "-25.61"},
+		}
+
+		got := buildGrowthSummary(points)
+		if got.TotalGrowthPct != "300.06" {
+			t.Errorf("TotalGrowthPct = %q, want 300.06", got.TotalGrowthPct)
+		}
+		if got.GainLoss != "-342.88" {
+			t.Errorf("GainLoss = %q, want -342.88", got.GainLoss)
+		}
+		if got.GainLossPct != "-25.61" {
+			t.Errorf("GainLossPct = %q, want -25.61", got.GainLossPct)
+		}
+	})
 }
 
 func TestGetAssetTransactionsPaginated(t *testing.T) {
@@ -128,22 +150,23 @@ func TestGetPortfolioGrowthUsesPeriodFilter(t *testing.T) {
 	userID := uuid.New()
 	var gotHasSince bool
 	var gotSince time.Time
+	var gotCurrency string
 
 	repo := new(fakeRepository{
-		getPortfolioGrowthByUserID: func(_ context.Context, uid uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error) {
+		getPortfolioGrowthByUserID: func(_ context.Context, uid uuid.UUID, currency string, hasSince bool, since time.Time) ([]GrowthPoint, error) {
 			if uid != userID {
 				t.Errorf("userID = %s, want %s", uid, userID)
 			}
-			gotHasSince, gotSince = hasSince, since
+			gotHasSince, gotSince, gotCurrency = hasSince, since, currency
 			return []GrowthPoint{
-				{TotalValue: "100.00"},
-				{TotalValue: "110.00"},
+				{TotalValue: "100.00", Currency: "COP"},
+				{TotalValue: "110.00", Currency: "COP"},
 			}, nil
 		},
 	})
 	svc := newTestServices(repo, newMemStorage())
 
-	points, summary, err := svc.GetPortfolioGrowth(context.Background(), userID, "1M")
+	points, summary, err := svc.GetPortfolioGrowth(context.Background(), userID, "COP", "1M")
 	if err != nil {
 		t.Fatalf("GetPortfolioGrowth: %v", err)
 	}
@@ -153,11 +176,19 @@ func TestGetPortfolioGrowthUsesPeriodFilter(t *testing.T) {
 	if gotSince.After(time.Now().UTC()) {
 		t.Error("since must be in the past")
 	}
+	if gotCurrency != "COP" {
+		t.Errorf("currency = %q, want COP", gotCurrency)
+	}
 	if len(points) != 2 {
 		t.Errorf("len(points) = %d, want 2", len(points))
 	}
 	if summary.TotalGrowthPct != "10.00" {
 		t.Errorf("TotalGrowthPct = %q, want 10.00", summary.TotalGrowthPct)
+	}
+	// La serie tiene una moneda y el resumen la nombra: sin ella el cliente
+	// pinta un símbolo de dólar sobre importes que pueden ser pesos.
+	if summary.Currency != "COP" {
+		t.Errorf("Currency = %q, want COP", summary.Currency)
 	}
 }
 

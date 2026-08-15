@@ -53,14 +53,22 @@ export function getAllocation(
 	return apiRequestSafe(event, `/portfolios/allocation${query}`, {}, z.array(allocationItemSchema));
 }
 
-/** `GET /portfolios/growth` — crecimiento agregado (soporta `since`/`period`). */
+/**
+ * `GET /portfolios/growth` — crecimiento agregado (soporta `since`/`period`).
+ *
+ * `currency` importa aquí más que en otros endpoints: la serie suma portafolios
+ * que pueden tener bases distintas, y sin ella el backend las lleva a la moneda
+ * del perfil. Omitirla dejaba el gráfico ajeno al selector de moneda del panel,
+ * con el resto de las tarjetas ya convertidas.
+ */
 export function getAggregateGrowth(
 	event: ApiEvent,
-	opts: { since?: string; period?: string } = {}
+	opts: { since?: string; period?: string; currency?: string } = {}
 ): Promise<ApiResult<PortfolioGrowth>> {
 	const params = new URLSearchParams();
 	if (opts.since) params.set('since', opts.since);
 	if (opts.period) params.set('period', opts.period);
+	if (opts.currency) params.set('currency', opts.currency);
 	const query = params.toString() ? `?${params}` : '';
 	return apiRequestSafe(event, `/portfolios/growth${query}`, {}, portfolioGrowthSchema);
 }

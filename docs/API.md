@@ -213,7 +213,7 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 | DELETE | `/portfolios/sources/:id` | usuario | Elimina plataforma |
 | GET | `/portfolios/assets` | usuario, paginada | Catálogo de assets (curados + los que aportó el llamante; §2.8) |
 | PATCH | `/portfolios/assets/:id/price` | admin | Fija precio manual de un asset |
-| GET | `/portfolios/growth` | usuario | Crecimiento agregado (`?since=`) |
+| GET | `/portfolios/growth` | usuario | Crecimiento agregado (`?since=`, `?currency=`) |
 | GET | `/portfolios/export/summary` | usuario | XLSX `resumen-mensual.xlsx` |
 | GET | `/portfolios/export/transactions` | usuario | XLSX `transacciones.xlsx` |
 | GET | `/portfolios/export/risk` | usuario | XLSX `riesgo-volatilidad.xlsx` |
@@ -324,6 +324,32 @@ lo que devolvía antes.
 Cada elemento lleva `currency` —la misma para todos, que es lo que hace
 comparables los `percent`— y `positionsUnconverted`, con el mismo significado
 que en el resumen: posiciones incluidas a valor nominal por no haber tasa.
+
+#### Moneda de la serie de crecimiento
+
+`GET /portfolios/growth` agrega los snapshots de **todos** los portfolios, cada
+uno guardado en su propia moneda base, así que convierte por la misma razón que
+la asignación: `?currency=` acepta la misma lista y, omitido, manda la moneda
+preferida de la cuenta. `summary.currency` dice en cuál quedó la serie y cada
+punto lleva `portfoliosUnconverted`, los portfolios sumados esa fecha a valor
+nominal por no haber tasa.
+
+La conversión usa la tasa de hoy en todas las fechas: la app guarda la última
+tasa por par, no una serie histórica. Los puntos pasados quedan por tanto
+reexpresados a la tasa actual —la presentación habitual a moneda constante— que
+es el límite honesto de lo que se guarda; la alternativa era sumarlos crudos.
+
+`GET /portfolios/:id/growth` es un solo portfolio y por tanto una sola moneda:
+no convierte nada y `portfoliosUnconverted` es siempre 0.
+
+#### Resumen de crecimiento: crecimiento no es rendimiento
+
+`summary` lleva dos lecturas que no hay que confundir. `initialValue`,
+`currentValue` y `totalGrowthPct` comparan el **valor** del primer snapshot con
+el del último, así que abrir un portfolio o añadir una posición cuenta como
+crecimiento. `gainLoss` y `gainLossPct` son el beneficio del último punto
+—mercado menos capital invertido—, que es el rendimiento. Las dos discrepan a
+propósito y una cartera en pérdidas puede tener `totalGrowthPct` positivo.
 
 #### Moneda de los holdings
 

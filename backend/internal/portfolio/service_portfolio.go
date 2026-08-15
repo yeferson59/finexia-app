@@ -213,9 +213,11 @@ func (s *Service) GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, 
 	return s.repo.GetPortfolioValuesAsOf(ctx, userID, asOf)
 }
 
-func (s *Service) GetPortfolioGrowth(ctx context.Context, userID uuid.UUID, period string) ([]GrowthPoint, GrowthSummary, error) {
+// GetPortfolioGrowth builds the account-wide series. An empty currency means
+// "the account's preferred one", the same default the summary endpoints use.
+func (s *Service) GetPortfolioGrowth(ctx context.Context, userID uuid.UUID, currency, period string) ([]GrowthPoint, GrowthSummary, error) {
 	hasSince, since := parsePeriod(period)
-	points, err := s.repo.GetPortfolioGrowthByUserID(ctx, userID, hasSince, since)
+	points, err := s.repo.GetPortfolioGrowthByUserID(ctx, userID, currency, hasSince, since)
 	if err != nil {
 		return nil, GrowthSummary{}, err
 	}
@@ -273,6 +275,14 @@ func buildGrowthSummary(points []GrowthPoint) GrowthSummary {
 		InitialValue:   initial.RoundBank(2).StringFixed(2),
 		CurrentValue:   current.RoundBank(2).StringFixed(2),
 		TotalGrowthPct: growthPct.RoundBank(2).StringFixed(2),
+		// The profit of the latest point, which is a different quantity from the
+		// growth above and has to travel next to it: TotalGrowthPct compares the
+		// value of two dates, so opening a portfolio or adding a position counts
+		// as growth. Only market - invested is a return, and it is what the chart
+		// already shows for the point under the cursor.
+		GainLoss:    last.GainLoss,
+		GainLossPct: last.GainLossPct,
+		Currency:    last.Currency,
 	}
 }
 

@@ -293,13 +293,23 @@ type GrowthDataPointDTO struct {
 	TotalCostBase string `json:"totalCostBase"`
 	GainLoss      string `json:"gainLoss"`
 	GainLossPct   string `json:"gainLossPct"`
+	// Portafolios sumados a esta fecha sin tasa con la que convertirlos, y por
+	// tanto contados a valor nominal. Normalmente 0.
+	PortfoliosUnconverted int64 `json:"portfoliosUnconverted"`
 }
 
 type GrowthSummaryDTO struct {
-	FirstDate      string `json:"firstDate"`
-	InitialValue   string `json:"initialValue"`
-	CurrentValue   string `json:"currentValue"`
+	FirstDate    string `json:"firstDate"`
+	InitialValue string `json:"initialValue"`
+	CurrentValue string `json:"currentValue"`
+	// Crecimiento del valor entre la primera fecha y la última: abrir un
+	// portafolio o añadir una posición cuenta como crecimiento.
 	TotalGrowthPct string `json:"totalGrowthPct"`
+	// Beneficio del último punto (mercado − invertido), que es el rendimiento.
+	GainLoss    string `json:"gainLoss"`
+	GainLossPct string `json:"gainLossPct"`
+	// Moneda en la que están todos los importes de la serie.
+	Currency string `json:"currency"`
 }
 
 type GrowthResponseDTO struct {
@@ -311,11 +321,12 @@ func NewGrowthResponse(points []GrowthPoint, summary GrowthSummary) GrowthRespon
 	dtos := make([]GrowthDataPointDTO, 0, len(points))
 	for _, p := range points {
 		dtos = append(dtos, GrowthDataPointDTO{
-			Date:          p.Date.Format("2006-01-02"),
-			TotalValue:    p.TotalValue,
-			TotalCostBase: p.TotalCostBase,
-			GainLoss:      p.GainLoss,
-			GainLossPct:   p.GainLossPct,
+			Date:                  p.Date.Format("2006-01-02"),
+			TotalValue:            p.TotalValue,
+			TotalCostBase:         p.TotalCostBase,
+			GainLoss:              p.GainLoss,
+			GainLossPct:           p.GainLossPct,
+			PortfoliosUnconverted: p.PortfoliosUnconverted,
 		})
 	}
 	firstDate := ""
@@ -329,6 +340,9 @@ func NewGrowthResponse(points []GrowthPoint, summary GrowthSummary) GrowthRespon
 			InitialValue:   summary.InitialValue,
 			CurrentValue:   summary.CurrentValue,
 			TotalGrowthPct: summary.TotalGrowthPct,
+			GainLoss:       summary.GainLoss,
+			GainLossPct:    summary.GainLossPct,
+			Currency:       summary.Currency,
 		},
 	}
 }

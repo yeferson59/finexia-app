@@ -81,7 +81,7 @@ type TransactionStore interface {
 type SnapshotStore interface {
 	GetAllPortfolioSummaryRows(ctx context.Context) ([]SnapshotRow, error)
 	UpsertPortfolioSnapshot(ctx context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, currency, totalGainLoss, totalGainLossPct string) error
-	GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
+	GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, currency string, hasSince bool, since time.Time) ([]GrowthPoint, error)
 	GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
 	GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error)
 }

@@ -34,7 +34,7 @@ export const load: PageServerLoad = async ({ cookies, fetch, url, locals }) => {
 			transactions.getRecent(event),
 			portfolio.getSummaries(event, currency),
 			portfolio.getAllocation(event, currency),
-			portfolio.getAggregateGrowth(event),
+			portfolio.getAggregateGrowth(event, { currency }),
 			market.getMarketCredentials(event),
 			market.getLatestExchangeRates(event)
 		]);

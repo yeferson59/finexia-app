@@ -241,7 +241,15 @@ func (h *handler) GetPortfolioGrowth(c fiber.Ctx) error {
 
 	period := c.Query("period", "ALL")
 
-	points, summary, err := h.service.GetPortfolioGrowth(c, userID, period)
+	// La serie agregada suma portafolios que pueden tener bases distintas, así
+	// que necesita una moneda a la que llevarlo todo. Vacío significa la del
+	// perfil, igual que en el resumen y en la asignación.
+	currency := strings.ToUpper(strings.TrimSpace(c.Query("currency")))
+	if currency != "" && !IsSupportedDisplayCurrency(currency) {
+		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+strings.Join(SupportedDisplayCurrencies, ", "))
+	}
+
+	points, summary, err := h.service.GetPortfolioGrowth(c, userID, currency, period)
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error retrieving portfolio growth", "Could not retrieve portfolio growth data")
 	}

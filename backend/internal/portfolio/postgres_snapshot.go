@@ -109,30 +109,65 @@ func (r *PostgresRepository) GetPortfolioValuesAsOf(ctx context.Context, userID 
 	return points, rows.Err()
 }
 
+// GetPortfolioGrowthByUserID aggregates every portfolio's snapshots into one
+// series, expressed in a single currency.
+//
+// Each snapshot is stored in its own portfolio's base currency, so the previous
+// bare SUM added a EUR portfolio to a USD one and produced a total in no
+// currency at all. Every row is converted first, to `currency` when the caller
+// asks for one and to the account's preferred currency otherwise — the same
+// rule the summary and allocation endpoints follow.
+//
+// The rate is today's, applied to every date in the series: the app keeps the
+// latest rate per pair, not a history. Past points are therefore restated at
+// the current rate, which is the usual constant-currency presentation and the
+// honest limit of the data we keep — the alternative was adding the numbers up
+// raw. A snapshot whose currency has no rate is left as-is and counted in
+// PortfoliosUnconverted so the caller can say so rather than pass off a total
+// that silently mixes units.
 func (r *PostgresRepository) GetPortfolioGrowthByUserID(
 	ctx context.Context,
 	userID uuid.UUID,
+	currency string,
 	hasSince bool,
 	since time.Time,
 ) ([]GrowthPoint, error) {
 	rows, err := r.db.Query(ctx, `
+		WITH converted AS (
+			SELECT
+				ps.snapshot_date,
+				target.code                               AS currency,
+				ps.total_value     * COALESCE(fx.rate, 1) AS total_value,
+				ps.total_gain_loss * COALESCE(fx.rate, 1) AS total_gain_loss,
+				(fx.rate IS NULL)::int                    AS unconverted
+			FROM portfolio_snapshots ps
+			JOIN portfolios p ON p.id = ps.portfolio_id
+			JOIN users u      ON u.id = p.user_id
+			CROSS JOIN LATERAL (
+				SELECT COALESCE(NULLIF($2::text, ''), u.preferred_currency, 'USD')::char(3) AS code
+			) target
+			CROSS JOIN LATERAL (
+				SELECT fx_rate(p.user_id, ps.currency, target.code) AS rate
+			) fx
+			WHERE p.user_id = $1
+			  AND ($3::boolean = FALSE OR ps.snapshot_date >= $4::date)
+		)
 		SELECT
-			ps.snapshot_date,
-			SUM(ps.total_value)::text,
-			(SUM(ps.total_value) - SUM(ps.total_gain_loss))::text,
-			SUM(ps.total_gain_loss)::text,
+			snapshot_date,
+			currency,
+			SUM(total_value)::text,
+			(SUM(total_value) - SUM(total_gain_loss))::text,
+			SUM(total_gain_loss)::text,
 			CASE
-				WHEN (SUM(ps.total_value) - SUM(ps.total_gain_loss)) > 0
-				THEN ((SUM(ps.total_gain_loss) / (SUM(ps.total_value) - SUM(ps.total_gain_loss))) * 100)::text
+				WHEN (SUM(total_value) - SUM(total_gain_loss)) > 0
+				THEN ((SUM(total_gain_loss) / (SUM(total_value) - SUM(total_gain_loss))) * 100)::text
 				ELSE '0'
-			END
-		FROM portfolio_snapshots ps
-		JOIN portfolios p ON p.id = ps.portfolio_id
-		WHERE p.user_id = $1
-		  AND ($2::boolean = FALSE OR ps.snapshot_date >= $3::date)
-		GROUP BY ps.snapshot_date
-		ORDER BY ps.snapshot_date ASC
-	`, userID, hasSince, since)
+			END,
+			SUM(unconverted)::bigint
+		FROM converted
+		GROUP BY snapshot_date, currency
+		ORDER BY snapshot_date ASC
+	`, userID, currency, hasSince, since)
 	if err != nil {
 		return nil, err
 	}
@@ -143,10 +178,12 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(
 		var point GrowthPoint
 		if err := rows.Scan(
 			&point.Date,
+			&point.Currency,
 			&point.TotalValue,
 			&point.TotalCostBase,
 			&point.GainLoss,
 			&point.GainLossPct,
+			&point.PortfoliosUnconverted,
 		); err != nil {
 			return nil, err
 		}
@@ -164,13 +201,17 @@ func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(
 	hasSince bool,
 	since time.Time,
 ) ([]GrowthPoint, error) {
+	// One portfolio, one base currency: nothing to convert and nothing that can
+	// fail to, which is why the unconverted count is a literal zero here.
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			ps.snapshot_date,
+			ps.currency,
 			ps.total_value::text,
 			(ps.total_value - ps.total_gain_loss)::text,
 			ps.total_gain_loss::text,
-			ps.total_gain_loss_pct::text
+			ps.total_gain_loss_pct::text,
+			0::bigint
 		FROM portfolio_snapshots ps
 		JOIN portfolios p ON p.id = ps.portfolio_id
 		WHERE ps.portfolio_id = $1 AND p.user_id = $2
@@ -187,10 +228,12 @@ func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(
 		var point GrowthPoint
 		if err := rows.Scan(
 			&point.Date,
+			&point.Currency,
 			&point.TotalValue,
 			&point.TotalCostBase,
 			&point.GainLoss,
 			&point.GainLossPct,
+			&point.PortfoliosUnconverted,
 		); err != nil {
 			return nil, err
 		}

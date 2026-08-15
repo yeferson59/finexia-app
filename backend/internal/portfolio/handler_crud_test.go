@@ -543,7 +543,7 @@ func TestHandlerGetPortfolioGrowth(t *testing.T) {
 	t.Run("aggregated growth defaults to the full history", func(t *testing.T) {
 		var gotHasSince bool
 		repo := new(fakeRepository{
-			getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
+			getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, _ string, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
 				gotHasSince = hasSince
 				return nil, nil
 			},
@@ -562,7 +562,7 @@ func TestHandlerGetPortfolioGrowth(t *testing.T) {
 	t.Run("a period query bounds the range", func(t *testing.T) {
 		var gotHasSince bool
 		repo := new(fakeRepository{
-			getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
+			getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, _ string, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
 				gotHasSince = hasSince
 				return nil, nil
 			},

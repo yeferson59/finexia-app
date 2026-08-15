@@ -119,7 +119,7 @@ func TestHandlerExportRiskMetrics(t *testing.T) {
 	userID := uuid.New()
 	var gotHasSince bool
 	repo := new(fakeRepository{
-		getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
+		getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, _ string, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
 			gotHasSince = hasSince
 			return []GrowthPoint{{
 				Date:       time.Date(2026, time.January, 15, 0, 0, 0, 0, time.UTC),

@@ -4,6 +4,7 @@
 	import Stat from '$lib/ui/stat.svelte';
 	import GrowthChart from './growth-chart.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
+	import { currencySymbol } from '$lib/shared/format/money';
 	import {
 		PERIODS,
 		filterByPeriod,
@@ -41,11 +42,46 @@
 	const activeGain = $derived(activePoint ? activePoint.mv - activePoint.cb : 0);
 
 	// Métricas del resumen (la foto completa, no la del punto señalado).
+	//
+	// La ganancia es mercado menos capital invertido, no la diferencia entre el
+	// valor de hoy y el del primer snapshot: esa segunda cuenta convertía en
+	// «ganancia» el dinero que entraba, y un portafolio nuevo o una posición
+	// añadida disparaban la cifra mientras la cartera perdía. Es también la que
+	// contradecía al punto del gráfico, que siempre restó bien.
 	const currentVal = $derived(parseFloat(summary.currentValue || '0'));
-	const initialVal = $derived(parseFloat(summary.initialValue || '0'));
-	const totalGrowthPct = $derived(parseFloat(summary.totalGrowthPct || '0'));
-	const absoluteGain = $derived(currentVal - initialVal);
+	const lastPoint = $derived(points.at(-1) ?? null);
+	// Ausente (backend anterior) no es cero: se cae al último punto de la serie.
+	const absoluteGain = $derived(
+		summary.gainLoss !== undefined
+			? parseFloat(summary.gainLoss || '0')
+			: (lastPoint?.mv ?? 0) - (lastPoint?.cb ?? 0)
+	);
+	const investedVal = $derived(currentVal - absoluteGain);
+	const gainPct = $derived(
+		summary.gainLossPct !== undefined
+			? parseFloat(summary.gainLossPct || '0')
+			: investedVal > 0
+				? (absoluteGain / investedVal) * 100
+				: 0
+	);
 	const isPositive = $derived(absoluteGain >= 0);
+
+	/*
+	 * La serie viene en una sola moneda: el backend convierte cada portafolio a
+	 * la del perfil, o a la que pida el panel. Antes el signo de dólar estaba
+	 * fijo en la tarjeta, así que unas cifras en pesos se leían como dólares.
+	 */
+	const currency = $derived((summary.currency || 'USD').trim().toUpperCase());
+	const symbol = $derived(currencySymbol(currency));
+
+	/*
+	 * Fechas cuyo total incluye algún portafolio que no se pudo convertir: sus
+	 * importes entran a valor nominal, así que el total no está del todo en la
+	 * moneda que dice. Se avisa en vez de callarlo.
+	 */
+	const unconvertedDates = $derived(
+		filteredData.filter((d) => (d.portfoliosUnconverted ?? 0) > 0).length
+	);
 
 	/** Al cambiar de periodo el índice anterior ya no señala al mismo día. */
 	function selectPeriod(period: Period) {
@@ -61,7 +97,7 @@
 	}
 
 	function fmtMoney(v: number): string {
-		return privacy.money('$' + fmt(v));
+		return privacy.money(symbol + fmt(v));
 	}
 
 	/*
@@ -70,10 +106,10 @@
 	 */
 	function fmtAbbrev(v: number): string {
 		const abs = Math.abs(v);
-		if (abs >= 1_000_000) return privacy.money(`$${(v / 1_000_000).toFixed(1)}M`);
-		if (abs >= 10_000) return privacy.money(`$${(v / 1_000).toFixed(0)}k`);
-		if (abs >= 1_000) return privacy.money(`$${(v / 1_000).toFixed(1)}k`);
-		return privacy.money(`$${v.toFixed(0)}`);
+		if (abs >= 1_000_000) return privacy.money(`${symbol}${(v / 1_000_000).toFixed(1)}M`);
+		if (abs >= 10_000) return privacy.money(`${symbol}${(v / 1_000).toFixed(0)}k`);
+		if (abs >= 1_000) return privacy.money(`${symbol}${(v / 1_000).toFixed(1)}k`);
+		return privacy.money(`${symbol}${v.toFixed(0)}`);
 	}
 
 	/*
@@ -128,12 +164,21 @@
 			value="{isPositive ? '+' : '−'}{fmtMoney(Math.abs(absoluteGain))}"
 		/>
 		<Stat
-			label="Desde creación"
+			label="Rendimiento"
 			tone={isPositive ? 'positive' : 'negative'}
-			value="{isPositive ? '+' : ''}{fmt(totalGrowthPct)}%"
+			value="{isPositive ? '+' : ''}{fmt(gainPct)}%"
 		/>
-		<Stat label="Valor actual" tone="highlight" value={fmtMoney(currentVal)} />
+		<!-- El código va en la etiqueta porque el símbolo no siempre distingue:
+		     en es-CO el peso y el dólar comparten el "$". -->
+		<Stat label="Valor actual · {currency}" tone="highlight" value={fmtMoney(currentVal)} />
 	</div>
+
+	{#if unconvertedDates > 0}
+		<p class="fx-note" role="status">
+			Faltan tasas para convertir algún portafolio a {currency}: en {unconvertedDates}
+			{unconvertedDates === 1 ? 'fecha' : 'fechas'} sus importes se suman sin convertir.
+		</p>
+	{/if}
 
 	{#if points.length < 2}
 		<EmptyState
@@ -255,6 +300,12 @@
 		margin-bottom: 1.5rem;
 		padding-bottom: 1.5rem;
 		border-bottom: 1px solid var(--border);
+	}
+
+	.fx-note {
+		margin: -0.75rem 0 1.25rem;
+		font-size: 0.8rem;
+		color: rgba(212, 145, 42, 0.85);
 	}
 
 	/* Alto fijo: el detalle aparece y desaparece sin mover la gráfica. */

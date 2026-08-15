@@ -151,15 +151,32 @@ export const growthDataPointSchema = z.object({
 	totalValue: z.string(),
 	totalCostBase: z.string(),
 	gainLoss: z.string(),
-	gainLossPct: z.string()
+	gainLossPct: z.string(),
+	// Portafolios sumados a esta fecha sin tasa con la que convertirlos, y por
+	// tanto contados a valor nominal. Opcional por si el backend va por detrás.
+	portfoliosUnconverted: z.number().optional()
 });
 
-/** Resumen agregado de la serie de crecimiento. */
+/**
+ * Resumen agregado de la serie de crecimiento.
+ *
+ * Lleva dos lecturas distintas que no hay que confundir: `totalGrowthPct` mide
+ * cuánto se movió el **valor** entre el primer snapshot y el último —abrir un
+ * portafolio o añadir una posición cuenta como crecimiento— mientras que
+ * `gainLoss`/`gainLossPct` son el beneficio del último punto, mercado menos
+ * capital invertido, que es el rendimiento de verdad.
+ *
+ * Las dos últimas son opcionales para tolerar un backend anterior.
+ */
 export const growthSummarySchema = z.object({
 	firstDate: z.string(),
 	initialValue: z.string(),
 	currentValue: z.string(),
-	totalGrowthPct: z.string()
+	totalGrowthPct: z.string(),
+	gainLoss: z.string().optional(),
+	gainLossPct: z.string().optional(),
+	/** Moneda en la que están todos los importes de la serie. */
+	currency: z.string().optional()
 });
 
 /** Crecimiento (`GET /portfolios/growth` y `GET /portfolios/:id/growth`). */

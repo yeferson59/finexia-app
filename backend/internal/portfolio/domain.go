@@ -412,13 +412,29 @@ type GrowthPoint struct {
 	TotalCostBase string
 	GainLoss      string
 	GainLossPct   string
+	// Currency the three amounts above are expressed in. The aggregate series
+	// converts every portfolio into it; a single portfolio's series is already
+	// in its own base currency.
+	Currency string
+	// How many portfolios went into this date without a rate to convert them,
+	// and are therefore added at face value. Zero is the normal case.
+	PortfoliosUnconverted int64
 }
 
+// GrowthSummary carries two different readings of the same series and they must
+// not be confused. InitialValue/CurrentValue/TotalGrowthPct describe how the
+// value moved between the first snapshot and the last, which counts money put
+// in as growth. GainLoss/GainLossPct are the profit of the latest point —
+// market value minus invested capital — which is the actual return.
 type GrowthSummary struct {
 	FirstDate      time.Time
 	InitialValue   string
 	CurrentValue   string
 	TotalGrowthPct string
+	GainLoss       string
+	GainLossPct    string
+	// Currency every amount in the series is expressed in.
+	Currency string
 }
 
 // PortfolioValuePoint is what one portfolio was worth on one snapshot date,

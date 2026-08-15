@@ -131,7 +131,7 @@ func (h *handler) ExportRiskMetrics(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	points, _, err := h.service.GetPortfolioGrowth(c, userID, "ALL")
+	points, _, err := h.service.GetPortfolioGrowth(c, userID, "", "ALL")
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error generating report", "Could not retrieve growth data")
 	}
