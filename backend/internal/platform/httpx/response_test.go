@@ -150,15 +150,15 @@ func TestEnvelopes(t *testing.T) {
 
 func TestPaginationMetadata(t *testing.T) {
 	info := new(paginate.PageInfo{Page: 2, Limit: 10, Offset: 10})
-	meta := PaginationMetadata(info, 35, "itemsForPage", "totalItems")
+	meta := PaginationMetadata(info, 35)
 
-	if meta["totalPages"] != uint(4) {
-		t.Errorf("totalPages = %v, want 4", meta["totalPages"])
+	if meta.TotalPages != uint(4) {
+		t.Errorf("totalPages = %v, want 4", meta.TotalPages)
 	}
-	if meta["previous"] != true || meta["next"] != true {
-		t.Errorf("previous/next = %v/%v, want true/true", meta["previous"], meta["next"])
+	if meta.Previous != true || meta.Next != true {
+		t.Errorf("previous/next = %v/%v, want true/true", meta.Previous, meta.Next)
 	}
-	if meta["itemsForPage"] != 10 || meta["totalItems"] != uint(35) {
+	if meta.Limit != 10 || meta.Total != uint(35) {
 		t.Errorf("unexpected keys: %v", meta)
 	}
 }

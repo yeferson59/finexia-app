@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 
+	"github.com/yeferson59/finexia-app/pkg/dtos"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
 )
 
@@ -99,16 +100,16 @@ func SuccessAction(c fiber.Ctx, status int, message, details, action string, dat
 // PaginationMetadata builds the standard "MetaData" block shared by every
 // paginated list response. limitKey and totalKey let callers keep their
 // historical field names (e.g. "usersForPage"/"totalUsers").
-func PaginationMetadata(paginateInfo *paginate.PageInfo, count uint, limitKey, totalKey string) fiber.Map {
+func PaginationMetadata(paginateInfo *paginate.PageInfo, count uint) dtos.MetaDataPagination {
 	totalPages := helpers.CalculateTotalPages(count, uint(paginateInfo.Limit))
 
-	return fiber.Map{
-		"currentPage": paginateInfo.Page,
-		limitKey:      paginateInfo.Limit,
-		"offset":      paginateInfo.Offset,
-		totalKey:      count,
-		"totalPages":  totalPages,
-		"previous":    paginateInfo.Page > 1,
-		"next":        paginateInfo.Page < int(totalPages),
+	return dtos.MetaDataPagination{
+		CurrentPage: uint(paginateInfo.Page),
+		Offset:      uint(paginateInfo.Offset),
+		Limit:       uint(paginateInfo.Limit),
+		Total:       count,
+		TotalPages:  totalPages,
+		Previous:    paginateInfo.Page > 1,
+		Next:        paginateInfo.Page < int(totalPages),
 	}
 }

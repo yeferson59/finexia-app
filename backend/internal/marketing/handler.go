@@ -47,8 +47,8 @@ func (h *handler) listWaitlist(c fiber.Ctx) error {
 		return httpx.FromDomain(c, err, "failed to list waitlist", "waitlist:list")
 	}
 
-	return httpx.OK(c, "waitlist", "waitlist retrieved successfully", dtos.FilterPagination[[]Waitlist, fiber.Map]{
+	return httpx.OK(c, "waitlist", "waitlist retrieved successfully", dtos.FilterPagination[[]Waitlist]{
 		Items:    waitlist,
-		MetaData: httpx.PaginationMetadata(paginateInfo, count, "limit", "total"),
+		MetaData: httpx.PaginationMetadata(paginateInfo, count),
 	})
 }

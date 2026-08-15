@@ -34,9 +34,9 @@ func (h *handler) GetListUsers(c fiber.Ctx) error {
 		return httpx.FromDomain(c, err, "get product pagination", "users:list")
 	}
 
-	return httpx.OK(c, "product pagination", "get products successfully", dtos.FilterPagination[[]identity.User, fiber.Map]{
+	return httpx.OK(c, "product pagination", "get products successfully", dtos.FilterPagination[[]identity.User]{
 		Items:    users,
-		MetaData: httpx.PaginationMetadata(paginateInfo, count, "usersForPage", "totalUsers"),
+		MetaData: httpx.PaginationMetadata(paginateInfo, count),
 	})
 }
 

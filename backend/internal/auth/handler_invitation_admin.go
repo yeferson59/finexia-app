@@ -56,9 +56,9 @@ func (h *handler) listInvitations(c fiber.Ctx) error {
 		return httpx.FromDomain(c, err, "failed to list invitations", "invitations:list")
 	}
 
-	return httpx.OK(c, "invitations", "invitations retrieved successfully", dtos.FilterPagination[[]Invitation, fiber.Map]{
+	return httpx.OK(c, "invitations", "invitations retrieved successfully", dtos.FilterPagination[[]Invitation]{
 		Items:    invitations,
-		MetaData: httpx.PaginationMetadata(paginateInfo, count, "limit", "total"),
+		MetaData: httpx.PaginationMetadata(paginateInfo, count),
 	})
 }
 
