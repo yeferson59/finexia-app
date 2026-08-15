@@ -185,8 +185,7 @@ func TestGetPortfolioGrowthUsesPeriodFilter(t *testing.T) {
 	if summary.TotalGrowthPct != "10.00" {
 		t.Errorf("TotalGrowthPct = %q, want 10.00", summary.TotalGrowthPct)
 	}
-	// La serie tiene una moneda y el resumen la nombra: sin ella el cliente
-	// pinta un símbolo de dólar sobre importes que pueden ser pesos.
+
 	if summary.Currency != "COP" {
 		t.Errorf("Currency = %q, want COP", summary.Currency)
 	}

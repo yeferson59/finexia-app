@@ -299,17 +299,13 @@ type GrowthDataPointDTO struct {
 }
 
 type GrowthSummaryDTO struct {
-	FirstDate    string `json:"firstDate"`
-	InitialValue string `json:"initialValue"`
-	CurrentValue string `json:"currentValue"`
-	// Crecimiento del valor entre la primera fecha y la última: abrir un
-	// portafolio o añadir una posición cuenta como crecimiento.
+	FirstDate      string `json:"firstDate"`
+	InitialValue   string `json:"initialValue"`
+	CurrentValue   string `json:"currentValue"`
 	TotalGrowthPct string `json:"totalGrowthPct"`
-	// Beneficio del último punto (mercado − invertido), que es el rendimiento.
-	GainLoss    string `json:"gainLoss"`
-	GainLossPct string `json:"gainLossPct"`
-	// Moneda en la que están todos los importes de la serie.
-	Currency string `json:"currency"`
+	GainLoss       string `json:"gainLoss"`
+	GainLossPct    string `json:"gainLossPct"`
+	Currency       string `json:"currency"`
 }
 
 type GrowthResponseDTO struct {

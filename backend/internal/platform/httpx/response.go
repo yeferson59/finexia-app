@@ -14,29 +14,29 @@ import (
 	"github.com/yeferson59/finexia-app/pkg/helpers"
 )
 
+// Success writes the success envelope with an explicit status.
+func Success(c fiber.Ctx, status int, message, details string, data any) error {
+	return c.Status(status).JSON(dtos.Response{
+		Success:   true,
+		Message:   message,
+		Details:   details,
+		Data:      data,
+		Timestamp: time.Now(),
+	})
+}
+
 // OK writes the standard 200 success envelope.
 func OK(c fiber.Ctx, message, details string, data any) error {
 	return Success(c, fiber.StatusOK, message, details, data)
 }
 
-// Success writes the success envelope with an explicit status.
-func Success(c fiber.Ctx, status int, message, details string, data any) error {
-	return c.Status(status).JSON(fiber.Map{
-		"success":   true,
-		"message":   message,
-		"details":   details,
-		"data":      data,
-		"timestamp": time.Now(),
-	})
-}
-
 // Error writes the error envelope with an explicit status.
 func Error(c fiber.Ctx, status int, message, details string) error {
-	return c.Status(status).JSON(fiber.Map{
-		"success":   false,
-		"message":   message,
-		"details":   details,
-		"timestamp": time.Now(),
+	return c.Status(status).JSON(dtos.Response{
+		Success:   false,
+		Message:   message,
+		Details:   details,
+		Timestamp: time.Now(),
 	})
 }
 
@@ -64,36 +64,36 @@ func Forbidden(c fiber.Ctx, message, details string) error {
 // the error's typed Kind — domains tag their errors via httpx.AsNotFound and
 // friends — and an untagged error is a 500.
 func FromDomain(c fiber.Ctx, err error, message, action string) error {
-	return c.Status(domainStatus(err)).JSON(fiber.Map{
-		"success":   false,
-		"message":   message,
-		"action":    action,
-		"timestamp": time.Now(),
+	return c.Status(domainStatus(err)).JSON(dtos.Response{
+		Success:   false,
+		Message:   message,
+		Action:    action,
+		Timestamp: time.Now(),
 	})
 }
 
 // ErrorAction writes an error envelope that carries an "action" code alongside
 // free-form details, for statuses FromDomain doesn't cover (403, 409, 410, …).
 func ErrorAction(c fiber.Ctx, status int, message, details, action string) error {
-	return c.Status(status).JSON(fiber.Map{
-		"success":   false,
-		"message":   message,
-		"details":   details,
-		"action":    action,
-		"timestamp": time.Now(),
+	return c.Status(status).JSON(dtos.Response{
+		Success:   false,
+		Message:   message,
+		Details:   details,
+		Action:    action,
+		Timestamp: time.Now(),
 	})
 }
 
 // SuccessAction is the success counterpart of ErrorAction, for responses that
 // carry both an action code and a data payload.
 func SuccessAction(c fiber.Ctx, status int, message, details, action string, data any) error {
-	return c.Status(status).JSON(fiber.Map{
-		"success":   true,
-		"message":   message,
-		"details":   details,
-		"action":    action,
-		"data":      data,
-		"timestamp": time.Now(),
+	return c.Status(status).JSON(dtos.Response{
+		Success:   true,
+		Message:   message,
+		Details:   details,
+		Action:    action,
+		Data:      data,
+		Timestamp: time.Now(),
 	})
 }
 
