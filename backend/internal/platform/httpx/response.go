@@ -98,8 +98,7 @@ func SuccessAction(c fiber.Ctx, status int, message, details, action string, dat
 }
 
 // PaginationMetadata builds the standard "MetaData" block shared by every
-// paginated list response. limitKey and totalKey let callers keep their
-// historical field names (e.g. "usersForPage"/"totalUsers").
+// paginated list response.
 func PaginationMetadata(paginateInfo *paginate.PageInfo, count uint) dtos.MetaDataPagination {
 	totalPages := helpers.CalculateTotalPages(count, uint(paginateInfo.Limit))
 
