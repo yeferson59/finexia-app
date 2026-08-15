@@ -142,7 +142,7 @@ function checkContract<T>(path: string, data: unknown, schema?: ZodType<T>) {
 		.join('\n');
 
 	console.warn(
-		`[api] La respuesta de ${path} no cumple el contrato de lib/api/schemas.ts:\n${issues}` +
+		`[api] Response from ${path} not implement contract lib/api/schemas.ts:\n${issues}` +
 			(parsed.error.issues.length > 5 ? `\n  · … y ${parsed.error.issues.length - 5} más` : '')
 	);
 }

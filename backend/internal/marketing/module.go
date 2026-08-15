@@ -102,7 +102,5 @@ func (m *Module) Routes(router fiber.Router) {
 	// already in the locals the JWT gate wrote, so checking it needs nothing
 	// from auth and every other module reads it the same way. Only RequireAuth
 	// has to be injected, because only it can validate a token.
-	router.Get("/users/waitlist",
-		m.authMiddl.RequireAuth(), m.limiter, httpx.RequireAdmin(),
-		paginate.New(), m.handler.listWaitlist)
+	router.Get("/users/waitlist", m.authMiddl.RequireAuth(), m.limiter, httpx.RequireAdmin(), paginate.New(), m.handler.listWaitlist)
 }

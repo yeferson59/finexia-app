@@ -304,7 +304,7 @@ export const userItemSchema = z.object({
 	email: z.string(),
 	emailVerified: z.boolean(),
 	createdAt: z.string(),
-	bannedAt: z.string().nullable(),
+	bannedAt: z.string().optional().nullable(),
 	role: z.object({ name: z.string() })
 });
 
@@ -324,7 +324,7 @@ export const waitlistItemSchema = z.object({
 	id: z.string(),
 	email: z.string(),
 	status: z.enum(['pending', 'invited', 'registered']),
-	invitedAt: z.string().nullable(),
+	invitedAt: z.string().optional().nullable(),
 	createdAt: z.string()
 });
 
