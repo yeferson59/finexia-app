@@ -2,12 +2,13 @@
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import DatePicker from '$lib/ui/date-picker.svelte';
 	import PageHeader from '$lib/ui/page-header.svelte';
 	import { todayLocalDateString } from '$lib/shared/format/date';
+	import { FALLBACK_CURRENCY } from '$lib/shared/currency';
 	import type { Asset, Platform } from '$lib/api/types';
 	import AssetCombobox from './asset-combobox.svelte';
 	import PortfolioEntryPlatformField from './portfolio-entry-platform-field.svelte';
+	import PortfolioEntryPurchaseFields from './portfolio-entry-purchase-fields.svelte';
 	import AssetPreview from './asset-preview.svelte';
 	import PortfolioEntrySummary from './portfolio-entry-summary.svelte';
 
@@ -30,6 +31,27 @@
 	let assetSearch = $state('');
 	let selectedAsset = $state<Asset | null>(null);
 
+	/**
+	 * Moneda en la que se pagó la compra. El precio que el usuario copia de su
+	 * bróker viene en la moneda de cotización del activo, así que esa es la
+	 * semilla; antes se enviaba USD fijo y una acción danesa entraba con su
+	 * precio en DKK etiquetado como dólares, lo que inflaba la pérdida al
+	 * comparar un coste sin convertir contra un valor de mercado convertido.
+	 *
+	 * Sigue siendo editable porque las dos monedas pueden diferir de verdad:
+	 * un bróker puede liquidar en USD una compra cotizada en DKK. Derivado
+	 * reasignable: se resiembra al cambiar de activo y, mientras tanto, manda lo
+	 * que haya elegido el usuario en el selector.
+	 *
+	 * Se exige el código ISO de tres letras: `Intl.NumberFormat` lanza con
+	 * cualquier otra cosa, y `assets.currency` es un CHAR(3) que un activo
+	 * aportado por un usuario puede traer relleno de espacios.
+	 */
+	const assetCurrency = $derived(selectedAsset?.currency?.trim().toUpperCase() ?? '');
+	let costCurrency: string = $derived(
+		/^[A-Z]{3}$/.test(assetCurrency) ? assetCurrency : FALLBACK_CURRENCY
+	);
+
 	let isSubmitting = $state(false);
 
 	const totalValue = $derived((parseFloat(quantity) || 0) * (parseFloat(purchasePrice) || 0));
@@ -41,7 +63,7 @@
 	function formatCurrency(value: number): string {
 		return new Intl.NumberFormat('es-CO', {
 			style: 'currency',
-			currency: 'USD',
+			currency: costCurrency,
 			minimumFractionDigits: 2
 		}).format(value);
 	}
@@ -104,64 +126,15 @@
 		</section>
 
 		<!-- Purchase Details -->
-		<section class="form-section">
-			<h2 class="section-title">Detalles de Compra</h2>
-
-			<div class="form-row">
-				<div class="form-group">
-					<label for="quantity" class="form-label">Cantidad <span class="required">*</span></label>
-					<div class="input-addon">
-						<input
-							id="quantity"
-							type="number"
-							name="quantity"
-							bind:value={quantity}
-							placeholder="1000"
-							class="form-input"
-							min="0"
-							step="any"
-							required
-						/>
-					</div>
-					<p class="field-hint">Número de unidades</p>
-				</div>
-
-				<div class="form-group">
-					<label for="purchasePrice" class="form-label"
-						>Precio de Compra <span class="required">*</span></label
-					>
-					<div class="input-addon">
-						<span class="addon-text">$</span>
-						<input
-							id="purchasePrice"
-							type="number"
-							name="purchasePrice"
-							bind:value={purchasePrice}
-							placeholder="150.50"
-							class="form-input"
-							min="0"
-							step="0.01"
-							required
-						/>
-					</div>
-					<p class="field-hint">Precio por unidad</p>
-				</div>
-			</div>
-
-			<div class="form-row">
-				<div class="form-group">
-					<span class="form-label">Fecha de Compra</span>
-					<DatePicker name="purchaseDate" bind:value={purchaseDate} required />
-				</div>
-
-				<div class="form-group">
-					<span class="form-label">Valor Total Invertido</span>
-					<div class="value-display">
-						<p class="total-value">{formatCurrency(totalValue)}</p>
-					</div>
-				</div>
-			</div>
-		</section>
+		<PortfolioEntryPurchaseFields
+			asset={selectedAsset}
+			bind:quantity
+			bind:purchasePrice
+			bind:purchaseDate
+			bind:costCurrency
+			{totalValue}
+			{formatCurrency}
+		/>
 
 		<!-- Additional Notes -->
 		<section class="form-section">
@@ -277,12 +250,6 @@
 		margin-bottom: 0;
 	}
 
-	.form-row {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1.5rem;
-	}
-
 	.form-label {
 		font-size: 0.9rem;
 		font-weight: 600;
@@ -294,7 +261,6 @@
 		color: var(--red);
 	}
 
-	.form-input,
 	.form-textarea {
 		padding: 0.85rem 1rem;
 		border: 1.5px solid rgba(212, 145, 42, 0.25);
@@ -306,12 +272,10 @@
 		transition: all 0.3s ease;
 	}
 
-	.form-input::placeholder,
 	.form-textarea::placeholder {
 		color: rgba(236, 234, 229, 0.55);
 	}
 
-	.form-input:focus,
 	.form-textarea:focus {
 		outline: none;
 		border-color: var(--amber);
@@ -333,47 +297,6 @@
 
 	/* La página original declaraba `.empty-text` dos veces; se fusionan aquí con
 	   el resultado efectivo de la cascada (color de la segunda, peso de la primera). */
-
-	.input-addon {
-		position: relative;
-		display: flex;
-		align-items: center;
-	}
-
-	.addon-text {
-		position: absolute;
-		left: 1rem;
-		font-size: 0.9rem;
-		color: rgba(236, 234, 229, 0.5);
-		font-weight: 600;
-		pointer-events: none;
-	}
-
-	.input-addon .form-input {
-		padding-left: 2.5rem;
-	}
-
-	.value-display {
-		font-family: var(--font-mono);
-		font-variant-numeric: tabular-nums;
-		padding: 0.85rem 1rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.022);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		min-height: 44px;
-	}
-
-	.total-value {
-		font-variant-numeric: tabular-nums;
-		margin: 0;
-		font-size: 1.2rem;
-		font-weight: 700;
-		color: var(--amber);
-		font-family: var(--font-body);
-	}
 
 	.form-error {
 		padding: 1rem 1.25rem;
@@ -475,10 +398,6 @@
 	}
 
 	@media (max-width: 768px) {
-		.form-row {
-			grid-template-columns: 1fr;
-		}
-
 		.form-actions {
 			flex-direction: column-reverse;
 		}

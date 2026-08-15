@@ -13,7 +13,7 @@ export const actions = {
 			sourceId: formData.get('platformId'),
 			quantity: formData.get('quantity'),
 			price: formData.get('purchasePrice'),
-			costCurrency: 'USD',
+			costCurrency: formData.get('costCurrency'),
 			category: formData.get('category'),
 			entryDate: formData.get('purchaseDate'),
 			notes: formData.get('notes')

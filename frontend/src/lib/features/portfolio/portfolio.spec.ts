@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { groupHoldings, computeTypeBreakdown, formatPct, type RawHolding } from './portfolio';
+import { portfolioEntrySchema } from './schemas';
 
 // Un portafolio en USD: los totales en moneda base coinciden con
 // cantidad × precio porque no hay conversión de por medio.
@@ -151,5 +152,35 @@ describe('formatPct', () => {
 	it('prefixes non-negative values with a plus sign', () => {
 		expect(formatPct(12.345)).toBe('+12.35%');
 		expect(formatPct(-3.2)).toBe('-3.20%');
+	});
+});
+
+describe('portfolioEntrySchema', () => {
+	const entry = {
+		portfolioId: '3f1c1c5e-1f5a-4f1e-9c2a-9a1d0b2f7e11',
+		assetId: '5b2d6a4c-2a3b-4c5d-8e9f-0a1b2c3d4e5f',
+		sourceId: 'a1b2c3d4-e5f6-4a5b-9c8d-7e6f5a4b3c2d',
+		quantity: '0.201065',
+		price: '866.60',
+		category: 'stock',
+		entryDate: '2024-04-11'
+	};
+
+	it('normaliza la moneda del coste a ISO en mayúsculas', () => {
+		const parsed = portfolioEntrySchema.safeParse({ ...entry, costCurrency: ' dkk ' });
+		expect(parsed.success).toBe(true);
+		expect(parsed.data?.costCurrency).toBe('DKK');
+	});
+
+	// El formulario la enviaba fija en USD: una acción danesa entraba con su
+	// precio en coronas etiquetado como dólares y el coste quedaba sin convertir.
+	it('rechaza una moneda ausente o que no sea un código de tres letras', () => {
+		expect(portfolioEntrySchema.safeParse({ ...entry, costCurrency: undefined }).success).toBe(
+			false
+		);
+		expect(portfolioEntrySchema.safeParse({ ...entry, costCurrency: '' }).success).toBe(false);
+		expect(portfolioEntrySchema.safeParse({ ...entry, costCurrency: 'corona' }).success).toBe(
+			false
+		);
 	});
 });

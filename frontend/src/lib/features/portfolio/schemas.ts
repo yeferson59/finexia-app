@@ -36,7 +36,14 @@ export const portfolioEntrySchema = z.object({
 	sourceId: z.uuid(),
 	quantity: z.coerce.number().positive(),
 	price: z.coerce.number().positive(),
-	costCurrency: z.coerce.string(),
+	// El precio y su moneda viajan separados, así que una moneda vacía o basura
+	// no falla: se guarda y el coste queda etiquetado con algo que no es lo que
+	// se pagó. Se exige el código ISO de tres letras que espera el backend.
+	costCurrency: z.coerce
+		.string()
+		.trim()
+		.toUpperCase()
+		.regex(/^[A-Z]{3}$/, 'Moneda inválida: usa un código ISO de tres letras'),
 	category: z.coerce.string().min(1),
 	entryDate: z.coerce.date(),
 	notes: z.coerce.string().optional()
