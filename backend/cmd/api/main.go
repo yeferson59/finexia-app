@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -18,24 +19,27 @@ import (
 )
 
 func main() {
-	cfg := config.New()
-	envs := cfg.LoadEnvs()
+	cfg, err := config.New()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	log := logger.New(logger.Config{
 		Level:       logger.LevelInfo,
 		Output:      os.Stderr,
-		Environment: envs.Environment,
+		Environment: cfg.Environment,
 	})
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if err := run(ctx, envs, log); err != nil {
+	if err := run(ctx, cfg, log); err != nil {
 		log.With(logger.Str("cmd", "main")).Fatal(ctx, "application error: "+err.Error())
 	}
 }
 
 // run creates the infrastructure and hands it to the composition root; all
 // application wiring lives in internal/app.
-func run(ctx context.Context, envs *config.Env, log logger.Logger) error {
+func run(ctx context.Context, envs *config.EnvConfig, log logger.Logger) error {
 	// Before anything is connected: a missing or guessable JWT_SECRET means
 	// every access token this process would issue is forgeable by anyone, so
 	// it stops the boot rather than degrading silently.
@@ -70,7 +74,7 @@ func run(ctx context.Context, envs *config.Env, log logger.Logger) error {
 	// without it is deliberate: a default would mean storing those keys under a
 	// guessable key, which is exactly the failure this is meant to prevent.
 	// Generate one with: openssl rand -base64 32
-	keyring, err := secretbox.NewKeyring(envs.MarketKEKKeys, envs.MarketKEKActive)
+	keyring, err := secretbox.NewKeyring(envs.MarketKEKKeys[0], envs.MarketKEKActive)
 	if err != nil {
 		return errors.New("failed to load MARKET_KEK_KEYS: " + err.Error())
 	}

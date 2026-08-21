@@ -27,10 +27,12 @@ func main() {
 // runMigration opens the migrate instance, defers its close, then delegates to run.
 // Keeping the defer here (no log.Fatal/os.Exit in this function) satisfies gocritic.
 func runMigration(cmd string, steps int) error {
-	c := config.New()
-	cfg := c.LoadEnvs()
+	c, err := config.New()
+	if err != nil {
+		return err
+	}
 
-	m, err := migrate.New(cfg.PathMigration, cfg.DatabaseURL)
+	m, err := migrate.New(c.PathMigration, c.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("migrate.New: %w", err)
 	}

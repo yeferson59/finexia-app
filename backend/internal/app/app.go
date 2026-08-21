@@ -56,7 +56,7 @@ const (
 // Deps carries the already-connected infrastructure the App composes. main
 // owns creating (and closing) these; App only wires them.
 type Deps struct {
-	Envs  *config.Env
+	Envs  *config.EnvConfig
 	DB    *pgxpool.Pool
 	Cache *goredis.Client
 	S3    *s3.Client
@@ -452,7 +452,7 @@ func (a *App) registerJobs(sched *scheduler.Scheduler, mods *modules, persistent
 
 // authConfig projects the platform-wide environment onto the auth module's own
 // Config, keeping the module decoupled from *config.Env.
-func authConfig(env *config.Env) auth.Config {
+func authConfig(env *config.EnvConfig) auth.Config {
 	return auth.Config{
 		JWTSecret:               env.JWTSecret,
 		JWTAccessDuration:       env.JWTAccessDuration,
@@ -471,7 +471,7 @@ func authConfig(env *config.Env) auth.Config {
 }
 
 // userConfig projects the environment onto the user module's Config.
-func userConfig(env *config.Env) user.Config {
+func userConfig(env *config.EnvConfig) user.Config {
 	return user.Config{
 		PublicURL:   env.PublicURL,
 		FrontendURL: env.FrontendURL,
@@ -479,14 +479,14 @@ func userConfig(env *config.Env) user.Config {
 }
 
 // portfolioConfig projects the environment onto the portfolio module's Config.
-func portfolioConfig(env *config.Env) portfolio.Config {
+func portfolioConfig(env *config.EnvConfig) portfolio.Config {
 	return portfolio.Config{
 		FrontendURL: env.FrontendURL,
 	}
 }
 
 // notificationConfig projects the environment onto the notification module's Config.
-func notificationConfig(env *config.Env) notification.Config {
+func notificationConfig(env *config.EnvConfig) notification.Config {
 	return notification.Config{
 		PublicURL: env.PublicURL,
 	}

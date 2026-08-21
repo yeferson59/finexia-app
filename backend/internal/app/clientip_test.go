@@ -50,7 +50,7 @@ func probeApp(t *testing.T) string {
 	}
 
 	a, err := New(Deps{
-		Envs: new(config.Env{
+		Envs: new(config.EnvConfig{
 			Port:               "0",
 			Environment:        "test",
 			JWTSecret:          "kP4vN8xQ2mR7wL5tZ9bC3jH6yF1sD0aG",

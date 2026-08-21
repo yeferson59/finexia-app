@@ -33,7 +33,7 @@ func TestValidateRejectsUnsafeJWTSecrets(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			env := Env{JWTSecret: tc.secret, DatabaseURL: "postgres://localhost/db"}
+			env := EnvConfig{JWTSecret: tc.secret, DatabaseURL: "postgres://localhost/db"}
 
 			if err := env.Validate(); err == nil {
 				t.Fatalf("Validate accepted JWT_SECRET %q", tc.secret)
@@ -46,7 +46,7 @@ func TestValidateRejectsUnsafeJWTSecrets(t *testing.T) {
 // value that is long enough to pass every other rule.
 func TestValidateRejectsPlaceholderRegardlessOfCase(t *testing.T) {
 	for _, secret := range []string{"your-256-bit-secret", "YOUR-256-BIT-SECRET"} {
-		env := Env{JWTSecret: secret, DatabaseURL: "postgres://localhost/db"}
+		env := EnvConfig{JWTSecret: secret, DatabaseURL: "postgres://localhost/db"}
 
 		err := env.Validate()
 		if err == nil {
@@ -59,7 +59,7 @@ func TestValidateRejectsPlaceholderRegardlessOfCase(t *testing.T) {
 }
 
 func TestValidateAcceptsAGeneratedSecret(t *testing.T) {
-	env := Env{JWTSecret: goodSecret, DatabaseURL: "postgres://localhost/db"}
+	env := EnvConfig{JWTSecret: goodSecret, DatabaseURL: "postgres://localhost/db"}
 
 	if err := env.Validate(); err != nil {
 		t.Fatalf("Validate rejected a well-formed configuration: %v", err)
@@ -67,7 +67,7 @@ func TestValidateAcceptsAGeneratedSecret(t *testing.T) {
 }
 
 func TestValidateRequiresDatabaseURL(t *testing.T) {
-	env := Env{JWTSecret: goodSecret}
+	env := EnvConfig{JWTSecret: goodSecret}
 
 	if err := env.Validate(); err == nil {
 		t.Fatal("Validate accepted a configuration with no DATABASE_URL")
@@ -80,8 +80,13 @@ func TestValidateRequiresDatabaseURL(t *testing.T) {
 func TestLoadEnvsHasNoJWTSecretDefault(t *testing.T) {
 	t.Setenv("JWT_SECRET", "")
 
-	cfg := New()
-	if got := cfg.LoadEnvs().JWTSecret; got != "" {
+	cfg, err := New()
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if got := cfg.JWTSecret; got != "" {
 		t.Fatalf("JWT_SECRET defaulted to %q; it must stay empty so Validate can refuse the boot", got)
 	}
 }
