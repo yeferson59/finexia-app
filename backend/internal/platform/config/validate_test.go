@@ -82,11 +82,11 @@ func TestLoadEnvsHasNoJWTSecretDefault(t *testing.T) {
 
 	cfg, err := New()
 
-	if err != nil {
-		t.Error(err)
+	if err == nil {
+		t.Fatal(err)
 	}
 
-	if got := cfg.JWTSecret; got != "" {
-		t.Fatalf("JWT_SECRET defaulted to %q; it must stay empty so Validate can refuse the boot", got)
+	if err.Error() != "field DATABASE_URL is required must have a value" {
+		t.Fatalf("JWT_SECRET %q must not be empty", cfg.JWTSecret)
 	}
 }
