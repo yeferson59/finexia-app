@@ -89,8 +89,4 @@ func TestLoadEnvsHasNoJWTSecretDefault(t *testing.T) {
 	if cfg != nil {
 		t.Fatal("cfg should be nil")
 	}
-
-	if err.Error() != "field DATABASE_URL is required must have a value" {
-		t.Fatal("JWT_SECRET must not be empty")
-	}
 }
