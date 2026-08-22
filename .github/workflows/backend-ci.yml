@@ -39,6 +39,10 @@ jobs:
         run: go vet ./...
 
       - name: Test
+        env:
+          DATABASE_URL: "postgresql://postgres:password@localhost:5432/postgres?sslmode=disable"
+          JWT_SECRET: "zXI+y4c59+ccBRqkx1eU2zNN6lIYa2566IZFZJxyhkFIxxGRc12S20rUyJ4qBuW7"
+          MARKET_KEK_KEYS: "1:X0TJ9pJPSKURUNeeX3o1pMXZMHSQ7eoPBh600nbqTWw="
         run: go test ./... -count=1 -coverprofile=coverage.out
 
       - name: Coverage summary

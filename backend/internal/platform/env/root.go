@@ -2,7 +2,6 @@ package env
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"reflect"
 	"strconv"
@@ -310,8 +309,6 @@ func processField(fieldValue reflect.Value, fieldType reflect.Type) error {
 		if err != nil {
 			return err
 		}
-
-		fmt.Println(fieldParams.Required, fieldParams.HasDefaultValue, fieldParams.Value)
 
 		if fieldParams.Required && fieldParams.HasDefaultValue {
 			return errors.New("field " + fieldParams.KeyName + " is required and mustn't have a default value")
