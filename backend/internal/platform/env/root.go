@@ -2,6 +2,7 @@ package env
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"strconv"
@@ -86,7 +87,7 @@ func Load(filenames ...string) error {
 	}
 
 	if !exist {
-		return errors.New("file not exist.")
+		return errors.New("file not exist")
 	}
 
 	data, err := os.ReadFile(filename)
@@ -106,8 +107,9 @@ func Load(filenames ...string) error {
 }
 
 type FieldParams struct {
-	KeyName         string
 	Key             string
+	KeyName         string
+	Value           string
 	DefaultValue    string
 	HasDefaultValue bool
 	Required        bool
@@ -126,12 +128,12 @@ func getFieldParams(f reflect.StructField) (FieldParams, error) {
 	}
 
 	defaultValue, hasDefaultValue := f.Tag.Lookup("default")
-
 	name, tags := getKeyTags(value)
 
 	field := FieldParams{
 		Key:             f.Name,
 		KeyName:         name,
+		Value:           os.Getenv(name),
 		DefaultValue:    defaultValue,
 		HasDefaultValue: hasDefaultValue,
 	}
@@ -146,46 +148,70 @@ func getFieldParams(f reflect.StructField) (FieldParams, error) {
 	return field, nil
 }
 
-func getString(key, defaultValue string) string {
-	value := strings.TrimSpace(os.Getenv(key))
-	if value != "" {
-		return value
+func processString(value, defaultValue string) string {
+	if value == "" {
+		return defaultValue
 	}
 
-	return defaultValue
+	return value
 }
 
-func convertDuration(value string) time.Duration {
-	value = strings.TrimSpace(value)
-
+func convertDuration(value string) (time.Duration, error) {
 	switch {
 	case strings.Contains(value, seconds):
-		strNS, _ := strings.CutSuffix(value, seconds)
-		ns, _ := strconv.ParseInt(strNS, 10, 64)
+		strNS, ok := strings.CutSuffix(value, seconds)
+		if !ok {
+			return time.Duration(0), errors.New("")
+		}
 
-		return time.Second * time.Duration(ns)
+		ns, err := strconv.ParseInt(strNS, 10, 64)
+		if err != nil {
+			return time.Duration(0), err
+		}
+
+		return time.Second * time.Duration(ns), nil
 	case strings.Contains(value, minute):
-		strNM, _ := strings.CutSuffix(value, minute)
-		nm, _ := strconv.ParseInt(strNM, 10, 64)
+		strNM, ok := strings.CutSuffix(value, minute)
+		if !ok {
+			return time.Duration(0), errors.New("")
+		}
 
-		return time.Minute * time.Duration(nm)
+		nm, err := strconv.ParseInt(strNM, 10, 64)
+		if err != nil {
+			return time.Duration(0), err
+		}
+
+		return time.Minute * time.Duration(nm), nil
 	case strings.Contains(value, hour):
-		strNH, _ := strings.CutSuffix(value, hour)
-		nh, _ := strconv.ParseInt(strNH, 10, 64)
+		strNH, ok := strings.CutSuffix(value, hour)
+		if !ok {
+			return time.Duration(0), errors.New("")
+		}
 
-		return time.Hour * time.Duration(nh)
+		nh, err := strconv.ParseInt(strNH, 10, 64)
+		if err != nil {
+			return time.Duration(0), err
+		}
+
+		return time.Hour * time.Duration(nh), nil
 	case strings.Contains(value, day):
-		strND, _ := strings.CutSuffix(value, day)
-		nd, _ := strconv.ParseInt(strND, 10, 64)
+		strND, ok := strings.CutSuffix(value, day)
+		if !ok {
+			return time.Duration(0), errors.New("")
+		}
 
-		return time.Hour * 24 * time.Duration(nd)
+		nd, err := strconv.ParseInt(strND, 10, 64)
+		if err != nil {
+			return time.Duration(0), err
+		}
+
+		return time.Hour * 24 * time.Duration(nd), nil
 	}
 
-	return time.Duration(0)
+	return time.Duration(0), nil
 }
 
-func getSliceString(key, defaultValue string) []string {
-	value := strings.TrimSpace(os.Getenv(key))
+func processSliceString(value, defaultValue string) []string {
 	if value == "" {
 		return strings.Split(defaultValue, ",")
 	}
@@ -193,8 +219,7 @@ func getSliceString(key, defaultValue string) []string {
 	return strings.Split(value, ",")
 }
 
-func getDuration(key string, defaultValue string) time.Duration {
-	value := strings.TrimSpace(os.Getenv(key))
+func processDuration(value, defaultValue string) (time.Duration, error) {
 	if value == "" {
 		return convertDuration(defaultValue)
 	}
@@ -202,40 +227,107 @@ func getDuration(key string, defaultValue string) time.Duration {
 	return convertDuration(value)
 }
 
-func getInt64(key string, defaultValue string) int64 {
-	value := strings.TrimSpace(os.Getenv(key))
+func processInt(value, defaultValue string, bitSize int) (int64, error) {
 	if value == "" {
-		dv, _ := strconv.ParseInt(defaultValue, 10, 64)
+		dv, err := strconv.ParseInt(defaultValue, 10, bitSize)
+		if err != nil {
+			return 0, err
+		}
 
-		return dv
+		return dv, nil
 	}
 
-	int64Value, err := strconv.ParseInt(value, 10, 64)
+	int64Value, err := strconv.ParseInt(value, 10, bitSize)
 	if err != nil {
-		dv, _ := strconv.ParseInt(defaultValue, 10, 64)
+		dv, err := strconv.ParseInt(defaultValue, 10, bitSize)
+		if err != nil {
+			return 0, err
+		}
 
-		return dv
+		return dv, nil
 	}
 
-	return int64Value
+	return int64Value, nil
 }
 
-func getBool(key string, defaultValue string) bool {
-	value := strings.TrimSpace(os.Getenv(key))
+func processBool(value, defaultValue string) (bool, error) {
 	if value == "" {
-		dv, _ := strconv.ParseBool(defaultValue)
+		dv, err := strconv.ParseBool(defaultValue)
+		if err != nil {
+			return false, err
+		}
 
-		return dv
+		return dv, nil
 	}
 
 	boolValue, err := strconv.ParseBool(value)
 	if err != nil {
-		dv, _ := strconv.ParseBool(defaultValue)
+		dv, err := strconv.ParseBool(defaultValue)
+		if err != nil {
+			return false, err
+		}
 
-		return dv
+		return dv, nil
 	}
 
-	return boolValue
+	return boolValue, nil
+}
+
+func setField(f reflect.Value, raw, defaultValue string) error {
+	switch f.Type() {
+	case reflect.TypeFor[string]():
+		f.SetString(processString(raw, defaultValue))
+	case reflect.TypeFor[int8](), reflect.TypeFor[int16](), reflect.TypeFor[int32](), reflect.TypeFor[int64](), reflect.TypeFor[int]():
+		n, err := processInt(raw, defaultValue, f.Type().Bits())
+		if err != nil {
+			return err
+		}
+
+		f.SetInt(n)
+	case reflect.TypeFor[bool]():
+		b, err := processBool(raw, defaultValue)
+		if err != nil {
+			return err
+		}
+
+		f.SetBool(b)
+	case reflect.TypeFor[time.Duration]():
+		d, err := processDuration(raw, defaultValue)
+		if err != nil {
+			return err
+		}
+
+		f.SetInt(int64(d))
+	case reflect.TypeFor[[]string]():
+		f.Set(reflect.ValueOf(processSliceString(raw, defaultValue)))
+	}
+
+	return nil
+}
+
+func processField(fieldValue reflect.Value, fieldType reflect.Type) error {
+	for i := range fieldValue.NumField() {
+		fieldParams, err := getFieldParams(fieldType.Field(i))
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(fieldParams.Required, fieldParams.HasDefaultValue, fieldParams.Value)
+
+		if fieldParams.Required && fieldParams.HasDefaultValue {
+			return errors.New("field " + fieldParams.KeyName + " is required and mustn't have a default value")
+		}
+
+		if fieldParams.Required && fieldParams.Value == "" {
+			return errors.New("field " + fieldParams.KeyName + " is required must have a value")
+		}
+
+		if err := setField(fieldValue.Field(i), fieldParams.Value, fieldParams.DefaultValue); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func Parse(v any) error {
@@ -249,28 +341,8 @@ func Parse(v any) error {
 		return errors.New("no struct")
 	}
 
-	t := s.Type()
-
-	for i := range t.NumField() {
-		fieldParams, err := getFieldParams(t.Field(i))
-		if err != nil {
-			return err
-		}
-
-		f := s.Field(i)
-
-		switch f.Type() {
-		case reflect.TypeFor[string]():
-			f.SetString(getString(fieldParams.KeyName, fieldParams.DefaultValue))
-		case reflect.TypeFor[int64]():
-			f.SetInt(getInt64(fieldParams.KeyName, fieldParams.DefaultValue))
-		case reflect.TypeFor[bool]():
-			f.SetBool(getBool(fieldParams.KeyName, fieldParams.DefaultValue))
-		case reflect.TypeFor[time.Duration]():
-			f.SetInt(int64(getDuration(fieldParams.KeyName, fieldParams.DefaultValue)))
-		case reflect.TypeFor[[]string]():
-			f.Set(reflect.ValueOf(getSliceString(fieldParams.KeyName, fieldParams.DefaultValue)))
-		}
+	if err := processField(s, s.Type()); err != nil {
+		return err
 	}
 
 	return nil
