@@ -139,8 +139,7 @@ func getFieldParams(f reflect.StructField) (FieldParams, error) {
 	}
 
 	for _, tag := range tags {
-		switch tag {
-		case "required":
+		if tag == "required" {
 			field.Required = true
 		}
 	}
