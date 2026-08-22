@@ -8,6 +8,8 @@ import (
 func TestLoadEnvs(t *testing.T) {
 	t.Setenv("ENVIRONMENT", "production")
 	t.Setenv("PORT", "9090")
+	t.Setenv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable")
+	t.Setenv("MARKET_KEK_KEYS", "1:TXJmOQZ2o7ClGXKhCgobHqBvwOE9+87ISKvXL6KHmK0=")
 	t.Setenv("JWT_SECRET", "super-secret")
 	t.Setenv("JWT_ACCESS_DURATION", "30m")
 	t.Setenv("JWT_REFRESH_DURATION", "14d")

@@ -12,6 +12,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/cache"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
 	"github.com/yeferson59/finexia-app/internal/platform/database"
+	"github.com/yeferson59/finexia-app/internal/platform/env"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
@@ -19,6 +20,8 @@ import (
 )
 
 func main() {
+	_ = env.Load()
+
 	cfg, err := config.New()
 	if err != nil {
 		log.Fatal(err)

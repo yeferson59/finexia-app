@@ -84,8 +84,6 @@ type EnvConfig struct {
 }
 
 func New() (*EnvConfig, error) {
-	_ = env.Load()
-
 	envConfig := new(EnvConfig{})
 
 	if err := env.Parse(envConfig); err != nil {
