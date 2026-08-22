@@ -72,7 +72,7 @@ type EnvConfig struct {
 	// Market data is BYO-key: each user supplies their own provider key, so
 	// the application holds no provider credentials of its own. These two are
 	// the keys that seal the users' keys, not keys to any provider.
-	MarketKEKKeys           []string      `env:"MARKET_KEK_KEYS"`
+	MarketKEKKeys           []string      `env:"MARKET_KEK_KEYS,required"`
 	MarketKEKActive         string        `env:"MARKET_KEK_ACTIVE" default:"1"`
 	PublicURL               string        `env:"PUBLIC_URL" default:"http://localhost:8080"`
 	FrontendURL             string        `env:"FRONTEND_URL" default:"http://localhost:5173"`

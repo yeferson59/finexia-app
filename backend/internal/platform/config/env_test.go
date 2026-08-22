@@ -16,7 +16,7 @@ func TestLoadEnvs(t *testing.T) {
 
 	c, err := New()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	if c.Environment != "production" {
