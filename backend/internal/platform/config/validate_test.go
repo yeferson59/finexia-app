@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 )
@@ -82,13 +81,16 @@ func TestLoadEnvsHasNoJWTSecretDefault(t *testing.T) {
 	t.Setenv("JWT_SECRET", "")
 
 	cfg, err := New()
-	fmt.Println(cfg, err)
 
 	if err == nil {
 		t.Fatal(err)
 	}
 
+	if cfg != nil {
+		t.Fatal("cfg should be nil")
+	}
+
 	if err.Error() != "field DATABASE_URL is required must have a value" {
-		t.Fatalf("JWT_SECRET %q must not be empty", cfg.JWTSecret)
+		t.Fatal("JWT_SECRET must not be empty")
 	}
 }
