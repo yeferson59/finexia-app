@@ -44,7 +44,6 @@ export const portfolioEntrySchema = z.object({
 		.trim()
 		.toUpperCase()
 		.regex(/^[A-Z]{3}$/, 'Moneda inválida: usa un código ISO de tres letras'),
-	category: z.coerce.string().min(1),
 	entryDate: z.coerce.date(),
 	notes: z.coerce.string().optional()
 });

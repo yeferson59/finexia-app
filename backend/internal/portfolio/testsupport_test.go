@@ -129,7 +129,7 @@ type fakeRepository struct {
 	getPlatformsWithStats           func(ctx context.Context, userID uuid.UUID, displayCurrency string) ([]PlatformStats, error)
 	updatePlatform                  func(ctx context.Context, userID, sourceID uuid.UUID, name, description string, sourceType SourceType, isActive bool) (PlatformStats, error)
 	deletePlatform                  func(ctx context.Context, userID, sourceID uuid.UUID) error
-	createPortfolioEntry            func(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency string, category EntryCategory, entryDate time.Time, notes string) (Entry, error)
+	createPortfolioEntry            func(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency string, entryDate time.Time, notes string) (Entry, error)
 	getEntryWithAsset               func(ctx context.Context, entryID uuid.UUID) (Entry, error)
 	getTransactionsByEntryID        func(ctx context.Context, userID, entryID uuid.UUID) ([]Transaction, error)
 	countAssetTransactions          func(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error)
@@ -205,8 +205,8 @@ func (f *fakeRepository) DeletePlatform(ctx context.Context, userID, sourceID uu
 	return f.deletePlatform(ctx, userID, sourceID)
 }
 
-func (f *fakeRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency string, category EntryCategory, entryDate time.Time, notes string) (Entry, error) {
-	return f.createPortfolioEntry(ctx, userID, portfolioID, assetID, sourceID, txnType, quantity, price, costCurrency, category, entryDate, notes)
+func (f *fakeRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency string, entryDate time.Time, notes string) (Entry, error) {
+	return f.createPortfolioEntry(ctx, userID, portfolioID, assetID, sourceID, txnType, quantity, price, costCurrency, entryDate, notes)
 }
 
 func (f *fakeRepository) GetEntryWithAsset(ctx context.Context, entryID uuid.UUID) (Entry, error) {

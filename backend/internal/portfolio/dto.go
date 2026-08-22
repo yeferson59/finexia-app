@@ -43,7 +43,6 @@ type CreatePortfolioEntryRequestDTO struct {
 	Quantity        decimal.Decimal `json:"quantity" validate:"required"`
 	Price           money.Money     `json:"price" validate:"required"`
 	CostCurrency    string          `json:"costCurrency" validate:"required"`
-	Category        string          `json:"category"`
 	EntryDate       time.Time       `json:"entryDate" validate:"required"`
 	Notes           string          `json:"notes"`
 }

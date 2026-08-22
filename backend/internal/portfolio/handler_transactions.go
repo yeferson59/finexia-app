@@ -25,13 +25,6 @@ func (h *handler) CreatePortfolioEntry(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
-	assetType := market.AssetType(req.Category)
-	category := entryCategoryFor(assetType)
-
-	if !category.IsValid() {
-		return httpx.BadRequest(c, "Invalid category", "Category must be one of: stocks, etf, crypto, bonds, cash, real_estate, commodities, other")
-	}
-
 	txnType := TransactionType(req.TransactionType)
 	if req.TransactionType == "" {
 		txnType = Buy
@@ -39,7 +32,9 @@ func (h *handler) CreatePortfolioEntry(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid transaction type", "Type must be one of: buy, sell, dividend, split, transfer_in, transfer_out, fee, interest")
 	}
 
-	entry, err := h.service.CreatePortfolioEntry(c, userID, req.PortfolioID, req.AssetID, req.SourceID, txnType, req.Quantity, req.Price, req.CostCurrency, category, req.EntryDate, req.Notes)
+	// No category travels with the request any more: the class of a position is
+	// the type of the asset it holds, and the catalogue is what stores that.
+	entry, err := h.service.CreatePortfolioEntry(c, userID, req.PortfolioID, req.AssetID, req.SourceID, txnType, req.Quantity, req.Price, req.CostCurrency, req.EntryDate, req.Notes)
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error creating portfolio entry", "Could not create portfolio entry")
 	}

@@ -203,7 +203,7 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 | GET | `/portfolios/allocation` | usuario | Asignación de activos por categoría (soporta `?currency=`) |
 | POST | `/portfolios` | usuario | Crea portfolio |
 | POST | `/portfolios/sources` | usuario | Crea plataforma/fuente |
-| POST | `/portfolios/entries` | usuario | Crea posición (entry) |
+| POST | `/portfolios/entries` | usuario | Crea posición (entry); la categoría sale del activo, no del cuerpo |
 | GET | `/portfolios/entries/:entryId/transactions` | usuario | Transacciones de una posición |
 | POST | `/portfolios/entries/:entryId/transactions` | usuario | Crea transacción |
 | PUT | `/portfolios/transactions/:txnId` | usuario | Actualiza transacción |
@@ -324,6 +324,27 @@ lo que devolvía antes.
 Cada elemento lleva `currency` —la misma para todos, que es lo que hace
 comparables los `percent`— y `positionsUnconverted`, con el mismo significado
 que en el resumen: posiciones incluidas a valor nominal por no haber tasa.
+
+#### De dónde sale la categoría
+
+La categoría de una posición es el **tipo del activo** (`assets.asset_type`),
+traducido al vocabulario plural que devuelve este endpoint (`stocks`, `etfs`,
+`bonds`, …). El catálogo es la única fuente: el `category` que llevan los
+holdings y las entries se deriva del mismo sitio, así que el donut del panel y
+el del portfolio no pueden discrepar.
+
+Antes existía `portfolio_entries.category`, una copia del tipo tomada al crear
+la entry que nadie volvía a escribir. Agrupar por ella era lo que hacía que dos
+gráficos sobre las mismas posiciones no coincidieran: corregir el tipo de un
+activo (un ETF de bonos fichado primero como ETF normal) movía la posición en el
+donut del portfolio, que agrupa los holdings por su tipo de activo, y la dejaba
+en la porción vieja en el del panel. **La migración 000026 elimina esa columna**
+—y su enum, que no tenía otro uso— junto con el campo `category` del cuerpo de
+`POST /portfolios/entries`, que solo servía para llenarla.
+
+Ese campo se sigue **aceptando e ignorando**, así que un cliente antiguo que lo
+mande no se rompe; lo que ya no ocurre es que un valor inválido devuelva 400,
+porque no hay nada que validar. La clase de una posición la decide el activo.
 
 #### Moneda de la serie de crecimiento
 

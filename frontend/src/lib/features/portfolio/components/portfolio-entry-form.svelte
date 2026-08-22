@@ -113,7 +113,6 @@
 				>
 
 				<input type="hidden" name="assetId" value={selectedAsset?.id ?? ''} />
-				<input type="hidden" name="category" value={selectedAsset?.assetType ?? ''} />
 
 				<AssetCombobox bind:selected={selectedAsset} bind:search={assetSearch} />
 

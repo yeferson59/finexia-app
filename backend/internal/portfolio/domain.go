@@ -79,6 +79,11 @@ const (
 
 // EntryCategory keeps the legacy PortfolioEntryCategory values; the name drops
 // the redundant prefix now that the type lives inside the portfolio package.
+//
+// Since 000026 it is a presentation vocabulary rather than a stored one: the
+// column that held it is gone, and every value is produced by entryCategoryFor
+// from an asset type. There is nothing left to validate — an unknown asset type
+// becomes Others — so the type carries no IsValid.
 type EntryCategory string
 
 const (
@@ -95,15 +100,6 @@ const (
 func (t TransactionType) IsValid() bool {
 	switch t {
 	case Buy, Sell, Dividend, Split, TransferIn, TransferOut, Fee, Interest:
-		return true
-	default:
-		return false
-	}
-}
-
-func (c EntryCategory) IsValid() bool {
-	switch c {
-	case Stocks, ETFs, Cryptos, Bonds, Cashs, RealEstates, Commodities, Others:
 		return true
 	default:
 		return false
@@ -245,13 +241,17 @@ const (
 )
 
 type Entry struct {
-	ID           uuid.UUID        `json:"id"`
-	PortfolioID  uuid.UUID        `json:"portfolioId"`
-	AssetID      uuid.UUID        `json:"assetId"`
-	SourceID     uuid.UUID        `json:"sourceId"`
-	Quantity     decimal.Decimal  `json:"quantity"`
-	Price        money.Money      `json:"price"`
-	CostCurrency string           `json:"costCurrency"`
+	ID           uuid.UUID       `json:"id"`
+	PortfolioID  uuid.UUID       `json:"portfolioId"`
+	AssetID      uuid.UUID       `json:"assetId"`
+	SourceID     uuid.UUID       `json:"sourceId"`
+	Quantity     decimal.Decimal `json:"quantity"`
+	Price        money.Money     `json:"price"`
+	CostCurrency string          `json:"costCurrency"`
+	// Category is the class of the asset this entry holds, derived from
+	// Asset.AssetType on the way out. It used to be a column of its own,
+	// stamped at insert and never updated, which is how a reclassified asset
+	// ended up in two different slices at once (migration 000026).
 	Category     EntryCategory    `json:"category"`
 	EntryDate    time.Time        `json:"entryDate"`
 	Notes        string           `json:"notes"`
@@ -303,7 +303,6 @@ type ImportTransactionRow struct {
 	Ticker    string
 	AssetName string
 	AssetType market.AssetType
-	Category  EntryCategory
 	Type      TransactionType
 	Quantity  decimal.Decimal
 	Price     money.Money

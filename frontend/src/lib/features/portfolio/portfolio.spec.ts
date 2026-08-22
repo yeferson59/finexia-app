@@ -162,7 +162,6 @@ describe('portfolioEntrySchema', () => {
 		sourceId: 'a1b2c3d4-e5f6-4a5b-9c8d-7e6f5a4b3c2d',
 		quantity: '0.201065',
 		price: '866.60',
-		category: 'stock',
 		entryDate: '2024-04-11'
 	};
 

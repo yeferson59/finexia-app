@@ -751,13 +751,13 @@ func TestHandlerCreatePortfolioEntry(t *testing.T) {
 			`"costCurrency":"USD","entryDate":"` + entryDate.Format(time.RFC3339) + `"}`
 	}
 
-	t.Run("maps the asset type to an entry category", func(t *testing.T) {
-		var gotCategory EntryCategory
+	t.Run("forwards the position without a category of its own", func(t *testing.T) {
+		var gotPortfolio, gotAsset, gotSource uuid.UUID
 		var gotType TransactionType
 		repo := new(fakeRepository{
-			createPortfolioEntry: func(_ context.Context, _, pid, aid, sid uuid.UUID, txnType TransactionType, _ decimal.Decimal, _ money.Money, _ string, category EntryCategory, _ time.Time, _ string) (Entry, error) {
-				gotCategory, gotType = category, txnType
-				return Entry{ID: uuid.New(), PortfolioID: pid, AssetID: aid, SourceID: sid, Category: category}, nil
+			createPortfolioEntry: func(_ context.Context, _, pid, aid, sid uuid.UUID, txnType TransactionType, _ decimal.Decimal, _ money.Money, _ string, _ time.Time, _ string) (Entry, error) {
+				gotPortfolio, gotAsset, gotSource, gotType = pid, aid, sid, txnType
+				return Entry{ID: uuid.New(), PortfolioID: pid, AssetID: aid, SourceID: sid}, nil
 			},
 		})
 		app := newTestModule(t, repo, userID, "user")
@@ -766,18 +766,40 @@ func TestHandlerCreatePortfolioEntry(t *testing.T) {
 		if resp.StatusCode != fiber.StatusOK {
 			t.Fatalf("status = %d, want 200", resp.StatusCode)
 		}
-		if gotCategory != Stocks {
-			t.Errorf("category = %q, want %q for asset type %q", gotCategory, Stocks, market.Stock)
+		if gotPortfolio != portfolioID || gotAsset != assetID || gotSource != sourceID {
+			t.Errorf("ids = %s/%s/%s, want %s/%s/%s", gotPortfolio, gotAsset, gotSource, portfolioID, assetID, sourceID)
 		}
 		if gotType != Buy {
 			t.Errorf("transactionType = %q, want buy", gotType)
 		}
 	})
 
+	// A category in the body is what an older client sends. It carried the
+	// asset's type, which the catalogue owns, so it is now ignored rather than
+	// validated — including a value that used to earn a 400 (migration 000026).
+	t.Run("a category in the body is ignored rather than rejected", func(t *testing.T) {
+		called := false
+		repo := new(fakeRepository{
+			createPortfolioEntry: func(_ context.Context, _, _, _, _ uuid.UUID, _ TransactionType, _ decimal.Decimal, _ money.Money, _ string, _ time.Time, _ string) (Entry, error) {
+				called = true
+				return Entry{ID: uuid.New()}, nil
+			},
+		})
+		app := newTestModule(t, repo, userID, "user")
+
+		resp := doJSON(t, app, http.MethodPost, "/portfolios/entries", body("nonsense", "buy"))
+		if resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		if !called {
+			t.Error("the entry never reached the repository")
+		}
+	})
+
 	t.Run("an empty transaction type defaults to buy", func(t *testing.T) {
 		var gotType TransactionType
 		repo := new(fakeRepository{
-			createPortfolioEntry: func(_ context.Context, _, _, _, _ uuid.UUID, txnType TransactionType, _ decimal.Decimal, _ money.Money, _ string, _ EntryCategory, _ time.Time, _ string) (Entry, error) {
+			createPortfolioEntry: func(_ context.Context, _, _, _, _ uuid.UUID, txnType TransactionType, _ decimal.Decimal, _ money.Money, _ string, _ time.Time, _ string) (Entry, error) {
 				gotType = txnType
 				return Entry{ID: uuid.New()}, nil
 			},

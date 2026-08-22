@@ -66,7 +66,7 @@ type CurrencyPair struct{ From, To string }
 
 // TransactionStore persists portfolio entries and their transactions.
 type TransactionStore interface {
-	CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency string, category EntryCategory, entryDate time.Time, notes string) (Entry, error)
+	CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency string, entryDate time.Time, notes string) (Entry, error)
 	GetEntryWithAsset(ctx context.Context, entryID uuid.UUID) (Entry, error)
 	GetTransactionsByEntryID(ctx context.Context, userID, entryID uuid.UUID) ([]Transaction, error)
 	CountAssetTransactions(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error)

@@ -8,11 +8,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/market"
 )
 
 func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfolioID uuid.UUID) ([]Entry, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT pe.id, pe.portfolio_id, pe.asset_id, pe.source_id, pe.quantity, pe.price, pe.cost_currency, pe.category, pe.entry_date, COALESCE(pe.notes, ''), pe.created_at, pe.updated_at,
+		SELECT pe.id, pe.portfolio_id, pe.asset_id, pe.source_id, pe.quantity, pe.price, pe.cost_currency, pe.entry_date, COALESCE(pe.notes, ''), pe.created_at, pe.updated_at,
 		       a.id, a.ticker, a.name, a.asset_type, COALESCE(a.exchange, ''), a.currency,
 		       -- BYO-key: the price this user's own key fetched wins; the shared
 		       -- column now only ever holds an admin-entered manual price. The
@@ -56,7 +58,6 @@ func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfo
 			&quantity,
 			&price,
 			&entry.CostCurrency,
-			&entry.Category,
 			&entry.EntryDate,
 			&entry.Notes,
 			&entry.CreatedAt,
@@ -77,6 +78,9 @@ func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfo
 		}
 
 		scanAssetCurrentPrice(&entry.Asset, assetPriceStr)
+		// The position's class follows the asset, so it is read off the row the
+		// join already brought rather than off a column of its own.
+		entry.Category = entryCategoryFor(entry.Asset.AssetType)
 
 		if sourceID.Valid {
 			entry.SourceID = uuid.UUID(sourceID.Bytes)
@@ -112,7 +116,7 @@ func (r *PostgresRepository) GetEntryWithAsset(ctx context.Context, entryID uuid
 	return entry, nil
 }
 
-func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency string, category EntryCategory, entryDate time.Time, notes string) (Entry, error) {
+func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency string, entryDate time.Time, notes string) (Entry, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return Entry{}, err
@@ -135,12 +139,12 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 
 	var entryID uuid.UUID
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, category, entry_date, notes)
-		VALUES ($1::uuid, $2::uuid, $3::uuid, 0, $4::numeric, $5::char(3), $6::portfolio_entry_category, $7::date, $8)
+		INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date, notes)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, 0, $4::numeric, $5::char(3), $6::date, $7)
 		ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, ''))
 		DO UPDATE SET updated_at = NOW()
 		RETURNING id
-	`, portfolioID, assetID, sourceID, price.String(), costCurrency, category, entryDate, notes).Scan(&entryID); err != nil {
+	`, portfolioID, assetID, sourceID, price.String(), costCurrency, entryDate, notes).Scan(&entryID); err != nil {
 		return Entry{}, err
 	}
 
@@ -154,11 +158,14 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 	// Read the position back with the values the trigger just recomputed.
 	var entry Entry
 	var quantityValue, priceValue string
+	var assetType market.AssetType
 	var sourceIDResult pgtype.UUID
 	if err := tx.QueryRow(ctx, `
-		SELECT id, portfolio_id, asset_id, source_id, quantity, price, cost_currency, category, entry_date, COALESCE(notes, ''), created_at, updated_at
-		FROM portfolio_entries
-		WHERE id = $1
+		SELECT pe.id, pe.portfolio_id, pe.asset_id, pe.source_id, pe.quantity, pe.price, pe.cost_currency,
+		       a.asset_type, pe.entry_date, COALESCE(pe.notes, ''), pe.created_at, pe.updated_at
+		FROM portfolio_entries pe
+		JOIN assets a ON a.id = pe.asset_id
+		WHERE pe.id = $1
 	`, entryID).Scan(
 		&entry.ID,
 		&entry.PortfolioID,
@@ -167,7 +174,7 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 		&quantityValue,
 		&priceValue,
 		&entry.CostCurrency,
-		&entry.Category,
+		&assetType,
 		&entry.EntryDate,
 		&entry.Notes,
 		&entry.CreatedAt,
@@ -175,6 +182,8 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 	); err != nil {
 		return Entry{}, err
 	}
+
+	entry.Category = entryCategoryFor(assetType)
 
 	if err := tx.Commit(ctx); err != nil {
 		return Entry{}, err

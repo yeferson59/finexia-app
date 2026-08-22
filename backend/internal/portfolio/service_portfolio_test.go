@@ -517,12 +517,12 @@ func TestCreatePortfolioEntry(t *testing.T) {
 
 	t.Run("forwards all fields", func(t *testing.T) {
 		repo := new(fakeRepository{
-			createPortfolioEntry: func(_ context.Context, uid, pid, aid, sid uuid.UUID, txnType TransactionType, quantity decimal.Decimal, p money.Money, costCurrency string, category EntryCategory, ed time.Time, notes string) (Entry, error) {
+			createPortfolioEntry: func(_ context.Context, uid, pid, aid, sid uuid.UUID, txnType TransactionType, quantity decimal.Decimal, p money.Money, costCurrency string, ed time.Time, notes string) (Entry, error) {
 				if uid != userID || pid != portfolioID || aid != assetID || sid != sourceID {
 					t.Error("IDs not forwarded correctly")
 				}
-				if txnType != Buy || category != Stocks {
-					t.Errorf("type/category = %q/%q", txnType, category)
+				if txnType != Buy {
+					t.Errorf("type = %q, want buy", txnType)
 				}
 				if !ed.Equal(entryDate) || notes != "first buy" {
 					t.Errorf("date/notes = %v/%q", ed, notes)
@@ -532,7 +532,7 @@ func TestCreatePortfolioEntry(t *testing.T) {
 		})
 		svc := newTestServices(repo, newMemStorage())
 
-		got, err := svc.CreatePortfolioEntry(context.Background(), userID, portfolioID, assetID, sourceID, Buy, qty, price, "USD", Stocks, entryDate, "first buy")
+		got, err := svc.CreatePortfolioEntry(context.Background(), userID, portfolioID, assetID, sourceID, Buy, qty, price, "USD", entryDate, "first buy")
 		if err != nil {
 			t.Fatalf("CreatePortfolioEntry: %v", err)
 		}
@@ -543,13 +543,13 @@ func TestCreatePortfolioEntry(t *testing.T) {
 
 	t.Run("repository error returns zero entry", func(t *testing.T) {
 		repo := new(fakeRepository{
-			createPortfolioEntry: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, TransactionType, decimal.Decimal, money.Money, string, EntryCategory, time.Time, string) (Entry, error) {
+			createPortfolioEntry: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, TransactionType, decimal.Decimal, money.Money, string, time.Time, string) (Entry, error) {
 				return Entry{}, errors.New("asset not found")
 			},
 		})
 		svc := newTestServices(repo, newMemStorage())
 
-		got, err := svc.CreatePortfolioEntry(context.Background(), userID, portfolioID, assetID, sourceID, Buy, qty, price, "USD", Stocks, entryDate, "")
+		got, err := svc.CreatePortfolioEntry(context.Background(), userID, portfolioID, assetID, sourceID, Buy, qty, price, "USD", entryDate, "")
 		if err == nil {
 			t.Fatal("expected error")
 		}

@@ -8,6 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/market"
 )
 
 // These cover the arithmetic and currency handling that now runs through
@@ -310,4 +312,83 @@ func TestTransactionAlertTotalKeepsCents(t *testing.T) {
 	if got != "87943.90" {
 		t.Errorf("total = %q, want 87943.90", got)
 	}
+}
+
+// The allocation groups by the asset's own type, because
+// portfolio_entries.category is a copy taken at insert time that nothing
+// updates: correcting an asset afterwards used to move it in the per-portfolio
+// donut and leave it in the old slice on the dashboard.
+func TestAllocationCategoriesComeFromTheAssetType(t *testing.T) {
+	cases := []struct {
+		assetType string
+		want      EntryCategory
+	}{
+		{"stock", Stocks},
+		{"etf", ETFs},
+		{"crypto", Cryptos},
+		{"bond", Bonds},
+		{"cash", Cashs},
+		{"real_estate", RealEstates},
+		{"commodity", Commodities},
+		{"other", Others},
+		// Anything the mapping does not know falls to Others rather than
+		// leaking a raw enum value the clients have no label for.
+		{"structured_note", Others},
+	}
+
+	for _, tc := range cases {
+		if got := entryCategoryFor(market.AssetType(tc.assetType)); got != tc.want {
+			t.Errorf("entryCategoryFor(%q) = %q, want %q", tc.assetType, got, tc.want)
+		}
+	}
+}
+
+func TestFoldAllocationByCategory(t *testing.T) {
+	t.Run("adds the rows that share a category", func(t *testing.T) {
+		// Two unrecognised asset types both land on Others. Keeping only one
+		// would drop the other's money out of the chart entirely.
+		got := foldAllocationByCategory([]AllocationItem{
+			{Category: Others, MarketValue: "300.50", Currency: "USD", PositionsUnconverted: 1},
+			{Category: Stocks, MarketValue: "250", Currency: "USD"},
+			{Category: Others, MarketValue: "100.25", Currency: "USD", PositionsUnconverted: 2},
+		})
+
+		if len(got) != 2 {
+			t.Fatalf("items = %+v, want two categories", got)
+		}
+		if got[0].Category != Others || got[0].MarketValue != "400.75" {
+			t.Errorf("first = %+v, want Others at 400.75", got[0])
+		}
+		if got[0].PositionsUnconverted != 3 {
+			t.Errorf("positionsUnconverted = %d, want 3", got[0].PositionsUnconverted)
+		}
+	})
+
+	t.Run("restores the by-value order a merge can disturb", func(t *testing.T) {
+		// The query hands these back sorted, but folding the two Others rows
+		// makes them outweigh the Stocks row that sat between them.
+		got := foldAllocationByCategory([]AllocationItem{
+			{Category: Others, MarketValue: "60"},
+			{Category: Stocks, MarketValue: "50"},
+			{Category: Others, MarketValue: "40"},
+		})
+
+		if got[0].Category != Others || got[0].MarketValue != "100" {
+			t.Errorf("first = %+v, want Others at 100", got[0])
+		}
+		if got[1].Category != Stocks {
+			t.Errorf("second = %+v, want Stocks", got[1])
+		}
+	})
+
+	t.Run("an unparsable amount counts as zero instead of dropping the row", func(t *testing.T) {
+		got := foldAllocationByCategory([]AllocationItem{
+			{Category: Stocks, MarketValue: "n/a"},
+			{Category: Bonds, MarketValue: "10"},
+		})
+
+		if len(got) != 2 || got[0].Category != Bonds {
+			t.Fatalf("items = %+v, want Bonds first and Stocks kept", got)
+		}
+	})
 }

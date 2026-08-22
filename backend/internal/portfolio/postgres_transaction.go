@@ -3,12 +3,15 @@ package portfolio
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/market"
 )
 
 func (r *PostgresRepository) GetTopTransactionByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID) (TopTransactionDTO, error) {
@@ -98,6 +101,19 @@ func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, 
 // PositionsUnconverted — the same choice the summary and the holdings make.
 // Dropping it would understate the category; hiding that it was not converted
 // is what this is fixing.
+//
+// The category comes from the asset's own type, not from
+// portfolio_entries.category. That column is a copy of the type taken when the
+// entry was created — the create handler and the importer both derive it
+// through entryCategoryFor — and nothing writes it again. Correcting an asset
+// afterwards (a bond ETF first filed as a plain ETF) therefore moved it in the
+// per-portfolio donut, which groups the holdings by their asset type, and left
+// it in the old slice here: two charts over the same positions, disagreeing.
+// Reading assets.asset_type is what makes both answer with one rule.
+//
+// The rows come back keyed by asset type and are folded into the entry
+// categories the response has always spoken, so the vocabulary clients map to
+// labels does not change.
 func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, userID uuid.UUID, targetCurrency string) ([]AllocationItem, error) {
 	// The sum is rounded to the scale every money column here keeps. Postgres
 	// adds the scales of what it multiplies, so quantity × price × rate reaches
@@ -106,7 +122,7 @@ func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, use
 	// the category's share silently collapsed.
 	rows, err := r.db.Query(ctx, `
 		SELECT
-			pe.category,
+			a.asset_type,
 			ROUND(COALESCE(SUM(pe.quantity::numeric * v.price * COALESCE(fx.rate, 1)), 0), 8)::text AS market_value,
 			target.code,
 			COUNT(DISTINCT pe.asset_id) FILTER (WHERE fx.rate IS NULL)::bigint AS positions_unconverted
@@ -135,7 +151,7 @@ func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, use
 		) fx
 		WHERE p.user_id = $1
 		  AND pe.quantity::numeric > 0
-		GROUP BY pe.category, target.code
+		GROUP BY a.asset_type, target.code
 		ORDER BY ROUND(COALESCE(SUM(pe.quantity::numeric * v.price * COALESCE(fx.rate, 1)), 0), 8) DESC
 	`, userID, targetCurrency)
 	if err != nil {
@@ -143,18 +159,64 @@ func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, use
 	}
 	defer rows.Close()
 
-	result := make([]AllocationItem, 0)
+	rowsByType := make([]AllocationItem, 0)
 	for rows.Next() {
+		var assetType string
 		var item AllocationItem
-		if err := rows.Scan(&item.Category, &item.MarketValue, &item.Currency, &item.PositionsUnconverted); err != nil {
+		if err := rows.Scan(&assetType, &item.MarketValue, &item.Currency, &item.PositionsUnconverted); err != nil {
 			return nil, err
 		}
-		result = append(result, item)
+		item.Category = entryCategoryFor(market.AssetType(assetType))
+		rowsByType = append(rowsByType, item)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	return result, nil
+	return foldAllocationByCategory(rowsByType), nil
+}
+
+// foldAllocationByCategory merges the rows that share a category and restores
+// the by-value ordering the query asked for.
+//
+// entryCategoryFor sends any asset type it does not recognise to Others, so two
+// of them can land on one category. Adding them is the only reading that keeps
+// the shares summing to the whole — letting the second row win would drop a
+// slice's worth of money off the chart — and a merged row can outgrow the one
+// above it, which is why the order is rebuilt rather than left almost-sorted.
+func foldAllocationByCategory(items []AllocationItem) []AllocationItem {
+	folded := make([]AllocationItem, 0, len(items))
+	index := make(map[EntryCategory]int, len(items))
+
+	for _, item := range items {
+		if at, seen := index[item.Category]; seen {
+			folded[at].MarketValue = sumAmounts(folded[at].MarketValue, item.MarketValue)
+			folded[at].PositionsUnconverted += item.PositionsUnconverted
+			continue
+		}
+		index[item.Category] = len(folded)
+		folded = append(folded, item)
+	}
+
+	slices.SortStableFunc(folded, func(a, b AllocationItem) int {
+		return amountOf(b.MarketValue).Cmp(amountOf(a.MarketValue))
+	})
+	return folded
+}
+
+// amountOf parses one of the text amounts these queries return, treating a
+// malformed one as zero — the same reading NewAllocationResponse takes, so a
+// row cannot sort by one value and be shown as another.
+func amountOf(raw string) decimal.Decimal {
+	value, err := decimal.NewFromString(raw)
+	if err != nil {
+		return decimal.Zero
+	}
+	return value
+}
+
+// sumAmounts adds two of those amounts back into the same text form.
+func sumAmounts(a, b string) string {
+	return amountOf(a).Add(amountOf(b)).String()
 }
 
 func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userID, entryID uuid.UUID) ([]Transaction, error) {
@@ -449,12 +511,12 @@ func (r *PostgresRepository) ImportEntryTransactions(ctx context.Context, userID
 
 		var entryID uuid.UUID
 		if err := tx.QueryRow(ctx, `
-			INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, category, entry_date, notes)
-			VALUES ($1::uuid, $2::uuid, $3::uuid, 0, $4::numeric, $5::char(3), $6::portfolio_entry_category, $7::date, $8)
+			INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date, notes)
+			VALUES ($1::uuid, $2::uuid, $3::uuid, 0, $4::numeric, $5::char(3), $6::date, $7)
 			ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, ''))
 			DO UPDATE SET updated_at = NOW()
 			RETURNING id
-		`, portfolioID, assetID, sourceID, row.Price.String(), row.Currency, row.Category, row.Date, row.Notes).Scan(&entryID); err != nil {
+		`, portfolioID, assetID, sourceID, row.Price.String(), row.Currency, row.Date, row.Notes).Scan(&entryID); err != nil {
 			return 0, err
 		}
 

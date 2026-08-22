@@ -301,7 +301,6 @@ func buildImportRow(
 		}
 	}
 	entity.AssetType = assetType
-	entity.Category = entryCategoryFor(assetType)
 	dto.Category = string(assetType)
 
 	// Notes.
