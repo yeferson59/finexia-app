@@ -16,8 +16,11 @@ func (s *Service) CreatePlatform(ctx context.Context, userID uuid.UUID, sourceTy
 	return platform, nil
 }
 
-func (s *Service) GetPlatforms(ctx context.Context, userID uuid.UUID) ([]PlatformStats, error) {
-	return s.repo.GetPlatformsWithStats(ctx, userID)
+// GetPlatforms lists the user's platforms with their totals converted into
+// displayCurrency. An empty displayCurrency leaves them in the account's
+// preferred currency; either way the answer says which one it used.
+func (s *Service) GetPlatforms(ctx context.Context, userID uuid.UUID, displayCurrency string) ([]PlatformStats, error) {
+	return s.repo.GetPlatformsWithStats(ctx, userID, displayCurrency)
 }
 
 func (s *Service) UpdatePlatform(ctx context.Context, userID, sourceID uuid.UUID, name, description string, sourceType SourceType, isActive bool) (PlatformStats, error) {

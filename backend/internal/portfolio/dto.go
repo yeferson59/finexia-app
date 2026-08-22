@@ -216,6 +216,11 @@ type PlatformResponseDTO struct {
 	UpdatedAt   time.Time `json:"updatedAt"`
 	Investments int64     `json:"investments"`
 	TotalValue  string    `json:"totalValue"`
+	// The currency TotalValue is in, and how many of the entries behind it
+	// could not be converted into it. See PlatformStats for why both travel
+	// with the amount.
+	DisplayCurrency      string `json:"displayCurrency"`
+	PositionsUnconverted int64  `json:"positionsUnconverted"`
 }
 
 func newPlatformResponse(p PlatformStats) PlatformResponseDTO {
@@ -229,6 +234,9 @@ func newPlatformResponse(p PlatformStats) PlatformResponseDTO {
 		UpdatedAt:   p.UpdatedAt,
 		Investments: p.Investments,
 		TotalValue:  p.TotalValue,
+
+		DisplayCurrency:      p.DisplayCurrency,
+		PositionsUnconverted: p.PositionsUnconverted,
 	}
 }
 

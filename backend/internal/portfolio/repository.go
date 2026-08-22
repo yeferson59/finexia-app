@@ -31,7 +31,9 @@ type PortfolioStore interface {
 // PlatformStore persists investment sources (platforms).
 type PlatformStore interface {
 	CreatePlatform(ctx context.Context, userID uuid.UUID, sourceType SourceType, name, description string) (InvestmentSource, error)
-	GetPlatformsWithStats(ctx context.Context, userID uuid.UUID) ([]PlatformStats, error)
+	// GetPlatformsWithStats reports each platform's totals in displayCurrency,
+	// or in the account's preferred currency when it is empty.
+	GetPlatformsWithStats(ctx context.Context, userID uuid.UUID, displayCurrency string) ([]PlatformStats, error)
 	UpdatePlatform(ctx context.Context, userID, sourceID uuid.UUID, name, description string, sourceType SourceType, isActive bool) (PlatformStats, error)
 	DeletePlatform(ctx context.Context, userID, sourceID uuid.UUID) error
 }

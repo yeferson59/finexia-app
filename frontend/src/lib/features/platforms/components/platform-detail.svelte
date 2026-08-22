@@ -3,6 +3,8 @@
 	import { resolve } from '$app/paths';
 	import Card from '$lib/ui/card.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
+	import { formatCurrency as formatMoney } from '$lib/shared/format/money';
+	import { FALLBACK_CURRENCY } from '$lib/shared/currency';
 	import { formatSourceType, type Platform } from '../platforms';
 	import PlatformEditForm from './platform-edit-form.svelte';
 	import PlatformDeleteDialog from './platform-delete-dialog.svelte';
@@ -17,14 +19,16 @@
 		});
 	}
 
+	// La moneda del total la informa el backend: es la suma de posiciones
+	// compradas en varias monedas, convertida a la de la cuenta, y etiquetarla
+	// siempre con "$" le ponía el símbolo equivocado.
+	const currency = $derived(platform.displayCurrency || FALLBACK_CURRENCY);
+
+	// Posiciones que entraron al total sin convertir por no haber tasa.
+	const unconverted = $derived(platform.positionsUnconverted ?? 0);
+
 	function formatCurrency(value: string): string {
-		return privacy.money(
-			'$' +
-				new Intl.NumberFormat('es-CO', {
-					minimumFractionDigits: 2,
-					maximumFractionDigits: 2
-				}).format(parseFloat(value) || 0)
-		);
+		return privacy.money(formatMoney(parseFloat(value) || 0, currency));
 	}
 
 	let isEditing = $state(false);
@@ -156,6 +160,14 @@
 							</div>
 						</div>
 					</div>
+
+					{#if unconverted > 0}
+						<p class="fx-note">
+							{unconverted}
+							{unconverted === 1 ? 'posición sigue' : 'posiciones siguen'} contadas en su propia moneda
+							porque no hay tasa de cambio guardada: el total suma monedas distintas.
+						</p>
+					{/if}
 				</div>
 			</Card>
 		{:else}
@@ -364,6 +376,19 @@
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		gap: 1.5rem;
+	}
+
+	/* Mismo aviso que en la tarjeta de portafolio: el total incluye importes
+	   sin convertir, así que se marca en vez de pasar por comparable. */
+	.fx-note {
+		margin: 1.25rem 0 0;
+		padding: 0.5rem 0.7rem;
+		border: 1px solid rgba(212, 145, 42, 0.3);
+		border-radius: 8px;
+		background: rgba(212, 145, 42, 0.08);
+		color: rgba(236, 234, 229, 0.75);
+		font-size: 0.78rem;
+		line-height: 1.4;
 	}
 
 	.stat-card {

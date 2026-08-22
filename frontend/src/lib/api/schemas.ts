@@ -233,6 +233,17 @@ export const platformSchema = z.object({
 	isActive: z.boolean(),
 	investments: z.number(),
 	totalValue: z.string(),
+	/**
+	 * Moneda en la que viene `totalValue`. El total suma posiciones compradas
+	 * en monedas distintas, así que sin esto la cifra no tiene unidad — y la
+	 * vista le ponía un "$" fijo. Opcional mientras convivan backends viejos.
+	 */
+	displayCurrency: z.string().optional(),
+	/**
+	 * Posiciones que siguen contadas en `totalValue` a valor nominal porque no
+	 * había tasa para su moneda: si es > 0 el total mezcla monedas.
+	 */
+	positionsUnconverted: z.number().optional(),
 	createdAt: z.string()
 });
 

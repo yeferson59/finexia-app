@@ -351,6 +351,17 @@ type PlatformStats struct {
 	UpdatedAt   time.Time  `json:"updatedAt"`
 	Investments int64      `json:"investments"`
 	TotalValue  string     `json:"totalValue"`
+	// DisplayCurrency is the currency TotalValue is expressed in: the one the
+	// caller asked for, or the account's preferred currency. The total sums
+	// entries settled in whatever currency each was bought in, so without this
+	// the figure has no unit and every client defaulted to reading it as USD.
+	DisplayCurrency string `json:"displayCurrency"`
+	// PositionsUnconverted counts the entries left at face value because no
+	// rate connected their cost currency to DisplayCurrency. They still count
+	// towards TotalValue — dropping them would understate the platform — so a
+	// non-zero count means the total adds different currencies together and a
+	// client has to say so rather than present it as one amount.
+	PositionsUnconverted int64 `json:"positionsUnconverted"`
 }
 
 // SummaryView is the result of joining portfolios + risks + portfolio_summary view.

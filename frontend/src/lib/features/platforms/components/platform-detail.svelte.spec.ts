@@ -12,7 +12,9 @@ const platform: Platform = {
 	isActive: true,
 	createdAt: '2026-01-15T00:00:00Z',
 	investments: 4,
-	totalValue: '12500.5'
+	totalValue: '12500.5',
+	displayCurrency: 'USD',
+	positionsUnconverted: 0
 };
 
 describe('platform-detail.svelte', () => {
@@ -24,6 +26,18 @@ describe('platform-detail.svelte', () => {
 			.toBeInTheDocument();
 		// broker -> "Bróker" via PLATFORM_TYPES
 		await expect.element(page.getByText('Bróker').first()).toBeInTheDocument();
+	});
+
+	it('labels the invested total with the currency the backend reports', async () => {
+		render(PlatformDetail, { platform: { ...platform, displayCurrency: 'COP' } });
+
+		await expect.element(page.getByText(/12\.501/)).toBeInTheDocument();
+	});
+
+	it('warns when the total still adds positions no rate could convert', async () => {
+		render(PlatformDetail, { platform: { ...platform, positionsUnconverted: 1 } });
+
+		await expect.element(page.getByText(/posición sigue/)).toBeInTheDocument();
 	});
 
 	it('switches to the edit form when "Editar" is clicked', async () => {

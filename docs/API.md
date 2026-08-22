@@ -208,7 +208,7 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 | POST | `/portfolios/entries/:entryId/transactions` | usuario | Crea transacción |
 | PUT | `/portfolios/transactions/:txnId` | usuario | Actualiza transacción |
 | DELETE | `/portfolios/transactions/:txnId` | usuario | Elimina transacción; la posición se recalcula sola y queda en cantidad 0 si era la última |
-| GET | `/portfolios/sources` | usuario | Lista plataformas |
+| GET | `/portfolios/sources` | usuario | Lista plataformas con sus totales (soporta `?currency=`) |
 | PATCH | `/portfolios/sources/:id` | usuario | Actualiza plataforma |
 | DELETE | `/portfolios/sources/:id` | usuario | Elimina plataforma |
 | GET | `/portfolios/assets` | usuario, paginada | Catálogo de assets (curados + los que aportó el llamante; §2.8) |
@@ -341,6 +341,24 @@ es el límite honesto de lo que se guarda; la alternativa era sumarlos crudos.
 
 `GET /portfolios/:id/growth` es un solo portfolio y por tanto una sola moneda:
 no convierte nada y `portfoliosUnconverted` es siempre 0.
+
+#### Moneda de las plataformas
+
+`GET /portfolios/sources` devuelve por plataforma un `totalValue`, que es el
+coste de sus posiciones —cantidad × coste medio ponderado— sumado sobre entries
+que pueden estar liquidadas en monedas distintas. Convierte por la misma razón
+que la asignación: `?currency=` acepta la misma lista y, omitido, manda la
+moneda preferida de la cuenta.
+
+Cada plataforma lleva `displayCurrency` —la moneda en la que quedó su
+`totalValue`— y `positionsUnconverted`, con el mismo significado que en el
+resumen: posiciones incluidas a valor nominal por no haber tasa.
+
+Hasta entonces `totalValue` salía de un `SUM` sobre la columna sin mirar
+`cost_currency`, así que una plataforma con una compra en pesos y tres en
+dólares devolvía sus importes nominales sumados: un número en ninguna moneda, e
+inflado en cuanto entraba una de unidad menor. El cliente, además, no tenía cómo
+saberlo — lo pintaba con un «$» fijo.
 
 #### Resumen de crecimiento: crecimiento no es rendimiento
 

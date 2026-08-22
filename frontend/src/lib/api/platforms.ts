@@ -6,9 +6,13 @@ import type { Platform } from './types';
 import { platformSchema } from './schemas';
 import { z } from 'zod';
 
-/** `GET /portfolios/sources` — plataformas del usuario. */
-export function getSources(event: ApiEvent): Promise<ApiResult<Platform[]>> {
-	return apiRequestSafe(event, '/portfolios/sources', {}, z.array(platformSchema));
+/**
+ * `GET /portfolios/sources` — plataformas del usuario, con sus totales
+ * (opcionalmente convertidos a `currency`; si no, a la moneda de la cuenta).
+ */
+export function getSources(event: ApiEvent, currency?: string): Promise<ApiResult<Platform[]>> {
+	const query = currency ? `?currency=${encodeURIComponent(currency)}` : '';
+	return apiRequestSafe(event, `/portfolios/sources${query}`, {}, z.array(platformSchema));
 }
 
 /** `POST /portfolios/sources` — crea una plataforma. */

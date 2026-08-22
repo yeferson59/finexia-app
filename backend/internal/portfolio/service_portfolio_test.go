@@ -452,13 +452,19 @@ func TestPlatformLifecycle(t *testing.T) {
 
 	t.Run("GetPlatforms returns stats", func(t *testing.T) {
 		repo := new(fakeRepository{
-			getPlatformsWithStats: func(_ context.Context, uid uuid.UUID) ([]PlatformStats, error) {
-				return []PlatformStats{{ID: sourceID, Name: "binance", Investments: 4, TotalValue: "250.00"}}, nil
+			getPlatformsWithStats: func(_ context.Context, _ uuid.UUID, displayCurrency string) ([]PlatformStats, error) {
+				if displayCurrency != "COP" {
+					t.Errorf("displayCurrency = %q, want COP", displayCurrency)
+				}
+				return []PlatformStats{{
+					ID: sourceID, Name: "binance", Investments: 4,
+					TotalValue: "250.00", DisplayCurrency: displayCurrency,
+				}}, nil
 			},
 		})
 		svc := newTestServices(repo, newMemStorage())
 
-		got, err := svc.GetPlatforms(context.Background(), userID)
+		got, err := svc.GetPlatforms(context.Background(), userID, "COP")
 		if err != nil {
 			t.Fatalf("GetPlatforms: %v", err)
 		}

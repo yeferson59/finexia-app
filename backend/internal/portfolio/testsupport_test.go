@@ -126,7 +126,7 @@ type fakeRepository struct {
 	getEntriesByPortfolioID         func(ctx context.Context, portfolioID uuid.UUID) ([]Entry, error)
 	getTopTransactionByPortfolio    func(ctx context.Context, userID, portfolioID uuid.UUID) (TopTransactionDTO, error)
 	createPlatform                  func(ctx context.Context, userID uuid.UUID, sourceType SourceType, name, description string) (InvestmentSource, error)
-	getPlatformsWithStats           func(ctx context.Context, userID uuid.UUID) ([]PlatformStats, error)
+	getPlatformsWithStats           func(ctx context.Context, userID uuid.UUID, displayCurrency string) ([]PlatformStats, error)
 	updatePlatform                  func(ctx context.Context, userID, sourceID uuid.UUID, name, description string, sourceType SourceType, isActive bool) (PlatformStats, error)
 	deletePlatform                  func(ctx context.Context, userID, sourceID uuid.UUID) error
 	createPortfolioEntry            func(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency string, category EntryCategory, entryDate time.Time, notes string) (Entry, error)
@@ -193,8 +193,8 @@ func (f *fakeRepository) CreatePlatform(ctx context.Context, userID uuid.UUID, s
 	return f.createPlatform(ctx, userID, sourceType, name, description)
 }
 
-func (f *fakeRepository) GetPlatformsWithStats(ctx context.Context, userID uuid.UUID) ([]PlatformStats, error) {
-	return f.getPlatformsWithStats(ctx, userID)
+func (f *fakeRepository) GetPlatformsWithStats(ctx context.Context, userID uuid.UUID, displayCurrency string) ([]PlatformStats, error) {
+	return f.getPlatformsWithStats(ctx, userID, displayCurrency)
 }
 
 func (f *fakeRepository) UpdatePlatform(ctx context.Context, userID, sourceID uuid.UUID, name, description string, sourceType SourceType, isActive bool) (PlatformStats, error) {

@@ -195,7 +195,15 @@ func (h *handler) GetPlatforms(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	platforms, err := h.service.GetPlatforms(c, userID)
+	// Same contract as the summary's ?currency=: the platform totals are a sum
+	// over entries in mixed currencies, so the caller has to be able to name
+	// the one they want them in.
+	displayCurrency := strings.ToUpper(strings.TrimSpace(c.Query("currency")))
+	if displayCurrency != "" && !IsSupportedDisplayCurrency(displayCurrency) {
+		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+strings.Join(SupportedDisplayCurrencies, ", "))
+	}
+
+	platforms, err := h.service.GetPlatforms(c, userID, displayCurrency)
 	if err != nil {
 		return httpx.FromDomain(c, err, "", "")
 	}

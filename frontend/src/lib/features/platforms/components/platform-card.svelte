@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { privacy } from '$lib/shared/privacy.svelte';
+	import { formatCurrency } from '$lib/shared/format/money';
+	import { FALLBACK_CURRENCY } from '$lib/shared/currency';
 
 	interface PlatformCardData {
 		id: string;
@@ -8,18 +10,25 @@
 		isActive: boolean;
 		investments: number;
 		totalValue: string;
+		/** Moneda real de `totalValue`, la informe el backend o no. */
+		displayCurrency?: string;
+		/** Posiciones incluidas en el total sin convertir, por falta de tasa. */
+		positionsUnconverted?: number;
 	}
 
 	let { platform, onView }: { platform: PlatformCardData; onView: (id: string) => void } = $props();
 
+	// El importe lleva el símbolo de su moneda, no un "$" fijo: el total sale
+	// convertido a la moneda de la cuenta y ponerle dólares a un total en pesos
+	// es la misma cifra con el significado equivocado.
+	const currency = $derived(platform.displayCurrency || FALLBACK_CURRENCY);
+
+	// Posiciones que el backend no pudo convertir: siguen sumadas a valor
+	// nominal, así que el total mezcla monedas y hay que decirlo.
+	const unconverted = $derived(platform.positionsUnconverted ?? 0);
+
 	function fmtMoney(value: string): string {
-		return privacy.money(
-			'$' +
-				new Intl.NumberFormat('es-CO', {
-					minimumFractionDigits: 2,
-					maximumFractionDigits: 2
-				}).format(parseFloat(value) || 0)
-		);
+		return privacy.money(formatCurrency(parseFloat(value) || 0, currency));
 	}
 
 	function getStatusColor(status: boolean) {
@@ -48,6 +57,14 @@
 			<span class="stat-value">{fmtMoney(platform.totalValue)}</span>
 		</div>
 	</div>
+
+	{#if unconverted > 0}
+		<p class="fx-note">
+			{unconverted}
+			{unconverted === 1 ? 'posición sin tasa' : 'posiciones sin tasa'} de cambio: el total suma monedas
+			distintas.
+		</p>
+	{/if}
 
 	<div class="card-actions">
 		<button
@@ -159,6 +176,19 @@
 		font-size: 1.1rem;
 		font-weight: 700;
 		font-family: var(--font-mono);
+	}
+
+	/* Mismo aviso que en la tarjeta de portafolio: el total incluye importes
+	   sin convertir, así que se marca en vez de pasar por comparable. */
+	.fx-note {
+		margin: 0;
+		padding: 0.5rem 0.7rem;
+		border: 1px solid rgba(212, 145, 42, 0.3);
+		border-radius: 8px;
+		background: rgba(212, 145, 42, 0.08);
+		color: rgba(236, 234, 229, 0.75);
+		font-size: 0.78rem;
+		line-height: 1.4;
 	}
 
 	.card-actions {

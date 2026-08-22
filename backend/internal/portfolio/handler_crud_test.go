@@ -244,13 +244,16 @@ func TestHandlerPlatformCRUD(t *testing.T) {
 	})
 
 	t.Run("lists platforms", func(t *testing.T) {
+		var gotCurrency string
 		repo := new(fakeRepository{
-			getPlatformsWithStats: func(_ context.Context, uid uuid.UUID) ([]PlatformStats, error) {
+			getPlatformsWithStats: func(_ context.Context, uid uuid.UUID, displayCurrency string) ([]PlatformStats, error) {
 				if uid != userID {
 					t.Errorf("userID = %s, want %s", uid, userID)
 				}
+				gotCurrency = displayCurrency
 				return []PlatformStats{{
 					ID: sourceID, Name: "ibkr", SourceType: SourceType("broker"), Investments: 3,
+					TotalValue: "1200.50", DisplayCurrency: "USD", PositionsUnconverted: 1,
 				}}, nil
 			},
 		})
@@ -260,6 +263,9 @@ func TestHandlerPlatformCRUD(t *testing.T) {
 		if resp.StatusCode != fiber.StatusOK {
 			t.Fatalf("status = %d, want 200", resp.StatusCode)
 		}
+		if gotCurrency != "" {
+			t.Errorf("displayCurrency = %q, want empty (account preference)", gotCurrency)
+		}
 		_, data := decodeEnvelope(t, resp)
 		var dtos []PlatformResponseDTO
 		if err := json.Unmarshal(data, &dtos); err != nil {
@@ -267,6 +273,46 @@ func TestHandlerPlatformCRUD(t *testing.T) {
 		}
 		if len(dtos) != 1 || dtos[0].Name != "ibkr" || dtos[0].Investments != 3 {
 			t.Errorf("dtos = %+v", dtos)
+		}
+		// The currency of the total and the count of what could not be
+		// converted into it have to survive the DTO: without them the amount
+		// is a bare number every client reads as dollars.
+		if dtos[0].DisplayCurrency != "USD" || dtos[0].PositionsUnconverted != 1 {
+			t.Errorf("displayCurrency = %q, positionsUnconverted = %d, want USD / 1", dtos[0].DisplayCurrency, dtos[0].PositionsUnconverted)
+		}
+	})
+
+	t.Run("lists platforms in a requested currency", func(t *testing.T) {
+		var gotCurrency string
+		repo := new(fakeRepository{
+			getPlatformsWithStats: func(_ context.Context, _ uuid.UUID, displayCurrency string) ([]PlatformStats, error) {
+				gotCurrency = displayCurrency
+				return nil, nil
+			},
+		})
+		app := newTestModule(t, repo, userID, "user")
+
+		resp := do(t, app, http.MethodGet, "/portfolios/sources?currency=cop")
+		if resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		if gotCurrency != "COP" {
+			t.Errorf("displayCurrency = %q, want COP", gotCurrency)
+		}
+	})
+
+	t.Run("rejects an unsupported currency", func(t *testing.T) {
+		repo := new(fakeRepository{
+			getPlatformsWithStats: func(_ context.Context, _ uuid.UUID, _ string) ([]PlatformStats, error) {
+				t.Error("repository reached with an unsupported currency")
+				return nil, nil
+			},
+		})
+		app := newTestModule(t, repo, userID, "user")
+
+		resp := do(t, app, http.MethodGet, "/portfolios/sources?currency=XYZ")
+		if resp.StatusCode != fiber.StatusBadRequest {
+			t.Fatalf("status = %d, want 400", resp.StatusCode)
 		}
 	})
 
