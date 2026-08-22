@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -81,6 +82,7 @@ func TestLoadEnvsHasNoJWTSecretDefault(t *testing.T) {
 	t.Setenv("JWT_SECRET", "")
 
 	cfg, err := New()
+	fmt.Println(cfg, err)
 
 	if err == nil {
 		t.Fatal(err)
