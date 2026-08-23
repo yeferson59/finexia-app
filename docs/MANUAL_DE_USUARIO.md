@@ -1,6 +1,6 @@
 # Manual de Usuario — FINEXIA
 
-**Versión del documento:** 1.5
+**Versión del documento:** 1.6
 **Fecha:** Agosto 2026
 **Aplicación:** Finexia — Plataforma de gestión y seguimiento de portafolios de inversión
 
@@ -411,6 +411,8 @@ La sección **Reportes** ("Gestiona y descarga documentos financieros de tu cuen
 - **Rentabilidad mensual (%):** calendario con el rendimiento de cada mes, un panel por año (verás tantos paneles como años cubra tu historial). Arriba de cada panel está el **acumulado del año**, y debajo la **leyenda de la escala de color** (de rojo intenso para caídas de más del 1 % a verde intenso para subidas del 2 % o más). Los meses sin dato aparecen con un guion.
 
   Lo que ves es **rendimiento de lo invertido, no variación del saldo**: los aportes y retiros del mes se descuentan antes de calcular el porcentaje, así que ingresar dinero no pinta el mes en verde. El descuento se hace con tus movimientos reales, uno a uno: una compra entra como dinero puesto, una venta sale por lo que cobraste —no por lo que te costó en su día, que es lo que convertiría una plusvalía en pérdida— y un dividendo cuenta como renta que sí ganaste. El mes en el que arranca tu historial va marcado con un asterisco porque cubre menos días que un mes completo.
+
+  Un detalle a tener en cuenta al empezar: cuando registras una posición que ya tenías comprada, la aplicación la incorpora el día en que se la cuentas, no el día en que la compraste —de tu historial anterior no sabe nada—. Si esa posición llega con ganancia acumulada, esa ganancia aparece entera en su primer día dentro de la aplicación. No es un error de cálculo, es todo lo que se puede saber de un periodo que nadie observó; a partir de ahí, el seguimiento ya es día a día.
 
 - **Estadísticas clave:** doce métricas repartidas en tres bloques.
 

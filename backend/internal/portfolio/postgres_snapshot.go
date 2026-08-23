@@ -128,9 +128,15 @@ func (r *PostgresRepository) GetPortfolioValuesAsOf(ctx context.Context, userID 
 //
 // Each point also carries the net external cash flow of the stretch that ends
 // on it, so a caller can tell the value the market added from the value the
-// owner deposited. Every transaction is attributed to the first snapshot on or
-// after its date — that is the snapshot that first reflects it — and converted
-// with the same rate as the snapshots it sits next to.
+// owner deposited. A transaction counts on the first snapshot computed after it
+// was recorded — the snapshot that first reflects it — and is converted with
+// the same rate as the snapshots it sits next to.
+//
+// The flow of a position loaded with history behind it is its cost, while the
+// value it brings in is what it is worth today, so the gain it accumulated
+// before the app ever saw it lands on that one day. That is the honest limit of
+// a series that only knows what it was told, when it was told: nobody watched
+// that gain happen, and there is no earlier point to spread it over.
 func (r *PostgresRepository) GetPortfolioGrowthByUserID(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -167,11 +173,18 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(
 			FROM converted
 			GROUP BY snapshot_date, currency
 		), flows AS (
+			-- Each transaction is attributed to the first snapshot computed
+			-- after it was recorded, which is the point of the series where its
+			-- money actually shows up. Not to its transaction_date: past
+			-- snapshots are never recomputed, so a position registered today
+			-- with a trade date of two months ago moves the series today and
+			-- leaves the older date untouched.
 			SELECT
 				(
-					SELECT MIN(t.snapshot_date)
-					FROM totals t
-					WHERE t.snapshot_date >= tx.transaction_date
+					SELECT MIN(ps.snapshot_date)
+					FROM portfolio_snapshots ps
+					WHERE ps.portfolio_id = pe.portfolio_id
+					  AND ps.created_at >= tx.created_at
 				) AS snapshot_date,
 				transaction_cash_flow(tx.type, tx.quantity, tx.price, tx.fees)
 					* COALESCE(fxt.rate, 1) AS amount
@@ -187,9 +200,11 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(
 			) fxt
 			WHERE pf.user_id = $1
 		), net_flows AS (
-			-- A transaction later than the last snapshot lands on NULL and waits
-			-- for the snapshot that will cover it; one earlier than the first
-			-- lands on the first, whose subperiod nobody measures.
+			-- A transaction the snapshot job has not caught up with yet lands on
+			-- NULL and waits for the snapshot that will cover it. One that lands
+			-- outside the asked-for window drops off the join below, which is
+			-- what should happen: the opening point of a window has no previous
+			-- point to be measured against.
 			SELECT snapshot_date, SUM(amount) AS net_flow
 			FROM flows
 			WHERE snapshot_date IS NOT NULL
@@ -263,11 +278,14 @@ func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(
 			WHERE ps.portfolio_id = $1 AND p.user_id = $2
 			  AND ($3::boolean = FALSE OR ps.snapshot_date >= $4::date)
 		), flows AS (
+			-- By when the transaction was recorded, not when it was traded: see
+			-- the account-wide query for why.
 			SELECT
 				(
-					SELECT MIN(pt.snapshot_date)
-					FROM points pt
-					WHERE pt.snapshot_date >= tx.transaction_date
+					SELECT MIN(ps.snapshot_date)
+					FROM portfolio_snapshots ps
+					WHERE ps.portfolio_id = $1
+					  AND ps.created_at >= tx.created_at
 				) AS snapshot_date,
 				transaction_cash_flow(tx.type, tx.quantity, tx.price, tx.fees)
 					* COALESCE(fxt.rate, 1) AS amount
