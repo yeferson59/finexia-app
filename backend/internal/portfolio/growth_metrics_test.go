@@ -254,8 +254,23 @@ func TestBuildGrowthMetricsCarriesTheLastPointsAmounts(t *testing.T) {
 	if got := m.GainLoss.StringFixed(0); got != "300" {
 		t.Errorf("gain/loss = %s", got)
 	}
-	// Cost base went 1000 → 1200: money put in, not earned.
-	if got := m.NetInvestment.StringFixed(0); got != "200" {
-		t.Errorf("net investment = %s, want 200", got)
+	// The flow of the measured span, not the change in cost base: they differ
+	// as soon as there is a fee or a dividend in it.
+	if got := m.NetFlow.StringFixed(0); got != "200" {
+		t.Errorf("net flow = %s, want 200", got)
+	}
+}
+
+func TestBuildGrowthMetricsNetFlowSkipsTheOpeningPoint(t *testing.T) {
+	// The first point carries whatever fell on or before its own date, which is
+	// outside the span the report measures.
+	m := BuildGrowthMetrics([]GrowthPoint{
+		day(0, "1000", "1000", "1000"),
+		day(1, "1500", "1400", "400"),
+		day(2, "1600", "1400", "-100"),
+	})
+
+	if got := m.NetFlow.StringFixed(0); got != "300" {
+		t.Errorf("net flow = %s, want 400 - 100 with the opening 1000 left out", got)
 	}
 }

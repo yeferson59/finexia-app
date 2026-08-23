@@ -225,7 +225,7 @@ func writeRiskMetricsSheet(f *excelize.File, m GrowthMetrics) {
 		{"Valor actual", m.CurrentValue.RoundBank(2).StringFixed(2), currency, "Valor de mercado de la cuenta en el último cierre."},
 		{"Capital invertido", m.InvestedCost.RoundBank(2).StringFixed(2), currency, "Coste de las posiciones abiertas en el último cierre."},
 		{"Ganancia / pérdida", m.GainLoss.RoundBank(2).StringFixed(2), currency, "Valor de mercado menos capital invertido."},
-		{"Aporte neto del periodo", m.NetInvestment.RoundBank(2).StringFixed(2), currency, "Lo que subió el capital invertido: dinero puesto, no ganado."},
+		{"Aporte neto del periodo", m.NetFlow.RoundBank(2).StringFixed(2), currency, "Dinero puesto menos dinero sacado: la suma de la columna «Aporte neto» del historial. No es rentabilidad."},
 	}
 
 	for i, entry := range rows {

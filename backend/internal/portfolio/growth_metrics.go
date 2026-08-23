@@ -84,10 +84,14 @@ type GrowthMetrics struct {
 	Best, Worst     MonthReturn
 	HasMonthReturns bool
 
-	CurrentValue  decimal.Decimal
-	InvestedCost  decimal.Decimal
-	GainLoss      decimal.Decimal
-	NetInvestment decimal.Decimal
+	CurrentValue decimal.Decimal
+	InvestedCost decimal.Decimal
+	GainLoss     decimal.Decimal
+	// NetFlow is the money moved in or out across the measured span: the sum of
+	// every point's flow bar the first, whose own flow predates the span and
+	// belongs to no subperiod. It is the amount a reader adding up the flow
+	// column of the history sheet arrives at.
+	NetFlow decimal.Decimal
 }
 
 // growthDecimal reads one amount of the series, treating an unparsable or empty
@@ -277,17 +281,22 @@ func BuildGrowthMetrics(points []GrowthPoint) GrowthMetrics {
 
 	first, last := points[0], points[len(points)-1]
 
+	netFlow := decimal.Zero
+	for _, p := range points[1:] {
+		netFlow = netFlow.Add(growthDecimal(p.NetFlow))
+	}
+
 	metrics := GrowthMetrics{
-		Currency:      last.Currency,
-		FirstDate:     first.Date,
-		LastDate:      last.Date,
-		SpanDays:      int(last.Date.Sub(first.Date).Hours() / 24),
-		Points:        len(points),
-		Subperiod:     SubperiodReturns(points),
-		CurrentValue:  growthDecimal(last.TotalValue),
-		InvestedCost:  growthDecimal(last.TotalCostBase),
-		GainLoss:      growthDecimal(last.GainLoss),
-		NetInvestment: growthDecimal(last.TotalCostBase).Sub(growthDecimal(first.TotalCostBase)),
+		Currency:     last.Currency,
+		FirstDate:    first.Date,
+		LastDate:     last.Date,
+		SpanDays:     int(last.Date.Sub(first.Date).Hours() / 24),
+		Points:       len(points),
+		Subperiod:    SubperiodReturns(points),
+		CurrentValue: growthDecimal(last.TotalValue),
+		InvestedCost: growthDecimal(last.TotalCostBase),
+		GainLoss:     growthDecimal(last.GainLoss),
+		NetFlow:      netFlow,
 	}
 
 	if len(metrics.Subperiod) == 0 {
