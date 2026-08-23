@@ -22,9 +22,9 @@ export interface ManualMeta {
 export const manual: ManualMeta = {
 	version: '1.5',
 	date: 'Agosto 2026',
-	bytes: 2807631,
-	generatedAt: '2026-08-23T03:11:04.205Z',
-	sourceHash: '704efe287076745c7dc137b5632837a48c8d0932c2a2599c10b468f119230ec1',
+	bytes: 2807620,
+	generatedAt: '2026-08-23T03:25:36.243Z',
+	sourceHash: 'b63c6fd7085a14fd5e1dd8d776962aa66c9f49515d14f971ca6017b020caeeaa',
 	sections: [
 		{
 			number: 1,
