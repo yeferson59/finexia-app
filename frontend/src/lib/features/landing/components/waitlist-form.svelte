@@ -1,4 +1,19 @@
 <script lang="ts">
+	import CountdownInline from './countdown-inline.svelte';
+
+	interface Props {
+		/** Ancla del formulario. Solo lo lleva el del hero, al que apunta el menú. */
+		anchor?: string;
+		/** El del CTA final va centrado dentro de su panel. */
+		centered?: boolean;
+		/** El aviso de spam sobra donde ya se ha leído una vez. */
+		note?: boolean;
+		/** Texto que precede a la cuenta atrás. */
+		countdownLabel?: string;
+	}
+
+	let { anchor, centered = false, note = true, countdownLabel = 'Faltan' }: Props = $props();
+
 	let waitlistEmail = $state('');
 	let waitlistError = $state(false);
 	let waitlistErrorMessage = $state('');
@@ -35,7 +50,7 @@
 	}
 </script>
 
-<div class="waitlist reveal" id="waitlist">
+<div class="waitlist reveal" class:centered id={anchor}>
 	{#if waitlistSuccess}
 		<div class="wl-success">
 			<span class="check-ico" aria-hidden="true">
@@ -77,30 +92,38 @@
 		{#if waitlistError && waitlistErrorMessage}
 			<p class="wl-error" role="alert">{waitlistErrorMessage}</p>
 		{/if}
-		<div class="wl-note">
-			<svg
-				width="13"
-				height="13"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				><rect x="3" y="11" width="18" height="11" rx="2" /><path
-					d="M7 11V7a5 5 0 0 1 10 0v4"
-				/></svg
-			>
-			Sin spam. Solo te escribimos el día del lanzamiento.
+		<div class="wl-meta">
+			{#if note}
+				<div class="wl-note">
+					<svg
+						width="13"
+						height="13"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						><rect x="3" y="11" width="18" height="11" rx="2" /><path
+							d="M7 11V7a5 5 0 0 1 10 0v4"
+						/></svg
+					>
+					Sin spam. Solo te escribimos el día del lanzamiento.
+				</div>
+			{/if}
+			<CountdownInline label={countdownLabel} />
 		</div>
 	{/if}
 </div>
 
 <style>
 	.waitlist {
-		margin-top: 36px;
 		width: 100%;
 		max-width: 480px;
+	}
+
+	.waitlist.centered {
+		margin: 0 auto;
 	}
 
 	.wl-form {
@@ -121,7 +144,7 @@
 	}
 
 	.wl-form.error {
-		border-color: #e05a5a;
+		border-color: var(--red);
 	}
 
 	.wl-form input {
@@ -140,8 +163,24 @@
 		color: var(--text-dim);
 	}
 
-	.wl-note {
+	/*
+	 * Aviso y cuenta atrás comparten fila: la información secundaria del
+	 * formulario ocupa una línea en vez de dos bloques apilados.
+	 */
+	.wl-meta {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
 		margin-top: 12px;
+	}
+
+	.waitlist.centered .wl-meta {
+		justify-content: center;
+		margin-top: 14px;
+	}
+
+	.wl-note {
 		font-size: 12px;
 		color: var(--text-dim);
 		display: flex;
@@ -152,7 +191,7 @@
 	.wl-error {
 		margin-top: 10px;
 		font-size: 12.5px;
-		color: #e05a5a;
+		color: var(--red);
 	}
 
 	.wl-success {
@@ -182,11 +221,16 @@
 		.wl-form {
 			flex-direction: column;
 		}
-	}
-
-	@media (max-width: 480px) {
-		.waitlist {
-			margin-top: 28px;
+		.wl-form input {
+			height: 44px;
+		}
+		.wl-meta {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 8px;
+		}
+		.waitlist.centered .wl-meta {
+			align-items: center;
 		}
 	}
 </style>

@@ -1,9 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
 	import Brand from './brand.svelte';
 
 	let headerEl: HTMLElement;
 	let menuOpen = $state(false);
+
+	const login = resolve('/auth');
 
 	// El `#` va literal en el marcado (`href="#{link.id}"`) y no dentro del dato:
 	// así `svelte/no-navigation-without-resolve` reconoce el enlace de fragmento.
@@ -48,6 +51,12 @@
 			{/each}
 		</nav>
 		<div class="nav-right">
+			<!--
+				Dos acciones con pesos distintos: entrar es un botón fantasma porque
+				solo lo usa quien ya tiene cuenta; la lista de espera, que es a lo que
+				viene la mayoría, se lleva el botón con borde.
+			-->
+			<a href={login} class="nav-login">Iniciar sesión</a>
 			<a href="#waitlist" class="nav-cta">Unirme a la lista</a>
 			<button
 				class="burger"
@@ -70,6 +79,16 @@
 				{link.label}
 			</a>
 		{/each}
+		<!-- En móvil el botón con borde de la barra es "Iniciar sesión", así que la
+		     lista de espera baja aquí para que siga estando a un toque. -->
+		<a
+			href="#waitlist"
+			class="menu-cta"
+			onclick={() => (menuOpen = false)}
+			tabindex={menuOpen ? 0 : -1}
+		>
+			Unirme a la lista
+		</a>
 	</nav>
 </header>
 
@@ -130,8 +149,28 @@
 	.nav-right {
 		display: flex;
 		align-items: center;
-		gap: 10px;
+		gap: 8px;
 	}
+
+	.nav-login {
+		display: inline-flex;
+		align-items: center;
+		padding: 9px 14px;
+		border-radius: 6px;
+		border: 1px solid transparent;
+		font-size: 13.5px;
+		font-weight: 500;
+		color: var(--text-muted);
+		white-space: nowrap;
+		transition:
+			color 0.2s,
+			background 0.2s;
+	}
+	.nav-login:hover {
+		color: var(--text);
+		background: var(--surface-2);
+	}
+
 	.nav-cta {
 		display: inline-flex;
 		align-items: center;
@@ -156,8 +195,9 @@
 		flex-direction: column;
 		justify-content: center;
 		gap: 4px;
-		width: 38px;
-		height: 38px;
+		/* 44×44: objetivo táctil mínimo recomendado. */
+		width: 44px;
+		height: 44px;
 		padding: 0;
 		border: 1px solid var(--border-strong);
 		border-radius: 6px;
@@ -194,7 +234,7 @@
 		transition: max-height 0.28s ease;
 	}
 	.menu.open {
-		max-height: 340px;
+		max-height: 420px;
 	}
 	.menu a {
 		padding: 14px 24px;
@@ -208,6 +248,10 @@
 	.menu a:hover {
 		color: var(--text);
 		background: var(--surface);
+	}
+	.menu .menu-cta {
+		color: var(--amber-light);
+		font-weight: 500;
 	}
 
 	@media (max-width: 1000px) {
@@ -229,14 +273,24 @@
 		.menu {
 			display: flex;
 		}
+		/* Con el hero justo debajo, el formulario de la lista ya está a la vista:
+		   la barra reserva su único botón para lo que no se ve en ningún otro
+		   sitio, entrar a la cuenta. */
+		.nav-cta {
+			display: none;
+		}
+		.nav-login {
+			border-color: var(--border-strong);
+			color: var(--text);
+		}
 	}
 
 	@media (max-width: 480px) {
 		.nav {
 			height: 58px;
 		}
-		.nav-cta {
-			padding: 8px 14px;
+		.nav-login {
+			padding: 9px 13px;
 			font-size: 13px;
 		}
 	}

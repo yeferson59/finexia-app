@@ -1,4 +1,11 @@
 <script lang="ts">
+	/*
+	 * Tres pasos en horizontal, unidos por un hilo.
+	 *
+	 * Antes era otra pila vertical justo después de la de beneficios, y las dos
+	 * contaban casi lo mismo con la misma forma. Puestos en fila se lee lo que
+	 * son: una secuencia, frente al catálogo de la sección anterior.
+	 */
 	const steps = [
 		{
 			num: '01',
@@ -18,61 +25,106 @@
 	];
 </script>
 
-<section class="wrap block" id="como-funciona">
-	<div class="sec-head reveal">
-		<div class="eyebrow">Cómo funciona</div>
-		<h2 class="sec-title">De plataformas dispersas<br />a un solo mapa</h2>
-	</div>
-	<div class="steps">
-		{#each steps as step (step.num)}
-			<div class="step reveal">
-				<div class="step-num">{step.num}</div>
-				<div class="step-body">
+<section class="band" id="como-funciona">
+	<div class="wrap block">
+		<div class="sec-head reveal">
+			<div class="eyebrow">Cómo funciona</div>
+			<h2 class="sec-title">De plataformas dispersas<br />a un solo mapa</h2>
+		</div>
+
+		<div class="steps">
+			<div class="thread" aria-hidden="true"></div>
+			{#each steps as step (step.num)}
+				<div class="step reveal">
+					<span class="step-num">{step.num}</span>
 					<h3>{step.title}</h3>
 					<p>{step.body}</p>
 				</div>
-			</div>
-		{/each}
+			{/each}
+		</div>
 	</div>
 </section>
 
 <style>
 	.steps {
-		display: flex;
-		flex-direction: column;
-		max-width: 660px;
-		margin: 0 auto;
+		position: relative;
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 48px;
 	}
+
+	.thread {
+		position: absolute;
+		top: 15px;
+		left: 12%;
+		right: 12%;
+		height: 1px;
+		background: linear-gradient(
+			90deg,
+			transparent,
+			rgba(212, 145, 42, 0.35),
+			rgba(212, 145, 42, 0.35),
+			transparent
+		);
+	}
+
 	.step {
-		display: flex;
-		gap: 32px;
-		padding: 32px 0;
-		border-bottom: 1px solid var(--border);
+		position: relative;
 	}
-	.step:last-child {
-		border-bottom: none;
-	}
+
 	.step-num {
+		display: grid;
+		place-items: center;
+		width: 30px;
+		height: 30px;
+		border-radius: 999px;
+		border: 1px solid rgba(212, 145, 42, 0.28);
+		/* Opaco a propósito: tapa el hilo que pasa por detrás. */
+		background: #0c0d0e;
 		font-family: var(--font-mono);
 		font-size: 11px;
 		font-weight: 600;
 		color: var(--amber);
-		letter-spacing: 0.06em;
-		flex-shrink: 0;
-		padding-top: 5px;
-		min-width: 26px;
 	}
-	.step-body h3 {
+
+	.step h3 {
+		margin-top: 22px;
 		font-family: var(--font-display);
 		font-weight: 500;
 		font-size: 21px;
 		letter-spacing: -0.01em;
-		margin-bottom: 10px;
 	}
-	.step-body p {
+
+	.step p {
+		margin-top: 10px;
 		font-size: 14.5px;
 		color: var(--text-muted);
 		line-height: 1.65;
 		font-weight: 300;
+		text-wrap: pretty;
+	}
+
+	@media (max-width: 860px) {
+		.steps {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 36px;
+			max-width: 660px;
+			margin: 0 auto;
+		}
+		/* En columna el hilo pasa a vertical, a la altura de los círculos. */
+		.thread {
+			top: 30px;
+			bottom: 30px;
+			left: 15px;
+			right: auto;
+			width: 1px;
+			height: auto;
+			background: linear-gradient(
+				180deg,
+				rgba(212, 145, 42, 0.35),
+				rgba(212, 145, 42, 0.35),
+				transparent
+			);
+		}
 	}
 </style>

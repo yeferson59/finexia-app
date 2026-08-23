@@ -142,32 +142,23 @@
 	{@html `<script type="application/ld+json">${jsonLd}</scr` + 'ipt>'}
 </svelte:head>
 
-<div class="scanlines" aria-hidden="true"></div>
-
 <Ticker />
 <Header />
 
+<!--
+	Las secciones ya no van separadas por un divisor suelto: las que llevan
+	`.band` se pintan sobre un fondo levemente elevado con filete arriba y abajo,
+	y se alternan con las que van sobre el fondo base. El corte lo marca el
+	cambio de fondo, y de paso la página deja de respirar igual siete veces.
+-->
 <main id="contenido">
 	<Hero />
-
-	<div class="wrap"><div class="divider"></div></div>
 	<ProductTour />
-
-	<div class="wrap"><div class="divider"></div></div>
 	<Benefits />
-
-	<div class="wrap"><div class="divider"></div></div>
 	<HowItWorks />
-
-	<div class="wrap"><div class="divider"></div></div>
 	<Trust />
-
-	<div class="wrap"><div class="divider"></div></div>
 	<Metrics />
-
-	<div class="wrap"><div class="divider"></div></div>
 	<Faq {faqs} />
-
 	<FinalCta />
 </main>
 
@@ -180,24 +171,5 @@
 	:global(body) {
 		line-height: 1.55;
 		overflow-x: hidden;
-	}
-
-	.scanlines {
-		position: fixed;
-		inset: 0;
-		z-index: 0;
-		pointer-events: none;
-		background: repeating-linear-gradient(
-			0deg,
-			transparent,
-			transparent 3px,
-			rgba(255, 255, 255, 0.006) 3px,
-			rgba(255, 255, 255, 0.006) 4px
-		);
-	}
-
-	main {
-		position: relative;
-		z-index: 1;
 	}
 </style>

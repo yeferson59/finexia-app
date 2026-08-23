@@ -3,6 +3,9 @@
 	 * Garantías de seguridad. Cada una corresponde a algo que la aplicación hace
 	 * hoy —2FA, cierre de sesiones, modo oculto, exportación en XLSX—, no a una
 	 * promesa a futuro: la landing no debe prometer lo que el dashboard no tiene.
+	 *
+	 * La cabecera va a dos columnas (titular y argumento sobre un filete), la
+	 * tercera forma distinta de abrir sección de la página.
 	 */
 	const guarantees = [
 		{
@@ -39,9 +42,11 @@
 </script>
 
 <section class="wrap block" id="seguridad">
-	<div class="sec-head reveal">
-		<div class="eyebrow">Seguridad y control</div>
-		<h2 class="sec-title">Menos accesos,<br />menos superficie de riesgo</h2>
+	<div class="sec-split reveal">
+		<div>
+			<div class="eyebrow">Seguridad y control</div>
+			<h2 class="sec-title">Menos accesos,<br />menos superficie de riesgo</h2>
+		</div>
 		<p class="sec-desc">
 			La forma más segura de tratar las llaves de tus cuentas es no pedirlas nunca. Sobre esa base
 			está construido el resto.
@@ -139,6 +144,7 @@
 		color: var(--text-muted);
 		line-height: 1.65;
 		font-weight: 300;
+		text-wrap: pretty;
 	}
 
 	@media (max-width: 900px) {

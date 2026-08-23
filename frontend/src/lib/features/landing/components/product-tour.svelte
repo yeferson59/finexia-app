@@ -7,6 +7,10 @@
 	 * vea el producto que va a usar y no una ilustración genérica. La ventana es
 	 * decorativa (`aria-hidden`); cada pestaña lleva debajo un pie de texto que
 	 * describe la vista, así que la información también existe sin verla.
+	 *
+	 * La cabecera va a la izquierda y las pestañas a la derecha sobre el mismo
+	 * filete: la sección abre con un eje horizontal en vez de con el tercer
+	 * bloque centrado seguido.
 	 */
 	import ProductTourWindow from './product-tour-window.svelte';
 	import { TOUR_VIEWS, type TourView } from '../product-tour';
@@ -26,39 +30,37 @@
 	}
 </script>
 
-<section class="wrap block" id="producto">
-	<div class="sec-head reveal">
-		<div class="eyebrow">El producto</div>
-		<h2 class="sec-title">Esto es lo que verás<br />al entrar</h2>
-		<p class="sec-desc">
-			Cuatro vistas que trabajan sobre los mismos datos: el resumen de tu patrimonio, tus
-			portafolios, cada movimiento registrado y los reportes que puedes descargar.
-		</p>
-	</div>
+<section class="band" id="producto">
+	<div class="wrap block">
+		<div class="tour-head reveal">
+			<div class="tour-head-text">
+				<div class="eyebrow">El producto</div>
+				<h2 class="sec-title">Esto es lo que verás al entrar</h2>
+			</div>
 
-	<div class="tour reveal">
-		<div class="tour-tabs" role="tablist" aria-label="Vistas del panel de Finexia">
-			{#each TOUR_VIEWS as v, i (v.id)}
-				<button
-					id="tour-tab-{v.id}"
-					class="tour-tab"
-					class:active={active === v.id}
-					role="tab"
-					type="button"
-					aria-selected={active === v.id}
-					aria-controls="tour-panel-{v.id}"
-					tabindex={active === v.id ? 0 : -1}
-					onclick={() => (active = v.id)}
-					onkeydown={(e) => onTabKey(e, i)}
-				>
-					{v.tab}
-				</button>
-			{/each}
+			<div class="tour-tabs" role="tablist" aria-label="Vistas del panel de Finexia">
+				{#each TOUR_VIEWS as v, i (v.id)}
+					<button
+						id="tour-tab-{v.id}"
+						class="tour-tab"
+						class:active={active === v.id}
+						role="tab"
+						type="button"
+						aria-selected={active === v.id}
+						aria-controls="tour-panel-{v.id}"
+						tabindex={active === v.id ? 0 : -1}
+						onclick={() => (active = v.id)}
+						onkeydown={(e) => onTabKey(e, i)}
+					>
+						{v.tab}
+					</button>
+				{/each}
+			</div>
 		</div>
 
 		<div
 			id="tour-panel-{view.id}"
-			class="tour-panel"
+			class="tour-panel reveal"
 			role="tabpanel"
 			aria-labelledby="tour-tab-{view.id}"
 			tabindex="-1"
@@ -66,8 +68,10 @@
 			<ProductTourWindow {view} />
 
 			<div class="tour-caption">
-				<h3>{view.title}</h3>
-				<p>{view.description}</p>
+				<div>
+					<h3>{view.title}</h3>
+					<p>{view.description}</p>
+				</div>
 				<ul class="tour-points">
 					{#each view.points as point (point)}
 						<li>{point}</li>
@@ -79,16 +83,24 @@
 </section>
 
 <style>
-	.tour {
-		max-width: 1080px;
-		margin: 0 auto;
+	.tour-head {
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 48px;
+		padding-bottom: 26px;
+		margin-bottom: 32px;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.tour-head-text {
+		max-width: 620px;
 	}
 
 	.tour-tabs {
 		display: flex;
 		gap: 4px;
-		margin: 0 auto 22px;
-		width: fit-content;
+		flex-shrink: 0;
 		max-width: 100%;
 		padding: 4px;
 		border: 1px solid var(--border);
@@ -132,33 +144,39 @@
 		outline: none;
 	}
 
+	/* El pie deja de ser una pila centrada: descripción a la izquierda,
+	   capacidades alineadas a la derecha. */
 	.tour-caption {
-		max-width: 720px;
-		margin: 26px auto 0;
-		text-align: center;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 380px;
+		gap: 56px;
+		align-items: start;
+		margin-top: 30px;
 	}
 
 	.tour-caption h3 {
 		font-family: var(--font-display);
 		font-weight: 500;
-		font-size: 20px;
+		font-size: 21px;
 		letter-spacing: -0.01em;
 	}
 
 	.tour-caption p {
 		margin-top: 10px;
+		max-width: 62ch;
 		font-size: 14.5px;
 		font-weight: 300;
 		line-height: 1.65;
 		color: var(--text-muted);
+		text-wrap: pretty;
 	}
 
 	.tour-points {
 		display: flex;
 		flex-wrap: wrap;
-		justify-content: center;
+		justify-content: flex-end;
 		gap: 8px;
-		margin-top: 18px;
+		margin: 0;
 		list-style: none;
 		padding: 0;
 	}
@@ -174,12 +192,25 @@
 		color: var(--text-muted);
 	}
 
-	@media (max-width: 640px) {
+	@media (max-width: 1040px) {
+		.tour-head {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 26px;
+		}
 		.tour-tabs {
 			width: 100%;
+		}
+		.tour-caption {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 22px;
+		}
+		.tour-points {
 			justify-content: flex-start;
 		}
+	}
 
+	@media (max-width: 640px) {
 		.tour-tab {
 			padding: 9px 14px;
 			font-size: 13px;

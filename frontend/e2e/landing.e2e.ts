@@ -43,6 +43,32 @@ test.describe('landing page', () => {
 		await expect(page.getByText(/Ver tu patrimonio agregado/)).toBeVisible();
 	});
 
+	test('offers a login button that reaches the auth page', async ({ page }) => {
+		await page.goto('/');
+
+		const login = page.locator('header').getByRole('link', { name: 'Iniciar sesión' });
+		await expect(login).toBeVisible();
+		await expect(login).toHaveAttribute('href', '/auth');
+
+		await login.click();
+		await expect(page).toHaveURL(/\/auth$/);
+	});
+
+	test('keeps the login button reachable on small screens', async ({ page }) => {
+		await page.setViewportSize({ width: 390, height: 844 });
+		await page.goto('/');
+
+		// En móvil la barra reserva su botón para entrar; la lista de espera baja
+		// al menú, porque su formulario ya está a la vista en el hero.
+		await expect(
+			page.locator('header').getByRole('link', { name: 'Iniciar sesión' })
+		).toBeVisible();
+
+		await page.getByRole('button', { name: 'Abrir menú' }).click();
+		const menu = page.getByRole('navigation', { name: 'Menú de navegación' });
+		await expect(menu.getByRole('link', { name: 'Unirme a la lista' })).toBeVisible();
+	});
+
 	test('opens the navigation menu on small screens', async ({ page }) => {
 		await page.setViewportSize({ width: 390, height: 844 });
 		await page.goto('/');

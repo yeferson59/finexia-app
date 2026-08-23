@@ -1,25 +1,28 @@
 <script lang="ts">
+	/*
+	 * La numeración 01–04 que llevaba cada tarjeta solo repetía lo que ya decía
+	 * el icono y le robaba ancho al texto, así que desaparece. La cabecera se
+	 * va a un raíl lateral: la sección anterior abre con un eje horizontal y
+	 * esta con uno vertical, de modo que dos cabeceras seguidas nunca son
+	 * iguales.
+	 */
 	const benefits = [
 		{
-			num: '01',
 			icon: 'pencil',
 			title: 'Registro manual, total control',
 			body: 'Anota tus brokers, exchanges, bancos o plataformas y los activos que tienes en cada uno. Tú decides qué incluir y cómo nombrarlo.'
 		},
 		{
-			num: '02',
 			icon: 'layers',
 			title: 'Portafolios a tu medida',
 			body: 'Agrupa activos en los portafolios que tienes en mente, aunque vivan en plataformas distintas. Tú trazas la estructura.'
 		},
 		{
-			num: '03',
 			icon: 'chart',
 			title: 'Ganancia real, no solo saldo',
 			body: 'Cada portafolio compara su valor de mercado con el capital que invertiste, así que ves lo que has ganado, no solo cuánto tienes.'
 		},
 		{
-			num: '04',
 			icon: 'pie',
 			title: 'Visión de un vistazo',
 			body: 'Distribución y peso de cada portafolio claros al instante, sin hojas de cálculo ni cuentas manuales.'
@@ -28,18 +31,23 @@
 </script>
 
 <section class="wrap block" id="beneficios">
-	<div class="sec-head reveal">
-		<div class="eyebrow">Por qué Finexia</div>
-		<h2 class="sec-title">Tu patrimonio organizado<br />a tu manera</h2>
-	</div>
-	<div class="benefits-list">
-		{#each benefits as benefit (benefit.num)}
-			<div class="bitem reveal">
-				<div class="bside">
+	<div class="sec-rail">
+		<div class="rail-head reveal">
+			<div class="eyebrow">Por qué Finexia</div>
+			<h2 class="sec-title sec-title-sm">Tu patrimonio organizado a tu manera</h2>
+			<p class="rail-desc">
+				Cuatro cosas que cambian cuando dejas de repartir tu patrimonio entre pestañas y hojas de
+				cálculo.
+			</p>
+		</div>
+
+		<div class="benefits-list">
+			{#each benefits as benefit (benefit.title)}
+				<div class="bitem reveal">
 					<span class="bicon" aria-hidden="true">
 						<svg
-							width="16"
-							height="16"
+							width="17"
+							height="17"
 							viewBox="0 0 24 24"
 							fill="none"
 							stroke="currentColor"
@@ -63,93 +71,80 @@
 							{/if}
 						</svg>
 					</span>
-					<div class="bnum">{benefit.num}</div>
-				</div>
-				<div class="bcontent">
 					<h3>{benefit.title}</h3>
 					<p>{benefit.body}</p>
 				</div>
-			</div>
-		{/each}
+			{/each}
+		</div>
 	</div>
 </section>
 
 <style>
+	.rail-desc {
+		margin-top: 18px;
+		font-size: 15px;
+		color: var(--text-muted);
+		font-weight: 300;
+		line-height: 1.7;
+		text-wrap: pretty;
+	}
+
+	/* Filete interior de 1px pintado con el `gap` sobre el color del borde,
+	   igual que la rejilla de seguridad. */
 	.benefits-list {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 1px;
+		background: var(--border);
 		border: 1px solid var(--border);
 		border-radius: 12px;
 		overflow: hidden;
 	}
+
 	.bitem {
-		display: flex;
-		gap: 22px;
-		padding: 36px 30px;
-		border-right: 1px solid var(--border);
-		border-bottom: 1px solid var(--border);
+		padding: 32px 30px;
+		background: var(--bg);
 		transition: background 0.2s;
 	}
+
 	.bitem:hover {
-		background: var(--surface);
+		background: rgba(255, 255, 255, 0.022);
 	}
-	.bitem:nth-child(2n) {
-		border-right: none;
-	}
-	.bitem:nth-last-child(-n + 2) {
-		border-bottom: none;
-	}
-	.bside {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 10px;
-		flex-shrink: 0;
-	}
+
 	.bicon {
 		display: grid;
 		place-items: center;
-		width: 32px;
-		height: 32px;
+		width: 34px;
+		height: 34px;
 		border-radius: 9px;
 		border: 1px solid rgba(212, 145, 42, 0.2);
 		background: rgba(212, 145, 42, 0.07);
 		color: var(--amber-light);
 	}
-	.bnum {
-		font-family: var(--font-mono);
-		font-size: 11px;
-		font-weight: 600;
-		color: var(--text-dim);
-		letter-spacing: 0.04em;
-	}
-	.bcontent h3 {
+
+	.bitem h3 {
+		margin-top: 18px;
 		font-family: var(--font-display);
 		font-weight: 500;
-		font-size: 20px;
+		font-size: 19px;
 		letter-spacing: -0.01em;
-		margin-bottom: 10px;
 	}
-	.bcontent p {
+
+	.bitem p {
+		margin-top: 10px;
 		font-size: 14px;
 		color: var(--text-muted);
 		line-height: 1.65;
 		font-weight: 300;
+		text-wrap: pretty;
 	}
+
 	@media (max-width: 700px) {
 		.benefits-list {
-			grid-template-columns: 1fr;
+			grid-template-columns: minmax(0, 1fr);
 		}
-		/* En una sola columna cada tarjeta vuelve a llevar su separador; el orden
-		   importa: `:last-child` va después para poder quitárselo a la última. */
-		.bitem,
-		.bitem:nth-last-child(-n + 2) {
-			border-right: none;
-			border-bottom: 1px solid var(--border);
+		.bitem {
 			padding: 28px 22px;
-		}
-		.bitem:last-child {
-			border-bottom: none;
 		}
 	}
 </style>

@@ -10,7 +10,11 @@
 
 	let { faqs }: Props = $props();
 
-	let openFaqIndex = $state<number | null>(null);
+	/*
+	 * La primera abierta de entrada: se ve el patrón de pregunta y respuesta sin
+	 * tener que adivinar que la fila es pulsable.
+	 */
+	let openFaqIndex = $state<number | null>(0);
 
 	function toggleFaq(index: number) {
 		openFaqIndex = openFaqIndex === index ? null : index;
@@ -18,45 +22,65 @@
 </script>
 
 <section class="wrap block" id="faq">
-	<div class="sec-head reveal">
-		<div class="eyebrow">Preguntas frecuentes</div>
-		<h2 class="sec-title">Lo que necesitas saber</h2>
-	</div>
-	<div class="faq">
-		{#each faqs as faq, i (faq.q)}
-			<div class="faq-item reveal" class:open={openFaqIndex === i}>
-				<h3>
-					<button
-						id="faq-q-{i}"
-						class="faq-q"
-						type="button"
-						aria-expanded={openFaqIndex === i}
-						aria-controls="faq-a-{i}"
-						onclick={() => toggleFaq(i)}
-					>
-						{faq.q}<span class="plus" aria-hidden="true"></span>
-					</button>
-				</h3>
-				<!--
-					La respuesta se abre con grid-template-rows 0fr → 1fr en vez de con
-					un max-height fijo: así el alto lo decide el texto y una respuesta
-					larga no queda recortada en pantallas estrechas.
-				-->
-				<div id="faq-a-{i}" class="faq-a" role="region" aria-labelledby="faq-q-{i}">
-					<div class="faq-a-inner"><p>{faq.a}</p></div>
+	<!-- De columna centrada de 720px a raíl más lista: la cabecera deja de
+	     empujar las preguntas media pantalla hacia abajo. -->
+	<div class="sec-rail">
+		<div class="faq-head reveal">
+			<div class="eyebrow">Preguntas frecuentes</div>
+			<h2 class="sec-title sec-title-sm">Lo que necesitas saber</h2>
+			<div class="faq-count">{faqs.length} preguntas</div>
+		</div>
+
+		<div class="faq">
+			{#each faqs as faq, i (faq.q)}
+				<div class="faq-item reveal" class:open={openFaqIndex === i}>
+					<h3>
+						<button
+							id="faq-q-{i}"
+							class="faq-q"
+							type="button"
+							aria-expanded={openFaqIndex === i}
+							aria-controls="faq-a-{i}"
+							onclick={() => toggleFaq(i)}
+						>
+							{faq.q}<span class="plus" aria-hidden="true"></span>
+						</button>
+					</h3>
+					<!--
+						La respuesta se abre con grid-template-rows 0fr → 1fr en vez de con
+						un max-height fijo: así el alto lo decide el texto y una respuesta
+						larga no queda recortada en pantallas estrechas.
+					-->
+					<div id="faq-a-{i}" class="faq-a" role="region" aria-labelledby="faq-q-{i}">
+						<div class="faq-a-inner"><p>{faq.a}</p></div>
+					</div>
 				</div>
-			</div>
-		{/each}
+			{/each}
+		</div>
 	</div>
 </section>
 
 <style>
-	.faq {
-		max-width: 720px;
-		margin: 0 auto;
+	.faq-count {
+		display: inline-flex;
+		align-items: center;
+		margin-top: 24px;
+		padding: 6px 12px;
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		background: var(--surface);
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--text-dim);
 	}
+
 	.faq-item {
 		border-bottom: 1px solid var(--border);
+	}
+	.faq-item:last-child {
+		border-bottom: none;
 	}
 	.faq-item h3 {
 		margin: 0;
@@ -72,7 +96,7 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 20px;
-		padding: 24px 0;
+		padding: 22px 0;
 		text-align: left;
 		font-family: var(--font-display);
 		font-weight: 300;
@@ -81,6 +105,9 @@
 		transition: color 0.2s;
 	}
 	.faq-q:hover {
+		color: var(--amber-light);
+	}
+	.faq-item.open .faq-q {
 		color: var(--amber-light);
 	}
 	.plus {
@@ -127,11 +154,22 @@
 		overflow: hidden;
 	}
 	.faq-a p {
+		max-width: 68ch;
 		font-size: 15px;
 		color: var(--text-muted);
 		line-height: 1.68;
 		font-weight: 300;
 		padding: 0 40px 24px 0;
+		text-wrap: pretty;
+	}
+
+	@media (max-width: 640px) {
+		.faq-q {
+			font-size: 17px;
+		}
+		.faq-a p {
+			padding-right: 0;
+		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {

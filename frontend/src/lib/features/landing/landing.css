@@ -13,9 +13,13 @@
 /*
  * Vertical rhythm for each landing section. Defined once here (global) instead of
  * per-component so the responsive scale lives in a single place.
+ *
+ * Solo el eje vertical: en atajo, `padding: 88px 0` pisaba el `padding: 0 36px`
+ * de `.wrap` (misma especificidad, regla posterior) y dejaba todas las secciones
+ * pegadas al borde de la pantalla en móvil.
  */
 .block {
-	padding: 88px 0;
+	padding-block: 88px;
 }
 
 @media (max-width: 768px) {
@@ -23,7 +27,7 @@
 		padding: 0 24px;
 	}
 	.block {
-		padding: 64px 0;
+		padding-block: 64px;
 	}
 }
 
@@ -32,8 +36,21 @@
 		padding: 0 18px;
 	}
 	.block {
-		padding: 52px 0;
+		padding-block: 52px;
 	}
+}
+
+/*
+ * Bandas de sección.
+ *
+ * Antes cada corte entre secciones era un `.divider` suelto en la ruta y todas
+ * compartían el mismo fondo, así que siete bloques seguidos respiraban igual.
+ * Alternando banda y fondo base la página cambia de ritmo sin añadir color.
+ */
+.band {
+	background: rgba(255, 255, 255, 0.014);
+	border-top: 1px solid var(--border);
+	border-bottom: 1px solid var(--border);
 }
 
 /* Section heading block */
@@ -66,9 +83,48 @@
 	font-weight: 300;
 }
 
-.divider {
-	height: 1px;
-	background: linear-gradient(90deg, transparent, var(--border), transparent);
+/*
+ * Variantes de cabecera. `.sec-head` (centrada) sigue siendo la de por defecto;
+ * estas dos existen para que dos secciones consecutivas nunca abran igual.
+ */
+
+/* Titular a la izquierda y argumento a la derecha, apoyados en un filete. */
+.sec-split {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 420px;
+	gap: 64px;
+	align-items: end;
+	margin-bottom: 40px;
+	padding-bottom: 28px;
+	border-bottom: 1px solid var(--border);
+}
+.sec-split .sec-desc {
+	margin-top: 0;
+}
+
+/* Cabecera fija en un raíl lateral con el contenido a la derecha. */
+.sec-rail {
+	display: grid;
+	grid-template-columns: 320px minmax(0, 1fr);
+	gap: 64px;
+	align-items: start;
+}
+
+/* Titular algo menor para las cabeceras de raíl, que tienen menos ancho. */
+.sec-title-sm {
+	font-size: clamp(26px, 3.4vw, 42px);
+}
+
+@media (max-width: 900px) {
+	.sec-split {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 20px;
+		align-items: start;
+	}
+	.sec-rail {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 36px;
+	}
 }
 
 /* Amber button — hero waitlist + final CTA */

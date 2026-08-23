@@ -1,4 +1,10 @@
 <script lang="ts">
+	/*
+	 * Antes era una sola fila flex con la marca, seis enlaces de sección, tres
+	 * legales y el copyright: al partirse quedaban en cualquier orden y sin
+	 * jerarquía. En columnas cada bloque se lee por lo que es, y "Iniciar
+	 * sesión" tiene un sitio fijo también al final de la página.
+	 */
 	import { resolve } from '$app/paths';
 	import Brand from './brand.svelte';
 
@@ -7,72 +13,134 @@
 </script>
 
 <footer>
-	<div class="wrap foot">
-		<Brand iconSize={26} nameSize={18} />
-		<nav class="foot-links">
-			<a href="{home}#producto">El producto</a>
-			<a href="{home}#beneficios">Beneficios</a>
-			<a href="{home}#como-funciona">Cómo funciona</a>
-			<a href="{home}#seguridad">Seguridad</a>
-			<a href="{home}#faq">Preguntas</a>
-			<a href="{home}#waitlist">Lista de espera</a>
-		</nav>
-		<nav class="foot-legal">
-			<a href={resolve('/privacidad')}>Política de Privacidad</a>
-			<a href={resolve('/terminos')}>Términos y Condiciones</a>
-			<a href={resolve('/cookies')}>Cookies</a>
-		</nav>
-		<div class="foot-copy">© {currentYear} Finexia. Todos los derechos reservados.</div>
+	<div class="wrap">
+		<div class="foot-cols">
+			<div class="foot-brand">
+				<Brand iconSize={26} nameSize={18} />
+				<p>Tu patrimonio en un solo mapa. Registro manual, sin conectar cuentas.</p>
+			</div>
+
+			<nav class="foot-col" aria-label="Producto">
+				<div class="foot-label">Producto</div>
+				<a href="{home}#producto">El producto</a>
+				<a href="{home}#beneficios">Beneficios</a>
+				<a href="{home}#como-funciona">Cómo funciona</a>
+				<a href="{home}#seguridad">Seguridad</a>
+			</nav>
+
+			<nav class="foot-col" aria-label="Legal">
+				<div class="foot-label">Legal</div>
+				<a href={resolve('/privacidad')}>Política de Privacidad</a>
+				<a href={resolve('/terminos')}>Términos y Condiciones</a>
+				<a href={resolve('/cookies')}>Cookies</a>
+			</nav>
+
+			<nav class="foot-col" aria-label="Cuenta">
+				<div class="foot-label">Cuenta</div>
+				<a href={resolve('/auth')}>Iniciar sesión</a>
+				<a href="{home}#waitlist">Lista de espera</a>
+				<a href="{home}#faq">Preguntas</a>
+			</nav>
+		</div>
+
+		<div class="foot-bottom">
+			<div class="foot-copy">© {currentYear} Finexia. Todos los derechos reservados.</div>
+			<div class="foot-launch">Lanzamiento · 1 oct 2026</div>
+		</div>
 	</div>
 </footer>
 
 <style>
 	footer {
 		border-top: 1px solid var(--border);
-		padding: 40px 0 52px;
 		margin-top: 40px;
+		padding-top: 56px;
 	}
-	.foot {
+
+	.foot-cols {
+		display: grid;
+		grid-template-columns: 1.6fr 1fr 1fr 1fr;
+		gap: 48px;
+		align-items: start;
+	}
+
+	.foot-brand p {
+		margin-top: 16px;
+		max-width: 34ch;
+		font-size: 13.5px;
+		font-weight: 300;
+		line-height: 1.65;
+		color: var(--text-dim);
+		text-wrap: pretty;
+	}
+
+	.foot-col {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 24px;
-		flex-wrap: wrap;
+		flex-direction: column;
+		gap: 12px;
 	}
-	.foot-links {
-		display: flex;
-		gap: 24px;
+
+	.foot-label {
+		padding-bottom: 2px;
+		font-family: var(--font-mono);
+		font-size: 9.5px;
+		font-weight: 500;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		color: var(--text-dim);
 	}
-	.foot-links a,
-	.foot-legal a {
+
+	.foot-col a {
 		font-size: 13.5px;
 		color: var(--text-muted);
 		transition: color 0.2s;
 	}
-	.foot-links a:hover,
-	.foot-legal a:hover {
+
+	.foot-col a:hover {
 		color: var(--text);
 	}
-	.foot-legal {
+
+	.foot-bottom {
 		display: flex;
+		align-items: center;
+		justify-content: space-between;
 		gap: 24px;
+		margin-top: 48px;
+		padding: 22px 0 40px;
+		border-top: 1px solid var(--border);
 	}
+
 	.foot-copy {
 		font-size: 13px;
 		color: var(--text-dim);
 	}
-	@media (max-width: 640px) {
-		.foot {
-			flex-direction: column;
-			align-items: center;
-			text-align: center;
-			gap: 20px;
+
+	.foot-launch {
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--text-dim);
+	}
+
+	@media (max-width: 860px) {
+		.foot-cols {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 40px 32px;
 		}
-		.foot-links,
-		.foot-legal {
-			flex-wrap: wrap;
-			justify-content: center;
-			gap: 16px 20px;
+		.foot-brand {
+			grid-column: 1 / -1;
+		}
+	}
+
+	@media (max-width: 480px) {
+		footer {
+			padding-top: 44px;
+		}
+		.foot-bottom {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 12px;
 		}
 	}
 </style>
