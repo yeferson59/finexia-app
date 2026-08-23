@@ -154,7 +154,12 @@ export const growthDataPointSchema = z.object({
 	gainLossPct: z.string(),
 	// Portafolios sumados a esta fecha sin tasa con la que convertirlos, y por
 	// tanto contados a valor nominal. Opcional por si el backend va por detrás.
-	portfoliosUnconverted: z.number().optional()
+	portfoliosUnconverted: z.number().optional(),
+	// Dinero que el dueño metió (positivo) o sacó (negativo) entre el punto
+	// anterior y este, reconstruido de las transacciones. Es lo que hay que
+	// descontar de la variación del valor para que quede rentabilidad.
+	// Opcional por si el backend va por detrás.
+	netFlow: z.string().optional()
 });
 
 /**

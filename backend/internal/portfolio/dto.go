@@ -303,6 +303,11 @@ type GrowthDataPointDTO struct {
 	// Portafolios sumados a esta fecha sin tasa con la que convertirlos, y por
 	// tanto contados a valor nominal. Normalmente 0.
 	PortfoliosUnconverted int64 `json:"portfoliosUnconverted"`
+	// Dinero que el dueño metió (positivo) o sacó (negativo) entre el punto
+	// anterior y este. Es lo que hay que descontar de la variación de
+	// `totalValue` para que quede rentabilidad: un depósito sube el valor sin
+	// que nadie haya ganado nada.
+	NetFlow string `json:"netFlow"`
 }
 
 type GrowthSummaryDTO struct {
@@ -320,6 +325,17 @@ type GrowthResponseDTO struct {
 	Summary GrowthSummaryDTO     `json:"summary"`
 }
 
+// netFlowOrZero keeps the payload's amount fields all numeric strings: a point
+// with no transactions carries "0", not the empty string a zero-value struct
+// would otherwise ship.
+func netFlowOrZero(raw string) string {
+	if raw == "" {
+		return "0"
+	}
+
+	return raw
+}
+
 func NewGrowthResponse(points []GrowthPoint, summary GrowthSummary) GrowthResponseDTO {
 	dtos := make([]GrowthDataPointDTO, 0, len(points))
 	for _, p := range points {
@@ -330,6 +346,7 @@ func NewGrowthResponse(points []GrowthPoint, summary GrowthSummary) GrowthRespon
 			GainLoss:              p.GainLoss,
 			GainLossPct:           p.GainLossPct,
 			PortfoliosUnconverted: p.PortfoliosUnconverted,
+			NetFlow:               netFlowOrZero(p.NetFlow),
 		})
 	}
 	firstDate := ""

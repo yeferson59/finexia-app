@@ -20,11 +20,11 @@ export interface ManualMeta {
 }
 
 export const manual: ManualMeta = {
-	version: '1.4',
+	version: '1.5',
 	date: 'Agosto 2026',
-	bytes: 2804702,
-	generatedAt: '2026-08-23T02:46:19.869Z',
-	sourceHash: '9d20a23288869465cad73f4e05418ab7d185ad138470ff4cac2f8071f258a56c',
+	bytes: 2807631,
+	generatedAt: '2026-08-23T03:11:04.205Z',
+	sourceHash: '704efe287076745c7dc137b5632837a48c8d0932c2a2599c10b468f119230ec1',
 	sections: [
 		{
 			number: 1,

@@ -12,17 +12,20 @@ import { periodReturns } from './returns';
 import type { GrowthDataPoint, GrowthSummary } from '$lib/api/types';
 
 /**
- * Punto de la serie. `cost` es el capital invertido a esa fecha: subirlo entre
- * dos puntos es un aporte, y es lo que distingue un depósito de una ganancia.
+ * Punto de la serie. `cost` es el capital invertido a esa fecha y `netFlow` el
+ * dinero que el dueño movió desde el punto anterior. Sin `netFlow` el cálculo
+ * cae al respaldo —la variación del coste—, que es el camino del backend
+ * anterior y también se prueba.
  */
-function point(date: string, totalValue: string, cost = '0'): GrowthDataPoint {
+function point(date: string, totalValue: string, cost = '0', netFlow?: string): GrowthDataPoint {
 	const gainLoss = String(Number(totalValue) - Number(cost));
 	return {
 		date,
 		totalValue,
 		totalCostBase: cost,
 		gainLoss,
-		gainLossPct: cost === '0' ? '0' : String((Number(gainLoss) / Number(cost)) * 100)
+		gainLossPct: cost === '0' ? '0' : String((Number(gainLoss) / Number(cost)) * 100),
+		...(netFlow === undefined ? {} : { netFlow })
 	};
 }
 
@@ -110,6 +113,50 @@ describe('periodReturns', () => {
 
 	it('devuelve una lista vacía con un solo punto', () => {
 		expect(periodReturns([point('2026-01-01', '1000', '1000')])).toEqual([]);
+	});
+
+	it('acredita una venta con plusvalía en vez de contarla como pérdida', () => {
+		// Acciones compradas por 600 se venden por 1000: el valor baja por lo
+		// cobrado y el flujo también, así que el día queda plano.
+		const [entry] = periodReturns([
+			point('2026-01-01', '2000', '1600'),
+			point('2026-01-02', '1000', '1000', '-1000')
+		]);
+
+		expect(entry.value).toBeCloseTo(0, 10);
+	});
+
+	it('sin `netFlow` cae al coste, y ahí la venta sí resta', () => {
+		// El mismo caso contra un backend que no publica el flujo: la variación
+		// del coste es -600, no -1000, y la plusvalía realizada aparece como
+		// caída. Queda probado para que se sepa qué se pierde sin el campo.
+		const [entry] = periodReturns([
+			point('2026-01-01', '2000', '1600'),
+			point('2026-01-02', '1000', '1000')
+		]);
+
+		expect(entry.value).toBeLessThan(0);
+	});
+
+	it('acredita un dividendo como renta cobrada', () => {
+		// El valor no se mueve —el dividendo sale de lo medido— y el flujo
+		// negativo es lo que lo convierte en rentabilidad.
+		const [entry] = periodReturns([
+			point('2026-01-01', '1000', '1000'),
+			point('2026-01-02', '1000', '1000', '-50')
+		]);
+
+		expect(entry.value).toBeCloseTo(50 / 975, 10);
+	});
+
+	it('el flujo del backend manda sobre la variación del coste', () => {
+		// Coste plano pero flujo declarado: gana el flujo.
+		const [entry] = periodReturns([
+			point('2026-01-01', '1000', '1000'),
+			point('2026-01-02', '2000', '1000', '1000')
+		]);
+
+		expect(entry.value).toBeCloseTo(0, 10);
 	});
 });
 

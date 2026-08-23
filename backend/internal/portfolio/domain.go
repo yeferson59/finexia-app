@@ -429,6 +429,14 @@ type GrowthPoint struct {
 	// How many portfolios went into this date without a rate to convert them,
 	// and are therefore added at face value. Zero is the normal case.
 	PortfoliosUnconverted int64
+	// NetFlow is the money the owner put in (positive) or took out (negative)
+	// between the previous point of the series and this one, in Currency. It is
+	// what has to be netted out of the change in TotalValue to leave a return:
+	// a deposit raises the value without anyone having earned anything. The
+	// sign convention lives in the transaction_cash_flow SQL function, and the
+	// first point of a series carries whatever fell on or before its own date,
+	// which no subperiod uses.
+	NetFlow string
 }
 
 // GrowthSummary carries two different readings of the same series and they must

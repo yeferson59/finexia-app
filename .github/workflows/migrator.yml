@@ -60,5 +60,7 @@ jobs:
         run: go run internal/migrator/main.go ${{ steps.args.outputs.flags }}
         working-directory: backend
         env:
+          JWT_SECRET: "zXI+y4c59+ccBRqkx1eU2zNN6lIYa2566IZFZJxyhkFIxxGRc12S20rUyJ4qBuW7"
+          MARKET_KEK_KEYS: "1:X0TJ9pJPSKURUNeeX3o1pMXZMHSQ7eoPBh600nbqTWw="
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           PATH_MIGRATION: "file://internal/migrations"

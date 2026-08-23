@@ -10,11 +10,12 @@
  * recién abierta—. Aquí cada retorno descuenta el aporte de su tramo con la
  * fórmula de Dietz modificada, así que lo que sale es rendimiento.
  *
- * Limitación conocida: una venta sale de la serie a valor de mercado pero solo
- * baja el capital invertido por su coste, así que el tramo en el que se vende
- * absorbe la plusvalía realizada. Es el precio de trabajar con valor y coste;
- * la alternativa —reconstruir los flujos desde las transacciones— pide un
- * endpoint que todavía no existe.
+ * El aporte de cada tramo sale de `netFlow`, que el backend reconstruye de las
+ * transacciones (`transaction_cash_flow`): sabe que una venta deja la serie a
+ * valor de mercado y que un dividendo es renta cobrada que abandona lo medido,
+ * cosas que la variación del capital invertido no distingue. La resta de costes
+ * queda de respaldo para un backend anterior, y ahí una venta con plusvalía sí
+ * se cuenta como pérdida el día en que se toma.
  *
  * Interno de la feature: `reports.ts` lo consume y publica los paneles.
  */
@@ -53,13 +54,27 @@ export function sortedPoints(points: GrowthDataPoint[]): GrowthDataPoint[] {
 }
 
 /**
+ * Lo que entró o salió de la cartera durante el tramo.
+ *
+ * `netFlow` es la cifra buena: el backend la arma sumando las transacciones del
+ * tramo con su signo. El respaldo —cuánto subió el capital invertido— acierta
+ * en una compra y falla en una venta, porque la posición sale de la serie a
+ * valor de mercado y solo baja el coste por lo que costó en su día.
+ */
+function periodFlow(prev: GrowthDataPoint, curr: GrowthDataPoint): number {
+	const reported = toNumber(curr.netFlow);
+	if (Number.isFinite(reported)) return reported;
+
+	return toNumber(curr.totalCostBase) - toNumber(prev.totalCostBase);
+}
+
+/**
  * Retorno de cada tramo de la serie por Dietz modificada.
  *
- * `flow` es lo que entró (o salió) durante el tramo, medido por la variación
- * del capital invertido, y se resta del numerador para que un depósito no
- * cuente como ganancia. El denominador lleva medio flujo porque el dinero nuevo
- * solo estuvo trabajando parte del tramo; con eso el primer día de una cuenta
- * —que abre con valor cero— deja de dividir por cero.
+ * El flujo se resta del numerador para que un depósito no cuente como
+ * ganancia. El denominador lleva medio flujo porque el dinero nuevo solo estuvo
+ * trabajando parte del tramo; con eso el primer día de una cuenta —que abre con
+ * valor cero— deja de dividir por cero.
  */
 export function periodReturns(points: GrowthDataPoint[]): PeriodReturn[] {
 	const series = sortedPoints(points);
@@ -71,11 +86,9 @@ export function periodReturns(points: GrowthDataPoint[]): PeriodReturn[] {
 
 		const prevValue = toNumber(prev.totalValue);
 		const currValue = toNumber(curr.totalValue);
-		const prevCost = toNumber(prev.totalCostBase);
-		const currCost = toNumber(curr.totalCostBase);
-		if (![prevValue, currValue, prevCost, currCost].every(Number.isFinite)) continue;
+		const flow = periodFlow(prev, curr);
+		if (![prevValue, currValue, flow].every(Number.isFinite)) continue;
 
-		const flow = currCost - prevCost;
 		const base = prevValue + flow / 2;
 		if (base <= 0) continue;
 

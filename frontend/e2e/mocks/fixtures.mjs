@@ -237,6 +237,8 @@ export const growth = (() => {
 	const points = [];
 	let wobbleIndex = 0;
 
+	let prevPointCost = null;
+
 	for (let m = 0; m < VALUE_CURVE.length; m++) {
 		const prevValue = m === 0 ? VALUE_CURVE[0] * 0.98 : VALUE_CURVE[m - 1];
 		const prevCost = m === 0 ? COST_CURVE[0] * 0.99 : COST_CURVE[m - 1];
@@ -249,13 +251,19 @@ export const growth = (() => {
 			const value = TOTAL_VALUE * (prevValue + (VALUE_CURVE[m] - prevValue) * t + noise);
 			const cost = TOTAL_COST * (prevCost + (COST_CURVE[m] - prevCost) * t);
 			const gain = value - cost;
+			// La serie del stub solo compra, y en una compra el aporte es
+			// exactamente lo que sube el capital invertido: el backend lo saca
+			// de las transacciones, aquí sale de la curva que las representa.
+			const netFlow = prevPointCost === null ? 0 : cost - prevPointCost;
+			prevPointCost = cost;
 
 			points.push({
 				date: isoDate(FIRST_MONTH.year, FIRST_MONTH.month + m, day),
 				totalValue: money(value),
 				totalCostBase: money(cost),
 				gainLoss: money(gain),
-				gainLossPct: (cost > 0 ? (gain / cost) * 100 : 0).toFixed(2)
+				gainLossPct: (cost > 0 ? (gain / cost) * 100 : 0).toFixed(2),
+				netFlow: money(netFlow)
 			});
 		}
 	}
@@ -290,7 +298,8 @@ export function growthFor(portfolioId) {
 			totalValue: money(value),
 			totalCostBase: money(cost),
 			gainLoss: money(value - cost),
-			gainLossPct: (cost > 0 ? ((value - cost) / cost) * 100 : 0).toFixed(2)
+			gainLossPct: (cost > 0 ? ((value - cost) / cost) * 100 : 0).toFixed(2),
+			netFlow: money(Number(point.netFlow) * share)
 		};
 	});
 

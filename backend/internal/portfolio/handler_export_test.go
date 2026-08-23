@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
@@ -17,8 +18,9 @@ import (
 // they are asserted on the download headers and on the workbook itself: the
 // rows have to reach the file, not just the handler.
 
-// readSheet parses the xlsx body and returns the rows of the named sheet.
-func readSheet(t *testing.T, resp *http.Response, sheet string) [][]string {
+// openWorkbook parses the xlsx body. The body can only be drained once, so a
+// report with several sheets is opened here and read through sheetRows.
+func openWorkbook(t *testing.T, resp *http.Response) *excelize.File {
 	t.Helper()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -28,13 +30,24 @@ func readSheet(t *testing.T, resp *http.Response, sheet string) [][]string {
 	if err != nil {
 		t.Fatalf("open xlsx (%d bytes): %v", len(body), err)
 	}
-	defer func() { _ = f.Close() }()
+	t.Cleanup(func() { _ = f.Close() })
+	return f
+}
 
+// sheetRows returns the rows of one sheet of an already-opened workbook.
+func sheetRows(t *testing.T, f *excelize.File, sheet string) [][]string {
+	t.Helper()
 	rows, err := f.GetRows(sheet)
 	if err != nil {
 		t.Fatalf("GetRows(%q): %v", sheet, err)
 	}
 	return rows
+}
+
+// readSheet is the one-sheet shorthand.
+func readSheet(t *testing.T, resp *http.Response, sheet string) [][]string {
+	t.Helper()
+	return sheetRows(t, openWorkbook(t, resp), sheet)
 }
 
 // assertSpreadsheetDownload checks the response is an attachment with the
@@ -115,16 +128,53 @@ func TestHandlerExportTransactions(t *testing.T) {
 	}
 }
 
+// cellFor finds a row of the metrics sheet by its label and returns its value.
+func cellFor(t *testing.T, rows [][]string, label string) string {
+	t.Helper()
+	for _, row := range rows {
+		if len(row) > 1 && row[0] == label {
+			return row[1]
+		}
+	}
+	t.Fatalf("no hay fila %q en %v", label, rows)
+	return ""
+}
+
+// riskSeries is a month of daily points with one contribution in the middle:
+// enough history for the risk figures, and a flow to prove they ignore it.
+func riskSeries() []GrowthPoint {
+	points := make([]GrowthPoint, 0, 31)
+	for i := range 31 {
+		value := 1000 + i*4
+		flow := "0"
+		if i == 15 {
+			// A deposit that doubles the account without earning anything.
+			value += 1000
+			flow = "1000"
+		}
+		if i > 15 {
+			value += 1000
+		}
+		points = append(points, GrowthPoint{
+			Date:          time.Date(2026, time.January, 1+i, 0, 0, 0, 0, time.UTC),
+			Currency:      "USD",
+			TotalValue:    strconv.Itoa(value),
+			TotalCostBase: "900",
+			GainLoss:      "100",
+			GainLossPct:   "11.11",
+			NetFlow:       flow,
+		})
+	}
+	return points
+}
+
 func TestHandlerExportRiskMetrics(t *testing.T) {
 	userID := uuid.New()
 	var gotHasSince bool
 	repo := new(fakeRepository{
 		getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, _ string, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
 			gotHasSince = hasSince
-			return []GrowthPoint{{
-				Date:       time.Date(2026, time.January, 15, 0, 0, 0, 0, time.UTC),
-				TotalValue: "1000", TotalCostBase: "900", GainLoss: "100", GainLossPct: "11.11",
-			}}, nil
+			return riskSeries(), nil
 		},
 	})
 	app := newTestModule(t, repo, userID, "user")
@@ -137,11 +187,66 @@ func TestHandlerExportRiskMetrics(t *testing.T) {
 		t.Error("hasSince = true, want the unbounded range")
 	}
 
-	rows := readSheet(t, resp, "Historial de crecimiento")
-	if len(rows) != 2 {
-		t.Fatalf("rows = %d, want a header plus one point", len(rows))
+	book := openWorkbook(t, resp)
+
+	// The file is named after metrics, so it has to contain them and not just
+	// the series they come from.
+	metrics := sheetRows(t, book, "Métricas de riesgo")
+	if got := cellFor(t, metrics, "Puntos de la serie"); got != "31" {
+		t.Errorf("points = %q, want 31", got)
 	}
-	if rows[1][0] != "2026-01-15" || rows[1][1] != "1000" {
+	if got := cellFor(t, metrics, "Volatilidad anualizada"); got == "Sin historial suficiente" {
+		t.Error("volatility withheld on a month of daily points")
+	}
+	if got := cellFor(t, metrics, "Ratio de Sharpe"); got == "Sin historial suficiente" {
+		t.Error("sharpe withheld on a month of daily points")
+	}
+	// Thirty days is short of the ninety the annualized figure needs, and the
+	// cell says so rather than leaving a blank that reads as zero.
+	if got := cellFor(t, metrics, "Rentabilidad anualizada"); got != "Sin historial suficiente" {
+		t.Errorf("annualized = %q, want the shortfall spelled out", got)
+	}
+	// The deposit of day 16 doubled the account; the return must not.
+	total, err := strconv.ParseFloat(cellFor(t, metrics, "Rentabilidad del periodo"), 64)
+	if err != nil {
+		t.Fatalf("total return is not a number: %v", err)
+	}
+	if total > 20 {
+		t.Errorf("total return = %.2f%%, the deposit leaked into the return", total)
+	}
+
+	monthly := sheetRows(t, book, "Rentabilidad mensual")
+	if len(monthly) != 2 || monthly[1][0] != "2026-01" {
+		t.Errorf("monthly sheet = %v, want a header plus January", monthly)
+	}
+
+	rows := sheetRows(t, book, "Historial de crecimiento")
+	if len(rows) != 32 {
+		t.Fatalf("rows = %d, want a header plus 31 points", len(rows))
+	}
+	if rows[1][0] != "2026-01-01" || rows[1][1] != "1000" {
 		t.Errorf("growth row = %v", rows[1])
+	}
+	// The flow column is what makes the metrics auditable from the raw series.
+	if rows[16][5] != "1000" {
+		t.Errorf("net flow on the contribution day = %q, want 1000", rows[16][5])
+	}
+}
+
+func TestHandlerExportRiskMetricsWithoutHistory(t *testing.T) {
+	repo := new(fakeRepository{
+		getPortfolioGrowthByUserID: func(context.Context, uuid.UUID, string, bool, time.Time) ([]GrowthPoint, error) {
+			return nil, nil
+		},
+	})
+	app := newTestModule(t, repo, uuid.New(), "user")
+
+	resp := do(t, app, http.MethodGet, "/portfolios/export/risk")
+	assertSpreadsheetDownload(t, resp, "riesgo-volatilidad.xlsx")
+
+	// An empty account still gets a readable file, saying why it is empty.
+	metrics := readSheet(t, resp, "Métricas de riesgo")
+	if got := cellFor(t, metrics, "Historial"); got != "Sin historial suficiente" {
+		t.Errorf("empty report says %q", got)
 	}
 }

@@ -1,6 +1,6 @@
 # Manual de Usuario — FINEXIA
 
-**Versión del documento:** 1.4
+**Versión del documento:** 1.5
 **Fecha:** Agosto 2026
 **Aplicación:** Finexia — Plataforma de gestión y seguimiento de portafolios de inversión
 
@@ -410,7 +410,7 @@ La sección **Reportes** ("Gestiona y descarga documentos financieros de tu cuen
 
 - **Rentabilidad mensual (%):** calendario con el rendimiento de cada mes, un panel por año (verás tantos paneles como años cubra tu historial). Arriba de cada panel está el **acumulado del año**, y debajo la **leyenda de la escala de color** (de rojo intenso para caídas de más del 1 % a verde intenso para subidas del 2 % o más). Los meses sin dato aparecen con un guion.
 
-  Lo que ves es **rendimiento de lo invertido, no variación del saldo**: los aportes y retiros del mes se descuentan antes de calcular el porcentaje, así que ingresar dinero no pinta el mes en verde. El mes en el que arranca tu historial va marcado con un asterisco porque cubre menos días que un mes completo.
+  Lo que ves es **rendimiento de lo invertido, no variación del saldo**: los aportes y retiros del mes se descuentan antes de calcular el porcentaje, así que ingresar dinero no pinta el mes en verde. El descuento se hace con tus movimientos reales, uno a uno: una compra entra como dinero puesto, una venta sale por lo que cobraste —no por lo que te costó en su día, que es lo que convertiría una plusvalía en pérdida— y un dividendo cuenta como renta que sí ganaste. El mes en el que arranca tu historial va marcado con un asterisco porque cubre menos días que un mes completo.
 
 - **Estadísticas clave:** doce métricas repartidas en tres bloques.
 
@@ -432,7 +432,15 @@ En la parte inferior de la página encontrarás las tarjetas de descarga; pulsa 
 |---|---|
 | **Resumen mensual** | Resumen mes a mes del portafolio |
 | **Estado de resultados** | Historial completo de transacciones |
-| **Riesgo y volatilidad** | Métricas de riesgo y volatilidad |
+| **Riesgo y volatilidad** | Las métricas de la página, el detalle mensual y la serie de la que salen |
+
+El reporte de **riesgo y volatilidad** trae tres hojas:
+
+| Hoja | Contenido |
+|---|---|
+| **Métricas de riesgo** | Las mismas cifras del panel *Estadísticas clave*, cada una con su unidad y una columna que explica cómo se calcula. Una métrica que tu historial todavía no sostiene dice «Sin historial suficiente» en vez de dejar la celda vacía, que se leería como un cero |
+| **Rentabilidad mensual** | El porcentaje de cada mes, el mismo del calendario |
+| **Historial de crecimiento** | La serie diaria: valor, coste, ganancia, rentabilidad y el **aporte neto** de cada día. Con esa última columna puedes rehacer cualquiera de las métricas por tu cuenta y comprobar que cuadran |
 
 Los archivos se descargan directamente a tu equipo en formato Excel (XLSX) y puedes abrirlos con Excel, LibreOffice o Google Sheets.
 

@@ -125,6 +125,12 @@ func (r *PostgresRepository) GetPortfolioValuesAsOf(ctx context.Context, userID 
 // raw. A snapshot whose currency has no rate is left as-is and counted in
 // PortfoliosUnconverted so the caller can say so rather than pass off a total
 // that silently mixes units.
+//
+// Each point also carries the net external cash flow of the stretch that ends
+// on it, so a caller can tell the value the market added from the value the
+// owner deposited. Every transaction is attributed to the first snapshot on or
+// after its date — that is the snapshot that first reflects it — and converted
+// with the same rate as the snapshots it sits next to.
 func (r *PostgresRepository) GetPortfolioGrowthByUserID(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -151,22 +157,60 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(
 			) fx
 			WHERE p.user_id = $1
 			  AND ($3::boolean = FALSE OR ps.snapshot_date >= $4::date)
+		), totals AS (
+			SELECT
+				snapshot_date,
+				currency,
+				SUM(total_value)         AS total_value,
+				SUM(total_gain_loss)     AS total_gain_loss,
+				SUM(unconverted)::bigint AS unconverted
+			FROM converted
+			GROUP BY snapshot_date, currency
+		), flows AS (
+			SELECT
+				(
+					SELECT MIN(t.snapshot_date)
+					FROM totals t
+					WHERE t.snapshot_date >= tx.transaction_date
+				) AS snapshot_date,
+				transaction_cash_flow(tx.type, tx.quantity, tx.price, tx.fees)
+					* COALESCE(fxt.rate, 1) AS amount
+			FROM transactions tx
+			JOIN portfolio_entries pe ON pe.id = tx.entry_id
+			JOIN portfolios pf        ON pf.id = pe.portfolio_id
+			JOIN users us             ON us.id = pf.user_id
+			CROSS JOIN LATERAL (
+				SELECT COALESCE(NULLIF($2::text, ''), us.preferred_currency, 'USD')::char(3) AS code
+			) tgt
+			CROSS JOIN LATERAL (
+				SELECT fx_rate(pf.user_id, tx.currency, tgt.code) AS rate
+			) fxt
+			WHERE pf.user_id = $1
+		), net_flows AS (
+			-- A transaction later than the last snapshot lands on NULL and waits
+			-- for the snapshot that will cover it; one earlier than the first
+			-- lands on the first, whose subperiod nobody measures.
+			SELECT snapshot_date, SUM(amount) AS net_flow
+			FROM flows
+			WHERE snapshot_date IS NOT NULL
+			GROUP BY snapshot_date
 		)
 		SELECT
-			snapshot_date,
-			currency,
-			SUM(total_value)::text,
-			(SUM(total_value) - SUM(total_gain_loss))::text,
-			SUM(total_gain_loss)::text,
+			t.snapshot_date,
+			t.currency,
+			t.total_value::text,
+			(t.total_value - t.total_gain_loss)::text,
+			t.total_gain_loss::text,
 			CASE
-				WHEN (SUM(total_value) - SUM(total_gain_loss)) > 0
-				THEN ((SUM(total_gain_loss) / (SUM(total_value) - SUM(total_gain_loss))) * 100)::text
+				WHEN (t.total_value - t.total_gain_loss) > 0
+				THEN ((t.total_gain_loss / (t.total_value - t.total_gain_loss)) * 100)::text
 				ELSE '0'
 			END,
-			SUM(unconverted)::bigint
-		FROM converted
-		GROUP BY snapshot_date, currency
-		ORDER BY snapshot_date ASC
+			t.unconverted,
+			COALESCE(nf.net_flow, 0)::text
+		FROM totals t
+		LEFT JOIN net_flows nf ON nf.snapshot_date = t.snapshot_date
+		ORDER BY t.snapshot_date ASC
 	`, userID, currency, hasSince, since)
 	if err != nil {
 		return nil, err
@@ -184,6 +228,7 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(
 			&point.GainLoss,
 			&point.GainLossPct,
 			&point.PortfoliosUnconverted,
+			&point.NetFlow,
 		); err != nil {
 			return nil, err
 		}
@@ -202,21 +247,55 @@ func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(
 	since time.Time,
 ) ([]GrowthPoint, error) {
 	// One portfolio, one base currency: nothing to convert and nothing that can
-	// fail to, which is why the unconverted count is a literal zero here.
+	// fail to, which is why the unconverted count is a literal zero here. The
+	// flows are the exception — a transaction carries its own currency and can
+	// differ from the portfolio's base, so those do go through fx_rate.
 	rows, err := r.db.Query(ctx, `
+		WITH points AS (
+			SELECT
+				ps.snapshot_date,
+				ps.currency,
+				ps.total_value,
+				ps.total_gain_loss,
+				ps.total_gain_loss_pct
+			FROM portfolio_snapshots ps
+			JOIN portfolios p ON p.id = ps.portfolio_id
+			WHERE ps.portfolio_id = $1 AND p.user_id = $2
+			  AND ($3::boolean = FALSE OR ps.snapshot_date >= $4::date)
+		), flows AS (
+			SELECT
+				(
+					SELECT MIN(pt.snapshot_date)
+					FROM points pt
+					WHERE pt.snapshot_date >= tx.transaction_date
+				) AS snapshot_date,
+				transaction_cash_flow(tx.type, tx.quantity, tx.price, tx.fees)
+					* COALESCE(fxt.rate, 1) AS amount
+			FROM transactions tx
+			JOIN portfolio_entries pe ON pe.id = tx.entry_id
+			JOIN portfolios pf        ON pf.id = pe.portfolio_id
+			CROSS JOIN LATERAL (
+				SELECT fx_rate(pf.user_id, tx.currency, pf.base_currency) AS rate
+			) fxt
+			WHERE pe.portfolio_id = $1 AND pf.user_id = $2
+		), net_flows AS (
+			SELECT snapshot_date, SUM(amount) AS net_flow
+			FROM flows
+			WHERE snapshot_date IS NOT NULL
+			GROUP BY snapshot_date
+		)
 		SELECT
-			ps.snapshot_date,
-			ps.currency,
-			ps.total_value::text,
-			(ps.total_value - ps.total_gain_loss)::text,
-			ps.total_gain_loss::text,
-			ps.total_gain_loss_pct::text,
-			0::bigint
-		FROM portfolio_snapshots ps
-		JOIN portfolios p ON p.id = ps.portfolio_id
-		WHERE ps.portfolio_id = $1 AND p.user_id = $2
-		  AND ($3::boolean = FALSE OR ps.snapshot_date >= $4::date)
-		ORDER BY ps.snapshot_date ASC
+			pt.snapshot_date,
+			pt.currency,
+			pt.total_value::text,
+			(pt.total_value - pt.total_gain_loss)::text,
+			pt.total_gain_loss::text,
+			pt.total_gain_loss_pct::text,
+			0::bigint,
+			COALESCE(nf.net_flow, 0)::text
+		FROM points pt
+		LEFT JOIN net_flows nf ON nf.snapshot_date = pt.snapshot_date
+		ORDER BY pt.snapshot_date ASC
 	`, portfolioID, userID, hasSince, since)
 	if err != nil {
 		return nil, err
@@ -234,6 +313,7 @@ func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(
 			&point.GainLoss,
 			&point.GainLossPct,
 			&point.PortfoliosUnconverted,
+			&point.NetFlow,
 		); err != nil {
 			return nil, err
 		}
