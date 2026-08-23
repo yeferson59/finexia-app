@@ -8,6 +8,11 @@
 	 * pinta sus cifras. Para quien no ve el SVG, los mismos datos están en una
 	 * tabla oculta a la vista pero disponible para el lector de pantalla, así que
 	 * la información no depende de poder apuntar con el ratón.
+	 *
+	 * El lienzo no sabe qué está dibujando: recibe dos series, cómo se llaman y
+	 * cómo se escriben sus cifras. Así la misma gráfica sirve para el dinero y
+	 * para la rentabilidad —quien decide es `portfolio-growth`— sin duplicar
+	 * ejes, cursor ni tabla accesible.
 	 */
 	import {
 		PLOT,
@@ -23,6 +28,19 @@
 		scale: GrowthScale;
 		/** Índice fijado por el usuario; `null` cuando no hay ninguno. */
 		active: number | null;
+		/** Cómo se llama el trazo principal (línea ámbar) en la vista activa. */
+		primaryLabel: string;
+		/** Cómo se llama el trazo de referencia (línea gris) en la vista activa. */
+		secondaryLabel: string;
+		/** Título de la tabla accesible; dice qué serie es esta. */
+		caption: string;
+		/**
+		 * Altura contra la que cierra el relleno y en la que se marca la línea de
+		 * referencia. `null` en la vista de dinero, donde el suelo es el borde del
+		 * lienzo; `0` en la de porcentaje, donde el equilibrio es la cifra que hay
+		 * que poder ver de un vistazo.
+		 */
+		baseline?: number | null;
 		/** Etiqueta corta del eje vertical. */
 		formatAbbrev: (value: number) => string;
 		/** Etiqueta del eje horizontal; se abrevia y puede repetirse entre puntos. */
@@ -34,7 +52,7 @@
 		 */
 		formatFullDate: (iso: string) => string;
 		/** Texto para el lector de pantalla y la tabla oculta. */
-		formatMoney: (value: number) => string;
+		formatValue: (value: number) => string;
 		onactivate: (index: number | null) => void;
 	}
 
@@ -42,10 +60,14 @@
 		points,
 		scale,
 		active,
+		primaryLabel,
+		secondaryLabel,
+		caption,
+		baseline = null,
 		formatAbbrev,
 		formatDate,
 		formatFullDate,
-		formatMoney,
+		formatValue,
 		onactivate
 	}: Props = $props();
 
@@ -58,10 +80,17 @@
 
 	const mvPoints = $derived(points.map((p, i) => `${toX(i)},${toY(p.mv)}`).join(' '));
 	const cbPoints = $derived(points.map((p, i) => `${toX(i)},${toY(p.cb)}`).join(' '));
+	/*
+	 * El relleno cierra contra la línea de referencia, no siempre contra el
+	 * suelo: en porcentaje una racha negativa tiene que verse colgando por
+	 * debajo del cero, y rellenarla hasta el borde la pintaba como si fuera
+	 * terreno ganado.
+	 */
+	const floorY = $derived(
+		baseline === null ? padT + plotH : Math.min(Math.max(toY(baseline), padT), padT + plotH)
+	);
 	const mvFill = $derived(
-		points.length < 2
-			? ''
-			: `${mvPoints} ${toX(points.length - 1)},${padT + plotH} ${toX(0)},${padT + plotH}`
+		points.length < 2 ? '' : `${mvPoints} ${toX(points.length - 1)},${floorY} ${toX(0)},${floorY}`
 	);
 
 	const yTicks = $derived(scale.ticks.map((value) => ({ value, y: toY(value) })));
@@ -92,7 +121,7 @@
 	 */
 	const valueText = $derived(
 		activePoint
-			? `${formatDate(activePoint.date)}: valor ${formatMoney(activePoint.mv)}, invertido ${formatMoney(activePoint.cb)}`
+			? `${formatDate(activePoint.date)}: ${primaryLabel} ${formatValue(activePoint.mv)}, ${secondaryLabel} ${formatValue(activePoint.cb)}`
 			: 'Ningún punto seleccionado'
 	);
 
@@ -159,6 +188,12 @@
 			<polygon points={mvFill} fill="url(#growthGradient)" />
 		{/if}
 
+		<!-- La línea de equilibrio, más marcada que la rejilla: en porcentaje es la
+		     frontera entre ganar y perder, y no puede confundirse con una marca más. -->
+		{#if baseline !== null}
+			<line x1={padL} y1={floorY} x2={svgW - padR} y2={floorY} class="baseline" />
+		{/if}
+
 		<polyline points={cbPoints} class="line-cost" />
 		<polyline points={mvPoints} class="line-value" />
 
@@ -191,20 +226,20 @@
 	     completa: es la única vía de acceso para quien no puede leer la gráfica,
 	     así que no puede quedarse corta respecto a lo que promete el título. -->
 	<table class="sr-only">
-		<caption>Valor de mercado y capital invertido del portafolio, por fecha</caption>
+		<caption>{caption}</caption>
 		<thead>
 			<tr>
 				<th scope="col">Fecha</th>
-				<th scope="col">Valor de mercado</th>
-				<th scope="col">Capital invertido</th>
+				<th scope="col">{primaryLabel}</th>
+				<th scope="col">{secondaryLabel}</th>
 			</tr>
 		</thead>
 		<tbody>
 			{#each points as point (point.date)}
 				<tr>
 					<th scope="row"><time datetime={point.date}>{formatFullDate(point.date)}</time></th>
-					<td>{formatMoney(point.mv)}</td>
-					<td>{formatMoney(point.cb)}</td>
+					<td>{formatValue(point.mv)}</td>
+					<td>{formatValue(point.cb)}</td>
 				</tr>
 			{/each}
 		</tbody>
@@ -237,6 +272,11 @@
 		fill: rgba(236, 234, 229, 0.42);
 		font-size: 9px;
 		font-family: var(--font-mono);
+	}
+
+	.baseline {
+		stroke: rgba(236, 234, 229, 0.35);
+		stroke-width: 1.25;
 	}
 
 	.line-cost {

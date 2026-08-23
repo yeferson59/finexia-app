@@ -41,7 +41,8 @@ frontend/src/
     │
     ├── ui/           # design system sin dominio (button, card, input, table…)
     ├── server/       # session.ts, testing.ts (server-only transversal)
-    └── shared/       # css.ts, format/, config/, form.ts, privacy.svelte.ts
+    └── shared/       # css.ts, format/, finance/, config/, form.ts,
+                      # privacy.svelte.ts
 ```
 
 Sin aliases propios: todo se importa por `$lib`, el estándar de SvelteKit.

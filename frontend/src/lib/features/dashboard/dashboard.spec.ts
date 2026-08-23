@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+	GROWTH_LABELS,
 	PLOT,
 	buildSlices,
 	filterByPeriod,
@@ -8,8 +9,11 @@ import {
 	nearestIndex,
 	polarToCartesian,
 	toAssetEntries,
+	toGrowthPoints,
+	toPercentPoints,
 	toPlotX,
-	toPlotY
+	toPlotY,
+	toValuePoints
 } from './dashboard';
 import type { AllocationItem, GrowthDataPoint } from '$lib/api/types';
 
@@ -178,5 +182,93 @@ describe('toPlotX / toPlotY', () => {
 			expect(y).toBeGreaterThanOrEqual(PLOT.padT);
 			expect(y).toBeLessThanOrEqual(PLOT.padT + PLOT.plotH);
 		}
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Las dos lecturas de la serie
+// ---------------------------------------------------------------------------
+
+/** Punto de la serie de crecimiento tal como llega del backend. */
+function growthPoint(
+	date: string,
+	totalValue: string,
+	cost: string,
+	netFlow?: string
+): GrowthDataPoint {
+	const gainLoss = String(Number(totalValue) - Number(cost));
+	return {
+		date,
+		totalValue,
+		totalCostBase: cost,
+		gainLoss,
+		gainLossPct: cost === '0' ? '0' : String((Number(gainLoss) / Number(cost)) * 100),
+		...(netFlow === undefined ? {} : { netFlow })
+	};
+}
+
+describe('toValuePoints', () => {
+	it('convierte los importes de la serie a números', () => {
+		expect(toValuePoints([growthPoint('2026-01-01', '1500.50', '1000')])).toEqual([
+			{ date: '2026-01-01', mv: 1500.5, cb: 1000 }
+		]);
+	});
+
+	it('trata un importe vacío como cero', () => {
+		const [p] = toValuePoints([{ ...growthPoint('2026-01-01', '', ''), totalValue: '' }]);
+		expect(p.mv).toBe(0);
+	});
+});
+
+describe('toPercentPoints', () => {
+	it('arranca la rentabilidad en cero y la encadena', () => {
+		const points = toPercentPoints([
+			growthPoint('2026-01-01', '1000', '1000'),
+			growthPoint('2026-01-02', '1100', '1000')
+		]);
+
+		expect(points[0].mv).toBe(0);
+		expect(points[1].mv).toBeCloseTo(10, 10);
+	});
+
+	// Es la razón de ser de la vista: el saldo se duplica por un depósito y la
+	// curva de rentabilidad no se mueve, mientras la de ganancia sobre coste sí
+	// acusa que el dinero nuevo entró sin haber subido todavía.
+	it('deja la rentabilidad quieta ante un aporte', () => {
+		const points = toPercentPoints([
+			growthPoint('2026-01-01', '1200', '1000'),
+			growthPoint('2026-01-02', '2200', '2000', '1000')
+		]);
+
+		expect(points[1].mv).toBe(0);
+		expect(points[1].cb).toBeCloseTo(10, 10);
+	});
+
+	it('dibuja en el equilibrio una fecha sin capital invertido', () => {
+		const points = toPercentPoints([growthPoint('2026-01-01', '0', '0')]);
+
+		expect(points[0].cb).toBe(0);
+	});
+});
+
+describe('toGrowthPoints', () => {
+	const series = [
+		growthPoint('2026-01-01', '1000', '1000'),
+		growthPoint('2026-01-02', '1100', '1000')
+	];
+
+	it('elige la serie de la vista pedida', () => {
+		expect(toGrowthPoints(series, 'value')).toEqual(toValuePoints(series));
+		expect(toGrowthPoints(series, 'percent')).toEqual(toPercentPoints(series));
+	});
+});
+
+describe('GROWTH_LABELS', () => {
+	// El lienzo no sabe qué dibuja: si las dos vistas compartieran etiqueta, la
+	// tabla accesible llamaría «valor de mercado» a un porcentaje.
+	it('nombra distinto cada trazo en cada vista', () => {
+		expect(GROWTH_LABELS.value.primary).not.toBe(GROWTH_LABELS.percent.primary);
+		expect(GROWTH_LABELS.value.secondary).not.toBe(GROWTH_LABELS.percent.secondary);
+		expect(GROWTH_LABELS.percent.caption).toMatch(/[Rr]entabilidad/);
 	});
 });

@@ -1,14 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
 	UNAVAILABLE,
-	buildGrowthProjection,
 	buildKeyStatistics,
 	buildPerformanceCalendars,
-	historySpanDays,
-	performanceClass,
-	projectionCoordinates
+	performanceClass
 } from './reports';
-import { periodReturns } from './returns';
+import { periodReturns } from '$lib/shared/finance/returns';
 import type { GrowthDataPoint, GrowthSummary } from '$lib/api/types';
 
 /**
@@ -449,106 +446,5 @@ describe('buildKeyStatistics', () => {
 
 	it('devuelve una lista vacía sin historial', () => {
 		expect(buildKeyStatistics([], summary())).toEqual([]);
-	});
-});
-
-describe('historySpanDays', () => {
-	it('cuenta los días entre el primer punto y el último', () => {
-		expect(historySpanDays([point('2026-01-01', '1'), point('2026-03-02', '1')])).toBe(60);
-	});
-
-	it('es cero sin dos puntos que comparar', () => {
-		expect(historySpanDays([point('2026-01-01', '1')])).toBe(0);
-		expect(historySpanDays([])).toBe(0);
-	});
-});
-
-describe('buildGrowthProjection', () => {
-	/** Serie de un año que gana un 20 % de mercado, sin aportes. */
-	const oneYear = () => {
-		const values = Array.from({ length: 366 }, (_, i) => 1000 * (1 + (0.2 * i) / 365));
-		return dailySeries(values, '1000');
-	};
-
-	it('proyecta cinco años desde la rentabilidad anualizada', () => {
-		const projection = buildGrowthProjection(oneYear(), summary({ currentValue: '1200' }));
-
-		expect(projection).toHaveLength(5);
-		expect(projection[0]).toEqual({ period: '2027', value: 1200 });
-		expect(projection.map((p) => p.period)).toEqual(['2027', '2028', '2029', '2030', '2031']);
-		expect(projection[4].value).toBeGreaterThan(projection[0].value);
-	});
-
-	it('se abstiene con menos de medio año de historial', () => {
-		const short = dailySeries(Array.from({ length: 100 }, (_, i) => 1000 + i));
-
-		expect(buildGrowthProjection(short, summary())).toEqual([]);
-	});
-
-	it('no proyecta el dinero aportado como si fuese rendimiento', () => {
-		// Un año en el que el saldo se multiplica por diez, todo a base de aportes:
-		// la rentabilidad es cero y la proyección queda plana.
-		const values = Array.from({ length: 366 }, (_, i) => 1000 + i * 25);
-		const funded = values.map((value, i) => {
-			const day = new Date(Date.UTC(2026, 0, 1 + i)).toISOString().substring(0, 10);
-			return point(day, String(value), String(value));
-		});
-
-		const projection = buildGrowthProjection(funded, summary({ currentValue: '10125' }));
-
-		expect(projection.map((p) => p.value)).toEqual(Array(5).fill(10125));
-	});
-
-	it('se abstiene con una tasa fuera de rango', () => {
-		// x10 en un año: fuera del rango plausible para extrapolar.
-		const values = Array.from({ length: 366 }, (_, i) => 1000 * (1 + (9 * i) / 365));
-
-		expect(buildGrowthProjection(dailySeries(values, '1000'), summary())).toEqual([]);
-	});
-
-	it('cae al último punto de la serie cuando el resumen no trae valor', () => {
-		// El loader rellena el resumen ausente con ceros; la serie sigue siendo buena.
-		const projection = buildGrowthProjection(oneYear(), summary({ currentValue: '0' }));
-
-		expect(projection[0].value).toBe(1200);
-	});
-
-	it('se abstiene cuando ni el resumen ni la serie dan un valor positivo', () => {
-		const emptied = [...oneYear().slice(0, -1), point('2027-01-01', '0', '1000')];
-
-		expect(buildGrowthProjection(emptied, summary({ currentValue: '0' }))).toEqual([]);
-	});
-
-	it('se abstiene sin puntos', () => {
-		expect(buildGrowthProjection([], summary())).toEqual([]);
-	});
-});
-
-describe('projectionCoordinates', () => {
-	it('reparte los puntos en el eje x y estira los valores al alto del viewBox', () => {
-		const coords = projectionCoordinates([
-			{ period: '2026', value: 100 },
-			{ period: '2027', value: 150 },
-			{ period: '2028', value: 200 }
-		]);
-
-		expect(coords.map((c) => c.x)).toEqual([58, 182, 306]);
-		// El mínimo se apoya en la base y el máximo llega al techo del área útil.
-		expect(coords[0].y).toBe(230);
-		expect(coords[2].y).toBe(50);
-		expect(coords[1].y).toBe(140);
-	});
-
-	it('no divide por cero cuando todos los valores son iguales', () => {
-		const coords = projectionCoordinates([
-			{ period: '2026', value: 100 },
-			{ period: '2027', value: 100 }
-		]);
-
-		expect(coords.every((c) => c.y === 230)).toBe(true);
-	});
-
-	it('devuelve una lista vacía sin proyección', () => {
-		expect(projectionCoordinates([])).toEqual([]);
 	});
 });
