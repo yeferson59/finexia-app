@@ -11,20 +11,36 @@
 	 * disponible para el lector de pantalla.
 	 */
 	import ReportPanel from './report-panel.svelte';
-	import { projectionCoordinates, type GrowthProjectionEntry } from '../reports';
+	import {
+		PROJECTION_GUTTER,
+		PROJECTION_MIN_DAYS,
+		projectionCoordinates,
+		type GrowthProjectionEntry
+	} from '../reports';
 
 	interface Props {
 		projection: GrowthProjectionEntry[];
+		/** Días de historial, para que el estado vacío diga cuánto falta. */
+		historyDays: number;
 	}
 
-	let { projection }: Props = $props();
+	let { projection, historyDays }: Props = $props();
+
+	const missingDays = $derived(Math.max(PROJECTION_MIN_DAYS - historyDays, 0));
 
 	const points = $derived(projectionCoordinates(projection));
 	const line = $derived(points.map((p) => `${p.x},${p.y}`).join(' '));
 	// El área cierra contra la base del viewBox, de la esquina derecha a la izquierda.
 	const area = $derived(
-		points.length > 0 ? `${line} ${points[points.length - 1].x},230 40,230` : ''
+		points.length > 0 ? `${line} ${points[points.length - 1].x},230 ${PROJECTION_GUTTER},230` : ''
 	);
+
+	/** Lo que abarca el eje vertical, de la marca más baja a la más alta. */
+	const span = $derived.by(() => {
+		if (projection.length === 0) return 0;
+		const values = projection.map((p) => p.value);
+		return Math.max(...values) - Math.min(...values);
+	});
 
 	/** Marcas del eje vertical: el valor proyectado en cada línea de la rejilla. */
 	const yTicks = $derived.by(() => {
@@ -39,10 +55,24 @@
 		}));
 	});
 
+	/**
+	 * Decimales que hacen falta para que dos marcas contiguas no salgan iguales.
+	 *
+	 * Con una tasa cercana a cero las cinco marcas caben en menos de mil dólares,
+	 * y redondear a miles imprimía «$89k» cinco veces: un eje sin escala, que es
+	 * justo lo que la rejilla venía a resolver.
+	 */
+	function decimalsFor(unit: number): number {
+		const steps = span / unit;
+		if (steps >= 10) return 0;
+		if (steps >= 1) return 1;
+		return 2;
+	}
+
 	function fmtAbbrev(value: number): string {
 		const abs = Math.abs(value);
-		if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-		if (abs >= 1_000) return `$${Math.round(value / 1_000)}k`;
+		if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(decimalsFor(1_000_000))}M`;
+		if (abs >= 1_000) return `$${(value / 1_000).toFixed(decimalsFor(1_000))}k`;
 		return `$${Math.round(value)}`;
 	}
 
@@ -67,8 +97,17 @@
 			</defs>
 
 			{#each yTicks as tick (tick.y)}
-				<line x1="40" y1={tick.y} x2="560" y2={tick.y} stroke="var(--border)" stroke-width="1" />
-				<text x="34" y={tick.y + 3.5} text-anchor="end" class="axis">{fmtAbbrev(tick.value)}</text>
+				<line
+					x1={PROJECTION_GUTTER}
+					y1={tick.y}
+					x2="572"
+					y2={tick.y}
+					stroke="var(--border)"
+					stroke-width="1"
+				/>
+				<text x={PROJECTION_GUTTER - 6} y={tick.y + 3.5} text-anchor="end" class="axis">
+					{fmtAbbrev(tick.value)}
+				</text>
 			{/each}
 
 			<!-- El relleno primero: si va después, tapa la línea que debe destacar. -->
@@ -111,11 +150,21 @@
 		</table>
 
 		<p class="footnote">
-			Extrapolación del crecimiento anual compuesto de tu historial. No es una previsión de mercado.
+			Extrapola tu rentabilidad anualizada sobre el valor actual, sin contar aportes futuros. No es
+			una previsión de mercado.
 		</p>
 	{:else}
 		<div class="empty-chart">
 			<p>Proyección disponible con al menos 6 meses de historial.</p>
+			<!-- Decir cuánto falta ahorra volver cada semana a comprobarlo. -->
+			<p class="countdown">
+				{#if historyDays > 0}
+					Llevas {historyDays}
+					{historyDays === 1 ? 'día' : 'días'}; faltan {missingDays}.
+				{:else}
+					Empieza a contar con el primer cierre diario de tu cartera.
+				{/if}
+			</p>
 		</div>
 	{/if}
 </ReportPanel>
@@ -159,6 +208,14 @@
 
 	.empty-chart p {
 		margin: 0;
+	}
+
+	/* `.empty-chart p` pone `margin: 0`; hace falta ganarle en especificidad. */
+	.empty-chart .countdown {
+		margin-top: 0.4rem;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: rgba(236, 234, 229, 0.35);
 	}
 
 	.sr-only {

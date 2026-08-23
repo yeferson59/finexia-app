@@ -1,6 +1,6 @@
 # Manual de Usuario — FINEXIA
 
-**Versión del documento:** 1.3
+**Versión del documento:** 1.4
 **Fecha:** Agosto 2026
 **Aplicación:** Finexia — Plataforma de gestión y seguimiento de portafolios de inversión
 
@@ -408,9 +408,21 @@ La sección **Reportes** ("Gestiona y descarga documentos financieros de tu cuen
 
 ### 11.1 Reportes en pantalla
 
-- **Rentabilidad mensual (%):** calendario con el porcentaje de ganancia o pérdida de cada mes, un panel por año (verás tantos paneles como años cubra tu historial). Arriba de cada panel está el **acumulado del año**, y debajo la **leyenda de la escala de color** (de rojo intenso para caídas de más del 1 % a verde intenso para subidas del 2 % o más). Los meses sin dato aparecen con un guion.
-- **Estadísticas clave:** métricas de riesgo del portafolio, como el **Max Drawdown** (la mayor caída desde un máximo) y la **Volatilidad**.
-- **Proyección de crecimiento:** estimación a cinco años calculada extrapolando el crecimiento anual compuesto (CAGR) de tu propio historial. Cada año muestra su valor proyectado y el eje vertical su escala. **No es una previsión de mercado**, y por eso la aplicación se abstiene de mostrarla cuando tienes menos de seis meses de historial o cuando el ritmo de crecimiento es tan extremo que proyectarlo daría cifras absurdas.
+- **Rentabilidad mensual (%):** calendario con el rendimiento de cada mes, un panel por año (verás tantos paneles como años cubra tu historial). Arriba de cada panel está el **acumulado del año**, y debajo la **leyenda de la escala de color** (de rojo intenso para caídas de más del 1 % a verde intenso para subidas del 2 % o más). Los meses sin dato aparecen con un guion.
+
+  Lo que ves es **rendimiento de lo invertido, no variación del saldo**: los aportes y retiros del mes se descuentan antes de calcular el porcentaje, así que ingresar dinero no pinta el mes en verde. El mes en el que arranca tu historial va marcado con un asterisco porque cubre menos días que un mes completo.
+
+- **Estadísticas clave:** doce métricas repartidas en tres bloques.
+
+  | Bloque | Métricas |
+  |---|---|
+  | **Rendimiento** | Rentabilidad del periodo, rentabilidad anualizada, ganancia / pérdida, ganancia sobre coste, mejor mes y peor mes |
+  | **Riesgo** | Volatilidad anualizada, máxima caída y ratio de Sharpe |
+  | **Historial** | Periodo cubierto, capital invertido y valor actual |
+
+  Al pasar el cursor por cualquier métrica verás qué mide exactamente. Las que necesitan más historial del que tienes aparecen como **N/A** con el motivo escrito debajo: la volatilidad y el Sharpe piden al menos 10 puntos y 21 días, y la rentabilidad anualizada no se calcula por debajo de 90 días, porque anualizar unas pocas semanas da cifras sin sentido.
+
+- **Proyección de crecimiento:** estimación a cinco años calculada extrapolando **tu rentabilidad anualizada** sobre el valor actual, sin contar aportes futuros. Cada año muestra su valor proyectado y el eje vertical su escala. **No es una previsión de mercado**, y por eso la aplicación se abstiene de mostrarla cuando tienes menos de seis meses de historial —en ese caso te dice cuántos días llevas y cuántos faltan— o cuando el ritmo es tan extremo que proyectarlo daría cifras absurdas.
 
 ### 11.2 Descargas en Excel (XLSX)
 
@@ -585,9 +597,11 @@ Si el problema persiste, contacta con el equipo de soporte de Finexia.
 | **Transacción** | Operación de compra o venta que modifica una posición |
 | **Asignación** | Porcentaje que representa un activo o tipo de activo dentro del total |
 | **ROI** | *Return on Investment*: retorno sobre la inversión, en porcentaje |
-| **Max Drawdown** | La mayor caída porcentual del valor desde un máximo anterior |
-| **CAGR** | *Compound Annual Growth Rate*: ritmo de crecimiento anual compuesto; es la base de la proyección |
-| **Volatilidad** | Medida de la variabilidad del valor de un activo o portafolio |
+| **Máxima caída** | *Max drawdown*: la mayor bajada porcentual de la rentabilidad acumulada desde un máximo anterior |
+| **CAGR** | *Compound Annual Growth Rate*: ritmo de crecimiento anual compuesto |
+| **Volatilidad** | Medida de cuánto oscila la rentabilidad; se publica anualizada |
+| **Ratio de Sharpe** | Rentabilidad obtenida por cada unidad de riesgo asumida (con tasa libre de riesgo 0); por encima de 1 se considera bueno |
+| **Rentabilidad del periodo** | Lo que rindió el dinero invertido a lo largo de tu historial, descontando aportes y retiros |
 | **2FA / TOTP** | Verificación en dos pasos con códigos temporales de 6 dígitos |
 | **Códigos de recuperación** | Códigos de un solo uso para acceder si pierdes tu aplicación de autenticación |
 | **Lista de espera** | Registro público para solicitar acceso anticipado a la plataforma |

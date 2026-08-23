@@ -4,8 +4,9 @@ import {
 	buildGrowthProjection,
 	buildKeyStatistics,
 	buildPerformanceCalendars,
+	historySpanDays,
 	type GrowthProjectionEntry,
-	type KeyStat,
+	type KeyStatGroup,
 	type PerformanceCalendar
 } from '$lib/features/reports';
 import type { GrowthDataPoint, GrowthSummary } from '$lib/api/types';
@@ -13,8 +14,9 @@ import type { GrowthDataPoint, GrowthSummary } from '$lib/api/types';
 export const load: PageServerLoad = async ({ cookies, fetch }) => {
 	const empty = {
 		performanceCalendars: [] as PerformanceCalendar[],
-		keyStatistics: [] as KeyStat[],
-		growthProjection: [] as GrowthProjectionEntry[]
+		keyStatistics: [] as KeyStatGroup[],
+		growthProjection: [] as GrowthProjectionEntry[],
+		historyDays: 0
 	};
 
 	const growthRes = await portfolio.getAggregateGrowth({ cookies, fetch }, { period: 'ALL' });
@@ -32,7 +34,9 @@ export const load: PageServerLoad = async ({ cookies, fetch }) => {
 
 	return {
 		performanceCalendars: buildPerformanceCalendars(points),
-		keyStatistics: buildKeyStatistics(points),
-		growthProjection: buildGrowthProjection(points, summary)
+		keyStatistics: buildKeyStatistics(points, summary),
+		growthProjection: buildGrowthProjection(points, summary),
+		// El panel de proyección lo usa para decir cuánto historial falta.
+		historyDays: historySpanDays(points)
 	};
 };

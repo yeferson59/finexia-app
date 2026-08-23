@@ -26,8 +26,8 @@
 <PerformanceCalendars calendars={data.performanceCalendars} />
 
 <section class="insights-grid">
-	<KeyStatistics statistics={data.keyStatistics} />
-	<GrowthProjection projection={data.growthProjection} />
+	<KeyStatistics groups={data.keyStatistics} />
+	<GrowthProjection projection={data.growthProjection} historyDays={data.historyDays} />
 </section>
 
 <ReportDownloads />
@@ -37,9 +37,11 @@
 	   con ella porque los renderiza `report-panel`, en la feature. */
 	/* `align-items: start` para que el panel de estadísticas no se estire hasta
 	   el alto de la gráfica y deje media tarjeta vacía. */
+	/* Columnas iguales: con la de estadísticas a un tercio, sus doce métricas
+	   caían en una sola columna y la tarjeta triplicaba el alto de la gráfica. */
 	.insights-grid {
 		display: grid;
-		grid-template-columns: 1fr 2fr;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		align-items: start;
 		gap: 1rem;
 		margin-bottom: 1rem;

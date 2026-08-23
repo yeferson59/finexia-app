@@ -21,19 +21,37 @@ test.describe('reports', () => {
 			calendar2026.getByRole('img', { name: /^Abr: −?-?\d+,\d%, negativo$/ })
 		).toBeVisible();
 
-		// El primer mes de la serie no tiene con qué compararse.
+		// El mes en el que arranca el historial se marca: su cifra es real, pero
+		// cubre menos días que un mes entero.
 		const calendar2025 = page.getByRole('article').filter({ hasText: '2025' }).first();
-		await expect(calendar2025.getByRole('img', { name: 'Jun: sin dato' })).toBeVisible();
+		await expect(calendar2025.getByRole('img', { name: /^Jun: .+, mes parcial$/ })).toBeVisible();
+		await expect(calendar2025.getByRole('img', { name: 'Ene: sin dato' })).toBeVisible();
+
+		// Y el pie deja dicho que las cifras son rendimiento, no saldo.
+		await expect(calendar2026.getByText(/no cuentan como rentabilidad/)).toBeVisible();
 	});
 
 	test('computes the risk statistics and the projection from the history', async ({ page }) => {
 		await login(page);
 		await page.goto('/dashboard/reports');
 
-		// Con trece retornos mensuales ya hay volatilidad que calcular.
 		await expect(page.getByRole('heading', { name: 'Estadísticas clave' })).toBeVisible();
-		await expect(page.getByText('Max Drawdown')).toBeVisible();
+		// Los tres bloques, y dentro las métricas que antes no se publicaban.
+		// `exact` porque «Riesgo» es prefijo del reporte «Riesgo y volatilidad».
+		for (const group of ['Rendimiento', 'Riesgo', 'Historial']) {
+			await expect(page.getByRole('heading', { name: group, exact: true })).toBeVisible();
+		}
+		for (const stat of ['Máxima caída', 'Ratio de Sharpe', 'Capital invertido']) {
+			await expect(page.locator('.stat-tile').filter({ hasText: stat })).toBeVisible();
+		}
+
+		// Con setenta puntos de historial no queda ninguna métrica sin calcular.
 		await expect(page.getByText('N/A')).toHaveCount(0);
+
+		// La rentabilidad del periodo es un porcentaje calculado, no la variación
+		// del saldo: la serie del fixture crece a base de aportes.
+		const period = page.locator('.stat-tile').filter({ hasText: 'Rentabilidad del periodo' });
+		await expect(period.locator('dd')).toHaveText(/^[+-]?\d+,\d%$/);
 
 		// Y más de medio año de historial, así que la proyección se dibuja.
 		await expect(page.getByRole('heading', { name: 'Proyección de crecimiento' })).toBeVisible();

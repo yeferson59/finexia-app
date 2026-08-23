@@ -6,6 +6,10 @@
 	 * pero no leyendo. Ahora cada celda dice su mes y su signo en el nombre
 	 * accesible, hay leyenda de la escala y el año lleva su acumulado, que es lo
 	 * primero que se busca al abrir la página.
+	 *
+	 * Las cifras son rendimiento, no variación del saldo: `reports.ts` descuenta
+	 * los aportes de cada tramo. El pie lo dice, porque una cuenta que crece a
+	 * base de depósitos venía marcando meses del +150 % y nadie sabía por qué.
 	 */
 	import ReportPanel from './report-panel.svelte';
 	import { MONTHS, performanceClass, type PerformanceCalendar } from '../reports';
@@ -31,10 +35,11 @@
 		return (months.reduce((acc, v) => acc * (1 + v / 100), 1) - 1) * 100;
 	}
 
-	function cellLabel(month: string, value: number | null): string {
+	function cellLabel(month: string, value: number | null, partial: boolean): string {
 		if (value === null) return `${month}: sin dato`;
 		const sign = value > 0 ? 'positivo' : value < 0 ? 'negativo' : 'plano';
-		return `${month}: ${fmtPct(value)}, ${sign}`;
+		const scope = partial ? ', mes parcial' : '';
+		return `${month}: ${fmtPct(value)}, ${sign}${scope}`;
 	}
 </script>
 
@@ -52,12 +57,15 @@
 
 				<div class="calendar-grid">
 					{#each calendar.values as value, index (`${calendar.year}-${MONTHS[index]}`)}
+						{@const partial = value !== null && index === calendar.partialMonth}
 						<div
 							class={`month-cell ${value === null ? 'null-cell' : performanceClass(value)}`}
 							role="img"
-							aria-label={cellLabel(MONTHS[index], value)}
+							aria-label={cellLabel(MONTHS[index], value, partial)}
 						>
-							<p class="month" aria-hidden="true">{MONTHS[index]}</p>
+							<p class="month" aria-hidden="true">
+								{MONTHS[index]}{#if partial}<span class="partial">*</span>{/if}
+							</p>
 							<p class="percent" aria-hidden="true">{value === null ? '–' : fmtPct(value)}</p>
 						</div>
 					{/each}
@@ -70,6 +78,11 @@
 					<li><i class="swatch positive"></i>1–2%</li>
 					<li><i class="swatch strong-positive"></i>≥ 2%</li>
 				</ul>
+
+				<p class="footnote">
+					Rendimiento de lo invertido: los aportes y retiros del mes no cuentan como rentabilidad.{#if calendar.partialMonth !== null}
+						<br />* Mes parcial: el historial empieza dentro de él.{/if}
+				</p>
 			</ReportPanel>
 		{/each}
 	{:else}
@@ -217,6 +230,18 @@
 		height: 9px;
 		border-radius: 2px;
 		border: 1px solid transparent;
+	}
+
+	.partial {
+		margin-left: 0.1rem;
+		color: rgba(236, 234, 229, 0.45);
+	}
+
+	.footnote {
+		margin: 0.6rem 0 0;
+		font-size: 0.6rem;
+		line-height: 1.5;
+		color: rgba(236, 234, 229, 0.38);
 	}
 
 	@media (max-width: 1024px) {

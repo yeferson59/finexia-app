@@ -106,7 +106,10 @@ await new Promise((resolve, reject) => {
 });
 
 console.log('· arrancando el servidor de vista previa…');
-run('pnpm', ['preview', '--port', String(APP_PORT)], {
+// `--host 127.0.0.1` explícito: por defecto `vite preview` escucha solo en
+// `::1`, y el sondeo de abajo —y el `fetch` del SSR contra el stub— van por
+// IPv4. Sin esto el script espera dos minutos a un servidor que sí arrancó.
+run('pnpm', ['preview', '--port', String(APP_PORT), '--host', '127.0.0.1'], {
 	BASE_API: `http://127.0.0.1:${MOCK_PORT}/api/v1`
 });
 await waitFor(`${BASE}/`);
