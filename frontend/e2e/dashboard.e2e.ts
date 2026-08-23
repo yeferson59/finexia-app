@@ -15,9 +15,36 @@ test.describe('dashboard charts', () => {
 		await chart.press('End');
 
 		// El punto señalado se anuncia y además se pinta en el detalle de arriba.
-		await expect(chart).toHaveAttribute('aria-valuetext', /valor \$/);
-		await expect(page.getByText(/^Invertido \$/)).toBeVisible();
+		await expect(chart).toHaveAttribute('aria-valuetext', /Valor de mercado \$/);
+		await expect(page.getByText(/^Capital invertido \$/)).toBeVisible();
 		await expect(page.getByText(/^Ganancia [+−]\$/)).toBeVisible();
+	});
+
+	test('la gráfica se puede leer en rentabilidad en vez de en dinero', async ({ page }) => {
+		await login(page);
+
+		const card = page.locator('section[aria-label="Crecimiento del portafolio"]');
+		const units = card.getByRole('group', { name: 'Unidad de la gráfica' });
+		await expect(units.getByRole('button', { name: 'Valor' })).toHaveAttribute(
+			'aria-pressed',
+			'true'
+		);
+
+		await units.getByRole('button', { name: '%', exact: true }).click();
+
+		// La serie del fixture crece a base de aportes: en dinero la curva sube y
+		// en rentabilidad no, que es justo lo que esta vista viene a enseñar.
+		const series = card.getByRole('table', {
+			name: /Rentabilidad acumulada y ganancia sobre coste/
+		});
+		await expect(
+			series.getByRole('columnheader', { name: 'Rentabilidad acumulada' })
+		).toBeAttached();
+		await expect(series.getByRole('columnheader', { name: 'Ganancia sobre coste' })).toBeAttached();
+		await expect(series.getByRole('cell').first()).toHaveText(/^[+-]?\d+,\d%$/);
+
+		// Y la cifra del periodo va con las otras métricas, no escondida en el SVG.
+		await expect(card.getByText('Rentabilidad real · Todo')).toBeVisible();
 	});
 
 	test('la gráfica ofrece sus dos series como tabla para el lector de pantalla', async ({

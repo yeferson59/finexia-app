@@ -11,7 +11,8 @@
 		HoldingsTable,
 		PortfolioDetailHeader,
 		groupHoldings,
-		computeTypeBreakdown
+		computeTypeBreakdown,
+		realReturnPct
 	} from '$lib/features/portfolio';
 	import type { PageProps } from './$types';
 
@@ -35,6 +36,10 @@
 	const totalGainLoss = $derived(totalValue - totalCost);
 	const totalGainLossPct = $derived(totalCost > 0 ? (totalGainLoss / totalCost) * 100 : 0);
 	const baseCurrency = $derived(portfolio?.baseCurrency?.trim() || 'USD');
+
+	// Rentabilidad ponderada por tiempo del historial: lo que rindió el dinero,
+	// sin que un aporte cuente como ganancia.
+	const realReturn = $derived(realReturnPct(growth?.points));
 
 	// Posiciones que el backend no pudo convertir por falta de tasa: sus
 	// importes están en su moneda nativa, así que los totales de arriba mezclan
@@ -131,6 +136,7 @@
 	{baseCurrency}
 	{totalGainLoss}
 	{totalGainLossPct}
+	{realReturn}
 	riskName={portfolio?.riskName}
 	holdingsCount={holdings.length}
 	{formatCurrency}

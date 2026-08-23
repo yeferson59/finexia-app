@@ -5,7 +5,7 @@ import {
 	buildKeyStatistics,
 	buildPerformanceCalendars,
 	historySpanDays,
-	type GrowthProjectionEntry,
+	type GrowthProjectionSeries,
 	type KeyStatGroup,
 	type PerformanceCalendar
 } from '$lib/features/reports';
@@ -15,7 +15,7 @@ export const load: PageServerLoad = async ({ cookies, fetch }) => {
 	const empty = {
 		performanceCalendars: [] as PerformanceCalendar[],
 		keyStatistics: [] as KeyStatGroup[],
-		growthProjection: [] as GrowthProjectionEntry[],
+		growthProjection: null as GrowthProjectionSeries | null,
 		historyDays: 0
 	};
 

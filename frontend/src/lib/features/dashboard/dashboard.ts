@@ -8,6 +8,7 @@
  */
 
 import type { AllocationItem, GrowthDataPoint } from '$lib/api/types';
+import { cumulativeReturns } from '$lib/shared/finance/returns';
 
 // ---------------------------------------------------------------------------
 // Asignación de activos (donut)
@@ -146,13 +147,90 @@ export function filterByPeriod(
 	return points.filter((d) => new Date(d.date) >= cutoff);
 }
 
-/** Punto de la serie de crecimiento, ya convertido a números. */
+/**
+ * Punto de la serie que dibuja la gráfica, ya convertido a números.
+ *
+ * Los dos campos son los dos trazos, y lo que miden depende de la vista: en la
+ * de dinero son valor de mercado y capital invertido; en la de porcentaje,
+ * rentabilidad acumulada y ganancia sobre coste. Los nombres se quedaron con
+ * los de la vista original —renombrarlos a `a` y `b` habría hecho ilegible el
+ * lienzo— y `GROWTH_LABELS` es quien dice, en cada vista, cómo se llama cada
+ * uno de cara al usuario.
+ */
 export interface GrowthPoint {
 	date: string;
-	/** Valor de mercado. */
+	/** Trazo principal (línea ámbar). */
 	mv: number;
-	/** Capital invertido (coste). */
+	/** Trazo de referencia (línea gris discontinua). */
 	cb: number;
+}
+
+/**
+ * Qué mide la gráfica.
+ *
+ * El dinero cuenta la historia de la cuenta —cuánto hay— y el porcentaje la del
+ * inversionista: un depósito sube la primera curva sin que nada se haya
+ * revalorizado, y deja la segunda donde estaba. Son la misma serie leída de dos
+ * formas, y por eso conviven en un conmutador y no en dos gráficas.
+ */
+export type GrowthView = 'value' | 'percent';
+
+export const GROWTH_VIEWS: { id: GrowthView; label: string; hint: string }[] = [
+	{ id: 'value', label: 'Valor', hint: 'Ver la gráfica en dinero' },
+	{ id: 'percent', label: '%', hint: 'Ver la gráfica en rentabilidad' }
+];
+
+/** Cómo se llaman los dos trazos —y la tabla accesible— en cada vista. */
+export const GROWTH_LABELS: Record<
+	GrowthView,
+	{ primary: string; secondary: string; caption: string }
+> = {
+	value: {
+		primary: 'Valor de mercado',
+		secondary: 'Capital invertido',
+		caption: 'Valor de mercado y capital invertido del portafolio, por fecha'
+	},
+	percent: {
+		primary: 'Rentabilidad acumulada',
+		secondary: 'Ganancia sobre coste',
+		caption: 'Rentabilidad acumulada y ganancia sobre coste del portafolio, por fecha'
+	}
+};
+
+/** La serie en dinero: valor de mercado contra capital invertido. */
+export function toValuePoints(points: GrowthDataPoint[]): GrowthPoint[] {
+	return points.map((point) => ({
+		date: point.date,
+		mv: parseFloat(point.totalValue || '0'),
+		cb: parseFloat(point.totalCostBase || '0')
+	}));
+}
+
+/**
+ * La serie en porcentaje: rentabilidad acumulada contra ganancia sobre coste.
+ *
+ * La primera arranca en 0 % el día en que empieza el tramo dibujado y descuenta
+ * aportes y retiros, así que es lo que rindió el dinero. La segunda es la foto
+ * de cada día —mercado sobre coste—, que sí se mueve con cuándo entró cada
+ * aporte; verlas juntas es lo que enseña la diferencia entre haber ganado y
+ * haber ingresado.
+ *
+ * Una fecha sin capital invertido no tiene ganancia sobre coste que enseñar
+ * —dividir por cero no da un 0 %, da nada—; se dibuja en la línea de equilibrio
+ * porque una gráfica no puede tener agujeros, y es el día en que la cuenta
+ * estaba vacía.
+ */
+export function toPercentPoints(points: GrowthDataPoint[]): GrowthPoint[] {
+	return cumulativeReturns(points).map((point) => ({
+		date: point.date,
+		mv: point.twr * 100,
+		cb: (point.overCost ?? 0) * 100
+	}));
+}
+
+/** La serie lista para dibujar en la vista pedida. */
+export function toGrowthPoints(points: GrowthDataPoint[], view: GrowthView): GrowthPoint[] {
+	return view === 'percent' ? toPercentPoints(points) : toValuePoints(points);
 }
 
 /** Escala vertical de la gráfica, con las marcas del eje ya calculadas. */
