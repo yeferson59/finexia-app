@@ -3,7 +3,7 @@ package portfolio
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/yeferson59/finexia-app/internal/market"
 )

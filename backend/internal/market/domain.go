@@ -3,7 +3,8 @@ package market
 import (
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
+
 	"github.com/yeferson59/gofinance/v2/decimal"
 )
 

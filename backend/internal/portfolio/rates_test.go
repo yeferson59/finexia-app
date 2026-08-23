@@ -4,7 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
+	"uuid"
+
 	"github.com/yeferson59/gofinance/v2/decimal"
 )
 

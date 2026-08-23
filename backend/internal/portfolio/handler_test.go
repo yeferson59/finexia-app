@@ -8,8 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"uuid"
+
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )

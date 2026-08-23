@@ -5,7 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
+
 	"github.com/jackc/pgx/v5"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
@@ -26,7 +27,7 @@ func (r *PostgresRepository) CreateSession(ctx context.Context, userID uuid.UUID
 		userID.String(), token, ip, ua, expiresAt,
 	).Scan(&id)
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil(), err
 	}
 
 	return id, nil

@@ -9,8 +9,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"uuid"
+
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 )
 
 // The import endpoints are the module's only multipart surface, so their

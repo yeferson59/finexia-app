@@ -9,8 +9,9 @@ import (
 	"errors"
 	"time"
 
+	"uuid"
+
 	"github.com/bytedance/sonic"
-	"github.com/google/uuid"
 )
 
 // ErrAccountUnverified signals a login attempt against an account whose email

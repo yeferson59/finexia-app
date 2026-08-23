@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // platformStatsSelect is the head shared by the two queries that report what a

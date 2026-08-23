@@ -4,7 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/google/uuid"
+	"uuid"
+
 	"github.com/jackc/pgx/v5"
 
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"

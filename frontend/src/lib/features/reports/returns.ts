@@ -161,3 +161,32 @@ export function returnsByMonth(returns: PeriodReturn[]): Map<string, number> {
 
 	return new Map([...buckets].map(([key, values]) => [key, compound(values)]));
 }
+
+/** Último día de un mes `YYYY-MM`, en `YYYY-MM-DD`. */
+function monthEnd(key: string): string {
+	const [year, month] = key.split('-').map((part) => Number.parseInt(part, 10));
+	const day = new Date(Date.UTC(year, month, 0)).getUTCDate();
+	return `${key}-${String(day).padStart(2, '0')}`;
+}
+
+/**
+ * Los meses que el historial no cubre enteros, en clave `YYYY-MM`.
+ *
+ * Son como mucho dos: aquel en el que empieza la serie —su retorno corre desde
+ * el día en que abrió el historial y no desde el día 1— y el último, si la
+ * serie se corta antes de que el mes acabe, que es siempre el caso del mes en
+ * curso. La cifra de esos meses es real, pero tres días no se comparan con un
+ * mes entero: el calendario los marca y el mejor/peor mes los deja fuera.
+ */
+export function incompleteMonths(points: GrowthDataPoint[]): Set<string> {
+	const series = sortedPoints(points);
+	if (series.length === 0) return new Set();
+
+	const last = series[series.length - 1].date;
+	const lastMonth = last.substring(0, 7);
+
+	const incomplete = new Set([series[0].date.substring(0, 7)]);
+	if (last < monthEnd(lastMonth)) incomplete.add(lastMonth);
+
+	return incomplete;
+}

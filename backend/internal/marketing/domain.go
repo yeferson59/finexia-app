@@ -5,7 +5,7 @@ package marketing
 import (
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 type WaitlistStatus string

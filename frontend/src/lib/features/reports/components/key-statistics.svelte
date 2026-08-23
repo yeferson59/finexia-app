@@ -7,6 +7,10 @@
 	 * sin explicar por qué, con el resto de la serie sin usar. Ahora los tres
 	 * bloques reparten doce métricas, cada una lleva en `title` qué mide, y la
 	 * que no se puede calcular dice a la vista qué historial le falta.
+	 *
+	 * Una métrica que sí sale puede traer `note`: el reparo que hay que leer con
+	 * la cifra —una estimación de margen amplio, un mes incompleto— y que en el
+	 * `title` no vería nadie.
 	 */
 	import ReportPanel from './report-panel.svelte';
 	import { UNAVAILABLE, type KeyStatGroup } from '../reports';
@@ -32,6 +36,10 @@
 							{#if stat.value === UNAVAILABLE && stat.hint}
 								<!-- Sin esto, `N/A` no distingue «falta historial» de «algo se rompió». -->
 								<p class="reason">{stat.hint}</p>
+							{:else if stat.note}
+								<!-- El reparo de una cifra que sí sale va a la vista, no al `title`:
+								     un Sharpe estimado con tres meses se lee mal sin él. -->
+								<p class="reason">{stat.note}</p>
 							{/if}
 						</div>
 					{/each}

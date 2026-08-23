@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
 )
@@ -19,7 +19,7 @@ func (r *PostgresRepository) CreateRefreshToken(ctx context.Context, userID uuid
 		userID, tokenHash, familyID, sessionID, ip, ua, expiresAt,
 	).Scan(&id)
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil(), err
 	}
 	return id, nil
 }

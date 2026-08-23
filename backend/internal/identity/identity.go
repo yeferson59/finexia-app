@@ -7,7 +7,7 @@ package identity
 import (
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 type Role struct {

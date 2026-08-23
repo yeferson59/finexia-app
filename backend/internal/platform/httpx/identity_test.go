@@ -5,8 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"uuid"
+
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 )
 
 // runWithLocals mounts h behind a middleware that seeds the request locals the

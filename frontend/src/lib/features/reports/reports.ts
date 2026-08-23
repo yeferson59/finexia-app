@@ -14,6 +14,7 @@ import {
 	DAYS_PER_YEAR,
 	compound,
 	dayGap,
+	incompleteMonths,
 	maxDrawdown,
 	mean,
 	periodReturns,
@@ -29,11 +30,11 @@ export interface PerformanceCalendar {
 	year: string;
 	values: (number | null)[];
 	/**
-	 * Índice del mes que solo cubre parte del calendario porque el historial
-	 * empieza dentro de él. Su cifra es real pero no comparable con un mes
-	 * entero, y la tarjeta la marca.
+	 * Índices de los meses que solo cubren parte del calendario: aquel en el que
+	 * empieza el historial y el que está en curso. Su cifra es real pero no
+	 * comparable con un mes entero, y la tarjeta la marca.
 	 */
-	partialMonth: number | null;
+	partialMonths: number[];
 }
 
 /** Métrica del panel de estadísticas. */
@@ -42,6 +43,12 @@ export interface KeyStat {
 	value: string;
 	/** Qué mide; y por qué falta, cuando el valor es `N/A`. */
 	hint?: string;
+	/**
+	 * Reparo que la cifra arrastra y que hay que leer con ella, no al pasar el
+	 * ratón: un Sharpe estimado con pocos meses, un mes incompleto. Se pinta
+	 * bajo el valor.
+	 */
+	note?: string;
 	/** Signo con el que colorear la cifra. `neutral` no la tiñe. */
 	tone?: 'up' | 'down' | 'neutral';
 }
@@ -83,11 +90,23 @@ export const REPORT_DOWNLOADS = [
 /** Valor de una métrica que el historial todavía no da para calcular. */
 export const UNAVAILABLE = 'N/A';
 
-/** Retornos mínimos —y días mínimos— para que una cifra de riesgo signifique algo. */
+/** Tramos mínimos para que una cifra de riesgo mida algo y no ruido. */
 const MIN_RISK_RETURNS = 10;
-const MIN_RISK_DAYS = 21;
 
-/** Días mínimos antes de anualizar: por debajo de un trimestre el factor dispara. */
+/**
+ * Días mínimos antes de anualizar: por debajo de un trimestre el factor dispara.
+ *
+ * Vale para las tres cifras anuales de la tarjeta —rentabilidad anualizada,
+ * volatilidad anualizada y Sharpe—, no solo para la primera. Antes la
+ * rentabilidad se ocultaba a los 55 días de historial mientras la volatilidad y
+ * el Sharpe, que son el mismo número anualizado por otro camino, se publicaban
+ * desde los 21: la tarjeta escondía una cifra y enseñaba dos derivadas suyas.
+ *
+ * Lo que el umbral gobierna es el paso a un año, no la medición. La dispersión
+ * de los tramos se publica en cuanto hay tramos que medir, sin anualizar y
+ * dicho en la etiqueta: converge mucho antes que una media, y esconderla tres
+ * meses era tirar un dato bueno por un factor que sí es prematuro.
+ */
 const MIN_ANNUALIZED_DAYS = 90;
 
 /** Días mínimos para proyectar a cinco años. */
@@ -172,8 +191,10 @@ function formatSpan(from: string, to: string): string {
  * Calendario de rentabilidad por año, del más reciente al más antiguo.
  *
  * Cada mes encadena los retornos de sus tramos, así que un mes sin snapshots no
- * aparece y el primero del historial cubre solo desde el día en que empieza:
- * queda marcado como parcial para que nadie lo compare con un mes entero.
+ * aparece. Los que el historial no cubre enteros —aquel en el que empieza y el
+ * que está en curso— quedan marcados como parciales para que nadie los compare
+ * con un mes completo; son los mismos que `buildKeyStatistics` deja fuera del
+ * mejor y el peor mes.
  */
 export function buildPerformanceCalendars(points: GrowthDataPoint[]): PerformanceCalendar[] {
 	const series = sortedPoints(points);
@@ -187,20 +208,21 @@ export function buildPerformanceCalendars(points: GrowthDataPoint[]): Performanc
 		byYear.get(year)![Number.parseInt(month, 10) - 1] = Number((value * 100).toFixed(2));
 	}
 
-	// El primer mes con retorno es parcial solo si el historial empieza dentro de
-	// él. Si el primer punto cae en el mes anterior —un cierre de enero seguido
-	// de febrero—, febrero está entero y marcarlo sobraría.
-	const firstReturnMonth = returns[0].date.substring(0, 7);
-	const partialKey = series[0].date.substring(0, 7) === firstReturnMonth ? firstReturnMonth : null;
-	const [partialYear, partialMonth] = (partialKey ?? '').split('-');
+	// Un mes sin retorno propio no se marca aunque esté incompleto: el punto que
+	// abre el historial un 31 de enero deja enero vacío, y una celda sin cifra no
+	// tiene nada que advertir.
+	const incomplete = incompleteMonths(series);
 
 	return [...byYear.entries()]
 		.sort(([a], [b]) => b.localeCompare(a))
 		.map(([year, values]) => ({
 			year,
 			values,
-			partialMonth:
-				partialKey !== null && year === partialYear ? Number.parseInt(partialMonth, 10) - 1 : null
+			partialMonths: [...incomplete]
+				.filter((key) => key.startsWith(`${year}-`))
+				.map((key) => Number.parseInt(key.substring(5), 10) - 1)
+				.filter((index) => values[index] !== null)
+				.sort((a, b) => a - b)
 		}));
 }
 
@@ -211,6 +233,20 @@ export function buildPerformanceCalendars(points: GrowthDataPoint[]): Performanc
  * Una métrica que el historial todavía no sostiene sale como `N/A` con la
  * razón en `hint` —antes solo decía `N/A`, y no había forma de saber si
  * faltaban datos o algo estaba roto—.
+ *
+ * Dos convenciones que la tarjeta tiene que dejar dichas, porque las cifras se
+ * contradicen a la vista de quien no las conoce:
+ *
+ *   - La rentabilidad del periodo es ponderada por tiempo: encadena tramos e
+ *     ignora cuándo entró cada aporte. La ganancia sí depende de eso, así que
+ *     un +30 % de periodo puede convivir con un +10 % sobre coste cuando el
+ *     dinero grande entró después de la subida. Ninguna de las dos está mal;
+ *     miden cosas distintas y cada `hint` lo dice.
+ *   - El Sharpe se anualiza por la vía de siempre —media aritmética de los
+ *     tramos × √tramos por año ÷ volatilidad—, que no es la rentabilidad
+ *     compuesta de arriba dividida entre la volatilidad. Multiplicar el Sharpe
+ *     por la volatilidad da una anualizada aritmética, más baja que la
+ *     compuesta; el `hint` avisa para que nadie cuadre una con la otra.
  */
 export function buildKeyStatistics(
 	points: GrowthDataPoint[],
@@ -233,25 +269,46 @@ export function buildKeyStatistics(
 	const gainLoss = amountOr(summary.gainLoss, last.gainLoss);
 	const gainLossPct = amountOr(summary.gainLossPct, last.gainLossPct);
 
-	const hasRisk = returns.length >= MIN_RISK_RETURNS && spanDays >= MIN_RISK_DAYS;
-	const missingRisk = `Necesita al menos ${MIN_RISK_RETURNS} puntos y ${MIN_RISK_DAYS} días de historial; llevas ${returns.length} y ${spanDays}.`;
+	// Un solo umbral de historial para las cifras anuales, y otro —de tramos—
+	// para lo que solo pide dispersión: 90 días de una serie con cuatro puntos no
+	// miden oscilación ninguna, y 60 días de una serie diaria sí.
+	const hasAnnualSpan = spanDays >= MIN_ANNUALIZED_DAYS;
+	const missingDispersion = `Necesita al menos ${MIN_RISK_RETURNS} tramos de historial; llevas ${returns.length}.`;
+	const missingRisk = `Necesita al menos ${MIN_RISK_RETURNS} tramos y ${MIN_ANNUALIZED_DAYS} días de historial; llevas ${returns.length} y ${spanDays}.`;
 
 	const perYear = returns.length > 0 ? periodsPerYear(returns) : 0;
-	const volatility = hasRisk ? stdDev(values) * Math.sqrt(perYear) : null;
+	// La desviación de los tramos es la medida; el √tramos es el que espera al
+	// trimestre. Por debajo se publica la primera, etiquetada como lo que es.
+	const dispersion = returns.length >= MIN_RISK_RETURNS ? stdDev(values) : null;
+	const annualVolatility =
+		dispersion === null || !hasAnnualSpan ? null : dispersion * Math.sqrt(perYear);
+	const volatility = annualVolatility ?? dispersion;
 	const sharpe =
-		hasRisk && volatility && volatility > 0 ? (mean(values) * perYear) / volatility : null;
+		annualVolatility !== null && annualVolatility > 0
+			? (mean(values) * perYear) / annualVolatility
+			: null;
 
 	const annualized =
-		spanDays >= MIN_ANNUALIZED_DAYS && totalReturn > -1
+		hasAnnualSpan && totalReturn > -1
 			? Math.pow(1 + totalReturn, DAYS_PER_YEAR / spanDays) - 1
 			: null;
 
+	// El mejor y el peor mes se buscan solo entre los meses enteros: el primero
+	// del historial y el que está en curso cubren unos pocos días, y un +0,4 %
+	// de tres días entraba como «peor mes» delante de meses completos peores.
+	// Sin ningún mes entero todavía se compara lo que hay, marcado con el mismo
+	// asterisco que usa el calendario.
+	const incomplete = incompleteMonths(series);
 	const monthly = [...returnsByMonth(returns)].sort(([a], [b]) => a.localeCompare(b));
-	const best = monthly.reduce<[string, number] | null>(
+	const whole = monthly.filter(([month]) => !incomplete.has(month));
+	const comparable = whole.length > 0 ? whole : monthly;
+	const onlyPartial = whole.length === 0 && monthly.length > 0;
+
+	const best = comparable.reduce<[string, number] | null>(
 		(top, entry) => (top === null || entry[1] > top[1] ? entry : top),
 		null
 	);
-	const worst = monthly.reduce<[string, number] | null>(
+	const worst = comparable.reduce<[string, number] | null>(
 		(low, entry) => (low === null || entry[1] < low[1] ? entry : low),
 		null
 	);
@@ -260,14 +317,26 @@ export function buildKeyStatistics(
 	const monthLabel = (entry: [string, number] | null) => {
 		if (entry === null) return UNAVAILABLE;
 		const [year, month] = entry[0].split('-');
-		return `${formatSignedPercent(entry[1] * 100)} · ${MONTHS[Number.parseInt(month, 10) - 1]} ${year}`;
+		const label = `${MONTHS[Number.parseInt(month, 10) - 1]} ${year}${onlyPartial ? '*' : ''}`;
+		return `${formatSignedPercent(entry[1] * 100)} · ${label}`;
 	};
+
+	const monthHint = (entry: [string, number] | null, which: string) => {
+		if (entry === null)
+			return 'Ningún mes del historial tiene todavía un tramo con el que calcularlo.';
+
+		return onlyPartial
+			? `El mes que ${which} rindió. * Está incompleto: su cifra cubre unos pocos días y no se compara con un mes entero.`
+			: `El mes que ${which} rindió del historial. Los meses incompletos —aquel en el que empieza y el que está en curso— no compiten.`;
+	};
+
+	const monthNote = onlyPartial ? '* Mes incompleto.' : undefined;
 
 	const performance: KeyStat[] = [
 		{
 			label: 'Rentabilidad del periodo',
 			value: returns.length > 0 ? formatSignedPercent(totalReturn * 100) : UNAVAILABLE,
-			hint: 'Lo que rindió el dinero invertido, encadenando los tramos del historial. Los aportes y retiros no cuentan como rentabilidad.',
+			hint: 'Lo que rindió el dinero invertido, encadenando los tramos del historial. Los aportes y retiros no cuentan como rentabilidad, y tampoco cuenta cuándo entraron: por eso esta cifra no se traduce en la ganancia de abajo.',
 			tone: toneOf(totalReturn * 100)
 		},
 		{
@@ -275,50 +344,63 @@ export function buildKeyStatistics(
 			value: annualized === null ? UNAVAILABLE : formatSignedPercent(annualized * 100),
 			hint:
 				annualized === null
-					? `Se anualiza a partir de ${MIN_ANNUALIZED_DAYS} días de historial; llevas ${spanDays}.`
-					: 'La rentabilidad del periodo llevada a un año. No es una previsión.',
+					? hasAnnualSpan
+						? 'Una pérdida total no se anualiza.'
+						: `Se anualiza a partir de ${MIN_ANNUALIZED_DAYS} días de historial; llevas ${spanDays}. El mismo umbral vale para la volatilidad y el Sharpe.`
+					: 'La rentabilidad del periodo compuesta hasta un año. No es una previsión, y no es la que divide el ratio de Sharpe.',
 			tone: annualized === null ? 'neutral' : toneOf(annualized * 100)
 		},
 		{
 			label: 'Ganancia / pérdida',
 			value: Number.isFinite(gainLoss) ? formatCurrency(gainLoss, currency) : UNAVAILABLE,
-			hint: 'Valor de mercado menos capital invertido, a día de hoy.',
+			hint: 'Valor de mercado menos capital invertido, a día de hoy. Depende de cuándo entró cada aporte, así que no es la rentabilidad del periodo aplicada al saldo.',
 			tone: Number.isFinite(gainLoss) ? toneOf(gainLoss) : 'neutral'
 		},
 		{
 			label: 'Ganancia sobre coste',
 			value: Number.isFinite(gainLossPct) ? formatSignedPercent(gainLossPct) : UNAVAILABLE,
-			hint: 'La ganancia anterior, en porcentaje de lo invertido.',
+			hint: 'La ganancia anterior, en porcentaje de lo invertido. Queda por debajo de la rentabilidad del periodo cuando los aportes grandes entran después de una subida, y por encima cuando entran antes.',
 			tone: Number.isFinite(gainLossPct) ? toneOf(gainLossPct) : 'neutral'
 		},
 		{
 			label: 'Mejor mes',
 			value: monthLabel(best),
-			hint: 'El mes que más rindió del historial.',
+			hint: monthHint(best, 'más'),
+			note: best === null ? undefined : monthNote,
 			tone: best === null ? 'neutral' : toneOf(best[1] * 100)
 		},
 		{
 			label: 'Peor mes',
 			value: monthLabel(worst),
-			hint: 'El mes que menos rindió del historial.',
+			hint: monthHint(worst, 'menos'),
+			note: worst === null ? undefined : monthNote,
 			tone: worst === null ? 'neutral' : toneOf(worst[1] * 100)
 		}
 	];
 
 	const risk: KeyStat[] = [
 		{
-			label: 'Volatilidad anualizada',
+			// La etiqueta cambia con la cifra: una volatilidad de tramo y una anual
+			// se diferencian en un factor de veinte, y llamarlas igual sería peor
+			// que no publicar la primera.
+			label: annualVolatility === null ? 'Volatilidad por tramo' : 'Volatilidad anualizada',
 			value: volatility === null ? UNAVAILABLE : formatPercent(volatility * 100),
 			hint:
 				volatility === null
-					? missingRisk
-					: 'Cuánto oscila la rentabilidad, llevado a un año. Más alta es más movimiento, arriba y abajo.',
+					? missingDispersion
+					: annualVolatility === null
+						? `Cuánto oscila la rentabilidad de un tramo del historial al siguiente, normalmente de un día al otro. Sin llevar a un año: eso pide ${MIN_ANNUALIZED_DAYS} días de historial.`
+						: 'Cuánto oscila la rentabilidad, llevada a un año por la raíz de los tramos. Más alta es más movimiento, arriba y abajo.',
+			note:
+				volatility !== null && annualVolatility === null
+					? `Sin anualizar: se lleva a un año a partir de ${MIN_ANNUALIZED_DAYS} días.`
+					: undefined,
 			tone: 'neutral'
 		},
 		{
 			label: 'Máxima caída',
 			value: returns.length > 0 ? formatPercent(maxDrawdown(values) * 100) : UNAVAILABLE,
-			hint: 'La peor bajada desde un máximo hasta el siguiente suelo. Mide lo que habrías aguantado, no lo que perdiste.',
+			hint: 'La peor bajada desde un máximo hasta el siguiente suelo, medida tramo a tramo: puede caer dentro de un mes que cerró en positivo. Mide lo que habrías aguantado, no lo que perdiste.',
 			tone: 'down'
 		},
 		{
@@ -327,8 +409,15 @@ export function buildKeyStatistics(
 			hint:
 				sharpe === null
 					? missingRisk
-					: 'Rentabilidad por unidad de riesgo, con tasa libre de riesgo 0. Por encima de 1 se considera bueno.',
-			tone: sharpe === null ? 'neutral' : toneOf(sharpe)
+					: 'Rentabilidad por unidad de riesgo, con tasa libre de riesgo 0. Sale de la media aritmética de los tramos anualizada, no de la rentabilidad anualizada de arriba: multiplicarlo por la volatilidad no devuelve aquella cifra.',
+			// En gris siempre: es un cociente estimado, no una ganancia, y pintarlo en
+			// verde lo vendía como un sello de calidad. Con pocos meses el margen de
+			// error se come la diferencia entre un 1 y un 3, y la nota lo dice.
+			note:
+				sharpe === null
+					? undefined
+					: 'Estimación: con pocos meses de historial su margen de error es amplio.',
+			tone: 'neutral'
 		}
 	];
 

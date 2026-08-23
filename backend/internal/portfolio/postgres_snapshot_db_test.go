@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -94,7 +95,7 @@ func backdatedPortfolio(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 	for i, position := range positions {
 		assetID, entryID := uuid.New(), uuid.New()
 		exec(`INSERT INTO assets (id, ticker, name, asset_type, currency)
-		      VALUES ($1, $2, 'probe', 'stock', 'USD')`, assetID, uuid.NewString()[:8])
+		      VALUES ($1, $2, 'probe', 'stock', 'USD')`, assetID, uuid.New().String()[:8])
 		exec(`INSERT INTO portfolio_entries
 		        (id, portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date)
 		      VALUES ($1, $2, $3, $4, 1, $5, 'USD', $6)`,

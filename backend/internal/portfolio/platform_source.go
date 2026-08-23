@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 func (s *Service) CreatePlatform(ctx context.Context, userID uuid.UUID, sourceType SourceType, name, description string) (InvestmentSource, error) {

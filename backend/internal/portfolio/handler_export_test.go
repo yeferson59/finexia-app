@@ -6,11 +6,13 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
+	"uuid"
+
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -140,11 +142,11 @@ func cellFor(t *testing.T, rows [][]string, label string) string {
 	return ""
 }
 
-// riskSeries is a month of daily points with one contribution in the middle:
-// enough history for the risk figures, and a flow to prove they ignore it.
-func riskSeries() []GrowthPoint {
-	points := make([]GrowthPoint, 0, 31)
-	for i := range 31 {
+// riskSeries is n daily points from 2026-01-01 with one contribution on the
+// sixteenth, there to prove the figures ignore it.
+func riskSeries(days int) []GrowthPoint {
+	points := make([]GrowthPoint, 0, days)
+	for i := range days {
 		value := 1000 + i*4
 		flow := "0"
 		if i == 15 {
@@ -174,7 +176,7 @@ func TestHandlerExportRiskMetrics(t *testing.T) {
 	repo := new(fakeRepository{
 		getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, _ string, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
 			gotHasSince = hasSince
-			return riskSeries(), nil
+			return riskSeries(31), nil
 		},
 	})
 	app := newTestModule(t, repo, userID, "user")
@@ -195,16 +197,19 @@ func TestHandlerExportRiskMetrics(t *testing.T) {
 	if got := cellFor(t, metrics, "Puntos de la serie"); got != "31" {
 		t.Errorf("points = %q, want 31", got)
 	}
-	if got := cellFor(t, metrics, "Volatilidad anualizada"); got == "Sin historial suficiente" {
-		t.Error("volatility withheld on a month of daily points")
+	// Thirty days is short of the ninety every yearly figure needs, and both
+	// cells say so rather than leaving a blank that reads as zero. The Sharpe is
+	// annual too: withholding one and printing the other was publishing a number
+	// the file claimed not to have.
+	for _, label := range []string{"Rentabilidad anualizada", "Ratio de Sharpe"} {
+		if got := cellFor(t, metrics, label); got != "Sin historial suficiente" {
+			t.Errorf("%s = %q, want the shortfall spelled out", label, got)
+		}
 	}
-	if got := cellFor(t, metrics, "Ratio de Sharpe"); got == "Sin historial suficiente" {
-		t.Error("sharpe withheld on a month of daily points")
-	}
-	// Thirty days is short of the ninety the annualized figure needs, and the
-	// cell says so rather than leaving a blank that reads as zero.
-	if got := cellFor(t, metrics, "Rentabilidad anualizada"); got != "Sin historial suficiente" {
-		t.Errorf("annualized = %q, want the shortfall spelled out", got)
+	// The dispersion is measurable at thirty days, so it is published under the
+	// name of what it is: the per-subperiod figure, not the annual one.
+	if got := cellFor(t, metrics, "Volatilidad por tramo"); got == "Sin historial suficiente" {
+		t.Error("per-subperiod volatility withheld on a month of daily points")
 	}
 	// The deposit of day 16 doubled the account; the return must not.
 	total, err := strconv.ParseFloat(cellFor(t, metrics, "Rentabilidad del periodo"), 64)
@@ -217,7 +222,12 @@ func TestHandlerExportRiskMetrics(t *testing.T) {
 
 	monthly := sheetRows(t, book, "Rentabilidad mensual")
 	if len(monthly) != 2 || monthly[1][0] != "2026-01" {
-		t.Errorf("monthly sheet = %v, want a header plus January", monthly)
+		t.Fatalf("monthly sheet = %v, want a header plus January", monthly)
+	}
+	// The history opens on the first, so January runs from the 2nd: the column
+	// says the month is not whole instead of leaving it to be compared.
+	if monthly[1][2] != "no" {
+		t.Errorf("January whole = %q, want no: the series starts inside it", monthly[1][2])
 	}
 
 	rows := sheetRows(t, book, "Historial de crecimiento")
@@ -230,6 +240,34 @@ func TestHandlerExportRiskMetrics(t *testing.T) {
 	// The flow column is what makes the metrics auditable from the raw series.
 	if rows[16][5] != "1000" {
 		t.Errorf("net flow on the contribution day = %q, want 1000", rows[16][5])
+	}
+}
+
+func TestHandlerExportRiskMetricsPublishesTheYearlyFiguresTogether(t *testing.T) {
+	repo := new(fakeRepository{
+		getPortfolioGrowthByUserID: func(context.Context, uuid.UUID, string, bool, time.Time) ([]GrowthPoint, error) {
+			return riskSeries(120), nil
+		},
+	})
+	app := newTestModule(t, repo, uuid.New(), "user")
+
+	resp := do(t, app, http.MethodGet, "/portfolios/export/risk")
+	metrics := readSheet(t, resp, "Métricas de riesgo")
+
+	// Past the quarter the three come out at once, by the same rule, and the
+	// volatility row is renamed to the annual figure it now holds.
+	for _, label := range []string{"Rentabilidad anualizada", "Volatilidad anualizada", "Ratio de Sharpe"} {
+		if got := cellFor(t, metrics, label); got == "Sin historial suficiente" {
+			t.Errorf("%s withheld on a hundred and twenty days of history", label)
+		}
+	}
+
+	// And the extremes come from whole months: January opens on the first, so
+	// the series starts inside it and it does not compete.
+	for _, label := range []string{"Mejor mes", "Peor mes"} {
+		if got := cellFor(t, metrics, label); strings.HasPrefix(got, "2026-01") {
+			t.Errorf("%s = %q, want a whole month", label, got)
+		}
 	}
 }
 

@@ -3,7 +3,7 @@ package user
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
 )

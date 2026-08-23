@@ -3,8 +3,9 @@ package httpx
 import (
 	"errors"
 
+	"uuid"
+
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 )
 
 // The authenticated caller travels from the auth middleware to every handler
@@ -47,14 +48,14 @@ func Identity(c fiber.Ctx) (uuid.UUID, string, string, error) {
 
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		return uuid.Nil, "", "", err
+		return uuid.Nil(), "", "", err
 	}
 
 	token, _ := c.Locals(LocalToken).(string)
 	role, _ := c.Locals(LocalRole).(string)
 
 	if token == "" || role == "" {
-		return uuid.Nil, "", "", ErrNoIdentity
+		return uuid.Nil(), "", "", ErrNoIdentity
 	}
 
 	return userID, token, role, nil

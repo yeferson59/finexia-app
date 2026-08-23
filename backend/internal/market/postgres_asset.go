@@ -6,7 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/yeferson59/gofinance/v2/money"
 )

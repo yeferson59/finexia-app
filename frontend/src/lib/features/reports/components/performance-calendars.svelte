@@ -57,7 +57,7 @@
 
 				<div class="calendar-grid">
 					{#each calendar.values as value, index (`${calendar.year}-${MONTHS[index]}`)}
-						{@const partial = value !== null && index === calendar.partialMonth}
+						{@const partial = value !== null && calendar.partialMonths.includes(index)}
 						<div
 							class={`month-cell ${value === null ? 'null-cell' : performanceClass(value)}`}
 							role="img"
@@ -80,8 +80,10 @@
 				</ul>
 
 				<p class="footnote">
-					Rendimiento de lo invertido: los aportes y retiros del mes no cuentan como rentabilidad.{#if calendar.partialMonth !== null}
-						<br />* Mes parcial: el historial empieza dentro de él.{/if}
+					Rendimiento de lo invertido: los aportes y retiros del mes no cuentan como rentabilidad.{#if calendar.partialMonths.length > 0}
+						<br />* Mes parcial: el historial no lo cubre entero, porque empieza dentro de él o
+						porque el mes sigue en curso. No entra en el mejor ni en el peor mes de las
+						estadísticas.{/if}
 				</p>
 			</ReportPanel>
 		{/each}

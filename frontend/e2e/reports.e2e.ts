@@ -27,6 +27,11 @@ test.describe('reports', () => {
 		await expect(calendar2025.getByRole('img', { name: /^Jun: .+, mes parcial$/ })).toBeVisible();
 		await expect(calendar2025.getByRole('img', { name: 'Ene: sin dato' })).toBeVisible();
 
+		// Y el que está en curso también: la serie del fixture se corta el 28 de
+		// julio, así que julio no es comparable con un mes entero tampoco.
+		await expect(calendar2026.getByRole('img', { name: /^Jul: .+, mes parcial$/ })).toBeVisible();
+		await expect(calendar2026.getByRole('img', { name: /^Abr: .+, mes parcial$/ })).toHaveCount(0);
+
 		// Y el pie deja dicho que las cifras son rendimiento, no saldo.
 		await expect(calendar2026.getByText(/no cuentan como rentabilidad/)).toBeVisible();
 	});
@@ -47,6 +52,19 @@ test.describe('reports', () => {
 
 		// Con setenta puntos de historial no queda ninguna métrica sin calcular.
 		await expect(page.getByText('N/A')).toHaveCount(0);
+
+		// El Sharpe se publica en gris y con su reparo al lado: es un cociente
+		// estimado, y en verde se leía como un sello de calidad.
+		const sharpe = page.locator('.stat-tile').filter({ hasText: 'Ratio de Sharpe' });
+		await expect(sharpe.locator('dd')).toHaveClass(/neutral/);
+		await expect(sharpe.getByText(/margen de error/)).toBeVisible();
+
+		// El mejor y el peor mes salen de meses enteros: junio de 2025 abre el
+		// historial y julio de 2026 sigue en curso, así que ninguno compite.
+		for (const label of ['Mejor mes', 'Peor mes']) {
+			const tile = page.locator('.stat-tile').filter({ hasText: label });
+			await expect(tile.locator('dd')).not.toHaveText(/Jun 2025|Jul 2026/);
+		}
 
 		// La rentabilidad del periodo es un porcentaje calculado, no la variación
 		// del saldo: la serie del fixture crece a base de aportes.

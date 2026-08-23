@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
+
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
@@ -355,7 +356,7 @@ func TestCreatePortfolio(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error")
 		}
-		if got.ID != uuid.Nil {
+		if got.ID != uuid.Nil() {
 			t.Errorf("expected zero portfolio, got %+v", got)
 		}
 	})
@@ -441,7 +442,7 @@ func TestCreatePlatform(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error")
 		}
-		if got.ID != uuid.Nil {
+		if got.ID != uuid.Nil() {
 			t.Errorf("expected zero source, got %+v", got)
 		}
 	})
@@ -553,7 +554,7 @@ func TestCreatePortfolioEntry(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error")
 		}
-		if got.ID != uuid.Nil {
+		if got.ID != uuid.Nil() {
 			t.Errorf("expected zero entry, got %+v", got)
 		}
 	})
@@ -783,7 +784,7 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error")
 		}
-		if got.ID != uuid.Nil {
+		if got.ID != uuid.Nil() {
 			t.Errorf("expected zero transaction, got %+v", got)
 		}
 

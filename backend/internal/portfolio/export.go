@@ -216,12 +216,12 @@ func writeRiskMetricsSheet(f *excelize.File, m GrowthMetrics) {
 		{"Días de historial", strconv.Itoa(m.SpanDays), "días", "Días naturales entre esos dos cierres."},
 		{"Puntos de la serie", strconv.Itoa(m.Points), "puntos", "Un cierre diario por punto."},
 		{"Rentabilidad del periodo", pct(m.TotalReturn, true), "%", "Retornos de cada tramo encadenados, con los aportes y retiros descontados (Dietz modificada)."},
-		{"Rentabilidad anualizada", pct(m.Annualized, m.HasAnnualized), "%", "(1 + rentabilidad del periodo) ^ (365,25 / días) − 1. Desde 90 días de historial."},
-		{"Volatilidad anualizada", pct(m.Volatility, m.HasVolatility), "%", "Desviación típica muestral de los retornos × √(tramos por año). Desde 10 tramos y 21 días."},
-		{"Máxima caída", pct(m.MaxDrawdown, true), "%", "Peor bajada desde un máximo del índice de rentabilidad, no del saldo."},
-		{"Ratio de Sharpe", ratio(m.Sharpe, m.HasSharpe), "veces", "Retorno medio ÷ volatilidad, anualizado, con tasa libre de riesgo 0."},
-		{"Mejor mes", monthCell(m.Best, m.HasMonthReturns), "%", "Mes con el retorno encadenado más alto."},
-		{"Peor mes", monthCell(m.Worst, m.HasMonthReturns), "%", "Mes con el retorno encadenado más bajo."},
+		{"Rentabilidad anualizada", pct(m.Annualized, m.HasAnnualized), "%", "(1 + rentabilidad del periodo) ^ (365,25 / días) − 1. Desde 90 días de historial, el mismo umbral que la volatilidad y el Sharpe."},
+		volatilityRow(m),
+		{"Máxima caída", pct(m.MaxDrawdown, true), "%", "Peor bajada desde un máximo del índice de rentabilidad, no del saldo. Se mide tramo a tramo, así que puede caer dentro de un mes que cerró en positivo."},
+		{"Ratio de Sharpe", ratio(m.Sharpe, m.HasSharpe), "veces", "Retorno medio de los tramos ÷ volatilidad, × √(tramos por año), con tasa libre de riesgo 0. No es la rentabilidad anualizada de arriba ÷ volatilidad: aquella es compuesta y sale más alta."},
+		{"Mejor mes", monthCell(m.Best, m.HasMonthReturns), "%", monthNote(m, "más alto")},
+		{"Peor mes", monthCell(m.Worst, m.HasMonthReturns), "%", monthNote(m, "más bajo")},
 		{"Valor actual", m.CurrentValue.RoundBank(2).StringFixed(2), currency, "Valor de mercado de la cuenta en el último cierre."},
 		{"Capital invertido", m.InvestedCost.RoundBank(2).StringFixed(2), currency, "Coste de las posiciones abiertas en el último cierre."},
 		{"Ganancia / pérdida", m.GainLoss.RoundBank(2).StringFixed(2), currency, "Valor de mercado menos capital invertido."},
@@ -237,6 +237,24 @@ func writeRiskMetricsSheet(f *excelize.File, m GrowthMetrics) {
 	}
 }
 
+// volatilityRow names the dispersion figure after what it actually is. Below
+// the ninety days that annualizing asks for, the sheet still publishes it —
+// dispersion converges long before a mean does — but as the per-subperiod
+// figure it is, because the two differ by a factor of twenty on a daily series.
+func volatilityRow(m GrowthMetrics) [4]string {
+	if !m.VolatilityAnnualized {
+		return [4]string{
+			"Volatilidad por tramo", pct(m.Volatility, m.HasVolatility), "%",
+			"Desviación típica muestral de los retornos de cada tramo, sin anualizar: eso pide 90 días de historial. Desde 10 tramos.",
+		}
+	}
+
+	return [4]string{
+		"Volatilidad anualizada", pct(m.Volatility, m.HasVolatility), "%",
+		"Desviación típica muestral de los retornos × √(tramos por año). Desde 10 tramos y 90 días.",
+	}
+}
+
 // ratio renders the Sharpe ratio, which is a multiple and not a percentage.
 func ratio(value decimal.Decimal, available bool) string {
 	if !available {
@@ -247,21 +265,47 @@ func ratio(value decimal.Decimal, available bool) string {
 }
 
 // monthCell renders "2026-03: +1,20" style content as the month and its return.
+// A month the history does not cover whole carries the same asterisk the
+// reports page uses, so the two never disagree on which figure is comparable.
 func monthCell(month MonthReturn, available bool) string {
 	if !available {
 		return riskUnavailableTag
 	}
 
-	return month.Month + " " + month.Rate.Mul(oneHundred).RoundBank(2).StringFixed(2)
+	cell := month.Month + " " + month.Rate.Mul(oneHundred).RoundBank(2).StringFixed(2)
+	if month.Partial {
+		cell += " *"
+	}
+
+	return cell
+}
+
+// monthNote explains what the best and worst month leave out, and warns when
+// the history is so short that the pick had to be a partial month after all.
+func monthNote(m GrowthMetrics, extreme string) string {
+	note := "Mes completo con el retorno encadenado " + extreme + "; los meses parciales —aquel en el que empieza el historial y el que está en curso— no compiten."
+	if m.MonthsPartialOnly {
+		note += " Todavía no hay ningún mes completo: la cifra sale de uno parcial y va marcada con *."
+	}
+
+	return note
 }
 
 func writeRiskMonthlySheet(f *excelize.File, m GrowthMetrics) {
-	writeHeaders(f, riskMonthlySheet, []string{"Mes", "Rentabilidad %"})
+	// The third column is what keeps a reader from comparing three days against
+	// a full month: the rate of a partial month is real, only not comparable.
+	writeHeaders(f, riskMonthlySheet, []string{"Mes", "Rentabilidad %", "Mes completo"})
 
 	for i, month := range MonthlyReturns(m.Subperiod) {
 		row := strconv.Itoa(i + 2)
+		whole := "sí"
+		if month.Partial {
+			whole = "no"
+		}
+
 		_ = f.SetCellValue(riskMonthlySheet, "A"+row, month.Month)
 		_ = f.SetCellValue(riskMonthlySheet, "B"+row, month.Rate.Mul(oneHundred).RoundBank(2).StringFixed(2))
+		_ = f.SetCellValue(riskMonthlySheet, "C"+row, whole)
 	}
 }
 

@@ -33,12 +33,22 @@ var (
 	two         = decimal.MustFromString("2")
 )
 
-// Below these the risk figures are noise: ten subperiods and three weeks is the
-// least that says anything about how much a portfolio swings.
+// Below these the risk figures are noise: ten subperiods is the least that says
+// anything about how much a portfolio swings.
 const (
 	minRiskReturns = 10
-	minRiskDays    = 21
 	// Annualizing a fortnight compounds its noise into an absurd yearly rate.
+	//
+	// It gates every yearly figure, not just the annualized return: the
+	// volatility and the Sharpe ratio are the same short history scaled by
+	// √(periods per year), and publishing those two while withholding the first
+	// was showing two derivatives of a number the report claimed not to have.
+	//
+	// What it gates is the step to a year, not the measuring. Dispersion is
+	// published as soon as there are subperiods to measure — unannualized, and
+	// said so in VolatilityAnnualized — because it converges long before a mean
+	// does and withholding it for a quarter threw away a sound figure over a
+	// factor that is the only premature part.
 	minAnnualizedDays = 90
 )
 
@@ -57,6 +67,11 @@ type SubperiodReturn struct {
 type MonthReturn struct {
 	Month string
 	Rate  decimal.Decimal
+	// Partial marks a month the history does not cover end to end: the one it
+	// starts inside, and the one still running when it stops. Their rate is
+	// real, but a three-day month does not compare with a thirty-one-day one,
+	// so the best and worst month leave them out.
+	Partial bool
 }
 
 // GrowthMetrics is what the risk report publishes. The decimal fields are
@@ -75,14 +90,21 @@ type GrowthMetrics struct {
 	TotalReturn decimal.Decimal
 	MaxDrawdown decimal.Decimal
 
-	Annualized      decimal.Decimal
-	HasAnnualized   bool
-	Volatility      decimal.Decimal
-	HasVolatility   bool
-	Sharpe          decimal.Decimal
-	HasSharpe       bool
-	Best, Worst     MonthReturn
-	HasMonthReturns bool
+	Annualized    decimal.Decimal
+	HasAnnualized bool
+	// Volatility is the dispersion of the subperiod returns, annualized only
+	// when VolatilityAnnualized says so. The two differ by a factor of twenty on
+	// a daily series, so nothing may publish the figure without the flag.
+	Volatility           decimal.Decimal
+	HasVolatility        bool
+	VolatilityAnnualized bool
+	Sharpe               decimal.Decimal
+	HasSharpe            bool
+	Best, Worst          MonthReturn
+	HasMonthReturns      bool
+	// MonthsPartialOnly says the history has no whole month yet, so Best and
+	// Worst fall back to the partial ones and carry their caveat.
+	MonthsPartialOnly bool
 
 	CurrentValue decimal.Decimal
 	InvestedCost decimal.Decimal
@@ -243,7 +265,8 @@ func maxDrawdown(subperiods []SubperiodReturn) decimal.Decimal {
 }
 
 // MonthlyReturns chains every stretch that closes in the same calendar month.
-// The first month of a series covers only from the day the history starts.
+// The first month of a series covers only from the day the history starts, and
+// the last one only up to the day it stops: both come back marked Partial.
 func MonthlyReturns(subperiods []SubperiodReturn) []MonthReturn {
 	if len(subperiods) == 0 {
 		return nil
@@ -262,12 +285,38 @@ func MonthlyReturns(subperiods []SubperiodReturn) []MonthReturn {
 		chained[month] = chained[month].Mul(decimal.One.Add(s.Rate))
 	}
 
+	partial := partialMonths(subperiods)
+
 	months := make([]MonthReturn, 0, len(order))
 	for _, month := range order {
-		months = append(months, MonthReturn{Month: month, Rate: chained[month].Sub(decimal.One)})
+		months = append(months, MonthReturn{
+			Month:   month,
+			Rate:    chained[month].Sub(decimal.One),
+			Partial: partial[month],
+		})
 	}
 
 	return months
+}
+
+// partialMonths is the set of "2006-01" keys the series does not cover whole.
+//
+// The bounds come off the subperiods themselves: the first one opens the day it
+// closes minus the days it spans, and the last one closes on the last day the
+// series has. At most two months qualify — the opening one and, when the series
+// stops before the month is out, the running one.
+func partialMonths(subperiods []SubperiodReturn) map[string]bool {
+	opening := subperiods[0]
+	first := opening.Date.AddDate(0, 0, -opening.Days)
+	last := subperiods[len(subperiods)-1].Date
+
+	partial := map[string]bool{first.Format("2006-01"): true}
+	// A day is the month's last when tomorrow is the first of the next.
+	if last.AddDate(0, 0, 1).Day() != 1 {
+		partial[last.Format("2006-01")] = true
+	}
+
+	return partial
 }
 
 // BuildGrowthMetrics derives every published figure from the series. An empty
@@ -312,10 +361,23 @@ func BuildGrowthMetrics(points []GrowthPoint) GrowthMetrics {
 	metrics.MaxDrawdown = maxDrawdown(metrics.Subperiod)
 
 	if months := MonthlyReturns(metrics.Subperiod); len(months) > 0 {
-		metrics.HasMonthReturns = true
-		metrics.Best, metrics.Worst = months[0], months[0]
+		// Whole months first, and only if there is none does a partial one get to
+		// be the best or the worst — flagged, so the spreadsheet can say so.
+		comparable := make([]MonthReturn, 0, len(months))
+		for _, month := range months {
+			if !month.Partial {
+				comparable = append(comparable, month)
+			}
+		}
 
-		for _, month := range months[1:] {
+		if len(comparable) == 0 {
+			comparable, metrics.MonthsPartialOnly = months, true
+		}
+
+		metrics.HasMonthReturns = true
+		metrics.Best, metrics.Worst = comparable[0], comparable[0]
+
+		for _, month := range comparable[1:] {
 			if month.Rate.Cmp(metrics.Best.Rate) > 0 {
 				metrics.Best = month
 			}
@@ -335,16 +397,25 @@ func BuildGrowthMetrics(points []GrowthPoint) GrowthMetrics {
 		}
 	}
 
-	if len(series) < minRiskReturns || metrics.SpanDays < minRiskDays {
+	if len(series) < minRiskReturns {
 		return metrics
 	}
 
 	perYear := periodsPerYear(metrics.Subperiod)
+	annualizes := metrics.SpanDays >= minAnnualizedDays
 
 	if volatility, err := returns.Volatility(series); err == nil {
-		if annualized, err := returns.AnnualizedVolatility(volatility, perYear); err == nil {
-			metrics.Volatility, metrics.HasVolatility = annualized, true
+		metrics.Volatility, metrics.HasVolatility = volatility, true
+
+		if annualizes {
+			if annualized, err := returns.AnnualizedVolatility(volatility, perYear); err == nil {
+				metrics.Volatility, metrics.VolatilityAnnualized = annualized, true
+			}
 		}
+	}
+
+	if !annualizes {
+		return metrics
 	}
 
 	// Risk-free rate zero: the app knows nothing about the user's currency of

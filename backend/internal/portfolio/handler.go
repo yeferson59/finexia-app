@@ -3,8 +3,9 @@ package portfolio
 import (
 	"strings"
 
+	"uuid"
+
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
@@ -100,7 +101,7 @@ func (h *handler) CreatePortfolio(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid portfolio type", "Portfolio type must be one of the supported values: stocks, etfs, cryptos, bonds, cash, forex, real_estates, commodities, their combinations or diversified")
 	}
 
-	if req.RiskID == uuid.Nil {
+	if req.RiskID == uuid.Nil() {
 		return httpx.BadRequest(c, "Invalid risk", "A valid risk level is required")
 	}
 

@@ -155,11 +155,11 @@ func TestBuildGrowthMetricsWithholdsRiskUntilTheHistoryEarnsIt(t *testing.T) {
 	}
 }
 
-func TestBuildGrowthMetricsPublishesRiskOnceTheHistoryAllows(t *testing.T) {
-	// Thirty daily points: past the ten-subperiod and twenty-one-day floors,
-	// and the alternating step gives the series something to vary by.
-	points := make([]GrowthPoint, 0, 30)
-	for i := range 30 {
+// wobbly is n daily points climbing by three with every other one stepping up,
+// so the series has something to vary by.
+func wobbly(n int) []GrowthPoint {
+	points := make([]GrowthPoint, 0, n)
+	for i := range n {
 		value := 1000 + i*3
 		if i%2 == 1 {
 			value += 12
@@ -167,18 +167,124 @@ func TestBuildGrowthMetricsPublishesRiskOnceTheHistoryAllows(t *testing.T) {
 		points = append(points, day(i, itoa(value), "1000", "0"))
 	}
 
-	m := BuildGrowthMetrics(points)
+	return points
+}
+
+func TestBuildGrowthMetricsPublishesEveryYearlyFigureAtOnce(t *testing.T) {
+	m := BuildGrowthMetrics(wobbly(120))
 
 	if !m.HasVolatility || m.Volatility.Sign() <= 0 {
 		t.Errorf("volatility = %s (has = %v), want a positive figure", m.Volatility.String(), m.HasVolatility)
 	}
-	if !m.HasSharpe {
-		t.Error("sharpe not reported with thirty points")
+	if !m.VolatilityAnnualized {
+		t.Error("volatility left unannualized past the quarter")
 	}
-	// Twenty-nine days is past the risk floors but short of the annualizing
-	// one, and each threshold answers on its own.
+	if !m.HasSharpe {
+		t.Error("sharpe not reported with a hundred and twenty points")
+	}
+	if !m.HasAnnualized {
+		t.Error("annualized not reported with a hundred and twenty days")
+	}
+}
+
+func TestBuildGrowthMetricsWithholdsEveryYearlyFigureUnderTheQuarter(t *testing.T) {
+	// Thirty daily points: subperiods to spare, history nowhere near a quarter.
+	// The Sharpe is the annualized return scaled by another rule, so publishing
+	// it while withholding the first said the report both had and did not have
+	// the number.
+	m := BuildGrowthMetrics(wobbly(30))
+
+	if m.HasSharpe {
+		t.Error("sharpe reported on twenty-nine days of history")
+	}
 	if m.HasAnnualized {
 		t.Error("annualized reported on twenty-nine days of history")
+	}
+	// The dispersion itself is measurable and comes out, only unannualized:
+	// √(periods per year) is the premature part, not the standard deviation.
+	if !m.HasVolatility || m.Volatility.Sign() <= 0 {
+		t.Errorf("volatility = %s (has = %v), want the per-subperiod figure",
+			m.Volatility.String(), m.HasVolatility)
+	}
+	if m.VolatilityAnnualized {
+		t.Error("volatility annualized on twenty-nine days of history")
+	}
+	// And it is the raw deviation, not the annual one under another name: this
+	// series moves by tenths of a point from one day to the next.
+	if m.Volatility.Mul(oneHundred).Cmp(decimalFromInt(5)) >= 0 {
+		t.Errorf("volatility = %s, too high to be the per-subperiod figure", m.Volatility.String())
+	}
+	// What is not annual still comes out: the period and its worst fall.
+	if m.TotalReturn.Sign() <= 0 {
+		t.Errorf("total return = %s, want the period figure regardless", m.TotalReturn.String())
+	}
+}
+
+func TestBuildGrowthMetricsPicksTheExtremesAmongWholeMonthsOnly(t *testing.T) {
+	// June opens on the 28th and gains 20 % in two days; August, whole, gains
+	// 5 %. Two days do not compete with thirty-one.
+	at := func(y int, mo time.Month, d int, value string) GrowthPoint {
+		return GrowthPoint{
+			Date: time.Date(y, mo, d, 0, 0, 0, 0, time.UTC), Currency: "USD",
+			TotalValue: value, TotalCostBase: "1000", GainLoss: "0", GainLossPct: "0", NetFlow: "0",
+		}
+	}
+
+	m := BuildGrowthMetrics([]GrowthPoint{
+		at(2026, time.June, 28, "1000"),
+		at(2026, time.June, 30, "1200"),
+		at(2026, time.July, 31, "1140"),
+		at(2026, time.August, 31, "1197"),
+	})
+
+	if m.Best.Month != "2026-08" || m.Worst.Month != "2026-07" {
+		t.Errorf("best/worst = %s/%s, want 2026-08/2026-07: June is a two-day month",
+			m.Best.Month, m.Worst.Month)
+	}
+	if m.MonthsPartialOnly {
+		t.Error("MonthsPartialOnly set with two whole months on the series")
+	}
+}
+
+func TestBuildGrowthMetricsFallsBackToAPartialMonthAndSaysSo(t *testing.T) {
+	// Ten days inside one month: nothing whole to compare with, so the figure
+	// comes out flagged instead of pretending to be a month.
+	m := BuildGrowthMetrics([]GrowthPoint{
+		day(9, "1000", "1000", "0"),
+		day(19, "1100", "1000", "0"),
+	})
+
+	if !m.MonthsPartialOnly {
+		t.Error("MonthsPartialOnly unset with no whole month on the series")
+	}
+	if !m.Best.Partial || !m.Worst.Partial {
+		t.Errorf("best/worst partial = %v/%v, want both flagged", m.Best.Partial, m.Worst.Partial)
+	}
+}
+
+func TestMonthlyReturnsFlagsTheMonthStillRunning(t *testing.T) {
+	// The series stops on the 12th: August is twelve days old, not thirty-one.
+	at := func(mo time.Month, d int, value string) GrowthPoint {
+		return GrowthPoint{
+			Date: time.Date(2026, mo, d, 0, 0, 0, 0, time.UTC), Currency: "USD",
+			TotalValue: value, TotalCostBase: "1000", GainLoss: "0", GainLossPct: "0", NetFlow: "0",
+		}
+	}
+
+	months := MonthlyReturns(SubperiodReturns([]GrowthPoint{
+		at(time.June, 30, "1000"),
+		at(time.July, 31, "1100"),
+		at(time.August, 12, "1150"),
+	}))
+
+	if len(months) != 2 {
+		t.Fatalf("months = %d, want July and August", len(months))
+	}
+	if months[0].Partial {
+		t.Error("July flagged partial: the series covers it end to end")
+	}
+	if !months[1].Partial {
+		t.Error("August not flagged partial: the series stops on the 12th")
 	}
 }
 

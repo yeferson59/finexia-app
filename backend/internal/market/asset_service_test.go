@@ -10,8 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"uuid"
+
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 )
 
 // The catalog has two creation paths and the difference between them is the

@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
+
 	"github.com/xuri/excelize/v2"
 
 	"github.com/yeferson59/finexia-app/internal/market"
