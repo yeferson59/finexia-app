@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - backend/internal/migrator/**
-      - backend/internal/migrations/**
+      - backend/cmd/migrator/**
+      - backend/cmd/migrations/**
 
   workflow_dispatch:
     inputs:
@@ -57,7 +57,7 @@ jobs:
           fi
 
       - name: Run migrations (${{ github.event.inputs.command || 'up' }})
-        run: go run internal/migrator/main.go ${{ steps.args.outputs.flags }}
+        run: go run cmd/migrator/main.go ${{ steps.args.outputs.flags }}
         working-directory: backend
         env:
           JWT_SECRET: "zXI+y4c59+ccBRqkx1eU2zNN6lIYa2566IZFZJxyhkFIxxGRc12S20rUyJ4qBuW7"
