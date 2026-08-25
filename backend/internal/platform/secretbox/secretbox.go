@@ -83,7 +83,7 @@ func prefixed(prefix string, err error) error { return new(annotated{err: err, p
 type Sealed struct {
 	// KEKVersion identifies which KEK wrapped the DEK, so rotation can retire a
 	// key without rewriting every row at once.
-	KEKVersion int
+	KEKVersion uint8
 	// WrappedDEK is the DEK sealed under the KEK, prefixed by its own nonce.
 	WrappedDEK []byte
 	// Nonce is the payload nonce, used with the DEK.
@@ -95,8 +95,8 @@ type Sealed struct {
 // Keyring holds every KEK the process accepts: the active one for sealing, plus
 // any retired versions still needed to open rows that have not been rewrapped.
 type Keyring struct {
-	keys   map[int][]byte
-	active int
+	keys   map[uint8][]byte
+	active uint8
 }
 
 // NewKeyring parses the KEK material from configuration. keys is a comma
@@ -106,15 +106,10 @@ type Keyring struct {
 // It is deliberately strict — a missing or short KEK is a configuration error
 // that must stop the process at startup, not a condition to paper over with a
 // default, which would silently store secrets under a guessable key.
-func NewKeyring(keys, active string) (*Keyring, error) {
-	keys = strings.TrimSpace(keys)
-	if keys == "" {
-		return nil, ErrNoKeys
-	}
+func NewKeyring(keys []string, active uint8) (*Keyring, error) {
+	parsed := make(map[uint8][]byte, len(keys))
 
-	parsed := make(map[int][]byte, strings.Count(keys, ","))
-
-	for entry := range strings.SplitSeq(keys, ",") {
+	for _, entry := range keys {
 		entry = strings.TrimSpace(entry)
 		if entry == "" {
 			continue
@@ -130,7 +125,7 @@ func NewKeyring(keys, active string) (*Keyring, error) {
 			return nil, detailed(errMalformedKeysEnv, "bad version "+rawVersion)
 		}
 
-		if _, duplicate := parsed[version]; duplicate {
+		if _, duplicate := parsed[uint8(version)]; duplicate {
 			return nil, errors.New("secretbox: KEK version " + rawVersion + " declared twice")
 		}
 
@@ -143,28 +138,23 @@ func NewKeyring(keys, active string) (*Keyring, error) {
 			return nil, detailed(errKeyLen, "version "+rawVersion+" has "+strconv.Itoa(len(key)))
 		}
 
-		parsed[version] = key
+		parsed[uint8(version)] = key
 	}
 
 	if len(parsed) == 0 {
 		return nil, ErrNoKeys
 	}
 
-	activeVersion, err := strconv.Atoi(strings.TrimSpace(active))
-	if err != nil {
-		return nil, errors.New("secretbox: active KEK version " + active + " is not a number")
+	if _, ok := parsed[active]; !ok {
+		return nil, detailed(ErrUnknownKEK, "active version "+strconv.FormatInt(int64(active), 10)+" was not supplied")
 	}
 
-	if _, ok := parsed[activeVersion]; !ok {
-		return nil, detailed(ErrUnknownKEK, "active version "+active+" was not supplied")
-	}
-
-	return new(Keyring{keys: parsed, active: activeVersion}), nil
+	return new(Keyring{keys: parsed, active: active}), nil
 }
 
 // ActiveVersion reports the KEK version new seals are written under. Callers use
 // it to decide which rows still need a Rewrap after a rotation.
-func (k *Keyring) ActiveVersion() int {
+func (k *Keyring) ActiveVersion() uint8 {
 	return k.active
 }
 
@@ -261,10 +251,10 @@ func (k *Keyring) Rewrap(s Sealed) (Sealed, error) {
 // wrapDEK seals a DEK under the KEK of the given version, prefixing the nonce so
 // the result is a single column value. The version goes in as AAD, which is what
 // prevents a stored row from claiming a different (say, retired) KEK version.
-func (k *Keyring) wrapDEK(dek []byte, version int) ([]byte, error) {
+func (k *Keyring) wrapDEK(dek []byte, version uint8) ([]byte, error) {
 	kek, ok := k.keys[version]
 	if !ok {
-		return nil, detailed(ErrUnknownKEK, strconv.Itoa(version))
+		return nil, detailed(ErrUnknownKEK, strconv.Itoa(int(version)))
 	}
 
 	kekAEAD, err := newAEAD(kek)
@@ -281,10 +271,10 @@ func (k *Keyring) wrapDEK(dek []byte, version int) ([]byte, error) {
 }
 
 // unwrapDEK is wrapDEK's inverse; the caller owns the returned DEK and must Zero it.
-func (k *Keyring) unwrapDEK(wrapped []byte, version int) ([]byte, error) {
+func (k *Keyring) unwrapDEK(wrapped []byte, version uint8) ([]byte, error) {
 	kek, ok := k.keys[version]
 	if !ok {
-		return nil, detailed(ErrUnknownKEK, strconv.Itoa(version))
+		return nil, detailed(ErrUnknownKEK, strconv.Itoa(int(version)))
 	}
 
 	kekAEAD, err := newAEAD(kek)
@@ -316,8 +306,8 @@ func AAD(parts ...string) []byte {
 // call that needed them has returned, so they do not linger in reusable memory.
 func Zero(b []byte) { clear(b) }
 
-func dekAAD(version int) []byte {
-	return []byte(dekAADPrefix + strconv.Itoa(version))
+func dekAAD(version uint8) []byte {
+	return []byte(dekAADPrefix + strconv.Itoa(int(version)))
 }
 
 func newAEAD(key []byte) (cipher.AEAD, error) {

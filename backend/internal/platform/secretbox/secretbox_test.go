@@ -26,7 +26,7 @@ func testKey(t *testing.T) string {
 func testKeyring(t *testing.T) *Keyring {
 	t.Helper()
 
-	ring, err := NewKeyring("1:"+testKey(t), "1")
+	ring, err := NewKeyring([]string{"1:" + testKey(t)}, 1)
 	if err != nil {
 		t.Fatalf("NewKeyring: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestOpenRejectsAShortNonce(t *testing.T) {
 // A row must not be openable by claiming a KEK version the process holds but
 // that did not wrap it.
 func TestOpenRejectsAForgedKEKVersion(t *testing.T) {
-	ring, err := NewKeyring("1:"+testKey(t)+",2:"+testKey(t), "1")
+	ring, err := NewKeyring([]string{"1:" + testKey(t), "2:" + testKey(t)}, 1)
 	if err != nil {
 		t.Fatalf("NewKeyring: %v", err)
 	}
@@ -196,11 +196,11 @@ func TestOpenRejectsAnUnknownKEKVersion(t *testing.T) {
 // Rotation: a row sealed under the retired KEK still opens, and Rewrap moves it
 // onto the active one without ever needing the provider key back.
 func TestRewrapMovesARowOntoTheActiveKEK(t *testing.T) {
-	keys := "1:" + testKey(t) + ",2:" + testKey(t)
+	keys := []string{"1:" + testKey(t), "2:" + testKey(t)}
 	aad := AAD("11111111-1111-1111-1111-111111111111", "finnhub")
 	secret := []byte("api-key")
 
-	old, err := NewKeyring(keys, "1")
+	old, err := NewKeyring(keys, 1)
 	if err != nil {
 		t.Fatalf("NewKeyring: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestRewrapMovesARowOntoTheActiveKEK(t *testing.T) {
 		t.Fatalf("Seal: %v", err)
 	}
 
-	rotated, err := NewKeyring(keys, "2")
+	rotated, err := NewKeyring(keys, 2)
 	if err != nil {
 		t.Fatalf("NewKeyring: %v", err)
 	}
@@ -249,10 +249,10 @@ func TestRewrapMovesARowOntoTheActiveKEK(t *testing.T) {
 // keep working and rows that were not are simply unreadable — never silently
 // wrong.
 func TestRotationDropsTheRetiredKEK(t *testing.T) {
-	firstKey, secondKey := testKey(t), testKey(t)
+	firstKey, secondKey := []string{"1:" + testKey(t)}, []string{"2:" + testKey(t)}
 	aad := AAD("11111111-1111-1111-1111-111111111111", "finnhub")
 
-	old, err := NewKeyring("1:"+firstKey, "1")
+	old, err := NewKeyring(firstKey, 1)
 	if err != nil {
 		t.Fatalf("NewKeyring: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestRotationDropsTheRetiredKEK(t *testing.T) {
 		t.Fatalf("Seal: %v", err)
 	}
 
-	only2, err := NewKeyring("2:"+secondKey, "2")
+	only2, err := NewKeyring(secondKey, 2)
 	if err != nil {
 		t.Fatalf("NewKeyring: %v", err)
 	}
@@ -336,16 +336,18 @@ func TestAADPartsAreUnambiguous(t *testing.T) {
 func TestNewKeyringRejectsBadConfiguration(t *testing.T) {
 	valid := testKey(t)
 
-	tests := map[string]struct{ keys, active string }{
-		"empty":               {"", "1"},
-		"only separators":     {" , ", "1"},
-		"no version":          {valid, "1"},
-		"non-numeric version": {"one:" + valid, "1"},
-		"bad base64":          {"1:not-base64!!", "1"},
-		"short key":           {"1:" + base64.StdEncoding.EncodeToString([]byte("too-short")), "1"},
-		"duplicate version":   {"1:" + valid + ",1:" + valid, "1"},
-		"unknown active":      {"1:" + valid, "7"},
-		"non-numeric active":  {"1:" + valid, "latest"},
+	tests := map[string]struct {
+		keys   []string
+		active uint8
+	}{
+		"empty":               {[]string{""}, 1},
+		"only separators":     {[]string{"", ""}, 1},
+		"no version":          {[]string{valid}, 1},
+		"non-numeric version": {[]string{"one:" + valid}, 1},
+		"bad base64":          {[]string{"1:not-base64!!"}, 1},
+		"short key":           {[]string{"1:" + base64.StdEncoding.EncodeToString([]byte("too-short"))}, 1},
+		"duplicate version":   {[]string{"1:" + valid, "1:" + valid}, 1},
+		"unknown active":      {[]string{"1:" + valid}, 7},
 	}
 
 	for name, tc := range tests {
@@ -358,7 +360,7 @@ func TestNewKeyringRejectsBadConfiguration(t *testing.T) {
 }
 
 func TestNewKeyringAcceptsMultipleVersions(t *testing.T) {
-	ring, err := NewKeyring(" 1:"+testKey(t)+" , 2:"+testKey(t)+" ", " 2 ")
+	ring, err := NewKeyring([]string{" 1:" + testKey(t), "2:" + testKey(t) + " "}, 2)
 	if err != nil {
 		t.Fatalf("NewKeyring: %v", err)
 	}

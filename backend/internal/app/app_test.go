@@ -230,7 +230,7 @@ func testKeyring(t *testing.T) *secretbox.Keyring {
 		t.Fatalf("rand: %v", err)
 	}
 
-	ring, err := secretbox.NewKeyring("1:"+base64.StdEncoding.EncodeToString(key), "1")
+	ring, err := secretbox.NewKeyring([]string{"1:" + base64.StdEncoding.EncodeToString(key)}, 1)
 	if err != nil {
 		t.Fatalf("NewKeyring: %v", err)
 	}

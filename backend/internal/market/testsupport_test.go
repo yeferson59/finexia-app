@@ -255,7 +255,7 @@ func testKeyring() *secretbox.Keyring {
 		panic("rand: " + err.Error())
 	}
 
-	ring, err := secretbox.NewKeyring("1:"+base64.StdEncoding.EncodeToString(key), "1")
+	ring, err := secretbox.NewKeyring([]string{"1:" + base64.StdEncoding.EncodeToString(key)}, 1)
 	if err != nil {
 		panic("keyring: " + err.Error())
 	}

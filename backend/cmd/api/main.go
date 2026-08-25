@@ -74,7 +74,7 @@ func run(ctx context.Context, envs *config.EnvConfig, log logger.Logger) error {
 	// without it is deliberate: a default would mean storing those keys under a
 	// guessable key, which is exactly the failure this is meant to prevent.
 	// Generate one with: openssl rand -base64 32
-	keyring, err := secretbox.NewKeyring(envs.MarketKEKKeys[0], envs.MarketKEKActive)
+	keyring, err := secretbox.NewKeyring(envs.MarketKEKKeys, envs.MarketKEKActive)
 	if err != nil {
 		return errors.New("failed to load MARKET_KEK_KEYS: " + err.Error())
 	}
