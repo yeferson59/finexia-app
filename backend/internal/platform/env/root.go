@@ -214,9 +214,9 @@ func setField(f reflect.Value, raw, defaultValue string) error {
 	return nil
 }
 
-func processField(fieldValue reflect.Value, fieldType reflect.Type) error {
-	for i := range fieldValue.NumField() {
-		fieldParams, err := getFieldParams(fieldType.Field(i))
+func processStruct(fieldValue reflect.Value) error {
+	for sf, sv := range fieldValue.Fields() {
+		fieldParams, err := getFieldParams(sf)
 		if err != nil {
 			return err
 		}
@@ -226,10 +226,10 @@ func processField(fieldValue reflect.Value, fieldType reflect.Type) error {
 		}
 
 		if fieldParams.Required && fieldParams.Value == "" {
-			return errors.New("field " + fieldParams.KeyName + " is required must have a value")
+			return errors.New("field " + fieldParams.KeyName + " is required, it must have a value")
 		}
 
-		if err := setField(fieldValue.Field(i), fieldParams.Value, fieldParams.DefaultValue); err != nil {
+		if err := setField(sv, fieldParams.Value, fieldParams.DefaultValue); err != nil {
 			return err
 		}
 	}
@@ -237,18 +237,61 @@ func processField(fieldValue reflect.Value, fieldType reflect.Type) error {
 	return nil
 }
 
-func Parse(v any) error {
+func structValue(v any) (reflect.Value, error) {
 	ptrRef := reflect.ValueOf(v)
 	if ptrRef.Kind() != reflect.Pointer {
-		return errors.New("no pointer")
+		return ptrRef, errors.New("no pointer")
 	}
 
 	s := ptrRef.Elem()
 	if s.Kind() != reflect.Struct {
-		return errors.New("no struct")
+		return s, errors.New("no struct")
 	}
 
-	if err := processField(s, s.Type()); err != nil {
+	return s, nil
+}
+
+func verifyEnvs(s reflect.Value) error {
+	for sf := range s.Type().Fields() {
+		fp, err := getFieldParams(sf)
+		if err != nil {
+			return err
+		}
+
+		if fp.Required && fp.Value == "" && !fp.HasDefaultValue {
+			return errors.New("field " + fp.KeyName + " is required and have a value and no default value")
+		}
+	}
+
+	return nil
+}
+
+func LoadParse(v any) error {
+	s, err := structValue(v)
+	if err != nil {
+		return err
+	}
+
+	if err := verifyEnvs(s); err != nil {
+		if err := Load(); err != nil {
+			return err
+		}
+	}
+
+	if err := processStruct(s); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func Parse(v any) error {
+	s, err := structValue(v)
+	if err != nil {
+		return err
+	}
+
+	if err := processStruct(s); err != nil {
 		return err
 	}
 
