@@ -17,31 +17,6 @@ import (
 	"github.com/yeferson59/finexia-app/internal/market"
 )
 
-// entryCategoryFor maps an asset type (owned by the market module) to the
-// portfolio-side entry category. It lives here because EntryCategory is a
-// portfolio concept; keeping the mapping out of market.AssetType avoids a
-// market → portfolio dependency.
-func entryCategoryFor(a market.AssetType) EntryCategory {
-	switch a {
-	case market.Stock:
-		return Stocks
-	case market.ETF:
-		return ETFs
-	case market.Crypto:
-		return Cryptos
-	case market.Bond:
-		return Bonds
-	case market.Cash:
-		return Cashs
-	case market.RealEstate:
-		return RealEstates
-	case market.Commodity:
-		return Commodities
-	default:
-		return Others
-	}
-}
-
 type SourceType string
 
 const (
@@ -97,6 +72,31 @@ const (
 	Commodities EntryCategory = "commodities"
 	Others      EntryCategory = "others"
 )
+
+// entryCategoryFor maps an asset type (owned by the market module) to the
+// portfolio-side entry category. It lives here because EntryCategory is a
+// portfolio concept; keeping the mapping out of market.AssetType avoids a
+// market → portfolio dependency.
+func entryCategoryFor(a market.AssetType) EntryCategory {
+	switch a {
+	case market.Stock:
+		return Stocks
+	case market.ETF:
+		return ETFs
+	case market.Crypto:
+		return Cryptos
+	case market.Bond:
+		return Bonds
+	case market.Cash:
+		return Cashs
+	case market.RealEstate:
+		return RealEstates
+	case market.Commodity:
+		return Commodities
+	default:
+		return Others
+	}
+}
 
 func (t TransactionType) IsValid() bool {
 	switch t {
