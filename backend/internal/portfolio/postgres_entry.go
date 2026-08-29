@@ -2,15 +2,17 @@ package portfolio
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"uuid"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5"
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/market"
+	"github.com/yeferson59/finexia-app/internal/platform/database"
 )
 
 func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfolioID uuid.UUID) ([]Entry, error) {
@@ -46,18 +48,15 @@ func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfo
 	entries := make([]Entry, 0)
 	for rows.Next() {
 		var entry Entry
-		var quantity string
-		var price string
-		var sourceID pgtype.UUID
 		var assetPriceStr *string
 
 		if err := rows.Scan(
 			&entry.ID,
 			&entry.PortfolioID,
 			&entry.AssetID,
-			&sourceID,
-			&quantity,
-			&price,
+			&entry.SourceID,
+			&entry.Quantity,
+			&entry.Price,
 			&entry.CostCurrency,
 			&entry.EntryDate,
 			&entry.Notes,
@@ -83,12 +82,8 @@ func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfo
 		// join already brought rather than off a column of its own.
 		entry.Category = entryCategoryFor(entry.Asset.AssetType)
 
-		if sourceID.Valid {
-			entry.SourceID = uuid.UUID(sourceID.Bytes)
-		}
-
-		entry.Quantity = decimal.MustFromString(quantity)
-		entry.Price = moneyOf(price, entry.CostCurrency)
+		fmt.Println("price es ", entry.Price)
+		entry.Price.SetCurrency(entry.CostCurrency)
 
 		entries = append(entries, entry)
 	}
@@ -98,9 +93,8 @@ func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfo
 
 func (r *PostgresRepository) GetEntryWithAsset(ctx context.Context, entryID uuid.UUID) (Entry, error) {
 	var entry Entry
-	err := r.db.QueryRow(ctx, `
-		SELECT pe.id, pe.portfolio_id, pe.asset_id,
-		       a.ticker, a.name
+	if err := r.db.QueryRow(ctx, `
+		SELECT pe.id, pe.portfolio_id, pe.asset_id, a.ticker, a.name
 		FROM portfolio_entries pe
 		JOIN assets a ON a.id = pe.asset_id
 		WHERE pe.id = $1
@@ -110,92 +104,84 @@ func (r *PostgresRepository) GetEntryWithAsset(ctx context.Context, entryID uuid
 		&entry.AssetID,
 		&entry.Asset.Ticker,
 		&entry.Asset.Name,
-	)
-	if err != nil {
-		return Entry{}, err
+	); err != nil {
+		return entry, err
 	}
+
 	return entry, nil
 }
 
 func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency string, entryDate time.Time, notes string) (Entry, error) {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return Entry{}, err
-	}
-	defer func() {
-		_ = tx.Rollback(ctx)
-	}()
+	var entry Entry
 
-	var owned bool
-	if err := tx.QueryRow(ctx, `
+	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		var owned bool
+
+		if err := tx.QueryRow(ctx, `
 		SELECT EXISTS (SELECT 1 FROM portfolios WHERE id = $1 AND user_id = $2)
 		   AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM investment_sources WHERE id = $3 AND user_id = $2))
 	`, portfolioID, userID, sourceID).Scan(&owned); err != nil {
-		return Entry{}, err
-	}
+			return err
+		}
 
-	if !owned {
-		return Entry{}, ErrPortfolioOrSourceNotFound
-	}
+		if !owned {
+			return ErrPortfolioOrSourceNotFound
+		}
 
-	var entryID uuid.UUID
-	if err := tx.QueryRow(ctx, `
+		var entryID uuid.UUID
+		if err := tx.QueryRow(ctx, `
 		INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date, notes)
 		VALUES ($1::uuid, $2::uuid, $3::uuid, 0, $4::numeric, $5::char(3), $6::date, $7)
 		ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, ''))
 		DO UPDATE SET updated_at = NOW()
 		RETURNING id
 	`, portfolioID, assetID, sourceID, price.String(), costCurrency, entryDate, notes).Scan(&entryID); err != nil {
-		return Entry{}, err
-	}
+			return err
+		}
 
-	if _, err := tx.Exec(ctx, `
+		if _, err := tx.Exec(ctx, `
 		INSERT INTO transactions (entry_id, type, quantity, price, currency, fees, transaction_date, notes)
 		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), 0, $6::date, $7)
 	`, entryID, txnType, quantity.String(), price.String(), costCurrency, entryDate, notes); err != nil {
-		return Entry{}, err
-	}
+			return err
+		}
 
-	// Read the position back with the values the trigger just recomputed.
-	var entry Entry
-	var quantityValue, priceValue string
-	var assetType market.AssetType
-	var sourceIDResult pgtype.UUID
-	if err := tx.QueryRow(ctx, `
-		SELECT pe.id, pe.portfolio_id, pe.asset_id, pe.source_id, pe.quantity, pe.price, pe.cost_currency,
-		       a.asset_type, pe.entry_date, COALESCE(pe.notes, ''), pe.created_at, pe.updated_at
+		// Read the position back with the values the trigger just recomputed.
+		var assetType market.AssetType
+		if err := tx.QueryRow(ctx, `
+		SELECT pe.id, pe.portfolio_id, pe.asset_id, pe.source_id, pe.quantity, pe.price, pe.cost_currency, a.asset_type, pe.entry_date, COALESCE(pe.notes, ''), pe.created_at, pe.updated_at
 		FROM portfolio_entries pe
 		JOIN assets a ON a.id = pe.asset_id
 		WHERE pe.id = $1
 	`, entryID).Scan(
-		&entry.ID,
-		&entry.PortfolioID,
-		&entry.AssetID,
-		&sourceIDResult,
-		&quantityValue,
-		&priceValue,
-		&entry.CostCurrency,
-		&assetType,
-		&entry.EntryDate,
-		&entry.Notes,
-		&entry.CreatedAt,
-		&entry.UpdatedAt,
-	); err != nil {
-		return Entry{}, err
+			&entry.ID,
+			&entry.PortfolioID,
+			&entry.AssetID,
+			&entry.SourceID,
+			&entry.Quantity,
+			&entry.Price,
+			&entry.CostCurrency,
+			&assetType,
+			&entry.EntryDate,
+			&entry.Notes,
+			&entry.CreatedAt,
+			&entry.UpdatedAt,
+		); err != nil {
+			return err
+		}
+
+		entry.Category = entryCategoryFor(assetType)
+		price, err := entry.Price.SetCurrency(entry.CostCurrency)
+		if err != nil {
+			return err
+		}
+
+		entry.Price = price
+
+		return nil
+	}); err != nil {
+		return entry, err
 	}
-
-	entry.Category = entryCategoryFor(assetType)
-
-	if err := tx.Commit(ctx); err != nil {
-		return Entry{}, err
-	}
-
-	if sourceIDResult.Valid {
-		entry.SourceID = uuid.UUID(sourceIDResult.Bytes)
-	}
-
-	entry.Quantity = decimal.MustFromString(quantityValue)
-	entry.Price = moneyOf(priceValue, entry.CostCurrency)
 
 	return entry, nil
 }
