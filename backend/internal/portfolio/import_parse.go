@@ -215,14 +215,14 @@ func normalizeCurrency(raw string) (string, bool) {
 	// as the currency. Checking each against the ISO table finds the real code
 	// and rejects a cell that holds none.
 	for _, code := range currencyCodeRe.FindAllString(s, -1) {
-		cur, err := money.CurrencyFromISOCode(code)
+		cur, err := money.GetCurrencyFromISOCode(code)
 		if err != nil {
 			continue
 		}
 		// Round-trip through the table so the stored code is the canonical
 		// spelling rather than whatever the cell happened to contain.
 		if iso, err := cur.GetCurrencyISOCode(); err == nil {
-			return iso, true
+			return string(iso[:]), true
 		}
 	}
 	return "", false

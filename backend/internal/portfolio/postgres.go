@@ -23,7 +23,7 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 // the currency columns existed — fall back to USD, which is what every amount
 // was tagged with unconditionally before.
 func currencyOf(code string) money.Currency {
-	cur, err := money.CurrencyFromISOCode(code)
+	cur, err := money.GetCurrencyFromISOCode(code)
 	if err != nil {
 		return money.USD
 	}
@@ -47,8 +47,12 @@ func retagCurrency(m *money.Money, code string) {
 	if m == nil {
 		return
 	}
+	newMoney, err := m.SetCurrency(currencyOf(code))
+	if err != nil {
+		newMoney, _ = m.SetCurrency(money.USD)
+	}
 
-	*m = money.FromDecimal(m.ToDecimal(), currencyOf(code))
+	*m = newMoney
 }
 
 // scanAssetCurrentPrice populates asset.CurrentPrice from a nullable numeric string
@@ -58,7 +62,7 @@ func scanAssetCurrentPrice(asset *market.Asset, priceStr *string) {
 	if priceStr == nil {
 		return
 	}
-	cur, err := money.CurrencyFromISOCode(asset.Currency)
+	cur, err := money.GetCurrencyFromISOCode(asset.Currency)
 	if err != nil {
 		return
 	}
@@ -66,5 +70,6 @@ func scanAssetCurrentPrice(asset *market.Asset, priceStr *string) {
 	if err != nil {
 		return
 	}
-	asset.CurrentPrice = new(m)
+
+	*asset.CurrentPrice = m
 }

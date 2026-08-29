@@ -28,7 +28,7 @@ func pricedEntry(ticker string, source PriceSource, price string, fetchedAt *tim
 		AssetID:      uuid.New(),
 		Quantity:     decimal.MustFromString("2"),
 		Price:        money.MustMoneyFromString("100", money.USD),
-		CostCurrency: "USD",
+		CostCurrency: money.USD,
 		PriceSource:  source,
 		Asset: market.Asset{
 			Ticker:         ticker,

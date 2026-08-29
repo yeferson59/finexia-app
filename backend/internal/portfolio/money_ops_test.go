@@ -40,8 +40,8 @@ func TestCurrencyOf(t *testing.T) {
 
 func TestMoneyOfCarriesTheRowCurrency(t *testing.T) {
 	m := moneyOf("1234.50", "COP")
-	if m.Currency() != money.COP {
-		t.Errorf("currency = %v, want COP", m.Currency())
+	if m.GetCurrency() != money.COP {
+		t.Errorf("currency = %v, want COP", m.GetCurrency())
 	}
 	if m.String() != "1234.5" {
 		t.Errorf("value = %q, want 1234.5", m.String())
@@ -56,14 +56,14 @@ func TestRetagCurrency(t *testing.T) {
 		if err := m.Scan("2500.75"); err != nil {
 			t.Fatalf("Scan: %v", err)
 		}
-		if m.Currency() == money.COP {
+		if m.GetCurrency() == money.COP {
 			t.Fatal("precondition: Scan should not have set COP")
 		}
 
 		retagCurrency(&m, "COP")
 
-		if m.Currency() != money.COP {
-			t.Errorf("currency = %v, want COP", m.Currency())
+		if m.GetCurrency() != money.COP {
+			t.Errorf("currency = %v, want COP", m.GetCurrency())
 		}
 		if m.String() != "2500.75" {
 			t.Errorf("value = %q, want 2500.75 unchanged", m.String())

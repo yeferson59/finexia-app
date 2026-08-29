@@ -20,13 +20,13 @@ import (
 
 // foreignEntry builds the shape GetEntriesByPortfolioID returns for a position
 // bought in costCurrency and quoted in the asset's own currency.
-func foreignEntry(qty, price, costCurrency, marketPrice, assetCurrency string) Entry {
+func foreignEntry(qty, marketPrice, assetCurrency string, price money.Money) Entry {
 	entry := Entry{
 		ID:           uuid.New(),
 		AssetID:      uuid.New(),
 		Quantity:     decimal.MustFromString(qty),
-		Price:        moneyOf(price, costCurrency),
-		CostCurrency: costCurrency,
+		Price:        price,
+		CostCurrency: price.GetCurrency(),
 		PriceSource:  PriceSourceOwn,
 		Asset: market.Asset{
 			Ticker:   "MC.FR",
@@ -51,7 +51,7 @@ func TestValueEntriesInBase(t *testing.T) {
 		}), newMemStorage())
 
 		got := svc.valueEntriesInBase(context.Background(), userID, "USD",
-			[]Entry{foreignEntry("2", "100", "EUR", "110", "EUR")})
+			[]Entry{foreignEntry("2", "100", "EUR", money.MustMoneyFromString("110", money.EUR))})
 
 		if !got[0].FXConverted {
 			t.Fatal("fxConverted = false, want true")
@@ -78,7 +78,7 @@ func TestValueEntriesInBase(t *testing.T) {
 		}), newMemStorage())
 
 		got := svc.valueEntriesInBase(context.Background(), userID, "USD",
-			[]Entry{foreignEntry("3", "50", "USD", "40", "EUR")})
+			[]Entry{foreignEntry("3", "50", "USD", money.MustMoneyFromString("40", money.EUR))})
 
 		if !got[0].FXConverted {
 			t.Fatal("fxConverted = false, want true")
@@ -106,7 +106,7 @@ func TestValueEntriesInBase(t *testing.T) {
 		}), newMemStorage())
 
 		got := svc.valueEntriesInBase(context.Background(), userID, "USD",
-			[]Entry{foreignEntry("2", "100", "EUR", "110", "EUR")})
+			[]Entry{foreignEntry("2", "100", "EUR", money.MustMoneyFromString("110", money.EUR))})
 
 		if got[0].FXConverted {
 			t.Error("fxConverted = true, want false when no rate connects the pair")
@@ -116,7 +116,7 @@ func TestValueEntriesInBase(t *testing.T) {
 		if cost := got[0].CostBasisBase.String(); cost != "200" {
 			t.Errorf("costBasisBase = %s, want the native 200", cost)
 		}
-		if cur := got[0].MarketValueBase.Currency(); cur != money.EUR {
+		if cur := got[0].MarketValueBase.GetCurrency(); cur != money.EUR {
 			t.Errorf("marketValueBase currency = %s, want EUR", cur)
 		}
 	})
@@ -127,7 +127,7 @@ func TestValueEntriesInBase(t *testing.T) {
 		svc := newTestServices(new(fakeRepository{}), newMemStorage())
 
 		got := svc.valueEntriesInBase(context.Background(), userID, "USD",
-			[]Entry{foreignEntry("2", "100", "USD", "110", "USD")})
+			[]Entry{foreignEntry("2", "100", "USD", money.MustMoneyFromString("110", money.USD))})
 
 		if !got[0].FXConverted {
 			t.Error("fxConverted = false, want true for a position already in base")
@@ -145,7 +145,7 @@ func TestValueEntriesInBase(t *testing.T) {
 		}), newMemStorage())
 
 		got := svc.valueEntriesInBase(context.Background(), userID, "USD",
-			[]Entry{foreignEntry("2", "100", "EUR", "", "EUR")})
+			[]Entry{foreignEntry("2", "100", "EUR", money.MustMoneyFromString("", money.EUR))})
 
 		if cost, value := got[0].CostBasisBase.String(), got[0].MarketValueBase.String(); cost != value || cost != "220" {
 			t.Errorf("totals = (%s, %s), want both 220", cost, value)
@@ -163,7 +163,7 @@ func TestGetPortfolioConvertsHoldingsToBaseCurrency(t *testing.T) {
 			return Portfolio{ID: portfolioID, BaseCurrency: "USD"}, nil
 		},
 		getEntriesByPortfolioID: func(context.Context, uuid.UUID) ([]Entry, error) {
-			return []Entry{foreignEntry("2", "100", "EUR", "110", "EUR")}, nil
+			return []Entry{foreignEntry("2", "100", "EUR", money.MustMoneyFromString("110", money.EUR))}, nil
 		},
 		getUserExchangeRateByPair: eurToUSD(t, "1.10"),
 	})

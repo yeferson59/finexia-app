@@ -21,7 +21,7 @@ import (
 // a malformed input.
 func mustUSD(t *testing.T, s string) money.Money {
 	t.Helper()
-	cur, err := money.CurrencyFromISOCode("USD")
+	cur, err := money.GetCurrencyFromISOCode("USD")
 	if err != nil {
 		t.Fatalf("CurrencyFromISOCode: %v", err)
 	}

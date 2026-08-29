@@ -248,7 +248,7 @@ type Entry struct {
 	SourceID     uuid.UUID       `json:"sourceId"`
 	Quantity     decimal.Decimal `json:"quantity"`
 	Price        money.Money     `json:"price"`
-	CostCurrency string          `json:"costCurrency"`
+	CostCurrency money.Currency  `json:"costCurrency"`
 	// Category is the class of the asset this entry holds, derived from
 	// Asset.AssetType on the way out. It used to be a column of its own,
 	// stamped at insert and never updated, which is how a reclassified asset

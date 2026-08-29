@@ -219,7 +219,7 @@ func applyChange(now, before decimal.Decimal, has *bool, value, pct, color *stri
 		*color = lossColor
 	}
 
-	roi, err := returns.ROI(money.FromDecimal(before, digestUnit), money.FromDecimal(now, digestUnit))
+	roi, err := returns.ROI(money.NewFromDecimal(before, digestUnit), money.NewFromDecimal(now, digestUnit))
 	if err != nil {
 		return
 	}
@@ -279,8 +279,8 @@ func fixed(d decimal.Decimal) string {
 // with — so the pair is handed to ROI in a single unit. The ratio is the same
 // whatever unit both ends share; only the sum above mixes them.
 func overallReturn(totalValue, totalGain decimal.Decimal) decimal.Decimal {
-	costBase := money.FromDecimal(totalValue.Sub(totalGain), digestUnit)
-	current := money.FromDecimal(totalValue, digestUnit)
+	costBase := money.NewFromDecimal(totalValue.Sub(totalGain), digestUnit)
+	current := money.NewFromDecimal(totalValue, digestUnit)
 
 	// ROI refuses a non-positive cost base, which is what stops a user whose
 	// holdings net out to nothing from dividing by zero.

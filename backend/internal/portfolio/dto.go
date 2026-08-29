@@ -398,7 +398,7 @@ func NewPortfolioDetailResponse(p Portfolio) PortfolioDetailResponseDTO {
 			Quantity:        entry.Quantity.String(),
 			Price:           entry.Price.String(),
 			MarketPrice:     marketPrice,
-			CostCurrency:    entry.CostCurrency,
+			CostCurrency:    entry.CostCurrency.String(),
 			Category:        string(entry.Category),
 			EntryDate:       entry.EntryDate,
 			Notes:           entry.Notes,

@@ -85,7 +85,7 @@ type CatalogView struct {
 // It is exported because the portfolio importer writes assets through the same
 // path and needs the same answer.
 func NormalizeCurrencyCode(raw string) (string, bool) {
-	cur, err := money.CurrencyFromISOCode(raw)
+	cur, err := money.GetCurrencyFromISOCode(raw)
 	if err != nil {
 		return "", false
 	}
@@ -95,7 +95,7 @@ func NormalizeCurrencyCode(raw string) (string, bool) {
 		return "", false
 	}
 
-	return code, true
+	return string(code[:]), true
 }
 
 // scanAssetCurrentPrice attaches the current price (stored as a string) to an
@@ -105,7 +105,7 @@ func scanAssetCurrentPrice(asset *Asset, priceStr *string) {
 		return
 	}
 
-	cur, err := money.CurrencyFromISOCode(asset.Currency)
+	cur, err := money.GetCurrencyFromISOCode(asset.Currency)
 	if err != nil {
 		return
 	}

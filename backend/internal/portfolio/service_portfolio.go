@@ -95,11 +95,11 @@ func (s *Service) convertSummaryTotals(ctx context.Context, userID uuid.UUID, su
 	// Both ends go through gofinance's ISO 4217 table rather than being carried
 	// as bare strings: money.Convert is what does the arithmetic below, and it
 	// needs the target currency to know how many minor units to round to.
-	from, err := money.CurrencyFromISOCode(summary.BaseCurrency)
+	from, err := money.GetCurrencyFromISOCode(summary.BaseCurrency)
 	if err != nil {
 		return unconvertedSummary(summary), nil
 	}
-	to, err := money.CurrencyFromISOCode(targetCurrency)
+	to, err := money.GetCurrencyFromISOCode(targetCurrency)
 	if err != nil {
 		// The target is the caller's own input, validated at the handler; an
 		// unknown one here is a bad request, not a portfolio the app can't price.
@@ -292,7 +292,7 @@ func buildGrowthSummary(points []GrowthPoint) GrowthSummary {
 func growthAmount(raw string) money.Money {
 	amount, err := money.NewMoneyFromString(raw, growthUnit)
 	if err != nil {
-		return money.FromDecimal(decimal.Zero, growthUnit)
+		return money.NewFromDecimal(decimal.Zero, growthUnit)
 	}
 
 	return amount

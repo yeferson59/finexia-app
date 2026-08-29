@@ -265,7 +265,7 @@ func buildImportRow(
 		if txnType == Buy || txnType == Sell {
 			errs = append(errs, "el precio está vacío")
 		} else {
-			entity.Price = money.FromDecimal(decimal.Zero, unit)
+			entity.Price = money.NewFromDecimal(decimal.Zero, unit)
 			dto.Price = "0"
 		}
 	} else if price, err := parseDecimal(priceRaw); err != nil {
@@ -273,13 +273,13 @@ func buildImportRow(
 	} else if price.IsNeg() {
 		errs = append(errs, fmt.Sprintf("el precio no puede ser negativo: %q", priceRaw))
 	} else {
-		entity.Price = money.FromDecimal(price, unit)
+		entity.Price = money.NewFromDecimal(price, unit)
 		dto.Price = price.String()
 	}
 
 	// Fees (optional).
 	feesRaw := spreadsheet.CellAt(row, mapping.Fees)
-	entity.Fees = money.FromDecimal(decimal.Zero, unit)
+	entity.Fees = money.NewFromDecimal(decimal.Zero, unit)
 	dto.Fees = "0"
 	if feesRaw != "" {
 		if fees, err := parseDecimal(feesRaw); err != nil {
@@ -287,7 +287,7 @@ func buildImportRow(
 		} else if fees.IsNeg() {
 			errs = append(errs, fmt.Sprintf("la comisión no puede ser negativa: %q", feesRaw))
 		} else {
-			entity.Fees = money.FromDecimal(fees, unit)
+			entity.Fees = money.NewFromDecimal(fees, unit)
 			dto.Fees = fees.String()
 		}
 	}

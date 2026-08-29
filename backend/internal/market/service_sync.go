@@ -124,7 +124,7 @@ func (s *Service) syncOneAsset(ctx context.Context, userID, assetID uuid.UUID, c
 		return UserAssetPrice{}, errAssetTypeUnsupported
 	}
 
-	cur, err := money.CurrencyFromISOCode(asset.Currency)
+	cur, err := money.GetCurrencyFromISOCode(asset.Currency)
 	if err != nil {
 		return UserAssetPrice{}, fmt.Errorf("unknown currency %q for %q: %w", asset.Currency, asset.Ticker, err)
 	}

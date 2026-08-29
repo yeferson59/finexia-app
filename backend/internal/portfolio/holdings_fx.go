@@ -34,7 +34,7 @@ import (
 // page. Such an entry keeps its native totals and is marked FXConverted=false,
 // which is the client's cue to show the amounts unconverted and say so.
 func (s *Service) valueEntriesInBase(ctx context.Context, userID uuid.UUID, baseCurrency string, entries []Entry) []Entry {
-	base, err := money.CurrencyFromISOCode(baseCurrency)
+	base, err := money.GetCurrencyFromISOCode(baseCurrency)
 	if err != nil {
 		// A portfolio whose base currency is not ISO 4217 has nothing to convert
 		// into. Report the native totals rather than none at all.
@@ -108,16 +108,16 @@ func entryTotals(entry Entry) (cost, marketValue money.Money) {
 // got there. On a missing or unusable rate the amount is returned untouched, in
 // its own currency.
 func convertTotal(amount money.Money, base money.Currency, rateFor func(string) (decimal.Decimal, bool)) (money.Money, bool) {
-	if amount.Currency() == base {
+	if amount.GetCurrency() == base {
 		return amount, true
 	}
 
-	from, err := amount.Currency().GetCurrencyISOCode()
+	from, err := amount.GetCurrency().GetCurrencyISOCode()
 	if err != nil {
 		return amount, false
 	}
 
-	rate, ok := rateFor(from)
+	rate, ok := rateFor(string(from[:]))
 	if !ok {
 		return amount, false
 	}
