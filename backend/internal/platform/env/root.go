@@ -136,6 +136,29 @@ func processDuration(value, defaultValue string) (time.Duration, error) {
 	return convertDuration(value)
 }
 
+func processFloat(value, defaultValue string, bitSize int) (float64, error) {
+	if value == "" {
+		f, err := strconv.ParseFloat(defaultValue, bitSize)
+		if err != nil {
+			return 0, err
+		}
+
+		return f, nil
+	}
+
+	f, err := strconv.ParseFloat(value, bitSize)
+	if err != nil {
+		f, err := strconv.ParseFloat(defaultValue, bitSize)
+		if err != nil {
+			return 0, err
+		}
+
+		return f, nil
+	}
+
+	return f, nil
+}
+
 func processInt(value, defaultValue string, bitSize int) (int64, error) {
 	if value == "" {
 		dv, err := strconv.ParseInt(defaultValue, 10, bitSize)
@@ -149,6 +172,29 @@ func processInt(value, defaultValue string, bitSize int) (int64, error) {
 	int64Value, err := strconv.ParseInt(value, 10, bitSize)
 	if err != nil {
 		dv, err := strconv.ParseInt(defaultValue, 10, bitSize)
+		if err != nil {
+			return 0, err
+		}
+
+		return dv, nil
+	}
+
+	return int64Value, nil
+}
+
+func processUint(value, defaultValue string, bitSize int) (uint64, error) {
+	if value == "" {
+		dv, err := strconv.ParseUint(defaultValue, 10, bitSize)
+		if err != nil {
+			return 0, err
+		}
+
+		return dv, nil
+	}
+
+	int64Value, err := strconv.ParseUint(value, 10, bitSize)
+	if err != nil {
+		dv, err := strconv.ParseUint(defaultValue, 10, bitSize)
 		if err != nil {
 			return 0, err
 		}
@@ -193,6 +239,13 @@ func setField(f reflect.Value, raw, defaultValue string) error {
 		}
 
 		f.SetInt(n)
+	case reflect.TypeFor[uint8](), reflect.TypeFor[uint16](), reflect.TypeFor[uint32](), reflect.TypeFor[uint64](), reflect.TypeFor[uint]():
+		n, err := processUint(raw, defaultValue, f.Type().Bits())
+		if err != nil {
+			return err
+		}
+
+		f.SetUint(n)
 	case reflect.TypeFor[bool]():
 		b, err := processBool(raw, defaultValue)
 		if err != nil {
@@ -209,6 +262,13 @@ func setField(f reflect.Value, raw, defaultValue string) error {
 		f.SetInt(int64(d))
 	case reflect.TypeFor[[]string]():
 		f.Set(reflect.ValueOf(processSliceString(raw, defaultValue)))
+	case reflect.TypeFor[float32](), reflect.TypeFor[float64]():
+		n, err := processFloat(raw, defaultValue, f.Type().Bits())
+		if err != nil {
+			return err
+		}
+
+		f.SetFloat(n)
 	}
 
 	return nil
