@@ -29,8 +29,8 @@ type UserAssetPrice struct {
 
 // UserExchangeRate is the same idea for a currency pair.
 type UserExchangeRate struct {
-	FromCurrency string          `json:"fromCurrency"`
-	ToCurrency   string          `json:"toCurrency"`
+	FromCurrency money.Currency  `json:"fromCurrency"`
+	ToCurrency   money.Currency  `json:"toCurrency"`
 	Rate         decimal.Decimal `json:"rate"`
 	Source       ProviderID      `json:"source"`
 	FetchedAt    time.Time       `json:"fetchedAt"`
@@ -114,22 +114,24 @@ func (s *Service) syncOneAsset(ctx context.Context, userID, assetID uuid.UUID, c
 		if !ok {
 			return UserAssetPrice{}, fmt.Errorf("cannot parse crypto ticker %q", asset.Ticker)
 		}
-		result, err := chain.FetchExchangeRate(ctx, base, quote)
+
+		var from, to money.Currency
+
+		from.Scan(base)
+		to.Scan(quote)
+
+		result, err := chain.FetchExchangeRate(ctx, from, to)
 		if err != nil {
 			return UserAssetPrice{}, fmt.Errorf("fetch exchange rate %q: %w", asset.Ticker, err)
 		}
+
 		priceStr, source = result.Rate, result.Source
 
 	default:
 		return UserAssetPrice{}, errAssetTypeUnsupported
 	}
 
-	cur, err := money.GetCurrencyFromISOCode(asset.Currency)
-	if err != nil {
-		return UserAssetPrice{}, fmt.Errorf("unknown currency %q for %q: %w", asset.Currency, asset.Ticker, err)
-	}
-
-	price, err := money.NewMoneyFromString(priceStr, cur)
+	price, err := money.NewMoneyFromString(priceStr, asset.Currency)
 	if err != nil {
 		return UserAssetPrice{}, fmt.Errorf("parse price for %q: %w", asset.Ticker, err)
 	}
@@ -177,7 +179,7 @@ func (s *Service) SyncRatesForUser(ctx context.Context, userID uuid.UUID, pairs 
 
 		result, err := chain.FetchExchangeRate(ctx, pair.From, pair.To)
 		if err != nil {
-			log.Error(ctx, "fetch rate failed", logger.Err(err), logger.Str("from", pair.From), logger.Str("to", pair.To))
+			log.Error(ctx, "fetch rate failed", logger.Err(err), logger.Str("from", pair.From.String()), logger.Str("to", pair.To.String()))
 			errs = append(errs, err)
 			s.recordProviderVerdict(ctx, userID, err)
 

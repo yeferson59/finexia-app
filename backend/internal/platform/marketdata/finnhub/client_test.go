@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -94,7 +95,7 @@ func TestFetchExchangeRate(t *testing.T) {
 			return jsonResponse(`{"base":"EUR","quote":{"USD":1.085,"GBP":0.85}}`), nil
 		})
 
-		res, err := c.FetchExchangeRate(context.Background(), "EUR", "USD")
+		res, err := c.FetchExchangeRate(context.Background(), money.EUR, money.USD)
 		if err != nil {
 			t.Fatalf("FetchExchangeRate: %v", err)
 		}
@@ -112,7 +113,7 @@ func TestFetchExchangeRate(t *testing.T) {
 			return jsonResponse(`{"base":"BTC","quote":{"GBP":0.85}}`), nil
 		})
 
-		if _, err := c.FetchExchangeRate(context.Background(), "BTC", "USD"); err == nil {
+		if _, err := c.FetchExchangeRate(context.Background(), money.Currency(255), money.USD); err == nil {
 			t.Fatal("expected error for missing target currency")
 		}
 	})

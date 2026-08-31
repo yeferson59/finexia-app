@@ -2,19 +2,22 @@
 // DTOs, entities, persistence, services and HTTP handlers for both.
 package market
 
-import "github.com/yeferson59/gofinance/v2/decimal"
+import (
+	"github.com/yeferson59/gofinance/v2/decimal"
+	"github.com/yeferson59/gofinance/v2/money"
+)
 
 type CreateAssetRequestDTO struct {
-	Ticker    string `json:"ticker"    validate:"required"`
-	Name      string `json:"name"      validate:"required"`
-	AssetType string `json:"assetType" validate:"required"`
-	Exchange  string `json:"exchange"`
-	Currency  string `json:"currency"  validate:"required"`
+	Ticker    string         `json:"ticker"    validate:"required"`
+	Name      string         `json:"name"      validate:"required"`
+	AssetType string         `json:"assetType" validate:"required"`
+	Exchange  string         `json:"exchange"`
+	Currency  money.Currency `json:"currency"  validate:"required"`
 }
 
 type CreateExchangeRateRequestDTO struct {
-	FromCurrency string          `json:"fromCurrency" validate:"required"`
-	ToCurrency   string          `json:"toCurrency"   validate:"required"`
+	FromCurrency money.Currency  `json:"fromCurrency" validate:"required"`
+	ToCurrency   money.Currency  `json:"toCurrency"   validate:"required"`
 	Rate         decimal.Decimal `json:"rate"         validate:"required"`
 }
 

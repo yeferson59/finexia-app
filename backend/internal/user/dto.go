@@ -1,5 +1,7 @@
 package user
 
+import "github.com/yeferson59/gofinance/v2/money"
+
 type CreateDTO struct {
 	Name  string `json:"name" validate:"required,min=2"`
 	Email string `json:"email" validate:"required,email,min=2"`
@@ -12,9 +14,9 @@ type UpdateDTO struct {
 }
 
 type UpdateProfileDTO struct {
-	Name              string `json:"name,omitzero"`
-	PreferredCurrency string `json:"preferredCurrency,omitzero"`
-	Image             string `json:"image,omitzero"`
+	Name              string         `json:"name,omitzero"`
+	PreferredCurrency money.Currency `json:"preferredCurrency,omitzero"`
+	Image             string         `json:"image,omitzero"`
 }
 
 type UpdatePreferencesDTO struct {

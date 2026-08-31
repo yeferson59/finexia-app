@@ -25,9 +25,9 @@ func (s *Service) SyncPortfolioSnapshots(ctx context.Context) (int, []error) {
 			row.PortfolioID,
 			today,
 			row.TotalMarketValue,
-			row.BaseCurrency,
 			row.TotalGainLoss,
 			row.TotalGainLossPct,
+			row.BaseCurrency,
 		); err != nil {
 			log.Error(ctx, "upsert snapshot failed", logger.Err(err), logger.Str("portfolioId", row.PortfolioID.String()))
 

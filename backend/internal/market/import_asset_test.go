@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 func TestImportAssetsFromFile(t *testing.T) {
@@ -16,7 +18,7 @@ func TestImportAssetsFromFile(t *testing.T) {
 
 		var upserted []string
 		repo := new(fakeRepository{
-			upsertAsset: func(_ context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error) {
+			upsertAsset: func(_ context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error) {
 				upserted = append(upserted, ticker)
 				return Asset{Ticker: ticker, Name: name, AssetType: assetType, Exchange: exchange, Currency: currency}, nil
 			},
@@ -57,7 +59,7 @@ func TestImportAssetsFromFile(t *testing.T) {
 	t.Run("repository failures are reported per row without stopping the import", func(t *testing.T) {
 		csv := "ticker,name,assetType,currency\nAAPL,Apple Inc.,stock,USD\n"
 		repo := new(fakeRepository{
-			upsertAsset: func(context.Context, string, string, AssetType, string, string) (Asset, error) {
+			upsertAsset: func(context.Context, string, string, AssetType, string, money.Currency) (Asset, error) {
 				return Asset{}, errors.New("db write failed")
 			},
 		})

@@ -32,7 +32,7 @@ func pricedEntry(ticker string, source PriceSource, price string, fetchedAt *tim
 		PriceSource:  source,
 		Asset: market.Asset{
 			Ticker:         ticker,
-			Currency:       "USD",
+			Currency:       money.USD,
 			PriceUpdatedAt: fetchedAt,
 		},
 	}
@@ -49,7 +49,7 @@ func TestPortfolioDetailReportsPriceProvenance(t *testing.T) {
 	p := Portfolio{
 		ID:           uuid.New(),
 		Name:         "Main",
-		BaseCurrency: "USD",
+		BaseCurrency: money.USD,
 		Entries: []Entry{
 			pricedEntry("AAPL", PriceSourceOwn, "190.55", new(fetched)),
 			pricedEntry("MSFT", PriceSourceManual, "410.00", new(fetched)),
@@ -98,7 +98,7 @@ func TestSummaryCountsSurviveCurrencyConversion(t *testing.T) {
 		getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]SummaryView, error) {
 			return []SummaryView{{
 				ID:                    uuid.New(),
-				BaseCurrency:          "USD",
+				BaseCurrency:          money.USD,
 				TotalPositions:        10,
 				TotalCostBase:         "1000",
 				TotalMarketValue:      "1200",
@@ -110,8 +110,8 @@ func TestSummaryCountsSurviveCurrencyConversion(t *testing.T) {
 				PositionsUnconverted:  2,
 			}}, nil
 		},
-		getUserExchangeRateByPair: func(_ context.Context, _ uuid.UUID, from, to string) (decimal.Decimal, error) {
-			if from == "USD" && to == "COP" {
+		getUserExchangeRateByPair: func(_ context.Context, _ uuid.UUID, from, to money.Currency) (decimal.Decimal, error) {
+			if from == money.USD && to == money.COP {
 				return rate(t, "4000"), nil
 			}
 
@@ -120,7 +120,7 @@ func TestSummaryCountsSurviveCurrencyConversion(t *testing.T) {
 	})
 
 	got, err := newTestServices(repo, newMemStorage()).
-		GetPortfoliosSummaryInCurrency(context.Background(), userID, "COP")
+		GetPortfoliosSummaryInCurrency(context.Background(), userID, money.COP)
 	if err != nil {
 		t.Fatalf("GetPortfoliosSummaryInCurrency: %v", err)
 	}

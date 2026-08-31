@@ -169,28 +169,28 @@ func TestGetPortfoliosSummaryInCurrency(t *testing.T) {
 	userID := uuid.New()
 
 	usd := SummaryView{
-		BaseCurrency: "USD", TotalMarketValue: "1000", TotalCostBase: "900",
+		BaseCurrency: money.USD, TotalMarketValue: "1000", TotalCostBase: "900",
 		TotalGainLoss: "100", TotalGainLossPct: "11.11",
 	}
 
 	t.Run("same currency skips conversion but still sets DisplayCurrency", func(t *testing.T) {
 		// The empty rate table would fail any lookup; asserting on the recorded
 		// lookups is what proves none was attempted in the first place.
-		got := convertSummary(t, userID, usd, "USD", summaryRates{})
+		got := convertSummary(t, userID, usd, money.USD, summaryRates{})
 
 		if len(got.lookups) != 0 {
 			t.Errorf("rate lookups = %v, want none when currencies match", got.lookups)
 		}
 		s := got.first(t)
-		if s.DisplayCurrency != "USD" || s.TotalMarketValue != "1000" {
+		if s.DisplayCurrency != money.USD || s.TotalMarketValue != "1000" {
 			t.Errorf("summary = %+v", s)
 		}
 	})
 
 	t.Run("converts totals with the direct rate and leaves the percentage untouched", func(t *testing.T) {
-		s := convertSummary(t, userID, usd, "COP", summaryRates{"USD/COP": "4000"}).first(t)
+		s := convertSummary(t, userID, usd, money.COP, summaryRates{"USD/COP": "4000"}).first(t)
 
-		if s.DisplayCurrency != "COP" {
+		if s.DisplayCurrency != money.COP {
 			t.Errorf("DisplayCurrency = %s, want COP", s.DisplayCurrency)
 		}
 		if s.TotalMarketValue != "4000000" || s.TotalCostBase != "3600000" || s.TotalGainLoss != "400000" {
@@ -203,11 +203,11 @@ func TestGetPortfoliosSummaryInCurrency(t *testing.T) {
 
 	t.Run("falls back to the inverse rate when only the opposite pair is synced", func(t *testing.T) {
 		cop := SummaryView{
-			BaseCurrency: "COP", TotalMarketValue: "4000000", TotalCostBase: "0",
+			BaseCurrency: money.COP, TotalMarketValue: "4000000", TotalCostBase: "0",
 			TotalGainLoss: "0", TotalGainLossPct: "0",
 		}
 
-		s := convertSummary(t, userID, cop, "USD", summaryRates{"USD/COP": "4000"}).first(t)
+		s := convertSummary(t, userID, cop, money.USD, summaryRates{"USD/COP": "4000"}).first(t)
 
 		if s.TotalMarketValue != "1000" {
 			t.Errorf("TotalMarketValue = %s, want 1000", s.TotalMarketValue)
@@ -218,14 +218,14 @@ func TestGetPortfoliosSummaryInCurrency(t *testing.T) {
 	// asks for a display currency on every load, so a single portfolio in a
 	// currency nothing quotes would otherwise blank out all the others.
 	t.Run("leaves a portfolio in its own currency when no rate connects the pair", func(t *testing.T) {
-		eur := SummaryView{BaseCurrency: "EUR", TotalMarketValue: "100", TotalCostBase: "80", TotalGainLoss: "20"}
+		eur := SummaryView{BaseCurrency: money.EUR, TotalMarketValue: "100", TotalCostBase: "80", TotalGainLoss: "20"}
 
-		s := convertSummary(t, userID, eur, "COP", summaryRates{}).first(t)
+		s := convertSummary(t, userID, eur, money.COP, summaryRates{}).first(t)
 
 		if s.FXConverted {
 			t.Error("FXConverted = true, want false when the rate is missing")
 		}
-		if s.DisplayCurrency != "EUR" {
+		if s.DisplayCurrency != money.EUR {
 			t.Errorf("DisplayCurrency = %s, want the untouched base EUR", s.DisplayCurrency)
 		}
 		if s.TotalMarketValue != "100" || s.TotalCostBase != "80" || s.TotalGainLoss != "20" {
@@ -234,7 +234,7 @@ func TestGetPortfoliosSummaryInCurrency(t *testing.T) {
 	})
 
 	t.Run("marks a successful conversion as converted", func(t *testing.T) {
-		s := convertSummary(t, userID, usd, "COP", summaryRates{"USD/COP": "4000"}).first(t)
+		s := convertSummary(t, userID, usd, money.COP, summaryRates{"USD/COP": "4000"}).first(t)
 
 		if !s.FXConverted {
 			t.Error("FXConverted = false, want true after converting")
@@ -314,11 +314,11 @@ func TestCreatePortfolio(t *testing.T) {
 
 	t.Run("passes all fields to the repository", func(t *testing.T) {
 		repo := new(fakeRepository{
-			createPortfolio: func(_ context.Context, uid uuid.UUID, name, description, baseCurrency string, rid uuid.UUID, typePortfolio Type, priceValue money.Money, isDefault bool) (Portfolio, error) {
+			createPortfolio: func(_ context.Context, uid uuid.UUID, name, description string, baseCurrency money.Currency, rid uuid.UUID, typePortfolio Type, priceValue money.Money, isDefault bool) (Portfolio, error) {
 				if uid != userID || rid != riskID {
 					t.Errorf("ids = %s/%s, want %s/%s", uid, rid, userID, riskID)
 				}
-				if name != "Retirement" || description != "long term" || baseCurrency != "USD" {
+				if name != "Retirement" || description != "long term" || baseCurrency != money.USD {
 					t.Errorf("fields = %q/%q/%q", name, description, baseCurrency)
 				}
 				if typePortfolio != TypeDiversified {
@@ -335,7 +335,7 @@ func TestCreatePortfolio(t *testing.T) {
 		})
 		svc := newTestServices(repo, newMemStorage())
 
-		got, err := svc.CreatePortfolio(context.Background(), userID, "Retirement", "long term", "USD", riskID, TypeDiversified, price, true)
+		got, err := svc.CreatePortfolio(context.Background(), userID, "Retirement", "long term", money.USD, riskID, TypeDiversified, price, true)
 		if err != nil {
 			t.Fatalf("CreatePortfolio: %v", err)
 		}
@@ -346,13 +346,13 @@ func TestCreatePortfolio(t *testing.T) {
 
 	t.Run("repository error returns zero portfolio", func(t *testing.T) {
 		repo := new(fakeRepository{
-			createPortfolio: func(context.Context, uuid.UUID, string, string, string, uuid.UUID, Type, money.Money, bool) (Portfolio, error) {
+			createPortfolio: func(context.Context, uuid.UUID, string, string, money.Currency, uuid.UUID, Type, money.Money, bool) (Portfolio, error) {
 				return Portfolio{}, errors.New("duplicate name")
 			},
 		})
 		svc := newTestServices(repo, newMemStorage())
 
-		got, err := svc.CreatePortfolio(context.Background(), userID, "X", "", "USD", riskID, TypeStocks, price, false)
+		got, err := svc.CreatePortfolio(context.Background(), userID, "X", "", money.USD, riskID, TypeStocks, price, false)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -453,8 +453,8 @@ func TestPlatformLifecycle(t *testing.T) {
 
 	t.Run("GetPlatforms returns stats", func(t *testing.T) {
 		repo := new(fakeRepository{
-			getPlatformsWithStats: func(_ context.Context, _ uuid.UUID, displayCurrency string) ([]PlatformStats, error) {
-				if displayCurrency != "COP" {
+			getPlatformsWithStats: func(_ context.Context, _ uuid.UUID, displayCurrency money.Currency) ([]PlatformStats, error) {
+				if displayCurrency != money.COP {
 					t.Errorf("displayCurrency = %q, want COP", displayCurrency)
 				}
 				return []PlatformStats{{
@@ -465,7 +465,7 @@ func TestPlatformLifecycle(t *testing.T) {
 		})
 		svc := newTestServices(repo, newMemStorage())
 
-		got, err := svc.GetPlatforms(context.Background(), userID, "COP")
+		got, err := svc.GetPlatforms(context.Background(), userID, money.COP)
 		if err != nil {
 			t.Fatalf("GetPlatforms: %v", err)
 		}
@@ -518,7 +518,7 @@ func TestCreatePortfolioEntry(t *testing.T) {
 
 	t.Run("forwards all fields", func(t *testing.T) {
 		repo := new(fakeRepository{
-			createPortfolioEntry: func(_ context.Context, uid, pid, aid, sid uuid.UUID, txnType TransactionType, quantity decimal.Decimal, p money.Money, costCurrency string, ed time.Time, notes string) (Entry, error) {
+			createPortfolioEntry: func(_ context.Context, uid, pid, aid, sid uuid.UUID, txnType TransactionType, quantity decimal.Decimal, p money.Money, costCurrency money.Currency, ed time.Time, notes string) (Entry, error) {
 				if uid != userID || pid != portfolioID || aid != assetID || sid != sourceID {
 					t.Error("IDs not forwarded correctly")
 				}
@@ -533,7 +533,7 @@ func TestCreatePortfolioEntry(t *testing.T) {
 		})
 		svc := newTestServices(repo, newMemStorage())
 
-		got, err := svc.CreatePortfolioEntry(context.Background(), userID, portfolioID, assetID, sourceID, Buy, qty, price, "USD", entryDate, "first buy")
+		got, err := svc.CreatePortfolioEntry(context.Background(), userID, portfolioID, assetID, sourceID, Buy, qty, price, money.USD, entryDate, "first buy")
 		if err != nil {
 			t.Fatalf("CreatePortfolioEntry: %v", err)
 		}
@@ -544,13 +544,13 @@ func TestCreatePortfolioEntry(t *testing.T) {
 
 	t.Run("repository error returns zero entry", func(t *testing.T) {
 		repo := new(fakeRepository{
-			createPortfolioEntry: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, TransactionType, decimal.Decimal, money.Money, string, time.Time, string) (Entry, error) {
+			createPortfolioEntry: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, TransactionType, decimal.Decimal, money.Money, money.Currency, time.Time, string) (Entry, error) {
 				return Entry{}, errors.New("asset not found")
 			},
 		})
 		svc := newTestServices(repo, newMemStorage())
 
-		got, err := svc.CreatePortfolioEntry(context.Background(), userID, portfolioID, assetID, sourceID, Buy, qty, price, "USD", entryDate, "")
+		got, err := svc.CreatePortfolioEntry(context.Background(), userID, portfolioID, assetID, sourceID, Buy, qty, price, money.USD, entryDate, "")
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -599,14 +599,14 @@ func TestTransactionQueries(t *testing.T) {
 
 	t.Run("GetAssetAllocation", func(t *testing.T) {
 		repo := new(fakeRepository{
-			getAssetAllocationByUserID: func(context.Context, uuid.UUID, string) ([]AllocationItem, error) {
-				return []AllocationItem{{Category: Stocks, MarketValue: "750.00"}}, nil
+			getAssetAllocationByUserID: func(context.Context, uuid.UUID, money.Currency) ([]AllocationItem, error) {
+				return []AllocationItem{{Category: market.Stock, MarketValue: "750.00"}}, nil
 			},
 		})
 		svc := newTestServices(repo, newMemStorage())
 
-		got, err := svc.GetAssetAllocation(context.Background(), userID, "")
-		if err != nil || len(got) != 1 || got[0].Category != Stocks {
+		got, err := svc.GetAssetAllocation(context.Background(), userID, money.COP)
+		if err != nil || len(got) != 1 || got[0].Category != market.Stock {
 			t.Fatalf("GetAssetAllocation = %+v, %v", got, err)
 		}
 	})
@@ -650,7 +650,7 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 
 	newTxnRepo := func() *fakeRepository {
 		return new(fakeRepository{
-			createTransaction: func(_ context.Context, uid, eid uuid.UUID, txnType TransactionType, quantity decimal.Decimal, p money.Money, currency string, f money.Money, transactionDate time.Time, notes string) (Transaction, error) {
+			createTransaction: func(_ context.Context, uid, eid uuid.UUID, txnType TransactionType, quantity decimal.Decimal, p money.Money, currency money.Currency, f money.Money, transactionDate time.Time, notes string) (Transaction, error) {
 				return Transaction{
 					ID: uuid.New(), EntryID: eid, Type: txnType,
 					Quantity: quantity, Price: p, Currency: currency,
@@ -676,7 +676,7 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 		svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
 		svc.cfg.FrontendURL = "https://app.finexia.me"
 
-		txn, err := svc.CreateTransaction(context.Background(), userID, entryID, Buy, qty, price, "USD", fees, date, "note")
+		txn, err := svc.CreateTransaction(context.Background(), userID, entryID, Buy, qty, price, money.USD, fees, date, "note")
 		if err != nil {
 			t.Fatalf("CreateTransaction: %v", err)
 		}
@@ -724,7 +724,7 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 		mailer := new(fakeMailer{})
 		svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
 
-		if _, err := svc.CreateTransaction(context.Background(), userID, entryID, Buy, qty, price, "USD", fees, date, ""); err != nil {
+		if _, err := svc.CreateTransaction(context.Background(), userID, entryID, Buy, qty, price, money.USD, fees, date, ""); err != nil {
 			t.Fatalf("CreateTransaction: %v", err)
 		}
 
@@ -753,7 +753,7 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 		mailer := new(fakeMailer{})
 		svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
 
-		if _, err := svc.CreateTransaction(context.Background(), userID, entryID, Buy, qty, price, "USD", fees, date, ""); err != nil {
+		if _, err := svc.CreateTransaction(context.Background(), userID, entryID, Buy, qty, price, money.USD, fees, date, ""); err != nil {
 			t.Fatalf("CreateTransaction: %v", err)
 		}
 
@@ -773,14 +773,14 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 
 	t.Run("repository error is returned and no alert goes out", func(t *testing.T) {
 		repo := new(fakeRepository{
-			createTransaction: func(context.Context, uuid.UUID, uuid.UUID, TransactionType, decimal.Decimal, money.Money, string, money.Money, time.Time, string) (Transaction, error) {
+			createTransaction: func(context.Context, uuid.UUID, uuid.UUID, TransactionType, decimal.Decimal, money.Money, money.Currency, money.Money, time.Time, string) (Transaction, error) {
 				return Transaction{}, errors.New("entry not found")
 			},
 		})
 		mailer := new(fakeMailer{})
 		svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
 
-		got, err := svc.CreateTransaction(context.Background(), userID, entryID, Buy, qty, price, "USD", fees, date, "")
+		got, err := svc.CreateTransaction(context.Background(), userID, entryID, Buy, qty, price, money.USD, fees, date, "")
 		if err == nil {
 			t.Fatal("expected error")
 		}

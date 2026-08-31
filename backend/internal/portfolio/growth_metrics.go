@@ -6,6 +6,7 @@ import (
 
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/finance/returns"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // Risk and rentability metrics over a growth series.
@@ -80,7 +81,7 @@ type MonthReturn struct {
 // Available reports which of the three risk figures the history sustains, so a
 // reader can tell "not enough data yet" from "zero".
 type GrowthMetrics struct {
-	Currency  string
+	Currency  money.Currency
 	FirstDate time.Time
 	LastDate  time.Time
 	SpanDays  int

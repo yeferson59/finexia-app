@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"uuid"
+
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type Role struct {
@@ -20,20 +22,20 @@ type Role struct {
 }
 
 type User struct {
-	ID                uuid.UUID  `json:"id"`
-	Name              string     `json:"name"`
-	Email             string     `json:"email"`
-	EmailVerified     bool       `json:"emailVerified"`
-	Image             string     `json:"image"`
-	RoleID            uuid.UUID  `json:"-"`
-	PreferredCurrency string     `json:"preferredCurrency"`
-	CreatedAt         time.Time  `json:"createdAt"`
-	UpdatedAt         time.Time  `json:"updatedAt"`
-	DeletedAt         *time.Time `json:"-"`
-	BannedAt          *time.Time `json:"bannedAt,omitempty"`
-	Role              Role       `json:"role,omitzero"`
-	Sessions          []Session  `json:"sessions,omitempty"`
-	Accounts          []Account  `json:"accounts,omitempty"`
+	ID                uuid.UUID      `json:"id"`
+	Name              string         `json:"name"`
+	Email             string         `json:"email"`
+	EmailVerified     bool           `json:"emailVerified"`
+	Image             string         `json:"image"`
+	RoleID            uuid.UUID      `json:"-"`
+	PreferredCurrency money.Currency `json:"preferredCurrency"`
+	CreatedAt         time.Time      `json:"createdAt"`
+	UpdatedAt         time.Time      `json:"updatedAt"`
+	DeletedAt         *time.Time     `json:"-"`
+	BannedAt          *time.Time     `json:"bannedAt,omitempty"`
+	Role              Role           `json:"role,omitzero"`
+	Sessions          []Session      `json:"sessions,omitempty"`
+	Accounts          []Account      `json:"accounts,omitempty"`
 }
 
 type Session struct {

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // roundTripFunc lets a test stub the HTTP transport, capturing the outgoing
@@ -83,7 +85,8 @@ func TestFetchExchangeRate(t *testing.T) {
 			return jsonResponse(`{"Realtime Currency Exchange Rate":{"5. Exchange Rate":"1.0850"}}`), nil
 		})
 
-		res, err := c.FetchExchangeRate(context.Background(), "EUR", "USD")
+		res, err := c.FetchExchangeRate(context.Background(), money.EUR, money.USD)
+
 		if err != nil {
 			t.Fatalf("FetchExchangeRate: %v", err)
 		}
@@ -105,7 +108,7 @@ func TestFetchExchangeRate(t *testing.T) {
 			return jsonResponse(`{"Realtime Currency Exchange Rate":{"5. Exchange Rate":""}}`), nil
 		})
 
-		if _, err := c.FetchExchangeRate(context.Background(), "EUR", "USD"); err == nil {
+		if _, err := c.FetchExchangeRate(context.Background(), money.EUR, money.USD); err == nil {
 			t.Fatal("expected error for missing rate")
 		}
 	})

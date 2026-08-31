@@ -11,6 +11,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/portfolio"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // fakeUserReader stubs the users the weekly summary iterates over.
@@ -70,8 +71,8 @@ func TestSendWeeklySummaryEmails(t *testing.T) {
 	t.Run("aggregates portfolios and emails each subscriber", func(t *testing.T) {
 		u := identity.User{ID: uuid.New(), Name: "Ada", Email: "ada@example.com"}
 		summaries := []portfolio.SummaryView{
-			{Name: "Growth", Type: portfolio.TypeStocks, BaseCurrency: "USD", TotalMarketValue: "600.00", TotalGainLoss: "100.00", TotalGainLossPct: "20.00"},
-			{Name: "Crypto", Type: portfolio.TypeCryptos, BaseCurrency: "USD", TotalMarketValue: "500.00", TotalGainLoss: "-50.00", TotalGainLossPct: "-9.09"},
+			{Name: "Growth", Type: portfolio.TypeStocks, BaseCurrency: money.USD, TotalMarketValue: "600.00", TotalGainLoss: "100.00", TotalGainLossPct: "20.00"},
+			{Name: "Crypto", Type: portfolio.TypeCryptos, BaseCurrency: money.USD, TotalMarketValue: "500.00", TotalGainLoss: "-50.00", TotalGainLossPct: "-9.09"},
 		}
 		users := new(fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
 			return []identity.User{u}, nil
@@ -134,7 +135,7 @@ func TestSendWeeklySummaryEmails(t *testing.T) {
 		}})
 		ports := new(fakePortfolioReader{getSummary: func(context.Context, uuid.UUID) ([]portfolio.SummaryView, error) {
 			return []portfolio.SummaryView{
-				{Name: "Down", BaseCurrency: "USD", TotalMarketValue: "900.00", TotalGainLoss: "-100.00", TotalGainLossPct: "-10.00"},
+				{Name: "Down", BaseCurrency: money.USD, TotalMarketValue: "900.00", TotalGainLoss: "-100.00", TotalGainLossPct: "-10.00"},
 			}, nil
 		}})
 		mailer := new(fakeMailer{})
@@ -183,7 +184,7 @@ func TestSendWeeklySummaryEmails(t *testing.T) {
 			if uid == badUser.ID {
 				return nil, errors.New("summary view broken")
 			}
-			return []portfolio.SummaryView{{Name: "P", BaseCurrency: "USD", TotalMarketValue: "10.00", TotalGainLoss: "1.00", TotalGainLossPct: "11.11"}}, nil
+			return []portfolio.SummaryView{{Name: "P", BaseCurrency: money.USD, TotalMarketValue: "10.00", TotalGainLoss: "1.00", TotalGainLossPct: "11.11"}}, nil
 		}})
 		mailer := new(fakeMailer{})
 		svc := newTestService(users, ports, mailer)
@@ -202,7 +203,7 @@ func TestSendWeeklySummaryEmails(t *testing.T) {
 			return []identity.User{{ID: uuid.New(), Email: "x@example.com"}}, nil
 		}})
 		ports := new(fakePortfolioReader{getSummary: func(context.Context, uuid.UUID) ([]portfolio.SummaryView, error) {
-			return []portfolio.SummaryView{{Name: "P", BaseCurrency: "USD", TotalMarketValue: "10.00", TotalGainLoss: "0.00", TotalGainLossPct: "0.00"}}, nil
+			return []portfolio.SummaryView{{Name: "P", BaseCurrency: money.USD, TotalMarketValue: "10.00", TotalGainLoss: "0.00", TotalGainLossPct: "0.00"}}, nil
 		}})
 		mailer := new(fakeMailer{weeklyErr: errors.New("smtp down")})
 		svc := newTestService(users, ports, mailer)
@@ -253,7 +254,7 @@ func TestWeeklySummaryArithmetic(t *testing.T) {
 		summaries := make([]portfolio.SummaryView, 0, 100)
 		for range 100 {
 			summaries = append(summaries, portfolio.SummaryView{
-				Name: "P", BaseCurrency: "USD",
+				Name: "P", BaseCurrency: money.USD,
 				TotalMarketValue: "0.07", TotalGainLoss: "0.00", TotalGainLossPct: "0.00",
 			})
 		}
@@ -268,7 +269,7 @@ func TestWeeklySummaryArithmetic(t *testing.T) {
 		// Value equals gain, so the cost base is zero: returns.ROI refuses it
 		// rather than dividing by it.
 		data := send(t, []portfolio.SummaryView{{
-			Name: "P", BaseCurrency: "USD",
+			Name: "P", BaseCurrency: money.USD,
 			TotalMarketValue: "500.00", TotalGainLoss: "500.00", TotalGainLossPct: "0.00",
 		}})
 		if data.TotalGainLossPct != "0.00" {
@@ -278,7 +279,7 @@ func TestWeeklySummaryArithmetic(t *testing.T) {
 
 	t.Run("a total wiped out to zero reports no return", func(t *testing.T) {
 		data := send(t, []portfolio.SummaryView{{
-			Name: "P", BaseCurrency: "USD",
+			Name: "P", BaseCurrency: money.USD,
 			TotalMarketValue: "0", TotalGainLoss: "0", TotalGainLossPct: "0",
 		}})
 		if data.TotalGainLossPct != "0.00" || data.TotalValue != "0.00" {
@@ -288,8 +289,8 @@ func TestWeeklySummaryArithmetic(t *testing.T) {
 
 	t.Run("an unparsable figure counts as zero instead of breaking the digest", func(t *testing.T) {
 		data := send(t, []portfolio.SummaryView{
-			{Name: "Broken", BaseCurrency: "USD", TotalMarketValue: "n/a", TotalGainLoss: "n/a", TotalGainLossPct: "n/a"},
-			{Name: "Fine", BaseCurrency: "USD", TotalMarketValue: "100.00", TotalGainLoss: "10.00", TotalGainLossPct: "11.11"},
+			{Name: "Broken", BaseCurrency: money.USD, TotalMarketValue: "n/a", TotalGainLoss: "n/a", TotalGainLossPct: "n/a"},
+			{Name: "Fine", BaseCurrency: money.USD, TotalMarketValue: "100.00", TotalGainLoss: "10.00", TotalGainLossPct: "11.11"},
 		})
 		if data.TotalValue != "100.00" || data.TotalGainLoss != "10.00" {
 			t.Errorf("totals = %q/%q, want 100.00/10.00", data.TotalValue, data.TotalGainLoss)
@@ -301,7 +302,7 @@ func TestWeeklySummaryArithmetic(t *testing.T) {
 
 	t.Run("figures are rendered with two decimals", func(t *testing.T) {
 		data := send(t, []portfolio.SummaryView{{
-			Name: "P", BaseCurrency: "COP",
+			Name: "P", BaseCurrency: money.COP,
 			TotalMarketValue: "4123456.789", TotalGainLoss: "1.005", TotalGainLossPct: "0.5",
 		}})
 		if data.Portfolios[0].TotalMarketValue != "4123456.79 COP" {
@@ -351,8 +352,8 @@ func TestWeeklySummaryWeekOverWeekChange(t *testing.T) {
 	}
 
 	twoPortfolios := []portfolio.SummaryView{
-		{ID: stocksID, Name: "Acciones", BaseCurrency: "USD", TotalMarketValue: "1100.00", TotalGainLoss: "50.00", TotalGainLossPct: "4.76"},
-		{ID: cryptoID, Name: "Cripto", BaseCurrency: "USD", TotalMarketValue: "400.00", TotalGainLoss: "-20.00", TotalGainLossPct: "-4.76"},
+		{ID: stocksID, Name: "Acciones", BaseCurrency: money.USD, TotalMarketValue: "1100.00", TotalGainLoss: "50.00", TotalGainLossPct: "4.76"},
+		{ID: cryptoID, Name: "Cripto", BaseCurrency: money.USD, TotalMarketValue: "400.00", TotalGainLoss: "-20.00", TotalGainLossPct: "-4.76"},
 	}
 
 	onePortfolio := []portfolio.SummaryView{twoPortfolios[0]}
@@ -549,7 +550,7 @@ func TestWeeklySummaryWeekOverWeekChange(t *testing.T) {
 		for range 100 {
 			id := uuid.New()
 			summaries = append(summaries, portfolio.SummaryView{
-				ID: id, Name: "P", BaseCurrency: "USD",
+				ID: id, Name: "P", BaseCurrency: money.USD,
 				TotalMarketValue: "0.07", TotalGainLoss: "0.00", TotalGainLossPct: "0.00",
 			})
 			baseline[id] = "0.07"

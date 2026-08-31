@@ -7,9 +7,10 @@ import (
 	"uuid"
 
 	"github.com/yeferson59/gofinance/v2/decimal"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
-type CurrencyPair struct{ From, To string }
+type CurrencyPair struct{ From, To money.Currency }
 
 // The exchange_rates table below is the shared, admin-maintained one. Rates
 // fetched with a user's own key do not come here — they go to
@@ -20,20 +21,12 @@ func (s *Service) GetExchangeRates(ctx context.Context, offset, limit uint) ([]E
 	return s.repo.GetExchangeRates(ctx, offset, limit)
 }
 
-func (s *Service) CreateExchangeRate(ctx context.Context, from, to string, rate decimal.Decimal) (ExchangeRate, error) {
-	fromCode, ok := NormalizeCurrencyCode(from)
-	if !ok {
-		return ExchangeRate{}, errExchangeRateCurrencyInvalid
-	}
-	toCode, ok := NormalizeCurrencyCode(to)
-	if !ok {
-		return ExchangeRate{}, errExchangeRateCurrencyInvalid
-	}
+func (s *Service) CreateExchangeRate(ctx context.Context, from, to money.Currency, rate decimal.Decimal) (ExchangeRate, error) {
 	if err := validRate(rate); err != nil {
 		return ExchangeRate{}, err
 	}
 
-	return s.repo.UpsertExchangeRate(ctx, fromCode, toCode, rate, time.Now())
+	return s.repo.UpsertExchangeRate(ctx, from, to, rate, time.Now())
 }
 
 func (s *Service) UpdateExchangeRate(ctx context.Context, id uuid.UUID, rate decimal.Decimal) (ExchangeRate, error) {

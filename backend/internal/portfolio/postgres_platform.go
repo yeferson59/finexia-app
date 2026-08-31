@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"uuid"
+
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // platformStatsSelect is the head shared by the two queries that report what a
@@ -53,7 +55,7 @@ const platformStatsSelect = `
 		SELECT fx_rate(is_.user_id, pe.cost_currency, target.currency) AS rate
 	) fx ON TRUE`
 
-func (r *PostgresRepository) GetPlatformsWithStats(ctx context.Context, userID uuid.UUID, displayCurrency string) ([]PlatformStats, error) {
+func (r *PostgresRepository) GetPlatformsWithStats(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]PlatformStats, error) {
 	rows, err := r.db.Query(ctx, fmt.Sprintf(platformStatsSelect, "$2")+`
 		WHERE is_.user_id = $1
 		GROUP BY is_.id, target.currency
@@ -75,8 +77,10 @@ func (r *PostgresRepository) GetPlatformsWithStats(ctx context.Context, userID u
 		); err != nil {
 			return nil, err
 		}
+
 		result = append(result, p)
 	}
+
 	return result, rows.Err()
 }
 
@@ -89,6 +93,7 @@ func (r *PostgresRepository) UpdatePlatform(ctx context.Context, userID, sourceI
 	if err != nil {
 		return PlatformStats{}, err
 	}
+
 	if tag.RowsAffected() == 0 {
 		return PlatformStats{}, ErrPlatformNotFound
 	}
@@ -107,6 +112,7 @@ func (r *PostgresRepository) UpdatePlatform(ctx context.Context, userID, sourceI
 	); err != nil {
 		return PlatformStats{}, err
 	}
+
 	return p, nil
 }
 
@@ -117,9 +123,11 @@ func (r *PostgresRepository) DeletePlatform(ctx context.Context, userID, sourceI
 	if err != nil {
 		return err
 	}
+
 	if tag.RowsAffected() == 0 {
 		return ErrPlatformNotFound
 	}
+
 	return nil
 }
 

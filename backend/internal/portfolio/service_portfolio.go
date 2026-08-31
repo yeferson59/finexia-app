@@ -2,7 +2,6 @@ package portfolio
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"uuid"
@@ -11,8 +10,6 @@ import (
 	"github.com/yeferson59/gofinance/v2/finance/returns"
 	"github.com/yeferson59/gofinance/v2/money"
 	"golang.org/x/sync/errgroup"
-
-	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 // oneHundred turns the fractions gofinance's returns package works in into the
@@ -66,7 +63,7 @@ func (s *Service) GetPortfoliosSummary(ctx context.Context, userID uuid.UUID) ([
 // converts each portfolio's totals from its own base currency into
 // targetCurrency, so a user with portfolios in different currencies gets a
 // single, comparable display currency.
-func (s *Service) GetPortfoliosSummaryInCurrency(ctx context.Context, userID uuid.UUID, targetCurrency string) ([]SummaryView, error) {
+func (s *Service) GetPortfoliosSummaryInCurrency(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]SummaryView, error) {
 	summaries, err := s.repo.GetPortfoliosSummaryByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -91,21 +88,7 @@ func (s *Service) GetPortfoliosSummaryInCurrency(ctx context.Context, userID uui
 // dashboard that now always asks for a display currency: a portfolio in a
 // currency no source quotes would blank out every other portfolio with it. The
 // same call is what holdings already make (see valueEntriesInBase).
-func (s *Service) convertSummaryTotals(ctx context.Context, userID uuid.UUID, summary SummaryView, targetCurrency string) (SummaryView, error) {
-	// Both ends go through gofinance's ISO 4217 table rather than being carried
-	// as bare strings: money.Convert is what does the arithmetic below, and it
-	// needs the target currency to know how many minor units to round to.
-	from, err := money.GetCurrencyFromISOCode(summary.BaseCurrency)
-	if err != nil {
-		return unconvertedSummary(summary), nil
-	}
-	to, err := money.GetCurrencyFromISOCode(targetCurrency)
-	if err != nil {
-		// The target is the caller's own input, validated at the handler; an
-		// unknown one here is a bad request, not a portfolio the app can't price.
-		return SummaryView{}, httpx.AsBadRequest(fmt.Errorf("unknown display currency %q: %w", targetCurrency, err))
-	}
-
+func (s *Service) convertSummaryTotals(ctx context.Context, userID uuid.UUID, summary SummaryView, targetCurrency money.Currency) (SummaryView, error) {
 	rate, err := s.GetConversionRate(ctx, userID, summary.BaseCurrency, targetCurrency)
 	if err != nil {
 		return unconvertedSummary(summary), nil
@@ -115,14 +98,15 @@ func (s *Service) convertSummaryTotals(ctx context.Context, userID uuid.UUID, su
 	// (half to even) to that currency's own precision, so a COP total no longer
 	// carries the full width of a USD figure times a four-digit rate.
 	convert := func(raw string) (string, error) {
-		amount, err := money.NewMoneyFromString(raw, from)
+		amount, err := money.NewMoneyFromString(raw, summary.BaseCurrency)
 		if err != nil {
 			return raw, err
 		}
-		converted, err := amount.Convert(to, rate)
+		converted, err := amount.Convert(targetCurrency, rate)
 		if err != nil {
 			return raw, err
 		}
+
 		return converted.String(), nil
 	}
 
@@ -188,7 +172,7 @@ func (s *Service) GetPortfolio(ctx context.Context, userID, portfolioID uuid.UUI
 	return portfolio, nil
 }
 
-func (s *Service) CreatePortfolio(ctx context.Context, userID uuid.UUID, name string, description string, baseCurrency string, riskID uuid.UUID, typePortfolio Type, priceValue money.Money, isDefault bool) (Portfolio, error) {
+func (s *Service) CreatePortfolio(ctx context.Context, userID uuid.UUID, name, description string, baseCurrency money.Currency, riskID uuid.UUID, typePortfolio Type, priceValue money.Money, isDefault bool) (Portfolio, error) {
 	portfolio, err := s.repo.CreatePortfolio(ctx, userID, name, description, baseCurrency, riskID, typePortfolio, priceValue, isDefault)
 	if err != nil {
 		return Portfolio{}, err
@@ -216,8 +200,9 @@ func (s *Service) GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, 
 
 // GetPortfolioGrowth builds the account-wide series. An empty currency means
 // "the account's preferred one", the same default the summary endpoints use.
-func (s *Service) GetPortfolioGrowth(ctx context.Context, userID uuid.UUID, currency, period string) ([]GrowthPoint, GrowthSummary, error) {
+func (s *Service) GetPortfolioGrowth(ctx context.Context, userID uuid.UUID, currency money.Currency, period string) ([]GrowthPoint, GrowthSummary, error) {
 	hasSince, since := parsePeriod(period)
+
 	points, err := s.repo.GetPortfolioGrowthByUserID(ctx, userID, currency, hasSince, since)
 	if err != nil {
 		return nil, GrowthSummary{}, err

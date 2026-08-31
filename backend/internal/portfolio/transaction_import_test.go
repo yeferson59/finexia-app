@@ -12,6 +12,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/yeferson59/finexia-app/internal/market"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // buildXLSX creates an in-memory workbook with the given rows on one sheet.
@@ -300,7 +301,7 @@ func TestImportTransactionsFromFile(t *testing.T) {
 	}
 	first := captured[0]
 	if first.Ticker != "AAPL" || first.Type != Buy || first.Quantity.String() != "10" ||
-		first.Price.String() != "180.5" || first.Fees.String() != "1.5" || first.Currency != "USD" ||
+		first.Price.String() != "180.5" || first.Fees.String() != "1.5" || first.Currency != money.USD ||
 		!first.Date.Equal(time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)) {
 		t.Errorf("unexpected first persisted row: %+v", first)
 	}

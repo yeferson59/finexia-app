@@ -107,7 +107,7 @@ func (s *Service) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
 			row := mail.WeeklySummaryPortfolio{
 				Name:             p.Name,
 				Type:             string(p.Type),
-				TotalMarketValue: fixed(mv) + " " + p.BaseCurrency,
+				TotalMarketValue: fixed(mv) + " " + p.BaseCurrency.String(),
 				TotalGainLoss:    fixed(gl),
 				TotalGainLossPct: fixed(glp),
 				GainLossColor:    color,

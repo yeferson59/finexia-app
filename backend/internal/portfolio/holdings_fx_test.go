@@ -20,7 +20,7 @@ import (
 
 // foreignEntry builds the shape GetEntriesByPortfolioID returns for a position
 // bought in costCurrency and quoted in the asset's own currency.
-func foreignEntry(qty, marketPrice, assetCurrency string, price money.Money) Entry {
+func foreignEntry(qty, marketPrice string, assetCurrency money.Currency, price money.Money) Entry {
 	entry := Entry{
 		ID:           uuid.New(),
 		AssetID:      uuid.New(),
@@ -34,7 +34,7 @@ func foreignEntry(qty, marketPrice, assetCurrency string, price money.Money) Ent
 		},
 	}
 	if marketPrice != "" {
-		entry.Asset.CurrentPrice = new(moneyOf(marketPrice, assetCurrency))
+		entry.Asset.CurrentPrice = new(money.MustMoneyFromString(marketPrice, assetCurrency))
 	}
 
 	return entry
@@ -50,8 +50,7 @@ func TestValueEntriesInBase(t *testing.T) {
 			getUserExchangeRateByPair: eurToUSD(t, "1.10"),
 		}), newMemStorage())
 
-		got := svc.valueEntriesInBase(context.Background(), userID, "USD",
-			[]Entry{foreignEntry("2", "100", "EUR", money.MustMoneyFromString("110", money.EUR))})
+		got := svc.valueEntriesInBase(context.Background(), userID, money.USD, []Entry{foreignEntry("2", "100", money.EUR, money.MustMoneyFromString("110", money.EUR))})
 
 		if !got[0].FXConverted {
 			t.Fatal("fxConverted = false, want true")
@@ -77,8 +76,7 @@ func TestValueEntriesInBase(t *testing.T) {
 			getUserExchangeRateByPair: eurToUSD(t, "1.20"),
 		}), newMemStorage())
 
-		got := svc.valueEntriesInBase(context.Background(), userID, "USD",
-			[]Entry{foreignEntry("3", "50", "USD", money.MustMoneyFromString("40", money.EUR))})
+		got := svc.valueEntriesInBase(context.Background(), userID, money.USD, []Entry{foreignEntry("3", "50", money.USD, money.MustMoneyFromString("40", money.EUR))})
 
 		if !got[0].FXConverted {
 			t.Fatal("fxConverted = false, want true")
@@ -97,16 +95,15 @@ func TestValueEntriesInBase(t *testing.T) {
 	// that must leave the portfolio readable rather than erroring the page out.
 	t.Run("missing rate degrades to native amounts", func(t *testing.T) {
 		svc := newTestServices(new(fakeRepository{
-			getUserExchangeRateByPair: func(context.Context, uuid.UUID, string, string) (decimal.Decimal, error) {
+			getUserExchangeRateByPair: func(context.Context, uuid.UUID, money.Currency, money.Currency) (decimal.Decimal, error) {
 				return decimal.Decimal{}, ErrExchangeRateNotFound
 			},
-			getExchangeRateByPair: func(context.Context, string, string) (decimal.Decimal, error) {
+			getExchangeRateByPair: func(context.Context, money.Currency, money.Currency) (decimal.Decimal, error) {
 				return decimal.Decimal{}, ErrExchangeRateNotFound
 			},
 		}), newMemStorage())
 
-		got := svc.valueEntriesInBase(context.Background(), userID, "USD",
-			[]Entry{foreignEntry("2", "100", "EUR", money.MustMoneyFromString("110", money.EUR))})
+		got := svc.valueEntriesInBase(context.Background(), userID, money.USD, []Entry{foreignEntry("2", "100", money.EUR, money.MustMoneyFromString("110", money.EUR))})
 
 		if got[0].FXConverted {
 			t.Error("fxConverted = true, want false when no rate connects the pair")
@@ -126,8 +123,7 @@ func TestValueEntriesInBase(t *testing.T) {
 	t.Run("base currency needs no rate lookup", func(t *testing.T) {
 		svc := newTestServices(new(fakeRepository{}), newMemStorage())
 
-		got := svc.valueEntriesInBase(context.Background(), userID, "USD",
-			[]Entry{foreignEntry("2", "100", "USD", money.MustMoneyFromString("110", money.USD))})
+		got := svc.valueEntriesInBase(context.Background(), userID, money.USD, []Entry{foreignEntry("2", "100", money.USD, money.MustMoneyFromString("110", money.USD))})
 
 		if !got[0].FXConverted {
 			t.Error("fxConverted = false, want true for a position already in base")
@@ -144,8 +140,7 @@ func TestValueEntriesInBase(t *testing.T) {
 			getUserExchangeRateByPair: eurToUSD(t, "1.10"),
 		}), newMemStorage())
 
-		got := svc.valueEntriesInBase(context.Background(), userID, "USD",
-			[]Entry{foreignEntry("2", "100", "EUR", money.MustMoneyFromString("", money.EUR))})
+		got := svc.valueEntriesInBase(context.Background(), userID, money.USD, []Entry{foreignEntry("2", "100", money.EUR, money.MustMoneyFromString("", money.EUR))})
 
 		if cost, value := got[0].CostBasisBase.String(), got[0].MarketValueBase.String(); cost != value || cost != "220" {
 			t.Errorf("totals = (%s, %s), want both 220", cost, value)
@@ -160,10 +155,10 @@ func TestGetPortfolioConvertsHoldingsToBaseCurrency(t *testing.T) {
 
 	repo := new(fakeRepository{
 		getPortfolioByID: func(context.Context, uuid.UUID, uuid.UUID) (Portfolio, error) {
-			return Portfolio{ID: portfolioID, BaseCurrency: "USD"}, nil
+			return Portfolio{ID: portfolioID, BaseCurrency: money.USD}, nil
 		},
 		getEntriesByPortfolioID: func(context.Context, uuid.UUID) ([]Entry, error) {
-			return []Entry{foreignEntry("2", "100", "EUR", money.MustMoneyFromString("110", money.EUR))}, nil
+			return []Entry{foreignEntry("2", "100", money.EUR, money.MustMoneyFromString("110", money.EUR))}, nil
 		},
 		getUserExchangeRateByPair: eurToUSD(t, "1.10"),
 	})
@@ -190,11 +185,11 @@ func TestGetPortfolioConvertsHoldingsToBaseCurrency(t *testing.T) {
 
 // eurToUSD serves one rate and rejects every other pair, so a test that
 // converts the wrong direction fails instead of silently passing.
-func eurToUSD(t *testing.T, value string) func(context.Context, uuid.UUID, string, string) (decimal.Decimal, error) {
+func eurToUSD(t *testing.T, value string) func(context.Context, uuid.UUID, money.Currency, money.Currency) (decimal.Decimal, error) {
 	t.Helper()
 
-	return func(_ context.Context, _ uuid.UUID, from, to string) (decimal.Decimal, error) {
-		if from == "EUR" && to == "USD" {
+	return func(_ context.Context, _ uuid.UUID, from, to money.Currency) (decimal.Decimal, error) {
+		if from == money.EUR && to == money.USD {
 			return rate(t, value), nil
 		}
 

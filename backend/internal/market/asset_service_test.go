@@ -13,6 +13,7 @@ import (
 	"uuid"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // The catalog has two creation paths and the difference between them is the
@@ -25,15 +26,16 @@ func TestContributeAsset(t *testing.T) {
 
 	t.Run("goes to CreateAssetIfAbsent, never to UpsertAsset", func(t *testing.T) {
 		var gotUserID uuid.UUID
-		var gotTicker, gotName, gotCurrency string
+		var gotTicker, gotName string
+		var gotCurrency money.Currency
 
 		repo := new(fakeRepository{
-			upsertAsset: func(context.Context, string, string, AssetType, string, string) (Asset, error) {
+			upsertAsset: func(context.Context, string, string, AssetType, string, money.Currency) (Asset, error) {
 				t.Fatal("a contribution reached UpsertAsset, which overwrites rows other users hold")
 
 				return Asset{}, nil
 			},
-			createAssetIfAbsent: func(_ context.Context, uid uuid.UUID, ticker, name string, _ AssetType, _, currency string) (Asset, error) {
+			createAssetIfAbsent: func(_ context.Context, uid uuid.UUID, ticker, name string, _ AssetType, _ string, currency money.Currency) (Asset, error) {
 				gotUserID, gotTicker, gotName, gotCurrency = uid, ticker, name, currency
 
 				return Asset{Ticker: ticker}, nil
@@ -42,7 +44,7 @@ func TestContributeAsset(t *testing.T) {
 
 		svc := newTestServices(repo, newMemStorage())
 
-		if _, err := svc.ContributeAsset(context.Background(), userID, "  ecopetrol  ", " Ecopetrol S.A. ", Stock, "BVC", "cop"); err != nil {
+		if _, err := svc.ContributeAsset(context.Background(), userID, "  ecopetrol  ", " Ecopetrol S.A. ", Stock, "BVC", money.COP); err != nil {
 			t.Fatalf("ContributeAsset: %v", err)
 		}
 
@@ -55,7 +57,7 @@ func TestContributeAsset(t *testing.T) {
 		if gotName != "Ecopetrol S.A." {
 			t.Errorf("name = %q, want it trimmed", gotName)
 		}
-		if gotCurrency != "COP" {
+		if gotCurrency != money.COP {
 			t.Errorf("currency = %q, want %q", gotCurrency, "COP")
 		}
 	})
@@ -63,14 +65,14 @@ func TestContributeAsset(t *testing.T) {
 	t.Run("an absent name falls back to the ticker", func(t *testing.T) {
 		var gotName string
 		repo := new(fakeRepository{
-			createAssetIfAbsent: func(_ context.Context, _ uuid.UUID, _, name string, _ AssetType, _, _ string) (Asset, error) {
+			createAssetIfAbsent: func(_ context.Context, _ uuid.UUID, _, name string, _ AssetType, _ string, _ money.Currency) (Asset, error) {
 				gotName = name
 
 				return Asset{}, nil
 			},
 		})
 
-		if _, err := newTestServices(repo, newMemStorage()).ContributeAsset(context.Background(), userID, "GEB", "", Stock, "", "COP"); err != nil {
+		if _, err := newTestServices(repo, newMemStorage()).ContributeAsset(context.Background(), userID, "GEB", "", Stock, "", money.COP); err != nil {
 			t.Fatalf("ContributeAsset: %v", err)
 		}
 
@@ -84,19 +86,18 @@ func TestContributeAsset(t *testing.T) {
 			name     string
 			ticker   string
 			asset    AssetType
-			currency string
+			currency money.Currency
 			want     error
 		}{
-			{"empty ticker", "   ", Stock, "USD", errAssetTickerRequired},
-			{"overlong ticker", strings.Repeat("A", maxTickerLen+1), Stock, "USD", errAssetTickerTooLong},
-			{"unknown type", "AAPL", AssetType("nft"), "USD", errAssetTypeInvalid},
-			{"malformed currency", "AAPL", Stock, "DOLAR", errAssetCurrencyInvalid},
+			{"empty ticker", "   ", Stock, money.USD, errAssetTickerRequired},
+			{"overlong ticker", strings.Repeat("A", maxTickerLen+1), Stock, money.USD, errAssetTickerTooLong},
+			{"unknown type", "AAPL", AssetType("nft"), money.USD, errAssetTypeInvalid},
 		}
 
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
 				repo := new(fakeRepository{
-					createAssetIfAbsent: func(context.Context, uuid.UUID, string, string, AssetType, string, string) (Asset, error) {
+					createAssetIfAbsent: func(context.Context, uuid.UUID, string, string, AssetType, string, money.Currency) (Asset, error) {
 						t.Fatal("invalid input reached the repository")
 
 						return Asset{}, nil
@@ -122,14 +123,14 @@ func TestContributeAsset(t *testing.T) {
 
 				return maxContributedAssetsPerDay, nil
 			},
-			createAssetIfAbsent: func(context.Context, uuid.UUID, string, string, AssetType, string, string) (Asset, error) {
+			createAssetIfAbsent: func(context.Context, uuid.UUID, string, string, AssetType, string, money.Currency) (Asset, error) {
 				t.Fatal("the quota was exceeded and the asset was created anyway")
 
 				return Asset{}, nil
 			},
 		})
 
-		_, err := newTestServices(repo, newMemStorage()).ContributeAsset(context.Background(), userID, "AAPL", "Apple", Stock, "", "USD")
+		_, err := newTestServices(repo, newMemStorage()).ContributeAsset(context.Background(), userID, "AAPL", "Apple", Stock, "", money.USD)
 		if !errors.Is(err, ErrAssetQuotaExceeded) {
 			t.Fatalf("err = %v, want ErrAssetQuotaExceeded", err)
 		}
@@ -167,12 +168,12 @@ func TestHandlerCreateAsset(t *testing.T) {
 	t.Run("a user contributes rather than curates", func(t *testing.T) {
 		var contributed bool
 		repo := new(fakeRepository{
-			upsertAsset: func(context.Context, string, string, AssetType, string, string) (Asset, error) {
+			upsertAsset: func(context.Context, string, string, AssetType, string, money.Currency) (Asset, error) {
 				t.Fatal("a non-admin reached the curating path")
 
 				return Asset{}, nil
 			},
-			createAssetIfAbsent: func(_ context.Context, uid uuid.UUID, ticker, _ string, _ AssetType, _, _ string) (Asset, error) {
+			createAssetIfAbsent: func(_ context.Context, uid uuid.UUID, ticker, _ string, _ AssetType, _ string, _ money.Currency) (Asset, error) {
 				contributed = true
 
 				if uid != userID {
@@ -195,12 +196,12 @@ func TestHandlerCreateAsset(t *testing.T) {
 	t.Run("an admin curates", func(t *testing.T) {
 		var curated bool
 		repo := new(fakeRepository{
-			upsertAsset: func(_ context.Context, ticker, _ string, _ AssetType, _, _ string) (Asset, error) {
+			upsertAsset: func(_ context.Context, ticker, _ string, _ AssetType, _ string, _ money.Currency) (Asset, error) {
 				curated = true
 
 				return Asset{ID: uuid.New(), Ticker: ticker, IsCurated: true}, nil
 			},
-			createAssetIfAbsent: func(context.Context, uuid.UUID, string, string, AssetType, string, string) (Asset, error) {
+			createAssetIfAbsent: func(context.Context, uuid.UUID, string, string, AssetType, string, money.Currency) (Asset, error) {
 				t.Fatal("an admin was routed through the contribution path")
 
 				return Asset{}, nil
@@ -231,7 +232,7 @@ func TestHandlerCreateAsset(t *testing.T) {
 
 	t.Run("a rejected input says why, an internal failure does not", func(t *testing.T) {
 		repo := new(fakeRepository{
-			createAssetIfAbsent: func(context.Context, uuid.UUID, string, string, AssetType, string, string) (Asset, error) {
+			createAssetIfAbsent: func(context.Context, uuid.UUID, string, string, AssetType, string, money.Currency) (Asset, error) {
 				return Asset{}, errors.New(`pq: duplicate key value violates unique constraint "idx_assets_ticker_exchange"`)
 			},
 		})

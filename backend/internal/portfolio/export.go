@@ -6,6 +6,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/xuri/excelize/v2"
 	"github.com/yeferson59/gofinance/v2/decimal"
+	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
@@ -23,7 +24,7 @@ func (h *handler) ExportSummary(c fiber.Ctx) error {
 
 	// No currency asked for: the spreadsheet reports in the user's own
 	// preference, the same default the allocation endpoint applies.
-	allocationItems, err := h.service.GetAssetAllocation(c, userID, "")
+	allocationItems, err := h.service.GetAssetAllocation(c, userID, money.USD)
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error generating report", "Could not retrieve allocation data")
 	}
@@ -147,7 +148,7 @@ func (h *handler) ExportRiskMetrics(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	points, _, err := h.service.GetPortfolioGrowth(c, userID, "", "ALL")
+	points, _, err := h.service.GetPortfolioGrowth(c, userID, money.USD, "ALL")
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error generating report", "Could not retrieve growth data")
 	}
@@ -207,8 +208,8 @@ func writeRiskMetricsSheet(f *excelize.File, m GrowthMetrics) {
 	}
 
 	currency := m.Currency
-	if currency == "" {
-		currency = "USD"
+	if currency == money.XXX {
+		currency = money.USD
 	}
 
 	rows := [][4]string{
@@ -222,10 +223,10 @@ func writeRiskMetricsSheet(f *excelize.File, m GrowthMetrics) {
 		{"Ratio de Sharpe", ratio(m.Sharpe, m.HasSharpe), "veces", "Retorno medio de los tramos ÷ volatilidad, × √(tramos por año), con tasa libre de riesgo 0. No es la rentabilidad anualizada de arriba ÷ volatilidad: aquella es compuesta y sale más alta."},
 		{"Mejor mes", monthCell(m.Best, m.HasMonthReturns), "%", monthNote(m, "más alto")},
 		{"Peor mes", monthCell(m.Worst, m.HasMonthReturns), "%", monthNote(m, "más bajo")},
-		{"Valor actual", m.CurrentValue.RoundBank(2).StringFixed(2), currency, "Valor de mercado de la cuenta en el último cierre."},
-		{"Capital invertido", m.InvestedCost.RoundBank(2).StringFixed(2), currency, "Coste de las posiciones abiertas en el último cierre."},
-		{"Ganancia / pérdida", m.GainLoss.RoundBank(2).StringFixed(2), currency, "Valor de mercado menos capital invertido."},
-		{"Aporte neto del periodo", m.NetFlow.RoundBank(2).StringFixed(2), currency, "Dinero puesto menos dinero sacado: la suma de la columna «Aporte neto» del historial. No es rentabilidad."},
+		{"Valor actual", m.CurrentValue.RoundBank(2).StringFixed(2), currency.String(), "Valor de mercado de la cuenta en el último cierre."},
+		{"Capital invertido", m.InvestedCost.RoundBank(2).StringFixed(2), currency.String(), "Coste de las posiciones abiertas en el último cierre."},
+		{"Ganancia / pérdida", m.GainLoss.RoundBank(2).StringFixed(2), currency.String(), "Valor de mercado menos capital invertido."},
+		{"Aporte neto del periodo", m.NetFlow.RoundBank(2).StringFixed(2), currency.String(), "Dinero puesto menos dinero sacado: la suma de la columna «Aporte neto» del historial. No es rentabilidad."},
 	}
 
 	for i, entry := range rows {

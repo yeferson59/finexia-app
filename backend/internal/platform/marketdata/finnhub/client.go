@@ -17,6 +17,7 @@ import (
 	json "github.com/bytedance/sonic"
 
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 const baseURL = "https://finnhub.io/api/v1"
@@ -109,19 +110,19 @@ type resultExchange struct {
 // FetchExchangeRate retrieves the rate between two fiat currencies via the
 // Finnhub /forex/rates endpoint. Crypto pairs are not served here and return
 // ErrUnsupported, allowing the fallback chain to continue.
-func (c *Client) FetchExchangeRate(ctx context.Context, from, to string) (marketdata.ExchangeRateResult, error) {
-	what := from + "/" + to
+func (c *Client) FetchExchangeRate(ctx context.Context, from, to money.Currency) (marketdata.ExchangeRateResult, error) {
+	what := from.String() + "/" + to.String()
 
 	var result resultExchange
 
 	params := url.Values{}
-	params.Set("base", from)
+	params.Set("base", from.String())
 
 	if err := c.get(ctx, "/forex/rates", params, what, &result); err != nil {
 		return marketdata.ExchangeRateResult{}, err
 	}
 
-	rate, ok := result.Quote[to]
+	rate, ok := result.Quote[to.String()]
 	if !ok || rate == 0 {
 		return marketdata.ExchangeRateResult{}, marketdata.Errorf(marketdata.Finnhub, c.apiKey, marketdata.ErrUnsupported, "finnhub: no rate for %s", what)
 	}

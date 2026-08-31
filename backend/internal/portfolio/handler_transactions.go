@@ -12,7 +12,9 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 
 	"github.com/yeferson59/finexia-app/internal/market"
+	"github.com/yeferson59/finexia-app/internal/platform/currency"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 func (h *handler) CreatePortfolioEntry(c fiber.Ctx) error {
@@ -66,6 +68,10 @@ func (h *handler) UpdateAssetPrice(c fiber.Ctx) error {
 	return httpx.OK(c, "Asset price updated", "Asset price updated successfully", asset)
 }
 
+type CurrencyDTO struct {
+	currency money.Currency `query:"currency"`
+}
+
 func (h *handler) GetAssetAllocation(c fiber.Ctx) error {
 	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
@@ -78,12 +84,17 @@ func (h *handler) GetAssetAllocation(c fiber.Ctx) error {
 	// preference rather than to no conversion at all: these categories are
 	// summed across portfolios that may be denominated differently, so there is
 	// no such thing as an unconverted total here.
-	currency := strings.ToUpper(strings.TrimSpace(c.Query("currency")))
-	if currency != "" && !IsSupportedDisplayCurrency(currency) {
-		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+strings.Join(SupportedDisplayCurrencies, ", "))
+
+	var req CurrencyDTO
+	if err := c.Bind().Query(&req); err != nil {
+		return httpx.BadRequest(c, "Unprocess query currency", "no process currency")
 	}
 
-	items, err := h.service.GetAssetAllocation(c, userID, currency)
+	if req.currency != money.XXX && !currency.IsSupported(req.currency) {
+		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+currency.List())
+	}
+
+	items, err := h.service.GetAssetAllocation(c, userID, req.currency)
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error retrieving asset allocation", "Could not retrieve asset allocation")
 	}
@@ -240,12 +251,16 @@ func (h *handler) GetPortfolioGrowth(c fiber.Ctx) error {
 	// La serie agregada suma portafolios que pueden tener bases distintas, así
 	// que necesita una moneda a la que llevarlo todo. Vacío significa la del
 	// perfil, igual que en el resumen y en la asignación.
-	currency := strings.ToUpper(strings.TrimSpace(c.Query("currency")))
-	if currency != "" && !IsSupportedDisplayCurrency(currency) {
-		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+strings.Join(SupportedDisplayCurrencies, ", "))
+	var req CurrencyDTO
+	if err := c.Bind().Query(&req); err != nil {
+		return httpx.BadRequest(c, "Unprocess query currency", "no process currency")
 	}
 
-	points, summary, err := h.service.GetPortfolioGrowth(c, userID, currency, period)
+	if req.currency != money.XXX && !currency.IsSupported(req.currency) {
+		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+currency.List())
+	}
+
+	points, summary, err := h.service.GetPortfolioGrowth(c, userID, req.currency, period)
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error retrieving portfolio growth", "Could not retrieve portfolio growth data")
 	}

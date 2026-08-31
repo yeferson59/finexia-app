@@ -15,6 +15,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // Service holds the user domain use cases: the admin CRUD, the self-service
@@ -97,7 +98,7 @@ func (s *Service) GetCurrentUser(ctx context.Context, userID uuid.UUID) (identit
 	return s.repo.GetByID(ctx, userID)
 }
 
-func (s *Service) UpdateCurrentUser(ctx context.Context, userID uuid.UUID, name, preferredCurrency, image string) (identity.User, error) {
+func (s *Service) UpdateCurrentUser(ctx context.Context, userID uuid.UUID, name, image string, preferredCurrency money.Currency) (identity.User, error) {
 	existing, err := s.repo.GetByID(ctx, userID)
 	if err != nil {
 		return identity.User{}, err
@@ -111,18 +112,19 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, userID uuid.UUID, name,
 	// outside the supported set has no rate behind it, so accepting one would
 	// leave the account with figures that cannot be converted and a sync asking
 	// providers for a pair that does not exist.
-	if strings.TrimSpace(preferredCurrency) != "" {
-		code := currency.Normalize(preferredCurrency)
-		if !currency.IsSupported(code) {
-			return identity.User{}, fmt.Errorf("%w %q: must be one of %s", ErrUnsupportedCurrency, code, currency.List())
+	if preferredCurrency.Valid() {
+		if !currency.IsSupported(preferredCurrency) {
+			return identity.User{}, fmt.Errorf("%w %q: must be one of %s", ErrUnsupportedCurrency, preferredCurrency, currency.List())
 		}
-		existing.PreferredCurrency = code
+
+		existing.PreferredCurrency = preferredCurrency
 	}
+
 	if strings.TrimSpace(image) != "" {
 		existing.Image = image
 	}
 
-	return s.repo.UpdateProfile(ctx, userID, existing.Name, existing.PreferredCurrency, existing.Image)
+	return s.repo.UpdateProfile(ctx, userID, existing.Name, existing.Image, existing.PreferredCurrency)
 }
 
 func (s *Service) GetUserPreferences(ctx context.Context, userID uuid.UUID) (UserPreferences, error) {

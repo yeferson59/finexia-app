@@ -10,13 +10,13 @@ import (
 )
 
 type CreatePortfolioRequestDTO struct {
-	Name        string      `json:"name" validate:"required"`
-	Description string      `json:"description"`
-	Currency    string      `json:"currency" validate:"required"`
-	Type        string      `json:"type" validate:"required"`
-	RiskID      uuid.UUID   `json:"riskId"`
-	PriceValue  money.Money `json:"priceValue"`
-	IsDefault   bool        `json:"isDefault"`
+	Name        string         `json:"name" validate:"required"`
+	Description string         `json:"description"`
+	Currency    money.Currency `json:"currency" validate:"required"`
+	Type        string         `json:"type" validate:"required"`
+	RiskID      uuid.UUID      `json:"riskId"`
+	PriceValue  money.Money    `json:"priceValue"`
+	IsDefault   bool           `json:"isDefault"`
 }
 
 type CreatePlatformRequestDTO struct {
@@ -43,7 +43,7 @@ type CreatePortfolioEntryRequestDTO struct {
 	TransactionType string          `json:"transactionType"`
 	Quantity        decimal.Decimal `json:"quantity" validate:"required"`
 	Price           money.Money     `json:"price" validate:"required"`
-	CostCurrency    string          `json:"costCurrency" validate:"required"`
+	CostCurrency    money.Currency  `json:"costCurrency" validate:"required"`
 	EntryDate       time.Time       `json:"entryDate" validate:"required"`
 	Notes           string          `json:"notes"`
 }
@@ -52,7 +52,7 @@ type CreateTransactionRequestDTO struct {
 	Type            string          `json:"type" validate:"required"`
 	Quantity        decimal.Decimal `json:"quantity" validate:"required"`
 	Price           money.Money     `json:"price" validate:"required"`
-	Currency        string          `json:"currency" validate:"required"`
+	Currency        money.Currency  `json:"currency" validate:"required"`
 	Fees            money.Money     `json:"fees"`
 	TransactionDate time.Time       `json:"transactionDate" validate:"required"`
 	Notes           string          `json:"notes"`
@@ -96,7 +96,7 @@ func NewTransactionResponse(t Transaction) TransactionResponseDTO {
 		Type:            string(t.Type),
 		Quantity:        t.Quantity.String(),
 		Price:           t.Price.String(),
-		Currency:        t.Currency,
+		Currency:        t.Currency.String(),
 		Fees:            t.Fees.String(),
 		TransactionDate: t.TransactionDate,
 		Notes:           t.Notes,
@@ -134,7 +134,7 @@ func NewUserTransactionResponse(t Transaction) UserTransactionResponseDTO {
 		Type:            string(t.Type),
 		Quantity:        t.Quantity.String(),
 		Price:           t.Price.String(),
-		Currency:        t.Currency,
+		Currency:        t.Currency.String(),
 		Fees:            t.Fees.String(),
 		TransactionDate: t.TransactionDate,
 		Notes:           t.Notes,
@@ -199,7 +199,7 @@ func NewAllocationResponse(items []AllocationItem) []AllocationItemDTO {
 			Category:             string(item.Category),
 			MarketValue:          item.MarketValue,
 			Percent:              pct,
-			Currency:             item.Currency,
+			Currency:             item.Currency.String(),
 			PositionsUnconverted: item.PositionsUnconverted,
 		})
 	}
@@ -235,7 +235,7 @@ func newPlatformResponse(p PlatformStats) PlatformResponseDTO {
 		Investments: p.Investments,
 		TotalValue:  p.TotalValue,
 
-		DisplayCurrency:      p.DisplayCurrency,
+		DisplayCurrency:      p.DisplayCurrency.String(),
 		PositionsUnconverted: p.PositionsUnconverted,
 	}
 }
@@ -363,7 +363,7 @@ func NewGrowthResponse(points []GrowthPoint, summary GrowthSummary) GrowthRespon
 			TotalGrowthPct: summary.TotalGrowthPct,
 			GainLoss:       summary.GainLoss,
 			GainLossPct:    summary.GainLossPct,
-			Currency:       summary.Currency,
+			Currency:       summary.Currency.String(),
 		},
 	}
 }
@@ -394,7 +394,7 @@ func NewPortfolioDetailResponse(p Portfolio) PortfolioDetailResponseDTO {
 			Name:            entry.Asset.Name,
 			AssetType:       string(entry.Asset.AssetType),
 			Exchange:        entry.Asset.Exchange,
-			Currency:        entry.Asset.Currency,
+			Currency:        entry.Asset.Currency.String(),
 			Quantity:        entry.Quantity.String(),
 			Price:           entry.Price.String(),
 			MarketPrice:     marketPrice,
@@ -416,7 +416,7 @@ func NewPortfolioDetailResponse(p Portfolio) PortfolioDetailResponseDTO {
 		Name:         p.Name,
 		Description:  p.Description,
 		Type:         p.Type,
-		BaseCurrency: p.BaseCurrency,
+		BaseCurrency: p.BaseCurrency.String(),
 		IsDefault:    p.IsDefault,
 		RiskID:       p.RiskID,
 		RiskName:     p.Risk.Name,

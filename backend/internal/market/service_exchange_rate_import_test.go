@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yeferson59/gofinance/v2/decimal"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 func TestImportExchangeRatesFromFile(t *testing.T) {
@@ -18,8 +19,8 @@ func TestImportExchangeRatesFromFile(t *testing.T) {
 
 		var pairs []string
 		repo := new(fakeRepository{
-			upsertExchangeRate: func(_ context.Context, from, to string, rate decimal.Decimal, _ time.Time) (ExchangeRate, error) {
-				pairs = append(pairs, from+"/"+to)
+			upsertExchangeRate: func(_ context.Context, from, to money.Currency, rate decimal.Decimal, _ time.Time) (ExchangeRate, error) {
+				pairs = append(pairs, from.String()+"/"+to.String())
 				return ExchangeRate{FromCurrency: from, ToCurrency: to, Rate: rate}, nil
 			},
 		})

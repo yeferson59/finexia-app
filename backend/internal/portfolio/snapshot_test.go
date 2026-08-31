@@ -7,20 +7,22 @@ import (
 	"time"
 
 	"uuid"
+
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 func TestSyncPortfolioSnapshots(t *testing.T) {
 	t.Run("upserts one snapshot per summary row", func(t *testing.T) {
 		rows := []SnapshotRow{
-			{PortfolioID: uuid.New(), BaseCurrency: "USD", TotalMarketValue: "1000.00", TotalGainLoss: "100.00", TotalGainLossPct: "11.11"},
-			{PortfolioID: uuid.New(), BaseCurrency: "EUR", TotalMarketValue: "500.00", TotalGainLoss: "-20.00", TotalGainLossPct: "-3.85"},
+			{PortfolioID: uuid.New(), BaseCurrency: money.USD, TotalMarketValue: "1000.00", TotalGainLoss: "100.00", TotalGainLossPct: "11.11"},
+			{PortfolioID: uuid.New(), BaseCurrency: money.EUR, TotalMarketValue: "500.00", TotalGainLoss: "-20.00", TotalGainLossPct: "-3.85"},
 		}
 
 		type upsertCall struct {
 			portfolioID uuid.UUID
 			date        time.Time
 			totalValue  string
-			currency    string
+			currency    money.Currency
 		}
 		var calls []upsertCall
 
@@ -28,7 +30,7 @@ func TestSyncPortfolioSnapshots(t *testing.T) {
 			getAllPortfolioSummaryRows: func(context.Context) ([]SnapshotRow, error) {
 				return rows, nil
 			},
-			upsertPortfolioSnapshot: func(_ context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, currency, totalGainLoss, totalGainLossPct string) error {
+			upsertPortfolioSnapshot: func(_ context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, totalGainLoss, totalGainLossPct string, currency money.Currency) error {
 				calls = append(calls, upsertCall{portfolioID, snapshotDate, totalValue, currency})
 				return nil
 			},
@@ -68,7 +70,7 @@ func TestSyncPortfolioSnapshots(t *testing.T) {
 			getAllPortfolioSummaryRows: func(context.Context) ([]SnapshotRow, error) {
 				return rows, nil
 			},
-			upsertPortfolioSnapshot: func(_ context.Context, portfolioID uuid.UUID, _ time.Time, _, _, _, _ string) error {
+			upsertPortfolioSnapshot: func(_ context.Context, portfolioID uuid.UUID, _ time.Time, _, _, _ string, _ money.Currency) error {
 				if portfolioID == badID {
 					return errors.New("constraint violation")
 				}

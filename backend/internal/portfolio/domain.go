@@ -53,51 +53,6 @@ const (
 	Interest    TransactionType = "interest"
 )
 
-// EntryCategory keeps the legacy PortfolioEntryCategory values; the name drops
-// the redundant prefix now that the type lives inside the portfolio package.
-//
-// Since 000026 it is a presentation vocabulary rather than a stored one: the
-// column that held it is gone, and every value is produced by entryCategoryFor
-// from an asset type. There is nothing left to validate — an unknown asset type
-// becomes Others — so the type carries no IsValid.
-type EntryCategory string
-
-const (
-	Stocks      EntryCategory = "stocks"
-	ETFs        EntryCategory = "etfs"
-	Cryptos     EntryCategory = "cryptos"
-	Bonds       EntryCategory = "bonds"
-	Cashs       EntryCategory = "cash"
-	RealEstates EntryCategory = "real_estates"
-	Commodities EntryCategory = "commodities"
-	Others      EntryCategory = "others"
-)
-
-// entryCategoryFor maps an asset type (owned by the market module) to the
-// portfolio-side entry category. It lives here because EntryCategory is a
-// portfolio concept; keeping the mapping out of market.AssetType avoids a
-// market → portfolio dependency.
-func entryCategoryFor(a market.AssetType) EntryCategory {
-	switch a {
-	case market.Stock:
-		return Stocks
-	case market.ETF:
-		return ETFs
-	case market.Crypto:
-		return Cryptos
-	case market.Bond:
-		return Bonds
-	case market.Cash:
-		return Cashs
-	case market.RealEstate:
-		return RealEstates
-	case market.Commodity:
-		return Commodities
-	default:
-		return Others
-	}
-}
-
 func (t TransactionType) IsValid() bool {
 	switch t {
 	case Buy, Sell, Dividend, Split, TransferIn, TransferOut, Fee, Interest:
@@ -109,54 +64,44 @@ func (t TransactionType) IsValid() bool {
 
 type Type string
 
-// Type values must stay in sync with the `portfolio_type` enum defined in
-// 000003_create_portfolio_tables.up.sql.
 const (
-	TypeStocks      Type = "stocks"
-	TypeETFs        Type = "etfs"
-	TypeCryptos     Type = "cryptos"
-	TypeBonds       Type = "bonds"
-	TypeCash        Type = "cash"
-	TypeForex       Type = "forex"
-	TypeRealEstates Type = "real_estates"
-	TypeCommodities Type = "commodities"
-
-	TypeForexStocks      Type = "forex_stocks"
-	TypeForexETFs        Type = "forex_etfs"
-	TypeForexCryptos     Type = "forex_cryptos"
-	TypeForexBonds       Type = "forex_bonds"
-	TypeForexCash        Type = "forex_cash"
-	TypeForexRealStates  Type = "forex_real_states"
-	TypeForexCommodities Type = "forex_commodities"
-
-	TypeStocksETFs        Type = "stocks_etfs"
-	TypeStocksCryptos     Type = "stocks_cryptos"
-	TypeStocksBonds       Type = "stocks_bonds"
-	TypeStocksCash        Type = "stocks_cash"
-	TypeStocksRealEstates Type = "stocks_real_estates"
-	TypeStocksCommodities Type = "stocks_commodities"
-
-	TypeETFsCryptos     Type = "etfs_cryptos"
-	TypeETFsBonds       Type = "etfs_bonds"
-	TypeETFsCash        Type = "etfs_cash"
-	TypeETFsRealEstates Type = "etfs_real_estates"
-	TypeETFsCommodities Type = "etfs_commodities"
-
-	TypeCryptosBonds       Type = "cryptos_bonds"
-	TypeCryptosCash        Type = "cryptos_cash"
-	TypeCryptosRealEstates Type = "cryptos_real_estates"
-	TypeCryptosCommodities Type = "cryptos_commodities"
-
-	TypeBondsCash        Type = "bonds_cash"
-	TypeBondsRealEstates Type = "bonds_real_estates"
-	TypeBondsCommodities Type = "bonds_commodities"
-
-	TypeCashRealEstates Type = "cash_real_estates"
-	TypeCashCommodities Type = "cash_commodities"
-
+	TypeStocks                 Type = "stocks"
+	TypeETFs                   Type = "etfs"
+	TypeCryptos                Type = "cryptos"
+	TypeBonds                  Type = "bonds"
+	TypeCash                   Type = "cash"
+	TypeForex                  Type = "forex"
+	TypeRealEstates            Type = "real_estates"
+	TypeCommodities            Type = "commodities"
+	TypeForexStocks            Type = "forex_stocks"
+	TypeForexETFs              Type = "forex_etfs"
+	TypeForexCryptos           Type = "forex_cryptos"
+	TypeForexBonds             Type = "forex_bonds"
+	TypeForexCash              Type = "forex_cash"
+	TypeForexRealStates        Type = "forex_real_states"
+	TypeForexCommodities       Type = "forex_commodities"
+	TypeStocksETFs             Type = "stocks_etfs"
+	TypeStocksCryptos          Type = "stocks_cryptos"
+	TypeStocksBonds            Type = "stocks_bonds"
+	TypeStocksCash             Type = "stocks_cash"
+	TypeStocksRealEstates      Type = "stocks_real_estates"
+	TypeStocksCommodities      Type = "stocks_commodities"
+	TypeETFsCryptos            Type = "etfs_cryptos"
+	TypeETFsBonds              Type = "etfs_bonds"
+	TypeETFsCash               Type = "etfs_cash"
+	TypeETFsRealEstates        Type = "etfs_real_estates"
+	TypeETFsCommodities        Type = "etfs_commodities"
+	TypeCryptosBonds           Type = "cryptos_bonds"
+	TypeCryptosCash            Type = "cryptos_cash"
+	TypeCryptosRealEstates     Type = "cryptos_real_estates"
+	TypeCryptosCommodities     Type = "cryptos_commodities"
+	TypeBondsCash              Type = "bonds_cash"
+	TypeBondsRealEstates       Type = "bonds_real_estates"
+	TypeBondsCommodities       Type = "bonds_commodities"
+	TypeCashRealEstates        Type = "cash_real_estates"
+	TypeCashCommodities        Type = "cash_commodities"
 	TypeRealEstatesCommodities Type = "real_estates_commodities"
-
-	TypeDiversified Type = "diversified"
+	TypeDiversified            Type = "diversified"
 )
 
 func (t Type) IsValid() bool {
@@ -178,6 +123,22 @@ func (t Type) IsValid() bool {
 		return false
 	}
 }
+
+type PriceSource string
+
+const (
+	// PriceSourceOwn is a price fetched with this user's own provider key. It
+	// is the only one that makes the valuation a market valuation.
+	PriceSourceOwn PriceSource = "own"
+	// PriceSourceManual is the operator's manually entered reference price
+	// (assets.current_price, PATCH /portfolios/assets/:id/price). It carries no
+	// provider licence and no freshness guarantee.
+	PriceSourceManual PriceSource = "manual"
+	// PriceSourceCost means no price was available and the position is valued
+	// at what it cost. Its gain/loss is zero by construction, so a client must
+	// not present it as a return.
+	PriceSourceCost PriceSource = "cost"
+)
 
 type InvestmentSource struct {
 	ID          uuid.UUID     `json:"id"`
@@ -202,84 +163,44 @@ type Risk struct {
 }
 
 type Portfolio struct {
-	ID           uuid.UUID     `json:"id"`
-	UserID       uuid.UUID     `json:"userId"`
-	Name         string        `json:"name"`
-	Description  string        `json:"description"`
-	Type         Type          `json:"type"`
-	RiskID       uuid.UUID     `json:"riskId"`
-	BaseCurrency string        `json:"baseCurrency"`
-	IsDefault    bool          `json:"isDefault"`
-	PriceValue   *money.Money  `json:"priceValue"`
-	CreatedAt    time.Time     `json:"createdAt"`
-	UpdatedAt    time.Time     `json:"updatedAt"`
-	Risk         Risk          `json:"risk,omitzero"`
-	User         identity.User `json:"user,omitzero"`
-	Entries      []Entry       `json:"portfolioEntries,omitempty"`
-	Snapshots    []Snapshot    `json:"portfolioSnapshots,omitempty"`
+	ID           uuid.UUID      `json:"id"`
+	UserID       uuid.UUID      `json:"userId"`
+	Name         string         `json:"name"`
+	Description  string         `json:"description"`
+	Type         Type           `json:"type"`
+	RiskID       uuid.UUID      `json:"riskId"`
+	BaseCurrency money.Currency `json:"baseCurrency"`
+	IsDefault    bool           `json:"isDefault"`
+	PriceValue   *money.Money   `json:"priceValue"`
+	CreatedAt    time.Time      `json:"createdAt"`
+	UpdatedAt    time.Time      `json:"updatedAt"`
+	Risk         Risk           `json:"risk,omitzero"`
+	User         identity.User  `json:"user,omitzero"`
+	Entries      []Entry        `json:"portfolioEntries,omitempty"`
+	Snapshots    []Snapshot     `json:"portfolioSnapshots,omitempty"`
 }
 
-// PriceSource says where the price used to value a position came from. Under
-// BYO-key that is a property of the position, not of the asset: the same
-// ticker is priced by one user's own key and left at cost for another, so it
-// lives on Entry rather than on market.Asset.
-//
-// The three values mirror the COALESCE the valuation applies, in order.
-type PriceSource string
-
-const (
-	// PriceSourceOwn is a price fetched with this user's own provider key. It
-	// is the only one that makes the valuation a market valuation.
-	PriceSourceOwn PriceSource = "own"
-	// PriceSourceManual is the operator's manually entered reference price
-	// (assets.current_price, PATCH /portfolios/assets/:id/price). It carries no
-	// provider licence and no freshness guarantee.
-	PriceSourceManual PriceSource = "manual"
-	// PriceSourceCost means no price was available and the position is valued
-	// at what it cost. Its gain/loss is zero by construction, so a client must
-	// not present it as a return.
-	PriceSourceCost PriceSource = "cost"
-)
-
 type Entry struct {
-	ID           uuid.UUID       `json:"id"`
-	PortfolioID  uuid.UUID       `json:"portfolioId"`
-	AssetID      uuid.UUID       `json:"assetId"`
-	SourceID     uuid.UUID       `json:"sourceId"`
-	Quantity     decimal.Decimal `json:"quantity"`
-	Price        money.Money     `json:"price"`
-	CostCurrency money.Currency  `json:"costCurrency"`
-	// Category is the class of the asset this entry holds, derived from
-	// Asset.AssetType on the way out. It used to be a column of its own,
-	// stamped at insert and never updated, which is how a reclassified asset
-	// ended up in two different slices at once (migration 000026).
-	Category     EntryCategory    `json:"category"`
-	EntryDate    time.Time        `json:"entryDate"`
-	Notes        string           `json:"notes"`
-	CreatedAt    time.Time        `json:"createdAt"`
-	UpdatedAt    time.Time        `json:"updatedAt"`
-	Portfolio    Portfolio        `json:"portfolio,omitzero"`
-	Asset        market.Asset     `json:"asset,omitzero"`
-	Source       InvestmentSource `json:"source,omitzero"`
-	Transactions []Transaction    `json:"transactions,omitempty"`
-	// PriceSource qualifies Asset.CurrentPrice, which the entry query already
-	// resolves through the same preference. Only the queries that resolve it
-	// populate this; elsewhere it is empty.
-	PriceSource PriceSource `json:"priceSource,omitempty"`
-	// CostBasisBase and MarketValueBase are this position's totals expressed in
-	// the portfolio's base currency — the only form in which positions bought in
-	// different currencies can be added up. Quantity, Price and
-	// Asset.CurrentPrice stay in their native currencies: those are per-unit
-	// figures and converting them would round a fractional share's price to the
-	// base currency's two decimals.
-	//
-	// Filled by valueEntriesInBase; empty on the queries that don't call it.
-	CostBasisBase   money.Money `json:"costBasisBase,omitzero"`
-	MarketValueBase money.Money `json:"marketValueBase,omitzero"`
-	// FXConverted reports whether both totals above really are in the base
-	// currency. It is false when a rate was missing, in which case they hold the
-	// native amounts unconverted and any sum across currencies is meaningless.
-	FXConverted bool `json:"fxConverted,omitempty"`
+	ID              uuid.UUID        `json:"id"`
+	PortfolioID     uuid.UUID        `json:"portfolioId"`
+	AssetID         uuid.UUID        `json:"assetId"`
+	SourceID        uuid.UUID        `json:"sourceId"`
+	Quantity        decimal.Decimal  `json:"quantity"`
+	Price           money.Money      `json:"price"`
+	CostCurrency    money.Currency   `json:"costCurrency"`
+	Category        market.AssetType `json:"category"`
+	EntryDate       time.Time        `json:"entryDate"`
+	Notes           string           `json:"notes"`
+	CreatedAt       time.Time        `json:"createdAt"`
+	UpdatedAt       time.Time        `json:"updatedAt"`
+	Portfolio       Portfolio        `json:"portfolio,omitzero"`
+	Asset           market.Asset     `json:"asset,omitzero"`
+	Source          InvestmentSource `json:"source,omitzero"`
+	Transactions    []Transaction    `json:"transactions,omitempty"`
+	PriceSource     PriceSource      `json:"priceSource,omitempty"`
+	CostBasisBase   money.Money      `json:"costBasisBase,omitzero"`
+	MarketValueBase money.Money      `json:"marketValueBase,omitzero"`
+	FXConverted     bool             `json:"fxConverted,omitempty"`
 }
 
 type Transaction struct {
@@ -288,7 +209,7 @@ type Transaction struct {
 	Type            TransactionType `json:"type"`
 	Quantity        decimal.Decimal `json:"quantity"`
 	Price           money.Money     `json:"price"`
-	Currency        string          `json:"currency"`
+	Currency        money.Currency  `json:"currency"`
 	Fees            money.Money     `json:"fees"`
 	TransactionDate time.Time       `json:"transactionDate"`
 	Notes           string          `json:"notes"`
@@ -308,109 +229,74 @@ type ImportTransactionRow struct {
 	Quantity  decimal.Decimal
 	Price     money.Money
 	Fees      money.Money
-	Currency  string
+	Currency  money.Currency
 	Date      time.Time
 	Notes     string
 }
 
 type Snapshot struct {
-	ID               uuid.UUID   `json:"id"`
-	PortfolioID      uuid.UUID   `json:"portfolioId"`
-	SnapshotDate     time.Time   `json:"snapshotDate"`
-	TotalValue       money.Money `json:"totalValue"`
-	Currency         string      `json:"currency"`
-	Allocation       []byte      `json:"allocation"`
-	TotalGainLoss    money.Money `json:"totalGainLoss"`
-	TotalGainLossPCT money.Money `json:"totalGainLossPCT"`
-	CreatedAt        time.Time   `json:"createdAt"`
-	Portfolio        Portfolio   `json:"portfolio,omitzero"`
+	ID               uuid.UUID      `json:"id"`
+	PortfolioID      uuid.UUID      `json:"portfolioId"`
+	SnapshotDate     time.Time      `json:"snapshotDate"`
+	TotalValue       money.Money    `json:"totalValue"`
+	Currency         money.Currency `json:"currency"`
+	Allocation       []byte         `json:"allocation"`
+	TotalGainLoss    money.Money    `json:"totalGainLoss"`
+	TotalGainLossPCT money.Money    `json:"totalGainLossPCT"`
+	CreatedAt        time.Time      `json:"createdAt"`
+	Portfolio        Portfolio      `json:"portfolio,omitzero"`
 }
 
 // AllocationItem is the result of grouping portfolio_entries by category.
 type AllocationItem struct {
-	Category    EntryCategory `json:"category"`
-	MarketValue string        `json:"marketValue"`
-	// Currency is what MarketValue is expressed in — the caller's requested
-	// display currency, or their stored preference. Every category in one
-	// response carries the same one: that is what makes the shares add up.
-	Currency string `json:"currency"`
-	// PositionsUnconverted counts the positions in this category that had no
-	// rate to Currency. They are included at face value, so a non-zero count
-	// means this category's total mixes currencies.
-	PositionsUnconverted int64 `json:"positionsUnconverted"`
+	Category             market.AssetType `json:"category"`
+	MarketValue          string           `json:"marketValue"`
+	Currency             money.Currency   `json:"currency"`
+	PositionsUnconverted int64            `json:"positionsUnconverted"`
 }
 
 // PlatformStats is the result of joining investment_sources with portfolio_entries stats.
 type PlatformStats struct {
-	ID          uuid.UUID  `json:"id"`
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	SourceType  SourceType `json:"sourceType"`
-	IsActive    bool       `json:"isActive"`
-	CreatedAt   time.Time  `json:"createdAt"`
-	UpdatedAt   time.Time  `json:"updatedAt"`
-	Investments int64      `json:"investments"`
-	TotalValue  string     `json:"totalValue"`
-	// DisplayCurrency is the currency TotalValue is expressed in: the one the
-	// caller asked for, or the account's preferred currency. The total sums
-	// entries settled in whatever currency each was bought in, so without this
-	// the figure has no unit and every client defaulted to reading it as USD.
-	DisplayCurrency string `json:"displayCurrency"`
-	// PositionsUnconverted counts the entries left at face value because no
-	// rate connected their cost currency to DisplayCurrency. They still count
-	// towards TotalValue — dropping them would understate the platform — so a
-	// non-zero count means the total adds different currencies together and a
-	// client has to say so rather than present it as one amount.
-	PositionsUnconverted int64 `json:"positionsUnconverted"`
+	ID                   uuid.UUID      `json:"id"`
+	Name                 string         `json:"name"`
+	Description          string         `json:"description"`
+	SourceType           SourceType     `json:"sourceType"`
+	IsActive             bool           `json:"isActive"`
+	CreatedAt            time.Time      `json:"createdAt"`
+	UpdatedAt            time.Time      `json:"updatedAt"`
+	Investments          int64          `json:"investments"`
+	TotalValue           string         `json:"totalValue"`
+	DisplayCurrency      money.Currency `json:"displayCurrency"`
+	PositionsUnconverted int64          `json:"positionsUnconverted"`
 }
 
 // SummaryView is the result of joining portfolios + risks + portfolio_summary view.
 type SummaryView struct {
-	ID               uuid.UUID `json:"id"`
-	Name             string    `json:"name"`
-	Description      string    `json:"description"`
-	Type             Type      `json:"type"`
-	BaseCurrency     string    `json:"baseCurrency"`
-	IsDefault        bool      `json:"isDefault"`
-	RiskID           uuid.UUID `json:"riskId"`
-	RiskName         string    `json:"riskName"`
-	TotalPositions   int64     `json:"totalPositions"`
-	TotalCostBase    string    `json:"totalCostBase"`
-	TotalMarketValue string    `json:"totalMarketValue"`
-	TotalGainLoss    string    `json:"totalGainLoss"`
-	TotalGainLossPct string    `json:"totalGainLossPct"`
-	CreatedAt        time.Time `json:"createdAt"`
-	// DisplayCurrency is the currency the totals above are expressed in. It
-	// equals BaseCurrency unless the caller requested conversion to another
-	// currency (see Service.GetPortfoliosSummaryInCurrency).
-	DisplayCurrency string `json:"displayCurrency"`
-	// FXConverted reports whether the totals are in the currency the caller
-	// asked for. It is false only when a display conversion was requested and no
-	// rate connected BaseCurrency to it, in which case the totals stayed in
-	// BaseCurrency: DisplayCurrency always says which currency they are in, and
-	// this says whether that is the one requested. Without it a list where one
-	// portfolio converted and another did not looks uniform, and gets summed.
-	FXConverted bool `json:"fxConverted"`
-	// The three counts below partition TotalPositions by where each position's
-	// price came from (see PriceSource). They are what tells a client how much
-	// of TotalMarketValue is an actual market value: when PositionsAtCost is
-	// the whole portfolio, TotalGainLoss is zero because nothing was priced,
-	// not because nothing moved.
-	PositionsPricedOwn    int64 `json:"positionsPricedOwn"`
-	PositionsPricedManual int64 `json:"positionsPricedManual"`
-	PositionsAtCost       int64 `json:"positionsAtCost"`
-	// PositionsUnconverted counts the positions whose amounts are not in
-	// BaseCurrency because no rate connected their currency to it. They are
-	// still included in the totals at face value, so a non-zero count means
-	// those totals add different currencies together — a client has to say so
-	// rather than present them as comparable. It cuts across the three counts
-	// above: a position can be priced by its owner's key and still unconverted.
-	PositionsUnconverted int64 `json:"positionsUnconverted"`
+	ID                    uuid.UUID      `json:"id"`
+	Name                  string         `json:"name"`
+	Description           string         `json:"description"`
+	Type                  Type           `json:"type"`
+	BaseCurrency          money.Currency `json:"baseCurrency"`
+	IsDefault             bool           `json:"isDefault"`
+	RiskID                uuid.UUID      `json:"riskId"`
+	RiskName              string         `json:"riskName"`
+	TotalPositions        int64          `json:"totalPositions"`
+	TotalCostBase         string         `json:"totalCostBase"`
+	TotalMarketValue      string         `json:"totalMarketValue"`
+	TotalGainLoss         string         `json:"totalGainLoss"`
+	TotalGainLossPct      string         `json:"totalGainLossPct"`
+	CreatedAt             time.Time      `json:"createdAt"`
+	DisplayCurrency       money.Currency `json:"displayCurrency"`
+	FXConverted           bool           `json:"fxConverted"`
+	PositionsPricedOwn    int64          `json:"positionsPricedOwn"`
+	PositionsPricedManual int64          `json:"positionsPricedManual"`
+	PositionsAtCost       int64          `json:"positionsAtCost"`
+	PositionsUnconverted  int64          `json:"positionsUnconverted"`
 }
 
 type SnapshotRow struct {
 	PortfolioID      uuid.UUID
-	BaseCurrency     string
+	BaseCurrency     money.Currency
 	TotalMarketValue string
 	TotalCostBase    string
 	TotalGainLoss    string
@@ -426,7 +312,7 @@ type GrowthPoint struct {
 	// Currency the three amounts above are expressed in. The aggregate series
 	// converts every portfolio into it; a single portfolio's series is already
 	// in its own base currency.
-	Currency string
+	Currency money.Currency
 	// How many portfolios went into this date without a rate to convert them,
 	// and are therefore added at face value. Zero is the normal case.
 	PortfoliosUnconverted int64
@@ -452,8 +338,7 @@ type GrowthSummary struct {
 	TotalGrowthPct string
 	GainLoss       string
 	GainLossPct    string
-	// Currency every amount in the series is expressed in.
-	Currency string
+	Currency       money.Currency
 }
 
 // PortfolioValuePoint is what one portfolio was worth on one snapshot date,

@@ -13,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // stubAuth injects the request locals the JWT middleware would normally set.
@@ -235,7 +236,7 @@ func TestHandlerGetPortfoliosSummary(t *testing.T) {
 		repo := new(fakeRepository{
 			getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]SummaryView, error) {
 				return []SummaryView{{
-					BaseCurrency: "USD", TotalMarketValue: "1000", TotalCostBase: "900",
+					BaseCurrency: money.USD, TotalMarketValue: "1000", TotalCostBase: "900",
 					TotalGainLoss: "100", TotalGainLossPct: "11.11",
 				}}, nil
 			},

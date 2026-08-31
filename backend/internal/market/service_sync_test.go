@@ -10,6 +10,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 	"github.com/yeferson59/finexia-app/internal/platform/secretbox"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // byoFixture wires a service with a real keyring, an in-memory credential store
@@ -64,7 +65,7 @@ func TestSyncAssetsForUser(t *testing.T) {
 			},
 		})
 
-		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: "USD"}), provider)
+		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: money.USD}), provider)
 		f.creds.seed(t, f.ring, userID, Finnhub, "user-finnhub-key")
 
 		got, errs := f.svc.SyncAssetsForUser(context.Background(), userID, []uuid.UUID{assetID})
@@ -95,7 +96,7 @@ func TestSyncAssetsForUser(t *testing.T) {
 			},
 		})
 
-		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: "USD"}), provider)
+		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: money.USD}), provider)
 		f.creds.seed(t, f.ring, userID, Finnhub, "the-users-own-key")
 
 		if _, errs := f.svc.SyncAssetsForUser(context.Background(), userID, []uuid.UUID{assetID}); len(errs) > 0 {
@@ -119,7 +120,7 @@ func TestSyncAssetsForUser(t *testing.T) {
 			},
 		})
 
-		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: "USD"}), provider)
+		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: money.USD}), provider)
 
 		_, errs := f.svc.SyncAssetsForUser(context.Background(), userID, []uuid.UUID{assetID})
 		if len(errs) != 1 || !errors.Is(errs[0], marketdata.ErrNoCredentials) {
@@ -128,7 +129,7 @@ func TestSyncAssetsForUser(t *testing.T) {
 	})
 
 	t.Run("one user's key cannot open another user's stored credential", func(t *testing.T) {
-		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: "USD"}), new(fakePriceProvider{}))
+		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: money.USD}), new(fakePriceProvider{}))
 
 		other := uuid.New()
 		f.creds.seed(t, f.ring, userID, Finnhub, "alices-key")
@@ -147,8 +148,8 @@ func TestSyncAssetsForUser(t *testing.T) {
 
 	t.Run("crypto prices come from an exchange rate on the split ticker", func(t *testing.T) {
 		provider := new(fakePriceProvider{
-			fetchExchangeRate: func(_ context.Context, from, to string) (marketdata.ExchangeRateResult, error) {
-				if from != "BTC" || to != "USD" {
+			fetchExchangeRate: func(_ context.Context, from, to money.Currency) (marketdata.ExchangeRateResult, error) {
+				if from != "BTC" || to != money.USD {
 					t.Errorf("pair = %s/%s, want BTC/USD", from, to)
 				}
 
@@ -156,7 +157,7 @@ func TestSyncAssetsForUser(t *testing.T) {
 			},
 		})
 
-		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "BTC-USD", AssetType: Crypto, Currency: "USD"}), provider)
+		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "BTC-USD", AssetType: Crypto, Currency: money.USD}), provider)
 		f.creds.seed(t, f.ring, userID, Finnhub, "key")
 
 		got, errs := f.svc.SyncAssetsForUser(context.Background(), userID, []uuid.UUID{assetID})
@@ -177,7 +178,7 @@ func TestSyncAssetsForUser(t *testing.T) {
 			},
 		})
 
-		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "CASH", AssetType: Cash, Currency: "USD"}), provider)
+		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "CASH", AssetType: Cash, Currency: money.USD}), provider)
 		f.creds.seed(t, f.ring, userID, Finnhub, "key")
 
 		got, errs := f.svc.SyncAssetsForUser(context.Background(), userID, []uuid.UUID{assetID})
@@ -204,7 +205,7 @@ func TestSyncRecordsTheProviderVerdictOnTheRightKey(t *testing.T) {
 
 	repo := new(fakeRepository{
 		getAssetByID: func(context.Context, uuid.UUID) (Asset, error) {
-			return Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: "USD"}, nil
+			return Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: money.USD}, nil
 		},
 	})
 
@@ -240,7 +241,7 @@ func TestSyncRatesForUser(t *testing.T) {
 
 	t.Run("rates are stored against the user who fetched them", func(t *testing.T) {
 		provider := new(fakePriceProvider{
-			fetchExchangeRate: func(_ context.Context, from, to string) (marketdata.ExchangeRateResult, error) {
+			fetchExchangeRate: func(_ context.Context, from, to money.Currency) (marketdata.ExchangeRateResult, error) {
 				return marketdata.ExchangeRateResult{Rate: "1.09", Source: Finnhub}, nil
 			},
 		})
@@ -248,7 +249,7 @@ func TestSyncRatesForUser(t *testing.T) {
 		f := newBYOFixture(t, new(fakeRepository{}), provider)
 		f.creds.seed(t, f.ring, userID, Finnhub, "key")
 
-		got, errs := f.svc.SyncRatesForUser(context.Background(), userID, []CurrencyPair{{From: "EUR", To: "USD"}})
+		got, errs := f.svc.SyncRatesForUser(context.Background(), userID, []CurrencyPair{{From: money.EUR, To: money.USD}})
 		if len(errs) > 0 {
 			t.Fatalf("SyncRatesForUser: %v", errs)
 		}
@@ -265,7 +266,7 @@ func TestSyncRatesForUser(t *testing.T) {
 
 	t.Run("unparseable rates are rejected", func(t *testing.T) {
 		provider := new(fakePriceProvider{
-			fetchExchangeRate: func(context.Context, string, string) (marketdata.ExchangeRateResult, error) {
+			fetchExchangeRate: func(context.Context, money.Currency, money.Currency) (marketdata.ExchangeRateResult, error) {
 				return marketdata.ExchangeRateResult{Rate: "not-a-number", Source: Finnhub}, nil
 			},
 		})
@@ -273,7 +274,7 @@ func TestSyncRatesForUser(t *testing.T) {
 		f := newBYOFixture(t, new(fakeRepository{}), provider)
 		f.creds.seed(t, f.ring, userID, Finnhub, "key")
 
-		got, errs := f.svc.SyncRatesForUser(context.Background(), userID, []CurrencyPair{{From: "EUR", To: "USD"}})
+		got, errs := f.svc.SyncRatesForUser(context.Background(), userID, []CurrencyPair{{From: money.EUR, To: money.USD}})
 		if len(got) != 0 || len(errs) != 1 {
 			t.Fatalf("got %+v / %v, want no results and one error", got, errs)
 		}
@@ -281,7 +282,7 @@ func TestSyncRatesForUser(t *testing.T) {
 
 	t.Run("a fetch failure is collected per pair", func(t *testing.T) {
 		provider := new(fakePriceProvider{
-			fetchExchangeRate: func(context.Context, string, string) (marketdata.ExchangeRateResult, error) {
+			fetchExchangeRate: func(context.Context, money.Currency, money.Currency) (marketdata.ExchangeRateResult, error) {
 				return marketdata.ExchangeRateResult{}, errors.New("provider down")
 			},
 		})
@@ -289,7 +290,7 @@ func TestSyncRatesForUser(t *testing.T) {
 		f := newBYOFixture(t, new(fakeRepository{}), provider)
 		f.creds.seed(t, f.ring, userID, Finnhub, "key")
 
-		pairs := []CurrencyPair{{"EUR", "USD"}, {"GBP", "USD"}, {"USD", "COP"}}
+		pairs := []CurrencyPair{{money.EUR, money.USD}, {money.GBP, money.USD}, {money.USD, money.COP}}
 
 		_, errs := f.svc.SyncRatesForUser(context.Background(), userID, pairs)
 		if len(errs) != len(pairs) {

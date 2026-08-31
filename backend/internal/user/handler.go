@@ -163,7 +163,7 @@ func (h *handler) UpdateMe(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
-	u, err := h.service.UpdateCurrentUser(c, userID, req.Name, req.PreferredCurrency, req.Image)
+	u, err := h.service.UpdateCurrentUser(c, userID, req.Name, req.Image, req.PreferredCurrency)
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error updating user", "users:me:update")
 	}

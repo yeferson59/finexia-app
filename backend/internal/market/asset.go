@@ -45,14 +45,14 @@ func (a AssetType) IsValid() bool {
 // the portfolio module references it (entries hold an Asset) but does not own
 // its lifecycle.
 type Asset struct {
-	ID             uuid.UUID    `json:"id"`
-	Ticker         string       `json:"ticker"`
-	Name           string       `json:"name"`
-	AssetType      AssetType    `json:"assetType"`
-	Exchange       string       `json:"exchange"`
-	Currency       string       `json:"currency"`
-	CurrentPrice   *money.Money `json:"currentPrice"`
-	PriceUpdatedAt *time.Time   `json:"priceUpdatedAt"`
+	ID             uuid.UUID      `json:"id"`
+	Ticker         string         `json:"ticker"`
+	Name           string         `json:"name"`
+	AssetType      AssetType      `json:"assetType"`
+	Exchange       string         `json:"exchange"`
+	Currency       money.Currency `json:"currency"`
+	CurrentPrice   *money.Money   `json:"currentPrice"`
+	PriceUpdatedAt *time.Time     `json:"priceUpdatedAt"`
 	// IsCurated marks a row the operator vouches for, which is what makes it
 	// visible to every user. A contributed row is only visible to the users who
 	// contributed it, so the flag doubles as the "everyone" audience.
@@ -72,50 +72,6 @@ type Asset struct {
 type CatalogView struct {
 	ViewerID uuid.UUID
 	All      bool
-}
-
-// NormalizeCurrencyCode validates a currency against gofinance's ISO 4217
-// table and returns its canonical code. Length alone was never the test that
-// mattered: every amount this module stores is read back as a money.Money, and
-// money.CurrencyFromISOCode is what has to accept the code for that to work.
-// A three-letter string it rejects — "DOL", "ABC" — reaches the database fine
-// and then costs the asset its price, because scanAssetCurrentPrice below
-// gives up on exactly the same lookup.
-//
-// It is exported because the portfolio importer writes assets through the same
-// path and needs the same answer.
-func NormalizeCurrencyCode(raw string) (string, bool) {
-	cur, err := money.GetCurrencyFromISOCode(raw)
-	if err != nil {
-		return "", false
-	}
-
-	code, err := cur.GetCurrencyISOCode()
-	if err != nil {
-		return "", false
-	}
-
-	return string(code[:]), true
-}
-
-// scanAssetCurrentPrice attaches the current price (stored as a string) to an
-// asset, ignoring malformed values.
-func scanAssetCurrentPrice(asset *Asset, priceStr *string) {
-	if priceStr == nil {
-		return
-	}
-
-	cur, err := money.GetCurrencyFromISOCode(asset.Currency)
-	if err != nil {
-		return
-	}
-
-	m, err := money.NewMoneyFromString(*priceStr, cur)
-	if err != nil {
-		return
-	}
-
-	asset.CurrentPrice = new(m)
 }
 
 var categorySynonyms = map[string]AssetType{

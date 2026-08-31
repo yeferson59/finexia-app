@@ -51,7 +51,7 @@ func (s *Service) GetRecentUserTransactions(ctx context.Context, userID uuid.UUI
 
 // GetAssetAllocation totals the user's holdings per category in one currency.
 // An empty targetCurrency reports in the user's stored preference.
-func (s *Service) GetAssetAllocation(ctx context.Context, userID uuid.UUID, targetCurrency string) ([]AllocationItem, error) {
+func (s *Service) GetAssetAllocation(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AllocationItem, error) {
 	return s.repo.GetAssetAllocationByUserID(ctx, userID, targetCurrency)
 }
 
@@ -65,7 +65,7 @@ func (s *Service) DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID
 	return s.repo.DeleteTransaction(ctx, userID, txnID)
 }
 
-func (s *Service) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
+func (s *Service) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency money.Currency, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
 	txn, err := s.repo.CreateTransaction(ctx, userID, entryID, txnType, quantity, price, currency, fees, transactionDate, notes)
 	if err != nil {
 		return Transaction{}, err
@@ -109,7 +109,7 @@ func (s *Service) sendTransactionAlert(userID, entryID uuid.UUID, txn Transactio
 		Quantity:        qty,
 		Price:           priceStr,
 		Total:           totalStr,
-		Currency:        txn.Currency,
+		Currency:        txn.Currency.String(),
 		TransactionDate: txn.TransactionDate.Format("02 Jan 2006"),
 		DashboardURL:    s.cfg.FrontendURL + "/dashboard/portfolios",
 	}

@@ -15,6 +15,7 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // The API key used throughout. Every test in this file eventually checks that
@@ -220,7 +221,7 @@ func TestSyncMarketDataHandler(t *testing.T) {
 	repoFor := func() *fakeRepository {
 		return new(fakeRepository{
 			getAssetByID: func(context.Context, uuid.UUID) (Asset, error) {
-				return Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: "USD"}, nil
+				return Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: money.USD}, nil
 			},
 		})
 	}
@@ -233,7 +234,7 @@ func TestSyncMarketDataHandler(t *testing.T) {
 			fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
 				return marketdata.QuoteResult{Price: "190.55", Source: Finnhub}, nil
 			},
-			fetchExchangeRate: func(context.Context, string, string) (marketdata.ExchangeRateResult, error) {
+			fetchExchangeRate: func(context.Context, money.Currency, money.Currency) (marketdata.ExchangeRateResult, error) {
 				return marketdata.ExchangeRateResult{Rate: "4100.5", Source: Finnhub}, nil
 			},
 		})
@@ -241,7 +242,7 @@ func TestSyncMarketDataHandler(t *testing.T) {
 		f := newBYOFixture(t, repoFor(), provider)
 		holdings := stubHoldings{
 			assetIDs: []uuid.UUID{assetID},
-			pairs:    []CurrencyPair{{From: "USD", To: "COP"}},
+			pairs:    []CurrencyPair{{From: money.USD, To: money.COP}},
 		}
 		userID := uuid.New()
 		app := newCredentialApp(t, f, holdings, userID)

@@ -9,6 +9,7 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // The growth series is the one piece of this package whose correctness lives in
@@ -143,7 +144,7 @@ func TestGrowthSeriesDoesNotCountABackdatedPurchaseAsAWindfall(t *testing.T) {
 	repo := NewPostgresRepository(pool)
 	userID := backdatedPortfolio(t, pool)
 
-	points, err := repo.GetPortfolioGrowthByUserID(context.Background(), userID, "", false, time.Time{})
+	points, err := repo.GetPortfolioGrowthByUserID(context.Background(), userID, money.USD, false, time.Time{})
 	if err != nil {
 		t.Fatalf("GetPortfolioGrowthByUserID: %v", err)
 	}
@@ -181,7 +182,7 @@ func TestGrowthSeriesFlowLandsOnTheDayTheValueMoves(t *testing.T) {
 	repo := NewPostgresRepository(pool)
 	userID := backdatedPortfolio(t, pool)
 
-	points, err := repo.GetPortfolioGrowthByUserID(context.Background(), userID, "", false, time.Time{})
+	points, err := repo.GetPortfolioGrowthByUserID(context.Background(), userID, money.USD, false, time.Time{})
 	if err != nil {
 		t.Fatalf("GetPortfolioGrowthByUserID: %v", err)
 	}

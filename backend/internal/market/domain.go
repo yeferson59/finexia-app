@@ -6,12 +6,13 @@ import (
 	"uuid"
 
 	"github.com/yeferson59/gofinance/v2/decimal"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type ExchangeRate struct {
 	ID           uuid.UUID       `json:"id"`
-	FromCurrency string          `json:"fromCurrency"`
-	ToCurrency   string          `json:"toCurrency"`
+	FromCurrency money.Currency  `json:"fromCurrency"`
+	ToCurrency   money.Currency  `json:"toCurrency"`
 	Rate         decimal.Decimal `json:"rate"`
 	RateDate     time.Time       `json:"rateDate"`
 	// Source says who put this number here: ManualRateSource for a rate an

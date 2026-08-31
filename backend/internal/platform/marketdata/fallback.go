@@ -3,6 +3,8 @@ package marketdata
 import (
 	"context"
 	"errors"
+
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 var _ Provider = (*FallbackProvider)(nil)
@@ -39,7 +41,7 @@ func (f *FallbackProvider) FetchQuote(ctx context.Context, symbol string) (Quote
 	return QuoteResult{}, errors.Join(errs...)
 }
 
-func (f *FallbackProvider) FetchExchangeRate(ctx context.Context, from, to string) (ExchangeRateResult, error) {
+func (f *FallbackProvider) FetchExchangeRate(ctx context.Context, from, to money.Currency) (ExchangeRateResult, error) {
 	var errs []error
 
 	for _, p := range f.providers {

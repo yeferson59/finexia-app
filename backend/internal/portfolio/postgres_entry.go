@@ -2,7 +2,6 @@ package portfolio
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"uuid"
@@ -11,7 +10,6 @@ import (
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
-	"github.com/yeferson59/finexia-app/internal/market"
 	"github.com/yeferson59/finexia-app/internal/platform/database"
 )
 
@@ -48,7 +46,6 @@ func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfo
 	entries := make([]Entry, 0)
 	for rows.Next() {
 		var entry Entry
-		var assetPriceStr *string
 
 		if err := rows.Scan(
 			&entry.ID,
@@ -68,7 +65,7 @@ func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfo
 			&entry.Asset.AssetType,
 			&entry.Asset.Exchange,
 			&entry.Asset.Currency,
-			&assetPriceStr,
+			&entry.Asset.CurrentPrice,
 			&entry.Asset.PriceUpdatedAt,
 			&entry.PriceSource,
 			&entry.Asset.CreatedAt,
@@ -77,12 +74,7 @@ func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfo
 			return nil, err
 		}
 
-		scanAssetCurrentPrice(&entry.Asset, assetPriceStr)
-		// The position's class follows the asset, so it is read off the row the
-		// join already brought rather than off a column of its own.
-		entry.Category = entryCategoryFor(entry.Asset.AssetType)
-
-		fmt.Println("price es ", entry.Price)
+		entry.Category = entry.Asset.AssetType
 		entry.Price.SetCurrency(entry.CostCurrency)
 
 		entries = append(entries, entry)
@@ -111,7 +103,7 @@ func (r *PostgresRepository) GetEntryWithAsset(ctx context.Context, entryID uuid
 	return entry, nil
 }
 
-func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency string, entryDate time.Time, notes string) (Entry, error) {
+func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency money.Currency, entryDate time.Time, notes string) (Entry, error) {
 	var entry Entry
 
 	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
@@ -146,8 +138,6 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 			return err
 		}
 
-		// Read the position back with the values the trigger just recomputed.
-		var assetType market.AssetType
 		if err := tx.QueryRow(ctx, `
 		SELECT pe.id, pe.portfolio_id, pe.asset_id, pe.source_id, pe.quantity, pe.price, pe.cost_currency, a.asset_type, pe.entry_date, COALESCE(pe.notes, ''), pe.created_at, pe.updated_at
 		FROM portfolio_entries pe
@@ -161,7 +151,7 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 			&entry.Quantity,
 			&entry.Price,
 			&entry.CostCurrency,
-			&assetType,
+			&entry.Category,
 			&entry.EntryDate,
 			&entry.Notes,
 			&entry.CreatedAt,
@@ -170,13 +160,7 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 			return err
 		}
 
-		entry.Category = entryCategoryFor(assetType)
-		price, err := entry.Price.SetCurrency(entry.CostCurrency)
-		if err != nil {
-			return err
-		}
-
-		entry.Price = price
+		entry.Price.SetCurrency(entry.CostCurrency)
 
 		return nil
 	}); err != nil {

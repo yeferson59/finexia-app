@@ -2,6 +2,7 @@ package market
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -36,7 +37,7 @@ func (s *Service) GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, e
 
 // CreateAsset curates a catalog row. Operator-only, and the seed runs through
 // it too.
-func (s *Service) CreateAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error) {
+func (s *Service) CreateAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error) {
 	input, err := normalizeAssetInput(ticker, name, assetType, exchange, currency)
 	if err != nil {
 		return Asset{}, err
@@ -62,7 +63,7 @@ const maxContributedAssetsPerDay = 50
 // caller's side both mean "the ticker you asked for is now in your catalog",
 // and distinguishing them would report on whether another user had already
 // contributed that ticker.
-func (s *Service) ContributeAsset(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error) {
+func (s *Service) ContributeAsset(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error) {
 	input, err := normalizeAssetInput(ticker, name, assetType, exchange, currency)
 	if err != nil {
 		return Asset{}, err
@@ -85,20 +86,24 @@ type assetInput struct {
 	name      string
 	assetType AssetType
 	exchange  string
-	currency  string
+	currency  money.Currency
 }
 
 // normalizeAssetInput trims, upper-cases and validates what both creation paths
 // receive. It lives in the service rather than the handler because the user
 // path is no longer the only untrusted one: a request body and a spreadsheet
 // row reach the same table, and the column limits have to hold for both.
-func normalizeAssetInput(ticker, name string, assetType AssetType, exchange, currency string) (assetInput, error) {
+func normalizeAssetInput(ticker, name string, assetType AssetType, exchange string, currency money.Currency) (assetInput, error) {
+	if !currency.Valid() {
+		return assetInput{}, errors.New("invalid currency")
+	}
+
 	in := assetInput{
 		ticker:    strings.ToUpper(strings.TrimSpace(ticker)),
 		name:      strings.TrimSpace(name),
 		assetType: assetType,
 		exchange:  strings.TrimSpace(exchange),
-		currency:  strings.ToUpper(strings.TrimSpace(currency)),
+		currency:  currency,
 	}
 
 	switch {
@@ -125,12 +130,6 @@ func normalizeAssetInput(ticker, name string, assetType AssetType, exchange, cur
 	if !in.assetType.IsValid() {
 		return assetInput{}, errAssetTypeInvalid
 	}
-
-	code, ok := NormalizeCurrencyCode(in.currency)
-	if !ok {
-		return assetInput{}, errAssetCurrencyInvalid
-	}
-	in.currency = code
 
 	return in, nil
 }

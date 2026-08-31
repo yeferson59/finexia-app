@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -43,7 +44,7 @@ const daily = `<?xml version="1.0" encoding="UTF-8"?>
 	</Cube>
 </gesmes:Envelope>`
 
-func rateFor(rates []marketdata.PublicRate, from, to string) (marketdata.PublicRate, bool) {
+func rateFor(rates []marketdata.PublicRate, from, to money.Currency) (marketdata.PublicRate, bool) {
 	for _, r := range rates {
 		if r.From == from && r.To == to {
 			return r, true
@@ -71,18 +72,18 @@ func TestFetchRates(t *testing.T) {
 		}
 
 		// 1 EUR = 1.25 USD, so a dollar buys 0.8 euro and a euro buys 1.25.
-		eurUSD, ok := rateFor(rates, "EUR", "USD")
+		eurUSD, ok := rateFor(rates, money.EUR, money.USD)
 		if !ok || eurUSD.Rate != "1.25" {
 			t.Errorf("EUR/USD = %q (found=%v), want 1.25", eurUSD.Rate, ok)
 		}
-		usdEUR, ok := rateFor(rates, "USD", "EUR")
+		usdEUR, ok := rateFor(rates, money.USD, money.EUR)
 		if !ok || usdEUR.Rate != "0.8" {
 			t.Errorf("USD/EUR = %q (found=%v), want 0.8", usdEUR.Rate, ok)
 		}
 
 		// A cross pair is derived through the euro: 150 JPY per EUR over 1.25
 		// USD per EUR is 120 JPY per dollar.
-		usdJPY, ok := rateFor(rates, "USD", "JPY")
+		usdJPY, ok := rateFor(rates, money.USD, money.JPY)
 		if !ok || usdJPY.Rate != "120" {
 			t.Errorf("USD/JPY = %q (found=%v), want 120", usdJPY.Rate, ok)
 		}
@@ -108,7 +109,7 @@ func TestFetchRates(t *testing.T) {
 			t.Fatalf("FetchRates: %v", err)
 		}
 
-		if _, ok := rateFor(rates, "USD", "ISK"); ok {
+		if _, ok := rateFor(rates, money.USD, money.ISK); ok {
 			t.Error("ISK was published; only the majors should be")
 		}
 		// EUR, JPY and GBP are majors the document quotes: two directions each.
@@ -157,10 +158,10 @@ func TestFetchRates(t *testing.T) {
 		if err != nil {
 			t.Fatalf("FetchRates: %v", err)
 		}
-		if _, ok := rateFor(rates, "USD", "GBP"); ok {
+		if _, ok := rateFor(rates, money.USD, money.GBP); ok {
 			t.Error("GBP was published from an unparsable quote")
 		}
-		if _, ok := rateFor(rates, "EUR", "USD"); !ok {
+		if _, ok := rateFor(rates, money.EUR, money.USD); !ok {
 			t.Error("EUR/USD is missing; a bad GBP quote must not drop it")
 		}
 	})

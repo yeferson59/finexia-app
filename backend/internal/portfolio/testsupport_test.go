@@ -59,7 +59,7 @@ type summaryConversion struct {
 // summary. Every display-currency scenario needs the same two stubs and
 // differs only in the figures it asserts on, so they share this rather than
 // each rebuilding the repository around them.
-func convertSummary(t *testing.T, userID uuid.UUID, summary SummaryView, target string, rates summaryRates) summaryConversion {
+func convertSummary(t *testing.T, userID uuid.UUID, summary SummaryView, target money.Currency, rates summaryRates) summaryConversion {
 	t.Helper()
 
 	out := summaryConversion{}
@@ -67,8 +67,8 @@ func convertSummary(t *testing.T, userID uuid.UUID, summary SummaryView, target 
 		getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]SummaryView, error) {
 			return []SummaryView{summary}, nil
 		},
-		getExchangeRateByPair: func(_ context.Context, from, to string) (decimal.Decimal, error) {
-			pair := from + "/" + to
+		getExchangeRateByPair: func(_ context.Context, from, to money.Currency) (decimal.Decimal, error) {
+			pair := from.String() + "/" + to.String()
 			out.lookups = append(out.lookups, pair)
 			if raw, ok := rates[pair]; ok {
 				return mustDecimal(t, raw), nil
@@ -122,32 +122,32 @@ type fakeRepository struct {
 	getPortfoliosByUserID           func(ctx context.Context, userID uuid.UUID) ([]Portfolio, error)
 	getPortfoliosSummaryByUserID    func(ctx context.Context, userID uuid.UUID) ([]SummaryView, error)
 	getPortfolioByID                func(ctx context.Context, portfolioID, userID uuid.UUID) (Portfolio, error)
-	createPortfolio                 func(ctx context.Context, userID uuid.UUID, name, description, baseCurrency string, riskID uuid.UUID, typePortfolio Type, priceValue money.Money, isDefault bool) (Portfolio, error)
+	createPortfolio                 func(ctx context.Context, userID uuid.UUID, name, description string, baseCurrency money.Currency, riskID uuid.UUID, typePortfolio Type, priceValue money.Money, isDefault bool) (Portfolio, error)
 	updatePortfolio                 func(ctx context.Context, userID, portfolioID uuid.UUID, name, description string, portfolioType Type, riskID uuid.UUID, isDefault bool) (Portfolio, error)
 	getEntriesByPortfolioID         func(ctx context.Context, portfolioID uuid.UUID) ([]Entry, error)
 	getTopTransactionByPortfolio    func(ctx context.Context, userID, portfolioID uuid.UUID) (TopTransactionDTO, error)
 	createPlatform                  func(ctx context.Context, userID uuid.UUID, sourceType SourceType, name, description string) (InvestmentSource, error)
-	getPlatformsWithStats           func(ctx context.Context, userID uuid.UUID, displayCurrency string) ([]PlatformStats, error)
+	getPlatformsWithStats           func(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]PlatformStats, error)
 	updatePlatform                  func(ctx context.Context, userID, sourceID uuid.UUID, name, description string, sourceType SourceType, isActive bool) (PlatformStats, error)
 	deletePlatform                  func(ctx context.Context, userID, sourceID uuid.UUID) error
-	createPortfolioEntry            func(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency string, entryDate time.Time, notes string) (Entry, error)
+	createPortfolioEntry            func(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency money.Currency, entryDate time.Time, notes string) (Entry, error)
 	getEntryWithAsset               func(ctx context.Context, entryID uuid.UUID) (Entry, error)
 	getTransactionsByEntryID        func(ctx context.Context, userID, entryID uuid.UUID) ([]Transaction, error)
 	countAssetTransactions          func(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error)
 	getAssetTransactionsPaginated   func(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, limit, offset int) ([]Transaction, error)
 	getRecentTransactionsByUserID   func(ctx context.Context, userID uuid.UUID, limit int) ([]Transaction, error)
-	getAssetAllocationByUserID      func(ctx context.Context, userID uuid.UUID, targetCurrency string) ([]AllocationItem, error)
-	createTransaction               func(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
+	getAssetAllocationByUserID      func(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AllocationItem, error)
+	createTransaction               func(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency money.Currency, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
 	updateTransaction               func(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
 	deleteTransaction               func(ctx context.Context, userID, txnID uuid.UUID) error
 	importEntryTransactions         func(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []ImportTransactionRow) (int, error)
 	getAllPortfolioSummaryRows      func(ctx context.Context) ([]SnapshotRow, error)
-	upsertPortfolioSnapshot         func(ctx context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, currency, totalGainLoss, totalGainLossPct string) error
-	getPortfolioGrowthByUserID      func(ctx context.Context, userID uuid.UUID, currency string, hasSince bool, since time.Time) ([]GrowthPoint, error)
+	upsertPortfolioSnapshot         func(ctx context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, totalGainLoss, totalGainLossPct string, currency money.Currency) error
+	getPortfolioGrowthByUserID      func(ctx context.Context, userID uuid.UUID, currency money.Currency, hasSince bool, since time.Time) ([]GrowthPoint, error)
 	getPortfolioGrowthByPortfolioID func(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
 	getPortfolioValuesAsOf          func(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error)
-	getExchangeRateByPair           func(ctx context.Context, from, to string) (decimal.Decimal, error)
-	getUserExchangeRateByPair       func(ctx context.Context, userID uuid.UUID, from, to string) (decimal.Decimal, error)
+	getExchangeRateByPair           func(ctx context.Context, from, to money.Currency) (decimal.Decimal, error)
+	getUserExchangeRateByPair       func(ctx context.Context, userID uuid.UUID, from, to money.Currency) (decimal.Decimal, error)
 	getHeldAssetIDs                 func(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
 	getRequiredCurrencyPairs        func(ctx context.Context, userID uuid.UUID) ([]CurrencyPair, error)
 
@@ -174,7 +174,7 @@ func (f *fakeRepository) GetPortfolioByID(ctx context.Context, portfolioID, user
 	return f.getPortfolioByID(ctx, portfolioID, userID)
 }
 
-func (f *fakeRepository) CreatePortfolio(ctx context.Context, userID uuid.UUID, name, description, baseCurrency string, riskID uuid.UUID, typePortfolio Type, priceValue money.Money, isDefault bool) (Portfolio, error) {
+func (f *fakeRepository) CreatePortfolio(ctx context.Context, userID uuid.UUID, name, description string, baseCurrency money.Currency, riskID uuid.UUID, typePortfolio Type, priceValue money.Money, isDefault bool) (Portfolio, error) {
 	return f.createPortfolio(ctx, userID, name, description, baseCurrency, riskID, typePortfolio, priceValue, isDefault)
 }
 
@@ -194,7 +194,7 @@ func (f *fakeRepository) CreatePlatform(ctx context.Context, userID uuid.UUID, s
 	return f.createPlatform(ctx, userID, sourceType, name, description)
 }
 
-func (f *fakeRepository) GetPlatformsWithStats(ctx context.Context, userID uuid.UUID, displayCurrency string) ([]PlatformStats, error) {
+func (f *fakeRepository) GetPlatformsWithStats(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]PlatformStats, error) {
 	return f.getPlatformsWithStats(ctx, userID, displayCurrency)
 }
 
@@ -206,7 +206,7 @@ func (f *fakeRepository) DeletePlatform(ctx context.Context, userID, sourceID uu
 	return f.deletePlatform(ctx, userID, sourceID)
 }
 
-func (f *fakeRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency string, entryDate time.Time, notes string) (Entry, error) {
+func (f *fakeRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency money.Currency, entryDate time.Time, notes string) (Entry, error) {
 	return f.createPortfolioEntry(ctx, userID, portfolioID, assetID, sourceID, txnType, quantity, price, costCurrency, entryDate, notes)
 }
 
@@ -230,11 +230,11 @@ func (f *fakeRepository) GetRecentTransactionsByUserID(ctx context.Context, user
 	return f.getRecentTransactionsByUserID(ctx, userID, limit)
 }
 
-func (f *fakeRepository) GetAssetAllocationByUserID(ctx context.Context, userID uuid.UUID, targetCurrency string) ([]AllocationItem, error) {
+func (f *fakeRepository) GetAssetAllocationByUserID(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AllocationItem, error) {
 	return f.getAssetAllocationByUserID(ctx, userID, targetCurrency)
 }
 
-func (f *fakeRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
+func (f *fakeRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency money.Currency, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
 	return f.createTransaction(ctx, userID, entryID, txnType, quantity, price, currency, fees, transactionDate, notes)
 }
 
@@ -254,11 +254,11 @@ func (f *fakeRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]Snap
 	return f.getAllPortfolioSummaryRows(ctx)
 }
 
-func (f *fakeRepository) UpsertPortfolioSnapshot(ctx context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, currency, totalGainLoss, totalGainLossPct string) error {
-	return f.upsertPortfolioSnapshot(ctx, portfolioID, snapshotDate, totalValue, currency, totalGainLoss, totalGainLossPct)
+func (f *fakeRepository) UpsertPortfolioSnapshot(ctx context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, totalGainLoss, totalGainLossPct string, currency money.Currency) error {
+	return f.upsertPortfolioSnapshot(ctx, portfolioID, snapshotDate, totalValue, totalGainLoss, totalGainLossPct, currency)
 }
 
-func (f *fakeRepository) GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, currency string, hasSince bool, since time.Time) ([]GrowthPoint, error) {
+func (f *fakeRepository) GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, currency money.Currency, hasSince bool, since time.Time) ([]GrowthPoint, error) {
 	return f.getPortfolioGrowthByUserID(ctx, userID, currency, hasSince, since)
 }
 
@@ -273,7 +273,7 @@ func (f *fakeRepository) GetPortfolioValuesAsOf(ctx context.Context, userID uuid
 	return f.getPortfolioValuesAsOf(ctx, userID, asOf)
 }
 
-func (f *fakeRepository) GetExchangeRateByPair(ctx context.Context, from, to string) (decimal.Decimal, error) {
+func (f *fakeRepository) GetExchangeRateByPair(ctx context.Context, from, to money.Currency) (decimal.Decimal, error) {
 	return f.getExchangeRateByPair(ctx, from, to)
 }
 
@@ -420,7 +420,7 @@ func newTestServicesFull(repo *fakeRepository, storage *memStorage, mailer Maile
 
 // BYO-key additions. The user-rate hook defaults to "this user has no rate of
 // their own", so existing scenarios keep exercising the shared table.
-func (f *fakeRepository) GetUserExchangeRateByPair(ctx context.Context, userID uuid.UUID, from, to string) (decimal.Decimal, error) {
+func (f *fakeRepository) GetUserExchangeRateByPair(ctx context.Context, userID uuid.UUID, from, to money.Currency) (decimal.Decimal, error) {
 	if f.getUserExchangeRateByPair == nil {
 		return decimal.Decimal{}, ErrExchangeRateNotFound
 	}

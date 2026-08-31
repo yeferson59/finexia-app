@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"uuid"
+
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 func (r *PostgresRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]SnapshotRow, error) {
@@ -37,11 +39,13 @@ func (r *PostgresRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]
 		); err != nil {
 			return nil, err
 		}
+
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 
@@ -49,7 +53,8 @@ func (r *PostgresRepository) UpsertPortfolioSnapshot(
 	ctx context.Context,
 	portfolioID uuid.UUID,
 	snapshotDate time.Time,
-	totalValue, currency, totalGainLoss, totalGainLossPct string,
+	totalValue, totalGainLoss, totalGainLossPct string,
+	currency money.Currency,
 ) error {
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO portfolio_snapshots
@@ -61,6 +66,7 @@ func (r *PostgresRepository) UpsertPortfolioSnapshot(
 			total_gain_loss     = EXCLUDED.total_gain_loss,
 			total_gain_loss_pct = EXCLUDED.total_gain_loss_pct
 	`, portfolioID, snapshotDate, totalValue, currency, totalGainLoss, totalGainLossPct)
+
 	return err
 }
 
@@ -140,7 +146,7 @@ func (r *PostgresRepository) GetPortfolioValuesAsOf(ctx context.Context, userID 
 func (r *PostgresRepository) GetPortfolioGrowthByUserID(
 	ctx context.Context,
 	userID uuid.UUID,
-	currency string,
+	currency money.Currency,
 	hasSince bool,
 	since time.Time,
 ) ([]GrowthPoint, error) {
@@ -249,9 +255,11 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(
 		}
 		result = append(result, point)
 	}
+
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 
@@ -337,8 +345,10 @@ func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(
 		}
 		result = append(result, point)
 	}
+
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }

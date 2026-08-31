@@ -47,12 +47,8 @@ func retagCurrency(m *money.Money, code string) {
 	if m == nil {
 		return
 	}
-	newMoney, err := m.SetCurrency(currencyOf(code))
-	if err != nil {
-		newMoney, _ = m.SetCurrency(money.USD)
-	}
 
-	*m = newMoney
+	m.SetCurrency(currencyOf(code))
 }
 
 // scanAssetCurrentPrice populates asset.CurrentPrice from a nullable numeric string
@@ -62,11 +58,8 @@ func scanAssetCurrentPrice(asset *market.Asset, priceStr *string) {
 	if priceStr == nil {
 		return
 	}
-	cur, err := money.GetCurrencyFromISOCode(asset.Currency)
-	if err != nil {
-		return
-	}
-	m, err := money.NewMoneyFromString(*priceStr, cur)
+
+	m, err := money.NewMoneyFromString(*priceStr, asset.Currency)
 	if err != nil {
 		return
 	}

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"uuid"
+
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 func TestParsePeriod(t *testing.T) {
@@ -150,23 +152,25 @@ func TestGetPortfolioGrowthUsesPeriodFilter(t *testing.T) {
 	userID := uuid.New()
 	var gotHasSince bool
 	var gotSince time.Time
-	var gotCurrency string
+	var gotCurrency money.Currency
 
 	repo := new(fakeRepository{
-		getPortfolioGrowthByUserID: func(_ context.Context, uid uuid.UUID, currency string, hasSince bool, since time.Time) ([]GrowthPoint, error) {
+		getPortfolioGrowthByUserID: func(_ context.Context, uid uuid.UUID, currency money.Currency, hasSince bool, since time.Time) ([]GrowthPoint, error) {
 			if uid != userID {
 				t.Errorf("userID = %s, want %s", uid, userID)
 			}
+
 			gotHasSince, gotSince, gotCurrency = hasSince, since, currency
+
 			return []GrowthPoint{
-				{TotalValue: "100.00", Currency: "COP"},
-				{TotalValue: "110.00", Currency: "COP"},
+				{TotalValue: "100.00", Currency: money.COP},
+				{TotalValue: "110.00", Currency: money.COP},
 			}, nil
 		},
 	})
 	svc := newTestServices(repo, newMemStorage())
 
-	points, summary, err := svc.GetPortfolioGrowth(context.Background(), userID, "COP", "1M")
+	points, summary, err := svc.GetPortfolioGrowth(context.Background(), userID, money.COP, "1M")
 	if err != nil {
 		t.Fatalf("GetPortfolioGrowth: %v", err)
 	}
@@ -176,7 +180,7 @@ func TestGetPortfolioGrowthUsesPeriodFilter(t *testing.T) {
 	if gotSince.After(time.Now().UTC()) {
 		t.Error("since must be in the past")
 	}
-	if gotCurrency != "COP" {
+	if gotCurrency != money.COP {
 		t.Errorf("currency = %q, want COP", gotCurrency)
 	}
 	if len(points) != 2 {
@@ -186,7 +190,7 @@ func TestGetPortfolioGrowthUsesPeriodFilter(t *testing.T) {
 		t.Errorf("TotalGrowthPct = %q, want 10.00", summary.TotalGrowthPct)
 	}
 
-	if summary.Currency != "COP" {
+	if summary.Currency != money.COP {
 		t.Errorf("Currency = %q, want COP", summary.Currency)
 	}
 }

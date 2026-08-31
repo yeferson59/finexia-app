@@ -37,7 +37,6 @@ func scanAssets(rows pgx.Rows) ([]Asset, error) {
 
 	for rows.Next() {
 		var asset Asset
-		var priceStr *string
 
 		if err := rows.Scan(
 			&asset.ID,
@@ -46,7 +45,7 @@ func scanAssets(rows pgx.Rows) ([]Asset, error) {
 			&asset.AssetType,
 			&asset.Exchange,
 			&asset.Currency,
-			&priceStr,
+			&asset.CurrentPrice,
 			&asset.PriceUpdatedAt,
 			&asset.IsCurated,
 			&asset.CreatedAt,
@@ -55,7 +54,8 @@ func scanAssets(rows pgx.Rows) ([]Asset, error) {
 			return nil, err
 		}
 
-		scanAssetCurrentPrice(&asset, priceStr)
+		asset.CurrentPrice.SetCurrency(asset.Currency)
+
 		assets = append(assets, asset)
 	}
 
@@ -68,22 +68,25 @@ func scanAssets(rows pgx.Rows) ([]Asset, error) {
 // it would break a portfolio whose asset was contributed by somebody else.
 func (r *PostgresRepository) GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, error) {
 	var asset Asset
-	var priceStr *string
+
 	err := r.db.QueryRow(ctx, `
 		SELECT `+assetColumns+`
 		FROM assets a WHERE a.id = $1
 	`, assetID).Scan(
 		&asset.ID, &asset.Ticker, &asset.Name, &asset.AssetType, &asset.Exchange,
-		&asset.Currency, &priceStr, &asset.PriceUpdatedAt, &asset.IsCurated,
+		&asset.Currency, &asset.CurrentPrice, &asset.PriceUpdatedAt, &asset.IsCurated,
 		&asset.CreatedAt, &asset.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Asset{}, ErrAssetNotFound
 		}
+
 		return Asset{}, err
 	}
-	scanAssetCurrentPrice(&asset, priceStr)
+
+	asset.CurrentPrice.SetCurrency(asset.Currency)
+
 	return asset, nil
 }
 
@@ -102,7 +105,6 @@ func (r *PostgresRepository) GetAssets(ctx context.Context, view CatalogView, of
 
 func (r *PostgresRepository) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error) {
 	var asset Asset
-	var priceStr *string
 
 	err := r.db.QueryRow(ctx, `
 		UPDATE assets a
@@ -116,7 +118,7 @@ func (r *PostgresRepository) UpdateAssetPrice(ctx context.Context, assetID uuid.
 		&asset.AssetType,
 		&asset.Exchange,
 		&asset.Currency,
-		&priceStr,
+		&asset.CurrentPrice,
 		&asset.PriceUpdatedAt,
 		&asset.IsCurated,
 		&asset.CreatedAt,
@@ -129,7 +131,8 @@ func (r *PostgresRepository) UpdateAssetPrice(ctx context.Context, assetID uuid.
 		return Asset{}, err
 	}
 
-	scanAssetCurrentPrice(&asset, priceStr)
+	asset.CurrentPrice.SetCurrency(asset.Currency)
+
 	return asset, nil
 }
 
@@ -148,9 +151,9 @@ func (r *PostgresRepository) SearchAssets(ctx context.Context, view CatalogView,
 	return scanAssets(rows)
 }
 
-func (r *PostgresRepository) UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error) {
+func (r *PostgresRepository) UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error) {
 	var asset Asset
-	var priceStr *string
+
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO assets (ticker, name, asset_type, exchange, currency, is_curated, created_at, updated_at)
 		VALUES ($1, $2, $3::asset_type, NULLIF($4, ''), $5, TRUE, NOW(), NOW())
@@ -165,7 +168,7 @@ func (r *PostgresRepository) UpsertAsset(ctx context.Context, ticker, name strin
 		&asset.AssetType,
 		&asset.Exchange,
 		&asset.Currency,
-		&priceStr,
+		&asset.CurrentPrice,
 		&asset.PriceUpdatedAt,
 		&asset.IsCurated,
 		&asset.CreatedAt,
@@ -174,7 +177,8 @@ func (r *PostgresRepository) UpsertAsset(ctx context.Context, ticker, name strin
 	if err != nil {
 		return asset, err
 	}
-	scanAssetCurrentPrice(&asset, priceStr)
+	asset.CurrentPrice.SetCurrency(asset.Currency)
+
 	return asset, nil
 }
 
@@ -191,7 +195,7 @@ func (r *PostgresRepository) UpsertAsset(ctx context.Context, ticker, name strin
 //
 // The membership row is written even when the asset already existed, so the
 // second user to reach for a contributed ticker can find it afterwards.
-func (r *PostgresRepository) CreateAssetIfAbsent(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error) {
+func (r *PostgresRepository) CreateAssetIfAbsent(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return Asset{}, err
@@ -223,13 +227,12 @@ func (r *PostgresRepository) CreateAssetIfAbsent(ctx context.Context, userID uui
 	}
 
 	var asset Asset
-	var priceStr *string
 	if err := tx.QueryRow(ctx, `
 		SELECT `+assetColumns+`
 		FROM assets a WHERE a.id = $1
 	`, assetID).Scan(
 		&asset.ID, &asset.Ticker, &asset.Name, &asset.AssetType, &asset.Exchange,
-		&asset.Currency, &priceStr, &asset.PriceUpdatedAt, &asset.IsCurated,
+		&asset.Currency, &asset.CurrentPrice, &asset.PriceUpdatedAt, &asset.IsCurated,
 		&asset.CreatedAt, &asset.UpdatedAt,
 	); err != nil {
 		return Asset{}, err
@@ -239,7 +242,7 @@ func (r *PostgresRepository) CreateAssetIfAbsent(ctx context.Context, userID uui
 		return Asset{}, err
 	}
 
-	scanAssetCurrentPrice(&asset, priceStr)
+	asset.CurrentPrice.SetCurrency(asset.Currency)
 
 	return asset, nil
 }

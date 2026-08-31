@@ -3,6 +3,8 @@ package portfolio
 import (
 	"testing"
 	"time"
+
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // day builds one point of the growth series. cost is the invested capital at
@@ -11,7 +13,7 @@ import (
 func day(offset int, value, cost, flow string) GrowthPoint {
 	return GrowthPoint{
 		Date:          time.Date(2026, time.January, 1+offset, 0, 0, 0, 0, time.UTC),
-		Currency:      "USD",
+		Currency:      money.USD,
 		TotalValue:    value,
 		TotalCostBase: cost,
 		GainLoss:      "0",
@@ -225,7 +227,7 @@ func TestBuildGrowthMetricsPicksTheExtremesAmongWholeMonthsOnly(t *testing.T) {
 	// 5 %. Two days do not compete with thirty-one.
 	at := func(y int, mo time.Month, d int, value string) GrowthPoint {
 		return GrowthPoint{
-			Date: time.Date(y, mo, d, 0, 0, 0, 0, time.UTC), Currency: "USD",
+			Date: time.Date(y, mo, d, 0, 0, 0, 0, time.UTC), Currency: money.USD,
 			TotalValue: value, TotalCostBase: "1000", GainLoss: "0", GainLossPct: "0", NetFlow: "0",
 		}
 	}
@@ -266,7 +268,7 @@ func TestMonthlyReturnsFlagsTheMonthStillRunning(t *testing.T) {
 	// The series stops on the 12th: August is twelve days old, not thirty-one.
 	at := func(mo time.Month, d int, value string) GrowthPoint {
 		return GrowthPoint{
-			Date: time.Date(2026, mo, d, 0, 0, 0, 0, time.UTC), Currency: "USD",
+			Date: time.Date(2026, mo, d, 0, 0, 0, 0, time.UTC), Currency: money.USD,
 			TotalValue: value, TotalCostBase: "1000", GainLoss: "0", GainLossPct: "0", NetFlow: "0",
 		}
 	}
@@ -347,11 +349,11 @@ func TestBuildGrowthMetricsWithoutHistory(t *testing.T) {
 
 func TestBuildGrowthMetricsCarriesTheLastPointsAmounts(t *testing.T) {
 	m := BuildGrowthMetrics([]GrowthPoint{
-		{Date: time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC), Currency: "COP", TotalValue: "1000", TotalCostBase: "1000", GainLoss: "0", NetFlow: "0"},
-		{Date: time.Date(2026, time.January, 2, 0, 0, 0, 0, time.UTC), Currency: "COP", TotalValue: "1500", TotalCostBase: "1200", GainLoss: "300", NetFlow: "200"},
+		{Date: time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC), Currency: money.COP, TotalValue: "1000", TotalCostBase: "1000", GainLoss: "0", NetFlow: "0"},
+		{Date: time.Date(2026, time.January, 2, 0, 0, 0, 0, time.UTC), Currency: money.COP, TotalValue: "1500", TotalCostBase: "1200", GainLoss: "300", NetFlow: "200"},
 	})
 
-	if m.Currency != "COP" {
+	if m.Currency != money.COP {
 		t.Errorf("currency = %q, want the series' own", m.Currency)
 	}
 	if got := m.CurrentValue.StringFixed(0); got != "1500" {

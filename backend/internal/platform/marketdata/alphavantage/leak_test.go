@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // Alpha Vantage accepts the key only as a URL query parameter, so every request
@@ -31,7 +32,7 @@ func TestTransportErrorsNeverCarryTheKey(t *testing.T) {
 	})
 
 	t.Run("FetchExchangeRate", func(t *testing.T) {
-		_, err := c.FetchExchangeRate(context.Background(), "EUR", "USD")
+		_, err := c.FetchExchangeRate(context.Background(), money.EUR, money.USD)
 		assertScrubbed(t, err)
 	})
 }

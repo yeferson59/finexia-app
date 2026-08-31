@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // DolarAPI names the keyless public feed at dolarapi.com.
@@ -29,8 +31,8 @@ const ECB ProviderName = "ecb"
 // result belongs in the shared exchange_rates table.
 type PublicRate struct {
 	// From and To are ISO 4217 codes: one unit of From is worth Rate of To.
-	From string
-	To   string
+	From money.Currency
+	To   money.Currency
 	// Rate is a decimal string, never a float, so the value the source
 	// published survives to the numeric column unrounded.
 	Rate string

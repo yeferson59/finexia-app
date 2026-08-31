@@ -71,6 +71,7 @@ func (r *PostgresRepository) GetPortfoliosSummaryByUserID(ctx context.Context, u
 		// currency the caller gets told about: that counts as converted.
 		item.DisplayCurrency = item.BaseCurrency
 		item.FXConverted = true
+
 		result = append(result, item)
 	}
 	return result, nil
@@ -91,7 +92,7 @@ func (r *PostgresRepository) GetPortfoliosByUserID(ctx context.Context, userID u
 			return nil, err
 		}
 
-		retagCurrency(portfolio.PriceValue, portfolio.BaseCurrency)
+		portfolio.PriceValue.SetCurrency(portfolio.BaseCurrency)
 
 		portfolios = append(portfolios, portfolio)
 	}
@@ -99,7 +100,7 @@ func (r *PostgresRepository) GetPortfoliosByUserID(ctx context.Context, userID u
 	return portfolios, nil
 }
 
-func (r *PostgresRepository) CreatePortfolio(ctx context.Context, userID uuid.UUID, name, description, baseCurrency string, riskID uuid.UUID, typePortfolio Type, priceValue money.Money, isDefault bool) (Portfolio, error) {
+func (r *PostgresRepository) CreatePortfolio(ctx context.Context, userID uuid.UUID, name, description string, baseCurrency money.Currency, riskID uuid.UUID, typePortfolio Type, priceValue money.Money, isDefault bool) (Portfolio, error) {
 	var portfolio Portfolio
 	if err := r.db.QueryRow(ctx, "INSERT INTO portfolios(user_id, name, description, base_currency, type, risk_id, price_value, is_default) VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *", userID, name, description, baseCurrency, typePortfolio, riskID, priceValue, isDefault).Scan(
 		&portfolio.ID,
@@ -117,7 +118,7 @@ func (r *PostgresRepository) CreatePortfolio(ctx context.Context, userID uuid.UU
 		return Portfolio{}, err
 	}
 
-	retagCurrency(portfolio.PriceValue, portfolio.BaseCurrency)
+	portfolio.PriceValue.SetCurrency(portfolio.BaseCurrency)
 
 	return portfolio, nil
 }
@@ -152,10 +153,11 @@ func (r *PostgresRepository) GetPortfolioByID(ctx context.Context, portfolioID, 
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Portfolio{}, ErrPortfolioNotFound
 		}
+
 		return Portfolio{}, err
 	}
 
-	retagCurrency(portfolio.PriceValue, portfolio.BaseCurrency)
+	portfolio.PriceValue.SetCurrency(portfolio.BaseCurrency)
 
 	return portfolio, nil
 }
@@ -184,6 +186,7 @@ func (r *PostgresRepository) UpdatePortfolio(ctx context.Context, userID, portfo
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Portfolio{}, ErrPortfolioNotFound
 		}
+
 		return Portfolio{}, err
 	}
 
@@ -197,7 +200,7 @@ func (r *PostgresRepository) UpdatePortfolio(ctx context.Context, userID, portfo
 		return Portfolio{}, err
 	}
 
-	retagCurrency(portfolio.PriceValue, portfolio.BaseCurrency)
+	portfolio.PriceValue.SetCurrency(portfolio.BaseCurrency)
 
 	return portfolio, nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 	"github.com/yeferson59/finexia-app/internal/platform/secretbox"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type defaultAsset struct {
@@ -16,16 +17,16 @@ type defaultAsset struct {
 	Name      string
 	AssetType AssetType
 	Exchange  string
-	Currency  string
+	Currency  money.Currency
 }
 
 var defaultAssets = []defaultAsset{
-	{"AAPL", "Apple Inc.", Stock, "NASDAQ", "USD"},
-	{"MSFT", "Microsoft Corporation", Stock, "NASDAQ", "USD"},
-	{"SPY", "SPDR S&P 500 ETF Trust", ETF, "NYSEARCA", "USD"},
-	{"BTC-USD", "Bitcoin", Crypto, "Coinbase", "USD"},
-	{"ETH-USD", "Ethereum", Crypto, "Coinbase", "USD"},
-	{"BND", "Vanguard Total Bond Market ETF", Bond, "NASDAQ", "USD"},
+	{"AAPL", "Apple Inc.", Stock, "NASDAQ", money.USD},
+	{"MSFT", "Microsoft Corporation", Stock, "NASDAQ", money.USD},
+	{"SPY", "SPDR S&P 500 ETF Trust", ETF, "NYSEARCA", money.USD},
+	{"BTC-USD", "Bitcoin", Crypto, "Coinbase", money.USD},
+	{"ETH-USD", "Ethereum", Crypto, "Coinbase", money.USD},
+	{"BND", "Vanguard Total Bond Market ETF", Bond, "NASDAQ", money.USD},
 }
 
 // Pacing between two calls made with the same user's key. Alpha Vantage's free

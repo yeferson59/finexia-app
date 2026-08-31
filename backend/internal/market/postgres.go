@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/yeferson59/gofinance/v2/decimal"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type PostgresRepository struct {
@@ -20,7 +21,7 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 	return new(PostgresRepository{db})
 }
 
-func (r *PostgresRepository) UpsertExchangeRate(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error) {
+func (r *PostgresRepository) UpsertExchangeRate(ctx context.Context, from, to money.Currency, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error) {
 	var er ExchangeRate
 	var rateStr string
 
@@ -56,7 +57,7 @@ func (r *PostgresRepository) UpsertExchangeRate(ctx context.Context, from, to st
 // permanently, and there is no endpoint to delete one and hand the pair back to
 // the feed. An operator correcting a pair the feed covers is correcting it
 // until the next refresh, and the source column is what makes that legible.
-func (r *PostgresRepository) UpsertPublicExchangeRate(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time, source ProviderID) (ExchangeRate, error) {
+func (r *PostgresRepository) UpsertPublicExchangeRate(ctx context.Context, from, to money.Currency, rate decimal.Decimal, rateDate time.Time, source ProviderID) (ExchangeRate, error) {
 	var er ExchangeRate
 	var rateStr string
 

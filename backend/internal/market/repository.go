@@ -14,7 +14,7 @@ type Repository interface {
 	// Exchange rates. The three below are the operator's: they write
 	// ManualRateSource, because an admin endpoint or a spreadsheet is what
 	// produced the number.
-	UpsertExchangeRate(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error)
+	UpsertExchangeRate(ctx context.Context, from, to money.Currency, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error)
 	GetExchangeRates(ctx context.Context, offset, limit uint) ([]ExchangeRate, error)
 	UpdateExchangeRateByID(ctx context.Context, id uuid.UUID, rate decimal.Decimal) (ExchangeRate, error)
 	// UpsertPublicExchangeRate is the refresh job's, and stays a separate method
@@ -23,7 +23,7 @@ type Repository interface {
 	// making a temporary correction that the next refresh replaces, and keeping
 	// the two writes apart is what makes that visible in the code instead of
 	// hidden in an argument.
-	UpsertPublicExchangeRate(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time, source ProviderID) (ExchangeRate, error)
+	UpsertPublicExchangeRate(ctx context.Context, from, to money.Currency, rate decimal.Decimal, rateDate time.Time, source ProviderID) (ExchangeRate, error)
 
 	// Assets (catalog owned by this module; portfolio reads them via AssetReader)
 	GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, error)
@@ -33,12 +33,12 @@ type Repository interface {
 	// one. Operator-only: the overwrite is what makes it unsafe to expose to
 	// users, since the ticker is the conflict target and any user could reach
 	// somebody else's row through it.
-	UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error)
+	UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error)
 	// CreateAssetIfAbsent is the user-facing counterpart: it inserts only when
 	// the ticker is new and otherwise returns the existing row untouched, so a
 	// contribution can never rewrite curated data. Either way the asset joins
 	// the user's own catalog.
-	CreateAssetIfAbsent(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error)
+	CreateAssetIfAbsent(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error)
 	// CountAssetsContributedBy bounds how much one user can add per day.
 	CountAssetsContributedBy(ctx context.Context, userID uuid.UUID, since time.Time) (int, error)
 	UpdateAssetPrice(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error)
@@ -62,6 +62,6 @@ type CredentialStore interface {
 	SetCredentialStatus(ctx context.Context, userID uuid.UUID, provider ProviderID, status CredentialStatus, lastErr string) error
 	UsersWithCredentials(ctx context.Context) ([]uuid.UUID, error)
 
-	UpsertUserAssetPrice(ctx context.Context, userID, assetID uuid.UUID, price money.Money, currency string, source ProviderID, fetchedAt time.Time) error
-	UpsertUserExchangeRate(ctx context.Context, userID uuid.UUID, from, to string, rate decimal.Decimal, source ProviderID, fetchedAt time.Time) error
+	UpsertUserAssetPrice(ctx context.Context, userID, assetID uuid.UUID, price money.Money, currency money.Currency, source ProviderID, fetchedAt time.Time) error
+	UpsertUserExchangeRate(ctx context.Context, userID uuid.UUID, from, to money.Currency, rate decimal.Decimal, source ProviderID, fetchedAt time.Time) error
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 func TestSyncJobRun(t *testing.T) {
@@ -17,9 +18,9 @@ func TestSyncJobRun(t *testing.T) {
 	repoFor := func() *fakeRepository {
 		return new(fakeRepository{
 			getAssetByID: func(context.Context, uuid.UUID) (Asset, error) {
-				return Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: "USD"}, nil
+				return Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: money.USD}, nil
 			},
-			upsertAsset: func(context.Context, string, string, AssetType, string, string) (Asset, error) {
+			upsertAsset: func(context.Context, string, string, AssetType, string, money.Currency) (Asset, error) {
 				return Asset{}, nil
 			},
 		})
@@ -28,7 +29,7 @@ func TestSyncJobRun(t *testing.T) {
 	holdingsFor := func() stubHoldings {
 		return stubHoldings{
 			assetIDs: []uuid.UUID{assetID},
-			pairs:    []CurrencyPair{{From: "USD", To: "COP"}},
+			pairs:    []CurrencyPair{{From: money.USD, To: money.COP}},
 		}
 	}
 
@@ -42,7 +43,7 @@ func TestSyncJobRun(t *testing.T) {
 			fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
 				return marketdata.QuoteResult{}, providerErr(Finnhub, marketdata.ErrUnsupported, "finnhub: no data for AAPL")
 			},
-			fetchExchangeRate: func(context.Context, string, string) (marketdata.ExchangeRateResult, error) {
+			fetchExchangeRate: func(context.Context, money.Currency, money.Currency) (marketdata.ExchangeRateResult, error) {
 				ratesFetched++
 
 				return marketdata.ExchangeRateResult{Rate: "4100.5", Source: Finnhub}, nil
@@ -78,7 +79,7 @@ func TestSyncJobRun(t *testing.T) {
 			fetchQuote: func(context.Context, string) (marketdata.QuoteResult, error) {
 				return marketdata.QuoteResult{Price: "190.55", Source: Finnhub}, nil
 			},
-			fetchExchangeRate: func(context.Context, string, string) (marketdata.ExchangeRateResult, error) {
+			fetchExchangeRate: func(context.Context, money.Currency, money.Currency) (marketdata.ExchangeRateResult, error) {
 				return marketdata.ExchangeRateResult{Rate: "4100.5", Source: Finnhub}, nil
 			},
 		})

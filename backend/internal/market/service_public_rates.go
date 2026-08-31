@@ -84,23 +84,13 @@ func (s *Service) RefreshPublicRates(ctx context.Context) ([]ExchangeRate, error
 // not more trusted than an operator: whatever gets in here is what every
 // portfolio valuation then converts with.
 func (s *Service) storePublicRate(ctx context.Context, pr marketdata.PublicRate) (ExchangeRate, error) {
-	from, ok := NormalizeCurrencyCode(pr.From)
-	if !ok {
-		return ExchangeRate{}, fmt.Errorf("public rate %q/%q: %w", pr.From, pr.To, errExchangeRateCurrencyInvalid)
-	}
-
-	to, ok := NormalizeCurrencyCode(pr.To)
-	if !ok {
-		return ExchangeRate{}, fmt.Errorf("public rate %q/%q: %w", pr.From, pr.To, errExchangeRateCurrencyInvalid)
-	}
-
 	rate, err := decimal.NewFromString(pr.Rate)
 	if err != nil {
-		return ExchangeRate{}, fmt.Errorf("public rate %s/%s: parse %q: %w", from, to, pr.Rate, err)
+		return ExchangeRate{}, fmt.Errorf("public rate %s/%s: parse %q: %w", pr.From, pr.To, pr.Rate, err)
 	}
 
 	if err := validRate(rate); err != nil {
-		return ExchangeRate{}, fmt.Errorf("public rate %s/%s: %w", from, to, err)
+		return ExchangeRate{}, fmt.Errorf("public rate %s/%s: %w", pr.From, pr.To, err)
 	}
 
 	// AsOf dates the rate, so a feed that stopped updating stores the day it
@@ -111,5 +101,5 @@ func (s *Service) storePublicRate(ctx context.Context, pr marketdata.PublicRate)
 		rateDate = time.Now()
 	}
 
-	return s.repo.UpsertPublicExchangeRate(ctx, from, to, rate, rateDate, pr.Source)
+	return s.repo.UpsertPublicExchangeRate(ctx, pr.From, pr.To, rate, rateDate, pr.Source)
 }

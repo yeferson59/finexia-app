@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yeferson59/gofinance/v2/decimal"
+	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
@@ -14,7 +15,7 @@ import (
 
 // storedRate is one row the fake repository accepted.
 type storedRate struct {
-	from, to string
+	from, to money.Currency
 	rate     decimal.Decimal
 	rateDate time.Time
 	source   ProviderID
@@ -26,7 +27,7 @@ func newPublicRatesFixture(source marketdata.PublicRateSource) (*Service, *[]sto
 	var written []storedRate
 
 	repo := new(fakeRepository{
-		upsertPublicExchangeRate: func(_ context.Context, from, to string, rate decimal.Decimal, rateDate time.Time, src ProviderID) (ExchangeRate, error) {
+		upsertPublicExchangeRate: func(_ context.Context, from, to money.Currency, rate decimal.Decimal, rateDate time.Time, src ProviderID) (ExchangeRate, error) {
 			written = append(written, storedRate{from, to, rate, rateDate, src})
 
 			return ExchangeRate{FromCurrency: from, ToCurrency: to, Rate: rate, RateDate: rateDate, Source: src}, nil
@@ -41,7 +42,7 @@ func TestRefreshPublicRates(t *testing.T) {
 
 	t.Run("stores what the feed published", func(t *testing.T) {
 		feed := new(fakePublicRateSource{rates: []marketdata.PublicRate{{
-			From: "USD", To: "COP", Rate: "3157.43", Source: marketdata.DolarAPI, AsOf: asOf,
+			From: money.USD, To: money.COP, Rate: "3157.43", Source: marketdata.DolarAPI, AsOf: asOf,
 		}}})
 		svc, written := newPublicRatesFixture(feed)
 
@@ -54,7 +55,7 @@ func TestRefreshPublicRates(t *testing.T) {
 		}
 
 		row := (*written)[0]
-		if row.from != "USD" || row.to != "COP" {
+		if row.from != money.USD || row.to != money.COP {
 			t.Errorf("pair = %s/%s, want USD/COP", row.from, row.to)
 		}
 		if row.rate.String() != "3157.43" {
@@ -70,26 +71,9 @@ func TestRefreshPublicRates(t *testing.T) {
 		}
 	})
 
-	// Lowercase and padded codes reach the same normalisation the admin
-	// endpoints use, so the table only ever holds canonical ISO codes — the
-	// pair lookups in portfolio compare them as strings.
-	t.Run("normalises the currency codes", func(t *testing.T) {
-		feed := new(fakePublicRateSource{rates: []marketdata.PublicRate{{
-			From: " usd ", To: "cop", Rate: "3157.43", Source: marketdata.DolarAPI, AsOf: asOf,
-		}}})
-		svc, written := newPublicRatesFixture(feed)
-
-		if _, err := svc.RefreshPublicRates(context.Background()); err != nil {
-			t.Fatalf("RefreshPublicRates: %v", err)
-		}
-		if row := (*written)[0]; row.from != "USD" || row.to != "COP" {
-			t.Errorf("pair = %s/%s, want the normalised USD/COP", row.from, row.to)
-		}
-	})
-
 	t.Run("dates a rate with no timestamp as today", func(t *testing.T) {
 		feed := new(fakePublicRateSource{rates: []marketdata.PublicRate{{
-			From: "USD", To: "COP", Rate: "3157.43", Source: marketdata.DolarAPI,
+			From: money.USD, To: money.COP, Rate: "3157.43", Source: marketdata.DolarAPI,
 		}}})
 		svc, written := newPublicRatesFixture(feed)
 
@@ -109,10 +93,10 @@ func TestRefreshPublicRates(t *testing.T) {
 			name string
 			rate marketdata.PublicRate
 		}{
-			{"unknown currency", marketdata.PublicRate{From: "USD", To: "XYZ", Rate: "1", Source: marketdata.DolarAPI}},
-			{"not a number", marketdata.PublicRate{From: "USD", To: "COP", Rate: "n/a", Source: marketdata.DolarAPI}},
-			{"zero", marketdata.PublicRate{From: "USD", To: "COP", Rate: "0", Source: marketdata.DolarAPI}},
-			{"negative", marketdata.PublicRate{From: "USD", To: "COP", Rate: "-3157.43", Source: marketdata.DolarAPI}},
+			{"unknown currency", marketdata.PublicRate{From: money.USD, To: money.Currency(255), Rate: "1", Source: marketdata.DolarAPI}},
+			{"not a number", marketdata.PublicRate{From: money.USD, To: money.COP, Rate: "n/a", Source: marketdata.DolarAPI}},
+			{"zero", marketdata.PublicRate{From: money.USD, To: money.COP, Rate: "0", Source: marketdata.DolarAPI}},
+			{"negative", marketdata.PublicRate{From: money.USD, To: money.COP, Rate: "-3157.43", Source: marketdata.DolarAPI}},
 		}
 
 		for _, tc := range cases {
@@ -134,8 +118,8 @@ func TestRefreshPublicRates(t *testing.T) {
 	// malformed would leave the dashboard without the number it needs.
 	t.Run("stores the good pairs and reports the bad ones", func(t *testing.T) {
 		feed := new(fakePublicRateSource{rates: []marketdata.PublicRate{
-			{From: "USD", To: "XYZ", Rate: "1", Source: marketdata.DolarAPI},
-			{From: "USD", To: "COP", Rate: "3157.43", Source: marketdata.DolarAPI, AsOf: asOf},
+			{From: money.USD, To: money.Currency(255), Rate: "1", Source: marketdata.DolarAPI},
+			{From: money.USD, To: money.COP, Rate: "3157.43", Source: marketdata.DolarAPI, AsOf: asOf},
 		}})
 		svc, written := newPublicRatesFixture(feed)
 
@@ -146,7 +130,7 @@ func TestRefreshPublicRates(t *testing.T) {
 		if len(stored) != 1 || len(*written) != 1 {
 			t.Fatalf("stored %d rates and wrote %d rows, want the one good pair", len(stored), len(*written))
 		}
-		if row := (*written)[0]; row.to != "COP" {
+		if row := (*written)[0]; row.to != money.COP {
 			t.Errorf("wrote %s/%s, want the valid USD/COP", row.from, row.to)
 		}
 	})
@@ -170,7 +154,7 @@ func TestRefreshPublicRates(t *testing.T) {
 	// another feed is down — that is the whole reason they are read together.
 	t.Run("stores what a partial fetch published", func(t *testing.T) {
 		feed := new(fakePublicRateSource{
-			rates: []marketdata.PublicRate{{From: "USD", To: "COP", Rate: "3157.43", Source: marketdata.DolarAPI, AsOf: asOf}},
+			rates: []marketdata.PublicRate{{From: money.USD, To: money.COP, Rate: "3157.43", Source: marketdata.DolarAPI, AsOf: asOf}},
 			err:   errors.New("ecb: reference rates: status 503"),
 		})
 		svc, written := newPublicRatesFixture(feed)
@@ -200,7 +184,7 @@ func TestGetLatestExchangeRates(t *testing.T) {
 		getExchangeRates: func(_ context.Context, offset, limit uint) ([]ExchangeRate, error) {
 			gotOffset, gotLimit = offset, limit
 
-			return []ExchangeRate{{FromCurrency: "USD", ToCurrency: "COP", Source: marketdata.DolarAPI}}, nil
+			return []ExchangeRate{{FromCurrency: money.USD, ToCurrency: money.COP, Source: marketdata.DolarAPI}}, nil
 		},
 	})
 	svc := newService(repo, newMemStorage(), nil, nil, testKeyring(), logger.Noop())
@@ -226,7 +210,7 @@ func TestGetLatestExchangeRates(t *testing.T) {
 func TestPublicRatesJob(t *testing.T) {
 	t.Run("succeeds when the feed answers", func(t *testing.T) {
 		feed := new(fakePublicRateSource{rates: []marketdata.PublicRate{{
-			From: "USD", To: "COP", Rate: "3157.43", Source: marketdata.DolarAPI,
+			From: money.USD, To: money.COP, Rate: "3157.43", Source: marketdata.DolarAPI,
 		}}})
 		svc, _ := newPublicRatesFixture(feed)
 

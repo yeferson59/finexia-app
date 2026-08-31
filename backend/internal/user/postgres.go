@@ -12,6 +12,7 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type PostgresRepository struct {
@@ -208,7 +209,7 @@ func (r *PostgresRepository) GetByEmail(ctx context.Context, email string) (iden
 	return user, nil
 }
 
-func (r *PostgresRepository) UpdateProfile(ctx context.Context, id uuid.UUID, name, preferredCurrency, image string) (identity.User, error) {
+func (r *PostgresRepository) UpdateProfile(ctx context.Context, id uuid.UUID, name, image string, preferredCurrency money.Currency) (identity.User, error) {
 	var user identity.User
 	if err := r.db.QueryRow(ctx,
 		`UPDATE users SET name = $1, preferred_currency = $2, image = $3, updated_at = $4 WHERE id = $5

@@ -3,25 +3,14 @@ package portfolio
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"uuid"
 
 	"github.com/yeferson59/gofinance/v2/decimal"
+	"github.com/yeferson59/gofinance/v2/money"
 
-	"github.com/yeferson59/finexia-app/internal/platform/currency"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
-
-// SupportedDisplayCurrencies lists the currencies a user can pick to view
-// their portfolio totals in. It is the application-wide set, shared with the
-// account's preferred currency: a currency the profile accepts but ?currency=
-// rejects is a preference the dashboard would have to ignore.
-var SupportedDisplayCurrencies = currency.Supported
-
-func IsSupportedDisplayCurrency(code string) bool {
-	return currency.IsSupported(code)
-}
 
 // ErrExchangeRateUnavailable means no stored rate (direct, inverse, or via a
 // USD hop) connects the requested currency pair. Tagged as NotFound so it maps
@@ -37,10 +26,7 @@ var ErrExchangeRateUnavailable = httpx.AsNotFound(errors.New("exchange rate not 
 // key fetched is consulted first, and only then the shared table, which now
 // holds admin-entered rows alone. Serving another user's fetched rate would be
 // the same redistribution problem as serving their prices.
-func (s *Service) GetConversionRate(ctx context.Context, userID uuid.UUID, from, to string) (decimal.Decimal, error) {
-	from = strings.ToUpper(strings.TrimSpace(from))
-	to = strings.ToUpper(strings.TrimSpace(to))
-
+func (s *Service) GetConversionRate(ctx context.Context, userID uuid.UUID, from, to money.Currency) (decimal.Decimal, error) {
 	if from == to {
 		return decimal.One, nil
 	}
@@ -49,11 +35,11 @@ func (s *Service) GetConversionRate(ctx context.Context, userID uuid.UUID, from,
 		return rate, nil
 	}
 
-	fromToUSD, err := s.pairRate(ctx, userID, from, "USD")
+	fromToUSD, err := s.pairRate(ctx, userID, from, money.USD)
 	if err != nil {
 		return decimal.Decimal{}, ErrExchangeRateUnavailable
 	}
-	usdToTarget, err := s.pairRate(ctx, userID, "USD", to)
+	usdToTarget, err := s.pairRate(ctx, userID, money.USD, to)
 	if err != nil {
 		return decimal.Decimal{}, ErrExchangeRateUnavailable
 	}
@@ -74,7 +60,7 @@ func usableRate(rate decimal.Decimal) bool {
 //
 // Each direction is looked up in the user's own cache first, then in the shared
 // table, so a user with their own rate never falls back to a stale shared one.
-func (s *Service) pairRate(ctx context.Context, userID uuid.UUID, from, to string) (decimal.Decimal, error) {
+func (s *Service) pairRate(ctx context.Context, userID uuid.UUID, from, to money.Currency) (decimal.Decimal, error) {
 	if from == to {
 		return decimal.One, nil
 	}
@@ -92,7 +78,7 @@ func (s *Service) pairRate(ctx context.Context, userID uuid.UUID, from, to strin
 }
 
 // storedRate reads one direction, preferring the user's own data.
-func (s *Service) storedRate(ctx context.Context, userID uuid.UUID, from, to string) (decimal.Decimal, error) {
+func (s *Service) storedRate(ctx context.Context, userID uuid.UUID, from, to money.Currency) (decimal.Decimal, error) {
 	if rate, err := s.repo.GetUserExchangeRateByPair(ctx, userID, from, to); err == nil {
 		return rate, nil
 	}

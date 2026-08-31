@@ -27,6 +27,7 @@ import (
 	json "github.com/bytedance/sonic"
 
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 const baseURL = "https://co.dolarapi.com/v1"
@@ -104,9 +105,15 @@ func (c *Client) FetchRates(ctx context.Context) ([]marketdata.PublicRate, error
 		asOf = time.Now()
 	}
 
+	var to money.Currency
+
+	if err := to.Scan(body.Unidad); err != nil {
+		return []marketdata.PublicRate{}, err
+	}
+
 	return []marketdata.PublicRate{{
-		From: trmBase,
-		To:   body.Unidad,
+		From: money.USD,
+		To:   to,
 		// -1 precision prints the shortest decimal that reads back as the same
 		// float64, so the two decimals the feed published arrive at the numeric
 		// column as they were written.

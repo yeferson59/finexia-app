@@ -14,6 +14,8 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/xuri/excelize/v2"
+	"github.com/yeferson59/finexia-app/internal/market"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // The export endpoints stream a spreadsheet rather than the JSON envelope, so
@@ -72,13 +74,13 @@ func TestHandlerExportSummary(t *testing.T) {
 	repo := new(fakeRepository{
 		getPortfoliosSummaryByUserID: func(context.Context, uuid.UUID) ([]SummaryView, error) {
 			return []SummaryView{{
-				Name: "Growth", Type: Type("stocks"), BaseCurrency: "USD", RiskName: "moderate",
+				Name: "Growth", Type: Type("stocks"), BaseCurrency: money.USD, RiskName: "moderate",
 				TotalPositions: 4, TotalCostBase: "900", TotalMarketValue: "1000",
 				TotalGainLoss: "100", TotalGainLossPct: "11.11",
 			}}, nil
 		},
-		getAssetAllocationByUserID: func(context.Context, uuid.UUID, string) ([]AllocationItem, error) {
-			return []AllocationItem{{Category: Stocks, MarketValue: "1000"}}, nil
+		getAssetAllocationByUserID: func(context.Context, uuid.UUID, money.Currency) ([]AllocationItem, error) {
+			return []AllocationItem{{Category: market.Stock, MarketValue: "1000"}}, nil
 		},
 	})
 	app := newTestModule(t, repo, userID, "user")
@@ -106,7 +108,7 @@ func TestHandlerExportTransactions(t *testing.T) {
 		getRecentTransactionsByUserID: func(_ context.Context, _ uuid.UUID, limit int) ([]Transaction, error) {
 			gotLimit = limit
 			return []Transaction{{
-				ID: uuid.New(), Type: Buy, Currency: "USD",
+				ID: uuid.New(), Type: Buy, Currency: money.USD,
 				TransactionDate: txnDate, Notes: "first buy",
 			}}, nil
 		},
@@ -159,7 +161,7 @@ func riskSeries(days int) []GrowthPoint {
 		}
 		points = append(points, GrowthPoint{
 			Date:          time.Date(2026, time.January, 1+i, 0, 0, 0, 0, time.UTC),
-			Currency:      "USD",
+			Currency:      money.USD,
 			TotalValue:    strconv.Itoa(value),
 			TotalCostBase: "900",
 			GainLoss:      "100",
@@ -174,7 +176,7 @@ func TestHandlerExportRiskMetrics(t *testing.T) {
 	userID := uuid.New()
 	var gotHasSince bool
 	repo := new(fakeRepository{
-		getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, _ string, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
+		getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, _ money.Currency, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
 			gotHasSince = hasSince
 			return riskSeries(31), nil
 		},
@@ -245,7 +247,7 @@ func TestHandlerExportRiskMetrics(t *testing.T) {
 
 func TestHandlerExportRiskMetricsPublishesTheYearlyFiguresTogether(t *testing.T) {
 	repo := new(fakeRepository{
-		getPortfolioGrowthByUserID: func(context.Context, uuid.UUID, string, bool, time.Time) ([]GrowthPoint, error) {
+		getPortfolioGrowthByUserID: func(context.Context, uuid.UUID, money.Currency, bool, time.Time) ([]GrowthPoint, error) {
 			return riskSeries(120), nil
 		},
 	})
@@ -273,7 +275,7 @@ func TestHandlerExportRiskMetricsPublishesTheYearlyFiguresTogether(t *testing.T)
 
 func TestHandlerExportRiskMetricsWithoutHistory(t *testing.T) {
 	repo := new(fakeRepository{
-		getPortfolioGrowthByUserID: func(context.Context, uuid.UUID, string, bool, time.Time) ([]GrowthPoint, error) {
+		getPortfolioGrowthByUserID: func(context.Context, uuid.UUID, money.Currency, bool, time.Time) ([]GrowthPoint, error) {
 			return nil, nil
 		},
 	})

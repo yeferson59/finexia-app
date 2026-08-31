@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -48,7 +49,7 @@ func TestFetchRates(t *testing.T) {
 		}
 
 		got := rates[0]
-		if got.From != "USD" || got.To != "COP" {
+		if got.From != money.USD || got.To != money.COP {
 			t.Errorf("pair = %s/%s, want USD/COP", got.From, got.To)
 		}
 		// The stored column is numeric, so the published decimal must survive as
@@ -78,7 +79,7 @@ func TestFetchRates(t *testing.T) {
 		if err != nil {
 			t.Fatalf("FetchRates: %v", err)
 		}
-		if rates[0].To != "USD" {
+		if rates[0].To != money.USD {
 			t.Errorf("To = %q, want the payload's unit", rates[0].To)
 		}
 	})

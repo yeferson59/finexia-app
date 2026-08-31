@@ -3,6 +3,8 @@ package marketdata
 import (
 	"context"
 	"time"
+
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type QuoteResult struct {
@@ -22,7 +24,7 @@ type ExchangeRateResult struct {
 
 type Provider interface {
 	FetchQuote(ctx context.Context, symbol string) (QuoteResult, error)
-	FetchExchangeRate(ctx context.Context, from, to string) (ExchangeRateResult, error)
+	FetchExchangeRate(ctx context.Context, from, to money.Currency) (ExchangeRateResult, error)
 }
 
 // Factory builds a Provider from the credentials of whoever is asking. Under

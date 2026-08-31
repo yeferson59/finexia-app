@@ -34,7 +34,7 @@ func (j *PublicRatesJob) Run(ctx context.Context) error {
 
 	for _, rate := range rates {
 		j.log.Info(ctx, "public exchange rate updated",
-			logger.Str("pair", rate.FromCurrency+"/"+rate.ToCurrency),
+			logger.Str("pair", rate.FromCurrency.String()+"/"+rate.ToCurrency.String()),
 			logger.Str("rate", rate.Rate.String()),
 			logger.Str("source", string(rate.Source)),
 		)

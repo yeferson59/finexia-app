@@ -6,6 +6,7 @@ import (
 	"uuid"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // fakeRepository embeds the Repository interface so tests only override the
@@ -16,7 +17,7 @@ type fakeRepository struct {
 	getUserByEmail            func(ctx context.Context, email string) (identity.User, error)
 	getUserByID               func(ctx context.Context, id uuid.UUID) (identity.User, error)
 	updateUser                func(ctx context.Context, id uuid.UUID, name, email, image string) (identity.User, error)
-	updateUserProfile         func(ctx context.Context, id uuid.UUID, name, preferredCurrency, image string) (identity.User, error)
+	updateUserProfile         func(ctx context.Context, id uuid.UUID, name, image string, preferredCurrency money.Currency) (identity.User, error)
 	getUserPreferences        func(ctx context.Context, userID uuid.UUID) (UserPreferences, error)
 	getUsersWithWeeklySummary func(ctx context.Context) ([]identity.User, error)
 }
@@ -41,6 +42,6 @@ func (f *fakeRepository) Update(ctx context.Context, id uuid.UUID, name, email, 
 	return f.updateUser(ctx, id, name, email, image)
 }
 
-func (f *fakeRepository) UpdateProfile(ctx context.Context, id uuid.UUID, name, preferredCurrency, image string) (identity.User, error) {
-	return f.updateUserProfile(ctx, id, name, preferredCurrency, image)
+func (f *fakeRepository) UpdateProfile(ctx context.Context, id uuid.UUID, name, image string, preferredCurrency money.Currency) (identity.User, error) {
+	return f.updateUserProfile(ctx, id, name, image, preferredCurrency)
 }

@@ -18,6 +18,7 @@ import (
 	json "github.com/bytedance/sonic"
 
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 const baseURL = "https://www.alphavantage.co/query"
@@ -122,7 +123,7 @@ type envelopExchange struct {
 	Data map[string]string `json:"Realtime Currency Exchange Rate"`
 }
 
-func (c *Client) FetchExchangeRate(ctx context.Context, from, to string) (marketdata.ExchangeRateResult, error) {
+func (c *Client) FetchExchangeRate(ctx context.Context, from, to money.Currency) (marketdata.ExchangeRateResult, error) {
 	what := fmt.Sprintf("%s/%s", from, to)
 
 	var envelope envelopExchange
@@ -130,8 +131,8 @@ func (c *Client) FetchExchangeRate(ctx context.Context, from, to string) (market
 	params := url.Values{}
 
 	params.Set("function", "CURRENCY_EXCHANGE_RATE")
-	params.Set("from_currency", from)
-	params.Set("to_currency", to)
+	params.Set("from_currency", from.String())
+	params.Set("to_currency", to.String())
 
 	if err := c.get(ctx, params, what, &envelope); err != nil {
 		return marketdata.ExchangeRateResult{}, err

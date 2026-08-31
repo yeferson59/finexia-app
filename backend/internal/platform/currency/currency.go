@@ -19,6 +19,8 @@ package currency
 import (
 	"slices"
 	"strings"
+
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // Supported is the application-wide currency universe: what an account may
@@ -28,24 +30,23 @@ import (
 //
 // USD leads because it is the hub every stored pair goes through, and COP
 // follows it as the app's home market; the rest are the ECB majors.
-var Supported = []string{"USD", "COP", "EUR", "GBP", "CHF", "JPY", "CAD", "AUD", "CNY", "MXN", "BRL"}
-
-// Normalize puts a user-supplied code in the shape the rest of the app stores
-// and compares: trimmed and upper case. It does not validate — pair it with
-// IsSupported.
-func Normalize(code string) string {
-	return strings.ToUpper(strings.TrimSpace(code))
-}
+var Supported = []money.Currency{money.USD, money.COP, money.EUR, money.GBP, money.CHF, money.JPY, money.CAD, money.AUD, money.CNY, money.MXN, money.BRL}
 
 // IsSupported reports whether code is one the app can convert to. It expects an
 // already-normalized code; callers reading user input should run Normalize
 // first.
-func IsSupported(code string) bool {
+func IsSupported(code money.Currency) bool {
 	return slices.Contains(Supported, code)
 }
 
 // List renders the set for an error message, so a rejected request tells the
 // caller what would have been accepted instead of just saying no.
 func List() string {
-	return strings.Join(Supported, ", ")
+	listCurrency := make([]string, len(Supported))
+
+	for _, c := range Supported {
+		listCurrency = append(listCurrency, c.String())
+	}
+
+	return strings.Join(listCurrency, ", ")
 }

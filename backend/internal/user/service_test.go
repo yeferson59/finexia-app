@@ -10,6 +10,7 @@ import (
 
 	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 func TestUpdateCurrentUser(t *testing.T) {
@@ -18,7 +19,7 @@ func TestUpdateCurrentUser(t *testing.T) {
 		ID:                userID,
 		Name:              "Old Name",
 		Email:             "user@example.com",
-		PreferredCurrency: "USD",
+		PreferredCurrency: money.USD,
 		Image:             "old.png",
 	}
 
@@ -30,7 +31,7 @@ func TestUpdateCurrentUser(t *testing.T) {
 			getUserByID: func(context.Context, uuid.UUID) (identity.User, error) {
 				return existing, nil
 			},
-			updateUserProfile: func(_ context.Context, id uuid.UUID, name, preferredCurrency, image string) (identity.User, error) {
+			updateUserProfile: func(_ context.Context, id uuid.UUID, name, image string, preferredCurrency money.Currency) (identity.User, error) {
 				*saved = identity.User{ID: id, Name: name, PreferredCurrency: preferredCurrency, Image: image}
 
 				return *saved, nil
@@ -42,14 +43,14 @@ func TestUpdateCurrentUser(t *testing.T) {
 	t.Run("normalizes name and currency", func(t *testing.T) {
 		svc, saved := newSvc(t)
 
-		_, err := svc.UpdateCurrentUser(context.Background(), userID, "  jane DOE ", " eur ", "new.png")
+		_, err := svc.UpdateCurrentUser(context.Background(), userID, "  jane DOE ", "new.png", money.EUR)
 		if err != nil {
 			t.Fatalf("UpdateCurrentUser: %v", err)
 		}
 		if saved.Name != "Jane Doe" {
 			t.Errorf("saved name = %q, want %q", saved.Name, "Jane Doe")
 		}
-		if saved.PreferredCurrency != "EUR" {
+		if saved.PreferredCurrency != money.EUR {
 			t.Errorf("saved currency = %q, want EUR", saved.PreferredCurrency)
 		}
 		if saved.Image != "new.png" {
@@ -63,11 +64,11 @@ func TestUpdateCurrentUser(t *testing.T) {
 	t.Run("rejects a currency the app cannot convert to", func(t *testing.T) {
 		svc, saved := newSvc(t)
 
-		_, err := svc.UpdateCurrentUser(context.Background(), userID, "Jane", "ARS", "")
+		_, err := svc.UpdateCurrentUser(context.Background(), userID, "Jane", "", money.ARS)
 		if !errors.Is(err, ErrUnsupportedCurrency) {
 			t.Fatalf("err = %v, want ErrUnsupportedCurrency", err)
 		}
-		if saved.PreferredCurrency != "" {
+		if saved.PreferredCurrency != money.ARS {
 			t.Errorf("saved currency = %q, want nothing written", saved.PreferredCurrency)
 		}
 	})
@@ -75,7 +76,7 @@ func TestUpdateCurrentUser(t *testing.T) {
 	t.Run("blank fields keep existing values", func(t *testing.T) {
 		svc, saved := newSvc(t)
 
-		_, err := svc.UpdateCurrentUser(context.Background(), userID, "   ", "", "")
+		_, err := svc.UpdateCurrentUser(context.Background(), userID, "   ", "", 255)
 		if err != nil {
 			t.Fatalf("UpdateCurrentUser: %v", err)
 		}

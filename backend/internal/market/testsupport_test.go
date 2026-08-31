@@ -30,24 +30,24 @@ type fakeRepository struct {
 	// BYO-key, in which case those methods panic like any other unstubbed one.
 	creds *credentialStore
 
-	upsertExchangeRate       func(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error)
-	upsertPublicExchangeRate func(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time, source ProviderID) (ExchangeRate, error)
+	upsertExchangeRate       func(ctx context.Context, from, to money.Currency, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error)
+	upsertPublicExchangeRate func(ctx context.Context, from, to money.Currency, rate decimal.Decimal, rateDate time.Time, source ProviderID) (ExchangeRate, error)
 	getExchangeRates         func(ctx context.Context, offset, limit uint) ([]ExchangeRate, error)
 
 	updateAssetPrice    func(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error)
-	upsertAsset         func(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error)
-	createAssetIfAbsent func(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error)
+	upsertAsset         func(ctx context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error)
+	createAssetIfAbsent func(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error)
 	countContributed    func(ctx context.Context, userID uuid.UUID, since time.Time) (int, error)
 	getAssets           func(ctx context.Context, view CatalogView, offset, limit uint) ([]Asset, error)
 	getAssetByID        func(ctx context.Context, assetID uuid.UUID) (Asset, error)
 	searchAssets        func(ctx context.Context, view CatalogView, search string, offset, limit uint) ([]Asset, error)
 }
 
-func (f *fakeRepository) UpsertExchangeRate(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error) {
+func (f *fakeRepository) UpsertExchangeRate(ctx context.Context, from, to money.Currency, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error) {
 	return f.upsertExchangeRate(ctx, from, to, rate, rateDate)
 }
 
-func (f *fakeRepository) UpsertPublicExchangeRate(ctx context.Context, from, to string, rate decimal.Decimal, rateDate time.Time, source ProviderID) (ExchangeRate, error) {
+func (f *fakeRepository) UpsertPublicExchangeRate(ctx context.Context, from, to money.Currency, rate decimal.Decimal, rateDate time.Time, source ProviderID) (ExchangeRate, error) {
 	return f.upsertPublicExchangeRate(ctx, from, to, rate, rateDate, source)
 }
 
@@ -62,14 +62,14 @@ func (f *fakeRepository) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID
 	return f.updateAssetPrice(ctx, assetID, price)
 }
 
-func (f *fakeRepository) UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error) {
+func (f *fakeRepository) UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error) {
 	if f.upsertAsset == nil {
 		return Asset{}, nil
 	}
 	return f.upsertAsset(ctx, ticker, name, assetType, exchange, currency)
 }
 
-func (f *fakeRepository) CreateAssetIfAbsent(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange, currency string) (Asset, error) {
+func (f *fakeRepository) CreateAssetIfAbsent(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error) {
 	if f.createAssetIfAbsent == nil {
 		return Asset{}, nil
 	}
@@ -109,14 +109,14 @@ func (f *fakeRepository) SearchAssets(ctx context.Context, view CatalogView, sea
 // fakePriceProvider stubs the market data provider used by the sync jobs.
 type fakePriceProvider struct {
 	fetchQuote        func(ctx context.Context, symbol string) (marketdata.QuoteResult, error)
-	fetchExchangeRate func(ctx context.Context, from, to string) (marketdata.ExchangeRateResult, error)
+	fetchExchangeRate func(ctx context.Context, from, to money.Currency) (marketdata.ExchangeRateResult, error)
 }
 
 func (p *fakePriceProvider) FetchQuote(ctx context.Context, symbol string) (marketdata.QuoteResult, error) {
 	return p.fetchQuote(ctx, symbol)
 }
 
-func (p *fakePriceProvider) FetchExchangeRate(ctx context.Context, from, to string) (marketdata.ExchangeRateResult, error) {
+func (p *fakePriceProvider) FetchExchangeRate(ctx context.Context, from, to money.Currency) (marketdata.ExchangeRateResult, error) {
 	return p.fetchExchangeRate(ctx, from, to)
 }
 
@@ -366,7 +366,7 @@ func (c *credentialStore) statusOf(userID uuid.UUID, provider ProviderID) Creden
 	return c.meta[credKey(userID, provider)].Status
 }
 
-func (c *credentialStore) UpsertUserAssetPrice(_ context.Context, userID, assetID uuid.UUID, price money.Money, _ string, _ ProviderID, _ time.Time) error {
+func (c *credentialStore) UpsertUserAssetPrice(_ context.Context, userID, assetID uuid.UUID, price money.Money, _ money.Currency, _ ProviderID, _ time.Time) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.prices[userID.String()+"/"+assetID.String()] = price
@@ -382,10 +382,10 @@ func (c *credentialStore) priceOf(userID, assetID uuid.UUID) (money.Money, bool)
 	return p, ok
 }
 
-func (c *credentialStore) UpsertUserExchangeRate(_ context.Context, userID uuid.UUID, from, to string, rate decimal.Decimal, _ ProviderID, _ time.Time) error {
+func (c *credentialStore) UpsertUserExchangeRate(_ context.Context, userID uuid.UUID, from, to money.Currency, rate decimal.Decimal, _ ProviderID, _ time.Time) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.rates[userID.String()+"/"+from+to] = rate
+	c.rates[userID.String()+"/"+from.String()+to.String()] = rate
 
 	return nil
 }
@@ -499,10 +499,10 @@ func (f *fakeRepository) UsersWithCredentials(ctx context.Context) ([]uuid.UUID,
 	return f.creds.UsersWithCredentials(ctx)
 }
 
-func (f *fakeRepository) UpsertUserAssetPrice(ctx context.Context, userID, assetID uuid.UUID, price money.Money, currency string, source ProviderID, fetchedAt time.Time) error {
+func (f *fakeRepository) UpsertUserAssetPrice(ctx context.Context, userID, assetID uuid.UUID, price money.Money, currency money.Currency, source ProviderID, fetchedAt time.Time) error {
 	return f.creds.UpsertUserAssetPrice(ctx, userID, assetID, price, currency, source, fetchedAt)
 }
 
-func (f *fakeRepository) UpsertUserExchangeRate(ctx context.Context, userID uuid.UUID, from, to string, rate decimal.Decimal, source ProviderID, fetchedAt time.Time) error {
+func (f *fakeRepository) UpsertUserExchangeRate(ctx context.Context, userID uuid.UUID, from, to money.Currency, rate decimal.Decimal, source ProviderID, fetchedAt time.Time) error {
 	return f.creds.UpsertUserExchangeRate(ctx, userID, from, to, rate, source, fetchedAt)
 }

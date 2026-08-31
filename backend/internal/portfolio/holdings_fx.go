@@ -33,24 +33,13 @@ import (
 // EUR→USD yet simply has no rate, and that must not take down the portfolio
 // page. Such an entry keeps its native totals and is marked FXConverted=false,
 // which is the client's cue to show the amounts unconverted and say so.
-func (s *Service) valueEntriesInBase(ctx context.Context, userID uuid.UUID, baseCurrency string, entries []Entry) []Entry {
-	base, err := money.GetCurrencyFromISOCode(baseCurrency)
-	if err != nil {
-		// A portfolio whose base currency is not ISO 4217 has nothing to convert
-		// into. Report the native totals rather than none at all.
-		for i := range entries {
-			entries[i].CostBasisBase, entries[i].MarketValueBase = entryTotals(entries[i])
-		}
-
-		return entries
-	}
-
+func (s *Service) valueEntriesInBase(ctx context.Context, userID uuid.UUID, baseCurrency money.Currency, entries []Entry) []Entry {
 	// One rate lookup per distinct source currency, not per position: a
 	// portfolio with twenty EUR holdings resolves EUR→USD once.
-	rates := make(map[string]decimal.Decimal, 2)
-	missing := make(map[string]struct{}, 2)
+	rates := make(map[money.Currency]decimal.Decimal, 2)
+	missing := make(map[money.Currency]struct{}, 2)
 
-	rateFor := func(from string) (decimal.Decimal, bool) {
+	rateFor := func(from money.Currency) (decimal.Decimal, bool) {
 		if rate, seen := rates[from]; seen {
 			return rate, true
 		}
@@ -72,8 +61,8 @@ func (s *Service) valueEntriesInBase(ctx context.Context, userID uuid.UUID, base
 	for i := range entries {
 		cost, marketValue := entryTotals(entries[i])
 
-		costBase, costOK := convertTotal(cost, base, rateFor)
-		marketBase, marketOK := convertTotal(marketValue, base, rateFor)
+		costBase, costOK := convertTotal(cost, baseCurrency, rateFor)
+		marketBase, marketOK := convertTotal(marketValue, baseCurrency, rateFor)
 
 		entries[i].CostBasisBase = costBase
 		entries[i].MarketValueBase = marketBase
@@ -82,7 +71,7 @@ func (s *Service) valueEntriesInBase(ctx context.Context, userID uuid.UUID, base
 
 	if len(missing) > 0 {
 		s.log.Warn(ctx, "no exchange rate for some holdings; totals left unconverted",
-			logger.Str("baseCurrency", baseCurrency),
+			logger.Str("baseCurrency", baseCurrency.String()),
 			logger.Int("currencies", len(missing)),
 		)
 	}
@@ -107,17 +96,14 @@ func entryTotals(entry Entry) (cost, marketValue money.Money) {
 // convertTotal moves one amount into the base currency, reporting whether it
 // got there. On a missing or unusable rate the amount is returned untouched, in
 // its own currency.
-func convertTotal(amount money.Money, base money.Currency, rateFor func(string) (decimal.Decimal, bool)) (money.Money, bool) {
+func convertTotal(amount money.Money, base money.Currency, rateFor func(money.Currency) (decimal.Decimal, bool)) (money.Money, bool) {
 	if amount.GetCurrency() == base {
 		return amount, true
 	}
 
-	from, err := amount.GetCurrency().GetCurrencyISOCode()
-	if err != nil {
-		return amount, false
-	}
+	from := amount.GetCurrency()
 
-	rate, ok := rateFor(string(from[:]))
+	rate, ok := rateFor(from)
 	if !ok {
 		return amount, false
 	}

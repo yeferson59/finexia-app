@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"uuid"
+
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 func (s *Service) CreatePlatform(ctx context.Context, userID uuid.UUID, sourceType SourceType, name, description string) (InvestmentSource, error) {
@@ -19,7 +21,7 @@ func (s *Service) CreatePlatform(ctx context.Context, userID uuid.UUID, sourceTy
 // GetPlatforms lists the user's platforms with their totals converted into
 // displayCurrency. An empty displayCurrency leaves them in the account's
 // preferred currency; either way the answer says which one it used.
-func (s *Service) GetPlatforms(ctx context.Context, userID uuid.UUID, displayCurrency string) ([]PlatformStats, error) {
+func (s *Service) GetPlatforms(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]PlatformStats, error) {
 	return s.repo.GetPlatformsWithStats(ctx, userID, displayCurrency)
 }
 

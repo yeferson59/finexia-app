@@ -9,10 +9,9 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/yeferson59/finexia-app/internal/market"
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
-
-	"github.com/yeferson59/finexia-app/internal/market"
 )
 
 func (r *PostgresRepository) GetTopTransactionByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID) (TopTransactionDTO, error) {
@@ -44,8 +43,10 @@ func (r *PostgresRepository) GetTopTransactionByPortfolioID(ctx context.Context,
 		if errors.Is(err, pgx.ErrNoRows) {
 			return TopTransactionDTO{}, nil
 		}
+
 		return TopTransactionDTO{}, err
 	}
+
 	return dto, nil
 }
 
@@ -70,20 +71,28 @@ func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, 
 	txns := make([]Transaction, 0)
 	for rows.Next() {
 		var txn Transaction
-		var quantity, price, fees string
+
 		if err := rows.Scan(
-			&txn.ID, &txn.EntryID, &txn.Type, &quantity, &price,
-			&txn.Currency, &fees, &txn.TransactionDate, &txn.Notes,
-			&txn.CreatedAt, &txn.UpdatedAt,
-			&txn.Entry.Asset.Ticker, &txn.Entry.Asset.Name,
+			&txn.ID,
+			&txn.EntryID,
+			&txn.Type,
+			&txn.Quantity,
+			&txn.Price,
+			&txn.Currency,
+			&txn.Fees,
+			&txn.TransactionDate,
+			&txn.Notes,
+			&txn.CreatedAt,
+			&txn.UpdatedAt,
+			&txn.Entry.Asset.Ticker,
+			&txn.Entry.Asset.Name,
 		); err != nil {
 			return nil, err
 		}
-		txn.Quantity = decimal.MustFromString(quantity)
-		txn.Price = moneyOf(price, txn.Currency)
-		txn.Fees = moneyOf(fees, txn.Currency)
+
 		txns = append(txns, txn)
 	}
+
 	return txns, nil
 }
 
@@ -115,7 +124,7 @@ func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, 
 // The rows come back keyed by asset type and are folded into the entry
 // categories the response has always spoken, so the vocabulary clients map to
 // labels does not change.
-func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, userID uuid.UUID, targetCurrency string) ([]AllocationItem, error) {
+func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AllocationItem, error) {
 	// The sum is rounded to the scale every money column here keeps. Postgres
 	// adds the scales of what it multiplies, so quantity × price × rate reaches
 	// thirty-odd decimals, and the decimal engine that parses this text back in
@@ -162,17 +171,18 @@ func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, use
 
 	rowsByType := make([]AllocationItem, 0)
 	for rows.Next() {
-		var assetType string
 		var item AllocationItem
-		if err := rows.Scan(&assetType, &item.MarketValue, &item.Currency, &item.PositionsUnconverted); err != nil {
+
+		if err := rows.Scan(&item.Category, &item.MarketValue, &item.Currency, &item.PositionsUnconverted); err != nil {
 			return nil, err
 		}
-		item.Category = entryCategoryFor(market.AssetType(assetType))
+
 		rowsByType = append(rowsByType, item)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+
 	return foldAllocationByCategory(rowsByType), nil
 }
 
@@ -186,14 +196,16 @@ func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, use
 // above it, which is why the order is rebuilt rather than left almost-sorted.
 func foldAllocationByCategory(items []AllocationItem) []AllocationItem {
 	folded := make([]AllocationItem, 0, len(items))
-	index := make(map[EntryCategory]int, len(items))
+	index := make(map[market.AssetType]int, len(items))
 
 	for _, item := range items {
 		if at, seen := index[item.Category]; seen {
 			folded[at].MarketValue = sumAmounts(folded[at].MarketValue, item.MarketValue)
 			folded[at].PositionsUnconverted += item.PositionsUnconverted
+
 			continue
 		}
+
 		index[item.Category] = len(folded)
 		folded = append(folded, item)
 	}
@@ -249,15 +261,15 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 	txns := make([]Transaction, 0)
 	for rows.Next() {
 		var txn Transaction
-		var quantity, price, fees string
+
 		if err := rows.Scan(
 			&txn.ID,
 			&txn.EntryID,
 			&txn.Type,
-			&quantity,
-			&price,
+			&txn.Quantity,
+			&txn.Price,
 			&txn.Currency,
-			&fees,
+			&txn.Fees,
 			&txn.TransactionDate,
 			&txn.Notes,
 			&txn.CreatedAt,
@@ -265,11 +277,10 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 		); err != nil {
 			return nil, err
 		}
-		txn.Quantity = decimal.MustFromString(quantity)
-		txn.Price = moneyOf(price, txn.Currency)
-		txn.Fees = moneyOf(fees, txn.Currency)
+
 		txns = append(txns, txn)
 	}
+
 	return txns, nil
 }
 
@@ -283,6 +294,7 @@ func (r *PostgresRepository) CountAssetTransactions(ctx context.Context, userID,
 		JOIN portfolios p ON p.id = pe.portfolio_id
 		WHERE p.id = $1 AND a.ticker = $2 AND p.user_id = $3
 	`, portfolioID, ticker, userID).Scan(&total)
+
 	return total, err
 }
 
@@ -306,15 +318,15 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 	txns := make([]Transaction, 0)
 	for rows.Next() {
 		var txn Transaction
-		var quantity, price, fees string
+
 		if err := rows.Scan(
 			&txn.ID,
 			&txn.EntryID,
 			&txn.Type,
-			&quantity,
-			&price,
+			&txn.Quantity,
+			&txn.Price,
 			&txn.Currency,
-			&fees,
+			&txn.Fees,
 			&txn.TransactionDate,
 			&txn.Notes,
 			&txn.CreatedAt,
@@ -322,15 +334,14 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 		); err != nil {
 			return nil, err
 		}
-		txn.Quantity = decimal.MustFromString(quantity)
-		txn.Price = moneyOf(price, txn.Currency)
-		txn.Fees = moneyOf(fees, txn.Currency)
+
 		txns = append(txns, txn)
 	}
+
 	return txns, nil
 }
 
-func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
+func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency money.Currency, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
 	var owned bool
 	if err := r.db.QueryRow(ctx, `
 		SELECT EXISTS (
@@ -346,7 +357,7 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 	}
 
 	var txn Transaction
-	var quantityValue, priceValue, feesValue string
+
 	if err := r.db.QueryRow(ctx, `
 		INSERT INTO transactions (entry_id, type, quantity, price, currency, fees, transaction_date, notes)
 		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::date, $8)
@@ -355,10 +366,10 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 		&txn.ID,
 		&txn.EntryID,
 		&txn.Type,
-		&quantityValue,
-		&priceValue,
+		&txn.Quantity,
+		&txn.Price,
 		&txn.Currency,
-		&feesValue,
+		&txn.Fees,
 		&txn.TransactionDate,
 		&txn.Notes,
 		&txn.CreatedAt,
@@ -367,15 +378,15 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 		return Transaction{}, err
 	}
 
-	txn.Quantity = decimal.MustFromString(quantityValue)
-	txn.Price = moneyOf(priceValue, txn.Currency)
-	txn.Fees = moneyOf(feesValue, txn.Currency)
+	txn.Price.SetCurrency(txn.Currency)
+	txn.Fees.SetCurrency(txn.Currency)
+
 	return txn, nil
 }
 
 func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
 	var txn Transaction
-	var quantityValue, priceValue, feesValue string
+
 	err := r.db.QueryRow(ctx, `
 		UPDATE transactions SET
 			type             = $1::transaction_type,
@@ -397,10 +408,10 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 		&txn.ID,
 		&txn.EntryID,
 		&txn.Type,
-		&quantityValue,
-		&priceValue,
+		&txn.Quantity,
+		&txn.Price,
 		&txn.Currency,
-		&feesValue,
+		&txn.Fees,
 		&txn.TransactionDate,
 		&txn.Notes,
 		&txn.CreatedAt,
@@ -410,11 +421,13 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Transaction{}, ErrTransactionNotFound
 		}
+
 		return Transaction{}, err
 	}
-	txn.Quantity = decimal.MustFromString(quantityValue)
-	txn.Price = moneyOf(priceValue, txn.Currency)
-	txn.Fees = moneyOf(feesValue, txn.Currency)
+
+	txn.Price.SetCurrency(txn.Currency)
+	txn.Fees.SetCurrency(txn.Currency)
+
 	return txn, nil
 }
 

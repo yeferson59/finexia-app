@@ -195,7 +195,7 @@ func (r *PostgresRepository) UsersWithCredentials(ctx context.Context) ([]uuid.U
 // UpsertUserAssetPrice stores a price against the user whose key fetched it.
 // The currency comes from the asset rather than from the Money value, matching
 // how UpdateAssetPrice already writes the shared column.
-func (r *PostgresRepository) UpsertUserAssetPrice(ctx context.Context, userID, assetID uuid.UUID, price money.Money, currency string, source ProviderID, fetchedAt time.Time) error {
+func (r *PostgresRepository) UpsertUserAssetPrice(ctx context.Context, userID, assetID uuid.UUID, price money.Money, currency money.Currency, source ProviderID, fetchedAt time.Time) error {
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO user_asset_prices (user_id, asset_id, price, currency, source, fetched_at)
 		VALUES ($1, $2, $3::numeric, $4, $5, $6)
@@ -210,7 +210,7 @@ func (r *PostgresRepository) UpsertUserAssetPrice(ctx context.Context, userID, a
 }
 
 // UpsertUserExchangeRate stores a rate against the user whose key fetched it.
-func (r *PostgresRepository) UpsertUserExchangeRate(ctx context.Context, userID uuid.UUID, from, to string, rate decimal.Decimal, source ProviderID, fetchedAt time.Time) error {
+func (r *PostgresRepository) UpsertUserExchangeRate(ctx context.Context, userID uuid.UUID, from, to money.Currency, rate decimal.Decimal, source ProviderID, fetchedAt time.Time) error {
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO user_exchange_rates (user_id, from_currency, to_currency, rate, source, fetched_at)
 		VALUES ($1, $2, $3, $4::numeric, $5, $6)

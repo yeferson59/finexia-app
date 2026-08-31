@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"mime/multipart"
-	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
@@ -118,10 +117,7 @@ func (h *handler) CreateExchangeRate(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
-	from := strings.ToUpper(strings.TrimSpace(req.FromCurrency))
-	to := strings.ToUpper(strings.TrimSpace(req.ToCurrency))
-
-	rate, err := h.service.CreateExchangeRate(c, from, to, req.Rate)
+	rate, err := h.service.CreateExchangeRate(c, req.FromCurrency, req.ToCurrency, req.Rate)
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error creating exchange rate", "Could not create exchange rate")
 	}

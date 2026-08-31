@@ -358,7 +358,7 @@ func (s *Service) GetSession(ctx context.Context, userID uuid.UUID, token string
 			EmailVerified:     user.EmailVerified,
 			Image:             user.Image,
 			Role:              user.Role.Name,
-			PreferredCurrency: user.PreferredCurrency,
+			PreferredCurrency: user.PreferredCurrency.String(),
 			CreatedAt:         user.CreatedAt,
 			UpdatedAt:         user.UpdatedAt,
 		},

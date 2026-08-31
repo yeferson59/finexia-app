@@ -1,13 +1,13 @@
 package portfolio
 
 import (
-	"strings"
-
 	"uuid"
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/yeferson59/finexia-app/internal/platform/currency"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type handler struct {
@@ -39,16 +39,20 @@ func (h *handler) GetPortfoliosSummary(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())
 	}
 
-	currency := strings.ToUpper(strings.TrimSpace(c.Query("currency")))
-	if currency != "" && !IsSupportedDisplayCurrency(currency) {
-		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+strings.Join(SupportedDisplayCurrencies, ", "))
+	var req CurrencyDTO
+	if err := c.Bind().Query(&req); err != nil {
+		return httpx.BadRequest(c, "Unprocess query currency", "no process currency")
+	}
+
+	if req.currency != money.XXX && !currency.IsSupported(req.currency) {
+		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+currency.List())
 	}
 
 	var summaries []SummaryView
-	if currency == "" {
+	if req.currency == money.XXX {
 		summaries, err = h.service.GetPortfoliosSummary(c, userID)
 	} else {
-		summaries, err = h.service.GetPortfoliosSummaryInCurrency(c, userID, currency)
+		summaries, err = h.service.GetPortfoliosSummaryInCurrency(c, userID, req.currency)
 	}
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error retrieving portfolio summaries", "Could not retrieve portfolio summaries")
@@ -199,12 +203,16 @@ func (h *handler) GetPlatforms(c fiber.Ctx) error {
 	// Same contract as the summary's ?currency=: the platform totals are a sum
 	// over entries in mixed currencies, so the caller has to be able to name
 	// the one they want them in.
-	displayCurrency := strings.ToUpper(strings.TrimSpace(c.Query("currency")))
-	if displayCurrency != "" && !IsSupportedDisplayCurrency(displayCurrency) {
-		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+strings.Join(SupportedDisplayCurrencies, ", "))
+	var req CurrencyDTO
+	if err := c.Bind().Query(&req); err != nil {
+		return httpx.BadRequest(c, "Unprocess query currency", "no process currency")
 	}
 
-	platforms, err := h.service.GetPlatforms(c, userID, displayCurrency)
+	if req.currency != money.XXX && !currency.IsSupported(req.currency) {
+		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+currency.List())
+	}
+
+	platforms, err := h.service.GetPlatforms(c, userID, req.currency)
 	if err != nil {
 		return httpx.FromDomain(c, err, "", "")
 	}

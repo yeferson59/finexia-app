@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // stubProvider is a configurable Provider used to drive the fallback chain.
@@ -20,7 +22,7 @@ func (s *stubProvider) FetchQuote(context.Context, string) (QuoteResult, error) 
 	return s.quote, s.quoteErr
 }
 
-func (s *stubProvider) FetchExchangeRate(context.Context, string, string) (ExchangeRateResult, error) {
+func (s *stubProvider) FetchExchangeRate(context.Context, money.Currency, money.Currency) (ExchangeRateResult, error) {
 	s.calls++
 	return s.rate, s.rateErr
 }
@@ -80,7 +82,7 @@ func TestFallbackFetchExchangeRate(t *testing.T) {
 		second := new(stubProvider{rate: ExchangeRateResult{Rate: "1.08"}})
 		third := new(stubProvider{rate: ExchangeRateResult{Rate: "9.99"}})
 
-		res, err := NewFallback(first, second, third).FetchExchangeRate(context.Background(), "EUR", "USD")
+		res, err := NewFallback(first, second, third).FetchExchangeRate(context.Background(), money.EUR, money.USD)
 		if err != nil {
 			t.Fatalf("FetchExchangeRate: %v", err)
 		}
@@ -100,7 +102,7 @@ func TestFallbackFetchExchangeRate(t *testing.T) {
 			new(stubProvider{rateErr: errB}),
 		)
 
-		_, err := f.FetchExchangeRate(context.Background(), "EUR", "USD")
+		_, err := f.FetchExchangeRate(context.Background(), money.EUR, money.USD)
 		if err == nil {
 			t.Fatal("expected an error when all providers fail")
 		}

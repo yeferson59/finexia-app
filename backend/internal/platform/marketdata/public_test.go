@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type stubSource struct {
@@ -18,8 +20,8 @@ func (s stubSource) FetchRates(context.Context) ([]PublicRate, error) { return s
 // every pair the app converts, so what one publishes never substitutes for
 // another and one being down must not silence the rest.
 func TestPublicRateSources(t *testing.T) {
-	trm := PublicRate{From: "USD", To: "COP", Rate: "3157.43", Source: DolarAPI}
-	eur := PublicRate{From: "EUR", To: "USD", Rate: "1.16", Source: ECB}
+	trm := PublicRate{From: money.USD, To: money.COP, Rate: "3157.43", Source: DolarAPI}
+	eur := PublicRate{From: money.EUR, To: money.USD, Rate: "1.16", Source: ECB}
 
 	t.Run("returns every feed's rates together", func(t *testing.T) {
 		sources := PublicRateSources{stubSource{rates: []PublicRate{trm}}, stubSource{rates: []PublicRate{eur}}}
@@ -28,7 +30,7 @@ func TestPublicRateSources(t *testing.T) {
 		if err != nil {
 			t.Fatalf("FetchRates: %v", err)
 		}
-		if len(rates) != 2 || rates[0].To != "COP" || rates[1].From != "EUR" {
+		if len(rates) != 2 || rates[0].To != money.COP || rates[1].From != money.EUR {
 			t.Errorf("rates = %+v, want the TRM followed by the euro pair", rates)
 		}
 	})
@@ -40,7 +42,7 @@ func TestPublicRateSources(t *testing.T) {
 		}
 
 		rates, err := sources.FetchRates(context.Background())
-		if len(rates) != 1 || rates[0].To != "COP" {
+		if len(rates) != 1 || rates[0].To != money.COP {
 			t.Errorf("rates = %+v, want the pair the working feed published", rates)
 		}
 		// Still reported: a silent partial refresh is how a feed stays broken

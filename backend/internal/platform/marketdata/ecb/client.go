@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/yeferson59/gofinance/v2/decimal"
+	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
@@ -155,8 +156,8 @@ func (c *Client) FetchRates(ctx context.Context) ([]marketdata.PublicRate, error
 		}
 
 		rates = append(rates,
-			marketdata.PublicRate{From: hub, To: code, Rate: forward.String(), Source: marketdata.ECB, AsOf: asOf},
-			marketdata.PublicRate{From: code, To: hub, Rate: backward.String(), Source: marketdata.ECB, AsOf: asOf},
+			marketdata.PublicRate{From: money.USD, To: code, Rate: forward.String(), Source: marketdata.ECB, AsOf: asOf},
+			marketdata.PublicRate{From: code, To: money.USD, Rate: backward.String(), Source: marketdata.ECB, AsOf: asOf},
 		)
 	}
 

@@ -80,7 +80,7 @@ func TestHandlerCreatePortfolio(t *testing.T) {
 
 	newApp := func(t *testing.T, created *Portfolio) *fiber.App {
 		repo := new(fakeRepository{
-			createPortfolio: func(_ context.Context, uid uuid.UUID, name, description, baseCurrency string, rid uuid.UUID, typePortfolio Type, _ money.Money, isDefault bool) (Portfolio, error) {
+			createPortfolio: func(_ context.Context, uid uuid.UUID, name, description string, baseCurrency money.Currency, rid uuid.UUID, typePortfolio Type, _ money.Money, isDefault bool) (Portfolio, error) {
 				*created = Portfolio{ID: uuid.New(), UserID: uid, Name: name, Description: description, BaseCurrency: baseCurrency, RiskID: rid, Type: typePortfolio, IsDefault: isDefault}
 				return *created, nil
 			},
@@ -99,7 +99,7 @@ func TestHandlerCreatePortfolio(t *testing.T) {
 		if created.UserID != userID {
 			t.Errorf("userID = %s, want %s (the handler must take it from the token, not the body)", created.UserID, userID)
 		}
-		if created.Name != "Growth" || created.BaseCurrency != "USD" || created.RiskID != riskID || !created.IsDefault {
+		if created.Name != "Growth" || created.BaseCurrency != money.USD || created.RiskID != riskID || !created.IsDefault {
 			t.Errorf("created = %+v", created)
 		}
 	})
@@ -245,16 +245,14 @@ func TestHandlerPlatformCRUD(t *testing.T) {
 	})
 
 	t.Run("lists platforms", func(t *testing.T) {
-		var gotCurrency string
 		repo := new(fakeRepository{
-			getPlatformsWithStats: func(_ context.Context, uid uuid.UUID, displayCurrency string) ([]PlatformStats, error) {
+			getPlatformsWithStats: func(_ context.Context, uid uuid.UUID, displayCurrency money.Currency) ([]PlatformStats, error) {
 				if uid != userID {
 					t.Errorf("userID = %s, want %s", uid, userID)
 				}
-				gotCurrency = displayCurrency
 				return []PlatformStats{{
 					ID: sourceID, Name: "ibkr", SourceType: SourceType("broker"), Investments: 3,
-					TotalValue: "1200.50", DisplayCurrency: "USD", PositionsUnconverted: 1,
+					TotalValue: "1200.50", DisplayCurrency: money.USD, PositionsUnconverted: 1,
 				}}, nil
 			},
 		})
@@ -264,9 +262,7 @@ func TestHandlerPlatformCRUD(t *testing.T) {
 		if resp.StatusCode != fiber.StatusOK {
 			t.Fatalf("status = %d, want 200", resp.StatusCode)
 		}
-		if gotCurrency != "" {
-			t.Errorf("displayCurrency = %q, want empty (account preference)", gotCurrency)
-		}
+
 		_, data := decodeEnvelope(t, resp)
 		var dtos []PlatformResponseDTO
 		if err := json.Unmarshal(data, &dtos); err != nil {
@@ -284,10 +280,11 @@ func TestHandlerPlatformCRUD(t *testing.T) {
 	})
 
 	t.Run("lists platforms in a requested currency", func(t *testing.T) {
-		var gotCurrency string
+		var gotCurrency money.Currency
 		repo := new(fakeRepository{
-			getPlatformsWithStats: func(_ context.Context, _ uuid.UUID, displayCurrency string) ([]PlatformStats, error) {
+			getPlatformsWithStats: func(_ context.Context, _ uuid.UUID, displayCurrency money.Currency) ([]PlatformStats, error) {
 				gotCurrency = displayCurrency
+
 				return nil, nil
 			},
 		})
@@ -297,14 +294,14 @@ func TestHandlerPlatformCRUD(t *testing.T) {
 		if resp.StatusCode != fiber.StatusOK {
 			t.Fatalf("status = %d, want 200", resp.StatusCode)
 		}
-		if gotCurrency != "COP" {
+		if gotCurrency != money.COP {
 			t.Errorf("displayCurrency = %q, want COP", gotCurrency)
 		}
 	})
 
 	t.Run("rejects an unsupported currency", func(t *testing.T) {
 		repo := new(fakeRepository{
-			getPlatformsWithStats: func(_ context.Context, _ uuid.UUID, _ string) ([]PlatformStats, error) {
+			getPlatformsWithStats: func(_ context.Context, _ uuid.UUID, _ money.Currency) ([]PlatformStats, error) {
 				t.Error("repository reached with an unsupported currency")
 				return nil, nil
 			},
@@ -384,7 +381,7 @@ func TestHandlerTransactions(t *testing.T) {
 		var gotType TransactionType
 		repo := new(fakeRepository{
 			getUserPreferences: alertsOff,
-			createTransaction: func(_ context.Context, _, eid uuid.UUID, txnType TransactionType, _ decimal.Decimal, _ money.Money, currency string, _ money.Money, _ time.Time, _ string) (Transaction, error) {
+			createTransaction: func(_ context.Context, _, eid uuid.UUID, txnType TransactionType, _ decimal.Decimal, _ money.Money, currency money.Currency, _ money.Money, _ time.Time, _ string) (Transaction, error) {
 				gotEntryID, gotType = eid, txnType
 				return Transaction{ID: txnID, EntryID: eid, Type: txnType, Currency: currency}, nil
 			},
@@ -529,16 +526,16 @@ func TestHandlerTransactions(t *testing.T) {
 func TestHandlerGetAssetAllocation(t *testing.T) {
 	userID := uuid.New()
 
-	newApp := func(t *testing.T, gotCurrency *string) *fiber.App {
+	newApp := func(t *testing.T, gotCurrency *money.Currency) *fiber.App {
 		t.Helper()
 		repo := new(fakeRepository{
-			getAssetAllocationByUserID: func(_ context.Context, uid uuid.UUID, currency string) ([]AllocationItem, error) {
+			getAssetAllocationByUserID: func(_ context.Context, uid uuid.UUID, currency money.Currency) ([]AllocationItem, error) {
 				if uid != userID {
 					t.Errorf("userID = %s, want %s", uid, userID)
 				}
 				*gotCurrency = currency
 
-				return []AllocationItem{{Category: EntryCategory("stocks"), MarketValue: "1000", Currency: "USD"}}, nil
+				return []AllocationItem{{Category: market.AssetType("stocks"), MarketValue: "1000", Currency: money.USD}}, nil
 			},
 		})
 
@@ -548,25 +545,22 @@ func TestHandlerGetAssetAllocation(t *testing.T) {
 	// Omitted means "the user's own preference", resolved further down. The
 	// handler must pass the absence through rather than pick a currency here.
 	t.Run("passes no currency through when none is asked for", func(t *testing.T) {
-		var gotCurrency string
+		var gotCurrency money.Currency
 
 		resp := do(t, newApp(t, &gotCurrency), http.MethodGet, "/portfolios/allocation")
 		if resp.StatusCode != fiber.StatusOK {
 			t.Fatalf("status = %d, want 200", resp.StatusCode)
 		}
-		if gotCurrency != "" {
-			t.Errorf("currency = %q, want it left empty", gotCurrency)
-		}
 	})
 
 	t.Run("normalises the requested currency", func(t *testing.T) {
-		var gotCurrency string
+		var gotCurrency money.Currency
 
 		resp := do(t, newApp(t, &gotCurrency), http.MethodGet, "/portfolios/allocation?currency=cop")
 		if resp.StatusCode != fiber.StatusOK {
 			t.Fatalf("status = %d, want 200", resp.StatusCode)
 		}
-		if gotCurrency != "COP" {
+		if gotCurrency != money.COP {
 			t.Errorf("currency = %q, want COP", gotCurrency)
 		}
 	})
@@ -590,7 +584,7 @@ func TestHandlerGetPortfolioGrowth(t *testing.T) {
 	t.Run("aggregated growth defaults to the full history", func(t *testing.T) {
 		var gotHasSince bool
 		repo := new(fakeRepository{
-			getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, _ string, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
+			getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, _ money.Currency, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
 				gotHasSince = hasSince
 				return nil, nil
 			},
@@ -609,7 +603,7 @@ func TestHandlerGetPortfolioGrowth(t *testing.T) {
 	t.Run("a period query bounds the range", func(t *testing.T) {
 		var gotHasSince bool
 		repo := new(fakeRepository{
-			getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, _ string, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
+			getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, _ money.Currency, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
 				gotHasSince = hasSince
 				return nil, nil
 			},
@@ -756,7 +750,7 @@ func TestHandlerCreatePortfolioEntry(t *testing.T) {
 		var gotPortfolio, gotAsset, gotSource uuid.UUID
 		var gotType TransactionType
 		repo := new(fakeRepository{
-			createPortfolioEntry: func(_ context.Context, _, pid, aid, sid uuid.UUID, txnType TransactionType, _ decimal.Decimal, _ money.Money, _ string, _ time.Time, _ string) (Entry, error) {
+			createPortfolioEntry: func(_ context.Context, _, pid, aid, sid uuid.UUID, txnType TransactionType, _ decimal.Decimal, _ money.Money, _ money.Currency, _ time.Time, _ string) (Entry, error) {
 				gotPortfolio, gotAsset, gotSource, gotType = pid, aid, sid, txnType
 				return Entry{ID: uuid.New(), PortfolioID: pid, AssetID: aid, SourceID: sid}, nil
 			},
@@ -781,7 +775,7 @@ func TestHandlerCreatePortfolioEntry(t *testing.T) {
 	t.Run("a category in the body is ignored rather than rejected", func(t *testing.T) {
 		called := false
 		repo := new(fakeRepository{
-			createPortfolioEntry: func(_ context.Context, _, _, _, _ uuid.UUID, _ TransactionType, _ decimal.Decimal, _ money.Money, _ string, _ time.Time, _ string) (Entry, error) {
+			createPortfolioEntry: func(_ context.Context, _, _, _, _ uuid.UUID, _ TransactionType, _ decimal.Decimal, _ money.Money, _ money.Currency, _ time.Time, _ string) (Entry, error) {
 				called = true
 				return Entry{ID: uuid.New()}, nil
 			},
@@ -800,7 +794,7 @@ func TestHandlerCreatePortfolioEntry(t *testing.T) {
 	t.Run("an empty transaction type defaults to buy", func(t *testing.T) {
 		var gotType TransactionType
 		repo := new(fakeRepository{
-			createPortfolioEntry: func(_ context.Context, _, _, _, _ uuid.UUID, txnType TransactionType, _ decimal.Decimal, _ money.Money, _ string, _ time.Time, _ string) (Entry, error) {
+			createPortfolioEntry: func(_ context.Context, _, _, _, _ uuid.UUID, txnType TransactionType, _ decimal.Decimal, _ money.Money, _ money.Currency, _ time.Time, _ string) (Entry, error) {
 				gotType = txnType
 				return Entry{ID: uuid.New()}, nil
 			},
