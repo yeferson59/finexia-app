@@ -45,15 +45,15 @@ func (h *handler) GetPortfoliosSummary(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Unprocess query currency", "no process currency")
 	}
 
-	if req.currency != money.XXX && !currency.IsSupported(req.currency) {
+	if req.Currency != money.XXX && !currency.IsSupported(req.Currency) {
 		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+currency.List())
 	}
 
 	var summaries []SummaryView
-	if req.currency == money.XXX {
+	if req.Currency == money.XXX {
 		summaries, err = h.service.GetPortfoliosSummary(c, userID)
 	} else {
-		summaries, err = h.service.GetPortfoliosSummaryInCurrency(c, userID, req.currency)
+		summaries, err = h.service.GetPortfoliosSummaryInCurrency(c, userID, req.Currency)
 	}
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error retrieving portfolio summaries", "Could not retrieve portfolio summaries")
@@ -209,11 +209,11 @@ func (h *handler) GetPlatforms(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Unprocess query currency", "no process currency")
 	}
 
-	if req.currency != money.XXX && !currency.IsSupported(req.currency) {
+	if req.Currency != money.XXX && !currency.IsSupported(req.Currency) {
 		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+currency.List())
 	}
 
-	platforms, err := h.service.GetPlatforms(c, userID, req.currency)
+	platforms, err := h.service.GetPlatforms(c, userID, req.Currency)
 	if err != nil {
 		return httpx.FromDomain(c, err, "", "")
 	}

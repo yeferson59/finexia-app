@@ -69,10 +69,6 @@ func (h *handler) UpdateAssetPrice(c fiber.Ctx) error {
 	return httpx.OK(c, "Asset price updated", "Asset price updated successfully", asset)
 }
 
-type CurrencyDTO struct {
-	currency money.Currency `query:"currency"`
-}
-
 func (h *handler) GetAssetAllocation(c fiber.Ctx) error {
 	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
@@ -91,11 +87,11 @@ func (h *handler) GetAssetAllocation(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Unprocess query currency", "no process currency")
 	}
 
-	if req.currency != money.XXX && !currency.IsSupported(req.currency) {
+	if req.Currency != money.XXX && !currency.IsSupported(req.Currency) {
 		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+currency.List())
 	}
 
-	items, err := h.service.GetAssetAllocation(c, userID, req.currency)
+	items, err := h.service.GetAssetAllocation(c, userID, req.Currency)
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error retrieving asset allocation", "Could not retrieve asset allocation")
 	}
@@ -257,11 +253,11 @@ func (h *handler) GetPortfolioGrowth(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Unprocess query currency", "no process currency")
 	}
 
-	if req.currency != money.XXX && !currency.IsSupported(req.currency) {
+	if req.Currency != money.XXX && !currency.IsSupported(req.Currency) {
 		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+currency.List())
 	}
 
-	points, summary, err := h.service.GetPortfolioGrowth(c, userID, req.currency, period)
+	points, summary, err := h.service.GetPortfolioGrowth(c, userID, req.Currency, period)
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error retrieving portfolio growth", "Could not retrieve portfolio growth data")
 	}

@@ -433,3 +433,7 @@ type PaginatedTransactionsDTO struct {
 	Limit      int                      `json:"limit"`
 	TotalPages int                      `json:"totalPages"`
 }
+
+type CurrencyDTO struct {
+	Currency money.Currency `query:"currency"`
+}
