@@ -3,14 +3,16 @@ package market
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"uuid"
 
+	"github.com/yeferson59/gofinance/v2/money"
+
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 	"github.com/yeferson59/finexia-app/internal/platform/secretbox"
-	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // byoFixture wires a service with a real keyring, an in-memory credential store
@@ -149,15 +151,15 @@ func TestSyncAssetsForUser(t *testing.T) {
 	t.Run("crypto prices come from an exchange rate on the split ticker", func(t *testing.T) {
 		provider := new(fakePriceProvider{
 			fetchExchangeRate: func(_ context.Context, from, to money.Currency) (marketdata.ExchangeRateResult, error) {
-				if from != "BTC" || to != money.USD {
-					t.Errorf("pair = %s/%s, want BTC/USD", from, to)
+				if from != money.EUR || to != money.USD {
+					t.Errorf("pair = %s/%s, want EUR/USD", from, to)
 				}
 
 				return marketdata.ExchangeRateResult{Rate: "64000.00", Source: Finnhub}, nil
 			},
 		})
 
-		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "BTC-USD", AssetType: Crypto, Currency: money.USD}), provider)
+		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "EUR-USD", AssetType: Crypto, Currency: money.USD}), provider)
 		f.creds.seed(t, f.ring, userID, Finnhub, "key")
 
 		got, errs := f.svc.SyncAssetsForUser(context.Background(), userID, []uuid.UUID{assetID})
@@ -166,6 +168,30 @@ func TestSyncAssetsForUser(t *testing.T) {
 		}
 		if len(got) != 1 || got[0].Price.String() != mustUSD(t, "64000.00").String() {
 			t.Fatalf("results = %+v, want one price of 64000.00", got)
+		}
+	})
+
+	// The pair a crypto ticker actually names is the one FetchExchangeRate
+	// cannot carry: money.Currency is ISO 4217, and no crypto is in that table.
+	// Until the provider interface takes the leg as text again, BTC-USD has to
+	// fail saying so rather than quietly asking the feed for XXX/USD.
+	t.Run("a crypto ticker outside ISO 4217 fails naming the leg", func(t *testing.T) {
+		provider := new(fakePriceProvider{
+			fetchExchangeRate: func(context.Context, money.Currency, money.Currency) (marketdata.ExchangeRateResult, error) {
+				t.Fatal("an unrepresentable pair must not reach the provider")
+				return marketdata.ExchangeRateResult{}, nil
+			},
+		})
+
+		f := newBYOFixture(t, repoFor(Asset{ID: assetID, Ticker: "BTC-USD", AssetType: Crypto, Currency: money.USD}), provider)
+		f.creds.seed(t, f.ring, userID, Finnhub, "key")
+
+		_, errs := f.svc.SyncAssetsForUser(context.Background(), userID, []uuid.UUID{assetID})
+		if len(errs) != 1 {
+			t.Fatalf("errs = %v, want one error", errs)
+		}
+		if !strings.Contains(errs[0].Error(), "BTC") {
+			t.Errorf("err = %v, want it to name the leg it could not express", errs[0])
 		}
 	})
 

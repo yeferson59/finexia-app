@@ -10,9 +10,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/yeferson59/gofinance/v2/money"
+
 	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
-	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type PostgresRepository struct {

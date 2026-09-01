@@ -9,9 +9,10 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/yeferson59/finexia-app/internal/market"
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/market"
 )
 
 func (r *PostgresRepository) GetTopTransactionByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID) (TopTransactionDTO, error) {

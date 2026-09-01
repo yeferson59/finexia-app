@@ -12,8 +12,9 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 // stubAuth injects the request locals the JWT middleware would normally set.

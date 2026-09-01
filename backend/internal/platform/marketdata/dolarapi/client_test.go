@@ -9,8 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)

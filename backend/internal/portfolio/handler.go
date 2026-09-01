@@ -5,9 +5,10 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/yeferson59/gofinance/v2/money"
+
 	"github.com/yeferson59/finexia-app/internal/platform/currency"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
-	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type handler struct {

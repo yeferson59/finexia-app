@@ -115,10 +115,21 @@ func (s *Service) syncOneAsset(ctx context.Context, userID, assetID uuid.UUID, c
 			return UserAssetPrice{}, fmt.Errorf("cannot parse crypto ticker %q", asset.Ticker)
 		}
 
+		// FetchExchangeRate speaks money.Currency, which is ISO 4217 and
+		// nothing else, so a leg the table does not hold — "BTC", "ETH" — has
+		// no value to pass. Rejecting it here is what keeps that visible: a
+		// discarded Scan error leaves the leg at XXX, and the provider is then
+		// asked for XXX/USD and answers "no rate", blaming the feed for a
+		// ticker this code could not express.
 		var from, to money.Currency
 
-		from.Scan(base)
-		to.Scan(quote)
+		if err := from.Scan(base); err != nil {
+			return UserAssetPrice{}, fmt.Errorf("crypto ticker %q: %q is not an ISO 4217 currency: %w", asset.Ticker, base, err)
+		}
+
+		if err := to.Scan(quote); err != nil {
+			return UserAssetPrice{}, fmt.Errorf("crypto ticker %q: %q is not an ISO 4217 currency: %w", asset.Ticker, quote, err)
+		}
 
 		result, err := chain.FetchExchangeRate(ctx, from, to)
 		if err != nil {

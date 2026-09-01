@@ -16,8 +16,9 @@ import (
 
 	json "github.com/bytedance/sonic"
 
-	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
 
 const baseURL = "https://finnhub.io/api/v1"

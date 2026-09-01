@@ -11,8 +11,9 @@ import (
 
 	"github.com/xuri/excelize/v2"
 
-	"github.com/yeferson59/finexia-app/internal/market"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/market"
 )
 
 // buildXLSX creates an in-memory workbook with the given rows on one sheet.

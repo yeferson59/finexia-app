@@ -59,7 +59,7 @@ func (s *Service) ImportAssetsFromFile(ctx context.Context, data []byte, filenam
 		ticker := strings.ToUpper(spreadsheet.CellAtIdx(row, cols["ticker"]))
 		name := spreadsheet.CellAtIdx(row, cols["name"])
 		assetTypeRaw := spreadsheet.CellAtIdx(row, cols["assettype"])
-		currency := strings.ToUpper(spreadsheet.CellAtIdx(row, cols["currency"]))
+		currencyRaw := strings.ToUpper(spreadsheet.CellAtIdx(row, cols["currency"]))
 		exchange := ""
 		if hasExchange {
 			exchange = spreadsheet.CellAtIdx(row, exchangeIdx)
@@ -89,10 +89,9 @@ func (s *Service) ImportAssetsFromFile(ctx context.Context, data []byte, filenam
 			}
 		}
 
-		if code, ok := NormalizeCurrencyCode(currency); ok {
-			currency = code
-		} else {
-			rowErrs = append(rowErrs, fmt.Sprintf("moneda inválida: %q", currency))
+		currency, ok := normalizeCurrencyCode(currencyRaw)
+		if !ok {
+			rowErrs = append(rowErrs, fmt.Sprintf("moneda inválida: %q", currencyRaw))
 		}
 
 		if len(rowErrs) > 0 {

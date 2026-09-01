@@ -41,16 +41,16 @@ const dailyURL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
 
 // base is the currency the ECB quotes everything in: each published rate says
 // how many units of a currency one euro buys.
-const base = "EUR"
+const base = money.EUR
 
 // hub is the currency the stored pairs are anchored to. See the package comment.
-const hub = "USD"
+const hub = money.USD
 
 // majors are the currencies worth publishing a pair for. The ECB quotes about
 // thirty; storing them all would fill the shared table with rows nothing in the
 // app converts and push the dashboard's rate list past being readable. These
 // are the ones an asset in this catalog is plausibly quoted in.
-var majors = []string{"EUR", "GBP", "CHF", "JPY", "CAD", "AUD", "CNY", "MXN", "BRL"}
+var majors = []money.Currency{money.EUR, money.GBP, money.CHF, money.JPY, money.CAD, money.AUD, money.CNY, money.MXN, money.BRL}
 
 var _ marketdata.PublicRateSource = (*Client)(nil)
 
@@ -113,16 +113,26 @@ func (c *Client) FetchRates(ctx context.Context) ([]marketdata.PublicRate, error
 
 	// Euro per unit of currency, the euro included so the arithmetic below has
 	// no special case for it.
-	perEuro := map[string]decimal.Decimal{base: decimal.One}
+	perEuro := map[money.Currency]decimal.Decimal{base: decimal.One}
 
 	for _, quote := range day.Rates {
+		// A code gofinance does not know is skipped rather than defaulted: the
+		// majors loop below only reads codes it asked for, so an unknown one has
+		// no pair to fill, and guessing a currency here would file a rate under
+		// the wrong one.
+		code, err := money.GetCurrencyFromISOCode(quote.Currency)
+		if err != nil {
+			continue
+		}
+
 		rate, err := decimal.NewFromString(quote.Rate)
 		if err != nil || !rate.IsPos() {
 			// One malformed quote is not a failed fetch: skip it and keep the
 			// currencies that parsed.
 			continue
 		}
-		perEuro[quote.Currency] = rate
+
+		perEuro[code] = rate
 	}
 
 	usd, ok := perEuro[hub]

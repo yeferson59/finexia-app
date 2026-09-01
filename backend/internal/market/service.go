@@ -6,10 +6,11 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/yeferson59/gofinance/v2/money"
+
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 	"github.com/yeferson59/finexia-app/internal/platform/secretbox"
-	"github.com/yeferson59/gofinance/v2/money"
 )
 
 type defaultAsset struct {

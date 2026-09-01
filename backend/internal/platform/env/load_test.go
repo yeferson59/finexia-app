@@ -213,7 +213,7 @@ func TestManyFilesEnv(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 
-	filenames := []string{}
+	filenames := make([]string, 0, len(files))
 
 	for _, file := range files {
 		if err := createEnvByName(file.name, dir, file.content); err != nil {

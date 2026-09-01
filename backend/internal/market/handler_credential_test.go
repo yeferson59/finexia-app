@@ -13,9 +13,10 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/yeferson59/gofinance/v2/money"
+
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
-	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // The API key used throughout. Every test in this file eventually checks that

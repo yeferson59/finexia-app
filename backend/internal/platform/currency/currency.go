@@ -42,7 +42,7 @@ func IsSupported(code money.Currency) bool {
 // List renders the set for an error message, so a rejected request tells the
 // caller what would have been accepted instead of just saying no.
 func List() string {
-	listCurrency := make([]string, len(Supported))
+	listCurrency := make([]string, 0, len(Supported))
 
 	for _, c := range Supported {
 		listCurrency = append(listCurrency, c.String())

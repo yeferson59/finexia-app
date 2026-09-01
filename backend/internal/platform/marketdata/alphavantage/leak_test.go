@@ -8,8 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
 
 // Alpha Vantage accepts the key only as a URL query parameter, so every request

@@ -74,6 +74,25 @@ type CatalogView struct {
 	All      bool
 }
 
+// normalizeCurrencyCode validates a currency spelling against gofinance's ISO
+// 4217 table and returns the Currency it names. Length alone was never the test
+// that mattered: every amount this module stores is tagged with a
+// money.Currency, and GetCurrencyFromISOCode is what has to accept the code for
+// that to work. A three-letter string it rejects — "DOL", "ABC" — would reach
+// the database as the zero currency, which prints as XXX and costs the asset
+// its price.
+//
+// The importers are the only callers: everywhere else the currency arrives as a
+// Currency already, decoded by the money package's own UnmarshalText.
+func normalizeCurrencyCode(raw string) (money.Currency, bool) {
+	cur, err := money.GetCurrencyFromISOCode(raw)
+	if err != nil {
+		return money.XXX, false
+	}
+
+	return cur, true
+}
+
 var categorySynonyms = map[string]AssetType{
 	"stock": Stock, "stocks": Stock, "accion": Stock, "acciones": Stock,
 	"equity": Stock, "equities": Stock,

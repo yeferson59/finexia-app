@@ -9,13 +9,14 @@ import (
 
 	"uuid"
 
+	"github.com/yeferson59/gofinance/v2/money"
+
 	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/platform/currency"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 	"github.com/yeferson59/finexia-app/internal/platform/objectstore"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
-	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // Service holds the user domain use cases: the admin CRUD, the self-service

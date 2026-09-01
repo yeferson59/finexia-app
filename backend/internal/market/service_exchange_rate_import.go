@@ -55,20 +55,18 @@ func (s *Service) ImportExchangeRatesFromFile(ctx context.Context, data []byte, 
 		rowNumber := headerIdx + 2 + i
 		result.TotalRows++
 
-		from := strings.ToUpper(spreadsheet.CellAtIdx(row, cols["fromcurrency"]))
-		to := strings.ToUpper(spreadsheet.CellAtIdx(row, cols["tocurrency"]))
+		fromRaw := strings.ToUpper(spreadsheet.CellAtIdx(row, cols["fromcurrency"]))
+		toRaw := strings.ToUpper(spreadsheet.CellAtIdx(row, cols["tocurrency"]))
 		rateRaw := spreadsheet.CellAtIdx(row, cols["rate"])
 
 		var rowErrs []string
-		if code, ok := NormalizeCurrencyCode(from); ok {
-			from = code
-		} else {
-			rowErrs = append(rowErrs, fmt.Sprintf("moneda origen inválida: %q", from))
+		from, ok := normalizeCurrencyCode(fromRaw)
+		if !ok {
+			rowErrs = append(rowErrs, fmt.Sprintf("moneda origen inválida: %q", fromRaw))
 		}
-		if code, ok := NormalizeCurrencyCode(to); ok {
-			to = code
-		} else {
-			rowErrs = append(rowErrs, fmt.Sprintf("moneda destino inválida: %q", to))
+		to, ok := normalizeCurrencyCode(toRaw)
+		if !ok {
+			rowErrs = append(rowErrs, fmt.Sprintf("moneda destino inválida: %q", toRaw))
 		}
 
 		rate, err := parseDecimal(rateRaw)

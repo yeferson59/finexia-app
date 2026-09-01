@@ -252,12 +252,14 @@ func buildImportRow(
 			errs = append(errs, fmt.Sprintf("moneda no reconocida: %q", curRaw))
 		}
 	}
-	entity.Currency = currency
-	dto.Currency = currency
 	// normalizeCurrency and applyImportDefaults both validate against
 	// gofinance's ISO 4217 table, so this lookup only ever falls back for a row
 	// whose currency cell was rejected above and already carries an error.
 	unit := currencyOf(currency)
+	entity.Currency = unit
+	// The preview DTO keeps the code as text: it is what the browser echoes
+	// back in the mapping step, not an amount to do arithmetic on.
+	dto.Currency = currency
 
 	// Price.
 	priceRaw := spreadsheet.CellAt(row, mapping.Price)

@@ -8,10 +8,11 @@ import (
 
 	"uuid"
 
+	"github.com/yeferson59/gofinance/v2/money"
+
 	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 	"github.com/yeferson59/finexia-app/internal/portfolio"
-	"github.com/yeferson59/gofinance/v2/money"
 )
 
 // fakeUserReader stubs the users the weekly summary iterates over.

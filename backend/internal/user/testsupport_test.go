@@ -5,8 +5,9 @@ import (
 
 	"uuid"
 
-	"github.com/yeferson59/finexia-app/internal/identity"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/identity"
 )
 
 // fakeRepository embeds the Repository interface so tests only override the

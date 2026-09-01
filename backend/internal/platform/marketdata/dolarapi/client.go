@@ -26,8 +26,9 @@ import (
 
 	json "github.com/bytedance/sonic"
 
-	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata"
 )
 
 const baseURL = "https://co.dolarapi.com/v1"
@@ -35,7 +36,7 @@ const baseURL = "https://co.dolarapi.com/v1"
 // trmBase is the currency the TRM prices. The endpoint states the unit it is
 // quoted in (COP) but not what it quotes, because for the TRM there is only one
 // answer: it is COP per US dollar, by definition.
-const trmBase = "USD"
+const trmBase = money.USD
 
 var _ marketdata.PublicRateSource = (*Client)(nil)
 
@@ -112,7 +113,7 @@ func (c *Client) FetchRates(ctx context.Context) ([]marketdata.PublicRate, error
 	}
 
 	return []marketdata.PublicRate{{
-		From: money.USD,
+		From: trmBase,
 		To:   to,
 		// -1 precision prints the shortest decimal that reads back as the same
 		// float64, so the two decimals the feed published arrive at the numeric

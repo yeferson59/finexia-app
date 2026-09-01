@@ -76,6 +76,12 @@ func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfo
 
 		entry.Category = entry.Asset.AssetType
 		entry.Price.SetCurrency(entry.CostCurrency)
+		// money.Money.Scan carries the value alone and leaves the currency at
+		// XXX, which the browser renders as "¤"; each amount's currency lives
+		// in its own column, so both are retagged from the row that holds them.
+		if entry.Asset.CurrentPrice != nil {
+			entry.Asset.CurrentPrice.SetCurrency(entry.Asset.Currency)
+		}
 
 		entries = append(entries, entry)
 	}

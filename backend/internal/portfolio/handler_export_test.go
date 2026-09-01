@@ -14,8 +14,9 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/xuri/excelize/v2"
-	"github.com/yeferson59/finexia-app/internal/market"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/market"
 )
 
 // The export endpoints stream a spreadsheet rather than the JSON envelope, so
