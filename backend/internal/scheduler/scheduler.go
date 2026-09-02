@@ -30,7 +30,7 @@ func (e Every) Next(now time.Time) time.Time {
 	return now.Add(e.Interval).UTC()
 }
 
-// DailyAt fires the job once a day at the given time (local time).
+// DailyAt fires the job once a day at the given time (UTC time).
 type DailyAt struct {
 	Hour   int
 	Minute int
@@ -80,7 +80,7 @@ func (j Jitter) Next(now time.Time) time.Time {
 	return j.Schedule.Next(now).Add(extra).UTC()
 }
 
-// WeeklyAt fires the job once a week, on the given day and time (local
+// WeeklyAt fires the job once a week, on the given day and time (UTC
 // time). E.g. WeeklyAt{Day: time.Monday, Hour: 8, Minute: 0}.
 type WeeklyAt struct {
 	Day    time.Weekday
