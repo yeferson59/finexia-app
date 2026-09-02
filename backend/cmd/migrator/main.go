@@ -11,7 +11,6 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
 	"github.com/yeferson59/finexia-app/internal/platform/config"
-	"github.com/yeferson59/finexia-app/internal/platform/env"
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
@@ -35,8 +34,6 @@ func main() {
 // runMigration opens the migrate instance, defers its close, then delegates to run.
 // Keeping the defer here (no log.Fatal/os.Exit in this function) satisfies gocritic.
 func runMigration(ctx context.Context, log logger.Logger, cmd string, steps int) error {
-	_ = env.Load()
-
 	c, err := config.New()
 	if err != nil {
 		return err
