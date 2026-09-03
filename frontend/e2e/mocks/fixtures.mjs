@@ -220,6 +220,54 @@ export const allocation = (() => {
 		}));
 })();
 
+/*
+ * `GET /portfolios/holdings` — una fila por activo, sumando todos los
+ * portafolios. Es el mismo dinero que reparte `allocation`, un nivel más fino:
+ * por activo en vez de por clase, y con las unidades, que solo esta vista trae.
+ *
+ * Se deriva de las posiciones igual que todo lo demás, así que el total de la
+ * lista es el mismo `TOTAL_VALUE` que enseña el resto de las pantallas.
+ */
+export const assetHoldings = (() => {
+	const byTicker = new Map();
+
+	for (const portfolio of PORTFOLIOS) {
+		for (const h of portfolio.holdings) {
+			const row = byTicker.get(h.ticker) ?? {
+				position: h,
+				quantity: 0,
+				value: 0,
+				portfolios: new Set()
+			};
+			row.quantity += Number(h.quantity);
+			row.value += valueOf(h);
+			row.portfolios.add(portfolio.id);
+			byTicker.set(h.ticker, row);
+		}
+	}
+
+	return [...byTicker.values()]
+		.sort((a, b) => b.value - a.value)
+		.map(({ position, quantity, value, portfolios }) => ({
+			assetId: position.assetId,
+			ticker: position.ticker,
+			name: position.name,
+			assetType: position.assetType,
+			exchange: position.exchange,
+			currency: 'USD',
+			quantity: String(quantity),
+			marketPrice: position.marketPrice,
+			marketValue: money(value),
+			percent: Number(((value / TOTAL_VALUE) * 100).toFixed(2)),
+			displayCurrency: 'USD',
+			portfolios: portfolios.size,
+			// Todo el catálogo del fixture tiene precio y está en USD: nada se
+			// valora a coste y no hay nada que convertir.
+			priceSource: 'own',
+			positionsUnconverted: 0
+		}));
+})();
+
 // --- Serie de crecimiento ---------------------------------------------------
 
 /*

@@ -577,6 +577,81 @@ func TestHandlerGetAssetAllocation(t *testing.T) {
 	})
 }
 
+func TestHandlerGetAssetHoldings(t *testing.T) {
+	userID := uuid.New()
+
+	newApp := func(t *testing.T, gotCurrency *money.Currency) *fiber.App {
+		t.Helper()
+		repo := new(fakeRepository{
+			getAssetHoldingsByUserID: func(_ context.Context, uid uuid.UUID, currency money.Currency) ([]AssetHolding, error) {
+				if uid != userID {
+					t.Errorf("userID = %s, want %s", uid, userID)
+				}
+				*gotCurrency = currency
+
+				return []AssetHolding{{
+					Ticker:          "AAPL",
+					Name:            "Apple Inc.",
+					AssetType:       market.Stock,
+					Quantity:        "12.5",
+					MarketValue:     "1000",
+					DisplayCurrency: money.USD,
+					Portfolios:      2,
+				}}, nil
+			},
+		})
+
+		return newTestModule(t, repo, userID, "user")
+	}
+
+	// Same contract as /allocation: omitted means "the account's own currency",
+	// resolved in SQL, so the handler passes the absence through.
+	t.Run("passes no currency through when none is asked for", func(t *testing.T) {
+		var gotCurrency money.Currency
+
+		resp := do(t, newApp(t, &gotCurrency), http.MethodGet, "/portfolios/holdings")
+		if resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		if gotCurrency != money.XXX {
+			t.Errorf("currency = %q, want the omitted marker", gotCurrency)
+		}
+	})
+
+	t.Run("normalises the requested currency", func(t *testing.T) {
+		var gotCurrency money.Currency
+
+		resp := do(t, newApp(t, &gotCurrency), http.MethodGet, "/portfolios/holdings?currency=cop")
+		if resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		if gotCurrency != money.COP {
+			t.Errorf("currency = %q, want COP", gotCurrency)
+		}
+	})
+
+	t.Run("rejects an unsupported currency", func(t *testing.T) {
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
+
+		resp := do(t, app, http.MethodGet, "/portfolios/holdings?currency=ARS")
+		if resp.StatusCode != fiber.StatusBadRequest {
+			t.Fatalf("status = %d, want 400", resp.StatusCode)
+		}
+	})
+
+	// "/holdings" has to keep matching before the "/:id" family below it, the
+	// same trap "/allocation" and "/summary" sit in: registered the other way
+	// round it would be read as a portfolio id and answer a 400.
+	t.Run("does not fall through to the parametric portfolio route", func(t *testing.T) {
+		var gotCurrency money.Currency
+
+		resp := do(t, newApp(t, &gotCurrency), http.MethodGet, "/portfolios/holdings")
+		if resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("status = %d, want 200 from the holdings handler", resp.StatusCode)
+		}
+	})
+}
+
 func TestHandlerGetPortfolioGrowth(t *testing.T) {
 	userID := uuid.New()
 	portfolioID := uuid.New()

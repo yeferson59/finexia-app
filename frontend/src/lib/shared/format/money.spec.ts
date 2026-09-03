@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCurrency, currencySymbol } from './money';
+import { formatCurrency, currencySymbol, formatCompactCurrency } from './money';
 
 describe('formatCurrency', () => {
 	it('formats USD with two decimals and the dollar symbol', () => {
@@ -37,5 +37,36 @@ describe('currencySymbol', () => {
 	it('falls back to the dollar sign instead of throwing on a bad code', () => {
 		expect(currencySymbol('')).toBe('$');
 		expect(currencySymbol('not-a-currency')).toBe('$');
+	});
+});
+
+describe('formatCompactCurrency', () => {
+	// Entre 1.000 y 10.000 hace falta el decimal: redondeando a miles, un eje
+	// que iba de 1.500 a 1.900 pintaba «$2k» en las cinco marcas.
+	it('keeps a decimal between a thousand and ten thousand', () => {
+		expect(formatCompactCurrency(1500, 'USD')).toBe('$1.5k');
+		expect(formatCompactCurrency(1900, 'USD')).toBe('$1.9k');
+	});
+
+	it('drops it above ten thousand, where it no longer distinguishes anything', () => {
+		expect(formatCompactCurrency(89406.1, 'USD')).toBe('$89k');
+	});
+
+	it('switches to millions when the amount reaches them', () => {
+		expect(formatCompactCurrency(1_450_000, 'USD')).toBe('$1.4M');
+	});
+
+	it('leaves small amounts whole', () => {
+		expect(formatCompactCurrency(240, 'USD')).toBe('$240');
+	});
+
+	it('carries the symbol of the currency it is given', () => {
+		expect(formatCompactCurrency(12000, 'COP')).toBe('$12k');
+		expect(formatCompactCurrency(12000, 'EUR')).toBe('EUR12k');
+	});
+
+	// Una pérdida es un importe como cualquier otro y conserva su signo.
+	it('keeps the sign of a negative amount', () => {
+		expect(formatCompactCurrency(-15000, 'USD')).toBe('$-15k');
 	});
 });

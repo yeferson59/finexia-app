@@ -15,6 +15,7 @@ import type { z } from 'zod';
 import type {
 	activeSessionSchema,
 	allocationItemSchema,
+	assetHoldingSchema,
 	assetPriceSchema,
 	assetSchema,
 	exchangeRateSchema,
@@ -91,6 +92,9 @@ export type Risk = z.infer<typeof riskSchema>;
 
 /** Asignación por categoría de activo (`GET /portfolios/allocation`). */
 export type AllocationItem = z.infer<typeof allocationItemSchema>;
+
+/** Un activo sumado a través de todos los portafolios (`GET /portfolios/holdings`). */
+export type AssetHolding = z.infer<typeof assetHoldingSchema>;
 
 /** Mayor transacción de un portfolio (`GET /portfolios/:id/top-transaction`). */
 export type TopTransaction = z.infer<typeof topTransactionSchema>;

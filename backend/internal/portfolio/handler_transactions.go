@@ -99,6 +99,34 @@ func (h *handler) GetAssetAllocation(c fiber.Ctx) error {
 	return httpx.OK(c, "Asset allocation retrieved", "Asset allocation retrieved successfully", NewAllocationResponse(items))
 }
 
+// GetAssetHoldings answers the consolidated view of what the user owns: one row
+// per asset, totalled across every portfolio. Same ?currency= contract as the
+// allocation — and for the same reason: the rows are summed across portfolios
+// that may be denominated differently, so there is no unconverted answer to
+// give.
+func (h *handler) GetAssetHoldings(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	var req CurrencyDTO
+	if err := c.Bind().Query(&req); err != nil {
+		return httpx.BadRequest(c, "Unprocess query currency", "no process currency")
+	}
+
+	if req.Currency != money.XXX && !currency.IsSupported(req.Currency) {
+		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+currency.List())
+	}
+
+	holdings, err := h.service.GetAssetHoldings(c, userID, req.Currency)
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error retrieving asset holdings", "Could not retrieve asset holdings")
+	}
+
+	return httpx.OK(c, "Asset holdings retrieved", "Asset holdings retrieved successfully", NewAssetHoldingsResponse(holdings))
+}
+
 func (h *handler) GetUserTransactions(c fiber.Ctx) error {
 	userID, _, _, err := httpx.Identity(c)
 	if err != nil {

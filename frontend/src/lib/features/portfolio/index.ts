@@ -1,9 +1,11 @@
 /**
  * Feature `portfolio` — superficie pública.
  *
- * Componentes del detalle de portafolio (`routes/dashboard/portfolios/[id]`) y
- * del alta (`portfolios/add`). `portfolio.ts` aporta los helpers puros
- * (agrupar holdings, distribución por tipo, segmentos del donut) y los tipos.
+ * Componentes del detalle de portafolio (`routes/dashboard/portfolios/[id]`),
+ * del alta (`portfolios/add`) y de la vista consolidada de activos
+ * (`dashboard/assets`). `portfolio.ts` aporta los helpers puros (agrupar
+ * holdings, distribución por tipo, segmentos del donut) y `asset-holdings.ts`
+ * los de la vista consolidada.
  */
 export { default as PortfolioEditForm } from './components/portfolio-edit-form.svelte';
 export { default as PortfolioSummaryCards } from './components/portfolio-summary-cards.svelte';
@@ -24,6 +26,12 @@ export { default as AssetPositionSummary } from './components/asset-position-sum
 export { default as AssetInfoPanel } from './components/asset-info-panel.svelte';
 export { default as AssetTransactionHistory } from './components/asset-transaction-history.svelte';
 
+// Vista consolidada de activos (`dashboard/assets`): lo que el usuario tiene
+// de cada activo sumando todos sus portafolios.
+export { default as AssetConcentration } from './components/asset-concentration.svelte';
+export { default as AssetHoldingsTable } from './components/asset-holdings-table.svelte';
+
 export * from './portfolio';
+export * from './asset-holdings';
 export * from './asset';
 export * from './schemas';

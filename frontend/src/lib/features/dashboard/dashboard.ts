@@ -1,6 +1,6 @@
 /**
- * Helpers puros de los widgets del dashboard: la geometría del donut de
- * asignación y la de la gráfica de crecimiento.
+ * Helpers puros de los widgets del dashboard: el reparto del donut de
+ * asignación y la geometría de la gráfica de crecimiento.
  *
  * Vivían dentro de sus componentes, donde no había forma de probarlas: son
  * matemáticas de SVG que se rompen en silencio (un ángulo mal, un eje que se
@@ -40,48 +40,11 @@ export function toAssetEntries(allocation: AllocationItem[]): AssetEntry[] {
 	}));
 }
 
-/** Punto del círculo en grados, con 0º arriba (de ahí el -90). */
-export function polarToCartesian(angle: number, radius: number, cx = 100, cy = 100) {
-	const radians = (angle - 90) * (Math.PI / 180);
-	return {
-		x: cx + radius * Math.cos(radians),
-		y: cy + radius * Math.sin(radians)
-	};
-}
-
-/** Porción del donut como `path`, con el flag de arco largo por encima de 180º. */
-export function generatePieSlice(
-	percent: number,
-	startAngle: number
-): { d: string; startAngle: number; endAngle: number } {
-	const cx = 100;
-	const cy = 100;
-	const radius = 75;
-	const endAngle = startAngle + (percent / 100) * 360;
-	const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-
-	const startPoint = polarToCartesian(startAngle, radius, cx, cy);
-	const endPoint = polarToCartesian(endAngle, radius, cx, cy);
-
-	const d = [
-		`M ${cx} ${cy}`,
-		`L ${startPoint.x} ${startPoint.y}`,
-		`A ${radius} ${radius} 0 ${largeArc} 1 ${endPoint.x} ${endPoint.y}`,
-		'Z'
-	].join(' ');
-
-	return { d, startAngle, endAngle };
-}
-
-/** Encadena las porciones: cada una arranca donde acabó la anterior. */
-export function buildSlices(items: AssetEntry[]) {
-	let angle = 0;
-	return items.map((asset) => {
-		const slice = generatePieSlice(asset.percent, angle);
-		angle = slice.endAngle;
-		return { ...asset, ...slice };
-	});
-}
+// La geometría del donut (dónde cae cada porción) bajó a `lib/shared/chart`:
+// la comparte con el donut por activo de la feature `portfolio`, y una feature
+// no importa de otra. Se reexporta para que quien ya la usaba —y sus pruebas—
+// la sigan encontrando aquí.
+export { buildSlices, generatePieSlice, polarToCartesian } from '$lib/shared/chart/pie';
 
 // ---------------------------------------------------------------------------
 // Crecimiento del portafolio (gráfica de líneas)

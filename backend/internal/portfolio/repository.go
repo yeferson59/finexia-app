@@ -12,7 +12,7 @@ import (
 
 // The persistence surface is split into cohesive, consumer-defined stores
 // (mirroring auth.Stores) so each stays small and fakes only implement what a
-// scenario needs. Repository is their union (27 methods, under the ~30
+// scenario needs. Repository is their union (28 methods, under the ~30
 // criterion), kept as a single alias because the portfolio Service
 // orchestrates across all of them. The asset catalog belongs to the market
 // module; portfolio reads assets via its AssetReader interface instead.
@@ -74,6 +74,9 @@ type TransactionStore interface {
 	GetAssetTransactionsPaginated(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, limit, offset int) ([]Transaction, error)
 	GetRecentTransactionsByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]Transaction, error)
 	GetAssetAllocationByUserID(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AllocationItem, error)
+	// GetAssetHoldingsByUserID is the same aggregation one level finer: per
+	// asset instead of per category, plus the units held.
+	GetAssetHoldingsByUserID(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AssetHolding, error)
 	CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency money.Currency, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
 	UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
 	DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID) error

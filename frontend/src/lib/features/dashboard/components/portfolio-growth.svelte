@@ -5,7 +5,7 @@
 	import GrowthChart from './growth-chart.svelte';
 	import GrowthControls from './growth-controls.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
-	import { currencySymbol } from '$lib/shared/format/money';
+	import { currencySymbol, formatCompactCurrency } from '$lib/shared/format/money';
 	import { formatPercent, formatSignedPercent } from '$lib/shared/format/percent';
 	import { timeWeightedReturn } from '$lib/shared/finance/returns';
 	import {
@@ -130,16 +130,9 @@
 		return privacy.money(symbol + fmt(v));
 	}
 
-	/*
-	 * Etiquetas del eje. Entre 1.000 y 10.000 hace falta un decimal: redondeando
-	 * a miles, una serie de 1.500 a 1.900 pintaba "$2k" en las cinco marcas.
-	 */
+	/** Etiquetas del eje: el importe abreviado, que es lo que cabe entre marcas. */
 	function fmtMoneyAbbrev(v: number): string {
-		const abs = Math.abs(v);
-		if (abs >= 1_000_000) return privacy.money(`${symbol}${(v / 1_000_000).toFixed(1)}M`);
-		if (abs >= 10_000) return privacy.money(`${symbol}${(v / 1_000).toFixed(0)}k`);
-		if (abs >= 1_000) return privacy.money(`${symbol}${(v / 1_000).toFixed(1)}k`);
-		return privacy.money(`${symbol}${v.toFixed(0)}`);
+		return privacy.money(formatCompactCurrency(v, currency));
 	}
 
 	/*

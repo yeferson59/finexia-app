@@ -6,6 +6,7 @@
 import { apiRequest, apiRequestSafe, type ApiEvent, type ApiResult } from './client';
 import type {
 	AllocationItem,
+	AssetHolding,
 	PortfolioDetail,
 	PortfolioGrowth,
 	PortfolioSummary,
@@ -14,6 +15,7 @@ import type {
 } from './types';
 import {
 	allocationItemSchema,
+	assetHoldingSchema,
 	portfolioDetailSchema,
 	portfolioGrowthSchema,
 	portfolioSummarySchema,
@@ -51,6 +53,22 @@ export function getAllocation(
 	// en la misma moneda.
 	const query = currency ? `?currency=${encodeURIComponent(currency)}` : '';
 	return apiRequestSafe(event, `/portfolios/allocation${query}`, {}, z.array(allocationItemSchema));
+}
+
+/**
+ * `GET /portfolios/holdings` — lo que el usuario tiene de cada activo, sumado a
+ * través de todos sus portafolios.
+ *
+ * `currency` importa por lo mismo que en la asignación: las filas suman
+ * posiciones de portafolios que pueden estar en monedas distintas, así que la
+ * respuesta siempre viene convertida. Omitirla usa la moneda de la cuenta.
+ */
+export function getAssetHoldings(
+	event: ApiEvent,
+	currency?: string
+): Promise<ApiResult<AssetHolding[]>> {
+	const query = currency ? `?currency=${encodeURIComponent(currency)}` : '';
+	return apiRequestSafe(event, `/portfolios/holdings${query}`, {}, z.array(assetHoldingSchema));
 }
 
 /**

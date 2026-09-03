@@ -258,6 +258,48 @@ type AllocationItem struct {
 	PositionsUnconverted int64            `json:"positionsUnconverted"`
 }
 
+// AssetHolding is one asset totalled across every portfolio the user owns.
+//
+// It answers a question no other view does: "how much of X do I have?", without
+// asking which portfolio it sits in. The per-portfolio holdings only ever add
+// up within their own portfolio, and the allocation folds everything down to
+// eight asset types, so an asset split across three portfolios had no single
+// row anywhere in the app.
+//
+// Quantity is a sum of units and therefore only means something per asset —
+// never across rows. MarketValue is what does compare, and it is in
+// DisplayCurrency for every row, which is what makes a share of the total
+// meaningful (same rule as AllocationItem).
+type AssetHolding struct {
+	AssetID   uuid.UUID        `json:"assetId"`
+	Ticker    string           `json:"ticker"`
+	Name      string           `json:"name"`
+	AssetType market.AssetType `json:"assetType"`
+	Exchange  string           `json:"exchange"`
+	// Currency the asset is quoted in, which is what MarketPrice is in. It is
+	// not DisplayCurrency: the price stays in its own currency, the value is
+	// converted.
+	Currency money.Currency `json:"currency"`
+	// Quantity is the units held across every portfolio, as text for the same
+	// reason the amounts are: the decimal engine, not float64, is what reads it.
+	Quantity string `json:"quantity"`
+	// MarketPrice is the per-unit price behind MarketValue, in Currency. Empty
+	// when PriceSource is cost — there was no price, and the entries' own costs
+	// differ from one another, so no single number stands for the asset.
+	MarketPrice string `json:"marketPrice"`
+	// MarketValue is the whole position, in DisplayCurrency.
+	MarketValue     string         `json:"marketValue"`
+	DisplayCurrency money.Currency `json:"displayCurrency"`
+	// Portfolios is how many of the user's portfolios hold this asset — the
+	// count the consolidated row hides by construction.
+	Portfolios  int64       `json:"portfolios"`
+	PriceSource PriceSource `json:"priceSource"`
+	// PositionsUnconverted counts this asset's entries that had no rate to
+	// DisplayCurrency and are therefore added at face value; same meaning as in
+	// AllocationItem and the summary.
+	PositionsUnconverted int64 `json:"positionsUnconverted"`
+}
+
 // PlatformStats is the result of joining investment_sources with portfolio_entries stats.
 type PlatformStats struct {
 	ID                   uuid.UUID      `json:"id"`

@@ -122,6 +122,10 @@ func (m *Module) Routes(router fiber.Router) {
 	portfolios.Post("/transactions/import/preview", m.handler.PreviewTransactionsImport)
 	portfolios.Post("/transactions/import", m.handler.ImportTransactions)
 	portfolios.Get("/allocation", m.handler.GetAssetAllocation)
+	// Consolidated holdings: the same positions as /allocation, one row per
+	// asset instead of one per category. Not "/assets" — that path is the
+	// catalog, registered below.
+	portfolios.Get("/holdings", m.handler.GetAssetHoldings)
 	portfolios.Post("", m.handler.CreatePortfolio)
 	portfolios.Post("/sources", m.handler.CreatePlatform)
 	portfolios.Post("/entries", m.handler.CreatePortfolioEntry)

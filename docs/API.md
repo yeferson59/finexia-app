@@ -202,6 +202,7 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 | POST | `/portfolios/transactions/import/preview` | usuario | Preview del import (multipart `file`, `sheet`, `mapping`, `defaults`) |
 | POST | `/portfolios/transactions/import` | usuario | Import masivo (además `portfolioId`, `sourceId`; `mapping` obligatorio) |
 | GET | `/portfolios/allocation` | usuario | Asignación de activos por categoría (soporta `?currency=`) |
+| GET | `/portfolios/holdings` | usuario | Activos consolidados: una fila por activo sumando todos los portfolios (soporta `?currency=`) |
 | POST | `/portfolios` | usuario | Crea portfolio |
 | POST | `/portfolios/sources` | usuario | Crea plataforma/fuente |
 | POST | `/portfolios/entries` | usuario | Crea posición (entry); la categoría sale del activo, no del cuerpo |
@@ -346,6 +347,36 @@ en la porción vieja en el del panel. **La migración 000026 elimina esa columna
 Ese campo se sigue **aceptando e ignorando**, así que un cliente antiguo que lo
 mande no se rompe; lo que ya no ocurre es que un valor inválido devuelva 400,
 porque no hay nada que validar. La clase de una posición la decide el activo.
+
+#### Activos consolidados
+
+`GET /portfolios/holdings` contesta «¿cuánto tengo de X?» sin preguntar en qué
+portfolio está: una fila por activo, con las unidades sumadas entre portfolios,
+el valor de la posición y su peso sobre el total. Ninguna otra vista la
+contesta —los holdings de `GET /portfolios/:id` solo suman dentro de su
+portfolio y la asignación pliega todo a ocho clases de activo—, así que un
+activo repartido entre tres portfolios no tenía una sola fila en ninguna parte.
+
+Es la asignación un nivel más fino y comparte con ella todas sus reglas: mismo
+`?currency=` (omitido, la moneda de la cuenta), mismo orden de precios —el del
+usuario, luego el manual del catálogo, luego el coste—, misma elección de la
+moneda junto con el precio y mismo tratamiento de una posición sin tasa, que se
+cuenta a valor nominal y se declara. Los `percent` de las dos respuestas salen
+del mismo cálculo sobre las mismas posiciones, así que las dos gráficas no
+pueden discrepar.
+
+Lo que solo trae esta:
+
+- `quantity`, las unidades. Solo significan algo dentro de su fila: sumar
+  acciones con bitcoins no da nada, y por eso el peso se mide en dinero.
+- `portfolios`, en cuántos aparece el activo.
+- `marketPrice`, el precio por unidad **en la moneda del activo** (`currency`),
+  no en `displayCurrency`: es lo que cotiza, no lo que se convirtió. Llega
+  **vacío** cuando `priceSource` es `cost` — cada entry pagó el suyo y ningún
+  número representa al activo. Vacío no es cero.
+
+Las entries en cantidad 0 quedan fuera: una posición vendida entera no es algo
+que el usuario tenga.
 
 #### Moneda de la serie de crecimiento
 

@@ -14,6 +14,7 @@
 	const menuItems = [
 		{ label: 'Dashboard', icon: 'dashboard', href: resolve('/dashboard') },
 		{ label: 'Portafolios', icon: 'briefcase', href: resolve('/dashboard/portfolios') },
+		{ label: 'Mis Activos', icon: 'pie-chart', href: resolve('/dashboard/assets') },
 		// "Inversiones" is hidden until the investments feature flag is enabled.
 		...(features.investments
 			? [{ label: 'Inversiones', icon: 'trending-up', href: resolve('/dashboard/investments') }]
@@ -92,6 +93,18 @@
 								>
 									<polyline points="23 6 13.5 15.5 8.5 10.5 1 17"></polyline>
 									<polyline points="17 6 23 6 23 12"></polyline>
+								</svg>
+							{:else if item.icon === 'pie-chart'}
+								<svg
+									width="18"
+									height="18"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
+									<path d="M22 12A10 10 0 0 0 12 2v10z"></path>
 								</svg>
 							{:else if item.icon === 'layers'}
 								<svg

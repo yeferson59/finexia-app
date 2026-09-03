@@ -12,6 +12,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+	allocationItemSchema,
+	assetHoldingSchema,
 	assetSchema,
 	exchangeRateSchema,
 	holdingSchema,
@@ -21,6 +23,8 @@ import {
 	userTransactionSchema
 } from '$lib/api/schemas';
 import {
+	allocation,
+	assetHoldings,
 	assets,
 	exchangeRates,
 	growth,
@@ -37,6 +41,8 @@ describe('las fixtures del stub cumplen el contrato', () => {
 		['portfolios/transactions', userTransactionSchema.array(), transactions],
 		['portfolios/growth', portfolioGrowthSchema, growth],
 		['portfolios/assets', assetSchema.array(), assets],
+		['portfolios/allocation', allocationItemSchema.array(), allocation],
+		['portfolios/holdings', assetHoldingSchema.array(), assetHoldings],
 		['portfolios/sources', platformSchema.array(), sources],
 		['exchange-rates', exchangeRateSchema.array(), exchangeRates]
 	])('%s', (_name, schema, fixture) => {

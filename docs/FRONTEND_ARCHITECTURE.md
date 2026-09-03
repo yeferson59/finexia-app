@@ -18,8 +18,9 @@ frontend/src/
 ├── app.html · app.d.ts · hooks.server.ts   # sesión y guardas globales
 ├── routes/                                 # SOLO orquestación y composición
 │   ├── (legal)/ · auth/ · api/ · sitemap.xml/
-│   └── dashboard/                          # portfolios, transactions, platforms,
-│                                           # reports, settings, notifications, admin…
+│   └── dashboard/                          # portfolios, assets, transactions,
+│                                           # platforms, reports, settings,
+│                                           # notifications, admin…
 └── lib/
     ├── api/          # capa de acceso al backend (server-only)
     │   ├── client.ts     # authedFetch/authedFetchSafe: auth, refresh y redirección
@@ -41,7 +42,7 @@ frontend/src/
     │
     ├── ui/           # design system sin dominio (button, card, input, table…)
     ├── server/       # session.ts, testing.ts (server-only transversal)
-    └── shared/       # css.ts, format/, finance/, config/, form.ts,
+    └── shared/       # css.ts, format/, finance/, chart/, config/, form.ts,
                       # privacy.svelte.ts
 ```
 

@@ -224,6 +224,55 @@ func TestNewAllocationResponsePercentages(t *testing.T) {
 	})
 }
 
+func TestNewAssetHoldingsResponse(t *testing.T) {
+	// The consolidated list and the donut are two readings of the same
+	// positions, so their shares come off the same helper. If this ever drifts
+	// from TestNewAllocationResponsePercentages the two charts disagree about
+	// the same money.
+	t.Run("shares are this asset's part of everything held", func(t *testing.T) {
+		got := NewAssetHoldingsResponse([]AssetHolding{
+			{Ticker: "AAPL", MarketValue: "750"},
+			{Ticker: "BTC", MarketValue: "250"},
+		})
+		if got[0].Percent != 75 || got[1].Percent != 25 {
+			t.Errorf("percents = %v/%v, want 75/25", got[0].Percent, got[1].Percent)
+		}
+	})
+
+	t.Run("an all-zero portfolio reports zero rather than dividing by it", func(t *testing.T) {
+		got := NewAssetHoldingsResponse([]AssetHolding{{Ticker: "AAPL", MarketValue: "0"}})
+		if got[0].Percent != 0 {
+			t.Errorf("percent = %v, want 0", got[0].Percent)
+		}
+	})
+
+	// Units are a sum across portfolios and never a share of anything, so they
+	// travel as the query wrote them — no rounding, no float64 on the way out.
+	t.Run("quantities are passed through untouched", func(t *testing.T) {
+		got := NewAssetHoldingsResponse([]AssetHolding{
+			{Ticker: "BTC", Quantity: "0.00000123", MarketValue: "100"},
+		})
+		if got[0].Quantity != "0.00000123" {
+			t.Errorf("Quantity = %q, want it unchanged", got[0].Quantity)
+		}
+	})
+
+	// A position carried at cost has no single price standing for the asset:
+	// each entry paid its own. The empty string is what says so, and it must
+	// not become a "0" a client would print as a free asset.
+	t.Run("an asset with no market price keeps an empty price", func(t *testing.T) {
+		got := NewAssetHoldingsResponse([]AssetHolding{
+			{Ticker: "PRIV", MarketValue: "100", PriceSource: PriceSourceCost},
+		})
+		if got[0].MarketPrice != "" {
+			t.Errorf("MarketPrice = %q, want empty", got[0].MarketPrice)
+		}
+		if got[0].PriceSource != "cost" {
+			t.Errorf("PriceSource = %q, want \"cost\"", got[0].PriceSource)
+		}
+	})
+}
+
 func TestNormalizeCurrencyValidatesAgainstISO4217(t *testing.T) {
 	cases := []struct {
 		name string

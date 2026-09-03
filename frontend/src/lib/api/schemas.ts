@@ -135,6 +135,39 @@ export const allocationItemSchema = z.object({
 	positionsUnconverted: z.number().optional()
 });
 
+/**
+ * Un activo con todo lo que el usuario tiene de él, sumado a través de sus
+ * portafolios (`GET /portfolios/holdings`).
+ *
+ * `quantity` son unidades y solo significa algo dentro de la fila: sumar
+ * acciones con bitcoins no da nada. `marketValue` es lo que sí compara, y viene
+ * en `displayCurrency` para todas las filas —igual que la asignación—, que es
+ * lo que hace que `percent` quiera decir algo.
+ *
+ * `marketPrice` vacío no es precio cero: es una posición valorada a coste, en la
+ * que cada entrada pagó el suyo y ningún número representa al activo. Eso lo
+ * dice `priceSource`.
+ */
+export const assetHoldingSchema = z.object({
+	assetId: z.string(),
+	ticker: z.string(),
+	name: z.string(),
+	assetType: z.string(),
+	exchange: z.string(),
+	/** Moneda en la que cotiza el activo, que es la de `marketPrice`. */
+	currency: z.string(),
+	quantity: z.string(),
+	marketPrice: z.string(),
+	marketValue: z.string(),
+	percent: z.number(),
+	/** Moneda de `marketValue`, la misma en todas las filas. */
+	displayCurrency: z.string(),
+	/** En cuántos portafolios del usuario aparece el activo. */
+	portfolios: z.number(),
+	priceSource: z.string(),
+	positionsUnconverted: z.number()
+});
+
 /** Mayor transacción de un portfolio (`GET /portfolios/:id/top-transaction`). */
 export const topTransactionSchema = z.object({
 	value: z.string(),

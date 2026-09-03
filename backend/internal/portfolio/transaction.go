@@ -55,6 +55,13 @@ func (s *service) GetAssetAllocation(ctx context.Context, userID uuid.UUID, targ
 	return s.repo.GetAssetAllocationByUserID(ctx, userID, targetCurrency)
 }
 
+// GetAssetHoldings lists what the user holds of each asset across all their
+// portfolios, valued in one currency. Same currency contract as
+// GetAssetAllocation: empty means the account's stored preference.
+func (s *service) GetAssetHoldings(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AssetHolding, error) {
+	return s.repo.GetAssetHoldingsByUserID(ctx, userID, targetCurrency)
+}
+
 func (s *service) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
 	return s.repo.UpdateTransaction(ctx, userID, txnID, txnType, quantity, price, currency, fees, transactionDate, notes)
 }

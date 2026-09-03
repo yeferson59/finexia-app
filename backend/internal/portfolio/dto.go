@@ -165,16 +165,17 @@ type AllocationItemDTO struct {
 	PositionsUnconverted int64 `json:"positionsUnconverted"`
 }
 
-// NewAllocationResponse turns each category's market value into its share of
-// the whole. Both the sum and the division run on gofinance's decimal engine —
-// summing the categories in float64 drifted against the total the same rows add
+// percentShares turns a list of text amounts into each one's share of their
+// total, in percent. Both the sum and the division run on gofinance's decimal
+// engine — summing them in float64 drifted against the total the same rows add
 // up to in Postgres, and the shares could miss 100% by more than the rounding
-// alone accounts for.
-func NewAllocationResponse(items []AllocationItem) []AllocationItemDTO {
-	values := make([]decimal.Decimal, len(items))
+// alone accounts for. A malformed amount reads as zero, the same as everywhere
+// else these strings are parsed.
+func percentShares(amounts []string) []float64 {
+	values := make([]decimal.Decimal, len(amounts))
 	total := decimal.Zero
-	for i, item := range items {
-		v, err := decimal.NewFromString(item.MarketValue)
+	for i, amount := range amounts {
+		v, err := decimal.NewFromString(amount)
 		if err != nil {
 			v = decimal.Zero
 		}
@@ -182,25 +183,95 @@ func NewAllocationResponse(items []AllocationItem) []AllocationItemDTO {
 		total = total.Add(v)
 	}
 
+	shares := make([]float64, len(amounts))
+	if !total.IsPos() {
+		return shares
+	}
+
+	for i, value := range values {
+		// Scale to a percentage before dividing: Div fixes the result's
+		// precision, so dividing first spends those digits on the 0.xx
+		// fraction and throws away the ones the percentage is read at.
+		if share, err := value.Mul(oneHundred).Div(total); err == nil {
+			// RoundHAZ is half-away-from-zero, the mode math.Round used here
+			// and the one a reader expects of a displayed percentage.
+			shares[i] = share.RoundHAZ(2).InexactFloat64()
+		}
+	}
+
+	return shares
+}
+
+// NewAllocationResponse turns each category's market value into its share of
+// the whole.
+func NewAllocationResponse(items []AllocationItem) []AllocationItemDTO {
+	amounts := make([]string, len(items))
+	for i, item := range items {
+		amounts[i] = item.MarketValue
+	}
+	shares := percentShares(amounts)
+
 	result := make([]AllocationItemDTO, 0, len(items))
 	for i, item := range items {
-		var pct float64
-		if total.IsPos() {
-			// Scale to a percentage before dividing: Div fixes the result's
-			// precision, so dividing first spends those digits on the 0.xx
-			// fraction and throws away the ones the percentage is read at.
-			if share, err := values[i].Mul(oneHundred).Div(total); err == nil {
-				// RoundHAZ is half-away-from-zero, the mode math.Round used
-				// here and the one a reader expects of a displayed percentage.
-				pct = share.RoundHAZ(2).InexactFloat64()
-			}
-		}
 		result = append(result, AllocationItemDTO{
 			Category:             string(item.Category),
 			MarketValue:          item.MarketValue,
-			Percent:              pct,
+			Percent:              shares[i],
 			Currency:             item.Currency.String(),
 			PositionsUnconverted: item.PositionsUnconverted,
+		})
+	}
+	return result
+}
+
+// AssetHoldingDTO is one asset totalled across every portfolio the user owns.
+// See AssetHolding for what each amount is denominated in; Percent is this
+// asset's share of everything the user holds, computed the same way — and over
+// the same positions — as the allocation's, so the two charts agree.
+type AssetHoldingDTO struct {
+	AssetID     uuid.UUID `json:"assetId"`
+	Ticker      string    `json:"ticker"`
+	Name        string    `json:"name"`
+	AssetType   string    `json:"assetType"`
+	Exchange    string    `json:"exchange"`
+	Currency    string    `json:"currency"`
+	Quantity    string    `json:"quantity"`
+	MarketPrice string    `json:"marketPrice"`
+	MarketValue string    `json:"marketValue"`
+	Percent     float64   `json:"percent"`
+	// DisplayCurrency is what MarketValue is in — the same for every row, which
+	// is what makes Percent meaningful.
+	DisplayCurrency      string `json:"displayCurrency"`
+	Portfolios           int64  `json:"portfolios"`
+	PriceSource          string `json:"priceSource"`
+	PositionsUnconverted int64  `json:"positionsUnconverted"`
+}
+
+// NewAssetHoldingsResponse gives each asset its share of the whole.
+func NewAssetHoldingsResponse(holdings []AssetHolding) []AssetHoldingDTO {
+	amounts := make([]string, len(holdings))
+	for i, holding := range holdings {
+		amounts[i] = holding.MarketValue
+	}
+	shares := percentShares(amounts)
+
+	result := make([]AssetHoldingDTO, 0, len(holdings))
+	for i, holding := range holdings {
+		result = append(result, AssetHoldingDTO{
+			AssetID:              holding.AssetID,
+			Ticker:               holding.Ticker,
+			Name:                 holding.Name,
+			AssetType:            string(holding.AssetType),
+			Exchange:             holding.Exchange,
+			Currency:             holding.Currency.String(),
+			Quantity:             holding.Quantity,
+			MarketPrice:          holding.MarketPrice,
+			MarketValue:          holding.MarketValue,
+			Percent:              shares[i],
+			DisplayCurrency:      holding.DisplayCurrency.String(),
+			Portfolios:           holding.Portfolios,
+			PriceSource:          string(holding.PriceSource),
+			PositionsUnconverted: holding.PositionsUnconverted,
 		})
 	}
 	return result

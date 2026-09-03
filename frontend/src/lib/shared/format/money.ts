@@ -40,3 +40,27 @@ export function currencySymbol(currencyCode: string): string {
 
 	return parts.find((part) => part.type === 'currency')?.value ?? '$';
 }
+
+/**
+ * Importe abreviado: «$1,2k», «$89k», «$1,4M».
+ *
+ * Para donde no cabe la cifra entera —las marcas de un eje, el centro de un
+ * donut—, no para leerla con precisión: eso es `formatCurrency`, y suele estar
+ * al lado.
+ *
+ * Entre 1.000 y 10.000 hace falta el decimal: redondeando a miles, una serie de
+ * 1.500 a 1.900 pintaba «$2k» en las cinco marcas del eje.
+ *
+ * No enmascara: quien lo muestre lo pasa por `privacy.money`, igual que a
+ * cualquier otro importe.
+ */
+export function formatCompactCurrency(value: number, currencyCode: string): string {
+	const symbol = currencySymbol(currencyCode);
+	const abs = Math.abs(value);
+
+	if (abs >= 1_000_000) return `${symbol}${(value / 1_000_000).toFixed(1)}M`;
+	if (abs >= 10_000) return `${symbol}${(value / 1_000).toFixed(0)}k`;
+	if (abs >= 1_000) return `${symbol}${(value / 1_000).toFixed(1)}k`;
+
+	return `${symbol}${value.toFixed(0)}`;
+}
