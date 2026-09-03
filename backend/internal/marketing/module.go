@@ -24,13 +24,13 @@ type authMiddleware interface {
 // appears here, which is what lets the service be built before auth.
 type ServiceDeps struct {
 	DB   *pgxpool.Pool
-	Mail Mailer
+	Mail mailer
 }
 
 // Deps is the routing half: the service NewService returned, plus the guards
 // the admin waitlist listing needs.
 type Deps struct {
-	Service   *Service
+	Service   *service
 	AuthMiddl authMiddleware
 	// Limiter is the per-user rate limiter shared with the other /users routes.
 	Limiter fiber.Handler
@@ -39,14 +39,14 @@ type Deps struct {
 // Module is the marketing domain module: construction via NewService + New,
 // HTTP surface via Routes. It receives only the dependencies it uses.
 type Module struct {
-	service   *Service
+	service   *service
 	handler   *handler
 	authMiddl authMiddleware
 	limiter   fiber.Handler
 }
 
 // NewService builds the module's use cases, before auth.
-func NewService(deps ServiceDeps) *Service {
+func NewService(deps ServiceDeps) *service {
 	return newService(NewPostgresRepository(deps.DB), deps.Mail)
 }
 
@@ -75,7 +75,7 @@ func New(deps Deps) *Module {
 
 // Service exposes the module's use cases to the composition root and other
 // modules (always consumed through interfaces declared by the consumer).
-func (m *Module) Service() *Service {
+func (m *Module) Service() *service {
 	return m.service
 }
 

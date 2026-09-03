@@ -9,10 +9,10 @@ import (
 )
 
 type handler struct {
-	service *Service
+	service *service
 }
 
-func newHandler(svc *Service) *handler {
+func newHandler(svc *service) *handler {
 	return new(handler{svc})
 }
 

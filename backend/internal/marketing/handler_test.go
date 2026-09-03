@@ -13,7 +13,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
-func newTestApp(repo Repository, mail Mailer) *fiber.App {
+func newTestApp(repo Repository, mail mailer) *fiber.App {
 	app := fiber.New()
 	New(Deps{Service: newService(repo, mail), AuthMiddl: fakeGuard{}}).Routes(app)
 	return app
