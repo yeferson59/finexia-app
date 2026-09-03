@@ -9,8 +9,9 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/yeferson59/finexia-app/internal/platform/database"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/platform/database"
 )
 
 // assetColumns is the projection every catalog read shares, aliased to a so the
