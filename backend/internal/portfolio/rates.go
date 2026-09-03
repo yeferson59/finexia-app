@@ -26,7 +26,7 @@ var ErrExchangeRateUnavailable = httpx.AsNotFound(errors.New("exchange rate not 
 // key fetched is consulted first, and only then the shared table, which now
 // holds admin-entered rows alone. Serving another user's fetched rate would be
 // the same redistribution problem as serving their prices.
-func (s *Service) GetConversionRate(ctx context.Context, userID uuid.UUID, from, to money.Currency) (decimal.Decimal, error) {
+func (s *service) GetConversionRate(ctx context.Context, userID uuid.UUID, from, to money.Currency) (decimal.Decimal, error) {
 	if from == to {
 		return decimal.One, nil
 	}
@@ -60,7 +60,7 @@ func usableRate(rate decimal.Decimal) bool {
 //
 // Each direction is looked up in the user's own cache first, then in the shared
 // table, so a user with their own rate never falls back to a stale shared one.
-func (s *Service) pairRate(ctx context.Context, userID uuid.UUID, from, to money.Currency) (decimal.Decimal, error) {
+func (s *service) pairRate(ctx context.Context, userID uuid.UUID, from, to money.Currency) (decimal.Decimal, error) {
 	if from == to {
 		return decimal.One, nil
 	}
@@ -78,7 +78,7 @@ func (s *Service) pairRate(ctx context.Context, userID uuid.UUID, from, to money
 }
 
 // storedRate reads one direction, preferring the user's own data.
-func (s *Service) storedRate(ctx context.Context, userID uuid.UUID, from, to money.Currency) (decimal.Decimal, error) {
+func (s *service) storedRate(ctx context.Context, userID uuid.UUID, from, to money.Currency) (decimal.Decimal, error) {
 	if rate, err := s.repo.GetUserExchangeRateByPair(ctx, userID, from, to); err == nil {
 		return rate, nil
 	}

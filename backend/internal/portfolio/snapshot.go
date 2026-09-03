@@ -7,7 +7,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
-func (s *Service) SyncPortfolioSnapshots(ctx context.Context) (int, []error) {
+func (s *service) SyncPortfolioSnapshots(ctx context.Context) (int, []error) {
 	log := s.log.With(logger.Str("job", "portfolio_snapshot"))
 
 	rows, err := s.repo.GetAllPortfolioSummaryRows(ctx)

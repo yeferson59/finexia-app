@@ -208,7 +208,7 @@ func serviceAccessorCalls(t *testing.T, dir string) map[string][]string {
 }
 
 // TestOnlyAppCallsServiceAccessors asserts no domain module calls a Module's
-// Service() accessor. That accessor hands out the concrete *Service, which is
+// Service() accessor. That accessor hands out the concrete *service, which is
 // the one way to step around the consumer-defined interfaces every cross-module
 // dependency goes through: portfolio already imports market for the Asset type,
 // so nothing but this test stops it from holding a *market.Module and reaching

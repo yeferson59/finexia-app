@@ -7,16 +7,16 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
-type service interface {
+type weeklySummaryService interface {
 	SendWeeklySummaryEmails(ctx context.Context) (int, []error)
 }
 
 type WeeklySummaryScheduler struct {
-	svc service
+	svc weeklySummaryService
 	log logger.Logger
 }
 
-func NewWeeklySummaryScheduler(svc service, log logger.Logger) *WeeklySummaryScheduler {
+func NewWeeklySummaryScheduler(svc weeklySummaryService, log logger.Logger) *WeeklySummaryScheduler {
 	return new(WeeklySummaryScheduler{
 		svc: svc,
 		log: log.With(logger.Str("scheduler", "weekly_summary")),

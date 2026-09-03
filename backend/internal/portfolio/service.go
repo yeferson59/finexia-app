@@ -17,18 +17,18 @@ import (
 
 // UserReader is the slice of the user module this module needs to build the
 // transaction activity alert. Satisfied by *user.Service.
-type UserReader interface {
+type userReader interface {
 	GetUserPreferences(ctx context.Context, userID uuid.UUID) (user.UserPreferences, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (identity.User, error)
 }
 
 // Mailer abstracts the outbound email service so tests can replace the
 // Resend-backed implementation with a fake.
-type Mailer interface {
+type mailer interface {
 	SendActivityAlert(email string, data mail.ActivityAlertData) error
 }
 
-var _ Mailer = (*mail.Service)(nil)
+var _ mailer = (*mail.Service)(nil)
 
 // risksCache memoizes the risk catalog: it is seed data shared by every user
 // and requested on each portfolio page, so a short TTL avoids one DB
@@ -43,19 +43,19 @@ const risksCacheTTL = 10 * time.Minute
 
 // Service holds the portfolio use cases. It is exposed by Module.Service()
 // and consumed by other areas only through interfaces they declare.
-type Service struct {
+type service struct {
 	repo    Repository
 	cfg     Config
 	storage fiber.Storage
-	mail    Mailer
-	user    UserReader
+	mail    mailer
+	user    userReader
 	log     logger.Logger
 
 	risksCache *risksCache
 }
 
-func newService(repo Repository, cfg Config, storage fiber.Storage, mailService Mailer, userReader UserReader, log logger.Logger) *Service {
-	return new(Service{
+func newService(repo Repository, cfg Config, storage fiber.Storage, mailService mailer, userReader userReader, log logger.Logger) *service {
+	return new(service{
 		repo:       repo,
 		cfg:        cfg,
 		storage:    storage,

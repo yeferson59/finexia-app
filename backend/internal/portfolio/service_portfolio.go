@@ -22,7 +22,7 @@ var oneHundred = decimal.MustFromString("100")
 // same whatever unit both ends share.
 const growthUnit = money.USD
 
-func (s *Service) GetPortfoliosRisks(ctx context.Context) ([]Risk, error) {
+func (s *service) GetPortfoliosRisks(ctx context.Context) ([]Risk, error) {
 	if c := s.risksCache; c != nil {
 		c.mu.RLock()
 		risks, fresh := c.risks, time.Now().Before(c.expiresAt)
@@ -46,7 +46,7 @@ func (s *Service) GetPortfoliosRisks(ctx context.Context) ([]Risk, error) {
 	return risks, nil
 }
 
-func (s *Service) GetPortfolios(ctx context.Context, userID uuid.UUID) ([]Portfolio, error) {
+func (s *service) GetPortfolios(ctx context.Context, userID uuid.UUID) ([]Portfolio, error) {
 	portfolios, err := s.repo.GetPortfoliosByUserID(ctx, userID)
 	if err != nil {
 		return []Portfolio{}, err
@@ -55,7 +55,7 @@ func (s *Service) GetPortfolios(ctx context.Context, userID uuid.UUID) ([]Portfo
 	return portfolios, nil
 }
 
-func (s *Service) GetPortfoliosSummary(ctx context.Context, userID uuid.UUID) ([]SummaryView, error) {
+func (s *service) GetPortfoliosSummary(ctx context.Context, userID uuid.UUID) ([]SummaryView, error) {
 	return s.repo.GetPortfoliosSummaryByUserID(ctx, userID)
 }
 
@@ -63,7 +63,7 @@ func (s *Service) GetPortfoliosSummary(ctx context.Context, userID uuid.UUID) ([
 // converts each portfolio's totals from its own base currency into
 // targetCurrency, so a user with portfolios in different currencies gets a
 // single, comparable display currency.
-func (s *Service) GetPortfoliosSummaryInCurrency(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]SummaryView, error) {
+func (s *service) GetPortfoliosSummaryInCurrency(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]SummaryView, error) {
 	summaries, err := s.repo.GetPortfoliosSummaryByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (s *Service) GetPortfoliosSummaryInCurrency(ctx context.Context, userID uui
 // dashboard that now always asks for a display currency: a portfolio in a
 // currency no source quotes would blank out every other portfolio with it. The
 // same call is what holdings already make (see valueEntriesInBase).
-func (s *Service) convertSummaryTotals(ctx context.Context, userID uuid.UUID, summary SummaryView, targetCurrency money.Currency) (SummaryView, error) {
+func (s *service) convertSummaryTotals(ctx context.Context, userID uuid.UUID, summary SummaryView, targetCurrency money.Currency) (SummaryView, error) {
 	rate, err := s.GetConversionRate(ctx, userID, summary.BaseCurrency, targetCurrency)
 	if err != nil {
 		return unconvertedSummary(summary), nil
@@ -139,7 +139,7 @@ func unconvertedSummary(summary SummaryView) SummaryView {
 	return summary
 }
 
-func (s *Service) GetPortfolio(ctx context.Context, userID, portfolioID uuid.UUID) (Portfolio, error) {
+func (s *service) GetPortfolio(ctx context.Context, userID, portfolioID uuid.UUID) (Portfolio, error) {
 	// The portfolio header and its entries are independent queries; running
 	// them concurrently halves the latency of the portfolio detail endpoint.
 	// The ownership check in GetPortfolioByID still gates the response: if it
@@ -172,7 +172,7 @@ func (s *Service) GetPortfolio(ctx context.Context, userID, portfolioID uuid.UUI
 	return portfolio, nil
 }
 
-func (s *Service) CreatePortfolio(ctx context.Context, userID uuid.UUID, name, description string, baseCurrency money.Currency, riskID uuid.UUID, typePortfolio Type, priceValue money.Money, isDefault bool) (Portfolio, error) {
+func (s *service) CreatePortfolio(ctx context.Context, userID uuid.UUID, name, description string, baseCurrency money.Currency, riskID uuid.UUID, typePortfolio Type, priceValue money.Money, isDefault bool) (Portfolio, error) {
 	portfolio, err := s.repo.CreatePortfolio(ctx, userID, name, description, baseCurrency, riskID, typePortfolio, priceValue, isDefault)
 	if err != nil {
 		return Portfolio{}, err
@@ -181,11 +181,11 @@ func (s *Service) CreatePortfolio(ctx context.Context, userID uuid.UUID, name, d
 	return portfolio, nil
 }
 
-func (s *Service) GetPortfolioTopTransaction(ctx context.Context, userID, portfolioID uuid.UUID) (TopTransactionDTO, error) {
+func (s *service) GetPortfolioTopTransaction(ctx context.Context, userID, portfolioID uuid.UUID) (TopTransactionDTO, error) {
 	return s.repo.GetTopTransactionByPortfolioID(ctx, userID, portfolioID)
 }
 
-func (s *Service) UpdatePortfolio(ctx context.Context, userID, portfolioID uuid.UUID, name, description string, portfolioType Type, riskID uuid.UUID, isDefault bool) (Portfolio, error) {
+func (s *service) UpdatePortfolio(ctx context.Context, userID, portfolioID uuid.UUID, name, description string, portfolioType Type, riskID uuid.UUID, isDefault bool) (Portfolio, error) {
 	return s.repo.UpdatePortfolio(ctx, userID, portfolioID, name, description, portfolioType, riskID, isDefault)
 }
 
@@ -194,13 +194,13 @@ func (s *Service) UpdatePortfolio(ctx context.Context, userID, portfolioID uuid.
 // back are absent from the result, and an empty result means the account has
 // none at all — a caller comparing against a past value falls back to showing
 // no comparison.
-func (s *Service) GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error) {
+func (s *service) GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error) {
 	return s.repo.GetPortfolioValuesAsOf(ctx, userID, asOf)
 }
 
 // GetPortfolioGrowth builds the account-wide series. An empty currency means
 // "the account's preferred one", the same default the summary endpoints use.
-func (s *Service) GetPortfolioGrowth(ctx context.Context, userID uuid.UUID, currency money.Currency, period string) ([]GrowthPoint, GrowthSummary, error) {
+func (s *service) GetPortfolioGrowth(ctx context.Context, userID uuid.UUID, currency money.Currency, period string) ([]GrowthPoint, GrowthSummary, error) {
 	hasSince, since := parsePeriod(period)
 
 	points, err := s.repo.GetPortfolioGrowthByUserID(ctx, userID, currency, hasSince, since)
@@ -210,7 +210,7 @@ func (s *Service) GetPortfolioGrowth(ctx context.Context, userID uuid.UUID, curr
 	return points, buildGrowthSummary(points), nil
 }
 
-func (s *Service) GetPortfolioGrowthByID(ctx context.Context, userID, portfolioID uuid.UUID, period string) ([]GrowthPoint, GrowthSummary, error) {
+func (s *service) GetPortfolioGrowthByID(ctx context.Context, userID, portfolioID uuid.UUID, period string) ([]GrowthPoint, GrowthSummary, error) {
 	hasSince, since := parsePeriod(period)
 	points, err := s.repo.GetPortfolioGrowthByPortfolioID(ctx, userID, portfolioID, hasSince, since)
 	if err != nil {

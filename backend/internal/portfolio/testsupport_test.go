@@ -407,14 +407,14 @@ func testConfig() Config {
 // newTestServices wires the portfolio service with a fake user reader and a
 // discarded mailer, matching the common case where a test only cares about
 // repository interactions.
-func newTestServices(repo *fakeRepository, storage *memStorage) *Service {
+func newTestServices(repo *fakeRepository, storage *memStorage) *service {
 	return newService(repo, testConfig(), storage, new(fakeMailer{}), fakeUserReader{repo}, logger.Noop())
 }
 
 // newTestServicesFull injects a caller-provided mailer for the flows that emit
 // the transaction activity alert. The fourth argument is retained for parity
 // with the legacy helper and ignored.
-func newTestServicesFull(repo *fakeRepository, storage *memStorage, mailer Mailer, _ any) *Service {
+func newTestServicesFull(repo *fakeRepository, storage *memStorage, mailer mailer, _ any) *service {
 	return newService(repo, testConfig(), storage, mailer, fakeUserReader{repo}, logger.Noop())
 }
 

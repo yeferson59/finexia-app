@@ -96,7 +96,7 @@ type InvitationStore interface {
 // WaitlistStore is the slice of the marketing module the invitation flow
 // consumes; the waitlist table belongs to marketing. Only the public
 // marketing.Waitlist type crosses the module boundary; the composition root
-// injects marketing's *Service here.
+// injects marketing's *service here.
 type WaitlistStore interface {
 	ListWaitlist(ctx context.Context, offset, limit uint) ([]marketing.Waitlist, uint, error)
 	SetWaitlistInvited(ctx context.Context, email string) error

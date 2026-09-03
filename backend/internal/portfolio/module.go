@@ -19,8 +19,8 @@ type Deps struct {
 	DB      *pgxpool.Pool
 	Cfg     Config
 	Storage fiber.Storage
-	Mail    Mailer
-	User    UserReader
+	Mail    mailer
+	User    userReader
 	Log     logger.Logger
 	// Assets serves the /portfolios/assets endpoints (catalog + manual price),
 	// whose domain lives in the market module. Satisfied by *market.Service.
@@ -51,7 +51,7 @@ type AssetReader interface {
 }
 
 type Module struct {
-	service   *Service
+	service   *service
 	handler   *handler
 	authMiddl authMiddleware
 	limiter   fiber.Handler
@@ -84,7 +84,7 @@ func New(deps Deps) *Module {
 // so the composition root is the only thing that can get it wrong, and failing
 // at boot is what keeps a misconfigured build from reaching production
 // quietly.
-func newModule(deps Deps, service *Service) *Module {
+func newModule(deps Deps, service *service) *Module {
 	if deps.AuthMiddl == nil {
 		panic("portfolio.New: Deps.AuthMiddl is required — every /portfolios route is guarded by it")
 	}
@@ -99,7 +99,7 @@ func newModule(deps Deps, service *Service) *Module {
 
 // Service exposes the module's use cases to the composition root and other
 // modules (always consumed through interfaces declared by the consumer).
-func (m *Module) Service() *Service {
+func (m *Module) Service() *service {
 	return m.service
 }
 

@@ -33,7 +33,7 @@ import (
 // EUR→USD yet simply has no rate, and that must not take down the portfolio
 // page. Such an entry keeps its native totals and is marked FXConverted=false,
 // which is the client's cue to show the amounts unconverted and say so.
-func (s *Service) valueEntriesInBase(ctx context.Context, userID uuid.UUID, baseCurrency money.Currency, entries []Entry) []Entry {
+func (s *service) valueEntriesInBase(ctx context.Context, userID uuid.UUID, baseCurrency money.Currency, entries []Entry) []Entry {
 	// One rate lookup per distinct source currency, not per position: a
 	// portfolio with twenty EUR holdings resolves EUR→USD once.
 	rates := make(map[money.Currency]decimal.Decimal, 2)

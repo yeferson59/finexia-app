@@ -7,7 +7,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
-type service interface {
+type SnapshotService interface {
 	SyncPortfolioSnapshots(ctx context.Context) (int, []error)
 }
 
@@ -15,11 +15,11 @@ type service interface {
 // growth endpoints have historical data points. It is a plain scheduler.Job:
 // the composition root registers it on a daily schedule.
 type SnapshotJob struct {
-	svc service
+	svc SnapshotService
 	log logger.Logger
 }
 
-func NewSnapshotJob(svc service, log logger.Logger) *SnapshotJob {
+func NewSnapshotJob(svc SnapshotService, log logger.Logger) *SnapshotJob {
 	return new(SnapshotJob{
 		svc: svc,
 		log: log.With(logger.Str("scheduler", "portfolio_snapshot")),

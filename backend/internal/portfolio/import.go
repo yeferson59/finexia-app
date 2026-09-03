@@ -322,7 +322,7 @@ func buildImportRow(
 // PreviewTransactionImport parses an uploaded spreadsheet and returns its
 // headers, a suggested column mapping and every row normalised + validated
 // with the active mapping, without touching the database.
-func (s *Service) PreviewTransactionImport(
+func (s *service) PreviewTransactionImport(
 	data []byte,
 	filename, sheet string,
 	mapping *ImportMappingDTO,
@@ -345,7 +345,7 @@ func (s *Service) PreviewTransactionImport(
 // ImportTransactionsFromFile re-parses the uploaded file with the confirmed
 // mapping and persists every valid row (asset + position + transaction) in a
 // single database transaction. Invalid rows are skipped and reported back.
-func (s *Service) ImportTransactionsFromFile(
+func (s *service) ImportTransactionsFromFile(
 	ctx context.Context,
 	userID, portfolioID, sourceID uuid.UUID,
 	data []byte,

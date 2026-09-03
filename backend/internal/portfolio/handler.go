@@ -12,11 +12,11 @@ import (
 )
 
 type handler struct {
-	service *Service
+	service *service
 	assets  AssetReader
 }
 
-func newHandler(svc *Service, assets AssetReader) *handler {
+func newHandler(svc *service, assets AssetReader) *handler {
 	return new(handler{svc, assets})
 }
 

@@ -14,13 +14,13 @@ import (
 // app/arch_test.go pins that direction. So market declares the interface and
 // this module implements it.
 
-var _ market.Holdings = (*Service)(nil)
+var _ market.Holdings = (*service)(nil)
 
 // HeldAssetIDs lists the assets the user actually owns across every portfolio.
 // Under BYO-key this bounds the sync to what the user cares about: walking the
 // whole catalog would burn a personal free-tier quota on assets they do not
 // hold.
-func (s *Service) HeldAssetIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
+func (s *service) HeldAssetIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
 	return s.repo.GetHeldAssetIDs(ctx, userID)
 }
 
@@ -28,7 +28,7 @@ func (s *Service) HeldAssetIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UU
 // need: from each currency their holdings are priced in, to each base currency
 // their portfolios report in. Same reasoning as above — only fetch what this
 // user's screens will display.
-func (s *Service) RequiredCurrencyPairs(ctx context.Context, userID uuid.UUID) ([]market.CurrencyPair, error) {
+func (s *service) RequiredCurrencyPairs(ctx context.Context, userID uuid.UUID) ([]market.CurrencyPair, error) {
 	pairs, err := s.repo.GetRequiredCurrencyPairs(ctx, userID)
 	if err != nil {
 		return nil, err

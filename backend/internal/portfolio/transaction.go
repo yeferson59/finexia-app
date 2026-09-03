@@ -13,11 +13,11 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/mail"
 )
 
-func (s *Service) GetTransactionsByEntry(ctx context.Context, userID, entryID uuid.UUID) ([]Transaction, error) {
+func (s *service) GetTransactionsByEntry(ctx context.Context, userID, entryID uuid.UUID) ([]Transaction, error) {
 	return s.repo.GetTransactionsByEntryID(ctx, userID, entryID)
 }
 
-func (s *Service) GetAssetTransactionsPaginated(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, page, limit int) ([]Transaction, int, error) {
+func (s *service) GetAssetTransactionsPaginated(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, page, limit int) ([]Transaction, int, error) {
 	offset := (page - 1) * limit
 
 	// The count and the page are independent reads; overlap them instead of
@@ -45,27 +45,27 @@ func (s *Service) GetAssetTransactionsPaginated(ctx context.Context, userID, por
 	return txns, total, nil
 }
 
-func (s *Service) GetRecentUserTransactions(ctx context.Context, userID uuid.UUID, limit int) ([]Transaction, error) {
+func (s *service) GetRecentUserTransactions(ctx context.Context, userID uuid.UUID, limit int) ([]Transaction, error) {
 	return s.repo.GetRecentTransactionsByUserID(ctx, userID, limit)
 }
 
 // GetAssetAllocation totals the user's holdings per category in one currency.
 // An empty targetCurrency reports in the user's stored preference.
-func (s *Service) GetAssetAllocation(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AllocationItem, error) {
+func (s *service) GetAssetAllocation(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AllocationItem, error) {
 	return s.repo.GetAssetAllocationByUserID(ctx, userID, targetCurrency)
 }
 
-func (s *Service) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
+func (s *service) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
 	return s.repo.UpdateTransaction(ctx, userID, txnID, txnType, quantity, price, currency, fees, transactionDate, notes)
 }
 
 // DeleteTransaction removes a transaction the user owns. No activity alert is
 // sent: those announce trades, and undoing a mistyped one is not a trade.
-func (s *Service) DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID) error {
+func (s *service) DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID) error {
 	return s.repo.DeleteTransaction(ctx, userID, txnID)
 }
 
-func (s *Service) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency money.Currency, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
+func (s *service) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency money.Currency, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
 	txn, err := s.repo.CreateTransaction(ctx, userID, entryID, txnType, quantity, price, currency, fees, transactionDate, notes)
 	if err != nil {
 		return Transaction{}, err
@@ -76,7 +76,7 @@ func (s *Service) CreateTransaction(ctx context.Context, userID, entryID uuid.UU
 	return txn, nil
 }
 
-func (s *Service) sendTransactionAlert(userID, entryID uuid.UUID, txn Transaction) {
+func (s *service) sendTransactionAlert(userID, entryID uuid.UUID, txn Transaction) {
 	ctx := context.Background()
 
 	prefs, err := s.user.GetUserPreferences(ctx, userID)
