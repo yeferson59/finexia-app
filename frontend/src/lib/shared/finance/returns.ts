@@ -1,5 +1,5 @@
 /**
- * La aritmética de rentabilidad del centro de reportes.
+ * La aritmética de rentabilidad de la aplicación.
  *
  * La serie de crecimiento (`GET /portfolios/growth`) da, por día, el valor de
  * mercado de la cuenta y el capital invertido a esa fecha. La distinción entre
@@ -17,10 +17,34 @@
  * queda de respaldo para un backend anterior, y ahí una venta con plusvalía sí
  * se cuenta como pérdida el día en que se toma.
  *
- * Interno de la feature: `reports.ts` lo consume y publica los paneles.
+ * Vivió dentro de `features/reports`, que fue quien lo estrenó. Bajó a `shared`
+ * cuando la misma cuenta pasó a hacer falta fuera del centro de reportes: la
+ * gráfica del dashboard la dibuja en su vista de porcentaje y el detalle de
+ * portafolio publica su rentabilidad real. Dos copias del cálculo habrían
+ * acabado dando dos cifras distintas para lo mismo.
+ *
+ * `shared` es la capa más baja y no puede importar de `lib/api`, así que la
+ * entrada se declara aquí de forma estructural: `GrowthDataPoint` encaja en
+ * `ReturnSeriesPoint` sin conversión.
  */
 
-import type { GrowthDataPoint } from '$lib/api/types';
+/**
+ * Lo que esta aritmética necesita de un punto de la serie de crecimiento.
+ *
+ * Es un subconjunto estructural de `GrowthDataPoint` (`$lib/api/types`), que se
+ * pasa tal cual. Los importes vienen como cadena porque el backend los manda en
+ * decimal exacto.
+ */
+export interface ReturnSeriesPoint {
+	/** `YYYY-MM-DD`. */
+	date: string;
+	/** Valor de mercado a esa fecha. */
+	totalValue: string;
+	/** Capital invertido (coste) a esa fecha. */
+	totalCostBase: string;
+	/** Dinero que entró (+) o salió (−) desde el punto anterior, si el backend lo manda. */
+	netFlow?: string;
+}
 
 /** Retorno de un tramo de la serie, ya limpio de aportes y retiros. */
 export interface PeriodReturn {
@@ -48,8 +72,14 @@ export function dayGap(from: string, to: string): number {
 	return Math.round((end - start) / DAY_MS);
 }
 
-/** La serie ordenada por fecha; el backend ya la manda así, esto es defensa. */
-export function sortedPoints(points: GrowthDataPoint[]): GrowthDataPoint[] {
+/**
+ * La serie ordenada por fecha; el backend ya la manda así, esto es defensa.
+ *
+ * Genérica para no estrechar lo que le entra: quien pasa `GrowthDataPoint[]`
+ * recupera `GrowthDataPoint[]`, con la ganancia y el porcentaje que este módulo
+ * no mira pero el llamador sí.
+ */
+export function sortedPoints<T extends ReturnSeriesPoint>(points: T[]): T[] {
 	return [...points].sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -61,7 +91,7 @@ export function sortedPoints(points: GrowthDataPoint[]): GrowthDataPoint[] {
  * en una compra y falla en una venta, porque la posición sale de la serie a
  * valor de mercado y solo baja el coste por lo que costó en su día.
  */
-function periodFlow(prev: GrowthDataPoint, curr: GrowthDataPoint): number {
+function periodFlow(prev: ReturnSeriesPoint, curr: ReturnSeriesPoint): number {
 	const reported = toNumber(curr.netFlow);
 	if (Number.isFinite(reported)) return reported;
 
@@ -76,7 +106,7 @@ function periodFlow(prev: GrowthDataPoint, curr: GrowthDataPoint): number {
  * trabajando parte del tramo; con eso el primer día de una cuenta —que abre con
  * valor cero— deja de dividir por cero.
  */
-export function periodReturns(points: GrowthDataPoint[]): PeriodReturn[] {
+export function periodReturns(points: ReturnSeriesPoint[]): PeriodReturn[] {
 	const series = sortedPoints(points);
 	const returns: PeriodReturn[] = [];
 
@@ -178,7 +208,7 @@ function monthEnd(key: string): string {
  * curso. La cifra de esos meses es real, pero tres días no se comparan con un
  * mes entero: el calendario los marca y el mejor/peor mes los deja fuera.
  */
-export function incompleteMonths(points: GrowthDataPoint[]): Set<string> {
+export function incompleteMonths(points: ReturnSeriesPoint[]): Set<string> {
 	const series = sortedPoints(points);
 	if (series.length === 0) return new Set();
 
@@ -189,4 +219,92 @@ export function incompleteMonths(points: GrowthDataPoint[]): Set<string> {
 	if (last < monthEnd(lastMonth)) incomplete.add(lastMonth);
 
 	return incomplete;
+}
+
+// ---------------------------------------------------------------------------
+// Lecturas de la serie entera
+// ---------------------------------------------------------------------------
+
+/**
+ * Días que cubre el historial, del primer punto al último.
+ *
+ * Cero con menos de dos puntos: un solo día no abarca ningún periodo, y quien
+ * anualiza necesita distinguirlo de un historial de un día real.
+ */
+export function spanDays(points: ReturnSeriesPoint[]): number {
+	const series = sortedPoints(points);
+	if (series.length < 2) return 0;
+	return dayGap(series[0].date, series[series.length - 1].date);
+}
+
+/**
+ * Rentabilidad del historial entero, ya limpia de aportes y retiros.
+ *
+ * Es la cifra ponderada por tiempo: encadena los tramos e ignora cuándo entró
+ * cada aporte, así que mide cómo se comportó el dinero invertido y no cuánto
+ * dinero se metió. `null` cuando la serie todavía no da ni un tramo con el que
+ * calcularla —una cuenta con un solo punto, o que abre a valor cero—.
+ */
+export function timeWeightedReturn(points: ReturnSeriesPoint[]): number | null {
+	const returns = periodReturns(points);
+	if (returns.length === 0) return null;
+	return compound(returns.map((r) => r.value));
+}
+
+/**
+ * Lleva una rentabilidad de `days` días a su equivalente anual, componiendo.
+ *
+ * `null` cuando la operación no significa nada: sin días que cubrir, o tras una
+ * pérdida total —una base negativa elevada a un exponente fraccionario no da un
+ * número real—.
+ */
+export function annualize(totalReturn: number, days: number): number | null {
+	if (!Number.isFinite(totalReturn) || days <= 0 || totalReturn <= -1) return null;
+	return Math.pow(1 + totalReturn, DAYS_PER_YEAR / days) - 1;
+}
+
+/**
+ * Ganancia sobre coste a una fecha: valor de mercado partido por lo invertido.
+ *
+ * Es la otra lectura, la ponderada por dinero: sí depende de cuándo entró cada
+ * aporte, y por eso no coincide con la rentabilidad encadenada. `null` sin
+ * capital invertido, que es el estado de una cuenta vacía y no un 0 %.
+ */
+export function gainOverCost(point: ReturnSeriesPoint): number | null {
+	const value = toNumber(point.totalValue);
+	const cost = toNumber(point.totalCostBase);
+	if (!Number.isFinite(value) || !Number.isFinite(cost) || cost <= 0) return null;
+	return value / cost - 1;
+}
+
+/** Punto de la curva de rentabilidad: las dos lecturas a una fecha. */
+export interface CumulativeReturnPoint {
+	/** Fecha del punto, `YYYY-MM-DD`. */
+	date: string;
+	/** Rentabilidad acumulada desde el inicio de la serie, fraccional. */
+	twr: number;
+	/** Ganancia sobre coste a esa fecha, fraccional; `null` sin capital invertido. */
+	overCost: number | null;
+}
+
+/**
+ * La serie convertida a rentabilidad acumulada, para dibujarla en porcentaje.
+ *
+ * El primer punto ancla la curva en 0 %: lo que se lee después es lo que rindió
+ * el dinero desde entonces, no lo que subió el saldo. Un tramo que la Dietz
+ * descarta —una cuenta que ese día valía cero, un hueco sin días— no rompe la
+ * curva: arrastra el índice anterior, que es lo que de verdad pasó con el
+ * dinero ya invertido, en vez de dejar un agujero en la línea.
+ */
+export function cumulativeReturns(points: ReturnSeriesPoint[]): CumulativeReturnPoint[] {
+	const series = sortedPoints(points);
+	if (series.length === 0) return [];
+
+	const byDate = new Map(periodReturns(series).map((entry) => [entry.date, entry.value]));
+
+	let index = 1;
+	return series.map((point, i) => {
+		if (i > 0) index *= 1 + (byDate.get(point.date) ?? 0);
+		return { date: point.date, twr: index - 1, overCost: gainOverCost(point) };
+	});
 }

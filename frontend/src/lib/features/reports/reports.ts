@@ -4,16 +4,17 @@
  *
  * El backend no expone estas vistas; se derivan de la serie de crecimiento
  * agregada (`GET /portfolios/growth`). La aritmética que las alimenta vive en
- * `returns.ts`, que es donde se explica por qué un aporte no puede contar como
- * rentabilidad; aquí solo se arman los bloques y se les da formato.
+ * `$lib/shared/finance/returns`, que es donde se explica por qué un aporte no
+ * puede contar como rentabilidad; aquí solo se arman los bloques y se les da
+ * formato.
  */
 
 import type { GrowthDataPoint, GrowthSummary } from '$lib/api/types';
 import { formatCurrency } from '$lib/shared/format/money';
+import { formatPercent, formatSignedPercent } from '$lib/shared/format/percent';
 import {
-	DAYS_PER_YEAR,
+	annualize,
 	compound,
-	dayGap,
 	incompleteMonths,
 	maxDrawdown,
 	mean,
@@ -21,9 +22,10 @@ import {
 	periodsPerYear,
 	returnsByMonth,
 	sortedPoints,
+	spanDays,
 	stdDev,
 	toNumber
-} from './returns';
+} from '$lib/shared/finance/returns';
 
 /** Rentabilidad mes a mes de un año; `null` en los meses sin dato. */
 export interface PerformanceCalendar {
@@ -57,12 +59,6 @@ export interface KeyStat {
 export interface KeyStatGroup {
 	title: string;
 	stats: KeyStat[];
-}
-
-/** Punto de la proyección a cinco años. */
-export interface GrowthProjectionEntry {
-	period: string;
-	value: number;
 }
 
 export const MONTHS = [
@@ -109,9 +105,6 @@ const MIN_RISK_RETURNS = 10;
  */
 const MIN_ANNUALIZED_DAYS = 90;
 
-/** Días mínimos para proyectar a cinco años. */
-const MIN_PROJECTION_DAYS = 183;
-
 /** Tramo de color de una celda del calendario, por rentabilidad mensual. */
 export function performanceClass(value: number): string {
 	if (value >= 2) return 'strong-positive';
@@ -125,29 +118,10 @@ export function performanceClass(value: number): string {
 // Formato
 // ---------------------------------------------------------------------------
 
-const PERCENT = new Intl.NumberFormat('es-CO', {
-	minimumFractionDigits: 1,
-	maximumFractionDigits: 1
-});
-
 const RATIO = new Intl.NumberFormat('es-CO', {
 	minimumFractionDigits: 2,
 	maximumFractionDigits: 2
 });
-
-/**
- * Porcentaje con coma decimal. El resto de cifras de la aplicación usan `Intl`
- * con la configuración de es-CO; estas se escapaban con un punto.
- */
-function formatPercent(value: number): string {
-	// Sin esto, una cifra que redondea a cero sale como «-0,0 %».
-	return `${PERCENT.format(Math.abs(value) < 0.05 ? 0 : value)}%`;
-}
-
-/** Como `formatPercent`, con el `+` explícito que pide una cifra de rendimiento. */
-function formatSignedPercent(value: number): string {
-	return `${value >= 0.05 ? '+' : ''}${formatPercent(value)}`;
-}
 
 /**
  * El importe del resumen, o el del último punto de la serie si aquel no lo
@@ -259,7 +233,7 @@ export function buildKeyStatistics(
 	const currency = summary.currency || 'USD';
 	const returns = periodReturns(series);
 	const values = returns.map((r) => r.value);
-	const spanDays = dayGap(series[0].date, last.date);
+	const historyDays = spanDays(series);
 
 	const totalReturn = compound(values);
 	const invested = toNumber(last.totalCostBase);
@@ -272,9 +246,9 @@ export function buildKeyStatistics(
 	// Un solo umbral de historial para las cifras anuales, y otro —de tramos—
 	// para lo que solo pide dispersión: 90 días de una serie con cuatro puntos no
 	// miden oscilación ninguna, y 60 días de una serie diaria sí.
-	const hasAnnualSpan = spanDays >= MIN_ANNUALIZED_DAYS;
+	const hasAnnualSpan = historyDays >= MIN_ANNUALIZED_DAYS;
 	const missingDispersion = `Necesita al menos ${MIN_RISK_RETURNS} tramos de historial; llevas ${returns.length}.`;
-	const missingRisk = `Necesita al menos ${MIN_RISK_RETURNS} tramos y ${MIN_ANNUALIZED_DAYS} días de historial; llevas ${returns.length} y ${spanDays}.`;
+	const missingRisk = `Necesita al menos ${MIN_RISK_RETURNS} tramos y ${MIN_ANNUALIZED_DAYS} días de historial; llevas ${returns.length} y ${historyDays}.`;
 
 	const perYear = returns.length > 0 ? periodsPerYear(returns) : 0;
 	// La desviación de los tramos es la medida; el √tramos es el que espera al
@@ -288,10 +262,7 @@ export function buildKeyStatistics(
 			? (mean(values) * perYear) / annualVolatility
 			: null;
 
-	const annualized =
-		hasAnnualSpan && totalReturn > -1
-			? Math.pow(1 + totalReturn, DAYS_PER_YEAR / spanDays) - 1
-			: null;
+	const annualized = hasAnnualSpan ? annualize(totalReturn, historyDays) : null;
 
 	// El mejor y el peor mes se buscan solo entre los meses enteros: el primero
 	// del historial y el que está en curso cubren unos pocos días, y un +0,4 %
@@ -346,7 +317,7 @@ export function buildKeyStatistics(
 				annualized === null
 					? hasAnnualSpan
 						? 'Una pérdida total no se anualiza.'
-						: `Se anualiza a partir de ${MIN_ANNUALIZED_DAYS} días de historial; llevas ${spanDays}. El mismo umbral vale para la volatilidad y el Sharpe.`
+						: `Se anualiza a partir de ${MIN_ANNUALIZED_DAYS} días de historial; llevas ${historyDays}. El mismo umbral vale para la volatilidad y el Sharpe.`
 					: 'La rentabilidad del periodo compuesta hasta un año. No es una previsión, y no es la que divide el ratio de Sharpe.',
 			tone: annualized === null ? 'neutral' : toneOf(annualized * 100)
 		},
@@ -447,76 +418,4 @@ export function buildKeyStatistics(
 		{ title: 'Riesgo', stats: risk },
 		{ title: 'Historial', stats: history }
 	];
-}
-
-/** Días que cubre el historial, para explicar qué falta cuando no hay proyección. */
-export function historySpanDays(points: GrowthDataPoint[]): number {
-	const series = sortedPoints(points);
-	if (series.length < 2) return 0;
-	return dayGap(series[0].date, series[series.length - 1].date);
-}
-
-/** Días de historial que exige la proyección, para el texto del estado vacío. */
-export const PROJECTION_MIN_DAYS = MIN_PROJECTION_DAYS;
-
-/**
- * Proyección a cinco años extrapolando la rentabilidad anualizada del historial.
- *
- * Extrapola rendimiento, no crecimiento del saldo: proyectar con la variación
- * del valor daba cifras absurdas en cuanto la cuenta recibía un aporte, porque
- * el depósito entraba en la tasa. Se abstiene en cuanto el dato no da para una
- * proyección honesta: menos de medio año de historial, valores no positivos o
- * una tasa fuera de un rango plausible.
- */
-export function buildGrowthProjection(
-	points: GrowthDataPoint[],
-	summary: GrowthSummary
-): GrowthProjectionEntry[] {
-	const series = sortedPoints(points);
-	if (series.length < 2) return [];
-
-	const last = series[series.length - 1];
-	const currentValue = toNumber(summary.currentValue) || toNumber(last.totalValue);
-	if (!Number.isFinite(currentValue) || currentValue <= 0) return [];
-
-	const spanDays = dayGap(series[0].date, last.date);
-	if (spanDays < MIN_PROJECTION_DAYS) return [];
-
-	const totalReturn = compound(periodReturns(series).map((r) => r.value));
-	if (totalReturn <= -1) return [];
-
-	const rate = Math.pow(1 + totalReturn, DAYS_PER_YEAR / spanDays) - 1;
-	if (!Number.isFinite(rate) || rate < -0.5 || rate > 2.0) return [];
-
-	const startYear = Number.parseInt(last.date.substring(0, 4), 10);
-	return Array.from({ length: 5 }, (_, i) => ({
-		period: String(startYear + i),
-		value: Math.round(currentValue * Math.pow(1 + rate, i))
-	}));
-}
-
-/**
- * Canal izquierdo de la gráfica de proyección, en unidades del viewBox.
- *
- * Son 58 y no 40: con una tasa pequeña las marcas del eje llegan a «$89.41k», y
- * con el margen anterior el `$` y las primeras cifras se salían del viewBox y
- * se veían cortadas.
- */
-export const PROJECTION_GUTTER = 58;
-
-/** Coordenadas de la gráfica de proyección dentro del viewBox `0 0 600 280`. */
-export function projectionCoordinates(
-	entries: GrowthProjectionEntry[]
-): { x: number; y: number; period: string }[] {
-	if (entries.length === 0) return [];
-
-	const values = entries.map((p) => p.value);
-	const min = Math.min(...values);
-	const range = Math.max(...values) - min || 1;
-
-	return entries.map((point, i) => ({
-		x: PROJECTION_GUTTER + i * 124,
-		y: 230 - ((point.value - min) / range) * 180,
-		period: point.period
-	}));
 }

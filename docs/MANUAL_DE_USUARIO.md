@@ -1,6 +1,6 @@
 # Manual de Usuario — FINEXIA
 
-**Versión del documento:** 1.6
+**Versión del documento:** 1.7
 **Fecha:** Agosto 2026
 **Aplicación:** Finexia — Plataforma de gestión y seguimiento de portafolios de inversión
 
@@ -189,7 +189,7 @@ El Dashboard es la primera pantalla tras iniciar sesión y ofrece una fotografí
 Sus bloques principales son:
 
 - **Patrimonio Neto:** el valor total de todos tus portafolios, con la ganancia acumulada en importe y porcentaje, el número de portafolios y de posiciones. Con el selector de moneda (p. ej. **USD/COP**) puedes ver el total consolidado en la moneda que prefieras.
-- **Crecimiento del portafolio:** gráfica de evolución de tu patrimonio que compara el **valor de mercado** (línea continua ámbar) con el **capital invertido** (línea discontinua). Puedes cambiar el periodo mostrado (1M, 3M, 6M, 1Y o Todo) y ver la ganancia total, el crecimiento desde la creación y el valor actual.
+- **Crecimiento del portafolio:** gráfica de evolución de tu patrimonio que compara el **valor de mercado** (línea continua ámbar) con el **capital invertido** (línea discontinua). Puedes cambiar el periodo mostrado (1M, 3M, 6M, 1Y o Todo), pasar la gráfica a **porcentaje** con el conmutador **Valor / %**, y ver la ganancia total, el rendimiento, la **rentabilidad real** del periodo y el valor actual.
 - **Portafolios:** tabla resumen con cada portafolio, su tipo, valor actual, importe invertido y ganancia/pérdida (en verde si es positiva, en rojo si es negativa), junto con los totales. El nombre de cada fila lleva a su detalle.
 - **Asignación de Activos:** gráfica de dona con la distribución porcentual de tu dinero entre tipos de activos (acciones, ETF, criptomonedas, fondos…).
 - **Actividad Reciente:** las últimas compras y ventas registradas, con acceso a **Ver todo** y a **Descargar extracto**.
@@ -200,7 +200,24 @@ La gráfica de crecimiento no es solo una imagen: **pasa el cursor por encima** 
 
 Si prefieres el teclado, pulsa **Tab** hasta llegar a la gráfica y recórrela con las **flechas izquierda y derecha**; **Inicio** y **Fin** saltan al primer y último día, y **Esc** quita la selección. Cada punto se anuncia en voz alta, de modo que la gráfica también se puede leer con un lector de pantalla.
 
-### 5.2 Leer la asignación de activos
+### 5.2 Ver la gráfica en porcentaje
+
+Junto a los botones de periodo hay un conmutador con dos posiciones: **Valor** y **%**. El primero es la vista de siempre, en dinero. El segundo dibuja la misma serie en **rentabilidad**, y es la que contesta a la pregunta de cuánto has ganado, no de cuánto tienes.
+
+La diferencia importa más de lo que parece. En dinero, tu patrimonio sube cuando el mercado te da la razón **y también cuando metes un depósito**: las dos cosas empujan la curva hacia arriba y la gráfica no las distingue. En porcentaje se dibujan dos líneas que sí lo hacen:
+
+| Línea | Qué mide |
+|---|---|
+| **Rentabilidad acumulada** (ámbar) | Lo que rindió tu dinero desde el inicio del periodo que estés viendo, **descontando aportes y retiros**. Un depósito no la mueve: solo el mercado la mueve |
+| **Ganancia sobre coste** (gris discontinua) | Lo que vale tu cartera frente a lo que te costó, día a día. Esta sí depende de *cuándo* aportaste |
+
+Cuando las dos líneas se separan, la distancia entre ellas es exactamente el efecto de tus movimientos de dinero: aportar antes de una subida las junta, aportar después las separa. La línea horizontal más marcada es el **equilibrio (0 %)**, la frontera entre ganar y perder.
+
+Sobre la gráfica, la métrica **Rentabilidad real** lleva el periodo en su etiqueta (`Rentabilidad real · 3M`) porque, a diferencia de las otras tres, mide el tramo que estás viendo. Es la misma cifra que la línea ámbar al final de su recorrido.
+
+> **Por qué no coincide con «Rendimiento».** El **Rendimiento** de al lado divide tu ganancia de hoy entre lo que llevas invertido hoy. Si metiste una cantidad grande justo después de una subida, esa cifra se hunde aunque tu cartera no haya perdido nada: el mismo beneficio repartido entre mucho más capital. La **Rentabilidad real** encadena lo que pasó en cada tramo y solo se mueve con el mercado. Las dos son correctas; contestan a preguntas distintas.
+
+### 5.3 Leer la asignación de activos
 
 En la dona, al señalar una porción —o su entrada en la leyenda— el resto se atenúa y el centro pasa a mostrar **esa categoría** con su porcentaje, en lugar del total. La leyenda funciona igual con el teclado y con un clic: cada entrada indica el importe y el peso de esa categoría dentro de tu patrimonio.
 
@@ -243,10 +260,10 @@ Pulsa sobre cualquier portafolio para abrir su **detalle**.
 
 La página de detalle muestra:
 
-- **Indicadores principales:** valor actual, ganancia/pérdida total y métricas del portafolio.
+- **Indicadores principales:** valor de mercado, ganancia/pérdida total, **rentabilidad real** y riesgo/número de activos. La rentabilidad real es la del portafolio limpia de aportes y retiros —la misma cuenta que explica el apartado 5.2—, así que puede no parecerse a la ganancia sobre costo de al lado; aparece como `—` hasta que el portafolio acumule al menos dos cierres diarios.
 - **Distribución por tipo:** gráfica con el reparto del portafolio por tipo de activo.
 - **Posiciones:** la lista de activos que componen el portafolio, con su cantidad, precio de compra, precio de mercado y rendimiento. Desde aquí puedes añadir posiciones nuevas o entrar al detalle de cada activo.
-- **Crecimiento:** evolución histórica del valor del portafolio.
+- **Crecimiento:** evolución histórica del portafolio, con el mismo conmutador **Valor / %** que la gráfica del Dashboard.
 - **Mayor transacción:** la operación de mayor importe registrada en el portafolio.
 
 ### 6.4 Editar un portafolio
@@ -431,7 +448,11 @@ La sección **Reportes** ("Gestiona y descarga documentos financieros de tu cuen
   - **La rentabilidad del periodo no se traduce en la ganancia.** La primera encadena lo que rindió tu dinero e ignora *cuándo* aportaste; la segunda es dinero contante y sí depende de eso. Un +30 % de periodo puede convivir con un +10 % sobre coste: significa que la mayor parte de tu capital entró después de la subida. Ninguna de las dos está mal, miden cosas distintas.
   - **El ratio de Sharpe no cuadra con la rentabilidad anualizada.** Se calcula por la convención de siempre (media de los tramos anualizada ÷ volatilidad), que no es la rentabilidad compuesta de la primera fila dividida entre la volatilidad. Si multiplicas el Sharpe por la volatilidad no te sale la anualizada, y no es un error. Va en gris y con un aviso al lado a propósito: es una estimación, y con pocos meses de historial su margen de error es lo bastante ancho como para que no debas leerlo como un sello de calidad.
 
-- **Proyección de crecimiento:** estimación a cinco años calculada extrapolando **tu rentabilidad anualizada** sobre el valor actual, sin contar aportes futuros. Cada año muestra su valor proyectado y el eje vertical su escala. **No es una previsión de mercado**, y por eso la aplicación se abstiene de mostrarla cuando tienes menos de seis meses de historial —en ese caso te dice cuántos días llevas y cuántos faltan— o cuando el ritmo es tan extremo que proyectarlo daría cifras absurdas.
+- **Proyección de crecimiento:** estimación a cinco años calculada extrapolando **tu rentabilidad anualizada** sobre el valor actual, sin contar aportes futuros. La tasa que se extrapola va en la píldora de la cabecera (p. ej. **+12,4 % anual**), y cada año muestra dos cifras: su **valor proyectado** y, debajo, el **porcentaje acumulado** desde hoy.
+
+  Las dos dicen lo mismo de dos formas, pero solo una es comparable. El importe depende de cuánto tengas hoy en la cuenta —un aporte de mañana lo mueve entero sin que la proyección haya cambiado de opinión—; el porcentaje es la extrapolación en crudo, y es el que puedes comparar con el de cualquier otra cartera o con lo que rinde una alternativa.
+
+  **No es una previsión de mercado**, y por eso la aplicación se abstiene de mostrarla cuando tienes menos de seis meses de historial —en ese caso te dice cuántos días llevas y cuántos faltan— o cuando el ritmo es tan extremo que proyectarlo daría cifras absurdas.
 
 ### 11.2 Descargas en Excel (XLSX)
 
@@ -619,6 +640,8 @@ Si el problema persiste, contacta con el equipo de soporte de Finexia.
 | **Volatilidad** | Medida de cuánto oscila la rentabilidad; se publica anualizada a partir de 90 días de historial y por tramo mientras tanto |
 | **Ratio de Sharpe** | Rentabilidad obtenida por cada unidad de riesgo asumida (con tasa libre de riesgo 0); por encima de 1 se considera bueno, aunque con poco historial la cifra es una estimación de margen ancho |
 | **Rentabilidad del periodo** | Lo que rindió el dinero invertido a lo largo de tu historial, descontando aportes y retiros |
+| **Rentabilidad real** | La misma cuenta aplicada al tramo que estás viendo (gráfica de crecimiento) o a un portafolio concreto; se mueve con el mercado, no con tus depósitos |
+| **Ganancia sobre coste** | Lo que vale tu cartera frente a lo que te costó; sí depende de cuándo entró cada aporte, y por eso no coincide con la rentabilidad real |
 | **2FA / TOTP** | Verificación en dos pasos con códigos temporales de 6 dígitos |
 | **Códigos de recuperación** | Códigos de un solo uso para acceder si pierdes tu aplicación de autenticación |
 | **Lista de espera** | Registro público para solicitar acceso anticipado a la plataforma |

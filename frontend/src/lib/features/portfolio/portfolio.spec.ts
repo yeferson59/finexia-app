@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { groupHoldings, computeTypeBreakdown, formatPct, type RawHolding } from './portfolio';
+import {
+	groupHoldings,
+	computeTypeBreakdown,
+	formatPct,
+	realReturnPct,
+	type RawHolding
+} from './portfolio';
 import { portfolioEntrySchema } from './schemas';
 
 // Un portafolio en USD: los totales en moneda base coinciden con
@@ -150,8 +156,47 @@ describe('computeTypeBreakdown', () => {
 
 describe('formatPct', () => {
 	it('prefixes non-negative values with a plus sign', () => {
-		expect(formatPct(12.345)).toBe('+12.35%');
-		expect(formatPct(-3.2)).toBe('-3.20%');
+		expect(formatPct(12.345)).toBe('+12,35%');
+		expect(formatPct(-3.2)).toBe('-3,20%');
+	});
+});
+
+describe('realReturnPct', () => {
+	const point = (date: string, totalValue: string, cost: string, netFlow?: string) => ({
+		date,
+		totalValue,
+		totalCostBase: cost,
+		gainLoss: String(Number(totalValue) - Number(cost)),
+		gainLossPct: '0',
+		...(netFlow === undefined ? {} : { netFlow })
+	});
+
+	it('encadena los tramos del historial y lo devuelve en porcentaje', () => {
+		const growth = [
+			point('2026-01-01', '1000', '1000'),
+			point('2026-01-02', '1100', '1000'),
+			point('2026-01-03', '1210', '1000')
+		];
+
+		expect(realReturnPct(growth)).toBeCloseTo(21, 10);
+	});
+
+	// La ganancia sobre coste diría −0 % aquí; la rentabilidad real dice que el
+	// mercado subió un 10 % antes de que entrara el dinero nuevo.
+	it('no cuenta un aporte como rentabilidad', () => {
+		const growth = [
+			point('2026-01-01', '1000', '1000'),
+			point('2026-01-02', '1100', '1000'),
+			point('2026-01-03', '2100', '2000', '1000')
+		];
+
+		expect(realReturnPct(growth)).toBeCloseTo(10, 10);
+	});
+
+	it('es null mientras el portafolio no tenga dos cierres', () => {
+		expect(realReturnPct([point('2026-01-01', '1000', '1000')])).toBeNull();
+		expect(realReturnPct([])).toBeNull();
+		expect(realReturnPct(undefined)).toBeNull();
 	});
 });
 

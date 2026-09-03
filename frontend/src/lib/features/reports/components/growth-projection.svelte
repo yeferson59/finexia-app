@@ -9,17 +9,21 @@
 	 * no tenía ni una cifra: la curva subía, pero no se sabía hasta dónde. Ahora
 	 * el relleno va debajo, cada año lleva su valor y la misma tabla está
 	 * disponible para el lector de pantalla.
+	 *
+	 * Cada punto lleva además el porcentaje acumulado, y la cabecera la tasa
+	 * anual de la que sale todo. El importe proyectado depende de cuánto haya
+	 * hoy en la cuenta —un aporte de mañana lo mueve entero sin que la
+	 * proyección haya cambiado de opinión—, así que quien quiera leer lo que
+	 * esta gráfica de verdad extrapola tiene que poder leerlo en porcentaje.
 	 */
 	import ReportPanel from './report-panel.svelte';
-	import {
-		PROJECTION_GUTTER,
-		PROJECTION_MIN_DAYS,
-		projectionCoordinates,
-		type GrowthProjectionEntry
-	} from '../reports';
+	import { formatSignedPercent } from '$lib/shared/format/percent';
+	import { PROJECTION_GUTTER, PROJECTION_MIN_DAYS, projectionCoordinates } from '../projection';
+	import type { GrowthProjectionSeries } from '../projection';
 
 	interface Props {
-		projection: GrowthProjectionEntry[];
+		/** `null` mientras el historial no dé para proyectar. */
+		projection: GrowthProjectionSeries | null;
 		/** Días de historial, para que el estado vacío diga cuánto falta. */
 		historyDays: number;
 	}
@@ -28,7 +32,9 @@
 
 	const missingDays = $derived(Math.max(PROJECTION_MIN_DAYS - historyDays, 0));
 
-	const points = $derived(projectionCoordinates(projection));
+	const entries = $derived(projection?.entries ?? []);
+
+	const points = $derived(projectionCoordinates(entries));
 	const line = $derived(points.map((p) => `${p.x},${p.y}`).join(' '));
 	// El área cierra contra la base del viewBox, de la esquina derecha a la izquierda.
 	const area = $derived(
@@ -37,15 +43,15 @@
 
 	/** Lo que abarca el eje vertical, de la marca más baja a la más alta. */
 	const span = $derived.by(() => {
-		if (projection.length === 0) return 0;
-		const values = projection.map((p) => p.value);
+		if (entries.length === 0) return 0;
+		const values = entries.map((p) => p.value);
 		return Math.max(...values) - Math.min(...values);
 	});
 
 	/** Marcas del eje vertical: el valor proyectado en cada línea de la rejilla. */
 	const yTicks = $derived.by(() => {
-		if (projection.length === 0) return [];
-		const values = projection.map((p) => p.value);
+		if (entries.length === 0) return [];
+		const values = entries.map((p) => p.value);
 		const min = Math.min(...values);
 		const max = Math.max(...values);
 		// `projectionCoordinates` reparte el rango entre y=230 (mínimo) y y=50.
@@ -81,7 +87,11 @@
 	}
 </script>
 
-<ReportPanel class="projection-card" title="Proyección de crecimiento">
+<ReportPanel
+	class="projection-card"
+	title="Proyección de crecimiento"
+	badge={projection ? `${formatSignedPercent(projection.annualRatePct)} anual` : ''}
+>
 	{#if points.length > 0}
 		<svg
 			class="projection-chart"
@@ -131,27 +141,43 @@
 					stroke-width="2"
 				/>
 				<text x={point.x} y={point.y - 13} text-anchor="middle" class="value-label">
-					{fmtAbbrev(projection[i].value)}
+					{fmtAbbrev(entries[i].value)}
 				</text>
+				<!-- El primer año es el punto de partida: su «+0,0 %» no dice nada y
+				     encima empuja la etiqueta de dinero contra el borde del lienzo. -->
+				{#if i > 0}
+					<text x={point.x} y={point.y - 26} text-anchor="middle" class="pct-label">
+						{formatSignedPercent(entries[i].returnPct)}
+					</text>
+				{/if}
 				<text x={point.x} y="260" text-anchor="middle" class="axis">{point.period}</text>
 			{/each}
 		</svg>
 
 		<table class="sr-only">
-			<caption>Valor proyectado del portafolio por año</caption>
+			<caption>Valor proyectado del portafolio por año y rentabilidad acumulada desde hoy</caption>
 			<thead>
-				<tr><th scope="col">Año</th><th scope="col">Valor proyectado</th></tr>
+				<tr>
+					<th scope="col">Año</th>
+					<th scope="col">Valor proyectado</th>
+					<th scope="col">Acumulado desde hoy</th>
+				</tr>
 			</thead>
 			<tbody>
-				{#each projection as entry (entry.period)}
-					<tr><td>{entry.period}</td><td>{fmtFull(entry.value)}</td></tr>
+				{#each entries as entry (entry.period)}
+					<tr>
+						<td>{entry.period}</td>
+						<td>{fmtFull(entry.value)}</td>
+						<td>{formatSignedPercent(entry.returnPct)}</td>
+					</tr>
 				{/each}
 			</tbody>
 		</table>
 
 		<p class="footnote">
-			Extrapola tu rentabilidad anualizada sobre el valor actual, sin contar aportes futuros. No es
-			una previsión de mercado.
+			Extrapola tu rentabilidad anualizada ({formatSignedPercent(projection?.annualRatePct ?? 0)} al año)
+			sobre el valor actual, sin contar aportes futuros. El porcentaje es lo que de verdad se proyecta;
+			el importe se mueve con cada aporte que hagas. No es una previsión de mercado.
 		</p>
 	{:else}
 		<div class="empty-chart">
@@ -186,6 +212,14 @@
 		fill: var(--amber-light);
 		font-size: 11px;
 		font-weight: 600;
+		font-family: var(--font-mono);
+	}
+
+	/* Más apagada que la de dinero: acompaña a la cifra principal, no compite
+	   con ella. */
+	.pct-label {
+		fill: rgba(236, 234, 229, 0.5);
+		font-size: 9.5px;
 		font-family: var(--font-mono);
 	}
 

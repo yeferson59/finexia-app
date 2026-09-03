@@ -8,8 +8,19 @@ Sustituye al antiguo cajón de sastre `lib/utils.ts`, repartido por tema.
 - `css.ts` — `cn()`, combinación condicional de clases.
 - `currency.ts` — `SUPPORTED_CURRENCIES` y `resolveDisplayCurrency()`: en qué
   monedas puede expresar dinero la app, copia de la lista que valida el backend.
-- `format/money.ts` — `formatCurrency()`.
+- `format/money.ts` — `formatCurrency()`, `currencySymbol()`.
 - `format/date.ts` — `formatCalendarDate()`, `todayLocalDateString()`.
+- `format/percent.ts` — `formatPercent()` y `formatSignedPercent()`, con la coma
+  decimal de es-CO: los porcentajes se escapaban con `toFixed`, que escribe un
+  punto, y en una misma tarjeta convivían «+12.35%» y «$1.234,50».
+- `finance/returns.ts` — la aritmética de rentabilidad: retornos por tramo con
+  Dietz modificada, encadenado, rentabilidad ponderada por tiempo, anualización
+  y la curva acumulada que dibuja la gráfica en porcentaje. Vivió en
+  `features/reports`, que la estrenó; bajó aquí cuando el dashboard y el detalle
+  de portafolio necesitaron la misma cifra, porque dos copias del cálculo
+  acaban dando dos respuestas distintas para lo mismo. La entrada
+  (`ReturnSeriesPoint`) se declara estructuralmente para no importar de
+  `lib/api`.
 - `config/features.ts` — feature flags (`investments`, `selfRegistration`).
 - `form.ts` — reparto del `form` de una página entre sus secciones
   (`actionSucceeded`, `actionError`, `actionData`), que usan ajustes y

@@ -7,6 +7,8 @@
  * componentes de la feature no tengan que conocer la capa de API.
  */
 import type { GrowthDataPoint, GrowthSummary, Holding, TopTransaction } from '$lib/api/types';
+import { formatSignedPercent } from '$lib/shared/format/percent';
+import { timeWeightedReturn } from '$lib/shared/finance/returns';
 
 export type { GrowthDataPoint, GrowthSummary, TopTransaction };
 
@@ -205,8 +207,33 @@ export function computeDonutSegments(typeBreakdown: TypeBreakdownSlice[]): Donut
 	});
 }
 
+/**
+ * Porcentaje con signo y dos decimales, «+12,35%».
+ *
+ * Delega en el formateador compartido, que escribe la coma decimal de es-CO: en
+ * una misma tarjeta convivían «+12.35%» y «$1.234,50», con dos convenciones
+ * distintas para el mismo número.
+ */
 export function formatPct(value: number): string {
-	return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+	return formatSignedPercent(value, 2);
+}
+
+/**
+ * Rentabilidad real del portafolio, en porcentaje, sobre su serie de
+ * crecimiento.
+ *
+ * Es la ponderada por tiempo: descuenta aportes y retiros, así que mide cómo se
+ * comportó el dinero y no cuánto dinero entró. La ganancia sobre coste que
+ * enseñan las otras tarjetas contesta a otra pregunta —cuánto vale hoy lo que
+ * costó— y por eso las dos cifras pueden no parecerse: un aporte grande hecho
+ * después de una subida hunde la segunda sin que la cartera haya perdido nada.
+ *
+ * `null` mientras la serie no dé ni un tramo que medir, que es el estado de un
+ * portafolio recién creado.
+ */
+export function realReturnPct(points: GrowthDataPoint[] | undefined): number | null {
+	const twr = timeWeightedReturn(points ?? []);
+	return twr === null ? null : twr * 100;
 }
 
 /** Tono del badge de riesgo, a partir del nombre del nivel. */
