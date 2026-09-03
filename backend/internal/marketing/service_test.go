@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"uuid"
 )
 
 type fakeRepository struct {
 	saveWaitlistEmail  func(ctx context.Context, email string) error
 	listWaitlist       func(ctx context.Context, offset, limit uint) ([]Waitlist, uint, error)
 	setWaitlistInvited func(ctx context.Context, email string) error
+	deleteWaitlist     func(ctx context.Context, id uuid.UUID) error
 }
 
 func (f *fakeRepository) SaveWaitlistEmail(ctx context.Context, email string) error {
@@ -22,6 +25,10 @@ func (f *fakeRepository) ListWaitlist(ctx context.Context, offset, limit uint) (
 
 func (f *fakeRepository) SetWaitlistInvited(ctx context.Context, email string) error {
 	return f.setWaitlistInvited(ctx, email)
+}
+
+func (f *fakeRepository) DeleteWaitlist(ctx context.Context, id uuid.UUID) error {
+	return f.deleteWaitlist(ctx, id)
 }
 
 type fakeMailer struct {
@@ -110,6 +117,25 @@ func TestWaitlistAdminPassthroughs(t *testing.T) {
 		}
 		if count != 1 || len(items) != 1 || items[0].Email != "a@example.com" {
 			t.Errorf("items = %v, count = %d", items, count)
+		}
+	})
+
+	t.Run("DeleteWaitlist delegates the id", func(t *testing.T) {
+		want := uuid.New()
+		var got uuid.UUID
+		repo := new(fakeRepository{
+			deleteWaitlist: func(_ context.Context, id uuid.UUID) error {
+				got = id
+				return nil
+			},
+		})
+		svc := newService(repo, new(fakeMailer{}))
+
+		if err := svc.DeleteWaitlist(context.Background(), want); err != nil {
+			t.Fatalf("DeleteWaitlist: %v", err)
+		}
+		if got != want {
+			t.Errorf("id = %v, want %v", got, want)
 		}
 	})
 

@@ -178,6 +178,7 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 | POST | `/users/invitations/:id/resend` | admin | Reenvía invitación |
 | DELETE | `/users/invitations/:id` | admin | Revoca invitación |
 | GET | `/users/waitlist` | admin, paginada | Lista la waitlist |
+| DELETE | `/users/waitlist/:id` | admin | Elimina una entrada de la waitlist |
 | GET | `/users/me` | usuario | Perfil propio |
 | PATCH | `/users/me` | usuario | Actualiza perfil propio (`preferredCurrency`, §2.7) |
 | POST | `/users/me/avatar` | usuario | Sube avatar |

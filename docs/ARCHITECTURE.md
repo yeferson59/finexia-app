@@ -228,7 +228,7 @@ consumen es exactamente su trabajo—; lo fija `TestOnlyAppCallsServiceAccessors
 
 Por eso hay rutas que responden bajo `/users` sin pertenecer al módulo `user`:
 `PATCH /users/me/password` y `/users/invitations*` son de `auth` (credenciales
-e invitaciones son su dominio) y `GET /users/waitlist` es de `marketing`. Los
+e invitaciones son su dominio) y `/users/waitlist*` es de `marketing`. Los
 paths no cambian —son los que documenta `API.md`—; lo que cambia es qué módulo
 los sirve. Al ser rutas terminales fuera del grupo `/users`, aplican los guards
 ellas mismas, y `mountRoutes` monta `auth` y `marketing` antes que `user` para

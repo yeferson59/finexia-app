@@ -133,6 +133,9 @@ func TestAppWiresAndRoutes(t *testing.T) {
 	if status := request("GET", "/users/invitations", "Authorization", "Bearer bogus-token"); status != fiber.StatusUnauthorized {
 		t.Errorf("GET /users/invitations = %d, want 401 with an invalid token", status)
 	}
+	if status := request("DELETE", "/users/waitlist/0b7f9c7e-1111-4222-8333-444455556666", "Authorization", "Bearer bogus-token"); status != fiber.StatusUnauthorized {
+		t.Errorf("DELETE /users/waitlist/:id = %d, want 401 with an invalid token", status)
+	}
 
 	// The 401s above stop at the JWT gate, so on their own they say nothing
 	// about the role guard sitting behind it. That is how the waitlist listing
@@ -161,6 +164,11 @@ func TestAppWiresAndRoutes(t *testing.T) {
 
 	// RequireAuth + limiter + RequireAdmin + paginate + handler.
 	assertGuarded(fiber.MethodGet, "/users/waitlist", 5)
+
+	// The delete removes a sign-up outright, so it carries the same guards as
+	// the listing minus the pagination: RequireAuth + limiter + RequireAdmin +
+	// handler.
+	assertGuarded(fiber.MethodDelete, "/users/waitlist/:id", 4)
 
 	// The avatar route (docs/API.md §2.3) is public: without a token the
 	// request must get past the JWT gate and reach the handler chain.

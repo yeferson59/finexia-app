@@ -12,6 +12,20 @@ test.describe('admin', () => {
 		await expect(page.getByText('espera@finexia.test').first()).toBeVisible();
 	});
 
+	// La baja de la lista de espera es la única acción destructiva de esa tabla;
+	// el mock no guarda estado, así que lo que se comprueba es que la action
+	// llega al endpoint y vuelve sin error por fila.
+	test('removes an entry from the waitlist', async ({ page }) => {
+		await login(page, ADMIN_EMAIL);
+		await page.goto('/dashboard/admin/users');
+
+		const row = page.locator('tr', { hasText: 'espera@finexia.test' });
+		await row.getByRole('button', { name: 'Eliminar' }).click();
+
+		await expect(page.getByRole('heading', { name: 'Lista de espera' })).toBeVisible();
+		await expect(row.locator('.row-error')).toHaveCount(0);
+	});
+
 	test('redirects non-admin users back to the dashboard', async ({ page }) => {
 		await login(page);
 		await page.goto('/dashboard/admin/users');

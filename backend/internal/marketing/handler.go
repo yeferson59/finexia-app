@@ -52,3 +52,18 @@ func (h *handler) listWaitlist(c fiber.Ctx) error {
 		MetaData: httpx.PaginationMetadata(paginateInfo, count),
 	})
 }
+
+// deleteWaitlist (admin) removes an entry from the waitlist,
+// DELETE /users/waitlist/:id (docs/API.md §2.6).
+func (h *handler) deleteWaitlist(c fiber.Ctx) error {
+	id, err := httpx.ParamUUID(c, "id")
+	if err != nil {
+		return httpx.BadRequest(c, "invalid waitlist id", err.Error())
+	}
+
+	if err := h.service.DeleteWaitlist(c, id); err != nil {
+		return httpx.FromDomain(c, err, "failed to delete waitlist entry", "waitlist:delete")
+	}
+
+	return httpx.Success(c, fiber.StatusNoContent, "", "", "")
+}

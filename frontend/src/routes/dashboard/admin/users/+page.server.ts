@@ -82,6 +82,21 @@ export const actions = {
 		return { inviteSuccess: true, inviteId: parsed.data, inviteAction: 'revoked' as const };
 	},
 
+	deleteWaitlist: async ({ request, cookies, fetch }) => {
+		const fd = await request.formData();
+		const parsed = rowIdSchema.safeParse(fd.get('id') ?? '');
+		if (!parsed.success) return fail(400, { waitlistError: 'ID requerido', waitlistId: '' });
+
+		const res = await user.deleteWaitlistEntry({ cookies, fetch }, parsed.data);
+		if (!res.ok) {
+			return fail(res.status, {
+				waitlistError: res.details ?? 'No se pudo eliminar de la lista de espera',
+				waitlistId: parsed.data
+			});
+		}
+		return { waitlistSuccess: true, waitlistId: parsed.data };
+	},
+
 	deleteUser: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
 		const parsed = rowIdSchema.safeParse(fd.get('id') ?? '');

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"uuid"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -81,4 +83,18 @@ func (r *PostgresRepository) SetWaitlistInvited(ctx context.Context, email strin
 		email,
 	)
 	return err
+}
+
+// DeleteWaitlist removes one waitlist row by id. A delete that matches nothing
+// is reported as ErrWaitlistNotFound rather than silently succeeding, so the
+// admin UI can tell "already gone" from "done".
+func (r *PostgresRepository) DeleteWaitlist(ctx context.Context, id uuid.UUID) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM waitlist WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrWaitlistNotFound
+	}
+	return nil
 }

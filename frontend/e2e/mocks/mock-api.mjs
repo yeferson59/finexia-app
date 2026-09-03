@@ -275,6 +275,14 @@ const server = createServer(async (req, res) => {
 			})
 		);
 	}
+	// El backend responde 204 sin cuerpo; el mock no guarda estado, así que la
+	// fila sigue ahí al recargar y lo que se comprueba es que la action llega.
+	if (req.method === 'DELETE' && /^\/users\/waitlist\/[^/]+$/.test(path)) {
+		if (account.user.role !== 'admin') return send(res, 403, errorEnvelope('forbidden'));
+		res.writeHead(204);
+		res.end();
+		return;
+	}
 
 	// ---- Portfolios ----
 	if (route === 'GET /portfolios/risks') {

@@ -80,7 +80,7 @@ func (m *Module) Service() *service {
 }
 
 // Routes registers the module's endpoints: the public signup and the admin
-// listing of the waitlist.
+// listing and deletion of the waitlist.
 //
 // The listing answers at GET /users/waitlist — the path the invitation
 // dashboard has always called (docs/API.md §2.6), kept unchanged so the
@@ -103,4 +103,9 @@ func (m *Module) Routes(router fiber.Router) {
 	// from auth and every other module reads it the same way. Only RequireAuth
 	// has to be injected, because only it can validate a token.
 	router.Get("/users/waitlist", m.authMiddl.RequireAuth(), m.limiter, httpx.RequireAdmin(), paginate.New(), m.handler.listWaitlist)
+
+	// Deleting sits next to the listing and carries the same guards. Its two
+	// segments after /users keep it clear of the user module's /users/:id, so
+	// the mount order only has to protect the listing.
+	router.Delete("/users/waitlist/:id", m.authMiddl.RequireAuth(), m.limiter, httpx.RequireAdmin(), m.handler.deleteWaitlist)
 }

@@ -10,6 +10,8 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"uuid"
+
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
@@ -230,5 +232,106 @@ func TestListWaitlistRoute(t *testing.T) {
 		}()
 
 		New(Deps{Service: newService(new(fakeRepository{}), new(fakeMailer{}))})
+	})
+}
+
+// TestDeleteWaitlistRoute covers the admin delete: it clears an entry out of
+// the funnel, and it is guarded exactly like the listing it sits next to.
+func TestDeleteWaitlistRoute(t *testing.T) {
+	newApp := func(repo Repository, guard fakeGuard) *fiber.App {
+		app := fiber.New()
+		New(Deps{Service: newService(repo, new(fakeMailer{})), AuthMiddl: guard}).Routes(app)
+		return app
+	}
+
+	del := func(t *testing.T, app *fiber.App, id string) int {
+		t.Helper()
+		resp, err := app.Test(httptest.NewRequest("DELETE", "/users/waitlist/"+id, nil))
+		if err != nil {
+			t.Fatalf("app.Test: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		return resp.StatusCode
+	}
+
+	t.Run("deletes the entry for an admin", func(t *testing.T) {
+		want := uuid.New()
+		var got uuid.UUID
+		repo := new(fakeRepository{
+			deleteWaitlist: func(_ context.Context, id uuid.UUID) error {
+				got = id
+				return nil
+			},
+		})
+
+		if status := del(t, newApp(repo, adminGuard), want.String()); status != fiber.StatusNoContent {
+			t.Fatalf("status = %d, want 204", status)
+		}
+		if got != want {
+			t.Errorf("id = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("rejects a malformed id before touching the repository", func(t *testing.T) {
+		reached := false
+		repo := new(fakeRepository{
+			deleteWaitlist: func(context.Context, uuid.UUID) error {
+				reached = true
+				return nil
+			},
+		})
+
+		if status := del(t, newApp(repo, adminGuard), "not-a-uuid"); status != fiber.StatusBadRequest {
+			t.Fatalf("status = %d, want 400", status)
+		}
+		if reached {
+			t.Error("the handler reached the repository with an unparsable id")
+		}
+	})
+
+	t.Run("maps a missing entry to 404", func(t *testing.T) {
+		repo := new(fakeRepository{
+			deleteWaitlist: func(context.Context, uuid.UUID) error {
+				return ErrWaitlistNotFound
+			},
+		})
+
+		if status := del(t, newApp(repo, adminGuard), uuid.New().String()); status != fiber.StatusNotFound {
+			t.Fatalf("status = %d, want 404", status)
+		}
+	})
+
+	// Same reasoning as the listing: a delete that reaches the handler at all
+	// is the failure, so the fake records it instead of being left unstubbed.
+	t.Run("is gated by the shared guards", func(t *testing.T) {
+		cases := []struct {
+			name  string
+			guard fakeGuard
+			want  int
+		}{
+			{"no session", fakeGuard{authStatus: fiber.StatusUnauthorized}, fiber.StatusUnauthorized},
+			{"signed in as a plain user", fakeGuard{role: "user"}, fiber.StatusForbidden},
+			{"signed in with no role at all", fakeGuard{}, fiber.StatusForbidden},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				reached := false
+				repo := new(fakeRepository{
+					deleteWaitlist: func(context.Context, uuid.UUID) error {
+						reached = true
+
+						return nil
+					},
+				})
+
+				if status := del(t, newApp(repo, tc.guard), uuid.New().String()); status != tc.want {
+					t.Errorf("status = %d, want %d", status, tc.want)
+				}
+				if reached {
+					t.Error("the handler deleted a waitlist entry; the guards must stop the request before it")
+				}
+			})
+		}
 	})
 }

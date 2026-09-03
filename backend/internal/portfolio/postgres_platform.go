@@ -60,7 +60,7 @@ func (r *PostgresRepository) GetPlatformsWithStats(ctx context.Context, userID u
 		WHERE is_.user_id = $1
 		GROUP BY is_.id, target.currency
 		ORDER BY is_.created_at DESC
-	`, userID, displayCurrency)
+	`, userID, currencyParam(displayCurrency))
 	if err != nil {
 		return nil, err
 	}

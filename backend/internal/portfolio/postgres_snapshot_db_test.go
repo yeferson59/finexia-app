@@ -179,6 +179,32 @@ func TestGrowthSeriesDoesNotCountABackdatedPurchaseAsAWindfall(t *testing.T) {
 	}
 }
 
+// Omitting the currency means "the account's preferred one" (docs/API.md
+// §2.7), and only the SQL can prove it: money.XXX used to reach the query as
+// the literal "XXX", which survived the NULLIF and became the target currency
+// of the whole series. Nothing converted, every amount kept its nominal value,
+// and the reports page labelled the lot with the generic currency sign.
+func TestGrowthSeriesWithoutACurrencyUsesTheAccountPreferredOne(t *testing.T) {
+	pool := growthTestPool(t)
+	repo := NewPostgresRepository(pool)
+	userID := backdatedPortfolio(t, pool)
+
+	points, err := repo.GetPortfolioGrowthByUserID(context.Background(), userID, money.XXX, false, time.Time{})
+	if err != nil {
+		t.Fatalf("GetPortfolioGrowthByUserID: %v", err)
+	}
+	if len(points) == 0 {
+		t.Fatal("the series came back empty")
+	}
+
+	for _, point := range points {
+		if point.Currency != money.USD {
+			t.Fatalf("%s came back in %v, want USD (the account's preferred currency)",
+				point.Date.Format("2006-01-02"), point.Currency)
+		}
+	}
+}
+
 func TestGrowthSeriesFlowLandsOnTheDayTheValueMoves(t *testing.T) {
 	pool := growthTestPool(t)
 	repo := NewPostgresRepository(pool)

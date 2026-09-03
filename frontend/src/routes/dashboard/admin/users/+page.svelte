@@ -44,7 +44,7 @@
 {/if}
 
 {#if data.waitlist.length > 0}
-	<WaitlistTable waitlist={data.waitlist} />
+	<WaitlistTable waitlist={data.waitlist} {form} />
 {/if}
 
 <UsersTable users={data.users} meta={data.meta} {form} />

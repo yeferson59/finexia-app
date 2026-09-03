@@ -1,6 +1,10 @@
 package marketing
 
-import "context"
+import (
+	"context"
+
+	"uuid"
+)
 
 // Mailer declares the single mail capability this module consumes; the
 // platform mail service satisfies it.
@@ -38,4 +42,11 @@ func (s *service) ListWaitlist(ctx context.Context, offset, limit uint) ([]Waitl
 // auth module when an admin issues an invitation.
 func (s *service) SetWaitlistInvited(ctx context.Context, email string) error {
 	return s.repo.SetWaitlistInvited(ctx, email)
+}
+
+// DeleteWaitlist removes an entry from the waitlist. It is the admin's way of
+// clearing a typo or a duplicate sign-up out of the funnel; the email can
+// register again afterwards, since the row is what holds the unique address.
+func (s *service) DeleteWaitlist(ctx context.Context, id uuid.UUID) error {
+	return s.repo.DeleteWaitlist(ctx, id)
 }

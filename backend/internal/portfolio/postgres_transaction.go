@@ -165,7 +165,7 @@ func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, use
 		  AND pe.quantity::numeric > 0
 		GROUP BY a.asset_type, target.code
 		ORDER BY ROUND(COALESCE(SUM(pe.quantity::numeric * v.price * COALESCE(fx.rate, 1)), 0), 8) DESC
-	`, userID, targetCurrency)
+	`, userID, currencyParam(targetCurrency))
 	if err != nil {
 		return nil, err
 	}

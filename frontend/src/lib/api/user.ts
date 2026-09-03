@@ -122,6 +122,11 @@ export function getWaitlist(
 	);
 }
 
+/** `DELETE /users/waitlist/:id` — elimina una entrada de la waitlist (admin). */
+export function deleteWaitlistEntry(event: ApiEvent, id: string): Promise<ApiResult<unknown>> {
+	return apiRequest<unknown>(event, `/users/waitlist/${id}`, { method: 'DELETE' });
+}
+
 /** `POST /users/invitations` — crea una invitación (admin). */
 export function inviteUser(
 	event: ApiEvent,

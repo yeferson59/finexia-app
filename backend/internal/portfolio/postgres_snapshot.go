@@ -286,7 +286,7 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, use
 		FROM totals t
 		LEFT JOIN net_flows nf ON nf.snapshot_date = t.snapshot_date
 		ORDER BY t.snapshot_date ASC
-	`, userID, currency, hasSince, since)
+	`, userID, currencyParam(currency), hasSince, since)
 	if err != nil {
 		return nil, err
 	}
