@@ -24,10 +24,25 @@ const item = (category: string, marketValue: string, percent: number): Allocatio
 });
 
 describe('toAssetEntries', () => {
+	// El backend agrupa por `assets.asset_type`, así que la categoría llega en
+	// singular (`stock`, no `stocks`). Con el vocabulario plural fallaban a la
+	// vez la etiqueta y el color, y el donut salía monocromo con los nombres
+	// crudos del backend.
 	it('traduce categoría, importe y color', () => {
-		expect(toAssetEntries([item('stocks', '1900.50', 60)])).toEqual([
+		expect(toAssetEntries([item('stock', '1900.50', 60)])).toEqual([
 			{ name: 'Acciones', value: 1900.5, percent: 60, color: '#d4912a' }
 		]);
+	});
+
+	it('da a cada clase de activo su propio color', () => {
+		const entries = toAssetEntries([
+			item('stock', '100', 50),
+			item('etf', '60', 30),
+			item('bond', '40', 20)
+		]);
+
+		expect(entries.map((e) => e.name)).toEqual(['Acciones', 'ETFs', 'Bonos']);
+		expect(new Set(entries.map((e) => e.color)).size).toBe(3);
 	});
 
 	it('no pierde una categoría que el backend añada por su cuenta', () => {
@@ -69,7 +84,7 @@ describe('generatePieSlice', () => {
 
 describe('buildSlices', () => {
 	it('encadena las porciones sin dejar hueco entre ellas', () => {
-		const slices = buildSlices(toAssetEntries([item('stocks', '60', 60), item('cash', '40', 40)]));
+		const slices = buildSlices(toAssetEntries([item('stock', '60', 60), item('cash', '40', 40)]));
 
 		expect(slices[0].startAngle).toBe(0);
 		expect(slices[0].endAngle).toBe(216);

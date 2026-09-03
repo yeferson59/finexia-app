@@ -9,6 +9,7 @@
 
 import type { AllocationItem, GrowthDataPoint } from '$lib/api/types';
 import { cumulativeReturns } from '$lib/shared/finance/returns';
+import { assetTypeColor, formatAssetType } from '$lib/shared/format/asset-type';
 
 // ---------------------------------------------------------------------------
 // Asignación de activos (donut)
@@ -22,41 +23,20 @@ export interface AssetEntry {
 	color: string;
 }
 
-export const CATEGORY_LABELS: Record<string, string> = {
-	stocks: 'Acciones',
-	etfs: 'ETFs',
-	cryptos: 'Crypto',
-	bonds: 'Bonos',
-	cash: 'Efectivo',
-	real_estates: 'Inmuebles',
-	commodities: 'Commodities',
-	others: 'Otros'
-};
-
-export const CATEGORY_COLORS: Record<string, string> = {
-	stocks: '#d4912a',
-	etfs: '#22c97e',
-	cryptos: '#6b8cef',
-	bonds: '#b988e0',
-	cash: '#8a8780',
-	real_estates: '#e0885a',
-	commodities: '#e0c15a',
-	others: '#5ab4e0'
-};
-
-/** Color de reserva de una categoría que el backend añada y aquí no esté. */
-const FALLBACK_COLOR = '#5ab4e0';
-
 /**
  * Traduce la asignación del backend a entradas del donut. Una categoría
  * desconocida conserva su nombre crudo en vez de desaparecer del gráfico.
+ *
+ * `item.category` es un `market.AssetType` (singular), el mismo vocabulario que
+ * el donut del detalle de portafolio: por eso la tabla es la de
+ * `shared/format/asset-type` y no una copia local.
  */
 export function toAssetEntries(allocation: AllocationItem[]): AssetEntry[] {
 	return allocation.map((item) => ({
-		name: CATEGORY_LABELS[item.category] ?? item.category,
+		name: formatAssetType(item.category),
 		value: parseFloat(item.marketValue || '0'),
 		percent: item.percent,
-		color: CATEGORY_COLORS[item.category] ?? FALLBACK_COLOR
+		color: assetTypeColor(item.category)
 	}));
 }
 

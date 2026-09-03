@@ -9,6 +9,7 @@
 import type { GrowthDataPoint, GrowthSummary, Holding, TopTransaction } from '$lib/api/types';
 import { formatSignedPercent } from '$lib/shared/format/percent';
 import { timeWeightedReturn } from '$lib/shared/finance/returns';
+import { assetTypeColor, formatAssetType } from '$lib/shared/format/asset-type';
 
 export type { GrowthDataPoint, GrowthSummary, TopTransaction };
 
@@ -23,28 +24,6 @@ export const PORTFOLIO_TYPES: { value: string; label: string }[] = [
 	{ value: 'commodities', label: 'Commodities' },
 	{ value: 'cash', label: 'Efectivo' }
 ];
-
-export const ASSET_TYPE_LABELS: Record<string, string> = {
-	stock: 'Acciones',
-	etf: 'ETFs',
-	crypto: 'Cripto',
-	bond: 'Bonos',
-	cash: 'Efectivo',
-	real_estate: 'Inmobiliario',
-	commodity: 'Materias primas',
-	other: 'Otros'
-};
-
-export const ASSET_TYPE_COLORS: Record<string, string> = {
-	stock: '#4f8ef7',
-	etf: '#d4912a',
-	crypto: '#f97316',
-	bond: '#22c55e',
-	cash: '#94a3b8',
-	real_estate: '#a855f7',
-	commodity: '#b45309',
-	other: '#6b7280'
-};
 
 /**
  * Subconjunto de `Holding` que necesita la agregación por ticker. Se deriva del
@@ -170,9 +149,9 @@ export function computeTypeBreakdown(holdings: HoldingView[]): TypeBreakdownSlic
 		const key = h.assetType;
 		if (!grouped[key]) {
 			grouped[key] = {
-				label: ASSET_TYPE_LABELS[key] ?? key,
+				label: formatAssetType(key),
 				value: 0,
-				color: ASSET_TYPE_COLORS[key] ?? '#6b7280'
+				color: assetTypeColor(key)
 			};
 		}
 		grouped[key].value += h.value;

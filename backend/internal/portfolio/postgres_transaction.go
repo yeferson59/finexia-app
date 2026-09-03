@@ -122,9 +122,10 @@ func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, 
 // it in the old slice here: two charts over the same positions, disagreeing.
 // Reading assets.asset_type is what makes both answer with one rule.
 //
-// The rows come back keyed by asset type and are folded into the entry
-// categories the response has always spoken, so the vocabulary clients map to
-// labels does not change.
+// The rows come back keyed by asset type, and that is the vocabulary the
+// response speaks: AllocationItem.Category is a market.AssetType. It is the
+// singular one — "stock", not "stocks" — which is *not* the plural vocabulary
+// of portfolio.Type; clients map labels and colours from the former.
 func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AllocationItem, error) {
 	// The sum is rounded to the scale every money column here keeps. Postgres
 	// adds the scales of what it multiplies, so quantity × price × rate reaches
@@ -187,8 +188,9 @@ func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, use
 	return foldAllocationByCategory(rowsByType), nil
 }
 
-// foldAllocationByCategory merges the rows that share a category and restores
-// the by-value ordering the query asked for.
+// foldAllocationByCategory merges the rows that share an asset type and
+// restores the by-value ordering the query asked for. It does not translate the
+// vocabulary: the type the query grouped by is what the response carries.
 //
 // Two rows can land on one category — the importer files every label it cannot
 // place as Other. Adding them is the only reading that keeps the shares summing

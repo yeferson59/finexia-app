@@ -10,6 +10,15 @@ Sustituye al antiguo cajón de sastre `lib/utils.ts`, repartido por tema.
   monedas puede expresar dinero la app, copia de la lista que valida el backend.
 - `format/money.ts` — `formatCurrency()`, `currencySymbol()`.
 - `format/date.ts` — `formatCalendarDate()`, `todayLocalDateString()`.
+- `format/asset-type.ts` — etiquetas y colores de `market.AssetType` (`stock`,
+  `etf`, …), la clase de un activo. Los tenían duplicados el detalle de
+  portafolio y el donut del dashboard, y la segunda copia hablaba el
+  vocabulario _plural_ de `portfolio.type`, con lo que no acertaba ninguna
+  clave. Una sola tabla mantiene el mismo color para la misma clase en las dos
+  gráficas.
+- `format/portfolio-type.ts` — etiquetas del `type` de un portafolio (plural y
+  con combinaciones, `stocks_etfs`). Es otro vocabulario: no confundir con el
+  anterior.
 - `format/percent.ts` — `formatPercent()` y `formatSignedPercent()`, con la coma
   decimal de es-CO: los porcentajes se escapaban con `toFixed`, que escribe un
   punto, y en una misma tarjeta convivían «+12.35%» y «$1.234,50».
