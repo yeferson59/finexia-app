@@ -22,6 +22,9 @@ func (s *service) GetExchangeRates(ctx context.Context, offset, limit uint) ([]E
 }
 
 func (s *service) CreateExchangeRate(ctx context.Context, from, to money.Currency, rate decimal.Decimal) (ExchangeRate, error) {
+	if err := validPair(from, to); err != nil {
+		return ExchangeRate{}, err
+	}
 	if err := validRate(rate); err != nil {
 		return ExchangeRate{}, err
 	}
@@ -35,6 +38,18 @@ func (s *service) UpdateExchangeRate(ctx context.Context, id uuid.UUID, rate dec
 	}
 
 	return s.repo.UpdateExchangeRateByID(ctx, id, rate)
+}
+
+// validPair rejects a currency outside gofinance's ISO 4217 table. The codes
+// arrive as money.Currency, but that is an integer type: an out-of-range value
+// decoded from a request body or a feed is still a number, and it reaches the
+// table fine before costing every later conversion its lookup.
+func validPair(from, to money.Currency) error {
+	if !from.Valid() || !to.Valid() {
+		return errExchangeRateCurrencyInvalid
+	}
+
+	return nil
 }
 
 // validRate rejects a rate money.Convert would refuse. gofinance returns

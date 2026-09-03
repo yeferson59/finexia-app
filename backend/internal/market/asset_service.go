@@ -2,7 +2,6 @@ package market
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -95,7 +94,7 @@ type assetInput struct {
 // row reach the same table, and the column limits have to hold for both.
 func normalizeAssetInput(ticker, name string, assetType AssetType, exchange string, currency money.Currency) (assetInput, error) {
 	if !currency.Valid() {
-		return assetInput{}, errors.New("invalid currency")
+		return assetInput{}, errAssetCurrencyInvalid
 	}
 
 	in := assetInput{

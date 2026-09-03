@@ -115,11 +115,10 @@ func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, 
 // is what this is fixing.
 //
 // The category comes from the asset's own type, not from
-// portfolio_entries.category. That column is a copy of the type taken when the
-// entry was created — the create handler and the importer both derive it
-// through entryCategoryFor — and nothing writes it again. Correcting an asset
-// afterwards (a bond ETF first filed as a plain ETF) therefore moved it in the
-// per-portfolio donut, which groups the holdings by their asset type, and left
+// portfolio_entries.category. That column was a copy of the type taken when the
+// entry was created, which nothing wrote again, and 000026 dropped it.
+// Correcting an asset afterwards (a bond ETF first filed as a plain ETF) moved
+// it in the per-portfolio donut, which groups the holdings by their type, and left
 // it in the old slice here: two charts over the same positions, disagreeing.
 // Reading assets.asset_type is what makes both answer with one rule.
 //
@@ -191,11 +190,11 @@ func (r *PostgresRepository) GetAssetAllocationByUserID(ctx context.Context, use
 // foldAllocationByCategory merges the rows that share a category and restores
 // the by-value ordering the query asked for.
 //
-// entryCategoryFor sends any asset type it does not recognise to Others, so two
-// of them can land on one category. Adding them is the only reading that keeps
-// the shares summing to the whole — letting the second row win would drop a
-// slice's worth of money off the chart — and a merged row can outgrow the one
-// above it, which is why the order is rebuilt rather than left almost-sorted.
+// Two rows can land on one category — the importer files every label it cannot
+// place as Other. Adding them is the only reading that keeps the shares summing
+// to the whole — letting the second row win would drop a slice's worth of money
+// off the chart — and a merged row can outgrow the one above it, which is why
+// the order is rebuilt rather than left almost-sorted.
 func foldAllocationByCategory(items []AllocationItem) []AllocationItem {
 	folded := make([]AllocationItem, 0, len(items))
 	index := make(map[market.AssetType]int, len(items))

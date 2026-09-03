@@ -2,6 +2,7 @@ package portfolio
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"uuid"
@@ -10,6 +11,8 @@ import (
 	"github.com/yeferson59/gofinance/v2/finance/returns"
 	"github.com/yeferson59/gofinance/v2/money"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 // oneHundred turns the fractions gofinance's returns package works in into the
@@ -89,6 +92,20 @@ func (s *service) GetPortfoliosSummaryInCurrency(ctx context.Context, userID uui
 // currency no source quotes would blank out every other portfolio with it. The
 // same call is what holdings already make (see valueEntriesInBase).
 func (s *service) convertSummaryTotals(ctx context.Context, userID uuid.UUID, summary SummaryView, targetCurrency money.Currency) (SummaryView, error) {
+	// money.Currency is an integer type, so a code outside gofinance's ISO 4217
+	// table travels this far without complaint and only fails inside
+	// money.Convert, which needs the target's minor units to round to. Both ends
+	// are screened here, because the two failures are not the same kind: a base
+	// currency comes from a stored row and a target comes from the caller.
+	if !summary.BaseCurrency.Valid() {
+		return unconvertedSummary(summary), nil
+	}
+	if !targetCurrency.Valid() {
+		// The target is the caller's own input, validated at the handler; an
+		// unknown one here is a bad request, not a portfolio the app can't price.
+		return SummaryView{}, httpx.AsBadRequest(fmt.Errorf("unknown display currency %q", targetCurrency))
+	}
+
 	rate, err := s.GetConversionRate(ctx, userID, summary.BaseCurrency, targetCurrency)
 	if err != nil {
 		return unconvertedSummary(summary), nil

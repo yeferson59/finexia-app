@@ -113,7 +113,12 @@ func (s *service) UpdateCurrentUser(ctx context.Context, userID uuid.UUID, name,
 	// outside the supported set has no rate behind it, so accepting one would
 	// leave the account with figures that cannot be converted and a sync asking
 	// providers for a pair that does not exist.
-	if preferredCurrency.Valid() {
+	//
+	// money.XXX is the zero value, which is what an omitted preferredCurrency
+	// decodes to: the field is absent from the update, not set to "no currency".
+	// Anything else is a request to change it, and is checked rather than
+	// dropped — a code the app cannot convert has to be refused, not ignored.
+	if preferredCurrency != money.XXX {
 		if !currency.IsSupported(preferredCurrency) {
 			return identity.User{}, fmt.Errorf("%w %q: must be one of %s", ErrUnsupportedCurrency, preferredCurrency, currency.List())
 		}

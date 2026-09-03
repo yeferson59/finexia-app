@@ -286,10 +286,12 @@ func TestTransactionAlertTotalKeepsCents(t *testing.T) {
 	}
 }
 
-// The allocation groups by the asset's own type, because
-// portfolio_entries.category is a copy taken at insert time that nothing
-// updates: correcting an asset afterwards used to move it in the per-portfolio
-// donut and leave it in the old slice on the dashboard.
+// The allocation groups by the asset's own type: 000026 dropped
+// portfolio_entries.category, a copy taken at insert time that nothing updated,
+// because correcting an asset afterwards moved it in the per-portfolio donut
+// and left it in the old slice on the dashboard. The category is now the
+// asset_type enum itself, so the only place a free-form label still has to be
+// placed is the importer, and NormalizeAssetType is what places it.
 func TestAllocationCategoriesComeFromTheAssetType(t *testing.T) {
 	cases := []struct {
 		assetType string
@@ -309,8 +311,14 @@ func TestAllocationCategoriesComeFromTheAssetType(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		if got := market.AssetType(tc.assetType); got != tc.want {
-			t.Errorf("entryCategoryFor(%q) = %q, want %q", tc.assetType, got, tc.want)
+		// The importer's own fallback: a label the mapping cannot place is
+		// filed as Other rather than written straight through.
+		got, ok := market.NormalizeAssetType(tc.assetType)
+		if !ok {
+			got = market.Other
+		}
+		if got != tc.want {
+			t.Errorf("NormalizeAssetType(%q) = %q, want %q", tc.assetType, got, tc.want)
 		}
 	}
 }

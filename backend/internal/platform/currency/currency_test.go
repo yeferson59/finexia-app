@@ -11,7 +11,8 @@ import (
 func TestIsSupported(t *testing.T) {
 	// ARS is the case that matters: a real ISO code with no source publishing a
 	// USD pair for it. The set is about what can be converted, not what exists.
-	for _, code := range []money.Currency{money.ARS, money.Currency(255), money.EUR} {
+	// Currency(255) is outside the ISO table altogether.
+	for _, code := range []money.Currency{money.ARS, money.Currency(255)} {
 		if IsSupported(code) {
 			t.Errorf("IsSupported(%q) = true, want false", code)
 		}

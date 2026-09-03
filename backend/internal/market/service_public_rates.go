@@ -79,11 +79,15 @@ func (s *service) RefreshPublicRates(ctx context.Context) ([]ExchangeRate, error
 }
 
 // storePublicRate validates one published rate against the same rules the admin
-// endpoints apply — the ISO 4217 table money.CurrencyFromISOCode reads, and
-// money.Convert's positive-rate rule — before it reaches the table. A feed is
-// not more trusted than an operator: whatever gets in here is what every
-// portfolio valuation then converts with.
+// endpoints apply — the ISO 4217 table Currency.Valid reads, and money.Convert's
+// positive-rate rule — before it reaches the table. A feed is not more trusted
+// than an operator: whatever gets in here is what every portfolio valuation
+// then converts with.
 func (s *service) storePublicRate(ctx context.Context, pr marketdata.PublicRate) (ExchangeRate, error) {
+	if err := validPair(pr.From, pr.To); err != nil {
+		return ExchangeRate{}, fmt.Errorf("public rate %s/%s: %w", pr.From, pr.To, err)
+	}
+
 	rate, err := decimal.NewFromString(pr.Rate)
 	if err != nil {
 		return ExchangeRate{}, fmt.Errorf("public rate %s/%s: parse %q: %w", pr.From, pr.To, pr.Rate, err)

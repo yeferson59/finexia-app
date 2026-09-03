@@ -69,7 +69,7 @@ func TestUpdateCurrentUser(t *testing.T) {
 		if !errors.Is(err, ErrUnsupportedCurrency) {
 			t.Fatalf("err = %v, want ErrUnsupportedCurrency", err)
 		}
-		if saved.PreferredCurrency != money.ARS {
+		if saved.PreferredCurrency != money.XXX {
 			t.Errorf("saved currency = %q, want nothing written", saved.PreferredCurrency)
 		}
 	})
@@ -77,7 +77,8 @@ func TestUpdateCurrentUser(t *testing.T) {
 	t.Run("blank fields keep existing values", func(t *testing.T) {
 		svc, saved := newSvc(t)
 
-		_, err := svc.UpdateCurrentUser(context.Background(), userID, "   ", "", 255)
+		// The zero currency is what an omitted preferredCurrency decodes to.
+		_, err := svc.UpdateCurrentUser(context.Background(), userID, "   ", "", money.XXX)
 		if err != nil {
 			t.Fatalf("UpdateCurrentUser: %v", err)
 		}
