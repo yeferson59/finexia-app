@@ -24,7 +24,7 @@ var exchangeRateHeaderSynonyms = map[string][]string{
 // ImportExchangeRatesFromFile parses an uploaded CSV/XLSX with columns
 // fromCurrency, toCurrency and rate, upserting one currency pair per valid
 // row (dated today). Invalid rows are skipped and reported.
-func (s *Service) ImportExchangeRatesFromFile(ctx context.Context, data []byte, filename, sheet string) (ImportResultResponseDTO, error) {
+func (s *service) ImportExchangeRatesFromFile(ctx context.Context, data []byte, filename, sheet string) (ImportResultResponseDTO, error) {
 	src, err := spreadsheet.ReadFile(data, filename, sheet)
 	if err != nil {
 		return ImportResultResponseDTO{}, httpx.AsBadRequest(err)

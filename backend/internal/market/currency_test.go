@@ -21,7 +21,7 @@ func TestNormalizeAssetInputCurrency(t *testing.T) {
 
 func TestCreateExchangeRateValidatesItsInput(t *testing.T) {
 	upsertCalled := false
-	newSvc := func() *Service {
+	newSvc := func() *service {
 		upsertCalled = false
 		repo := new(fakeRepository{
 			upsertExchangeRate: func(_ context.Context, from, to money.Currency, rate decimal.Decimal, _ time.Time) (ExchangeRate, error) {

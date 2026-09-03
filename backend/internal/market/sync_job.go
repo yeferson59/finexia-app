@@ -34,12 +34,12 @@ type Holdings interface {
 // with their own. It replaces the two global daily jobs, which no longer have a
 // key to run under: the application holds no provider credentials.
 type SyncJob struct {
-	service  *Service
+	service  *service
 	holdings Holdings
 	log      logger.Logger
 }
 
-func NewSyncJob(service *Service, holdings Holdings, log logger.Logger) *SyncJob {
+func NewSyncJob(service *service, holdings Holdings, log logger.Logger) *SyncJob {
 	return new(SyncJob{
 		service:  service,
 		holdings: holdings,

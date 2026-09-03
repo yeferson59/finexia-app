@@ -12,7 +12,7 @@ import (
 )
 
 type handler struct {
-	service *Service
+	service *service
 	// holdings answers "which assets does this user own", supplied by the
 	// composition root from the portfolio module. market must not import
 	// portfolio, so it is consumed through the interface declared here.

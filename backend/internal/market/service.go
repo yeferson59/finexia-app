@@ -39,7 +39,7 @@ const (
 	finnhubPace      = time.Second
 )
 
-type Service struct {
+type service struct {
 	repo    Repository
 	storage fiber.Storage
 	// providers builds a chain from a user's own keys, per sync run.
@@ -54,8 +54,8 @@ type Service struct {
 	log     logger.Logger
 }
 
-func newService(repo Repository, storage fiber.Storage, providers marketdata.Factory, publicRates marketdata.PublicRateSource, keyring *secretbox.Keyring, log logger.Logger) *Service {
-	return new(Service{
+func newService(repo Repository, storage fiber.Storage, providers marketdata.Factory, publicRates marketdata.PublicRateSource, keyring *secretbox.Keyring, log logger.Logger) *service {
+	return new(service{
 		repo:        repo,
 		storage:     storage,
 		providers:   providers,
@@ -69,7 +69,7 @@ func newService(repo Repository, storage fiber.Storage, providers marketdata.Fac
 // instruments the app ships with. It touches no provider and needs no key: it
 // only creates catalog rows, whose prices each user then fills with their own
 // key.
-func (s *Service) SeedDefaultAssets(ctx context.Context) []error {
+func (s *service) SeedDefaultAssets(ctx context.Context) []error {
 	var errs []error
 
 	for _, da := range defaultAssets {

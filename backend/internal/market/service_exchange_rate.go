@@ -17,11 +17,11 @@ type CurrencyPair struct{ From, To money.Currency }
 // user_exchange_rates via SyncRatesForUser, because provider terms do not allow
 // serving one user's data to another.
 
-func (s *Service) GetExchangeRates(ctx context.Context, offset, limit uint) ([]ExchangeRate, error) {
+func (s *service) GetExchangeRates(ctx context.Context, offset, limit uint) ([]ExchangeRate, error) {
 	return s.repo.GetExchangeRates(ctx, offset, limit)
 }
 
-func (s *Service) CreateExchangeRate(ctx context.Context, from, to money.Currency, rate decimal.Decimal) (ExchangeRate, error) {
+func (s *service) CreateExchangeRate(ctx context.Context, from, to money.Currency, rate decimal.Decimal) (ExchangeRate, error) {
 	if err := validRate(rate); err != nil {
 		return ExchangeRate{}, err
 	}
@@ -29,7 +29,7 @@ func (s *Service) CreateExchangeRate(ctx context.Context, from, to money.Currenc
 	return s.repo.UpsertExchangeRate(ctx, from, to, rate, time.Now())
 }
 
-func (s *Service) UpdateExchangeRate(ctx context.Context, id uuid.UUID, rate decimal.Decimal) (ExchangeRate, error) {
+func (s *service) UpdateExchangeRate(ctx context.Context, id uuid.UUID, rate decimal.Decimal) (ExchangeRate, error) {
 	if err := validRate(rate); err != nil {
 		return ExchangeRate{}, err
 	}

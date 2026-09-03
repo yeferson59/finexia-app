@@ -18,7 +18,7 @@ import (
 // byoFixture wires a service with a real keyring, an in-memory credential store
 // and a stub provider, which is what every BYO-key sync scenario needs.
 type byoFixture struct {
-	svc     *Service
+	svc     *service
 	creds   *credentialStore
 	factory *fakeFactory
 	ring    *secretbox.Keyring

@@ -22,7 +22,7 @@ const verifySymbol = "AAPL"
 
 // ListCredentials returns what a user may see about their own keys: never the
 // key, never the ciphertext.
-func (s *Service) ListCredentials(ctx context.Context, userID uuid.UUID) ([]Credential, error) {
+func (s *service) ListCredentials(ctx context.Context, userID uuid.UUID) ([]Credential, error) {
 	return s.repo.ListCredentials(ctx, userID)
 }
 
@@ -32,7 +32,7 @@ func (s *Service) ListCredentials(ctx context.Context, userID uuid.UUID) ([]Cred
 // The plaintext key lives in this function and in the provider client it builds,
 // and nowhere else: it is never logged, never returned, and never written
 // unsealed.
-func (s *Service) SaveCredential(ctx context.Context, userID uuid.UUID, provider ProviderID, apiKey string) (Credential, error) {
+func (s *service) SaveCredential(ctx context.Context, userID uuid.UUID, provider ProviderID, apiKey string) (Credential, error) {
 	if !provider.IsValid() {
 		return Credential{}, ErrInvalidProvider
 	}
@@ -58,7 +58,7 @@ func (s *Service) SaveCredential(ctx context.Context, userID uuid.UUID, provider
 	return s.repo.UpsertCredential(ctx, userID, sealed, last4(apiKey), status, new(time.Now().UTC()))
 }
 
-func (s *Service) DeleteCredential(ctx context.Context, userID uuid.UUID, provider ProviderID) error {
+func (s *service) DeleteCredential(ctx context.Context, userID uuid.UUID, provider ProviderID) error {
 	if !provider.IsValid() {
 		return ErrInvalidProvider
 	}
@@ -69,7 +69,7 @@ func (s *Service) DeleteCredential(ctx context.Context, userID uuid.UUID, provid
 // VerifyCredential re-checks a stored key and records the verdict, so a key
 // that was revoked at the provider shows up as invalid in the UI instead of
 // just producing no prices.
-func (s *Service) VerifyCredential(ctx context.Context, userID uuid.UUID, provider ProviderID) (Credential, error) {
+func (s *service) VerifyCredential(ctx context.Context, userID uuid.UUID, provider ProviderID) (Credential, error) {
 	if !provider.IsValid() {
 		return Credential{}, ErrInvalidProvider
 	}
@@ -116,7 +116,7 @@ func (s *Service) VerifyCredential(ctx context.Context, userID uuid.UUID, provid
 // A non-nil error means "do not record this outcome as a verdict on the key":
 // either the provider rejected it (ErrInvalidAPIKey) or we never got an answer
 // worth acting on (ErrProviderUnavailable).
-func (s *Service) probe(ctx context.Context, provider ProviderID, apiKey string) (CredentialStatus, error) {
+func (s *service) probe(ctx context.Context, provider ProviderID, apiKey string) (CredentialStatus, error) {
 	chain, err := s.providers.For([]marketdata.Credential{{Provider: provider, APIKey: apiKey}})
 	if err != nil {
 		return "", err
@@ -175,7 +175,7 @@ func classifyProbe(err error) (CredentialStatus, error) {
 }
 
 // seal encrypts the key for storage, bound to the user and provider that own it.
-func (s *Service) seal(userID uuid.UUID, provider ProviderID, apiKey string) (sealedCredential, error) {
+func (s *service) seal(userID uuid.UUID, provider ProviderID, apiKey string) (sealedCredential, error) {
 	if s.keyring == nil {
 		return sealedCredential{}, ErrKeyEncryptionOff
 	}
@@ -190,7 +190,7 @@ func (s *Service) seal(userID uuid.UUID, provider ProviderID, apiKey string) (se
 
 // openCredential decrypts one stored key. The caller owns the returned bytes
 // and must Zero them.
-func (s *Service) openCredential(ctx context.Context, userID uuid.UUID, provider ProviderID) ([]byte, error) {
+func (s *service) openCredential(ctx context.Context, userID uuid.UUID, provider ProviderID) ([]byte, error) {
 	if s.keyring == nil {
 		return nil, ErrKeyEncryptionOff
 	}
@@ -209,7 +209,7 @@ func (s *Service) openCredential(ctx context.Context, userID uuid.UUID, provider
 //
 // It also reports the pace to leave between calls, taken from the slowest
 // provider the user actually configured.
-func (s *Service) providerFor(ctx context.Context, userID uuid.UUID) (marketdata.Provider, time.Duration, error) {
+func (s *service) providerFor(ctx context.Context, userID uuid.UUID) (marketdata.Provider, time.Duration, error) {
 	if s.keyring == nil {
 		return nil, 0, ErrKeyEncryptionOff
 	}

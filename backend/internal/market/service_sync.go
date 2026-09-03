@@ -43,7 +43,7 @@ type UserExchangeRate struct {
 // itself: knowing which assets a user holds means reading portfolios, and
 // market must not depend on portfolio (the dependency runs the other way, and
 // app/arch_test.go pins it). The caller supplies the holdings.
-func (s *Service) SyncAssetsForUser(ctx context.Context, userID uuid.UUID, assetIDs []uuid.UUID) ([]UserAssetPrice, []error) {
+func (s *service) SyncAssetsForUser(ctx context.Context, userID uuid.UUID, assetIDs []uuid.UUID) ([]UserAssetPrice, []error) {
 	log := s.log.With(logger.Str("job", "asset_price"), logger.Str("userID", userID.String()))
 
 	if len(assetIDs) == 0 {
@@ -92,7 +92,7 @@ func (s *Service) SyncAssetsForUser(ctx context.Context, userID uuid.UUID, asset
 // estate…). Not a failure, just nothing to do.
 var errAssetTypeUnsupported = errors.New("asset type not quotable")
 
-func (s *Service) syncOneAsset(ctx context.Context, userID, assetID uuid.UUID, chain marketdata.Provider, log logger.Logger) (UserAssetPrice, error) {
+func (s *service) syncOneAsset(ctx context.Context, userID, assetID uuid.UUID, chain marketdata.Provider, log logger.Logger) (UserAssetPrice, error) {
 	asset, err := s.repo.GetAssetByID(ctx, assetID)
 	if err != nil {
 		return UserAssetPrice{}, err
@@ -164,7 +164,7 @@ func (s *Service) syncOneAsset(ctx context.Context, userID, assetID uuid.UUID, c
 }
 
 // SyncRatesForUser refreshes the given currency pairs with the user's own keys.
-func (s *Service) SyncRatesForUser(ctx context.Context, userID uuid.UUID, pairs []CurrencyPair) ([]UserExchangeRate, []error) {
+func (s *service) SyncRatesForUser(ctx context.Context, userID uuid.UUID, pairs []CurrencyPair) ([]UserExchangeRate, []error) {
 	log := s.log.With(logger.Str("job", "exchange_rate"), logger.Str("userID", userID.String()))
 
 	if len(pairs) == 0 {
@@ -229,7 +229,7 @@ func (s *Service) SyncRatesForUser(ctx context.Context, userID uuid.UUID, pairs 
 // The verdict is applied per provider, never to the whole chain: a fallback
 // failure joins the errors of every key the user has, and one provider
 // rejecting its key is no reason to demote a different key that still works.
-func (s *Service) recordProviderVerdict(ctx context.Context, userID uuid.UUID, err error) {
+func (s *service) recordProviderVerdict(ctx context.Context, userID uuid.UUID, err error) {
 	for _, verdict := range marketdata.Verdicts(err) {
 		var status CredentialStatus
 

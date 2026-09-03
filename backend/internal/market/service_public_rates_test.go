@@ -23,7 +23,7 @@ type storedRate struct {
 
 // newPublicRatesFixture wires the service against a recording repository and a
 // canned feed, and returns both so a test can assert on what was written.
-func newPublicRatesFixture(source marketdata.PublicRateSource) (*Service, *[]storedRate) {
+func newPublicRatesFixture(source marketdata.PublicRateSource) (*service, *[]storedRate) {
 	var written []storedRate
 
 	repo := new(fakeRepository{

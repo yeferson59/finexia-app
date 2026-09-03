@@ -46,7 +46,7 @@ type ServiceDeps struct {
 // Deps is the routing half: the service NewService returned, plus the guards
 // and the holdings reader, which only exist once the other modules are built.
 type Deps struct {
-	Service        *Service
+	Service        *service
 	AuthMiddleware authMiddleware
 	Limiter        fiber.Handler
 	// Holdings answers "which assets does this user own", satisfied by the
@@ -58,7 +58,7 @@ type Deps struct {
 }
 
 type Module struct {
-	service     *Service
+	service     *service
 	authMiddl   authMiddleware
 	handler     *handler
 	limiter     fiber.Handler
@@ -71,7 +71,7 @@ type authMiddleware interface {
 
 // NewService builds the module's use cases. It is constructed before portfolio,
 // which consumes it.
-func NewService(deps ServiceDeps) *Service {
+func NewService(deps ServiceDeps) *service {
 	return newService(NewPostgresRepository(deps.DB), deps.Storage, deps.Providers, deps.PublicRates, deps.Keyring, deps.Log)
 }
 
@@ -99,7 +99,7 @@ func New(deps Deps) *Module {
 	})
 }
 
-func (m *Module) Service() *Service {
+func (m *Module) Service() *service {
 	return m.service
 }
 

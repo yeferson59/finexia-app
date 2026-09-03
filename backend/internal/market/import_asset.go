@@ -25,7 +25,7 @@ var assetHeaderSynonyms = map[string][]string{
 // ImportAssetsFromFile parses an uploaded CSV/XLSX with columns
 // ticker, name, assetType, currency (required) and exchange (optional),
 // upserting one asset per valid row. Invalid rows are skipped and reported.
-func (s *Service) ImportAssetsFromFile(ctx context.Context, data []byte, filename, sheet string) (ImportResultResponseDTO, error) {
+func (s *service) ImportAssetsFromFile(ctx context.Context, data []byte, filename, sheet string) (ImportResultResponseDTO, error) {
 	src, err := spreadsheet.ReadFile(data, filename, sheet)
 	if err != nil {
 		return ImportResultResponseDTO{}, httpx.AsBadRequest(err)

@@ -31,7 +31,7 @@ const maxSharedRates = 100
 // Unpaginated, unlike the admin listing: the table holds one row per currency
 // pair the app converts between, which is a handful, and the caller is a
 // dashboard asking "what is a dollar worth today", not a browser of records.
-func (s *Service) GetLatestExchangeRates(ctx context.Context) ([]ExchangeRate, error) {
+func (s *service) GetLatestExchangeRates(ctx context.Context) ([]ExchangeRate, error) {
 	return s.repo.GetExchangeRates(ctx, 0, maxSharedRates)
 }
 
@@ -47,7 +47,7 @@ var ErrPublicRatesUnavailable = errors.New("market: no public exchange rate sour
 // feed that adds a currency gofinance does not know still updates the ones it
 // does. A pair that fails keeps its previous value, which is the right failure
 // mode for a rate — stale beats absent.
-func (s *Service) RefreshPublicRates(ctx context.Context) ([]ExchangeRate, error) {
+func (s *service) RefreshPublicRates(ctx context.Context) ([]ExchangeRate, error) {
 	if s.publicRates == nil {
 		return nil, ErrPublicRatesUnavailable
 	}
@@ -83,7 +83,7 @@ func (s *Service) RefreshPublicRates(ctx context.Context) ([]ExchangeRate, error
 // money.Convert's positive-rate rule — before it reaches the table. A feed is
 // not more trusted than an operator: whatever gets in here is what every
 // portfolio valuation then converts with.
-func (s *Service) storePublicRate(ctx context.Context, pr marketdata.PublicRate) (ExchangeRate, error) {
+func (s *service) storePublicRate(ctx context.Context, pr marketdata.PublicRate) (ExchangeRate, error) {
 	rate, err := decimal.NewFromString(pr.Rate)
 	if err != nil {
 		return ExchangeRate{}, fmt.Errorf("public rate %s/%s: parse %q: %w", pr.From, pr.To, pr.Rate, err)

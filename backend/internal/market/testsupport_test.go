@@ -205,7 +205,7 @@ func mustUSD(t *testing.T, amount string) money.Money {
 	return m
 }
 
-func newTestServices(repo Repository, storage *memStorage) *Service {
+func newTestServices(repo Repository, storage *memStorage) *service {
 	return newService(repo, storage, nil, nil, testKeyring(), logger.Noop())
 }
 

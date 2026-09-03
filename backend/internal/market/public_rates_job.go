@@ -14,11 +14,11 @@ import (
 // nobody's quota and produces one result for everybody, so it runs on its own
 // short cadence and a retry is free.
 type PublicRatesJob struct {
-	service *Service
+	service *service
 	log     logger.Logger
 }
 
-func NewPublicRatesJob(service *Service, log logger.Logger) *PublicRatesJob {
+func NewPublicRatesJob(service *service, log logger.Logger) *PublicRatesJob {
 	return new(PublicRatesJob{
 		service: service,
 		log:     log.With(logger.Str("scheduler", "public_rates")),
