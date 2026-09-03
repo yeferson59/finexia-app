@@ -92,9 +92,11 @@ func (r *PostgresRepository) GetRequiredCurrencyPairs(ctx context.Context, userI
 	pairs := make([]CurrencyPair, 0)
 	for rows.Next() {
 		var pair CurrencyPair
+
 		if err := rows.Scan(&pair.From, &pair.To); err != nil {
 			return nil, err
 		}
+
 		pairs = append(pairs, pair)
 	}
 
@@ -105,12 +107,12 @@ func (r *PostgresRepository) GetRequiredCurrencyPairs(ctx context.Context, userI
 // their key fetched. Falls back to nothing: the shared exchange_rates table is
 // read separately by GetExchangeRateByPair, and only holds admin-entered rows.
 func (r *PostgresRepository) GetUserExchangeRateByPair(ctx context.Context, userID uuid.UUID, from, to money.Currency) (decimal.Decimal, error) {
-	var rateStr string
+	var rate decimal.Decimal
 
 	err := r.db.QueryRow(ctx, `
 		SELECT rate::text FROM user_exchange_rates
 		WHERE user_id = $1 AND from_currency = $2 AND to_currency = $3
-	`, userID, from, to).Scan(&rateStr)
+	`, userID, from, to).Scan(&rate)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return decimal.Decimal{}, ErrExchangeRateNotFound
@@ -119,5 +121,5 @@ func (r *PostgresRepository) GetUserExchangeRateByPair(ctx context.Context, user
 		return decimal.Decimal{}, err
 	}
 
-	return decimal.NewFromString(rateStr)
+	return rate, nil
 }

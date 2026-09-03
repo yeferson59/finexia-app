@@ -255,7 +255,7 @@ func buildImportRow(
 	// normalizeCurrency and applyImportDefaults both validate against
 	// gofinance's ISO 4217 table, so this lookup only ever falls back for a row
 	// whose currency cell was rejected above and already carries an error.
-	unit := currencyOf(currency)
+	unit, _ := money.GetCurrencyFromISOCode(currency)
 	entity.Currency = unit
 	// The preview DTO keeps the code as text: it is what the browser echoes
 	// back in the mapping step, not an amount to do arithmetic on.

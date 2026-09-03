@@ -23,7 +23,6 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 
 func (r *PostgresRepository) UpsertExchangeRate(ctx context.Context, from, to money.Currency, rate decimal.Decimal, rateDate time.Time) (ExchangeRate, error) {
 	var er ExchangeRate
-	var rateStr string
 
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO exchange_rates (from_currency, to_currency, rate, rate_date, source, fetched_at)
@@ -35,7 +34,7 @@ func (r *PostgresRepository) UpsertExchangeRate(ctx context.Context, from, to mo
 		&er.ID,
 		&er.FromCurrency,
 		&er.ToCurrency,
-		&rateStr,
+		&er.Rate,
 		&er.RateDate,
 		&er.Source,
 		&er.CreatedAt, // fetched_at mapped to CreatedAt; table has no separate created_at/updated_at
@@ -44,7 +43,6 @@ func (r *PostgresRepository) UpsertExchangeRate(ctx context.Context, from, to mo
 		return ExchangeRate{}, err
 	}
 
-	er.Rate = decimal.MustFromString(rateStr)
 	return er, nil
 }
 
@@ -59,7 +57,6 @@ func (r *PostgresRepository) UpsertExchangeRate(ctx context.Context, from, to mo
 // until the next refresh, and the source column is what makes that legible.
 func (r *PostgresRepository) UpsertPublicExchangeRate(ctx context.Context, from, to money.Currency, rate decimal.Decimal, rateDate time.Time, source ProviderID) (ExchangeRate, error) {
 	var er ExchangeRate
-	var rateStr string
 
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO exchange_rates (from_currency, to_currency, rate, rate_date, source, fetched_at)
@@ -71,7 +68,7 @@ func (r *PostgresRepository) UpsertPublicExchangeRate(ctx context.Context, from,
 		&er.ID,
 		&er.FromCurrency,
 		&er.ToCurrency,
-		&rateStr,
+		&er.Rate,
 		&er.RateDate,
 		&er.Source,
 		&er.CreatedAt,
@@ -80,7 +77,6 @@ func (r *PostgresRepository) UpsertPublicExchangeRate(ctx context.Context, from,
 		return ExchangeRate{}, err
 	}
 
-	er.Rate = decimal.MustFromString(rateStr)
 	return er, nil
 }
 
@@ -99,13 +95,11 @@ func (r *PostgresRepository) GetExchangeRates(ctx context.Context, offset, limit
 	rates := make([]ExchangeRate, 0)
 	for rows.Next() {
 		var er ExchangeRate
-		var rateStr string
 
-		if err := rows.Scan(&er.ID, &er.FromCurrency, &er.ToCurrency, &rateStr, &er.RateDate, &er.Source, &er.CreatedAt); err != nil {
+		if err := rows.Scan(&er.ID, &er.FromCurrency, &er.ToCurrency, &er.Rate, &er.RateDate, &er.Source, &er.CreatedAt); err != nil {
 			return nil, err
 		}
 
-		er.Rate = decimal.MustFromString(rateStr)
 		rates = append(rates, er)
 	}
 
@@ -120,7 +114,6 @@ func (r *PostgresRepository) GetExchangeRates(ctx context.Context, offset, limit
 
 func (r *PostgresRepository) UpdateExchangeRateByID(ctx context.Context, id uuid.UUID, rate decimal.Decimal) (ExchangeRate, error) {
 	var er ExchangeRate
-	var rateStr string
 
 	// The edit also claims the row for the operator. Leaving source alone would
 	// label a hand-typed number with the feed that no longer produced it, which
@@ -130,14 +123,14 @@ func (r *PostgresRepository) UpdateExchangeRateByID(ctx context.Context, id uuid
 		SET rate = $2::numeric, source = $3, fetched_at = NOW()
 		WHERE id = $1
 		RETURNING id, from_currency, to_currency, rate::text, rate_date, source, fetched_at
-	`, id, rate.String(), ManualRateSource).Scan(&er.ID, &er.FromCurrency, &er.ToCurrency, &rateStr, &er.RateDate, &er.Source, &er.CreatedAt)
+	`, id, rate.String(), ManualRateSource).Scan(&er.ID, &er.FromCurrency, &er.ToCurrency, &er.Rate, &er.RateDate, &er.Source, &er.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ExchangeRate{}, ErrExchangeRateNotFound
 		}
+
 		return ExchangeRate{}, err
 	}
 
-	er.Rate = decimal.MustFromString(rateStr)
 	return er, nil
 }

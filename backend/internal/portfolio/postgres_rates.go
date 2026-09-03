@@ -15,17 +15,19 @@ import (
 // invert the returned rate themselves. Read-only: writing/syncing exchange
 // rates is owned by the market module.
 func (r *PostgresRepository) GetExchangeRateByPair(ctx context.Context, from, to money.Currency) (decimal.Decimal, error) {
-	var rateStr string
+	var rate decimal.Decimal
+
 	err := r.db.QueryRow(ctx, `
 		SELECT rate::text
 		FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2
-	`, from, to).Scan(&rateStr)
+	`, from, to).Scan(&rate)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return decimal.Decimal{}, ErrExchangeRateNotFound
 		}
+
 		return decimal.Decimal{}, err
 	}
 
-	return decimal.MustFromString(rateStr), nil
+	return rate, nil
 }

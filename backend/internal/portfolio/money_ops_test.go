@@ -13,33 +13,8 @@ import (
 	"github.com/yeferson59/finexia-app/internal/market"
 )
 
-// These cover the arithmetic and currency handling that now runs through
-// gofinance instead of float64 and hand-rolled string checks.
-
-func TestCurrencyOf(t *testing.T) {
-	cases := []struct {
-		name string
-		code string
-		want money.Currency
-	}{
-		{"known code", "COP", money.COP},
-		{"lower case is normalised by gofinance", "eur", money.EUR},
-		{"surrounding space", " JPY ", money.JPY},
-		{"unknown code falls back to USD", "ABC", money.USD},
-		{"empty falls back to USD", "", money.USD},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := currencyOf(tc.code); got != tc.want {
-				t.Errorf("currencyOf(%q) = %v, want %v", tc.code, got, tc.want)
-			}
-		})
-	}
-}
-
 func TestMoneyOfCarriesTheRowCurrency(t *testing.T) {
-	m := moneyOf("1234.50", "COP")
+	m, _ := money.NewMoneyFromString("1234.50", money.COP)
 	if m.GetCurrency() != money.COP {
 		t.Errorf("currency = %v, want COP", m.GetCurrency())
 	}
@@ -60,7 +35,7 @@ func TestRetagCurrency(t *testing.T) {
 			t.Fatal("precondition: Scan should not have set COP")
 		}
 
-		retagCurrency(&m, "COP")
+		m.SetCurrency(money.COP)
 
 		if m.GetCurrency() != money.COP {
 			t.Errorf("currency = %v, want COP", m.GetCurrency())
@@ -68,10 +43,6 @@ func TestRetagCurrency(t *testing.T) {
 		if m.String() != "2500.75" {
 			t.Errorf("value = %q, want 2500.75 unchanged", m.String())
 		}
-	})
-
-	t.Run("a nil price is left alone", func(t *testing.T) {
-		retagCurrency(nil, "COP") // must not panic
 	})
 }
 

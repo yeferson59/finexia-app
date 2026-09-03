@@ -9,6 +9,7 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/yeferson59/finexia-app/internal/platform/database"
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
@@ -54,7 +55,9 @@ func scanAssets(rows pgx.Rows) ([]Asset, error) {
 			return nil, err
 		}
 
-		asset.CurrentPrice.SetCurrency(asset.Currency)
+		if asset.CurrentPrice != nil {
+			asset.CurrentPrice.SetCurrency(asset.Currency)
+		}
 
 		assets = append(assets, asset)
 	}
@@ -85,7 +88,9 @@ func (r *PostgresRepository) GetAssetByID(ctx context.Context, assetID uuid.UUID
 		return Asset{}, err
 	}
 
-	asset.CurrentPrice.SetCurrency(asset.Currency)
+	if asset.CurrentPrice != nil {
+		asset.CurrentPrice.SetCurrency(asset.Currency)
+	}
 
 	return asset, nil
 }
@@ -131,7 +136,9 @@ func (r *PostgresRepository) UpdateAssetPrice(ctx context.Context, assetID uuid.
 		return Asset{}, err
 	}
 
-	asset.CurrentPrice.SetCurrency(asset.Currency)
+	if asset.CurrentPrice != nil {
+		asset.CurrentPrice.SetCurrency(asset.Currency)
+	}
 
 	return asset, nil
 }
@@ -177,7 +184,10 @@ func (r *PostgresRepository) UpsertAsset(ctx context.Context, ticker, name strin
 	if err != nil {
 		return asset, err
 	}
-	asset.CurrentPrice.SetCurrency(asset.Currency)
+
+	if asset.CurrentPrice != nil {
+		asset.CurrentPrice.SetCurrency(asset.Currency)
+	}
 
 	return asset, nil
 }
@@ -196,53 +206,53 @@ func (r *PostgresRepository) UpsertAsset(ctx context.Context, ticker, name strin
 // The membership row is written even when the asset already existed, so the
 // second user to reach for a contributed ticker can find it afterwards.
 func (r *PostgresRepository) CreateAssetIfAbsent(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error) {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return Asset{}, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	var asset Asset
 
-	var assetID uuid.UUID
-	err = tx.QueryRow(ctx, `
+	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		var assetID uuid.UUID
+
+		err := tx.QueryRow(ctx, `
 		SELECT id FROM assets WHERE UPPER(ticker) = $1 ORDER BY created_at LIMIT 1
 	`, ticker).Scan(&assetID)
 
-	if errors.Is(err, pgx.ErrNoRows) {
-		err = tx.QueryRow(ctx, `
+		if errors.Is(err, pgx.ErrNoRows) {
+			err = tx.QueryRow(ctx, `
 			INSERT INTO assets (ticker, name, asset_type, exchange, currency, created_by, is_curated, created_at, updated_at)
 			VALUES ($1, $2, $3::asset_type, NULLIF($4, ''), $5, $6, FALSE, NOW(), NOW())
 			ON CONFLICT (ticker, COALESCE(exchange, '')) DO UPDATE SET updated_at = NOW()
 			RETURNING id
 		`, ticker, name, assetType, exchange, currency, userID).Scan(&assetID)
-	}
-	if err != nil {
-		return Asset{}, err
-	}
+		}
+		if err != nil {
+			return err
+		}
 
-	if _, err := tx.Exec(ctx, `
+		if _, err := tx.Exec(ctx, `
 		INSERT INTO user_catalog_assets (user_id, asset_id) VALUES ($1, $2)
 		ON CONFLICT DO NOTHING
 	`, userID, assetID); err != nil {
-		return Asset{}, err
-	}
+			return err
+		}
 
-	var asset Asset
-	if err := tx.QueryRow(ctx, `
+		if err := tx.QueryRow(ctx, `
 		SELECT `+assetColumns+`
 		FROM assets a WHERE a.id = $1
 	`, assetID).Scan(
-		&asset.ID, &asset.Ticker, &asset.Name, &asset.AssetType, &asset.Exchange,
-		&asset.Currency, &asset.CurrentPrice, &asset.PriceUpdatedAt, &asset.IsCurated,
-		&asset.CreatedAt, &asset.UpdatedAt,
-	); err != nil {
-		return Asset{}, err
-	}
+			&asset.ID, &asset.Ticker, &asset.Name, &asset.AssetType, &asset.Exchange,
+			&asset.Currency, &asset.CurrentPrice, &asset.PriceUpdatedAt, &asset.IsCurated,
+			&asset.CreatedAt, &asset.UpdatedAt,
+		); err != nil {
+			return err
+		}
 
-	if err := tx.Commit(ctx); err != nil {
-		return Asset{}, err
-	}
+		if asset.CurrentPrice != nil {
+			asset.CurrentPrice.SetCurrency(asset.Currency)
+		}
 
-	asset.CurrentPrice.SetCurrency(asset.Currency)
+		return nil
+	}); err != nil {
+		return asset, err
+	}
 
 	return asset, nil
 }

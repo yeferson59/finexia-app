@@ -143,13 +143,7 @@ func (r *PostgresRepository) GetPortfolioValuesAsOf(ctx context.Context, userID 
 // before the app ever saw it lands on that one day. That is the honest limit of
 // a series that only knows what it was told, when it was told: nobody watched
 // that gain happen, and there is no earlier point to spread it over.
-func (r *PostgresRepository) GetPortfolioGrowthByUserID(
-	ctx context.Context,
-	userID uuid.UUID,
-	currency money.Currency,
-	hasSince bool,
-	since time.Time,
-) ([]GrowthPoint, error) {
+func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, currency money.Currency, hasSince bool, since time.Time) ([]GrowthPoint, error) {
 	rows, err := r.db.Query(ctx, `
 		WITH converted AS (
 			SELECT
@@ -263,12 +257,7 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(
 	return result, nil
 }
 
-func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(
-	ctx context.Context,
-	userID, portfolioID uuid.UUID,
-	hasSince bool,
-	since time.Time,
-) ([]GrowthPoint, error) {
+func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error) {
 	// One portfolio, one base currency: nothing to convert and nothing that can
 	// fail to, which is why the unconverted count is a literal zero here. The
 	// flows are the exception — a transaction carries its own currency and can

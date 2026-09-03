@@ -69,6 +69,7 @@ func (r *PostgresRepository) GetPlatformsWithStats(ctx context.Context, userID u
 	result := make([]PlatformStats, 0)
 	for rows.Next() {
 		var p PlatformStats
+
 		if err := rows.Scan(
 			&p.ID, &p.Name, &p.Description, &p.SourceType,
 			&p.IsActive, &p.CreatedAt, &p.UpdatedAt,
@@ -133,6 +134,7 @@ func (r *PostgresRepository) DeletePlatform(ctx context.Context, userID, sourceI
 
 func (r *PostgresRepository) CreatePlatform(ctx context.Context, userID uuid.UUID, sourceType SourceType, name, desciption string) (InvestmentSource, error) {
 	var platform InvestmentSource
+
 	err := r.db.QueryRow(ctx, "INSERT INTO investment_sources(user_id, source_type, name, description) VALUES ($1, $2, $3, $4) RETURNING id, name, description, created_at, updated_at", userID, sourceType, name, desciption).Scan(&platform.ID, &platform.Name, &platform.Description, &platform.CreatedAt, &platform.UpdatedAt)
 	if err != nil {
 		return InvestmentSource{}, err

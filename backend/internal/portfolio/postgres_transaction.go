@@ -13,6 +13,7 @@ import (
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/market"
+	"github.com/yeferson59/finexia-app/internal/platform/database"
 )
 
 func (r *PostgresRepository) GetTopTransactionByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID) (TopTransactionDTO, error) {
@@ -214,6 +215,7 @@ func foldAllocationByCategory(items []AllocationItem) []AllocationItem {
 	slices.SortStableFunc(folded, func(a, b AllocationItem) int {
 		return amountOf(b.MarketValue).Cmp(amountOf(a.MarketValue))
 	})
+
 	return folded
 }
 
@@ -225,6 +227,7 @@ func amountOf(raw string) decimal.Decimal {
 	if err != nil {
 		return decimal.Zero
 	}
+
 	return value
 }
 
@@ -280,6 +283,10 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 		}
 
 		txns = append(txns, txn)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return txns, nil
@@ -343,44 +350,50 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 }
 
 func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency money.Currency, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
-	var owned bool
-	if err := r.db.QueryRow(ctx, `
+	var txn Transaction
+
+	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		var owned bool
+		if err := r.db.QueryRow(ctx, `
 		SELECT EXISTS (
 			SELECT 1 FROM portfolio_entries pe
 			JOIN portfolios p ON p.id = pe.portfolio_id
 			WHERE pe.id = $1 AND p.user_id = $2
 		)
 	`, entryID, userID).Scan(&owned); err != nil {
-		return Transaction{}, err
-	}
-	if !owned {
-		return Transaction{}, ErrEntryNotFound
-	}
+			return err
+		}
+		if !owned {
+			return ErrEntryNotFound
+		}
 
-	var txn Transaction
-
-	if err := r.db.QueryRow(ctx, `
+		if err := r.db.QueryRow(ctx, `
 		INSERT INTO transactions (entry_id, type, quantity, price, currency, fees, transaction_date, notes)
 		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::date, $8)
 		RETURNING id, entry_id, type, quantity, price, currency, fees, transaction_date, COALESCE(notes, ''), created_at, updated_at
 	`, entryID, txnType, quantity.String(), price.String(), currency, fees.String(), transactionDate, notes).Scan(
-		&txn.ID,
-		&txn.EntryID,
-		&txn.Type,
-		&txn.Quantity,
-		&txn.Price,
-		&txn.Currency,
-		&txn.Fees,
-		&txn.TransactionDate,
-		&txn.Notes,
-		&txn.CreatedAt,
-		&txn.UpdatedAt,
-	); err != nil {
-		return Transaction{}, err
-	}
+			&txn.ID,
+			&txn.EntryID,
+			&txn.Type,
+			&txn.Quantity,
+			&txn.Price,
+			&txn.Currency,
+			&txn.Fees,
+			&txn.TransactionDate,
+			&txn.Notes,
+			&txn.CreatedAt,
+			&txn.UpdatedAt,
+		); err != nil {
+			return err
+		}
 
-	txn.Price.SetCurrency(txn.Currency)
-	txn.Fees.SetCurrency(txn.Currency)
+		txn.Price.SetCurrency(txn.Currency)
+		txn.Fees.SetCurrency(txn.Currency)
+
+		return nil
+	}); err != nil {
+		return txn, err
+	}
 
 	return txn, nil
 }
@@ -453,6 +466,7 @@ func (r *PostgresRepository) DeleteTransaction(ctx context.Context, userID, txnI
 	if err != nil {
 		return err
 	}
+
 	if tag.RowsAffected() == 0 {
 		return ErrTransactionNotFound
 	}
@@ -465,87 +479,87 @@ func (r *PostgresRepository) DeleteTransaction(ctx context.Context, userID, txnI
 // upserts the portfolio position and inserts the transaction, so a mid-batch
 // failure never leaves a half-imported file behind.
 func (r *PostgresRepository) ImportEntryTransactions(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []ImportTransactionRow) (int, error) {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return 0, err
-	}
-	defer func() {
-		_ = tx.Rollback(ctx)
-	}()
+	var imported int
 
-	var owned bool
-	if err := tx.QueryRow(ctx, `
+	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		var owned bool
+
+		if err := tx.QueryRow(ctx, `
 		SELECT EXISTS (SELECT 1 FROM portfolios WHERE id = $1 AND user_id = $2)
 		   AND EXISTS (SELECT 1 FROM investment_sources WHERE id = $3 AND user_id = $2)
 	`, portfolioID, userID, sourceID).Scan(&owned); err != nil {
-		return 0, err
-	}
-	if !owned {
-		return 0, ErrPortfolioOrSourceNotFound
-	}
+			return err
+		}
 
-	// Cache asset lookups: classic spreadsheets repeat the same ticker on
-	// many rows.
-	assetIDs := make(map[string]uuid.UUID)
-	imported := 0
-	for _, row := range rows {
-		assetID, ok := assetIDs[row.Ticker]
-		if !ok {
-			// Reuse an existing asset for the ticker (regardless of exchange)
-			// before creating a new one, so imports never clobber curated
-			// asset data the way an upsert would.
-			err := tx.QueryRow(ctx, `
+		if !owned {
+			return ErrPortfolioOrSourceNotFound
+		}
+
+		// Cache asset lookups: classic spreadsheets repeat the same ticker on
+		// many rows.
+		assetIDs := make(map[string]uuid.UUID)
+		imported := 0
+		for _, row := range rows {
+			assetID, ok := assetIDs[row.Ticker]
+			if !ok {
+				// Reuse an existing asset for the ticker (regardless of exchange)
+				// before creating a new one, so imports never clobber curated
+				// asset data the way an upsert would.
+				err := tx.QueryRow(ctx, `
 				SELECT id FROM assets WHERE UPPER(ticker) = $1 ORDER BY created_at LIMIT 1
 			`, row.Ticker).Scan(&assetID)
-			if errors.Is(err, pgx.ErrNoRows) {
-				// created_by, and the membership row below, are what a
-				// contributed asset needs to be visible to its contributor:
-				// the catalog only serves curated rows to everybody. Without
-				// them an imported ticker would be in the user's portfolio and
-				// missing from the picker they add the next one with.
-				err = tx.QueryRow(ctx, `
+				if errors.Is(err, pgx.ErrNoRows) {
+					// created_by, and the membership row below, are what a
+					// contributed asset needs to be visible to its contributor:
+					// the catalog only serves curated rows to everybody. Without
+					// them an imported ticker would be in the user's portfolio and
+					// missing from the picker they add the next one with.
+					err = tx.QueryRow(ctx, `
 					INSERT INTO assets (ticker, name, asset_type, exchange, currency, created_by, is_curated, created_at, updated_at)
 					VALUES ($1, $2, $3::asset_type, NULL, $4, $5, FALSE, NOW(), NOW())
 					ON CONFLICT (ticker, COALESCE(exchange, '')) DO UPDATE SET updated_at = NOW()
 					RETURNING id
 				`, row.Ticker, row.AssetName, row.AssetType, row.Currency, userID).Scan(&assetID)
-			}
-			if err != nil {
-				return 0, err
-			}
+				}
+				if err != nil {
+					return err
+				}
 
-			if _, err := tx.Exec(ctx, `
+				if _, err := tx.Exec(ctx, `
 				INSERT INTO user_catalog_assets (user_id, asset_id) VALUES ($1, $2)
 				ON CONFLICT DO NOTHING
 			`, userID, assetID); err != nil {
-				return 0, err
+					return err
+				}
+
+				assetIDs[row.Ticker] = assetID
 			}
 
-			assetIDs[row.Ticker] = assetID
-		}
-
-		var entryID uuid.UUID
-		if err := tx.QueryRow(ctx, `
+			var entryID uuid.UUID
+			if err := tx.QueryRow(ctx, `
 			INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date, notes)
 			VALUES ($1::uuid, $2::uuid, $3::uuid, 0, $4::numeric, $5::char(3), $6::date, $7)
 			ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, ''))
 			DO UPDATE SET updated_at = NOW()
 			RETURNING id
 		`, portfolioID, assetID, sourceID, row.Price.String(), row.Currency, row.Date, row.Notes).Scan(&entryID); err != nil {
-			return 0, err
-		}
+				return err
+			}
 
-		if _, err := tx.Exec(ctx, `
+			if _, err := tx.Exec(ctx, `
 			INSERT INTO transactions (entry_id, type, quantity, price, currency, fees, transaction_date, notes)
 			VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::date, $8)
 		`, entryID, row.Type, row.Quantity.String(), row.Price.String(), row.Currency, row.Fees.String(), row.Date, row.Notes); err != nil {
-			return 0, err
+				return err
+			}
+
+			imported++
 		}
-		imported++
+
+		return nil
+	}); err != nil {
+		return imported, err
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return 0, err
-	}
 	return imported, nil
 }
