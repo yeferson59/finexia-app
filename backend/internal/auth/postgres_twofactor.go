@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/yeferson59/finexia-app/internal/platform/database"
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
@@ -76,48 +77,44 @@ func (r *PostgresRepository) EnableTwoFactor(ctx context.Context, userID uuid.UU
 // DeleteTwoFactor removes the enrollment and every recovery code in one
 // transaction, returning the account to the "2FA disabled" default.
 func (r *PostgresRepository) DeleteTwoFactor(ctx context.Context, userID uuid.UUID) error {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	return database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx,
+			"DELETE FROM user_two_factor_recovery_codes WHERE user_id = $1", userID.String(),
+		); err != nil {
+			return err
+		}
 
-	if _, err := tx.Exec(ctx,
-		"DELETE FROM user_two_factor_recovery_codes WHERE user_id = $1", userID.String(),
-	); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx,
-		"DELETE FROM user_two_factor WHERE user_id = $1", userID.String(),
-	); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
+		if _, err := tx.Exec(ctx,
+			"DELETE FROM user_two_factor WHERE user_id = $1", userID.String(),
+		); err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 // ReplaceTwoFactorRecoveryCodes atomically swaps the user's recovery codes
 // for a new batch of hashes.
 func (r *PostgresRepository) ReplaceTwoFactorRecoveryCodes(ctx context.Context, userID uuid.UUID, codeHashes []string) error {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	if _, err := tx.Exec(ctx,
-		"DELETE FROM user_two_factor_recovery_codes WHERE user_id = $1", userID.String(),
-	); err != nil {
-		return err
-	}
-	for _, hash := range codeHashes {
+	return database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx,
-			"INSERT INTO user_two_factor_recovery_codes (user_id, code_hash) VALUES ($1, $2)",
-			userID.String(), hash,
+			"DELETE FROM user_two_factor_recovery_codes WHERE user_id = $1", userID.String(),
 		); err != nil {
 			return err
 		}
-	}
-	return tx.Commit(ctx)
+
+		for _, hash := range codeHashes {
+			if _, err := tx.Exec(ctx,
+				"INSERT INTO user_two_factor_recovery_codes (user_id, code_hash) VALUES ($1, $2)",
+				userID.String(), hash,
+			); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
 }
 
 // ConsumeTwoFactorRecoveryCode marks a recovery code as used. The UPDATE only
