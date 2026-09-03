@@ -6,16 +6,16 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
-type service interface {
+type authService interface {
 	CleanupExpiredAuth(ctx context.Context) (int64, int64, error)
 }
 
 type CleanupJob struct {
-	svc service
+	svc authService
 	log logger.Logger
 }
 
-func NewCleanupJob(svc service, log logger.Logger) *CleanupJob {
+func NewCleanupJob(svc authService, log logger.Logger) *CleanupJob {
 	return new(CleanupJob{
 		svc: svc,
 		log: log.With(logger.Str("job", "auth_cleanup")),

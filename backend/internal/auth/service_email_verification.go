@@ -15,7 +15,7 @@ import (
 // email and emails it. Errors are logged, not returned: it runs right after
 // account creation, and a mail hiccup must not fail the registration since the
 // user can always request a new link.
-func (s *Service) issueEmailVerification(ctx context.Context, name, email string) {
+func (s *service) issueEmailVerification(ctx context.Context, name, email string) {
 	raw, hash, err := generateRefreshToken()
 	if err != nil {
 		s.log.Error(ctx, "email verification: failed to generate token", logger.Err(err))
@@ -37,7 +37,7 @@ func (s *Service) issueEmailVerification(ctx context.Context, name, email string
 // is registered but not yet verified. The response is intentionally the same
 // regardless of whether the email exists or is already verified, so the
 // endpoint never confirms which addresses are registered.
-func (s *Service) RequestEmailVerification(ctx context.Context, email string) error {
+func (s *service) RequestEmailVerification(ctx context.Context, email string) error {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" {
 		return nil
@@ -55,14 +55,14 @@ func (s *Service) RequestEmailVerification(ctx context.Context, email string) er
 
 // ValidateEmailVerification reports whether a token is still redeemable, so
 // the verify page can reject dead links before confirming.
-func (s *Service) ValidateEmailVerification(ctx context.Context, rawToken string) error {
+func (s *service) ValidateEmailVerification(ctx context.Context, rawToken string) error {
 	_, err := s.lookupEmailVerification(ctx, rawToken)
 	return err
 }
 
 // VerifyEmail consumes a valid verification token and marks the account's
 // email as verified.
-func (s *Service) VerifyEmail(ctx context.Context, rawToken string) error {
+func (s *service) VerifyEmail(ctx context.Context, rawToken string) error {
 	v, err := s.lookupEmailVerification(ctx, rawToken)
 	if err != nil {
 		return err
@@ -78,7 +78,7 @@ func (s *Service) VerifyEmail(ctx context.Context, rawToken string) error {
 // lookupEmailVerification hashes the raw token, fetches the verification row,
 // and rejects anything not currently redeemable. The hash comparison happens
 // in the database via the value column, so the raw token is never stored.
-func (s *Service) lookupEmailVerification(ctx context.Context, rawToken string) (Verification, error) {
+func (s *service) lookupEmailVerification(ctx context.Context, rawToken string) (Verification, error) {
 	rawToken = strings.TrimSpace(rawToken)
 	if rawToken == "" {
 		return Verification{}, ErrEmailVerificationInvalid
@@ -104,7 +104,7 @@ func (s *Service) lookupEmailVerification(ctx context.Context, rawToken string) 
 // sendEmailVerificationMail delivers the verification link. Best-effort and
 // async: a mail hiccup must not fail the caller, and a new link can always be
 // requested.
-func (s *Service) sendEmailVerificationMail(ctx context.Context, userName, email, rawToken string, expiresAt time.Time) {
+func (s *service) sendEmailVerificationMail(ctx context.Context, userName, email, rawToken string, expiresAt time.Time) {
 	if s.mail == nil {
 		return
 	}

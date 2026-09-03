@@ -32,7 +32,7 @@ var allowedInviteRoles = map[string]bool{
 // the recipient a single-use link. The raw token is returned only inside that
 // email; only its hash is persisted. Inviting an address that already has an
 // account is refused so the flow can never overwrite existing credentials.
-func (s *Service) CreateInvitation(ctx context.Context, email, name, role string, invitedBy uuid.UUID) (Invitation, error) {
+func (s *service) CreateInvitation(ctx context.Context, email, name, role string, invitedBy uuid.UUID) (Invitation, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" {
 		return Invitation{}, httpx.AsBadRequest(errors.New("invalid email"))
@@ -82,7 +82,7 @@ func (s *Service) CreateInvitation(ctx context.Context, email, name, role string
 
 // ResendInvitation rotates the token of an existing pending invitation and
 // emails the new link, invalidating the previous one.
-func (s *Service) ResendInvitation(ctx context.Context, id, invitedBy uuid.UUID) (Invitation, error) {
+func (s *service) ResendInvitation(ctx context.Context, id, invitedBy uuid.UUID) (Invitation, error) {
 	existing, err := s.stores.Invitations.GetInvitationByID(ctx, id)
 	if err != nil {
 		return Invitation{}, err
@@ -99,22 +99,22 @@ func (s *Service) ResendInvitation(ctx context.Context, id, invitedBy uuid.UUID)
 	return s.CreateInvitation(ctx, existing.Email, existing.Name, existing.Role, invitedBy)
 }
 
-func (s *Service) ListInvitations(ctx context.Context, offset, limit uint) ([]Invitation, uint, error) {
+func (s *service) ListInvitations(ctx context.Context, offset, limit uint) ([]Invitation, uint, error) {
 	return s.stores.Invitations.ListInvitations(ctx, offset, limit)
 }
 
-func (s *Service) RevokeInvitation(ctx context.Context, id uuid.UUID) error {
+func (s *service) RevokeInvitation(ctx context.Context, id uuid.UUID) error {
 	return s.stores.Invitations.RevokeInvitation(ctx, id)
 }
 
-func (s *Service) ListWaitlist(ctx context.Context, offset, limit uint) ([]marketing.Waitlist, uint, error) {
+func (s *service) ListWaitlist(ctx context.Context, offset, limit uint) ([]marketing.Waitlist, uint, error) {
 	return s.stores.Waitlist.ListWaitlist(ctx, offset, limit)
 }
 
 // ValidateInvitation resolves a raw token to its invitation and enforces that it
 // is still redeemable, so the accept page can prefill the email and reject dead
 // links before asking for a password.
-func (s *Service) ValidateInvitation(ctx context.Context, rawToken string) (Invitation, error) {
+func (s *service) ValidateInvitation(ctx context.Context, rawToken string) (Invitation, error) {
 	inv, err := s.lookupPendingInvitation(ctx, rawToken)
 	if err != nil {
 		return Invitation{}, err
@@ -125,7 +125,7 @@ func (s *Service) ValidateInvitation(ctx context.Context, rawToken string) (Invi
 // AcceptInvitation consumes a valid invitation and provisions the account with
 // the password the invitee chose. The heavy lifting (create user + account,
 // mark consumed, advance waitlist) happens in a single repository transaction.
-func (s *Service) AcceptInvitation(ctx context.Context, rawToken, name, password string) (identity.User, error) {
+func (s *service) AcceptInvitation(ctx context.Context, rawToken, name, password string) (identity.User, error) {
 	inv, err := s.lookupPendingInvitation(ctx, rawToken)
 	if err != nil {
 		return identity.User{}, err
@@ -149,7 +149,7 @@ func (s *Service) AcceptInvitation(ctx context.Context, rawToken, name, password
 // lookupPendingInvitation hashes the raw token, fetches the invitation, and
 // rejects anything not currently redeemable. The hash comparison happens in the
 // database via the unique token_hash column, so the raw token is never stored.
-func (s *Service) lookupPendingInvitation(ctx context.Context, rawToken string) (Invitation, error) {
+func (s *service) lookupPendingInvitation(ctx context.Context, rawToken string) (Invitation, error) {
 	rawToken = strings.TrimSpace(rawToken)
 	if rawToken == "" {
 		return Invitation{}, ErrInvitationInvalid
@@ -178,7 +178,7 @@ func (s *Service) lookupPendingInvitation(ctx context.Context, rawToken string) 
 // sendInvitationEmail delivers the invitation link. Best-effort and async: a
 // mail hiccup must not fail the admin's request, and the invitation can always
 // be resent.
-func (s *Service) sendInvitationEmail(ctx context.Context, inv Invitation, rawToken string) {
+func (s *service) sendInvitationEmail(ctx context.Context, inv Invitation, rawToken string) {
 	if s.mail == nil {
 		return
 	}

@@ -489,13 +489,13 @@ func testConfig() Config {
 	}
 }
 
-func newTestService(repo *fakeRepository, storage *memStorage) *Service {
+func newTestService(repo *fakeRepository, storage *memStorage) *service {
 	return newService(testStores(repo), testConfig(), storage, nil, nil, logger.Noop())
 }
 
 // newTestServiceFull wires a fake mailer in addition to the repository, for
 // flows that send email.
-func newTestServiceFull(repo *fakeRepository, storage *memStorage, mailer Mailer) *Service {
+func newTestServiceFull(repo *fakeRepository, storage *memStorage, mailer Mailer) *service {
 	return newService(testStores(repo), testConfig(), storage, mailer, nil, logger.Noop())
 }
 

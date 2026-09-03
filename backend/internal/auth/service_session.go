@@ -12,7 +12,7 @@ import (
 
 // ListSessions returns the user's live sessions, flagging the one that issued
 // the current request so the client can distinguish "this device".
-func (s *Service) ListSessions(ctx context.Context, userID uuid.UUID, currentToken string) ([]ActiveSessionDTO, error) {
+func (s *service) ListSessions(ctx context.Context, userID uuid.UUID, currentToken string) ([]ActiveSessionDTO, error) {
 	sessions, err := s.stores.Sessions.ListSessionsByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func (s *Service) ListSessions(ctx context.Context, userID uuid.UUID, currentTok
 
 // RevokeSession terminates one of the user's other sessions. The current
 // session must be closed through logout so the refresh cookie is cleared too.
-func (s *Service) RevokeSession(ctx context.Context, userID, sessionID uuid.UUID, currentToken string) error {
+func (s *service) RevokeSession(ctx context.Context, userID, sessionID uuid.UUID, currentToken string) error {
 	sessions, err := s.stores.Sessions.ListSessionsByUserID(ctx, userID)
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func (s *Service) RevokeSession(ctx context.Context, userID, sessionID uuid.UUID
 
 // RevokeOtherSessions terminates every session except the one making the
 // request and returns how many were closed.
-func (s *Service) RevokeOtherSessions(ctx context.Context, userID uuid.UUID, currentToken string) (int64, error) {
+func (s *service) RevokeOtherSessions(ctx context.Context, userID uuid.UUID, currentToken string) (int64, error) {
 	sessions, err := s.stores.Sessions.ListSessionsByUserID(ctx, userID)
 	if err != nil {
 		return 0, err
@@ -81,7 +81,7 @@ func (s *Service) RevokeOtherSessions(ctx context.Context, userID uuid.UUID, cur
 // could keep them alive: the validated-access-token entries, the refresh-token
 // entries, and the family revocation markers (set BEFORE the delete cascades,
 // mirroring Logout).
-func (s *Service) revokeSessions(ctx context.Context, userID uuid.UUID, sessions []identity.Session) (int64, error) {
+func (s *service) revokeSessions(ctx context.Context, userID uuid.UUID, sessions []identity.Session) (int64, error) {
 	ids := make([]uuid.UUID, 0, len(sessions))
 	for _, sess := range sessions {
 		ids = append(ids, sess.ID)

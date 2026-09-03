@@ -24,7 +24,7 @@ import (
 
 // Service holds the auth domain use cases. It depends only on the module's
 // own consumer-defined interfaces plus platform infrastructure.
-type Service struct {
+type service struct {
 	stores  Stores
 	cfg     Config
 	storage fiber.Storage
@@ -33,8 +33,8 @@ type Service struct {
 	log     logger.Logger
 }
 
-func newService(stores Stores, cfg Config, storage fiber.Storage, mailService Mailer, geo GeoLocator, log logger.Logger) *Service {
-	return new(Service{
+func newService(stores Stores, cfg Config, storage fiber.Storage, mailService Mailer, geo GeoLocator, log logger.Logger) *service {
+	return new(service{
 		stores:  stores,
 		cfg:     cfg,
 		storage: storage,
@@ -62,7 +62,7 @@ func loginAttemptsCacheKey(email string) string {
 // isLoginLocked reports whether the account accumulated too many failed
 // attempts. It counts by email regardless of whether the account exists, so
 // the lockout response never leaks which emails are registered.
-func (s *Service) isLoginLocked(ctx context.Context, email string) bool {
+func (s *service) isLoginLocked(ctx context.Context, email string) bool {
 	if s.cfg.MaxLoginAttempts <= 0 {
 		return false
 	}
@@ -76,7 +76,7 @@ func (s *Service) isLoginLocked(ctx context.Context, email string) bool {
 
 // recordLoginFailure increments the failure counter. Each failure renews the
 // TTL, so an ongoing brute-force attempt keeps the lock alive.
-func (s *Service) recordLoginFailure(ctx context.Context, email string) {
+func (s *service) recordLoginFailure(ctx context.Context, email string) {
 	if s.cfg.MaxLoginAttempts <= 0 {
 		return
 	}
@@ -88,7 +88,7 @@ func (s *Service) recordLoginFailure(ctx context.Context, email string) {
 	_ = s.storage.SetWithContext(ctx, key, []byte(strconv.Itoa(count+1)), s.cfg.LoginLockout)
 }
 
-func (s *Service) clearLoginFailures(ctx context.Context, email string) {
+func (s *service) clearLoginFailures(ctx context.Context, email string) {
 	_ = s.storage.DeleteWithContext(ctx, loginAttemptsCacheKey(email))
 }
 
@@ -103,7 +103,7 @@ func revokedFamilyCacheKey(familyID uuid.UUID) string {
 // revokeRefreshFamily revokes the family in the database and purges every
 // cached token entry, then sets the revocation marker as a backstop in case a
 // cache delete fails or races with a concurrent refresh.
-func (s *Service) revokeRefreshFamily(ctx context.Context, familyID uuid.UUID) {
+func (s *service) revokeRefreshFamily(ctx context.Context, familyID uuid.UUID) {
 	if hashes, err := s.stores.RefreshTokens.RevokeRefreshTokenFamily(ctx, familyID); err == nil {
 		for _, hash := range hashes {
 			_ = s.storage.DeleteWithContext(ctx, refreshCacheKey(hash))
@@ -112,7 +112,7 @@ func (s *Service) revokeRefreshFamily(ctx context.Context, familyID uuid.UUID) {
 	_ = s.storage.SetWithContext(ctx, revokedFamilyCacheKey(familyID), []byte("1"), s.cfg.JWTRefreshDuration)
 }
 
-func (s *Service) Login(ctx context.Context, email, password, ipAddress, userAgent string) (LoginInternalDTO, error) {
+func (s *service) Login(ctx context.Context, email, password, ipAddress, userAgent string) (LoginInternalDTO, error) {
 	ipAddress = sanitizeIP(truncate(ipAddress, 45))
 	userAgent = truncate(userAgent, 255)
 
@@ -169,7 +169,7 @@ func (s *Service) Login(ctx context.Context, email, password, ipAddress, userAge
 // issueSession creates the access token, session row, refresh token, and
 // new-device alert for a fully authenticated user. Shared by password-only
 // logins and logins completed through the two-factor step.
-func (s *Service) issueSession(ctx context.Context, userID uuid.UUID, roleName, userName, userEmail, ipAddress, userAgent string) (LoginInternalDTO, error) {
+func (s *service) issueSession(ctx context.Context, userID uuid.UUID, roleName, userName, userEmail, ipAddress, userAgent string) (LoginInternalDTO, error) {
 	// Decide whether this login comes from a device the user has used before.
 	// Checked against known_login_ips (not the sessions table) because a
 	// session is deleted on logout and swept on expiry, while this history
@@ -250,7 +250,7 @@ func (s *Service) issueSession(ctx context.Context, userID uuid.UUID, roleName, 
 
 // recordSessionLocation stamps the session row with the approximate location
 // of its IP. Best-effort: an unknown location just leaves the column empty.
-func (s *Service) recordSessionLocation(ctx context.Context, sessionID uuid.UUID, ipAddress string) {
+func (s *service) recordSessionLocation(ctx context.Context, sessionID uuid.UUID, ipAddress string) {
 	location := s.locateIP(ipAddress)
 	if location == "" {
 		return
@@ -264,7 +264,7 @@ func (s *Service) recordSessionLocation(ctx context.Context, sessionID uuid.UUID
 // with no prior session. Security notices are sent regardless of the marketing
 // email preferences: knowing about an unexpected login protects the account
 // itself. Best-effort — a mail failure never affects the login.
-func (s *Service) sendLoginAlert(userName, email, ipAddress, userAgent string) {
+func (s *service) sendLoginAlert(userName, email, ipAddress, userAgent string) {
 	if s.mail == nil {
 		return
 	}
@@ -291,7 +291,7 @@ func (s *Service) sendLoginAlert(userName, email, ipAddress, userAgent string) {
 	})
 }
 
-func (s *Service) CreateJWToken(userID uuid.UUID, role string, expiresAt time.Time) (string, error) {
+func (s *service) CreateJWToken(userID uuid.UUID, role string, expiresAt time.Time) (string, error) {
 	claims := jwt.MapClaims{
 		"id":   userID,
 		"role": role,
@@ -303,7 +303,7 @@ func (s *Service) CreateJWToken(userID uuid.UUID, role string, expiresAt time.Ti
 	return token.SignedString([]byte(s.cfg.JWTSecret))
 }
 
-func (s *Service) Register(ctx context.Context, name, email, password string) (RegisterResponseDTO, error) {
+func (s *service) Register(ctx context.Context, name, email, password string) (RegisterResponseDTO, error) {
 	_, err := s.stores.Users.GetUserByEmail(ctx, email)
 	if err == nil {
 		return RegisterResponseDTO{}, ErrEmailAlreadyExists
@@ -332,7 +332,7 @@ func (s *Service) Register(ctx context.Context, name, email, password string) (R
 // step of ChangePassword, which this module owns. Both failures are tagged so
 // httpx.FromDomain resolves them by type: a missing account is a 404 and a
 // wrong password a 400.
-func (s *Service) VerifyPassword(ctx context.Context, userID uuid.UUID, currentPassword string) error {
+func (s *service) VerifyPassword(ctx context.Context, userID uuid.UUID, currentPassword string) error {
 	account, err := s.stores.Accounts.GetAccountByUserID(ctx, userID)
 	if err != nil {
 		return httpx.AsNotFound(errors.New("not found account"))
@@ -345,7 +345,7 @@ func (s *Service) VerifyPassword(ctx context.Context, userID uuid.UUID, currentP
 	return nil
 }
 
-func (s *Service) GetSession(ctx context.Context, userID uuid.UUID, token string) (UserSessionResponseDTO, error) {
+func (s *service) GetSession(ctx context.Context, userID uuid.UUID, token string) (UserSessionResponseDTO, error) {
 	user, err := s.stores.Sessions.GetSessionByUserIDToken(ctx, userID, token)
 	if err != nil {
 		return UserSessionResponseDTO{}, err

@@ -254,7 +254,7 @@ func TestValidateToken(t *testing.T) {
 		Role: identity.Role{Name: "user"},
 	}
 
-	newSvc := func(sessionUser identity.User, sessionErr error) (*Service, *memStorage, *int) {
+	newSvc := func(sessionUser identity.User, sessionErr error) (*service, *memStorage, *int) {
 		calls := new(0)
 		repo := new(fakeRepository{
 			getSessionByToken: func(context.Context, string) (identity.User, error) {
@@ -266,7 +266,7 @@ func TestValidateToken(t *testing.T) {
 		return newTestService(repo, storage), storage, calls
 	}
 
-	signToken := func(t *testing.T, svc *Service, exp time.Time) string {
+	signToken := func(t *testing.T, svc *service, exp time.Time) string {
 		t.Helper()
 		token, err := svc.CreateJWToken(user.ID, user.Role.Name, exp)
 		if err != nil {
@@ -384,7 +384,7 @@ func TestValidateToken(t *testing.T) {
 // primedRefreshFixture wires a service whose cache already holds a valid
 // refresh token entry, mimicking the state right after a login.
 type refreshFixture struct {
-	svc       *Service
+	svc       *service
 	storage   *memStorage
 	raw       string
 	hash      string

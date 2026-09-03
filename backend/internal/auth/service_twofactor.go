@@ -66,7 +66,7 @@ func generateTwoFactorRecoveryCodes() (raws, hashes []string, err error) {
 
 // verifyCurrentPassword gates every 2FA management action behind the account
 // password, so a hijacked session alone cannot reconfigure 2FA.
-func (s *Service) verifyCurrentPassword(ctx context.Context, userID uuid.UUID, password string) error {
+func (s *service) verifyCurrentPassword(ctx context.Context, userID uuid.UUID, password string) error {
 	account, err := s.stores.Accounts.GetAccountByUserID(ctx, userID)
 	if err != nil {
 		return httpx.AsBadRequest(errors.New("invalid current password"))
@@ -79,7 +79,7 @@ func (s *Service) verifyCurrentPassword(ctx context.Context, userID uuid.UUID, p
 
 // getTwoFactor returns the row plus a found flag, folding the not-found case
 // so callers don't repeat the sentinel check.
-func (s *Service) getTwoFactor(ctx context.Context, userID uuid.UUID) (TwoFactor, bool, error) {
+func (s *service) getTwoFactor(ctx context.Context, userID uuid.UUID) (TwoFactor, bool, error) {
 	tf, err := s.stores.TwoFactor.GetTwoFactor(ctx, userID)
 	if errors.Is(err, ErrTwoFactorNotFound) {
 		return TwoFactor{}, false, nil
@@ -92,7 +92,7 @@ func (s *Service) getTwoFactor(ctx context.Context, userID uuid.UUID) (TwoFactor
 
 // TwoFactorStatus reports whether 2FA is enabled (default: disabled), whether
 // a setup is mid-flight, and how many recovery codes remain unused.
-func (s *Service) TwoFactorStatus(ctx context.Context, userID uuid.UUID) (TwoFactorStatusResponseDTO, error) {
+func (s *service) TwoFactorStatus(ctx context.Context, userID uuid.UUID) (TwoFactorStatusResponseDTO, error) {
 	tf, found, err := s.getTwoFactor(ctx, userID)
 	if err != nil {
 		return TwoFactorStatusResponseDTO{}, err
@@ -117,7 +117,7 @@ func (s *Service) TwoFactorStatus(ctx context.Context, userID uuid.UUID) (TwoFac
 // BeginTwoFactorSetup issues a fresh TOTP secret for the user to load into an
 // authenticator app. Nothing is enforced yet: login only starts requiring
 // codes after ConfirmTwoFactorSetup proves the app produces valid ones.
-func (s *Service) BeginTwoFactorSetup(ctx context.Context, userID uuid.UUID, password string) (TwoFactorSetupResponseDTO, error) {
+func (s *service) BeginTwoFactorSetup(ctx context.Context, userID uuid.UUID, password string) (TwoFactorSetupResponseDTO, error) {
 	if err := s.verifyCurrentPassword(ctx, userID, password); err != nil {
 		return TwoFactorSetupResponseDTO{}, err
 	}
@@ -153,7 +153,7 @@ func (s *Service) BeginTwoFactorSetup(ctx context.Context, userID uuid.UUID, pas
 // ConfirmTwoFactorSetup verifies the first code from the authenticator app,
 // switches 2FA on, and hands back the single-use recovery codes. The raw
 // codes exist only in this response; the database keeps hashes.
-func (s *Service) ConfirmTwoFactorSetup(ctx context.Context, userID uuid.UUID, code, ipAddress, userAgent string) (TwoFactorEnableResponseDTO, error) {
+func (s *service) ConfirmTwoFactorSetup(ctx context.Context, userID uuid.UUID, code, ipAddress, userAgent string) (TwoFactorEnableResponseDTO, error) {
 	tf, found, err := s.getTwoFactor(ctx, userID)
 	if err != nil {
 		return TwoFactorEnableResponseDTO{}, err
@@ -191,7 +191,7 @@ func (s *Service) ConfirmTwoFactorSetup(ctx context.Context, userID uuid.UUID, c
 // DisableTwoFactor turns 2FA back off. It demands the password AND a valid
 // code (TOTP or recovery), so neither a stolen session nor a stolen password
 // alone is enough to strip the protection.
-func (s *Service) DisableTwoFactor(ctx context.Context, userID uuid.UUID, password, code, ipAddress, userAgent string) error {
+func (s *service) DisableTwoFactor(ctx context.Context, userID uuid.UUID, password, code, ipAddress, userAgent string) error {
 	if err := s.verifyCurrentPassword(ctx, userID, password); err != nil {
 		return err
 	}
@@ -225,7 +225,7 @@ func (s *Service) DisableTwoFactor(ctx context.Context, userID uuid.UUID, passwo
 
 // RegenerateTwoFactorRecoveryCodes invalidates every old recovery code and
 // issues a fresh batch, guarded by password + current code.
-func (s *Service) RegenerateTwoFactorRecoveryCodes(ctx context.Context, userID uuid.UUID, password, code string) (TwoFactorEnableResponseDTO, error) {
+func (s *service) RegenerateTwoFactorRecoveryCodes(ctx context.Context, userID uuid.UUID, password, code string) (TwoFactorEnableResponseDTO, error) {
 	if err := s.verifyCurrentPassword(ctx, userID, password); err != nil {
 		return TwoFactorEnableResponseDTO{}, err
 	}
@@ -256,7 +256,7 @@ func (s *Service) RegenerateTwoFactorRecoveryCodes(ctx context.Context, userID u
 // createTwoFactorPending stores a short-lived opaque token that represents
 // "password already verified, waiting for the code". Only its hash is cached,
 // mirroring how refresh tokens are handled.
-func (s *Service) createTwoFactorPending(ctx context.Context, userID uuid.UUID) (string, error) {
+func (s *service) createTwoFactorPending(ctx context.Context, userID uuid.UUID) (string, error) {
 	raw, hash, err := generateRefreshToken()
 	if err != nil {
 		return "", err
@@ -270,7 +270,7 @@ func (s *Service) createTwoFactorPending(ctx context.Context, userID uuid.UUID) 
 // CompleteTwoFactorLogin exchanges a pending-login token plus a valid TOTP or
 // recovery code for a real session. Attempts are counted per pending token;
 // too many failures kill the token and force a fresh password login.
-func (s *Service) CompleteTwoFactorLogin(ctx context.Context, rawToken, code, ipAddress, userAgent string) (LoginInternalDTO, error) {
+func (s *service) CompleteTwoFactorLogin(ctx context.Context, rawToken, code, ipAddress, userAgent string) (LoginInternalDTO, error) {
 	ipAddress = sanitizeIP(truncate(ipAddress, 45))
 	userAgent = truncate(userAgent, 255)
 
@@ -332,7 +332,7 @@ func (s *Service) CompleteTwoFactorLogin(ctx context.Context, rawToken, code, ip
 }
 
 // verifyTwoFactorCode accepts either a 6-digit TOTP code or a recovery code.
-func (s *Service) verifyTwoFactorCode(ctx context.Context, userID uuid.UUID, secret, code string) bool {
+func (s *service) verifyTwoFactorCode(ctx context.Context, userID uuid.UUID, secret, code string) bool {
 	compact := strings.NewReplacer("-", "", " ", "").Replace(strings.TrimSpace(code))
 	if len(compact) == 6 {
 		if _, err := strconv.Atoi(compact); err == nil {
@@ -346,7 +346,7 @@ func (s *Service) verifyTwoFactorCode(ctx context.Context, userID uuid.UUID, sec
 // verifyTOTPWithReplayGuard checks the code and refuses to accept the same
 // time step twice, closing the window where a shoulder-surfed or intercepted
 // code would still be valid.
-func (s *Service) verifyTOTPWithReplayGuard(ctx context.Context, userID uuid.UUID, secret, code string) bool {
+func (s *service) verifyTOTPWithReplayGuard(ctx context.Context, userID uuid.UUID, secret, code string) bool {
 	ok, step := helpers.VerifyTOTP(secret, code, time.Now().UTC())
 	if !ok {
 		return false
@@ -363,7 +363,7 @@ func (s *Service) verifyTOTPWithReplayGuard(ctx context.Context, userID uuid.UUI
 
 // sendTwoFactorAlert notifies the user of 2FA state changes. Like other
 // security notices it ignores marketing preferences and is best-effort.
-func (s *Service) sendTwoFactorAlert(userID uuid.UUID, event, detail, ipAddress, userAgent string) {
+func (s *service) sendTwoFactorAlert(userID uuid.UUID, event, detail, ipAddress, userAgent string) {
 	if s.mail == nil {
 		return
 	}

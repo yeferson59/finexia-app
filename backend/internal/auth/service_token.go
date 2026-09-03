@@ -19,7 +19,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
-func (s *Service) ValidateToken(ctx context.Context, token string) (string, error) {
+func (s *service) ValidateToken(ctx context.Context, token string) (string, error) {
 	cacheKey := validateTokenCacheKey(token)
 
 	data, _ := s.storage.GetWithContext(ctx, cacheKey)
@@ -123,7 +123,7 @@ func (s *Service) ValidateToken(ctx context.Context, token string) (string, erro
 	return token, nil
 }
 
-func (s *Service) RefreshToken(ctx context.Context, rawToken, ipAddress, userAgent string) (LoginInternalDTO, error) {
+func (s *service) RefreshToken(ctx context.Context, rawToken, ipAddress, userAgent string) (LoginInternalDTO, error) {
 	ipAddress = sanitizeIP(truncate(ipAddress, 45))
 	userAgent = truncate(userAgent, 255)
 
@@ -291,7 +291,7 @@ func (s *Service) RefreshToken(ctx context.Context, rawToken, ipAddress, userAge
 // than folding it into the boolean: skipping the check because the database
 // hiccuped would hand a revoked account a working session, and a refresh that
 // errors out is retried by the client a moment later.
-func (s *Service) accountDisabled(ctx context.Context, userID uuid.UUID) (bool, error) {
+func (s *service) accountDisabled(ctx context.Context, userID uuid.UUID) (bool, error) {
 	user, err := s.stores.Users.GetUserByID(ctx, userID)
 	if err != nil {
 		return false, err
@@ -305,7 +305,7 @@ func (s *Service) accountDisabled(ctx context.Context, userID uuid.UUID) (bool, 
 // ban or a deletion take effect at once instead of at the next token expiry,
 // and it is exposed for the user module (which owns those two operations but
 // not the session tables) to call through its own interface.
-func (s *Service) RevokeAllSessions(ctx context.Context, userID uuid.UUID) (int64, error) {
+func (s *service) RevokeAllSessions(ctx context.Context, userID uuid.UUID) (int64, error) {
 	sessions, err := s.stores.Sessions.ListSessionsByUserID(ctx, userID)
 	if err != nil {
 		return 0, err
@@ -317,7 +317,7 @@ func (s *Service) RevokeAllSessions(ctx context.Context, userID uuid.UUID) (int6
 	return s.revokeSessions(ctx, userID, sessions)
 }
 
-func (s *Service) Logout(ctx context.Context, userID uuid.UUID, accessToken, rawRefreshToken string) error {
+func (s *service) Logout(ctx context.Context, userID uuid.UUID, accessToken, rawRefreshToken string) error {
 	// Cache invalidation is best-effort: a cache hiccup must not leave the user
 	// unable to log out, and the markers below close the remaining windows.
 	_ = s.storage.DeleteWithContext(ctx, validateTokenCacheKey(accessToken))
@@ -356,7 +356,7 @@ func (s *Service) Logout(ctx context.Context, userID uuid.UUID, accessToken, raw
 // CleanupExpiredAuth prunes refresh tokens that can no longer be redeemed and
 // sessions that expired with no live refresh token left. Without this, both
 // tables grow unboundedly: rows are only ever deleted on explicit logout.
-func (s *Service) CleanupExpiredAuth(ctx context.Context) (int64, int64, error) {
+func (s *service) CleanupExpiredAuth(ctx context.Context) (int64, int64, error) {
 	refreshTokens, err := s.stores.RefreshTokens.DeleteExpiredRefreshTokens(ctx)
 	if err != nil {
 		return 0, 0, err

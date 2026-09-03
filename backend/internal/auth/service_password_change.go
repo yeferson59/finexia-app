@@ -20,7 +20,7 @@ import (
 //
 // currentToken is the session token of the caller, kept alive so the user is
 // not logged out of the device they just changed the password on.
-func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, currentToken, currentPassword, newPassword, ipAddress, userAgent string) error {
+func (s *service) ChangePassword(ctx context.Context, userID uuid.UUID, currentToken, currentPassword, newPassword, ipAddress, userAgent string) error {
 	if err := s.VerifyPassword(ctx, userID, currentPassword); err != nil {
 		return err
 	}

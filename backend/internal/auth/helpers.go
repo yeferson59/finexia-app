@@ -84,7 +84,7 @@ func humanizeExpiry(d time.Duration) string {
 // locateIP resolves the approximate location of an IP for security alert
 // emails. Bounded by its own timeout so a slow lookup can only delay the
 // (already asynchronous) email, never the request that triggered it.
-func (s *Service) locateIP(ipAddress string) string {
+func (s *service) locateIP(ipAddress string) string {
 	if s.geo == nil {
 		return ""
 	}

@@ -9,11 +9,11 @@ import (
 )
 
 type handler struct {
-	service *Service
+	service *service
 	cfg     Config
 }
 
-func newHandler(svc *Service, cfg Config) *handler {
+func newHandler(svc *service, cfg Config) *handler {
 	return new(handler{svc, cfg})
 }
 

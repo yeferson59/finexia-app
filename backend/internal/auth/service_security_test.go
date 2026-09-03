@@ -14,7 +14,7 @@ import (
 
 // newLockoutService builds a Service with the login lockout enabled, which
 // testConfig leaves disabled so unrelated tests never trip it.
-func newLockoutService(repo *fakeRepository, storage *memStorage, maxAttempts int) *Service {
+func newLockoutService(repo *fakeRepository, storage *memStorage, maxAttempts int) *service {
 	cfg := testConfig()
 	cfg.MaxLoginAttempts = maxAttempts
 	cfg.LoginLockout = time.Minute

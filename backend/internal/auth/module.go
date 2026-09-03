@@ -35,7 +35,7 @@ type Module struct {
 	cfg     Config
 	storage fiber.Storage
 	limiter fiber.Handler
-	service *Service
+	service *service
 	handler *handler
 }
 
@@ -63,7 +63,7 @@ func New(deps Deps) *Module {
 // there is nothing here that must fail the build. The limiter is the one
 // injected handler, and it degrades rather than refuses; see
 // httpx.OrPassThrough.
-func newModule(deps Deps, service *Service) *Module {
+func newModule(deps Deps, service *service) *Module {
 	return new(Module{
 		cfg:     deps.Cfg,
 		storage: deps.Storage,
@@ -75,7 +75,7 @@ func newModule(deps Deps, service *Service) *Module {
 
 // Service exposes the module's use cases to the composition root and other
 // modules (always consumed through interfaces declared by the consumer).
-func (m *Module) Service() *Service {
+func (m *Module) Service() *service {
 	return m.service
 }
 

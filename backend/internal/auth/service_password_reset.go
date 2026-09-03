@@ -19,7 +19,7 @@ import (
 // account, if one exists for the address. The response is intentionally the
 // same regardless of whether the email is registered, so the endpoint never
 // confirms which addresses have an account.
-func (s *Service) RequestPasswordReset(ctx context.Context, email string) error {
+func (s *service) RequestPasswordReset(ctx context.Context, email string) error {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" {
 		return nil
@@ -49,7 +49,7 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email string) error 
 
 // ValidatePasswordResetToken reports whether a token is still redeemable, so
 // the reset page can reject dead links before asking for a new password.
-func (s *Service) ValidatePasswordResetToken(ctx context.Context, rawToken string) error {
+func (s *service) ValidatePasswordResetToken(ctx context.Context, rawToken string) error {
 	_, err := s.lookupPasswordReset(ctx, rawToken)
 	return err
 }
@@ -57,7 +57,7 @@ func (s *Service) ValidatePasswordResetToken(ctx context.Context, rawToken strin
 // ResetPassword consumes a valid reset token and sets the new password. Every
 // existing session is revoked afterward: proving control of the inbox is not
 // the same as proving control of any device that was already logged in.
-func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword, ipAddress, userAgent string) error {
+func (s *service) ResetPassword(ctx context.Context, rawToken, newPassword, ipAddress, userAgent string) error {
 	pr, err := s.lookupPasswordReset(ctx, rawToken)
 	if err != nil {
 		return err
@@ -85,7 +85,7 @@ func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword, ipAd
 // rejects anything not currently redeemable. The hash comparison happens in
 // the database via the unique token_hash column, so the raw token is never
 // stored.
-func (s *Service) lookupPasswordReset(ctx context.Context, rawToken string) (PasswordReset, error) {
+func (s *service) lookupPasswordReset(ctx context.Context, rawToken string) (PasswordReset, error) {
 	rawToken = strings.TrimSpace(rawToken)
 	if rawToken == "" {
 		return PasswordReset{}, ErrPasswordResetInvalid
@@ -113,7 +113,7 @@ func (s *Service) lookupPasswordReset(ctx context.Context, rawToken string) (Pas
 
 // sendPasswordResetEmail delivers the reset link. Best-effort and async: a
 // mail hiccup must not fail the request, and the user can always ask again.
-func (s *Service) sendPasswordResetEmail(ctx context.Context, userName, email, rawToken string, expiresAt time.Time) {
+func (s *service) sendPasswordResetEmail(ctx context.Context, userName, email, rawToken string, expiresAt time.Time) {
 	if s.mail == nil {
 		return
 	}
@@ -138,7 +138,7 @@ func (s *Service) sendPasswordResetEmail(ctx context.Context, userName, email, r
 // login alert, it bypasses email preferences: if the change wasn't theirs,
 // this email is their only chance to react. Best-effort, and shared by both
 // paths that write a password — the reset flow and ChangePassword.
-func (s *Service) sendPasswordChangedAlert(userID uuid.UUID, ipAddress, userAgent string) {
+func (s *service) sendPasswordChangedAlert(userID uuid.UUID, ipAddress, userAgent string) {
 	if s.mail == nil {
 		return
 	}
