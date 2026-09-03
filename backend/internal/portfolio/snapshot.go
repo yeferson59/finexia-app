@@ -20,15 +20,7 @@ func (s *service) SyncPortfolioSnapshots(ctx context.Context) (int, []error) {
 	count := 0
 
 	for _, row := range rows {
-		if err := s.repo.UpsertPortfolioSnapshot(
-			ctx,
-			row.PortfolioID,
-			today,
-			row.TotalMarketValue,
-			row.TotalGainLoss,
-			row.TotalGainLossPct,
-			row.BaseCurrency,
-		); err != nil {
+		if err := s.repo.UpsertPortfolioSnapshot(ctx, row, today); err != nil {
 			log.Error(ctx, "upsert snapshot failed", logger.Err(err), logger.Str("portfolioId", row.PortfolioID.String()))
 
 			errs = append(errs, err)

@@ -142,7 +142,7 @@ type fakeRepository struct {
 	deleteTransaction               func(ctx context.Context, userID, txnID uuid.UUID) error
 	importEntryTransactions         func(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []ImportTransactionRow) (int, error)
 	getAllPortfolioSummaryRows      func(ctx context.Context) ([]SnapshotRow, error)
-	upsertPortfolioSnapshot         func(ctx context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, totalGainLoss, totalGainLossPct string, currency money.Currency) error
+	upsertPortfolioSnapshot         func(ctx context.Context, row SnapshotRow, snapshotDate time.Time) error
 	getPortfolioGrowthByUserID      func(ctx context.Context, userID uuid.UUID, currency money.Currency, hasSince bool, since time.Time) ([]GrowthPoint, error)
 	getPortfolioGrowthByPortfolioID func(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
 	getPortfolioValuesAsOf          func(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error)
@@ -254,8 +254,8 @@ func (f *fakeRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]Snap
 	return f.getAllPortfolioSummaryRows(ctx)
 }
 
-func (f *fakeRepository) UpsertPortfolioSnapshot(ctx context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, totalGainLoss, totalGainLossPct string, currency money.Currency) error {
-	return f.upsertPortfolioSnapshot(ctx, portfolioID, snapshotDate, totalValue, totalGainLoss, totalGainLossPct, currency)
+func (f *fakeRepository) UpsertPortfolioSnapshot(ctx context.Context, row SnapshotRow, snapshotDate time.Time) error {
+	return f.upsertPortfolioSnapshot(ctx, row, snapshotDate)
 }
 
 func (f *fakeRepository) GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, currency money.Currency, hasSince bool, since time.Time) ([]GrowthPoint, error) {

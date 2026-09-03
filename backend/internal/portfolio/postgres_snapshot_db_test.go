@@ -2,6 +2,7 @@ package portfolio
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
@@ -212,4 +214,202 @@ func TestGrowthSeriesFlowLandsOnTheDayTheValueMoves(t *testing.T) {
 			t.Errorf("flujo inesperado de %.2f el %s", amount, date)
 		}
 	}
+}
+
+// mixedPortfolio plants one portfolio holding three asset types at prices that
+// come from all three sources the value expression falls back through: the
+// user's own override, the catalog's price, and — for the bond, priced
+// nowhere — the entry's cost.
+func mixedPortfolio(t *testing.T, pool *pgxpool.Pool) (userID, portfolioID uuid.UUID) {
+	t.Helper()
+	ctx := context.Background()
+
+	userID, portfolioID = uuid.New(), uuid.New()
+
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, sql, args...); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
+	})
+
+	exec(`INSERT INTO users (id, name, email, role_id, preferred_currency)
+	      VALUES ($1, 'allocation probe', $2, (SELECT id FROM roles WHERE name = 'customer'), 'USD')`,
+		userID, userID.String()+"@alloc.test")
+
+	sourceID := uuid.New()
+	exec(`INSERT INTO investment_sources (id, user_id, name, source_type)
+	      VALUES ($1, $2, 'probe', 'broker')`, sourceID, userID)
+
+	exec(`INSERT INTO portfolios (id, user_id, name, type, risk_id, base_currency)
+	      VALUES ($1, $2, 'probe', 'diversified', (SELECT id FROM risks LIMIT 1), 'USD')`,
+		portfolioID, userID)
+
+	positions := []struct {
+		assetType    string
+		quantity     float64
+		cost         float64
+		currentPrice *float64
+		ownPrice     *float64
+	}{
+		{assetType: "stock", quantity: 10, cost: 100, currentPrice: ptr(151.91)},
+		{assetType: "etf", quantity: 4, cost: 60, currentPrice: ptr(70.00), ownPrice: ptr(77.35)},
+		{assetType: "bond", quantity: 2, cost: 10.105},
+	}
+
+	for _, position := range positions {
+		assetID, entryID := uuid.New(), uuid.New()
+		exec(`INSERT INTO assets (id, ticker, name, asset_type, currency, current_price)
+		      VALUES ($1, $2, 'probe', $3, 'USD', $4)`,
+			assetID, uuid.New().String()[:8], position.assetType, position.currentPrice)
+
+		if position.ownPrice != nil {
+			exec(`INSERT INTO user_asset_prices (user_id, asset_id, price)
+			      VALUES ($1, $2, $3)`, userID, assetID, *position.ownPrice)
+		}
+
+		exec(`INSERT INTO portfolio_entries
+		        (id, portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date)
+		      VALUES ($1, $2, $3, $4, $5, $6, 'USD', now())`,
+			entryID, portfolioID, assetID, sourceID, position.quantity, position.cost)
+	}
+
+	return userID, portfolioID
+}
+
+func ptr(v float64) *float64 { return &v }
+
+// The allocation a snapshot stores has to be a breakdown *of the total stored
+// beside it*. It is aggregated by a second expression, so nothing but a test
+// against real rows stops the two from drifting into a row that contradicts
+// itself — which is what the column did for its whole life as a literal '{}'.
+func TestSnapshotAllocationAddsUpToTheStoredTotal(t *testing.T) {
+	pool := growthTestPool(t)
+	ctx := context.Background()
+
+	_, portfolioID := mixedPortfolio(t, pool)
+	repo := &PostgresRepository{db: pool}
+
+	rows, err := repo.GetAllPortfolioSummaryRows(ctx)
+	if err != nil {
+		t.Fatalf("GetAllPortfolioSummaryRows: %v", err)
+	}
+
+	var row SnapshotRow
+	for _, candidate := range rows {
+		if candidate.PortfolioID == portfolioID {
+			row = candidate
+			break
+		}
+	}
+	if row.PortfolioID != portfolioID {
+		t.Fatalf("el portafolio de prueba no aparece en las filas del job")
+	}
+
+	allocation := map[string]string{}
+	if err := json.Unmarshal([]byte(row.Allocation), &allocation); err != nil {
+		t.Fatalf("allocation no es un objeto JSON (%q): %v", row.Allocation, err)
+	}
+
+	// Los tres precios salen de las tres ramas del COALESCE: override propio,
+	// precio del catálogo y coste de la entrada.
+	want := map[string]string{
+		"stock": "1519.11", // 10 × 151.91, precio del catálogo
+		"etf":   "309.40",  // 4 × 77.35, precio propio del usuario
+		"bond":  "20.21",   // 2 × 10.105, sin precio: se lleva a coste
+	}
+	if len(allocation) != len(want) {
+		t.Fatalf("allocation = %v, quería %d clases", allocation, len(want))
+	}
+
+	total := decimal.Zero
+	for assetType, wantAmount := range want {
+		got, ok := allocation[assetType]
+		if !ok {
+			t.Fatalf("falta la clase %q en %v", assetType, allocation)
+		}
+		gotDec, err := decimal.NewFromString(got)
+		if err != nil {
+			t.Fatalf("importe de %q no parseable (%q): %v", assetType, got, err)
+		}
+		wantDec, _ := decimal.NewFromString(wantAmount)
+		if !gotDec.Equal(wantDec) {
+			t.Errorf("%s = %s, quería %s", assetType, gotDec, wantDec)
+		}
+		total = total.Add(gotDec)
+	}
+
+	// La propiedad que importa: las partes son el todo que se guarda al lado.
+	storedTotal, err := decimal.NewFromString(row.TotalMarketValue)
+	if err != nil {
+		t.Fatalf("total_market_value no parseable (%q): %v", row.TotalMarketValue, err)
+	}
+	if !total.Equal(storedTotal) {
+		t.Errorf("las porciones suman %s pero el snapshot guarda %s", total, storedTotal)
+	}
+}
+
+// Un portafolio sin posiciones guarda un objeto vacío, no NULL: la columna es
+// NOT NULL y quien lo lea espera un objeto en todos los casos.
+func TestSnapshotAllocationOfAnEmptyPortfolioIsAnEmptyObject(t *testing.T) {
+	pool := growthTestPool(t)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	portfolioID := uuid.New()
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
+	})
+
+	mustExec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, sql, args...); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	mustExec(`INSERT INTO users (id, name, email, role_id, preferred_currency)
+	          VALUES ($1, 'empty probe', $2, (SELECT id FROM roles WHERE name = 'customer'), 'USD')`,
+		userID, userID.String()+"@empty.test")
+	mustExec(`INSERT INTO portfolios (id, user_id, name, type, risk_id, base_currency)
+	          VALUES ($1, $2, 'vacío', 'stocks', (SELECT id FROM risks LIMIT 1), 'USD')`,
+		portfolioID, userID)
+
+	repo := &PostgresRepository{db: pool}
+	rows, err := repo.GetAllPortfolioSummaryRows(ctx)
+	if err != nil {
+		t.Fatalf("GetAllPortfolioSummaryRows: %v", err)
+	}
+
+	for _, row := range rows {
+		if row.PortfolioID != portfolioID {
+			continue
+		}
+		if row.Allocation != "{}" {
+			t.Fatalf("allocation de un portafolio vacío = %q, quería {}", row.Allocation)
+		}
+
+		// Y sobrevive el viaje de ida y vuelta a la columna jsonb.
+		if err := repo.UpsertPortfolioSnapshot(ctx, row, time.Now().UTC().Truncate(24*time.Hour)); err != nil {
+			t.Fatalf("UpsertPortfolioSnapshot: %v", err)
+		}
+
+		var stored string
+		if err := pool.QueryRow(ctx,
+			`SELECT allocation::text FROM portfolio_snapshots WHERE portfolio_id = $1`,
+			portfolioID,
+		).Scan(&stored); err != nil {
+			t.Fatalf("releyendo el snapshot: %v", err)
+		}
+		if stored != "{}" {
+			t.Fatalf("allocation persistida = %q, quería {}", stored)
+		}
+
+		return
+	}
+
+	t.Fatalf("el portafolio vacío no aparece en las filas del job")
 }

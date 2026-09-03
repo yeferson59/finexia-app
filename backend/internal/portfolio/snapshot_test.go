@@ -14,8 +14,8 @@ import (
 func TestSyncPortfolioSnapshots(t *testing.T) {
 	t.Run("upserts one snapshot per summary row", func(t *testing.T) {
 		rows := []SnapshotRow{
-			{PortfolioID: uuid.New(), BaseCurrency: money.USD, TotalMarketValue: "1000.00", TotalGainLoss: "100.00", TotalGainLossPct: "11.11"},
-			{PortfolioID: uuid.New(), BaseCurrency: money.EUR, TotalMarketValue: "500.00", TotalGainLoss: "-20.00", TotalGainLossPct: "-3.85"},
+			{PortfolioID: uuid.New(), BaseCurrency: money.USD, TotalMarketValue: "1000.00", TotalGainLoss: "100.00", TotalGainLossPct: "11.11", Allocation: `{"stock": "600.00", "etf": "400.00"}`},
+			{PortfolioID: uuid.New(), BaseCurrency: money.EUR, TotalMarketValue: "500.00", TotalGainLoss: "-20.00", TotalGainLossPct: "-3.85", Allocation: `{"bond": "500.00"}`},
 		}
 
 		type upsertCall struct {
@@ -23,6 +23,7 @@ func TestSyncPortfolioSnapshots(t *testing.T) {
 			date        time.Time
 			totalValue  string
 			currency    money.Currency
+			allocation  string
 		}
 		var calls []upsertCall
 
@@ -30,8 +31,8 @@ func TestSyncPortfolioSnapshots(t *testing.T) {
 			getAllPortfolioSummaryRows: func(context.Context) ([]SnapshotRow, error) {
 				return rows, nil
 			},
-			upsertPortfolioSnapshot: func(_ context.Context, portfolioID uuid.UUID, snapshotDate time.Time, totalValue, totalGainLoss, totalGainLossPct string, currency money.Currency) error {
-				calls = append(calls, upsertCall{portfolioID, snapshotDate, totalValue, currency})
+			upsertPortfolioSnapshot: func(_ context.Context, row SnapshotRow, snapshotDate time.Time) error {
+				calls = append(calls, upsertCall{row.PortfolioID, snapshotDate, row.TotalMarketValue, row.BaseCurrency, row.Allocation})
 				return nil
 			},
 		})
@@ -57,6 +58,11 @@ func TestSyncPortfolioSnapshots(t *testing.T) {
 			if call.totalValue != rows[i].TotalMarketValue || call.currency != rows[i].BaseCurrency {
 				t.Errorf("call %d value/currency = %s/%s", i, call.totalValue, call.currency)
 			}
+			// La composición del día viaja hasta el upsert: era el campo que se
+			// persistía como '{}' fijo y hacía inútil el histórico.
+			if call.allocation != rows[i].Allocation {
+				t.Errorf("call %d allocation = %q, want %q", i, call.allocation, rows[i].Allocation)
+			}
 		}
 	})
 
@@ -70,8 +76,8 @@ func TestSyncPortfolioSnapshots(t *testing.T) {
 			getAllPortfolioSummaryRows: func(context.Context) ([]SnapshotRow, error) {
 				return rows, nil
 			},
-			upsertPortfolioSnapshot: func(_ context.Context, portfolioID uuid.UUID, _ time.Time, _, _, _ string, _ money.Currency) error {
-				if portfolioID == badID {
+			upsertPortfolioSnapshot: func(_ context.Context, row SnapshotRow, _ time.Time) error {
+				if row.PortfolioID == badID {
 					return errors.New("constraint violation")
 				}
 				return nil

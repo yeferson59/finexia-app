@@ -9,6 +9,18 @@ import (
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
+// GetAllPortfolioSummaryRows reads what the snapshot job persists for each
+// portfolio: the totals from the portfolio_summary view plus the day's
+// composition by asset type.
+//
+// The composition is aggregated here, in the same statement, rather than from
+// the allocation endpoint: that one answers across all of a user's portfolios
+// and in a currency they ask for, while a snapshot is one portfolio in its own
+// base currency. Above all, the value expression below is the view's
+// total_market_value term spelled out per asset type — same price fallback
+// (own price, then the catalog's, then cost), same rate, same 8-decimal
+// rounding — so the slices add up to the total_value stored beside them
+// instead of being a second opinion about the same positions.
 func (r *PostgresRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]SnapshotRow, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT
@@ -17,9 +29,36 @@ func (r *PostgresRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]
 			COALESCE(ps.total_market_value, 0)::text,
 			COALESCE(ps.total_cost_base,    0)::text,
 			COALESCE(ps.total_gain_loss,    0)::text,
-			COALESCE(ps.total_gain_loss_pct,0)::text
+			COALESCE(ps.total_gain_loss_pct,0)::text,
+			COALESCE(alloc.allocation, '{}'::jsonb)::text
 		FROM portfolios p
 		LEFT JOIN portfolio_summary ps ON ps.portfolio_id = p.id
+		LEFT JOIN LATERAL (
+			-- asset_type es un ENUM: jsonb_object_agg pide la clave en text y
+			-- Postgres no lo convierte solo.
+			SELECT jsonb_object_agg(byType.asset_type::text, byType.market_value::text) AS allocation
+			FROM (
+				SELECT
+					a.asset_type,
+					ROUND(COALESCE(SUM(
+						pe.quantity * COALESCE(uap.price, a.current_price, pe.price)
+						            * COALESCE(fx.value_rate, 1)
+					), 0), 8) AS market_value
+				FROM portfolio_entries pe
+				JOIN assets a ON a.id = pe.asset_id
+				LEFT JOIN user_asset_prices uap
+					ON uap.asset_id = pe.asset_id AND uap.user_id = p.user_id
+				LEFT JOIN LATERAL (
+					SELECT fx_rate(
+						p.user_id,
+						COALESCE(a.currency, pe.cost_currency),
+						p.base_currency
+					) AS value_rate
+				) fx ON TRUE
+				WHERE pe.portfolio_id = p.id
+				GROUP BY a.asset_type
+			) byType
+		) alloc ON TRUE
 	`)
 	if err != nil {
 		return nil, err
@@ -36,6 +75,7 @@ func (r *PostgresRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]
 			&row.TotalCostBase,
 			&row.TotalGainLoss,
 			&row.TotalGainLossPct,
+			&row.Allocation,
 		); err != nil {
 			return nil, err
 		}
@@ -49,23 +89,43 @@ func (r *PostgresRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]
 	return result, nil
 }
 
+// UpsertPortfolioSnapshot writes one portfolio's row for a day, replacing it if
+// the job already ran. It takes the row whole rather than six positional
+// arguments: three of them were adjacent strings holding a value, a gain and a
+// percentage, which a caller could reorder without the compiler noticing.
+//
+// allocation is refreshed along with the totals. A same-day re-run happens
+// after positions moved, so leaving it would pair the new total with the old
+// composition — the row would contradict itself.
 func (r *PostgresRepository) UpsertPortfolioSnapshot(
 	ctx context.Context,
-	portfolioID uuid.UUID,
+	row SnapshotRow,
 	snapshotDate time.Time,
-	totalValue, totalGainLoss, totalGainLossPct string,
-	currency money.Currency,
 ) error {
+	allocation := row.Allocation
+	if allocation == "" {
+		allocation = "{}"
+	}
+
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO portfolio_snapshots
 			(portfolio_id, snapshot_date, total_value, currency, allocation, total_gain_loss, total_gain_loss_pct)
-		VALUES ($1, $2::date, $3::numeric, $4, '{}', $5::numeric, $6::numeric)
+		VALUES ($1, $2::date, $3::numeric, $4, $5::jsonb, $6::numeric, $7::numeric)
 		ON CONFLICT (portfolio_id, snapshot_date)
 		DO UPDATE SET
 			total_value         = EXCLUDED.total_value,
+			allocation          = EXCLUDED.allocation,
 			total_gain_loss     = EXCLUDED.total_gain_loss,
 			total_gain_loss_pct = EXCLUDED.total_gain_loss_pct
-	`, portfolioID, snapshotDate, totalValue, currency, totalGainLoss, totalGainLossPct)
+	`,
+		row.PortfolioID,
+		snapshotDate,
+		row.TotalMarketValue,
+		row.BaseCurrency,
+		allocation,
+		row.TotalGainLoss,
+		row.TotalGainLossPct,
+	)
 
 	return err
 }

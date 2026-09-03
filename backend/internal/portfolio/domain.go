@@ -6,6 +6,7 @@
 package portfolio
 
 import (
+	"encoding/json"
 	"time"
 
 	"uuid"
@@ -235,16 +236,18 @@ type ImportTransactionRow struct {
 }
 
 type Snapshot struct {
-	ID               uuid.UUID      `json:"id"`
-	PortfolioID      uuid.UUID      `json:"portfolioId"`
-	SnapshotDate     time.Time      `json:"snapshotDate"`
-	TotalValue       money.Money    `json:"totalValue"`
-	Currency         money.Currency `json:"currency"`
-	Allocation       []byte         `json:"allocation"`
-	TotalGainLoss    money.Money    `json:"totalGainLoss"`
-	TotalGainLossPCT money.Money    `json:"totalGainLossPCT"`
-	CreatedAt        time.Time      `json:"createdAt"`
-	Portfolio        Portfolio      `json:"portfolio,omitzero"`
+	ID           uuid.UUID      `json:"id"`
+	PortfolioID  uuid.UUID      `json:"portfolioId"`
+	SnapshotDate time.Time      `json:"snapshotDate"`
+	TotalValue   money.Money    `json:"totalValue"`
+	Currency     money.Currency `json:"currency"`
+	// Allocation is a JSON object, so it is held raw: as []byte it would reach
+	// a client base64-encoded.
+	Allocation       json.RawMessage `json:"allocation"`
+	TotalGainLoss    money.Money     `json:"totalGainLoss"`
+	TotalGainLossPCT money.Money     `json:"totalGainLossPCT"`
+	CreatedAt        time.Time       `json:"createdAt"`
+	Portfolio        Portfolio       `json:"portfolio,omitzero"`
 }
 
 // AllocationItem is the result of grouping portfolio_entries by category.
@@ -301,6 +304,12 @@ type SnapshotRow struct {
 	TotalCostBase    string
 	TotalGainLoss    string
 	TotalGainLossPct string
+	// Allocation is the day's composition, as a JSON object mapping each
+	// market.AssetType to what the portfolio held of it, in BaseCurrency and as
+	// text — the same shape and the same reading the totals above get. It comes
+	// out of the same statement as TotalMarketValue so the parts add up to it
+	// by construction; see GetAllPortfolioSummaryRows.
+	Allocation string
 }
 
 type GrowthPoint struct {
