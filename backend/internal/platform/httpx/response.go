@@ -5,10 +5,13 @@
 package httpx
 
 import (
+	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
+	"github.com/gofiber/fiber/v3/middleware/requestid"
+	"github.com/rs/zerolog"
 
 	"github.com/yeferson59/finexia-app/pkg/dtos"
 	"github.com/yeferson59/finexia-app/pkg/helpers"
@@ -82,6 +85,20 @@ func FromDomain(c fiber.Ctx, err error, message, action string) error {
 		details = err.Error()
 	}
 
+	// A 5xx's cause goes to the operator, since it is deliberately kept out of
+	// the response. Without this it went nowhere at all: FromDomain consumed the
+	// error and returned only the envelope, so the request logger recorded a
+	// bare "500" and the text — a failing constraint, a missing column after a
+	// migration that was never run — existed in no log on either side.
+	if status >= fiber.StatusInternalServerError && err != nil {
+		serverErrors.Error().
+			Err(err).
+			Str("method", c.Method()).
+			Str("path", c.Path()).
+			Str("requestId", requestid.FromContext(c)).
+			Msg(message)
+	}
+
 	return c.Status(status).JSON(dtos.Response{
 		Success:   false,
 		Message:   message,
@@ -90,6 +107,13 @@ func FromDomain(c fiber.Ctx, err error, message, action string) error {
 		Timestamp: time.Now(),
 	})
 }
+
+// serverErrors writes the causes FromDomain refuses to put in a response body.
+// It builds its own stderr writer for the same reason the Logger middleware
+// does: this package is called from every handler in the app and threading a
+// logger through all of them, to be used on one branch, would cost more than it
+// buys.
+var serverErrors = zerolog.New(os.Stderr).With().Timestamp().Str("component", "httpx").Logger()
 
 // ErrorAction writes an error envelope that carries an "action" code alongside
 // free-form details, for statuses FromDomain doesn't cover (403, 409, 410, …).

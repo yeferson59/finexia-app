@@ -162,3 +162,42 @@ func TestPaginationMetadata(t *testing.T) {
 		t.Errorf("unexpected keys: %v", meta)
 	}
 }
+
+// The 4xx/5xx split on `details`, which is the difference between a client that
+// can fix its request and one retrying blind against the same refusal.
+func TestFromDomainDetailsOnlyOnClientErrors(t *testing.T) {
+	t.Run("a 4xx names the cause", func(t *testing.T) {
+		// The shape a domain sentinel takes once a caller has wrapped it with
+		// which of its rules was broken.
+		err := fmt.Errorf("%w: USD does not convert into itself at 1.0638",
+			AsBadRequest(errors.New("invalid transaction exchange rate")))
+
+		status, payload := perform(t, func(c fiber.Ctx) error {
+			return FromDomain(c, err, "Error creating portfolio entry", "domain:action")
+		})
+		if status != fiber.StatusBadRequest {
+			t.Fatalf("status = %d, want 400: a wrapped tag must still resolve", status)
+		}
+		details, _ := payload["details"].(string)
+		if details != err.Error() {
+			t.Errorf("details = %q, want the error's own text", details)
+		}
+	})
+
+	// The server's own text can carry a query, a constraint name or a
+	// connection string, so it stays out of the body and goes to the log
+	// instead.
+	t.Run("a 5xx says nothing", func(t *testing.T) {
+		err := errors.New(`column "fx_rate" of relation "transactions" does not exist`)
+
+		status, payload := perform(t, func(c fiber.Ctx) error {
+			return FromDomain(c, err, "Error creating portfolio entry", "domain:action")
+		})
+		if status != fiber.StatusInternalServerError {
+			t.Fatalf("status = %d, want 500", status)
+		}
+		if details, ok := payload["details"].(string); ok && details != "" {
+			t.Errorf("details = %q, want empty on a server fault", details)
+		}
+	})
+}
