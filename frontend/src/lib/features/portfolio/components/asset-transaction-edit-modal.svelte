@@ -154,7 +154,7 @@
 						bind:value={editForm.price}
 						placeholder="150.50"
 						min="0"
-						step="0.01"
+						step="any"
 						required
 					/>
 				</div>
