@@ -35,24 +35,32 @@ const money = (value) => value.toFixed(2);
 
 // --- Catálogo de activos ----------------------------------------------------
 
-/** `[ticker, nombre, tipo, mercado, categoría, precio de mercado]`. */
+/*
+ * `[ticker, nombre, tipo, mercado, precio de mercado]`.
+ *
+ * No hay columna de «categoría»: la migración 000026 borró
+ * `portfolio_entries.category` —una copia del tipo del activo que se quedaba
+ * obsoleta al reclasificarlo— junto con su enum en plural. Hoy el backend hace
+ * `entry.Category = entry.Asset.AssetType`, así que la categoría de una
+ * posición *es* su tipo, en singular.
+ */
 const CATALOG = [
-	['AAPL', 'Apple Inc.', 'stock', 'NASDAQ', 'stocks', 214.35],
-	['MSFT', 'Microsoft Corp.', 'stock', 'NASDAQ', 'stocks', 438.9],
-	['NVDA', 'NVIDIA Corp.', 'stock', 'NASDAQ', 'stocks', 126.4],
-	['VWCE', 'Vanguard FTSE All-World UCITS ETF', 'etf', 'XETRA', 'etfs', 128.62],
-	['CSPX', 'iShares Core S&P 500 UCITS ETF', 'etf', 'XETRA', 'etfs', 568.2],
-	['BTC', 'Bitcoin', 'crypto', '', 'cryptos', 67240.0],
-	['ETH', 'Ethereum', 'crypto', '', 'cryptos', 3482.5],
-	['SOL', 'Solana', 'crypto', '', 'cryptos', 168.9],
-	['TLT', 'iShares 20+ Year Treasury Bond ETF', 'bond', 'NASDAQ', 'bonds', 92.15],
-	['USD', 'Efectivo en dólares', 'cash', '', 'cash', 1.0]
+	['AAPL', 'Apple Inc.', 'stock', 'NASDAQ', 214.35],
+	['MSFT', 'Microsoft Corp.', 'stock', 'NASDAQ', 438.9],
+	['NVDA', 'NVIDIA Corp.', 'stock', 'NASDAQ', 126.4],
+	['VWCE', 'Vanguard FTSE All-World UCITS ETF', 'etf', 'XETRA', 128.62],
+	['CSPX', 'iShares Core S&P 500 UCITS ETF', 'etf', 'XETRA', 568.2],
+	['BTC', 'Bitcoin', 'crypto', '', 67240.0],
+	['ETH', 'Ethereum', 'crypto', '', 3482.5],
+	['SOL', 'Solana', 'crypto', '', 168.9],
+	['TLT', 'iShares 20+ Year Treasury Bond ETF', 'bond', 'NASDAQ', 92.15],
+	['USD', 'Efectivo en dólares', 'cash', '', 1.0]
 ];
 
 const asset = (ticker) => CATALOG.find((row) => row[0] === ticker);
 
 /** `GET /portfolios/assets` — el catálogo que ve el buscador de activos. */
-export const assets = CATALOG.map(([ticker, name, assetType, exchange, , price], index) => ({
+export const assets = CATALOG.map(([ticker, name, assetType, exchange, price], index) => ({
 	id: `22222222-2222-4222-8222-2222222222${String(index).padStart(2, '0')}`,
 	ticker,
 	name,
@@ -73,7 +81,7 @@ let entrySeq = 0;
 
 /** Posición dentro de un portafolio: cantidad y precio medio de compra. */
 function holding(ticker, quantity, price, entryDate, notes = '') {
-	const [, name, assetType, exchange, category, marketPrice] = asset(ticker);
+	const [, name, assetType, exchange, marketPrice] = asset(ticker);
 	entrySeq += 1;
 	return {
 		// La primera posición conserva el id histórico: los e2e lo usan.
@@ -96,7 +104,8 @@ function holding(ticker, quantity, price, entryDate, notes = '') {
 		costBasisBase: money(quantity * price),
 		marketValueBase: money(quantity * marketPrice),
 		fxConverted: true,
-		category,
+		// El backend la copia del tipo del activo; no es un dato aparte.
+		category: assetType,
 		entryDate,
 		notes
 	};
@@ -187,11 +196,16 @@ export const portfolioSummary = (displayCurrency = 'USD') =>
 		};
 	});
 
-/** `GET /portfolios/allocation` — reparto por categoría, en el orden del donut. */
+/*
+ * `GET /portfolios/allocation` — reparto por clase de activo, en el orden del
+ * donut. Agrupa por `assetType` porque es por lo que agrupa el backend desde
+ * que lee `assets.asset_type`: las claves son `stock`, `etf`… y es el
+ * vocabulario que el donut traduce a etiquetas y colores.
+ */
 export const allocation = (() => {
 	const byCategory = new Map();
 	for (const h of holdings) {
-		byCategory.set(h.category, (byCategory.get(h.category) ?? 0) + valueOf(h));
+		byCategory.set(h.assetType, (byCategory.get(h.assetType) ?? 0) + valueOf(h));
 	}
 	return [...byCategory.entries()]
 		.sort(([, a], [, b]) => b - a)
@@ -504,7 +518,7 @@ export const importPreview = {
 		price,
 		fees: '',
 		currency: 'USD',
-		category: asset(ticker)?.[4] ?? 'others',
+		category: asset(ticker)?.[2] ?? 'other',
 		notes: '',
 		valid,
 		errors
