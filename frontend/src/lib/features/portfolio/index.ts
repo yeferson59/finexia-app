@@ -25,6 +25,7 @@ export { default as AssetPositionHeader } from './components/asset-position-head
 export { default as AssetPositionSummary } from './components/asset-position-summary.svelte';
 export { default as AssetInfoPanel } from './components/asset-info-panel.svelte';
 export { default as AssetTransactionHistory } from './components/asset-transaction-history.svelte';
+export { default as AssetDeletePosition } from './components/asset-delete-position.svelte';
 
 // Vista consolidada de activos (`dashboard/assets`): lo que el usuario tiene
 // de cada activo sumando todos sus portafolios.

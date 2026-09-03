@@ -46,6 +46,32 @@ func (h *handler) CreatePortfolioEntry(c fiber.Ctx) error {
 	return httpx.OK(c, "Portfolio entry created", "Portfolio entry created successfully", entry)
 }
 
+// DeletePortfolioEntry removes one position and every transaction recorded
+// against it.
+//
+// The response carries the number of transactions that went, because the
+// cascade is the part a caller cannot see coming: it is the difference between
+// "the position is gone" and "eleven trades are gone".
+func (h *handler) DeletePortfolioEntry(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	entryID, err := httpx.ParamUUID(c, "entryId")
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid entry ID", err.Error())
+	}
+
+	deleted, err := h.service.DeletePortfolioEntry(c, userID, entryID)
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error deleting position", "Could not delete position")
+	}
+
+	return httpx.OK(c, "Position deleted", "Position deleted successfully",
+		DeleteEntryResponseDTO{DeletedTransactions: deleted})
+}
+
 func (h *handler) UpdateAssetPrice(c fiber.Ctx) error {
 	if _, _, _, err := httpx.Identity(c); err != nil {
 		return httpx.BadRequest(c, "Invalid user ID", err.Error())

@@ -134,6 +134,15 @@ func (d CreatePortfolioEntryRequestDTO) Input(txnType TransactionType) Transacti
 	}
 }
 
+// DeleteEntryResponseDTO reports what a position's removal took with it.
+//
+// It is a body on a delete because the number is not derivable by the caller:
+// the client knows it asked to remove one position, not that eleven
+// transactions cascaded out behind it.
+type DeleteEntryResponseDTO struct {
+	DeletedTransactions int `json:"deletedTransactions"`
+}
+
 type UpdatePortfolioRequestDTO struct {
 	Name        string `json:"name,omitzero"`
 	Description string `json:"description,omitzero"`

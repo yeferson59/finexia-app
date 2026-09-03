@@ -110,6 +110,9 @@ func backdatedPortfolio(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 		if i == 0 {
 			recordedAt = start.AddDate(0, 0, -1).Add(10 * time.Hour)
 		}
+		// fees_currency is left unnamed on purpose: since 000030 the schema fills
+		// it from the row's own currency, and a fixture that spelled it out would
+		// stop exercising that.
 		exec(`INSERT INTO transactions
 		        (entry_id, type, quantity, price, currency, fees, transaction_date, created_at)
 		      VALUES ($1, 'buy', 1, $2, 'USD', 0, $3, $4)`,
@@ -294,8 +297,11 @@ func mixedPortfolio(t *testing.T, pool *pgxpool.Pool) (userID, portfolioID uuid.
 			assetID, uuid.New().String()[:8], position.assetType, position.currentPrice)
 
 		if position.ownPrice != nil {
-			exec(`INSERT INTO user_asset_prices (user_id, asset_id, price)
-			      VALUES ($1, $2, $3)`, userID, assetID, *position.ownPrice)
+			// currency and source are NOT NULL since 000018; the fixture had
+			// never named them, so this insert failed on every run against a
+			// migrated database and the test could only ever pass by skipping.
+			exec(`INSERT INTO user_asset_prices (user_id, asset_id, price, currency, source)
+			      VALUES ($1, $2, $3, 'USD', 'probe')`, userID, assetID, *position.ownPrice)
 		}
 
 		exec(`INSERT INTO portfolio_entries
@@ -344,7 +350,7 @@ func TestSnapshotAllocationAddsUpToTheStoredTotal(t *testing.T) {
 	// Los tres precios salen de las tres ramas del COALESCE: override propio,
 	// precio del catálogo y coste de la entrada.
 	want := map[string]string{
-		"stock": "1519.11", // 10 × 151.91, precio del catálogo
+		"stock": "1519.10", // 10 × 151.91, precio del catálogo
 		"etf":   "309.40",  // 4 × 77.35, precio propio del usuario
 		"bond":  "20.21",   // 2 × 10.105, sin precio: se lleva a coste
 	}

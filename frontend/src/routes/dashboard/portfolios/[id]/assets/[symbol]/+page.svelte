@@ -8,6 +8,7 @@
 		AssetPositionSummary,
 		AssetInfoPanel,
 		AssetTransactionHistory,
+		AssetDeletePosition,
 		computePosition
 	} from '$lib/features/portfolio';
 
@@ -98,6 +99,13 @@
 			marketPrice={position.marketPrice}
 			{form}
 			{formatCurrency}
+			{formatAmount}
+		/>
+
+		<AssetDeletePosition
+			portfolioId={params.id}
+			{entries}
+			transactionsCount={txnMeta.total}
 			{formatAmount}
 		/>
 	{/if}

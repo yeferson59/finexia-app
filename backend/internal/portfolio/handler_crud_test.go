@@ -970,3 +970,77 @@ func TestHandlerGetAssetTransactions(t *testing.T) {
 		}
 	})
 }
+
+func TestHandlerDeletePortfolioEntry(t *testing.T) {
+	userID := uuid.New()
+	entryID := uuid.New()
+
+	t.Run("reports how many transactions went with the position", func(t *testing.T) {
+		var gotEntry uuid.UUID
+		repo := new(fakeRepository{
+			deletePortfolioEntry: func(_ context.Context, uid, eid uuid.UUID) (int, error) {
+				if uid != userID {
+					t.Errorf("userID = %s, want %s", uid, userID)
+				}
+				gotEntry = eid
+
+				return 11, nil
+			},
+		})
+		app := newTestModule(t, repo, userID, "user")
+
+		resp := doJSON(t, app, http.MethodDelete, "/portfolios/entries/"+entryID.String(), "")
+		if resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		if gotEntry != entryID {
+			t.Errorf("entryID = %s, want %s", gotEntry, entryID)
+		}
+
+		// The count is the point of the body: the caller asked to remove one
+		// position and cannot otherwise know what cascaded out behind it.
+		var body struct {
+			Data DeleteEntryResponseDTO `json:"data"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if body.Data.DeletedTransactions != 11 {
+			t.Errorf("deletedTransactions = %d, want 11", body.Data.DeletedTransactions)
+		}
+	})
+
+	t.Run("a position the caller does not own is a 404", func(t *testing.T) {
+		repo := new(fakeRepository{
+			deletePortfolioEntry: func(context.Context, uuid.UUID, uuid.UUID) (int, error) {
+				return 0, ErrEntryNotFound
+			},
+		})
+		app := newTestModule(t, repo, userID, "user")
+
+		resp := doJSON(t, app, http.MethodDelete, "/portfolios/entries/"+entryID.String(), "")
+		if resp.StatusCode != fiber.StatusNotFound {
+			t.Errorf("status = %d, want 404", resp.StatusCode)
+		}
+	})
+
+	t.Run("a malformed id never reaches the service", func(t *testing.T) {
+		called := false
+		repo := new(fakeRepository{
+			deletePortfolioEntry: func(context.Context, uuid.UUID, uuid.UUID) (int, error) {
+				called = true
+
+				return 0, nil
+			},
+		})
+		app := newTestModule(t, repo, userID, "user")
+
+		resp := doJSON(t, app, http.MethodDelete, "/portfolios/entries/not-a-uuid", "")
+		if resp.StatusCode != fiber.StatusBadRequest {
+			t.Errorf("status = %d, want 400", resp.StatusCode)
+		}
+		if called {
+			t.Error("a malformed id reached the service")
+		}
+	})
+}

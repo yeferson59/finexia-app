@@ -69,6 +69,7 @@ type CurrencyPair struct{ From, To money.Currency }
 type TransactionStore interface {
 	CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, costCurrency money.Currency, in TransactionInput) (Entry, error)
 	GetEntryWithAsset(ctx context.Context, entryID uuid.UUID) (Entry, error)
+	DeletePortfolioEntry(ctx context.Context, userID, entryID uuid.UUID) (int, error)
 	GetTransactionsByEntryID(ctx context.Context, userID, entryID uuid.UUID) ([]Transaction, error)
 	CountAssetTransactions(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error)
 	GetAssetTransactionsPaginated(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, limit, offset int) ([]Transaction, error)

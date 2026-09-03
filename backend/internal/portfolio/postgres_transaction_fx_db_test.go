@@ -106,12 +106,19 @@ func TestAvgCostConvertsAtTheTradesOwnRate(t *testing.T) {
 		t.Fatalf("CreateTransaction: %v", err)
 	}
 
-	// The trade is stored as the broker states it, not pre-multiplied.
-	if got := txn.Price.String(); got != "606.60" {
+	// The trade is stored as the broker states it, not pre-multiplied. Compared
+	// at a fixed scale because money.Money.String() drops a trailing zero, so
+	// the round trip through numeric comes back as "606.6".
+	if got := txn.Price.RoundBank(2).StringFixed(2); got != "606.60" {
 		t.Errorf("stored price = %s, want 606.60 (the quoted price, unconverted)", got)
 	}
 	if txn.Currency != money.EUR || txn.CostCurrency != money.USD {
 		t.Errorf("currencies = %q into %q, want EUR into USD", txn.Currency, txn.CostCurrency)
+	}
+	// Not stated by the caller, so it defaults to the trade's — the rule Validate
+	// applies in Go and, since 000030, the schema applies on its own.
+	if txn.FeesCurrency != money.EUR {
+		t.Errorf("feesCurrency = %q, want EUR", txn.FeesCurrency)
 	}
 
 	quantity, price := entryCost(t, pool, entryID)
@@ -278,6 +285,32 @@ func TestTransactionFeesInCostSQL(t *testing.T) {
 	}
 }
 
+// An insert that never names fees_currency has to land on the trade's currency
+// rather than on a not-null violation. Every writer outside this application is
+// such an insert — a backfill, a fixture, a future column list written by
+// someone who has not read Validate — and 000029 shipped without that guarantee.
+func TestFeesCurrencyDefaultsWithoutBeingNamed(t *testing.T) {
+	pool := growthTestPool(t)
+	_, entryID := fxPosition(t, pool)
+	ctx := context.Background()
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO transactions (entry_id, type, quantity, price, currency, fees, transaction_date)
+		VALUES ($1, 'buy', 1, 100, 'EUR', 0, '2025-05-01')
+	`, entryID); err != nil {
+		t.Fatalf("insert without fees_currency: %v", err)
+	}
+
+	var feesCurrency string
+	if err := pool.QueryRow(ctx,
+		`SELECT fees_currency FROM transactions WHERE entry_id = $1`, entryID).Scan(&feesCurrency); err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if feesCurrency != "EUR" {
+		t.Errorf("fees_currency = %q, want EUR (the row's own currency)", feesCurrency)
+	}
+}
+
 // Every row written before 000029 has fx_rate = 1 and both currencies equal, so
 // the rewritten trigger has to reproduce the old numbers exactly. This is the
 // same single-currency position the app has always supported.
@@ -300,5 +333,87 @@ func TestSingleCurrencyPositionIsUnchanged(t *testing.T) {
 	quantity, price := entryCost(t, pool, entryID)
 	if quantity != "10.00000000" || price != "150.50000000" {
 		t.Errorf("quantity/price = %s/%s, want 10.00000000/150.50000000", quantity, price)
+	}
+}
+
+// Deleting a position takes its whole trade history with it, and the count the
+// endpoint returns has to be that history's real size. The cascade lives in a
+// foreign key and the recomputation in a trigger, so neither is visible to the
+// fake repository the handler tests run against.
+func TestDeletePortfolioEntryCascadesItsTransactions(t *testing.T) {
+	pool := growthTestPool(t)
+	repo := NewPostgresRepository(pool)
+	userID, entryID := fxPosition(t, pool)
+
+	for i, rate := range []string{"1.0638", "1.1000", "1.1565"} {
+		if _, err := repo.CreateTransaction(context.Background(), userID, entryID, TransactionInput{
+			Type:            Buy,
+			Quantity:        mustDecimal(t, "1"),
+			Price:           mustEUR(t, "100.00"),
+			Currency:        money.EUR,
+			FXRate:          mustDecimal(t, rate),
+			Fees:            mustEUR(t, "0"),
+			TransactionDate: time.Date(2025, time.March, i+1, 0, 0, 0, 0, time.UTC),
+		}); err != nil {
+			t.Fatalf("CreateTransaction: %v", err)
+		}
+	}
+
+	deleted, err := repo.DeletePortfolioEntry(context.Background(), userID, entryID)
+	if err != nil {
+		t.Fatalf("DeletePortfolioEntry: %v", err)
+	}
+	if deleted != 3 {
+		t.Errorf("deleted transactions = %d, want 3", deleted)
+	}
+
+	var entries, txns int
+	if err := pool.QueryRow(context.Background(),
+		`SELECT (SELECT COUNT(*) FROM portfolio_entries WHERE id = $1),
+		        (SELECT COUNT(*) FROM transactions WHERE entry_id = $1)`, entryID,
+	).Scan(&entries, &txns); err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if entries != 0 || txns != 0 {
+		t.Errorf("left behind %d entries and %d transactions, want none", entries, txns)
+	}
+}
+
+// A position with no trades on it still deletes, and reports zero rather than
+// failing the COUNT's GROUP BY: the LEFT JOIN is what makes that row exist.
+func TestDeletePortfolioEntryWithNoTransactions(t *testing.T) {
+	pool := growthTestPool(t)
+	repo := NewPostgresRepository(pool)
+	userID, entryID := fxPosition(t, pool)
+
+	deleted, err := repo.DeletePortfolioEntry(context.Background(), userID, entryID)
+	if err != nil {
+		t.Fatalf("DeletePortfolioEntry: %v", err)
+	}
+	if deleted != 0 {
+		t.Errorf("deleted transactions = %d, want 0", deleted)
+	}
+}
+
+// Ownership is in the WHERE clause, so somebody else's position is
+// indistinguishable from one that does not exist — and, crucially, is still
+// there afterwards.
+func TestDeletePortfolioEntryRefusesAnotherUsersPosition(t *testing.T) {
+	pool := growthTestPool(t)
+	repo := NewPostgresRepository(pool)
+	_, entryID := fxPosition(t, pool)
+	stranger, _ := fxPosition(t, pool)
+
+	if _, err := repo.DeletePortfolioEntry(context.Background(), stranger, entryID); !errors.Is(err, ErrEntryNotFound) {
+		t.Fatalf("err = %v, want ErrEntryNotFound", err)
+	}
+
+	var entries int
+	if err := pool.QueryRow(context.Background(),
+		`SELECT COUNT(*) FROM portfolio_entries WHERE id = $1`, entryID).Scan(&entries); err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if entries != 1 {
+		t.Error("a refused delete removed the position anyway")
 	}
 }

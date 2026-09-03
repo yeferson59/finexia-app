@@ -38,6 +38,8 @@ func heldAcrossPortfolios(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 
 	t.Cleanup(func() {
 		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
+		_, _ = pool.Exec(context.Background(),
+			`DELETE FROM exchange_rates WHERE from_currency = 'NOK' AND to_currency = 'USD'`)
 	})
 
 	exec(`INSERT INTO users (id, name, email, role_id, preferred_currency)
@@ -58,11 +60,28 @@ func heldAcrossPortfolios(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 			p.id, userID, p.name, p.currency)
 	}
 
-	// EUR converts at 1.20; JPY has no rate at all, in either direction or
-	// through USD, which is what makes the last asset unconvertible.
+	// Neither currency here is one the application converts for real, and that
+	// is the point on both sides.
+	//
+	// exchange_rates is global — one row per pair, shared by every account — so
+	// a fixture that writes a rate for a currency the app actually uses edits
+	// production-shaped data. This one did: it upserted EUR→USD at 1.20 on every
+	// run, overwriting whatever the ECB feed had synced.
+	//
+	// NOK is outside platform/currency.Supported, so no sync will ever fetch or
+	// overwrite it, and the row is deleted again on cleanup. XTS is ISO 4217's
+	// code reserved for testing, which is exactly the guarantee the unconvertible
+	// case needs: no feed publishes it, so "no rate in any direction" is true by
+	// construction rather than by the table happening to be empty. The previous
+	// choice, JPY, is in Supported and does have a rate the moment the sync has
+	// run once — which is why this assertion failed against any real database.
+	//
+	// The conflict target is the pair alone: 000014 collapsed the table to one
+	// row per pair and re-keyed the unique index, so the three-column target
+	// this fixture used to name has not existed since.
 	exec(`INSERT INTO exchange_rates (from_currency, to_currency, rate, rate_date)
-	      VALUES ('EUR', 'USD', 1.20, CURRENT_DATE)
-	      ON CONFLICT (from_currency, to_currency, rate_date) DO UPDATE SET rate = 1.20`)
+	      VALUES ('NOK', 'USD', 1.20, CURRENT_DATE)
+	      ON CONFLICT (from_currency, to_currency) DO UPDATE SET rate = 1.20`)
 
 	asset := func(ticker, currency string, price any) uuid.UUID {
 		t.Helper()
@@ -85,13 +104,13 @@ func heldAcrossPortfolios(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 	entry(portfolioA, priced, 10, 150)
 	entry(portfolioB, priced, 5, 180)
 
-	inEUR := asset("INEUR", "EUR", 50)
-	entry(portfolioA, inEUR, 4, 40)
+	inNOK := asset("INNOK", "NOK", 50)
+	entry(portfolioA, inNOK, 4, 40)
 
 	atCost := asset("ATCOST", "USD", nil)
 	entry(portfolioA, atCost, 2, 100)
 
-	noRate := asset("NORATE", "JPY", 10)
+	noRate := asset("NORATE", "XTS", 10)
 	entry(portfolioA, noRate, 3, 9)
 
 	soldOut := asset("SOLDOUT", "USD", 500)
@@ -149,19 +168,19 @@ func TestAssetHoldingsTotalTheSameAssetAcrossPortfolios(t *testing.T) {
 		t.Errorf("PRICED price source = %q, want manual", priced.PriceSource)
 	}
 
-	// Priced in euros, reported in dollars: the price stays in the asset's own
-	// currency and only the total is converted.
-	inEUR := byName["INEUR"]
+	// Priced in another currency, reported in dollars: the price stays in the
+	// asset's own currency and only the total is converted.
+	inNOK := byName["INNOK"]
 	// 4 × 50 × 1.20.
-	worth(t, "INEUR", inEUR.MarketValue, 240)
-	if inEUR.Currency != money.EUR {
-		t.Errorf("INEUR currency = %v, want EUR (the asset's own)", inEUR.Currency)
+	worth(t, "INNOK", inNOK.MarketValue, 240)
+	if inNOK.Currency != money.NOK {
+		t.Errorf("INNOK currency = %v, want NOK (the asset's own)", inNOK.Currency)
 	}
-	if inEUR.DisplayCurrency != money.USD {
-		t.Errorf("INEUR display currency = %v, want USD", inEUR.DisplayCurrency)
+	if inNOK.DisplayCurrency != money.USD {
+		t.Errorf("INNOK display currency = %v, want USD", inNOK.DisplayCurrency)
 	}
-	if inEUR.PositionsUnconverted != 0 {
-		t.Errorf("INEUR unconverted = %d, want 0: the rate exists", inEUR.PositionsUnconverted)
+	if inNOK.PositionsUnconverted != 0 {
+		t.Errorf("INNOK unconverted = %d, want 0: the rate exists", inNOK.PositionsUnconverted)
 	}
 
 	// No price anywhere: the position is carried at what it cost, and no single

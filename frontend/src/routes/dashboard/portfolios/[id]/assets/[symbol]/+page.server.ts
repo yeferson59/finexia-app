@@ -3,6 +3,7 @@ import * as transactions from '$lib/api/transactions';
 import type { PageServerLoad, Actions } from './$types';
 import type { Holding, Transaction } from '$lib/api/types';
 import {
+	entryDeleteSchema,
 	transactionCreateSchema,
 	transactionDeleteSchema,
 	transactionUpdateSchema
@@ -192,5 +193,35 @@ export const actions: Actions = {
 		}
 
 		return { success: response.success, deleted: true };
+	},
+
+	// Borrar la posición entera, no una de sus transacciones: se lleva el
+	// historial completo por la clave foránea, así que la respuesta trae cuántas
+	// transacciones cayeron y la página lo dice después de hacerlo.
+	deleteEntry: async ({ request, fetch, cookies }) => {
+		const formData = await request.formData();
+
+		const { success, error, data } = await entryDeleteSchema.safeParseAsync({
+			entryId: formData.get('entryId')
+		});
+
+		if (!success) {
+			return { success: false, entryDeleted: true, error: error.message };
+		}
+
+		const response = await portfolio.deleteEntry({ cookies, fetch }, data.entryId);
+
+		if (!response.ok || !response.success) {
+			return {
+				success: false,
+				entryDeleted: true,
+				error: response.details || response.message || response.action
+			};
+		}
+
+		const deletedTransactions = (response.data as { deletedTransactions?: number } | null)
+			?.deletedTransactions;
+
+		return { success: true, entryDeleted: true, deletedTransactions };
 	}
 };

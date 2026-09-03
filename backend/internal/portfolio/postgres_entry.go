@@ -2,6 +2,7 @@ package portfolio
 
 import (
 	"context"
+	"errors"
 
 	"uuid"
 
@@ -116,6 +117,66 @@ func (r *PostgresRepository) GetEntryWithAsset(ctx context.Context, entryID uuid
 // upserts, so calling it again for the same portfolio/asset/source adds a trade
 // to the position that is already there, and that position keeps the currency it
 // was opened with.
+// DeletePortfolioEntry removes one position the caller owns and reports how
+// many transactions went with it.
+//
+// The count is what makes the operation answerable afterwards. A position is
+// the parent of its whole trade history — fk_transactions_entry cascades — so
+// deleting one silently discards every buy, sell and dividend recorded against
+// it, and "deleted" alone does not tell the owner what they just lost.
+//
+// Ownership is enforced in the WHERE clause rather than by a prior read, the
+// same way DeleteTransaction does it: an entry belonging to somebody else is
+// indistinguishable from one that does not exist, and both answer 404.
+//
+// The cascade makes trg_recalculate_avg_cost fire once per deleted transaction,
+// each time trying to recompute an entry that this same statement is removing.
+// Those updates match no row and are wasted rather than wrong. Deleting the
+// transactions first would only fire the trigger more, and silencing it needs a
+// session-level privilege the app does not hold, so the waste is accepted: it
+// is bounded by one position's history.
+func (r *PostgresRepository) DeletePortfolioEntry(ctx context.Context, userID, entryID uuid.UUID) (int, error) {
+	var deleted int
+
+	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		// Counted before the delete, inside the transaction that performs it, so
+		// the number describes exactly the rows that went.
+		if err := tx.QueryRow(ctx, `
+		SELECT COUNT(t.id)
+		FROM portfolio_entries pe
+		JOIN portfolios p ON p.id = pe.portfolio_id
+		LEFT JOIN transactions t ON t.entry_id = pe.id
+		WHERE pe.id = $1 AND p.user_id = $2
+		GROUP BY pe.id
+	`, entryID, userID).Scan(&deleted); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrEntryNotFound
+			}
+
+			return err
+		}
+
+		tag, err := tx.Exec(ctx, `
+		DELETE FROM portfolio_entries
+		WHERE id = $1
+		  AND portfolio_id IN (SELECT id FROM portfolios WHERE user_id = $2)
+	`, entryID, userID)
+		if err != nil {
+			return err
+		}
+
+		if tag.RowsAffected() == 0 {
+			return ErrEntryNotFound
+		}
+
+		return nil
+	}); err != nil {
+		return 0, err
+	}
+
+	return deleted, nil
+}
+
 func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, costCurrency money.Currency, in TransactionInput) (Entry, error) {
 	var entry Entry
 

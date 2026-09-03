@@ -292,16 +292,29 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, use
 		SELECT
 			t.snapshot_date,
 			t.currency,
-			t.total_value::text,
-			(t.total_value - t.total_gain_loss)::text,
-			t.total_gain_loss::text,
+			-- Every amount is rounded to the scale its column has before it
+			-- becomes text, and the reason is not tidiness.
+			--
+			-- These strings are parsed by growthDecimal, whose decimal type tops
+			-- out at 19 fractional digits and which answers an unparsable value
+			-- with zero. Numeric multiplication accumulates scale — a NUMERIC(20,8)
+			-- quantity times a NUMERIC(20,8) price is already 16 digits, and one
+			-- more rate takes it past the limit — so a flow could come back as
+			-- "300.000000000000000000000000" and be read as no flow at all. The
+			-- series then reported a deposit as return: 411% on a portfolio that
+			-- had earned 14.7%, with nothing anywhere saying a number had been
+			-- dropped. Division makes it worse still, which is why the percentage
+			-- below is rounded too.
+			ROUND(t.total_value, 8)::text,
+			ROUND(t.total_value - t.total_gain_loss, 8)::text,
+			ROUND(t.total_gain_loss, 8)::text,
 			CASE
 				WHEN (t.total_value - t.total_gain_loss) > 0
-				THEN ((t.total_gain_loss / (t.total_value - t.total_gain_loss)) * 100)::text
+				THEN ROUND((t.total_gain_loss / (t.total_value - t.total_gain_loss)) * 100, 6)::text
 				ELSE '0'
 			END,
 			t.unconverted,
-			COALESCE(nf.net_flow, 0)::text
+			ROUND(COALESCE(nf.net_flow, 0), 8)::text
 		FROM totals t
 		LEFT JOIN net_flows nf ON nf.snapshot_date = t.snapshot_date
 		ORDER BY t.snapshot_date ASC
@@ -389,12 +402,13 @@ func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context
 		SELECT
 			pt.snapshot_date,
 			pt.currency,
-			pt.total_value::text,
-			(pt.total_value - pt.total_gain_loss)::text,
-			pt.total_gain_loss::text,
-			pt.total_gain_loss_pct::text,
+			-- Same rounding, same reason: see the account-wide query above.
+			ROUND(pt.total_value, 8)::text,
+			ROUND(pt.total_value - pt.total_gain_loss, 8)::text,
+			ROUND(pt.total_gain_loss, 8)::text,
+			ROUND(pt.total_gain_loss_pct, 6)::text,
 			0::bigint,
-			COALESCE(nf.net_flow, 0)::text
+			ROUND(COALESCE(nf.net_flow, 0), 8)::text
 		FROM points pt
 		LEFT JOIN net_flows nf ON nf.snapshot_date = pt.snapshot_date
 		ORDER BY pt.snapshot_date ASC

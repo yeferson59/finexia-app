@@ -206,6 +206,7 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 | POST | `/portfolios` | usuario | Crea portfolio |
 | POST | `/portfolios/sources` | usuario | Crea plataforma/fuente |
 | POST | `/portfolios/entries` | usuario | Crea posición (entry); la categoría sale del activo, no del cuerpo |
+| DELETE | `/portfolios/entries/:entryId` | usuario | Elimina una posición **y todas sus transacciones**; devuelve `deletedTransactions` |
 | GET | `/portfolios/entries/:entryId/transactions` | usuario | Transacciones de una posición |
 | POST | `/portfolios/entries/:entryId/transactions` | usuario | Crea transacción |
 | PUT | `/portfolios/transactions/:txnId` | usuario | Actualiza transacción |
@@ -412,6 +413,25 @@ Hasta entonces `totalValue` salía de un `SUM` sobre la columna sin mirar
 dólares devolvía sus importes nominales sumados: un número en ninguna moneda, e
 inflado en cuanto entraba una de unidad menor. El cliente, además, no tenía cómo
 saberlo — lo pintaba con un «$» fijo.
+
+#### Eliminar una posición no es eliminar una transacción
+
+`DELETE /portfolios/transactions/:txnId` quita una operación y deja que la
+posición se recalcule con las que queden (queda en cantidad 0 si era la última).
+`DELETE /portfolios/entries/:entryId` quita la posición entera: la fila es el
+padre de su historial y `fk_transactions_entry` cascadea, así que se lleva cada
+compra, venta y dividendo registrados contra ella.
+
+Por eso la respuesta trae cuerpo, cosa rara en un `DELETE`:
+
+```json
+{ "success": true, "data": { "deletedTransactions": 11 } }
+```
+
+El número no es deducible por quien llama —pidió borrar una posición, no once
+operaciones—, y es la diferencia entre confirmar lo que pasó y suponerlo. Una
+posición que no exista o que sea de otro usuario devuelve el mismo `404`: la
+pertenencia se impone en el `WHERE`, no con una lectura previa.
 
 #### Errores de cliente: el motivo viaja en `details`
 

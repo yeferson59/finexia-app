@@ -129,6 +129,17 @@ export function updatePortfolio(
 	});
 }
 
+/**
+ * `DELETE /portfolios/entries/:entryId` — elimina una posición.
+ *
+ * Se lleva por delante todas sus transacciones: la posición es el padre de su
+ * historial y la clave foránea cascadea. La respuesta dice cuántas fueron, que
+ * es el dato que quien borra no puede deducir por su cuenta.
+ */
+export function deleteEntry(event: ApiEvent, entryId: string): Promise<ApiResult<unknown>> {
+	return apiRequest<unknown>(event, `/portfolios/entries/${entryId}`, { method: 'DELETE' });
+}
+
 /** `POST /portfolios/entries` — crea una posición (entry) en un portfolio. */
 export function createEntry(
 	event: ApiEvent,

@@ -104,3 +104,6 @@ export const transactionUpdateSchema = transactionSchema.extend({ txnId: z.uuid(
 
 /** Borrado de una transacción: solo hace falta identificarla. */
 export const transactionDeleteSchema = z.object({ txnId: z.uuid() });
+
+/** Borrado de una posición entera, con todo su historial. */
+export const entryDeleteSchema = z.object({ entryId: z.uuid() });
