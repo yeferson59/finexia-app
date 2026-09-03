@@ -33,7 +33,7 @@ type ServiceDeps struct {
 // Deps is the routing half: the service NewService returned, plus the guards,
 // which only exist once the auth module is built.
 type Deps struct {
-	Service   *Service
+	Service   *service
 	AuthMiddl authMiddleware
 	// Sessions closes out the live sessions of a user this module bans or
 	// deletes. The session and refresh-token tables belong to auth, so the
@@ -59,7 +59,7 @@ type sessionRevoker interface {
 }
 
 type Module struct {
-	service   *Service
+	service   *service
 	handler   *handler
 	authMiddl authMiddleware
 	limiter   fiber.Handler
@@ -67,7 +67,7 @@ type Module struct {
 
 // NewService builds the module's use cases. It is the first domain thing the
 // composition root constructs, before auth.
-func NewService(deps ServiceDeps) *Service {
+func NewService(deps ServiceDeps) *service {
 	return newService(NewPostgresRepository(deps.DB), deps.Store, deps.Log, deps.Cfg)
 }
 
@@ -99,7 +99,7 @@ func New(deps Deps) *Module {
 
 // Service exposes the module's use cases to the composition root and other
 // modules (always consumed through interfaces declared by the consumer).
-func (m *Module) Service() *Service {
+func (m *Module) Service() *service {
 	return m.service
 }
 

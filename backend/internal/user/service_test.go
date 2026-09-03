@@ -24,7 +24,7 @@ func TestUpdateCurrentUser(t *testing.T) {
 		Image:             "old.png",
 	}
 
-	newSvc := func(t *testing.T) (*Service, *identity.User) {
+	newSvc := func(t *testing.T) (*service, *identity.User) {
 		t.Helper()
 		saved := new(identity.User{})
 

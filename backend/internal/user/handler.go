@@ -15,11 +15,11 @@ import (
 )
 
 type handler struct {
-	service  *Service
+	service  *service
 	sessions sessionRevoker
 }
 
-func newHandler(svc *Service, sessions sessionRevoker) *handler {
+func newHandler(svc *service, sessions sessionRevoker) *handler {
 	return new(handler{svc, sessions})
 }
 
