@@ -23,3 +23,12 @@ var (
 	ErrPortfolioOrSourceNotFound = httpx.AsNotFound(errors.New("portfolio or source not found"))
 	ErrExchangeRateNotFound      = httpx.AsNotFound(errors.New("exchange rate not found"))
 )
+
+// ErrTransactionFXRate rejects a transaction whose currency and exchange rate
+// contradict each other or the position they are being recorded on. It is a 400
+// rather than a 422 for the same reason the rest of this module's input errors
+// are: the request is malformed, not merely unprocessable, and the caller has
+// to change what it sent. TransactionInput.Validate wraps it with which of the
+// rules was broken, so the message the client sees names the two currencies
+// involved instead of just refusing.
+var ErrTransactionFXRate = httpx.AsBadRequest(errors.New("invalid transaction exchange rate"))

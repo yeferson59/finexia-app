@@ -8,7 +8,6 @@ import (
 
 	"uuid"
 
-	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
@@ -518,22 +517,28 @@ func TestCreatePortfolioEntry(t *testing.T) {
 
 	t.Run("forwards all fields", func(t *testing.T) {
 		repo := new(fakeRepository{
-			createPortfolioEntry: func(_ context.Context, uid, pid, aid, sid uuid.UUID, txnType TransactionType, quantity decimal.Decimal, p money.Money, costCurrency money.Currency, ed time.Time, notes string) (Entry, error) {
+			createPortfolioEntry: func(_ context.Context, uid, pid, aid, sid uuid.UUID, costCurrency money.Currency, in TransactionInput) (Entry, error) {
 				if uid != userID || pid != portfolioID || aid != assetID || sid != sourceID {
 					t.Error("IDs not forwarded correctly")
 				}
-				if txnType != Buy {
-					t.Errorf("type = %q, want buy", txnType)
+				if in.Type != Buy {
+					t.Errorf("type = %q, want buy", in.Type)
 				}
-				if !ed.Equal(entryDate) || notes != "first buy" {
-					t.Errorf("date/notes = %v/%q", ed, notes)
+				if !in.TransactionDate.Equal(entryDate) || in.Notes != "first buy" {
+					t.Errorf("date/notes = %v/%q", in.TransactionDate, in.Notes)
+				}
+				if costCurrency != money.USD {
+					t.Errorf("costCurrency = %q, want USD", costCurrency)
 				}
 				return Entry{ID: uuid.New(), PortfolioID: pid}, nil
 			},
 		})
 		svc := newTestServices(repo, newMemStorage())
 
-		got, err := svc.CreatePortfolioEntry(context.Background(), userID, portfolioID, assetID, sourceID, Buy, qty, price, money.USD, entryDate, "first buy")
+		got, err := svc.CreatePortfolioEntry(context.Background(), userID, portfolioID, assetID, sourceID, money.USD, TransactionInput{
+			Type: Buy, Quantity: qty, Price: price, Currency: money.USD,
+			TransactionDate: entryDate, Notes: "first buy",
+		})
 		if err != nil {
 			t.Fatalf("CreatePortfolioEntry: %v", err)
 		}
@@ -544,13 +549,15 @@ func TestCreatePortfolioEntry(t *testing.T) {
 
 	t.Run("repository error returns zero entry", func(t *testing.T) {
 		repo := new(fakeRepository{
-			createPortfolioEntry: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, TransactionType, decimal.Decimal, money.Money, money.Currency, time.Time, string) (Entry, error) {
+			createPortfolioEntry: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, money.Currency, TransactionInput) (Entry, error) {
 				return Entry{}, errors.New("asset not found")
 			},
 		})
 		svc := newTestServices(repo, newMemStorage())
 
-		got, err := svc.CreatePortfolioEntry(context.Background(), userID, portfolioID, assetID, sourceID, Buy, qty, price, money.USD, entryDate, "")
+		got, err := svc.CreatePortfolioEntry(context.Background(), userID, portfolioID, assetID, sourceID, money.USD, TransactionInput{
+			Type: Buy, Quantity: qty, Price: price, Currency: money.USD, TransactionDate: entryDate,
+		})
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -620,19 +627,22 @@ func TestUpdateTransaction(t *testing.T) {
 	date := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
 
 	repo := new(fakeRepository{
-		updateTransaction: func(_ context.Context, uid, tid uuid.UUID, txnType TransactionType, quantity decimal.Decimal, p money.Money, currency string, f money.Money, transactionDate time.Time, notes string) (Transaction, error) {
+		updateTransaction: func(_ context.Context, uid, tid uuid.UUID, in TransactionInput) (Transaction, error) {
 			if uid != userID || tid != txnID {
 				t.Error("IDs not forwarded correctly")
 			}
-			if txnType != Sell || currency != "USD" || !transactionDate.Equal(date) {
-				t.Errorf("type/currency/date = %q/%q/%v", txnType, currency, transactionDate)
+			if in.Type != Sell || in.Currency != money.USD || !in.TransactionDate.Equal(date) {
+				t.Errorf("type/currency/date = %q/%q/%v", in.Type, in.Currency, in.TransactionDate)
 			}
-			return Transaction{ID: tid, Type: txnType}, nil
+			return Transaction{ID: tid, Type: in.Type}, nil
 		},
 	})
 	svc := newTestServices(repo, newMemStorage())
 
-	got, err := svc.UpdateTransaction(context.Background(), userID, txnID, Sell, qty, price, "USD", fees, date, "sold half")
+	got, err := svc.UpdateTransaction(context.Background(), userID, txnID, TransactionInput{
+		Type: Sell, Quantity: qty, Price: price, Currency: money.USD,
+		Fees: fees, TransactionDate: date, Notes: "sold half",
+	})
 	if err != nil {
 		t.Fatalf("UpdateTransaction: %v", err)
 	}
@@ -650,11 +660,12 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 
 	newTxnRepo := func() *fakeRepository {
 		return new(fakeRepository{
-			createTransaction: func(_ context.Context, uid, eid uuid.UUID, txnType TransactionType, quantity decimal.Decimal, p money.Money, currency money.Currency, f money.Money, transactionDate time.Time, notes string) (Transaction, error) {
+			createTransaction: func(_ context.Context, uid, eid uuid.UUID, in TransactionInput) (Transaction, error) {
 				return Transaction{
-					ID: uuid.New(), EntryID: eid, Type: txnType,
-					Quantity: quantity, Price: p, Currency: currency,
-					Fees: f, TransactionDate: transactionDate, Notes: notes,
+					ID: uuid.New(), EntryID: eid, Type: in.Type,
+					Quantity: in.Quantity, Price: in.Price, Currency: in.Currency,
+					FXRate: in.Rate(), CostCurrency: in.Currency,
+					Fees: in.Fees, TransactionDate: in.TransactionDate, Notes: in.Notes,
 				}, nil
 			},
 		})
@@ -676,7 +687,10 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 		svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
 		svc.cfg.FrontendURL = "https://app.finexia.me"
 
-		txn, err := svc.CreateTransaction(context.Background(), userID, entryID, Buy, qty, price, money.USD, fees, date, "note")
+		txn, err := svc.CreateTransaction(context.Background(), userID, entryID, TransactionInput{
+			Type: Buy, Quantity: qty, Price: price, Currency: money.USD,
+			Fees: fees, TransactionDate: date, Notes: "note",
+		})
 		if err != nil {
 			t.Fatalf("CreateTransaction: %v", err)
 		}
@@ -724,7 +738,10 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 		mailer := new(fakeMailer{})
 		svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
 
-		if _, err := svc.CreateTransaction(context.Background(), userID, entryID, Buy, qty, price, money.USD, fees, date, ""); err != nil {
+		if _, err := svc.CreateTransaction(context.Background(), userID, entryID, TransactionInput{
+			Type: Buy, Quantity: qty, Price: price, Currency: money.USD,
+			Fees: fees, TransactionDate: date, Notes: "",
+		}); err != nil {
 			t.Fatalf("CreateTransaction: %v", err)
 		}
 
@@ -753,7 +770,10 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 		mailer := new(fakeMailer{})
 		svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
 
-		if _, err := svc.CreateTransaction(context.Background(), userID, entryID, Buy, qty, price, money.USD, fees, date, ""); err != nil {
+		if _, err := svc.CreateTransaction(context.Background(), userID, entryID, TransactionInput{
+			Type: Buy, Quantity: qty, Price: price, Currency: money.USD,
+			Fees: fees, TransactionDate: date, Notes: "",
+		}); err != nil {
 			t.Fatalf("CreateTransaction: %v", err)
 		}
 
@@ -773,14 +793,17 @@ func TestCreateTransactionSendsAlert(t *testing.T) {
 
 	t.Run("repository error is returned and no alert goes out", func(t *testing.T) {
 		repo := new(fakeRepository{
-			createTransaction: func(context.Context, uuid.UUID, uuid.UUID, TransactionType, decimal.Decimal, money.Money, money.Currency, money.Money, time.Time, string) (Transaction, error) {
+			createTransaction: func(context.Context, uuid.UUID, uuid.UUID, TransactionInput) (Transaction, error) {
 				return Transaction{}, errors.New("entry not found")
 			},
 		})
 		mailer := new(fakeMailer{})
 		svc := newTestServicesFull(repo, newMemStorage(), mailer, nil)
 
-		got, err := svc.CreateTransaction(context.Background(), userID, entryID, Buy, qty, price, money.USD, fees, date, "")
+		got, err := svc.CreateTransaction(context.Background(), userID, entryID, TransactionInput{
+			Type: Buy, Quantity: qty, Price: price, Currency: money.USD,
+			Fees: fees, TransactionDate: date, Notes: "",
+		})
 		if err == nil {
 			t.Fatal("expected error")
 		}

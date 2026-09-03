@@ -13,6 +13,7 @@
 		quantity: '',
 		price: '',
 		currency: 'USD',
+		fxRate: '1',
 		fees: '',
 		transactionDate: '',
 		notes: ''
@@ -28,6 +29,7 @@
 				quantity: txn.quantity,
 				price: txn.price,
 				currency: txn.currency,
+				fxRate: txn.fxRate ?? '1',
 				fees: txn.fees,
 				transactionDate: txn.transactionDate.split('T')[0],
 				notes: txn.notes
@@ -43,6 +45,20 @@
 
 	const editTxnMode = $derived(txnModeFor(editForm.type));
 	const editPriceLabel = $derived(priceLabelFor(editForm.type));
+
+	/**
+	 * La transacción se convirtió al liquidarse.
+	 *
+	 * `PUT /portfolios/transactions/:id` reemplaza la fila entera, así que el
+	 * formulario tiene que devolver la tasa igual que devuelve el precio. Si no
+	 * la mandara, editar una nota de una compra en euros liquidada en dólares la
+	 * regrabaría con tasa 1 y el coste de la posición se reescribiría a la baja
+	 * sin que nada lo señalara.
+	 */
+	const editCostCurrency = $derived(transaction.costCurrency?.trim().toUpperCase() || '');
+	const editIsCrossCurrency = $derived(
+		!!editCostCurrency && editCostCurrency !== editForm.currency
+	);
 </script>
 
 <div
@@ -86,6 +102,9 @@
 	>
 		<input type="hidden" name="txnId" value={transaction.id} />
 		<input type="hidden" name="currency" value={editForm.currency} />
+		{#if !editIsCrossCurrency}
+			<input type="hidden" name="fxRate" value={editForm.fxRate || '1'} />
+		{/if}
 
 		<div class="form-row">
 			<div class="form-group">
@@ -186,6 +205,26 @@
 						placeholder="100"
 						min="0"
 						step="0.00000001"
+						required
+					/>
+				</div>
+			</div>
+		{/if}
+
+		{#if editIsCrossCurrency}
+			<div class="form-row">
+				<div class="form-group">
+					<label class="form-label" for="edit-fx"
+						>Tasa {editForm.currency} → {editCostCurrency} <span class="required">*</span></label
+					>
+					<input
+						id="edit-fx"
+						type="number"
+						class="form-input"
+						name="fxRate"
+						bind:value={editForm.fxRate}
+						min="0"
+						step="any"
 						required
 					/>
 				</div>

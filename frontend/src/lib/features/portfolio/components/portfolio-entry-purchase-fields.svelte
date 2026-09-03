@@ -8,30 +8,63 @@
 		quantity = $bindable(),
 		purchasePrice = $bindable(),
 		purchaseDate = $bindable(),
+		currency = $bindable(),
 		costCurrency = $bindable(),
-		totalValue,
+		fxRate = $bindable(),
 		formatCurrency
 	}: {
 		asset: Asset | null;
 		quantity: string;
 		purchasePrice: string;
 		purchaseDate: string;
-		/** Moneda en la que se pagó, que el padre siembra desde el activo. */
+		/** Moneda en la que cotizó la operación, que el padre siembra del activo. */
+		currency: string;
+		/** Moneda en la que la cuenta liquidó, y en la que queda el coste. */
 		costCurrency: string;
-		totalValue: number;
-		formatCurrency: (value: number) => string;
+		/** Cuánto valía una unidad de `currency` en `costCurrency` ese día. */
+		fxRate: string;
+		formatCurrency: (value: number, code: string) => string;
 	} = $props();
 
 	// La moneda del activo puede no estar en la lista de conversión (DKK, por
 	// ejemplo): se ofrece igual, porque es la que hace correcto el coste.
 	const currencyOptions = $derived.by(() => {
 		const options: string[] = [...SUPPORTED_CURRENCIES];
-		if (costCurrency && !options.includes(costCurrency)) options.unshift(costCurrency);
+		for (const code of [currency, costCurrency]) {
+			if (code && !options.includes(code)) options.unshift(code);
+		}
 
 		return options;
 	});
 
 	const assetCurrency = $derived(asset?.currency?.trim().toUpperCase() ?? '');
+
+	/**
+	 * Si la cuenta liquidó en otra moneda.
+	 *
+	 * Es un interruptor y no dos selectores siempre visibles porque el caso
+	 * normal —cuenta y activo en la misma moneda— no tiene nada que decidir, y
+	 * un campo de tasa a la vista invita a rellenarlo con la tasa de hoy, que
+	 * para una compra vieja es justo el número equivocado.
+	 */
+	let converted = $state(false);
+
+	// Apagarlo tiene que deshacer lo que encendió: si quedara una moneda de
+	// liquidación distinta con tasa 1, el backend guardaría el precio cotizado
+	// etiquetado con la moneda de la cuenta, que es el error original.
+	$effect(() => {
+		if (!converted) {
+			costCurrency = currency;
+			fxRate = '';
+		}
+	});
+
+	const rate = $derived(parseFloat(fxRate) || (converted ? 0 : 1));
+	const units = $derived(parseFloat(quantity) || 0);
+	const unitPrice = $derived(parseFloat(purchasePrice) || 0);
+
+	const tradedTotal = $derived(units * unitPrice);
+	const settledTotal = $derived(tradedTotal * rate);
 </script>
 
 <section class="form-section">
@@ -64,11 +97,11 @@
 			     es el mismo hueco, pero ahora dice la verdad sobre el precio. -->
 			<div class="price-field">
 				<select
-					id="costCurrency"
-					name="costCurrency"
-					bind:value={costCurrency}
+					id="currency"
+					name="currency"
+					bind:value={currency}
 					class="currency-select"
-					aria-label="Moneda de la compra"
+					aria-label="Moneda de la operación"
 				>
 					{#each currencyOptions as code (code)}
 						<option value={code}>{code}</option>
@@ -82,20 +115,79 @@
 					placeholder="150.50"
 					class="form-input"
 					min="0"
-					step="0.01"
+					step="any"
 					required
 				/>
 			</div>
-			{#if asset && assetCurrency && costCurrency !== assetCurrency}
+			{#if asset && assetCurrency && currency !== assetCurrency}
 				<p class="field-warning">
-					{asset.ticker} cotiza en {assetCurrency}. Elige {costCurrency} solo si tu bróker liquidó la
-					compra en esa moneda.
+					{asset.ticker} cotiza en {assetCurrency}. Copia el precio tal como lo muestra tu bróker,
+					en la moneda en la que se ejecutó.
 				</p>
 			{:else}
-				<p class="field-hint">Precio por unidad en {costCurrency}</p>
+				<p class="field-hint">Precio por unidad en {currency}</p>
 			{/if}
 		</div>
 	</div>
+
+	<div class="form-group">
+		<label class="settlement-toggle">
+			<input type="checkbox" bind:checked={converted} />
+			<span>Mi cuenta liquidó en otra moneda</span>
+		</label>
+		<p class="field-hint">
+			Actívalo si el activo cotiza en una moneda y tu cuenta está en otra: el bróker convirtió a una
+			tasa que forma parte de lo que te costó la posición.
+		</p>
+	</div>
+
+	{#if converted}
+		<div class="form-row">
+			<div class="form-group">
+				<label for="costCurrency" class="form-label"
+					>Moneda de la cuenta <span class="required">*</span></label
+				>
+				<select
+					id="costCurrency"
+					name="costCurrency"
+					bind:value={costCurrency}
+					class="currency-select"
+				>
+					{#each currencyOptions as code (code)}
+						<option value={code}>{code}</option>
+					{/each}
+				</select>
+				<p class="field-hint">En la que el bróker debitó el importe</p>
+			</div>
+
+			<div class="form-group">
+				<label for="fxRate" class="form-label"
+					>Tasa de la operación <span class="required">*</span></label
+				>
+				<input
+					id="fxRate"
+					type="number"
+					name="fxRate"
+					bind:value={fxRate}
+					placeholder="1.0638"
+					class="form-input"
+					min="0"
+					step="any"
+					required={converted}
+				/>
+				<p class="field-hint">
+					Cuántos {costCurrency} costaba 1 {currency} ese día. Cópiala de la confirmación del bróker,
+					no la de hoy: la de hoy convierte la compra a un precio que nunca pagaste.
+				</p>
+			</div>
+		</div>
+	{:else}
+		<!-- Sin conversión las dos monedas son la misma y la tasa es 1. Van en
+		     campos ocultos para que el cuerpo enviado sea idéntico en los dos
+		     casos y el servidor no tenga que adivinar cuál falta. -->
+		<input type="hidden" name="costCurrency" value={currency} />
+		<input type="hidden" name="fxRate" value="1" />
+	{/if}
 
 	<div class="form-row">
 		<div class="form-group">
@@ -106,8 +198,19 @@
 		<div class="form-group">
 			<span class="form-label">Valor Total Invertido</span>
 			<div class="value-display">
-				<p class="total-value">{formatCurrency(totalValue)}</p>
+				<p class="total-value">{formatCurrency(settledTotal, costCurrency || currency)}</p>
 			</div>
+			{#if converted && currency !== costCurrency}
+				<!-- El número que el usuario puede contrastar contra la pantalla de
+				     su bróker: si no coincide con el «open value» de allí, la tasa
+				     o el precio están mal, y se ve antes de guardar. -->
+				<p class="field-hint">
+					{formatCurrency(tradedTotal, currency)} × {fxRate || '—'} = {formatCurrency(
+						settledTotal,
+						costCurrency
+					)}
+				</p>
+			{/if}
 		</div>
 	</div>
 </section>
@@ -193,6 +296,23 @@
 		margin: 0.4rem 0 0;
 		font-size: 0.8rem;
 		color: rgba(212, 145, 42, 0.85);
+	}
+
+	.settlement-toggle {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		font-size: 0.9rem;
+		font-weight: 600;
+		color: var(--text);
+		cursor: pointer;
+	}
+
+	.settlement-toggle input {
+		width: 1rem;
+		height: 1rem;
+		accent-color: var(--amber);
+		cursor: pointer;
 	}
 
 	.input-addon {

@@ -7,6 +7,7 @@ package portfolio
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"uuid"
@@ -205,18 +206,103 @@ type Entry struct {
 }
 
 type Transaction struct {
-	ID              uuid.UUID       `json:"id"`
-	EntryID         uuid.UUID       `json:"entryId"`
-	Type            TransactionType `json:"type"`
-	Quantity        decimal.Decimal `json:"quantity"`
-	Price           money.Money     `json:"price"`
-	Currency        money.Currency  `json:"currency"`
-	Fees            money.Money     `json:"fees"`
-	TransactionDate time.Time       `json:"transactionDate"`
-	Notes           string          `json:"notes"`
-	CreatedAt       time.Time       `json:"createdAt"`
-	UpdatedAt       time.Time       `json:"updatedAt"`
-	Entry           Entry           `json:"entry,omitzero"`
+	ID       uuid.UUID       `json:"id"`
+	EntryID  uuid.UUID       `json:"entryId"`
+	Type     TransactionType `json:"type"`
+	Quantity decimal.Decimal `json:"quantity"`
+	// Price and Fees are in Currency: the currency the trade was quoted in,
+	// which is the asset's own whenever the broker fills on its home exchange.
+	Price    money.Money    `json:"price"`
+	Currency money.Currency `json:"currency"`
+	// FXRate is how much of the position's cost currency one unit of Currency
+	// bought on the day of the trade, so Price * FXRate is what the trade
+	// actually cost. It is 1 whenever the two currencies agree, which is every
+	// transaction recorded before 000029.
+	FXRate decimal.Decimal `json:"fxRate"`
+	// CostCurrency is the position's, not the transaction's — it comes from the
+	// entry and is repeated here so a transaction read on its own says what
+	// FXRate converts into. Empty on reads that do not join the entry.
+	CostCurrency    money.Currency `json:"costCurrency,omitzero"`
+	Fees            money.Money    `json:"fees"`
+	TransactionDate time.Time      `json:"transactionDate"`
+	Notes           string         `json:"notes"`
+	CreatedAt       time.Time      `json:"createdAt"`
+	UpdatedAt       time.Time      `json:"updatedAt"`
+	Entry           Entry          `json:"entry,omitzero"`
+}
+
+// TransactionInput is one transaction as a caller states it, on its way to
+// being persisted.
+//
+// It replaced eight positional parameters on four call paths, but the reason it
+// is a type rather than a longer signature is Currency and FXRate: those two
+// are only meaningful together, and the rule binding them needs a third value
+// — the cost currency of the position — that no caller passes explicitly.
+// Validate is where that rule lives, so every writer applies the same one.
+type TransactionInput struct {
+	Type            TransactionType
+	Quantity        decimal.Decimal
+	Price           money.Money
+	Currency        money.Currency
+	FXRate          decimal.Decimal
+	Fees            money.Money
+	TransactionDate time.Time
+	Notes           string
+}
+
+// Rate resolves the omitted case. A caller that sends no rate at all is the
+// common one — same currency on both sides — and 1 is the honest answer there
+// rather than a default standing in for a missing fact. Validate is what makes
+// sure it is only reached in that case.
+func (in TransactionInput) Rate() decimal.Decimal {
+	if in.FXRate.IsZero() {
+		return decimal.One
+	}
+
+	return in.FXRate
+}
+
+// Validate checks the input against the cost currency of the position it will
+// be recorded on, and returns the currency to store when the caller left it
+// unset.
+//
+// Two things are refused, both because they would corrupt a cost basis rather
+// than fail:
+//
+//   - a rate other than 1 between a currency and itself, which is a typo no
+//     arithmetic can absorb: it scales the position's cost by whatever number
+//     was typed and nothing downstream can tell.
+//   - a missing rate between two different currencies. The tempting fallback is
+//     to look up today's rate, and it is exactly wrong: today's rate applied to
+//     a trade from December is the re-translation this whole column exists to
+//     stop. A caller who does not know the historical rate has to say so, and
+//     the client fills the field from the stored rate as a suggestion the owner
+//     can correct against their confirmation.
+func (in TransactionInput) Validate(costCurrency money.Currency) (money.Currency, error) {
+	currency := in.Currency
+	if currency == money.XXX {
+		currency = costCurrency
+	}
+
+	rate := in.Rate()
+
+	if !rate.IsPos() {
+		return money.XXX, fmt.Errorf("%w: rate must be greater than zero, got %s", ErrTransactionFXRate, rate.String())
+	}
+
+	if currency == costCurrency {
+		if !rate.Equal(decimal.One) {
+			return money.XXX, fmt.Errorf("%w: %s does not convert into itself at %s", ErrTransactionFXRate, currency, rate.String())
+		}
+
+		return currency, nil
+	}
+
+	if in.FXRate.IsZero() {
+		return money.XXX, fmt.Errorf("%w: the trade is in %s and the position costs in %s, so fxRate is required", ErrTransactionFXRate, currency, costCurrency)
+	}
+
+	return currency, nil
 }
 
 // ImportTransactionRow is one validated spreadsheet row, ready to be

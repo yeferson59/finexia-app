@@ -53,7 +53,13 @@
 			{@const qty = parseFloat(txn.quantity) || 0}
 			{@const price = parseFloat(txn.price) || 0}
 			{@const fees = parseFloat(txn.fees) || 0}
-			{@const total = qty * price}
+			{@const rate = parseFloat(txn.fxRate ?? '1') || 1}
+			{@const costCurrency = txn.costCurrency || txn.currency}
+			{@const converted = costCurrency !== txn.currency}
+			<!-- El total es lo que la cuenta pagó o recibió, no lo que la
+			     operación cotizó: precio y comisión se quedan en la moneda del
+			     mercado, y la tasa los lleva a la de la cuenta. -->
+			{@const total = qty * price * rate}
 			{@const isBuyLot = txn.type === 'buy' || txn.type === 'transfer_in'}
 			{@const isActiveSell = sellingTxnId === txn.id}
 			<div class="table-row" class:row-selling={isActiveSell}>
@@ -66,7 +72,12 @@
 				<p class="qty">{qty.toLocaleString('es-CO', { maximumFractionDigits: 8 })}</p>
 				<p class="price">{formatAmount(price, txn.currency)}</p>
 				<p class="fees">{fees > 0 ? formatAmount(fees, txn.currency) : '—'}</p>
-				<p class="total">{formatAmount(total, txn.currency)}</p>
+				<p class="total">
+					{formatAmount(total, costCurrency)}
+					{#if converted}
+						<span class="fx-note">{txn.currency} × {rate}</span>
+					{/if}
+				</p>
 				<p class="notes">{txn.notes || '—'}</p>
 				<p class="cell-action">
 					<button
@@ -286,6 +297,14 @@
 	.qty {
 		color: var(--text);
 		font-weight: 500;
+	}
+
+	.fx-note {
+		display: block;
+		font-size: 0.7rem;
+		font-weight: 500;
+		color: rgba(236, 234, 229, 0.45);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.price {

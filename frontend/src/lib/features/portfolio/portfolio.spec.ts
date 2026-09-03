@@ -210,21 +210,60 @@ describe('portfolioEntrySchema', () => {
 		entryDate: '2024-04-11'
 	};
 
-	it('normaliza la moneda del coste a ISO en mayúsculas', () => {
-		const parsed = portfolioEntrySchema.safeParse({ ...entry, costCurrency: ' dkk ' });
+	it('normaliza las dos monedas a ISO en mayúsculas', () => {
+		const parsed = portfolioEntrySchema.safeParse({
+			...entry,
+			costCurrency: ' dkk ',
+			currency: ' dkk '
+		});
 		expect(parsed.success).toBe(true);
 		expect(parsed.data?.costCurrency).toBe('DKK');
+		expect(parsed.data?.currency).toBe('DKK');
 	});
 
 	// El formulario la enviaba fija en USD: una acción danesa entraba con su
 	// precio en coronas etiquetado como dólares y el coste quedaba sin convertir.
 	it('rechaza una moneda ausente o que no sea un código de tres letras', () => {
-		expect(portfolioEntrySchema.safeParse({ ...entry, costCurrency: undefined }).success).toBe(
+		const valid = { ...entry, currency: 'DKK' };
+		expect(portfolioEntrySchema.safeParse({ ...valid, costCurrency: undefined }).success).toBe(
 			false
 		);
-		expect(portfolioEntrySchema.safeParse({ ...entry, costCurrency: '' }).success).toBe(false);
-		expect(portfolioEntrySchema.safeParse({ ...entry, costCurrency: 'corona' }).success).toBe(
+		expect(portfolioEntrySchema.safeParse({ ...valid, costCurrency: '' }).success).toBe(false);
+		expect(portfolioEntrySchema.safeParse({ ...valid, costCurrency: 'corona' }).success).toBe(
 			false
 		);
+	});
+
+	// Una tasa ausente es tasa 1, que es lo que vale toda compra en la que la
+	// cuenta y el mercado usan la misma moneda: el formulario no la manda y el
+	// backend la acepta porque las dos monedas coinciden.
+	it('una tasa ausente vale 1', () => {
+		const parsed = portfolioEntrySchema.safeParse({
+			...entry,
+			costCurrency: 'DKK',
+			currency: 'DKK'
+		});
+		expect(parsed.success).toBe(true);
+		expect(parsed.data?.fxRate).toBe(1);
+	});
+
+	it('conserva la tasa de una compra convertida por el bróker', () => {
+		const parsed = portfolioEntrySchema.safeParse({
+			...entry,
+			price: '606.60',
+			costCurrency: 'USD',
+			currency: 'EUR',
+			fxRate: '1.0638'
+		});
+		expect(parsed.success).toBe(true);
+		expect(parsed.data?.fxRate).toBe(1.0638);
+	});
+
+	// Cero o negativa no convierte nada: borra el coste de la posición. El
+	// `.catch(1)` del esquema no debe tragárselas.
+	it('rechaza una tasa que no sea positiva', () => {
+		const base = { ...entry, costCurrency: 'USD', currency: 'EUR' };
+		expect(portfolioEntrySchema.safeParse({ ...base, fxRate: '0' }).success).toBe(false);
+		expect(portfolioEntrySchema.safeParse({ ...base, fxRate: '-1.0638' }).success).toBe(false);
 	});
 });

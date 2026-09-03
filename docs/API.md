@@ -448,6 +448,42 @@ incluya está mezclando monedas: hay que decirlo en pantalla en vez de sumar. La
 tasas son datos BYO-key (§2.10), así que la ausencia se resuelve sincronizando
 con la clave del propio usuario, no reintentando.
 
+#### Moneda de una transacción: `currency` + `fxRate`
+
+Una operación también arrastra dos monedas, y por una razón distinta a la de los
+holdings: el activo cotiza en una y la cuenta liquida en otra. Comprar LVMH
+(`MC.FR`, cotiza en EUR) desde una cuenta en dólares deja una confirmación con
+un precio de 606,60 EUR, una tasa de 1,0638 y un cargo de 15,55 USD.
+
+Cada transacción guarda las tres piezas:
+
+| Campo | Valor |
+|---|---|
+| `price`, `fees` | En `currency`: la moneda en la que se ejecutó la operación, tal como la imprime el bróker |
+| `currency` | Moneda de la operación. Por omisión, la de coste de la posición |
+| `fxRate` | Cuántos `costCurrency` valía 1 `currency` **el día de la operación**. Por omisión `1` |
+| `costCurrency` | La de la posición (`portfolio_entries.cost_currency`), repetida aquí para que `fxRate` se pueda interpretar sin releer la entry |
+
+El coste real es `price × fxRate`, y es lo que el trigger de coste medio guarda
+en `portfolio_entries.price`. Guardar la tasa —en vez de convertir al leer— es lo
+que hace que el resultado sea el del titular de la cuenta y no el del mercado
+local: `exchange_rates` guarda una fila por par (§migración 000014), así que una
+conversión hecha al leer aplica la tasa de hoy a las dos patas y las cancela, y
+lo que queda en pantalla es la rentabilidad en EUR con el símbolo del dólar.
+
+Dos combinaciones se rechazan con `400` en vez de guardarse:
+
+- `fxRate` distinto de 1 cuando `currency` y `costCurrency` coinciden: una moneda
+  no se convierte en sí misma, y el número escala el coste de la posición sin que
+  nada aguas abajo pueda detectarlo.
+- `fxRate` ausente cuando difieren. La app **no** rellena el hueco con la tasa
+  actual: para una compra de hace un año esa es justo la tasa equivocada, y el
+  error sería invisible. El cliente propone la tasa y el titular la corrige
+  contra su confirmación.
+
+Un cliente que no mande ninguno de los dos campos sigue funcionando igual que
+antes: la operación se registra en la moneda de la posición, con tasa 1.
+
 ### 2.8 Assets (JWT; *admin* donde se indica)
 
 | Método | Path | Acceso | Descripción |

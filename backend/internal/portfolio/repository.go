@@ -67,7 +67,7 @@ type CurrencyPair struct{ From, To money.Currency }
 
 // TransactionStore persists portfolio entries and their transactions.
 type TransactionStore interface {
-	CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency money.Currency, entryDate time.Time, notes string) (Entry, error)
+	CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, costCurrency money.Currency, in TransactionInput) (Entry, error)
 	GetEntryWithAsset(ctx context.Context, entryID uuid.UUID) (Entry, error)
 	GetTransactionsByEntryID(ctx context.Context, userID, entryID uuid.UUID) ([]Transaction, error)
 	CountAssetTransactions(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error)
@@ -77,8 +77,8 @@ type TransactionStore interface {
 	// GetAssetHoldingsByUserID is the same aggregation one level finer: per
 	// asset instead of per category, plus the units held.
 	GetAssetHoldingsByUserID(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AssetHolding, error)
-	CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency money.Currency, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
-	UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
+	CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, in TransactionInput) (Transaction, error)
+	UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, in TransactionInput) (Transaction, error)
 	DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID) error
 	ImportEntryTransactions(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []ImportTransactionRow) (int, error)
 }

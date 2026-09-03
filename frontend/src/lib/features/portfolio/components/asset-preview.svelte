@@ -1,8 +1,14 @@
 <script lang="ts">
 	import type { Asset } from '$lib/api/types';
 
-	let { asset, formatCurrency }: { asset: Asset; formatCurrency: (value: number) => string } =
-		$props();
+	let {
+		asset,
+		formatCurrency
+	}: { asset: Asset; formatCurrency: (value: number, code?: string) => string } = $props();
+
+	// El precio de mercado está en la moneda del activo, que no tiene por qué
+	// ser aquella en la que se pagará la compra.
+	const assetCurrency = $derived(asset.currency?.trim().toUpperCase() || undefined);
 </script>
 
 <div class="asset-preview">
@@ -25,7 +31,9 @@
 	{#if asset.currentPrice}
 		<div class="preview-item">
 			<span class="preview-label">Precio de mercado</span>
-			<span class="preview-value">{formatCurrency(parseFloat(asset.currentPrice.value))}</span>
+			<span class="preview-value"
+				>{formatCurrency(parseFloat(asset.currentPrice.value), assetCurrency)}</span
+			>
 		</div>
 	{/if}
 </div>

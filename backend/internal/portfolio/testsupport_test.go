@@ -130,7 +130,7 @@ type fakeRepository struct {
 	getPlatformsWithStats           func(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]PlatformStats, error)
 	updatePlatform                  func(ctx context.Context, userID, sourceID uuid.UUID, name, description string, sourceType SourceType, isActive bool) (PlatformStats, error)
 	deletePlatform                  func(ctx context.Context, userID, sourceID uuid.UUID) error
-	createPortfolioEntry            func(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency money.Currency, entryDate time.Time, notes string) (Entry, error)
+	createPortfolioEntry            func(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, costCurrency money.Currency, in TransactionInput) (Entry, error)
 	getEntryWithAsset               func(ctx context.Context, entryID uuid.UUID) (Entry, error)
 	getTransactionsByEntryID        func(ctx context.Context, userID, entryID uuid.UUID) ([]Transaction, error)
 	countAssetTransactions          func(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error)
@@ -138,8 +138,8 @@ type fakeRepository struct {
 	getRecentTransactionsByUserID   func(ctx context.Context, userID uuid.UUID, limit int) ([]Transaction, error)
 	getAssetAllocationByUserID      func(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AllocationItem, error)
 	getAssetHoldingsByUserID        func(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AssetHolding, error)
-	createTransaction               func(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency money.Currency, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
-	updateTransaction               func(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error)
+	createTransaction               func(ctx context.Context, userID, entryID uuid.UUID, in TransactionInput) (Transaction, error)
+	updateTransaction               func(ctx context.Context, userID, txnID uuid.UUID, in TransactionInput) (Transaction, error)
 	deleteTransaction               func(ctx context.Context, userID, txnID uuid.UUID) error
 	importEntryTransactions         func(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []ImportTransactionRow) (int, error)
 	getAllPortfolioSummaryRows      func(ctx context.Context) ([]SnapshotRow, error)
@@ -207,8 +207,8 @@ func (f *fakeRepository) DeletePlatform(ctx context.Context, userID, sourceID uu
 	return f.deletePlatform(ctx, userID, sourceID)
 }
 
-func (f *fakeRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency money.Currency, entryDate time.Time, notes string) (Entry, error) {
-	return f.createPortfolioEntry(ctx, userID, portfolioID, assetID, sourceID, txnType, quantity, price, costCurrency, entryDate, notes)
+func (f *fakeRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, costCurrency money.Currency, in TransactionInput) (Entry, error) {
+	return f.createPortfolioEntry(ctx, userID, portfolioID, assetID, sourceID, costCurrency, in)
 }
 
 func (f *fakeRepository) GetEntryWithAsset(ctx context.Context, entryID uuid.UUID) (Entry, error) {
@@ -239,12 +239,12 @@ func (f *fakeRepository) GetAssetHoldingsByUserID(ctx context.Context, userID uu
 	return f.getAssetHoldingsByUserID(ctx, userID, targetCurrency)
 }
 
-func (f *fakeRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency money.Currency, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
-	return f.createTransaction(ctx, userID, entryID, txnType, quantity, price, currency, fees, transactionDate, notes)
+func (f *fakeRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, in TransactionInput) (Transaction, error) {
+	return f.createTransaction(ctx, userID, entryID, in)
 }
 
-func (f *fakeRepository) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
-	return f.updateTransaction(ctx, userID, txnID, txnType, quantity, price, currency, fees, transactionDate, notes)
+func (f *fakeRepository) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, in TransactionInput) (Transaction, error) {
+	return f.updateTransaction(ctx, userID, txnID, in)
 }
 
 func (f *fakeRepository) DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID) error {

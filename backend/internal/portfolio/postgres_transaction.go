@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"time"
 
 	"uuid"
 
@@ -18,11 +17,17 @@ import (
 
 func (r *PostgresRepository) GetTopTransactionByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID) (TopTransactionDTO, error) {
 	var dto TopTransactionDTO
+	// The amount is the position's, not the trade's: ranking by the quoted price
+	// puts a 606 EUR fill above an 800 USD one, and reporting the winner under
+	// the currency it was quoted in makes the dashboard's "largest transaction"
+	// a figure that cannot be compared with the totals beside it. fx_rate turns
+	// both into what the account paid, which is the only basis on which two
+	// trades in different currencies can be ordered at all.
 	err := r.db.QueryRow(ctx, `
 		SELECT
-			(t.quantity::numeric * t.price::numeric)::text,
+			(t.quantity::numeric * t.price::numeric * t.fx_rate::numeric)::text,
 			t.type,
-			t.currency,
+			pe.cost_currency,
 			t.transaction_date,
 			a.ticker,
 			a.name
@@ -31,7 +36,7 @@ func (r *PostgresRepository) GetTopTransactionByPortfolioID(ctx context.Context,
 		JOIN assets a ON a.id = pe.asset_id
 		JOIN portfolios p ON p.id = pe.portfolio_id
 		WHERE pe.portfolio_id = $1 AND p.user_id = $2
-		ORDER BY t.quantity::numeric * t.price::numeric DESC
+		ORDER BY t.quantity::numeric * t.price::numeric * t.fx_rate::numeric DESC
 		LIMIT 1
 	`, portfolioID, userID).Scan(
 		&dto.Value,
@@ -54,7 +59,8 @@ func (r *PostgresRepository) GetTopTransactionByPortfolioID(ctx context.Context,
 
 func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]Transaction, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fees,
+		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fx_rate,
+		       pe.cost_currency, t.fees,
 		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at,
 		       a.ticker, a.name
 		FROM transactions t
@@ -81,6 +87,8 @@ func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, 
 			&txn.Quantity,
 			&txn.Price,
 			&txn.Currency,
+			&txn.FXRate,
+			&txn.CostCurrency,
 			&txn.Fees,
 			&txn.TransactionDate,
 			&txn.Notes,
@@ -253,10 +261,12 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 	}
 
 	rows, err := r.db.Query(ctx, `
-		SELECT id, entry_id, type, quantity, price, currency, fees, transaction_date, COALESCE(notes, ''), created_at, updated_at
-		FROM transactions
-		WHERE entry_id = $1
-		ORDER BY transaction_date DESC, created_at DESC
+		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fx_rate,
+		       pe.cost_currency, t.fees, t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at
+		FROM transactions t
+		JOIN portfolio_entries pe ON pe.id = t.entry_id
+		WHERE t.entry_id = $1
+		ORDER BY t.transaction_date DESC, t.created_at DESC
 	`, entryID)
 	if err != nil {
 		return nil, err
@@ -274,6 +284,8 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 			&txn.Quantity,
 			&txn.Price,
 			&txn.Currency,
+			&txn.FXRate,
+			&txn.CostCurrency,
 			&txn.Fees,
 			&txn.TransactionDate,
 			&txn.Notes,
@@ -309,7 +321,8 @@ func (r *PostgresRepository) CountAssetTransactions(ctx context.Context, userID,
 
 func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, limit, offset int) ([]Transaction, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fees,
+		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fx_rate,
+		       pe.cost_currency, t.fees,
 		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at
 		FROM transactions t
 		JOIN portfolio_entries pe ON pe.id = t.entry_id
@@ -335,6 +348,8 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 			&txn.Quantity,
 			&txn.Price,
 			&txn.Currency,
+			&txn.FXRate,
+			&txn.CostCurrency,
 			&txn.Fees,
 			&txn.TransactionDate,
 			&txn.Notes,
@@ -350,35 +365,48 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 	return txns, nil
 }
 
-func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency money.Currency, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
+// CreateTransaction records one trade on an existing position.
+//
+// The position's cost currency is read first, and not only to be handed to
+// Validate: that read is also the ownership check, since an entry the caller
+// does not own returns no row. Both it and the insert run on tx — the previous
+// version issued them on r.db, so the surrounding transaction was opened,
+// committed and never actually used.
+func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, in TransactionInput) (Transaction, error) {
 	var txn Transaction
 
 	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
-		var owned bool
-		if err := r.db.QueryRow(ctx, `
-		SELECT EXISTS (
-			SELECT 1 FROM portfolio_entries pe
-			JOIN portfolios p ON p.id = pe.portfolio_id
-			WHERE pe.id = $1 AND p.user_id = $2
-		)
-	`, entryID, userID).Scan(&owned); err != nil {
+		var costCurrency money.Currency
+		if err := tx.QueryRow(ctx, `
+		SELECT pe.cost_currency
+		FROM portfolio_entries pe
+		JOIN portfolios p ON p.id = pe.portfolio_id
+		WHERE pe.id = $1 AND p.user_id = $2
+	`, entryID, userID).Scan(&costCurrency); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrEntryNotFound
+			}
+
 			return err
 		}
-		if !owned {
-			return ErrEntryNotFound
+
+		tradeCurrency, err := in.Validate(costCurrency)
+		if err != nil {
+			return err
 		}
 
-		if err := r.db.QueryRow(ctx, `
-		INSERT INTO transactions (entry_id, type, quantity, price, currency, fees, transaction_date, notes)
-		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::date, $8)
-		RETURNING id, entry_id, type, quantity, price, currency, fees, transaction_date, COALESCE(notes, ''), created_at, updated_at
-	`, entryID, txnType, quantity.String(), price.String(), currency, fees.String(), transactionDate, notes).Scan(
+		if err := tx.QueryRow(ctx, `
+		INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, transaction_date, notes)
+		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::numeric, $8::date, $9)
+		RETURNING id, entry_id, type, quantity, price, currency, fx_rate, fees, transaction_date, COALESCE(notes, ''), created_at, updated_at
+	`, entryID, in.Type, in.Quantity.String(), in.Price.String(), tradeCurrency, in.Rate().String(), in.Fees.String(), in.TransactionDate, in.Notes).Scan(
 			&txn.ID,
 			&txn.EntryID,
 			&txn.Type,
 			&txn.Quantity,
 			&txn.Price,
 			&txn.Currency,
+			&txn.FXRate,
 			&txn.Fees,
 			&txn.TransactionDate,
 			&txn.Notes,
@@ -388,6 +416,7 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 			return err
 		}
 
+		txn.CostCurrency = costCurrency
 		txn.Price.SetCurrency(txn.Currency)
 		txn.Fees.SetCurrency(txn.Currency)
 
@@ -399,49 +428,85 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 	return txn, nil
 }
 
-func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
+// UpdateTransaction rewrites one transaction the caller owns.
+//
+// It grew a surrounding database transaction for the same reason CreateTransaction
+// has one: the rate can only be judged against the position's cost currency, so
+// that has to be read before the write, and reading it separately from a write
+// that depends on it is only safe if the two are atomic. The UPDATE keeps its
+// own ownership predicate anyway — the read cannot be trusted to still hold by
+// the time the write lands, and the cost of restating it is one join.
+func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, in TransactionInput) (Transaction, error) {
 	var txn Transaction
 
-	err := r.db.QueryRow(ctx, `
+	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		var costCurrency money.Currency
+		if err := tx.QueryRow(ctx, `
+		SELECT pe.cost_currency
+		FROM transactions t
+		JOIN portfolio_entries pe ON pe.id = t.entry_id
+		JOIN portfolios p        ON p.id = pe.portfolio_id
+		WHERE t.id = $1 AND p.user_id = $2
+	`, txnID, userID).Scan(&costCurrency); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrTransactionNotFound
+			}
+
+			return err
+		}
+
+		tradeCurrency, err := in.Validate(costCurrency)
+		if err != nil {
+			return err
+		}
+
+		if err := tx.QueryRow(ctx, `
 		UPDATE transactions SET
 			type             = $1::transaction_type,
 			quantity         = $2::numeric,
 			price            = $3::numeric,
 			currency         = $4::char(3),
-			fees             = $5::numeric,
-			transaction_date = $6::date,
-			notes            = $7,
+			fx_rate          = $5::numeric,
+			fees             = $6::numeric,
+			transaction_date = $7::date,
+			notes            = $8,
 			updated_at       = NOW()
-		WHERE id = $8
+		WHERE id = $9
 		  AND entry_id IN (
 			SELECT pe.id FROM portfolio_entries pe
 			JOIN portfolios p ON p.id = pe.portfolio_id
-			WHERE p.user_id = $9
+			WHERE p.user_id = $10
 		  )
-		RETURNING id, entry_id, type, quantity, price, currency, fees, transaction_date, COALESCE(notes, ''), created_at, updated_at
-	`, txnType, quantity.String(), price.String(), currency, fees.String(), transactionDate, notes, txnID, userID).Scan(
-		&txn.ID,
-		&txn.EntryID,
-		&txn.Type,
-		&txn.Quantity,
-		&txn.Price,
-		&txn.Currency,
-		&txn.Fees,
-		&txn.TransactionDate,
-		&txn.Notes,
-		&txn.CreatedAt,
-		&txn.UpdatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Transaction{}, ErrTransactionNotFound
+		RETURNING id, entry_id, type, quantity, price, currency, fx_rate, fees, transaction_date, COALESCE(notes, ''), created_at, updated_at
+	`, in.Type, in.Quantity.String(), in.Price.String(), tradeCurrency, in.Rate().String(), in.Fees.String(), in.TransactionDate, in.Notes, txnID, userID).Scan(
+			&txn.ID,
+			&txn.EntryID,
+			&txn.Type,
+			&txn.Quantity,
+			&txn.Price,
+			&txn.Currency,
+			&txn.FXRate,
+			&txn.Fees,
+			&txn.TransactionDate,
+			&txn.Notes,
+			&txn.CreatedAt,
+			&txn.UpdatedAt,
+		); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrTransactionNotFound
+			}
+
+			return err
 		}
 
+		txn.CostCurrency = costCurrency
+		txn.Price.SetCurrency(txn.Currency)
+		txn.Fees.SetCurrency(txn.Currency)
+
+		return nil
+	}); err != nil {
 		return Transaction{}, err
 	}
-
-	txn.Price.SetCurrency(txn.Currency)
-	txn.Fees.SetCurrency(txn.Currency)
 
 	return txn, nil
 }

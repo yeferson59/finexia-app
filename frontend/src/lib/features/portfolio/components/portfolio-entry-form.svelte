@@ -48,22 +48,38 @@
 	 * aportado por un usuario puede traer relleno de espacios.
 	 */
 	const assetCurrency = $derived(selectedAsset?.currency?.trim().toUpperCase() ?? '');
-	let costCurrency: string = $derived(
+	let currency: string = $derived(
 		/^[A-Z]{3}$/.test(assetCurrency) ? assetCurrency : FALLBACK_CURRENCY
 	);
 
+	/**
+	 * Moneda en la que liquidó la cuenta y tasa a la que el bróker convirtió.
+	 *
+	 * Las gestiona el campo de compra: mientras las dos monedas coincidan
+	 * mantiene `costCurrency` igual a `currency` y la tasa vacía, que es tasa 1.
+	 * Viven aquí porque el resumen y el total invertido también necesitan saber
+	 * en qué moneda acabó el coste.
+	 */
+	let costCurrency = $state('');
+	let fxRate = $state('');
+
 	let isSubmitting = $state(false);
 
-	const totalValue = $derived((parseFloat(quantity) || 0) * (parseFloat(purchasePrice) || 0));
+	// El total es lo que la cuenta pagó, no lo que la operación cotizó: son el
+	// mismo número salvo que el bróker haya convertido, y cuando convierte es el
+	// segundo el que no se puede comparar con nada más de la pantalla.
+	const totalValue = $derived(
+		(parseFloat(quantity) || 0) * (parseFloat(purchasePrice) || 0) * (parseFloat(fxRate) || 1)
+	);
 
 	function handleCancel() {
 		goto(resolve('/dashboard/portfolios/[id]', { id: portfolioId }));
 	}
 
-	function formatCurrency(value: number): string {
+	function formatCurrency(value: number, code: string = costCurrency || currency): string {
 		return new Intl.NumberFormat('es-CO', {
 			style: 'currency',
-			currency: costCurrency,
+			currency: code,
 			minimumFractionDigits: 2
 		}).format(value);
 	}
@@ -130,8 +146,9 @@
 			bind:quantity
 			bind:purchasePrice
 			bind:purchaseDate
+			bind:currency
 			bind:costCurrency
-			{totalValue}
+			bind:fxRate
 			{formatCurrency}
 		/>
 
@@ -158,6 +175,8 @@
 				asset={selectedAsset}
 				{quantity}
 				{purchasePrice}
+				{currency}
+				costCurrency={costCurrency || currency}
 				{totalValue}
 				{formatCurrency}
 			/>

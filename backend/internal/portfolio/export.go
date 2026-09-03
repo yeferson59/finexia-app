@@ -99,7 +99,11 @@ func (h *handler) ExportTransactions(c fiber.Ctx) error {
 
 	sheet := "Transacciones"
 	_ = f.SetSheetName("Sheet1", sheet)
-	headers := []string{"Fecha", "Tipo", "Activo", "Ticker", "Cantidad", "Precio", "Comisiones", "Moneda", "Notas"}
+	// "Tasa" and "Moneda de coste" sit next to "Moneda" because the three only
+	// mean something together: the price is in Moneda, the rate turns it into
+	// Moneda de coste, and a sheet that showed the price alone would misstate
+	// every cross-currency trade by exactly the rate.
+	headers := []string{"Fecha", "Tipo", "Activo", "Ticker", "Cantidad", "Precio", "Comisiones", "Moneda", "Tasa", "Moneda de coste", "Notas"}
 	for i, header := range headers {
 		col, _ := excelize.ColumnNumberToName(i + 1)
 		_ = f.SetCellValue(sheet, col+"1", header)
@@ -114,7 +118,9 @@ func (h *handler) ExportTransactions(c fiber.Ctx) error {
 		_ = f.SetCellValue(sheet, "F"+row, t.Price)
 		_ = f.SetCellValue(sheet, "G"+row, t.Fees)
 		_ = f.SetCellValue(sheet, "H"+row, t.Currency)
-		_ = f.SetCellValue(sheet, "I"+row, t.Notes)
+		_ = f.SetCellValue(sheet, "I"+row, t.FXRate)
+		_ = f.SetCellValue(sheet, "J"+row, t.CostCurrency)
+		_ = f.SetCellValue(sheet, "K"+row, t.Notes)
 	}
 
 	buf, err := f.WriteToBuffer()

@@ -5,14 +5,20 @@
 		asset,
 		quantity,
 		purchasePrice,
+		currency,
+		costCurrency,
 		totalValue,
 		formatCurrency
 	}: {
 		asset: Asset;
 		quantity: string;
 		purchasePrice: string;
+		/** Moneda del precio unitario: la de la operación, no la de la cuenta. */
+		currency: string;
+		/** Moneda del total: la que la cuenta pagó. */
+		costCurrency: string;
 		totalValue: number;
-		formatCurrency: (value: number) => string;
+		formatCurrency: (value: number, code?: string) => string;
 	} = $props();
 </script>
 
@@ -29,11 +35,14 @@
 		</div>
 		<div class="summary-item">
 			<span class="summary-label">Precio Unitario</span>
-			<span class="summary-value">{formatCurrency(parseFloat(purchasePrice))}</span>
+			<!-- En la moneda en la que cotizó: es el número que el usuario copió
+			     del bróker, y etiquetarlo con la de la cuenta lo convierte en
+			     otro precio. -->
+			<span class="summary-value">{formatCurrency(parseFloat(purchasePrice), currency)}</span>
 		</div>
 		<div class="summary-item border-top">
 			<span class="summary-label">Inversión Total</span>
-			<span class="summary-value highlight">{formatCurrency(totalValue)}</span>
+			<span class="summary-value highlight">{formatCurrency(totalValue, costCurrency)}</span>
 		</div>
 	</div>
 </section>

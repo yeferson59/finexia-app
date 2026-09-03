@@ -2,11 +2,9 @@ package portfolio
 
 import (
 	"context"
-	"time"
 
 	"uuid"
 
-	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 	"golang.org/x/sync/errgroup"
 
@@ -62,8 +60,8 @@ func (s *service) GetAssetHoldings(ctx context.Context, userID uuid.UUID, target
 	return s.repo.GetAssetHoldingsByUserID(ctx, userID, targetCurrency)
 }
 
-func (s *service) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency string, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
-	return s.repo.UpdateTransaction(ctx, userID, txnID, txnType, quantity, price, currency, fees, transactionDate, notes)
+func (s *service) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, in TransactionInput) (Transaction, error) {
+	return s.repo.UpdateTransaction(ctx, userID, txnID, in)
 }
 
 // DeleteTransaction removes a transaction the user owns. No activity alert is
@@ -72,8 +70,8 @@ func (s *service) DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID
 	return s.repo.DeleteTransaction(ctx, userID, txnID)
 }
 
-func (s *service) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, currency money.Currency, fees money.Money, transactionDate time.Time, notes string) (Transaction, error) {
-	txn, err := s.repo.CreateTransaction(ctx, userID, entryID, txnType, quantity, price, currency, fees, transactionDate, notes)
+func (s *service) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, in TransactionInput) (Transaction, error) {
+	txn, err := s.repo.CreateTransaction(ctx, userID, entryID, in)
 	if err != nil {
 		return Transaction{}, err
 	}
@@ -101,12 +99,25 @@ func (s *service) sendTransactionAlert(userID, entryID uuid.UUID, txn Transactio
 		return
 	}
 
+	// CreateTransaction fills CostCurrency from the entry it wrote against; the
+	// entry is re-read here anyway for the asset, so it is the fallback when a
+	// caller hands over a transaction that never went through the repository.
+	costCurrency := txn.CostCurrency
+	if costCurrency == money.XXX {
+		costCurrency = entry.CostCurrency
+	}
+
 	qty := txn.Quantity.String()
 	priceStr := txn.Price.String()
 	// The line total stays on the money type all the way to the string: going
 	// through float64 lost cents on prices with more than a couple of decimals,
 	// which is every crypto fill.
-	totalStr := txn.Price.MulDecimal(txn.Quantity).RoundBank(2).StringFixed(2)
+	//
+	// The rate is applied here for the same reason the average cost applies it:
+	// the alert says what the trade cost, and on a cross-currency fill that is
+	// the amount the account was debited, not the quoted one. It is 1 on every
+	// single-currency trade, so this changes nothing for those.
+	totalStr := txn.Price.MulDecimal(txn.Quantity).MulDecimal(txn.FXRate).RoundBank(2).StringFixed(2)
 
 	data := mail.ActivityAlertData{
 		UserName:        usr.Name,
@@ -116,7 +127,7 @@ func (s *service) sendTransactionAlert(userID, entryID uuid.UUID, txn Transactio
 		Quantity:        qty,
 		Price:           priceStr,
 		Total:           totalStr,
-		Currency:        txn.Currency.String(),
+		Currency:        costCurrency.String(),
 		TransactionDate: txn.TransactionDate.Format("02 Jan 2006"),
 		DashboardURL:    s.cfg.FrontendURL + "/dashboard/portfolios",
 	}

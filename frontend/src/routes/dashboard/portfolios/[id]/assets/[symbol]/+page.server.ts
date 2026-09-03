@@ -81,6 +81,10 @@ export const actions: Actions = {
 			quantity: formData.get('quantity'),
 			price: formData.get('price'),
 			currency: formData.get('currency') ?? 'USD',
+			// Vacía significa tasa 1, que es lo correcto mientras la operación y
+			// la posición estén en la misma moneda. Si difieren, el backend
+			// rechaza la transacción en vez de inventar la tasa de hoy.
+			fxRate: formData.get('fxRate') ?? 1,
 			fees: formData.get('fees') ?? 0,
 			transactionDate: formData.get('transactionDate'),
 			notes: formData.get('notes')
@@ -95,6 +99,7 @@ export const actions: Actions = {
 			quantity: data.quantity,
 			price: data.price,
 			currency: data.currency,
+			fxRate: data.fxRate,
 			fees: data.fees,
 			transactionDate: data.transactionDate,
 			notes: data.notes ?? ''
@@ -116,6 +121,10 @@ export const actions: Actions = {
 			quantity: formData.get('quantity'),
 			price: formData.get('price'),
 			currency: formData.get('currency') ?? 'USD',
+			// Vacía significa tasa 1, que es lo correcto mientras la operación y
+			// la posición estén en la misma moneda. Si difieren, el backend
+			// rechaza la transacción en vez de inventar la tasa de hoy.
+			fxRate: formData.get('fxRate') ?? 1,
 			fees: formData.get('fees') ?? 0,
 			transactionDate: formData.get('transactionDate'),
 			notes: formData.get('notes')
@@ -130,6 +139,7 @@ export const actions: Actions = {
 			quantity: data.quantity,
 			price: data.price,
 			currency: data.currency,
+			fxRate: data.fxRate,
 			fees: data.fees,
 			transactionDate: data.transactionDate,
 			notes: data.notes ?? ''

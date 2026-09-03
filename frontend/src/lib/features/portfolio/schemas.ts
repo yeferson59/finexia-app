@@ -29,6 +29,37 @@ export const portfolioUpdateSchema = z.object({
 	isDefault: z.coerce.boolean()
 });
 
+/**
+ * Código ISO de tres letras. El precio y su moneda viajan separados, así que
+ * una moneda vacía o basura no falla: se guarda y el coste queda etiquetado con
+ * algo que no es lo que se pagó.
+ */
+const currencyCode = z.coerce
+	.string()
+	.trim()
+	.toUpperCase()
+	.regex(/^[A-Z]{3}$/, 'Moneda inválida: usa un código ISO de tres letras');
+
+/**
+ * Tasa de cambio de la operación.
+ *
+ * Ausente o vacía significa 1, que es lo que vale cuando la operación y la
+ * cuenta usan la misma moneda —la inmensa mayoría—, y es lo que manda el
+ * formulario en ese caso. El backend rechaza una tasa distinta de 1 entre una
+ * moneda y sí misma, y rechaza que falte cuando las dos difieren, así que aquí
+ * solo hace falta normalizar el hueco.
+ *
+ * Lo que no se normaliza es una tasa inválida. Un `.catch(1)` la convertiría en
+ * «sin conversión», que es un número plausible y equivocado: el coste quedaría
+ * registrado en la moneda del mercado con la etiqueta de la cuenta, que es
+ * exactamente el error que la columna existe para evitar. Cero o negativa
+ * tienen que fallar y verse.
+ */
+const fxRate = z.preprocess(
+	(value) => (value === null || value === undefined || value === '' ? 1 : value),
+	z.coerce.number().positive('La tasa debe ser mayor que cero')
+);
+
 /** Alta de una posición (`routes/dashboard/portfolios/[id]/add`). */
 export const portfolioEntrySchema = z.object({
 	portfolioId: z.uuid(),
@@ -36,14 +67,12 @@ export const portfolioEntrySchema = z.object({
 	sourceId: z.uuid(),
 	quantity: z.coerce.number().positive(),
 	price: z.coerce.number().positive(),
-	// El precio y su moneda viajan separados, así que una moneda vacía o basura
-	// no falla: se guarda y el coste queda etiquetado con algo que no es lo que
-	// se pagó. Se exige el código ISO de tres letras que espera el backend.
-	costCurrency: z.coerce
-		.string()
-		.trim()
-		.toUpperCase()
-		.regex(/^[A-Z]{3}$/, 'Moneda inválida: usa un código ISO de tres letras'),
+	// `costCurrency` es la de la cuenta —en la que el bróker debitó— y
+	// `currency` la de la operación, que es la de cotización del activo. Solo
+	// difieren cuando el bróker convirtió, y entonces `fxRate` es a cuánto.
+	costCurrency: currencyCode,
+	currency: currencyCode,
+	fxRate,
 	entryDate: z.coerce.date(),
 	notes: z.coerce.string().optional()
 });
@@ -57,6 +86,7 @@ const transactionSchema = z.object({
 	quantity: z.coerce.number().positive(),
 	price: z.coerce.number().min(0),
 	currency: z.string().default('USD'),
+	fxRate,
 	fees: z.coerce.number().min(0).default(0),
 	transactionDate: z.coerce.date(),
 	notes: z.string().optional()

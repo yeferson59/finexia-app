@@ -235,6 +235,16 @@ export const transactionSchema = z.object({
 	quantity: z.string(),
 	price: z.string(),
 	currency: z.string(),
+	// `price` está en `currency` —la moneda en la que cotizó la operación— y
+	// `fxRate` es lo que valía una unidad de esa moneda en `costCurrency` el día
+	// de la operación. El coste real es `price * fxRate`: sin la tasa, una
+	// compra de LVMH en euros liquidada en dólares se lee como si el broker
+	// hubiera cobrado 606,60 USD.
+	//
+	// Opcionales para tolerar un backend anterior a la migración 000029: sin
+	// ellos se asume tasa 1, que es lo que valía toda transacción de entonces.
+	fxRate: z.string().optional(),
+	costCurrency: z.string().optional(),
 	fees: z.string(),
 	transactionDate: z.string(),
 	notes: z.string(),

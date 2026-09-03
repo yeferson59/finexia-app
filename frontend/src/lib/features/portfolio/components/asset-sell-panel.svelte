@@ -30,6 +30,7 @@
 	let sellValue = $state('');
 	let sellPrice = $state('');
 	let sellFees = $state('');
+	let sellRate = $state('');
 	let sellDate = $state(todayLocalDateString());
 	let sellNotes = $state('');
 	let isSellSubmitting = $state(false);
@@ -43,6 +44,7 @@
 			sellValue = '';
 			sellPrice = marketPrice ? marketPrice.toFixed(2) : transaction.price;
 			sellFees = '';
+			sellRate = '';
 			sellNotes = '';
 			sellDate = todayLocalDateString();
 			setTimeout(() => sellPanelEl?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
@@ -71,6 +73,27 @@
 
 	const sellExceedsLot = $derived(
 		sellMode === 'partial' && sellEffectiveQty > sellLotMaxQty + 1e-8
+	);
+
+	/**
+	 * Las dos monedas de la posición que se está vendiendo.
+	 *
+	 * `sellPrice` se siembra del precio de mercado, que está en la moneda de
+	 * cotización del activo; mandarlo etiquetado con la de la cuenta —que es lo
+	 * que hacía este panel— registra una venta de 429,45 USD donde hubo uno de
+	 * 429,45 EUR, y el resultado de la operación sale mal por la tasa entera.
+	 */
+	const sellEntry = $derived(entries.find((e) => e.id === transaction.entryId));
+	const sellCostCurrency = $derived(
+		sellEntry?.costCurrency?.trim().toUpperCase() || fallbackCurrency
+	);
+	const sellTradeCurrency = $derived(sellEntry?.currency?.trim().toUpperCase() || sellCostCurrency);
+	const sellIsCrossCurrency = $derived(sellTradeCurrency !== sellCostCurrency);
+
+	const sellProceeds = $derived(
+		sellEffectiveQty *
+			(parseFloat(sellPrice) || 0) *
+			(parseFloat(sellRate) || (sellIsCrossCurrency ? 0 : 1))
 	);
 </script>
 
@@ -110,11 +133,10 @@
 	>
 		<input type="hidden" name="entryId" value={transaction.entryId} />
 		<input type="hidden" name="type" value="sell" />
-		<input
-			type="hidden"
-			name="currency"
-			value={entries.find((e) => e.id === transaction.entryId)?.costCurrency ?? fallbackCurrency}
-		/>
+		<input type="hidden" name="currency" value={sellTradeCurrency} />
+		{#if !sellIsCrossCurrency}
+			<input type="hidden" name="fxRate" value="1" />
+		{/if}
 		<input type="hidden" name="quantity" value={sellEffectiveQty} />
 
 		{#if sellMode === 'partial'}
@@ -190,10 +212,38 @@
 					name="price"
 					bind:value={sellPrice}
 					min="0"
-					step="0.01"
+					step="any"
 					required
 				/>
+				{#if sellIsCrossCurrency}
+					<span class="sell-computed-hint">en {sellTradeCurrency}</span>
+				{/if}
 			</div>
+			{#if sellIsCrossCurrency}
+				<div class="form-group">
+					<label class="form-label" for="sell-rate"
+						>Tasa a {sellCostCurrency} <span class="required">*</span></label
+					>
+					<input
+						id="sell-rate"
+						type="number"
+						class="form-input"
+						name="fxRate"
+						bind:value={sellRate}
+						placeholder="1.1565"
+						min="0"
+						step="any"
+						required
+					/>
+					<span class="sell-computed-hint">
+						≈ {sellProceeds.toLocaleString('es-CO', {
+							style: 'currency',
+							currency: sellCostCurrency,
+							maximumFractionDigits: 2
+						})} recibidos
+					</span>
+				</div>
+			{/if}
 			<div class="form-group">
 				<label class="form-label" for="sell-fees">Comisión</label>
 				<input

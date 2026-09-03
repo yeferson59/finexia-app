@@ -2,12 +2,10 @@ package portfolio
 
 import (
 	"context"
-	"time"
 
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/platform/database"
@@ -106,8 +104,30 @@ func (r *PostgresRepository) GetEntryWithAsset(ctx context.Context, entryID uuid
 	return entry, nil
 }
 
-func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID uuid.UUID, sourceID uuid.UUID, txnType TransactionType, quantity decimal.Decimal, price money.Money, costCurrency money.Currency, entryDate time.Time, notes string) (Entry, error) {
+// CreatePortfolioEntry opens a position and records the trade that opened it.
+//
+// costCurrency is the position's — what the account was debited in — and
+// in.Currency is the trade's, which is the asset's own whenever the fill
+// happened on its home exchange. The two differ exactly when the broker had to
+// convert, and in.FXRate is the rate it converted at; Validate refuses the
+// combinations that cannot be true.
+//
+// costCurrency only takes effect when this opens a new position. The endpoint
+// upserts, so calling it again for the same portfolio/asset/source adds a trade
+// to the position that is already there, and that position keeps the currency it
+// was opened with.
+func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, costCurrency money.Currency, in TransactionInput) (Entry, error) {
 	var entry Entry
+
+	rate := in.Rate()
+	// The seeded price is in the position's currency, like the column it goes
+	// into. The trigger overwrites it from the transactions a moment later, so
+	// this only ever shows through if that trigger is gone — but a row that is
+	// right on its own is worth the multiplication. The rate is not validated
+	// yet, and does not need to be: an unvalidated Rate() is either what the
+	// caller stated or 1, and the upsert below is rolled back if it turns out to
+	// be neither legal nor needed.
+	costPrice := in.Price.MulDecimal(rate)
 
 	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		var owned bool
@@ -123,21 +143,37 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 			return ErrPortfolioOrSourceNotFound
 		}
 
+		// cost_currency comes back from the upsert rather than being assumed to
+		// be the one that was asked for. On a conflict this row already existed
+		// and DO UPDATE deliberately leaves its currency alone — a position
+		// cannot change what it costs in halfway through its life — so the
+		// requested currency may simply not be the position's. Validating the
+		// rate against the requested one would then approve a conversion into a
+		// currency the entry does not use, and the trigger would average euros
+		// into a dollar column with a rate applied on top.
 		var entryID uuid.UUID
+		var entryCostCurrency money.Currency
 		if err := tx.QueryRow(ctx, `
 		INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date, notes)
 		VALUES ($1::uuid, $2::uuid, $3::uuid, 0, $4::numeric, $5::char(3), $6::date, $7)
 		ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, ''))
 		DO UPDATE SET updated_at = NOW()
-		RETURNING id
-	`, portfolioID, assetID, sourceID, price.String(), costCurrency, entryDate, notes).Scan(&entryID); err != nil {
+		RETURNING id, cost_currency
+	`, portfolioID, assetID, sourceID, costPrice.String(), costCurrency, in.TransactionDate, in.Notes).Scan(&entryID, &entryCostCurrency); err != nil {
+			return err
+		}
+
+		// A refusal here rolls the upsert back with it, so a rejected request
+		// leaves no half-opened position behind.
+		tradeCurrency, err := in.Validate(entryCostCurrency)
+		if err != nil {
 			return err
 		}
 
 		if _, err := tx.Exec(ctx, `
-		INSERT INTO transactions (entry_id, type, quantity, price, currency, fees, transaction_date, notes)
-		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), 0, $6::date, $7)
-	`, entryID, txnType, quantity.String(), price.String(), costCurrency, entryDate, notes); err != nil {
+		INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, transaction_date, notes)
+		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, 0, $7::date, $8)
+	`, entryID, in.Type, in.Quantity.String(), in.Price.String(), tradeCurrency, rate.String(), in.TransactionDate, in.Notes); err != nil {
 			return err
 		}
 

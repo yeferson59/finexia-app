@@ -38,7 +38,7 @@ func (h *handler) CreatePortfolioEntry(c fiber.Ctx) error {
 
 	// No category travels with the request any more: the class of a position is
 	// the type of the asset it holds, and the catalogue is what stores that.
-	entry, err := h.service.CreatePortfolioEntry(c, userID, req.PortfolioID, req.AssetID, req.SourceID, txnType, req.Quantity, req.Price, req.CostCurrency, req.EntryDate, req.Notes)
+	entry, err := h.service.CreatePortfolioEntry(c, userID, req.PortfolioID, req.AssetID, req.SourceID, req.CostCurrency, req.Input(txnType))
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error creating portfolio entry", "Could not create portfolio entry")
 	}
@@ -196,7 +196,7 @@ func (h *handler) CreateTransaction(c fiber.Ctx) error {
 	}
 
 	return h.upsertTransaction(c, req.Type, func(userID uuid.UUID, txnType TransactionType) (Transaction, error) {
-		return h.service.CreateTransaction(c, userID, entryID, txnType, req.Quantity, req.Price, req.Currency, req.Fees, req.TransactionDate, req.Notes)
+		return h.service.CreateTransaction(c, userID, entryID, req.Input(txnType))
 	}, "Error creating transaction", "Could not create transaction", "Transaction created", "Transaction created successfully")
 }
 
@@ -212,7 +212,7 @@ func (h *handler) UpdateTransaction(c fiber.Ctx) error {
 	}
 
 	return h.upsertTransaction(c, req.Type, func(userID uuid.UUID, txnType TransactionType) (Transaction, error) {
-		return h.service.UpdateTransaction(c, userID, txnID, txnType, req.Quantity, req.Price, req.Currency, req.Fees, req.TransactionDate, req.Notes)
+		return h.service.UpdateTransaction(c, userID, txnID, req.Input(txnType))
 	}, "Error updating transaction", "Could not update transaction", "Transaction updated", "Transaction updated successfully")
 }
 

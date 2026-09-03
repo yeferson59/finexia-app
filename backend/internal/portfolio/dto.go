@@ -43,16 +43,30 @@ type CreatePortfolioEntryRequestDTO struct {
 	TransactionType string          `json:"transactionType"`
 	Quantity        decimal.Decimal `json:"quantity" validate:"required"`
 	Price           money.Money     `json:"price" validate:"required"`
-	CostCurrency    money.Currency  `json:"costCurrency" validate:"required"`
-	EntryDate       time.Time       `json:"entryDate" validate:"required"`
-	Notes           string          `json:"notes"`
+	// CostCurrency is the position's: what the account was debited in, and what
+	// its cost basis is reported in from here on. Currency is the trade's — the
+	// one Price is quoted in, which is the asset's own on a normal fill. They
+	// differ only when the broker converted, and then FXRate is what it
+	// converted at. Currency is optional and defaults to CostCurrency, so a
+	// client that knows nothing about any of this keeps working unchanged.
+	CostCurrency money.Currency  `json:"costCurrency" validate:"required"`
+	Currency     money.Currency  `json:"currency"`
+	FXRate       decimal.Decimal `json:"fxRate"`
+	EntryDate    time.Time       `json:"entryDate" validate:"required"`
+	Notes        string          `json:"notes"`
 }
 
 type CreateTransactionRequestDTO struct {
-	Type            string          `json:"type" validate:"required"`
-	Quantity        decimal.Decimal `json:"quantity" validate:"required"`
-	Price           money.Money     `json:"price" validate:"required"`
-	Currency        money.Currency  `json:"currency" validate:"required"`
+	Type     string          `json:"type" validate:"required"`
+	Quantity decimal.Decimal `json:"quantity" validate:"required"`
+	Price    money.Money     `json:"price" validate:"required"`
+	Currency money.Currency  `json:"currency" validate:"required"`
+	// FXRate converts Currency into the cost currency of the position this is
+	// recorded on, at the time of the trade. Omitted means 1, which is only
+	// accepted when the two currencies are the same — see
+	// TransactionInput.Validate for why a missing rate is refused rather than
+	// looked up.
+	FXRate          decimal.Decimal `json:"fxRate"`
 	Fees            money.Money     `json:"fees"`
 	TransactionDate time.Time       `json:"transactionDate" validate:"required"`
 	Notes           string          `json:"notes"`
@@ -62,10 +76,55 @@ type UpdateTransactionRequestDTO struct {
 	Type            string          `json:"type"`
 	Quantity        decimal.Decimal `json:"quantity"`
 	Price           money.Money     `json:"price"`
-	Currency        string          `json:"currency"`
+	Currency        money.Currency  `json:"currency"`
+	FXRate          decimal.Decimal `json:"fxRate"`
 	Fees            money.Money     `json:"fees"`
 	TransactionDate time.Time       `json:"transactionDate"`
 	Notes           string          `json:"notes"`
+}
+
+// Input folds the three write DTOs into the one shape the service takes. The
+// transaction type is left to the caller: the handler has already rejected an
+// invalid one by the time this is built.
+func (d CreateTransactionRequestDTO) Input(txnType TransactionType) TransactionInput {
+	return TransactionInput{
+		Type:            txnType,
+		Quantity:        d.Quantity,
+		Price:           d.Price,
+		Currency:        d.Currency,
+		FXRate:          d.FXRate,
+		Fees:            d.Fees,
+		TransactionDate: d.TransactionDate,
+		Notes:           d.Notes,
+	}
+}
+
+func (d UpdateTransactionRequestDTO) Input(txnType TransactionType) TransactionInput {
+	return TransactionInput{
+		Type:            txnType,
+		Quantity:        d.Quantity,
+		Price:           d.Price,
+		Currency:        d.Currency,
+		FXRate:          d.FXRate,
+		Fees:            d.Fees,
+		TransactionDate: d.TransactionDate,
+		Notes:           d.Notes,
+	}
+}
+
+// Input builds the opening trade of a new position. The entry date doubles as
+// the transaction date and the notes are shared, which is what the endpoint has
+// always done — a position and the purchase that opened it are one act here.
+func (d CreatePortfolioEntryRequestDTO) Input(txnType TransactionType) TransactionInput {
+	return TransactionInput{
+		Type:            txnType,
+		Quantity:        d.Quantity,
+		Price:           d.Price,
+		Currency:        d.Currency,
+		FXRate:          d.FXRate,
+		TransactionDate: d.EntryDate,
+		Notes:           d.Notes,
+	}
 }
 
 type UpdatePortfolioRequestDTO struct {
@@ -77,12 +136,18 @@ type UpdatePortfolioRequestDTO struct {
 }
 
 type TransactionResponseDTO struct {
-	ID              uuid.UUID `json:"id"`
-	EntryID         uuid.UUID `json:"entryId"`
-	Type            string    `json:"type"`
-	Quantity        string    `json:"quantity"`
-	Price           string    `json:"price"`
-	Currency        string    `json:"currency"`
+	ID       uuid.UUID `json:"id"`
+	EntryID  uuid.UUID `json:"entryId"`
+	Type     string    `json:"type"`
+	Quantity string    `json:"quantity"`
+	Price    string    `json:"price"`
+	Currency string    `json:"currency"`
+	// FXRate and CostCurrency travel together with Price: on their own, "606.60
+	// EUR" does not say what the trade cost an account funded in dollars, and
+	// the rate does not say what it converts into. With all three the client can
+	// show the line the way the broker's confirmation does.
+	FXRate          string    `json:"fxRate"`
+	CostCurrency    string    `json:"costCurrency,omitempty"`
 	Fees            string    `json:"fees"`
 	TransactionDate time.Time `json:"transactionDate"`
 	Notes           string    `json:"notes"`
@@ -97,11 +162,36 @@ func NewTransactionResponse(t Transaction) TransactionResponseDTO {
 		Quantity:        t.Quantity.String(),
 		Price:           t.Price.String(),
 		Currency:        t.Currency.String(),
+		FXRate:          transactionRate(t).String(),
+		CostCurrency:    costCurrencyCode(t),
 		Fees:            t.Fees.String(),
 		TransactionDate: t.TransactionDate,
 		Notes:           t.Notes,
 		CreatedAt:       t.CreatedAt,
 	}
+}
+
+// transactionRate reports 1 rather than 0 for a transaction read from a query
+// that does not select fx_rate. A rate of zero is not a rate, and a client
+// multiplying by it would erase the price; 1 is both the truthful answer for
+// every same-currency row and the harmless one everywhere else.
+func transactionRate(t Transaction) decimal.Decimal {
+	if t.FXRate.IsZero() {
+		return decimal.One
+	}
+
+	return t.FXRate
+}
+
+// costCurrencyCode omits the field instead of emitting money.XXX when the
+// transaction was read without its entry: an absent currency is something a
+// client can branch on, whereas "XXX" reads like a real answer.
+func costCurrencyCode(t Transaction) string {
+	if t.CostCurrency == money.XXX {
+		return ""
+	}
+
+	return t.CostCurrency.String()
 }
 
 func NewTransactionListResponse(txns []Transaction) []TransactionResponseDTO {
@@ -119,6 +209,8 @@ type UserTransactionResponseDTO struct {
 	Quantity        string    `json:"quantity"`
 	Price           string    `json:"price"`
 	Currency        string    `json:"currency"`
+	FXRate          string    `json:"fxRate"`
+	CostCurrency    string    `json:"costCurrency,omitempty"`
 	Fees            string    `json:"fees"`
 	TransactionDate time.Time `json:"transactionDate"`
 	Notes           string    `json:"notes"`
@@ -135,6 +227,8 @@ func NewUserTransactionResponse(t Transaction) UserTransactionResponseDTO {
 		Quantity:        t.Quantity.String(),
 		Price:           t.Price.String(),
 		Currency:        t.Currency.String(),
+		FXRate:          transactionRate(t).String(),
+		CostCurrency:    costCurrencyCode(t),
 		Fees:            t.Fees.String(),
 		TransactionDate: t.TransactionDate,
 		Notes:           t.Notes,

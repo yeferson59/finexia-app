@@ -13,7 +13,12 @@ export const actions = {
 			sourceId: formData.get('platformId'),
 			quantity: formData.get('quantity'),
 			price: formData.get('purchasePrice'),
+			// Tres campos que solo significan algo juntos: el precio está en
+			// `currency`, la cuenta pagó en `costCurrency` y `fxRate` es lo que
+			// costaba una unidad de la primera en la segunda ese día.
 			costCurrency: formData.get('costCurrency'),
+			currency: formData.get('currency'),
+			fxRate: formData.get('fxRate'),
 			entryDate: formData.get('purchaseDate'),
 			notes: formData.get('notes')
 		});

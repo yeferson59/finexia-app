@@ -246,8 +246,16 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, use
 					WHERE ps.portfolio_id = pe.portfolio_id
 					  AND ps.created_at >= tx.created_at
 				) AS snapshot_date,
+				-- Two rates, and the order of them is the point. tx.fx_rate is
+				-- historical: it carries the trade from the currency it was
+				-- quoted in to the one the account settled it in, at the rate of
+				-- that day. fxt.rate is current: it carries that settled amount
+				-- into whatever currency the series is being read in. Using the
+				-- current rate for both legs — which is what this did before
+				-- fx_rate existed — restates a December purchase at today's
+				-- rate and books the difference as a flow the owner never made.
 				transaction_cash_flow(tx.type, tx.quantity, tx.price, tx.fees)
-					* COALESCE(fxt.rate, 1) AS amount
+					* tx.fx_rate * COALESCE(fxt.rate, 1) AS amount
 			FROM transactions tx
 			JOIN portfolio_entries pe ON pe.id = tx.entry_id
 			JOIN portfolios pf        ON pf.id = pe.portfolio_id
@@ -256,7 +264,7 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, use
 				SELECT COALESCE(NULLIF($2::text, ''), us.preferred_currency, 'USD')::char(3) AS code
 			) tgt
 			CROSS JOIN LATERAL (
-				SELECT fx_rate(pf.user_id, tx.currency, tgt.code) AS rate
+				SELECT fx_rate(pf.user_id, pe.cost_currency, tgt.code) AS rate
 			) fxt
 			WHERE pf.user_id = $1
 		), net_flows AS (
@@ -320,7 +328,7 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, use
 func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error) {
 	// One portfolio, one base currency: nothing to convert and nothing that can
 	// fail to, which is why the unconverted count is a literal zero here. The
-	// flows are the exception — a transaction carries its own currency and can
+	// flows are the exception — a position costs in its own currency and can
 	// differ from the portfolio's base, so those do go through fx_rate.
 	rows, err := r.db.Query(ctx, `
 		WITH points AS (
@@ -344,13 +352,16 @@ func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context
 					WHERE ps.portfolio_id = $1
 					  AND ps.created_at >= tx.created_at
 				) AS snapshot_date,
+				-- Historical rate onto the position's own currency, then the
+				-- current one onto the portfolio's base: see the account-wide
+				-- query for why the two cannot be collapsed into one.
 				transaction_cash_flow(tx.type, tx.quantity, tx.price, tx.fees)
-					* COALESCE(fxt.rate, 1) AS amount
+					* tx.fx_rate * COALESCE(fxt.rate, 1) AS amount
 			FROM transactions tx
 			JOIN portfolio_entries pe ON pe.id = tx.entry_id
 			JOIN portfolios pf        ON pf.id = pe.portfolio_id
 			CROSS JOIN LATERAL (
-				SELECT fx_rate(pf.user_id, tx.currency, pf.base_currency) AS rate
+				SELECT fx_rate(pf.user_id, pe.cost_currency, pf.base_currency) AS rate
 			) fxt
 			WHERE pe.portfolio_id = $1 AND pf.user_id = $2
 		), net_flows AS (

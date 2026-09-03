@@ -18,6 +18,7 @@
 		quantity: '',
 		price: '',
 		currency: 'USD',
+		fxRate: '',
 		fees: '',
 		transactionDate: todayLocalDateString(),
 		notes: ''
@@ -25,13 +26,46 @@
 
 	$effect(() => {
 		txnForm.entryId = entries[0]?.id ?? '';
-		txnForm.currency = entries[0]?.costCurrency ?? 'USD';
 	});
 
 	let isSubmitting = $state(false);
 
 	const txnMode = $derived(txnModeFor(txnForm.type));
 	const priceLabel = $derived(priceLabelFor(txnForm.type));
+
+	/**
+	 * La posición sobre la que se registra, y sus dos monedas.
+	 *
+	 * `costCurrency` es en la que se lleva el coste —la de la cuenta— y
+	 * `currency` la de cotización del activo. Cuando difieren, cada operación
+	 * nueva sobre esta posición volvió a pasar por una conversión, y sin su tasa
+	 * el coste medio se calcularía sumando euros a dólares.
+	 */
+	const entry = $derived(entries.find((e) => e.id === txnForm.entryId) ?? entries[0]);
+	const costCurrency = $derived(entry?.costCurrency?.trim().toUpperCase() || 'USD');
+	const assetCurrency = $derived(entry?.currency?.trim().toUpperCase() || costCurrency);
+
+	// El split no mueve dinero —el precio va a 0— así que pedir una tasa para él
+	// sería un campo obligatorio que no cambia ningún número.
+	const crossCurrency = $derived(assetCurrency !== costCurrency && txnMode !== 'split');
+
+	$effect(() => {
+		txnForm.currency = crossCurrency ? assetCurrency : costCurrency;
+		if (!crossCurrency) txnForm.fxRate = '';
+	});
+
+	const rate = $derived(parseFloat(txnForm.fxRate) || (crossCurrency ? 0 : 1));
+	const settledTotal = $derived(
+		(parseFloat(txnForm.quantity) || 0) * (parseFloat(txnForm.price) || 0) * rate
+	);
+
+	function formatIn(value: number, code: string): string {
+		return new Intl.NumberFormat('es-CO', {
+			style: 'currency',
+			currency: code,
+			minimumFractionDigits: 2
+		}).format(value);
+	}
 </script>
 
 <form
@@ -48,6 +82,9 @@
 >
 	<input type="hidden" name="entryId" value={txnForm.entryId} />
 	<input type="hidden" name="currency" value={txnForm.currency} />
+	{#if !crossCurrency}
+		<input type="hidden" name="fxRate" value="1" />
+	{/if}
 
 	{#if entries.length > 1}
 		<div class="form-row">
@@ -178,6 +215,43 @@
 		</div>
 	{/if}
 
+	{#if crossCurrency}
+		<div class="form-row fx-row">
+			<div class="form-group">
+				<span class="form-label">Moneda de la operación</span>
+				<p class="fx-static">{txnForm.currency}</p>
+				<p class="field-hint">
+					{assetCurrency} es la moneda en la que cotiza el activo; el precio y la comisión de arriba van
+					en ella.
+				</p>
+			</div>
+			<div class="form-group">
+				<label class="form-label" for="txn-fx"
+					>Tasa a {costCurrency} <span class="required">*</span></label
+				>
+				<input
+					id="txn-fx"
+					type="number"
+					class="form-input"
+					name="fxRate"
+					bind:value={txnForm.fxRate}
+					placeholder="1.0638"
+					min="0"
+					step="any"
+					required
+				/>
+				<p class="field-hint">
+					Cuántos {costCurrency} costaba 1 {assetCurrency} ese día, según la confirmación del bróker.
+				</p>
+			</div>
+			<div class="form-group">
+				<span class="form-label">Coste en {costCurrency}</span>
+				<p class="fx-static">{formatIn(settledTotal, costCurrency)}</p>
+				<p class="field-hint">Contrástalo con el importe que te debitaron.</p>
+			</div>
+		</div>
+	{/if}
+
 	<div class="form-group">
 		<label class="form-label" for="txn-notes">Notas</label>
 		<input
@@ -236,6 +310,29 @@
 
 	.required {
 		color: var(--red);
+	}
+
+	.field-hint {
+		margin: 0;
+		font-size: 0.75rem;
+		color: rgba(236, 234, 229, 0.45);
+		font-style: italic;
+	}
+
+	.fx-row {
+		padding: 0.9rem;
+		border: 1px dashed rgba(212, 145, 42, 0.3);
+		border-radius: 8px;
+		background: rgba(212, 145, 42, 0.04);
+	}
+
+	.fx-static {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: var(--amber);
 	}
 
 	.form-input {
