@@ -32,3 +32,9 @@ var (
 // rules was broken, so the message the client sees names the two currencies
 // involved instead of just refusing.
 var ErrTransactionFXRate = httpx.AsBadRequest(errors.New("invalid transaction exchange rate"))
+
+// ErrTransactionFeesCurrency rejects a commission billed in a currency the
+// transaction has no way to convert. A row carries exactly one rate, between
+// the trade's currency and the position's, so a fee in a third currency could
+// only be reached by inventing a second one.
+var ErrTransactionFeesCurrency = httpx.AsBadRequest(errors.New("invalid transaction fees currency"))

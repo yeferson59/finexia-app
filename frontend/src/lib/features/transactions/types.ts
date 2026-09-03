@@ -12,6 +12,8 @@ export interface ImportMapping {
 	price: number | null;
 	fees: number | null;
 	currency: number | null;
+	/** Tasa a la que esa fila liquidó en la moneda de la cuenta. */
+	fxRate: number | null;
 	category: number | null;
 	notes: number | null;
 }
@@ -27,6 +29,9 @@ export interface ImportRow {
 	price: string;
 	fees: string;
 	currency: string;
+	fxRate: string;
+	/** La de la cuenta, que sale de los valores por defecto, no de la fila. */
+	costCurrency: string;
 	category: string;
 	notes: string;
 	valid: boolean;
@@ -56,6 +61,16 @@ export interface ImportResult {
 export interface ImportDefaults {
 	type: string;
 	currency: string;
+	/**
+	 * Moneda de la cuenta: en la que el bróker debitó, y en la que quedará el
+	 * coste de toda posición que abra esta importación.
+	 *
+	 * Va en los valores por defecto y no en una columna porque un extracto es
+	 * una cuenta: su moneda de liquidación es del archivo, no de la fila. Vacía
+	 * significa «la misma que la de cada fila», que es lo que hacía toda
+	 * importación anterior a la tasa por transacción.
+	 */
+	costCurrency: string;
 	category: string;
 	dateFormat: string;
 }
@@ -84,6 +99,7 @@ export const emptyMapping: ImportMapping = {
 	price: null,
 	fees: null,
 	currency: null,
+	fxRate: null,
 	category: null,
 	notes: null
 };

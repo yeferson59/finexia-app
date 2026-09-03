@@ -49,6 +49,17 @@ func applyImportDefaults(defaults ImportDefaultsDTO) (ImportDefaultsDTO, error) 
 		return out, httpx.AsBadRequest(fmt.Errorf("invalid default currency %q", out.Currency))
 	}
 	out.Currency = cur
+	// Empty means "whatever the row is in", which is a per-row answer and so
+	// cannot be resolved here — buildImportRow does it. What is resolved here is
+	// that a code, if given, is a real one, so a typo fails the upload instead
+	// of silently tagging every position with a currency that does not exist.
+	if strings.TrimSpace(out.CostCurrency) != "" {
+		costCur, ok := normalizeCurrency(out.CostCurrency)
+		if !ok {
+			return out, httpx.AsBadRequest(fmt.Errorf("invalid default cost currency %q", out.CostCurrency))
+		}
+		out.CostCurrency = costCur
+	}
 	if strings.TrimSpace(out.Category) == "" {
 		out.Category = string(market.Stock)
 	}
@@ -260,6 +271,45 @@ func buildImportRow(
 	// The preview DTO keeps the code as text: it is what the browser echoes
 	// back in the mapping step, not an amount to do arithmetic on.
 	dto.Currency = currency
+
+	// Cost currency: the account's, named once for the whole upload. An empty
+	// default means the statement never converted anything, so each row settles
+	// in the currency it traded in — which is exactly what every import before
+	// this field produced.
+	costCurrency := currency
+	if defaults.CostCurrency != "" {
+		costCurrency = defaults.CostCurrency
+	}
+	costUnit, _ := money.GetCurrencyFromISOCode(costCurrency)
+	entity.CostCurrency = costUnit
+	dto.CostCurrency = costCurrency
+
+	// FX rate. The three refusals are the ones TransactionInput.Validate makes,
+	// restated here in the language the rest of this file speaks: the importer
+	// reports per-row problems to someone fixing a spreadsheet, and an English
+	// wrapped error in the middle of that list is a worse message even though it
+	// is the same rule. ImportEntryTransactions runs the real Validate before
+	// writing, so the two can never drift into disagreeing about what is legal.
+	rate := decimal.One
+	rateRaw := spreadsheet.CellAt(row, mapping.FXRate)
+	switch {
+	case rateRaw != "":
+		parsed, err := parseDecimal(rateRaw)
+		switch {
+		case err != nil:
+			errs = append(errs, fmt.Sprintf("tasa de cambio no numérica: %q", rateRaw))
+		case !parsed.IsPos():
+			errs = append(errs, fmt.Sprintf("la tasa de cambio debe ser mayor que 0: %q", rateRaw))
+		case currency == costCurrency && !parsed.Equal(decimal.One):
+			errs = append(errs, fmt.Sprintf("%s no se convierte en sí misma a %s", currency, parsed))
+		default:
+			rate = parsed
+		}
+	case currency != costCurrency:
+		errs = append(errs, fmt.Sprintf("falta la tasa de cambio: la operación está en %s y la cuenta en %s", currency, costCurrency))
+	}
+	entity.FXRate = rate
+	dto.FXRate = rate.String()
 
 	// Price.
 	priceRaw := spreadsheet.CellAt(row, mapping.Price)

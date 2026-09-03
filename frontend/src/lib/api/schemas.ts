@@ -246,6 +246,10 @@ export const transactionSchema = z.object({
 	fxRate: z.string().optional(),
 	costCurrency: z.string().optional(),
 	fees: z.string(),
+	// La comisión no siempre se cobra del mismo lado que la ejecución: el
+	// bróker que cotizó en EUR pudo cargarla en USD. Es `currency` o
+	// `costCurrency`, nunca una tercera; ausente significa `currency`.
+	feesCurrency: z.string().optional(),
 	transactionDate: z.string(),
 	notes: z.string(),
 	createdAt: z.string()

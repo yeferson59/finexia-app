@@ -164,16 +164,22 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 		}
 
 		// A refusal here rolls the upsert back with it, so a rejected request
-		// leaves no half-opened position behind.
-		tradeCurrency, err := in.Validate(entryCostCurrency)
+		// leaves no half-opened position behind. `settled` is the input with
+		// every currency and the rate resolved; using it rather than `in` is
+		// what keeps a defaulted currency from being written as an empty string.
+		settled, err := in.Validate(entryCostCurrency)
 		if err != nil {
 			return err
 		}
 
+		// The opening trade carries no commission: this endpoint has never taken
+		// one, so its fee currency is the trade's by the same default every
+		// other zero-fee row gets.
 		if _, err := tx.Exec(ctx, `
-		INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, transaction_date, notes)
-		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, 0, $7::date, $8)
-	`, entryID, in.Type, in.Quantity.String(), in.Price.String(), tradeCurrency, rate.String(), in.TransactionDate, in.Notes); err != nil {
+		INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes)
+		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, 0, $7::char(3), $8::date, $9)
+	`, entryID, settled.Type, settled.Quantity.String(), settled.Price.String(), settled.Currency,
+			settled.FXRate.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes); err != nil {
 			return err
 		}
 

@@ -86,6 +86,7 @@ export const actions: Actions = {
 			// rechaza la transacción en vez de inventar la tasa de hoy.
 			fxRate: formData.get('fxRate') ?? 1,
 			fees: formData.get('fees') ?? 0,
+			feesCurrency: formData.get('feesCurrency') ?? '',
 			transactionDate: formData.get('transactionDate'),
 			notes: formData.get('notes')
 		});
@@ -101,12 +102,17 @@ export const actions: Actions = {
 			currency: data.currency,
 			fxRate: data.fxRate,
 			fees: data.fees,
+			// Se omite en vez de mandarse vacía: el backend decodifica la moneda
+			// a un tipo que rechaza la cadena vacía con un error de formato, así
+			// que «no la sé» tiene que ser la ausencia del campo, no un hueco.
+			// Ausente significa la moneda de la operación.
+			...(data.feesCurrency ? { feesCurrency: data.feesCurrency } : {}),
 			transactionDate: data.transactionDate,
 			notes: data.notes ?? ''
 		});
 
 		if (!response.ok) {
-			return { success: false };
+			return { success: false, error: response.details || response.message || response.action };
 		}
 
 		return { success: response.success };
@@ -126,6 +132,7 @@ export const actions: Actions = {
 			// rechaza la transacción en vez de inventar la tasa de hoy.
 			fxRate: formData.get('fxRate') ?? 1,
 			fees: formData.get('fees') ?? 0,
+			feesCurrency: formData.get('feesCurrency') ?? '',
 			transactionDate: formData.get('transactionDate'),
 			notes: formData.get('notes')
 		});
@@ -141,12 +148,25 @@ export const actions: Actions = {
 			currency: data.currency,
 			fxRate: data.fxRate,
 			fees: data.fees,
+			// Se omite en vez de mandarse vacía: el backend decodifica la moneda
+			// a un tipo que rechaza la cadena vacía con un error de formato, así
+			// que «no la sé» tiene que ser la ausencia del campo, no un hueco.
+			// Ausente significa la moneda de la operación.
+			...(data.feesCurrency ? { feesCurrency: data.feesCurrency } : {}),
 			transactionDate: data.transactionDate,
 			notes: data.notes ?? ''
 		});
 
 		if (!response.ok) {
-			return { success: false, edited: true, error: response.message ?? response.action };
+			// `details` primero: desde que FromDomain devuelve el texto del error en
+			// los 4xx, es el campo que nombra el problema —«USD no se convierte en
+			// sí misma a 1.0638»—, mientras que `message` es el titular genérico
+			// del handler.
+			return {
+				success: false,
+				edited: true,
+				error: response.details || response.message || response.action
+			};
 		}
 
 		return { success: response.success, edited: true };

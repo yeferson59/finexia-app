@@ -59,6 +59,17 @@
 		}
 	});
 
+	/**
+	 * El interruptor está encendido pero las dos monedas son la misma.
+	 *
+	 * Es un estado alcanzable —basta no tocar el selector de la izquierda— y no
+	 * es una conversión: una moneda no se convierte en sí misma a 1,0638. El
+	 * backend lo rechaza con un 400, así que el formulario lo dice antes, junto
+	 * al campo que hay que cambiar, y manda tasa 1 en vez de una que no puede
+	 * ser cierta.
+	 */
+	const sameCurrency = $derived(converted && costCurrency === currency);
+
 	const rate = $derived(parseFloat(fxRate) || (converted ? 0 : 1));
 	const units = $derived(parseFloat(quantity) || 0);
 	const unitPrice = $derived(parseFloat(purchasePrice) || 0);
@@ -142,6 +153,11 @@
 	</div>
 
 	{#if converted}
+		{#if sameCurrency}
+			<!-- La tasa igual va oculta en 1: mientras las dos monedas coincidan no
+			     hubo conversión, y mandar la que esté escrita solo produce el 400. -->
+			<input type="hidden" name="fxRate" value="1" />
+		{/if}
 		<div class="form-row">
 			<div class="form-group">
 				<label for="costCurrency" class="form-label"
@@ -167,18 +183,27 @@
 				<input
 					id="fxRate"
 					type="number"
-					name="fxRate"
+					name={sameCurrency ? 'fxRateIgnored' : 'fxRate'}
 					bind:value={fxRate}
 					placeholder="1.0638"
 					class="form-input"
 					min="0"
 					step="any"
-					required={converted}
+					disabled={sameCurrency}
+					required={converted && !sameCurrency}
 				/>
-				<p class="field-hint">
-					Cuántos {costCurrency} costaba 1 {currency} ese día. Cópiala de la confirmación del bróker,
-					no la de hoy: la de hoy convierte la compra a un precio que nunca pagaste.
-				</p>
+				{#if sameCurrency}
+					<p class="field-warning">
+						La operación y la cuenta están las dos en {currency}, así que no hubo conversión y no
+						hay tasa que aplicar. Si el activo cotizó en otra moneda, cámbiala arriba, en el
+						selector que está junto al precio.
+					</p>
+				{:else}
+					<p class="field-hint">
+						Cuántos {costCurrency} costaba 1 {currency} ese día. Cópiala de la confirmación del bróker,
+						no la de hoy: la de hoy convierte la compra a un precio que nunca pagaste.
+					</p>
+				{/if}
 			</div>
 		</div>
 	{:else}
@@ -200,7 +225,7 @@
 			<div class="value-display">
 				<p class="total-value">{formatCurrency(settledTotal, costCurrency || currency)}</p>
 			</div>
-			{#if converted && currency !== costCurrency}
+			{#if converted && !sameCurrency}
 				<!-- El número que el usuario puede contrastar contra la pantalla de
 				     su bróker: si no coincide con el «open value» de allí, la tasa
 				     o el precio están mal, y se ve antes de guardar. -->

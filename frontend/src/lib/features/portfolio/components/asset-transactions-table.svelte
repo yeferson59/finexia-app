@@ -56,6 +56,7 @@
 			{@const rate = parseFloat(txn.fxRate ?? '1') || 1}
 			{@const costCurrency = txn.costCurrency || txn.currency}
 			{@const converted = costCurrency !== txn.currency}
+			{@const feesCurrency = txn.feesCurrency || txn.currency}
 			<!-- El total es lo que la cuenta pagó o recibió, no lo que la
 			     operación cotizó: precio y comisión se quedan en la moneda del
 			     mercado, y la tasa los lleva a la de la cuenta. -->
@@ -71,7 +72,10 @@
 				<p class="date">{fmtDate(txn.transactionDate)}</p>
 				<p class="qty">{qty.toLocaleString('es-CO', { maximumFractionDigits: 8 })}</p>
 				<p class="price">{formatAmount(price, txn.currency)}</p>
-				<p class="fees">{fees > 0 ? formatAmount(fees, txn.currency) : '—'}</p>
+				<!-- La comisión en la moneda en la que se cobró, que no siempre es la
+				     de la ejecución: un bróker que llenó en euros pudo cargarla en
+				     dólares, y etiquetarla con la del precio la mueve por la tasa. -->
+				<p class="fees">{fees > 0 ? formatAmount(fees, feesCurrency) : '—'}</p>
 				<p class="total">
 					{formatAmount(total, costCurrency)}
 					{#if converted}

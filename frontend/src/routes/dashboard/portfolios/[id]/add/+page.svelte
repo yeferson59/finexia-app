@@ -14,4 +14,5 @@
 	portfolioId={params.id}
 	platforms={data?.platforms ?? []}
 	submitError={form?.success === false}
+	submitErrorDetail={form?.error ?? ''}
 />

@@ -54,6 +54,56 @@ BEGIN
   END IF;
 END$$;
 
+-- Which of the two currencies the commission was charged in.
+--
+-- The rate above settles the price; it does not settle the fee, because a fee
+-- is not part of the instrument's price and brokers do not consistently charge
+-- it on the same side. The confirmation that prompted this column quotes the
+-- fill at 606.60 EUR and the commission at 0.00 USD: one line, two currencies,
+-- and multiplying both by the same rate is right for exactly one of them.
+--
+-- The column is deliberately not free: a fee is either in the currency the
+-- trade was quoted in or in the one the account settled in, and nothing else is
+-- a fee on this transaction. That is a two-table rule, so it lives in
+-- TransactionInput.Validate rather than in a CHECK — but it is what makes the
+-- conversion below a choice between fx_rate and 1, with no third rate to store.
+--
+-- Backfilled from currency rather than defaulted to a constant: every existing
+-- row has fees in the currency it also priced in, which is the same as its cost
+-- currency, so the two candidate answers coincide and this one is exact. The
+-- column is filled before it is made NOT NULL so no row is ever unlabelled.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS fees_currency CHAR(3);
+UPDATE transactions SET fees_currency = currency WHERE fees_currency IS NULL;
+ALTER TABLE transactions ALTER COLUMN fees_currency SET NOT NULL;
+
+-- The fee, in the position's cost currency.
+--
+-- It is a function for the reason transaction_cash_flow (000027) is one: the
+-- account-wide growth series and the per-portfolio one both need this rule, and
+-- two copies of it are two chances to disagree about whose rate a commission
+-- takes.
+--
+-- The rule is small because the column above is constrained. A fee charged in
+-- the currency of the trade rode the same conversion the trade did; a fee
+-- charged in the currency of the account is already there. There is no third
+-- case, so there is no third rate to look up and nothing here can fail.
+CREATE OR REPLACE FUNCTION transaction_fees_in_cost(
+  p_fees          NUMERIC,
+  p_fees_currency CHAR(3),
+  p_currency      CHAR(3),
+  p_fx_rate       NUMERIC
+)
+RETURNS NUMERIC
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT COALESCE(p_fees, 0) *
+    CASE WHEN p_fees_currency IS NOT DISTINCT FROM p_currency
+      THEN COALESCE(p_fx_rate, 1)
+      ELSE 1
+    END;
+$$;
+
 -- The average cost becomes an average of converted costs.
 --
 -- This is the whole reason the column exists. portfolio_entries.price is read

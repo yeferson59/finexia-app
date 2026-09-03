@@ -413,6 +413,15 @@ dólares devolvía sus importes nominales sumados: un número en ninguna moneda,
 inflado en cuanto entraba una de unidad menor. El cliente, además, no tenía cómo
 saberlo — lo pintaba con un «$» fijo.
 
+#### Errores de cliente: el motivo viaja en `details`
+
+Un 4xx generado por `FromDomain` incluye el texto del error de dominio en
+`details`, además del `message` genérico del handler y del `action`. Es lo que
+convierte «no se pudo registrar el activo» en «USD no se convierte en sí misma a
+1.0638», que es la diferencia entre corregir un campo y reintentar a ciegas
+contra el mismo rechazo. Un 5xx **no** lo incluye: ese texto está escrito para
+quien lee los logs y puede arrastrar una consulta o el nombre de una restricción.
+
 #### Resumen de crecimiento: crecimiento no es rendimiento
 
 `summary` lleva dos lecturas que no hay que confundir. `initialValue`,
@@ -459,10 +468,12 @@ Cada transacción guarda las tres piezas:
 
 | Campo | Valor |
 |---|---|
-| `price`, `fees` | En `currency`: la moneda en la que se ejecutó la operación, tal como la imprime el bróker |
+| `price` | En `currency`: la moneda en la que se ejecutó la operación, tal como la imprime el bróker |
 | `currency` | Moneda de la operación. Por omisión, la de coste de la posición |
 | `fxRate` | Cuántos `costCurrency` valía 1 `currency` **el día de la operación**. Por omisión `1` |
 | `costCurrency` | La de la posición (`portfolio_entries.cost_currency`), repetida aquí para que `fxRate` se pueda interpretar sin releer la entry |
+| `fees` | La comisión, en `feesCurrency` |
+| `feesCurrency` | `currency` o `costCurrency`, nunca una tercera. Por omisión `currency` |
 
 El coste real es `price × fxRate`, y es lo que el trigger de coste medio guarda
 en `portfolio_entries.price`. Guardar la tasa —en vez de convertir al leer— es lo
@@ -480,9 +491,35 @@ Dos combinaciones se rechazan con `400` en vez de guardarse:
   actual: para una compra de hace un año esa es justo la tasa equivocada, y el
   error sería invisible. El cliente propone la tasa y el titular la corrige
   contra su confirmación.
+- `feesCurrency` que no sea ni `currency` ni `costCurrency`. La fila lleva una
+  sola tasa, así que una comisión en una tercera moneda solo se alcanzaría
+  inventando una segunda.
 
-Un cliente que no mande ninguno de los dos campos sigue funcionando igual que
-antes: la operación se registra en la moneda de la posición, con tasa 1.
+Un cliente que no mande ninguno de estos campos sigue funcionando igual que
+antes: la operación se registra en la moneda de la posición, con tasa 1 y la
+comisión en esa misma moneda.
+
+`feesCurrency` es un campo aparte porque la comisión no se cobra siempre del
+mismo lado que la ejecución: la confirmación que motivó todo esto cotiza el
+llenado en 606,60 EUR y la comisión en 0,00 USD. Multiplicar las dos por la
+misma tasa es correcto para una sola de ellas, así que el coste de la posición
+convierte el precio por `fxRate` y la comisión solo si se cobró en `currency`.
+
+#### Importación de un extracto en dos monedas
+
+El wizard de import (§2.6) toma las mismas tres piezas repartidas entre la fila
+y el archivo, porque un extracto es **una** cuenta:
+
+| Dónde | Campo | Valor |
+|---|---|---|
+| Columna mapeable | `fxRate` | La tasa de esa fila. Sin mapear, todas las filas valen 1 |
+| Columna mapeable | `currency` | La moneda de la fila, como hasta ahora |
+| `defaults.costCurrency` | — | La moneda de la cuenta, una para todo el archivo. Vacía significa «la misma de cada fila», que es lo que producía toda importación anterior |
+
+Con `costCurrency` puesta, una fila en otra moneda **sin** tasa se marca
+inválida en el preview con el motivo, en vez de importarse convertida a la tasa
+de hoy. La comisión de una fila importada va en la moneda de esa fila: es lo que
+significa la columna «Moneda» del archivo para los importes que etiqueta.
 
 ### 2.8 Assets (JWT; *admin* donde se indica)
 

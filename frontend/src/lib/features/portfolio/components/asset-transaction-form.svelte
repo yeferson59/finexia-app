@@ -20,6 +20,7 @@
 		currency: 'USD',
 		fxRate: '',
 		fees: '',
+		feesCurrency: '',
 		transactionDate: todayLocalDateString(),
 		notes: ''
 	});
@@ -49,9 +50,25 @@
 	// sería un campo obligatorio que no cambia ningún número.
 	const crossCurrency = $derived(assetCurrency !== costCurrency && txnMode !== 'split');
 
+	/**
+	 * La comisión arranca en la moneda de la cuenta, no en la de la operación.
+	 *
+	 * Es lo contrario del valor por defecto de la API, y a propósito: la API
+	 * empareja `fees` con `price` porque es la lectura menos sorprendente de dos
+	 * campos contiguos, pero un bróker cobra la comisión de la cuenta más a
+	 * menudo que de la ejecución —la confirmación que motivó todo esto cotiza en
+	 * EUR y cobra 0,00 USD—. Este formulario siempre manda el campo, así que el
+	 * valor por defecto de la API nunca se le aplica y las dos elecciones no se
+	 * pisan.
+	 */
 	$effect(() => {
 		txnForm.currency = crossCurrency ? assetCurrency : costCurrency;
-		if (!crossCurrency) txnForm.fxRate = '';
+		if (!crossCurrency) {
+			txnForm.fxRate = '';
+			txnForm.feesCurrency = '';
+		} else if (txnForm.feesCurrency === '') {
+			txnForm.feesCurrency = costCurrency;
+		}
 	});
 
 	const rate = $derived(parseFloat(txnForm.fxRate) || (crossCurrency ? 0 : 1));
@@ -155,16 +172,41 @@
 			</div>
 			<div class="form-group">
 				<label class="form-label" for="txn-fees">Comisión</label>
-				<input
-					id="txn-fees"
-					type="number"
-					class="form-input"
-					name="fees"
-					bind:value={txnForm.fees}
-					placeholder="0"
-					min="0"
-					step="0.01"
-				/>
+				{#if crossCurrency}
+					<div class="fees-field">
+						<select
+							class="form-select"
+							name="feesCurrency"
+							bind:value={txnForm.feesCurrency}
+							aria-label="Moneda de la comisión"
+						>
+							<option value={costCurrency}>{costCurrency}</option>
+							<option value={assetCurrency}>{assetCurrency}</option>
+						</select>
+						<input
+							id="txn-fees"
+							type="number"
+							class="form-input"
+							name="fees"
+							bind:value={txnForm.fees}
+							placeholder="0"
+							min="0"
+							step="any"
+						/>
+					</div>
+					<p class="field-hint">La que el bróker cobró, no siempre la de la ejecución.</p>
+				{:else}
+					<input
+						id="txn-fees"
+						type="number"
+						class="form-input"
+						name="fees"
+						bind:value={txnForm.fees}
+						placeholder="0"
+						min="0"
+						step="any"
+					/>
+				{/if}
 			</div>
 		</div>
 
@@ -317,6 +359,13 @@
 		font-size: 0.75rem;
 		color: rgba(236, 234, 229, 0.45);
 		font-style: italic;
+	}
+
+	.fees-field {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 0.4rem;
+		align-items: center;
 	}
 
 	.fx-row {

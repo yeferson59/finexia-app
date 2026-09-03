@@ -4,6 +4,7 @@
 	import { todayLocalDateString } from '$lib/shared/format/date';
 	import type { Holding, Transaction } from '$lib/api/types';
 	import AssetSellPanelHeader from './asset-sell-panel-header.svelte';
+	import AssetSellCurrencyFields from './asset-sell-currency-fields.svelte';
 
 	let {
 		transaction,
@@ -30,6 +31,7 @@
 	let sellValue = $state('');
 	let sellPrice = $state('');
 	let sellFees = $state('');
+	let sellFeesCurrency = $state('');
 	let sellRate = $state('');
 	let sellDate = $state(todayLocalDateString());
 	let sellNotes = $state('');
@@ -44,6 +46,7 @@
 			sellValue = '';
 			sellPrice = marketPrice ? marketPrice.toFixed(2) : transaction.price;
 			sellFees = '';
+			sellFeesCurrency = '';
 			sellRate = '';
 			sellNotes = '';
 			sellDate = todayLocalDateString();
@@ -89,6 +92,17 @@
 	);
 	const sellTradeCurrency = $derived(sellEntry?.currency?.trim().toUpperCase() || sellCostCurrency);
 	const sellIsCrossCurrency = $derived(sellTradeCurrency !== sellCostCurrency);
+
+	// Igual que en el alta de transacciones: la comisión arranca en la moneda de
+	// la cuenta porque es de donde el bróker la cobra, y el formulario siempre la
+	// manda explícita, así que el valor por defecto de la API no se le aplica.
+	$effect(() => {
+		if (!sellIsCrossCurrency) {
+			sellFeesCurrency = '';
+		} else if (sellFeesCurrency === '') {
+			sellFeesCurrency = sellCostCurrency;
+		}
+	});
 
 	const sellProceeds = $derived(
 		sellEffectiveQty *
@@ -219,44 +233,15 @@
 					<span class="sell-computed-hint">en {sellTradeCurrency}</span>
 				{/if}
 			</div>
-			{#if sellIsCrossCurrency}
-				<div class="form-group">
-					<label class="form-label" for="sell-rate"
-						>Tasa a {sellCostCurrency} <span class="required">*</span></label
-					>
-					<input
-						id="sell-rate"
-						type="number"
-						class="form-input"
-						name="fxRate"
-						bind:value={sellRate}
-						placeholder="1.1565"
-						min="0"
-						step="any"
-						required
-					/>
-					<span class="sell-computed-hint">
-						≈ {sellProceeds.toLocaleString('es-CO', {
-							style: 'currency',
-							currency: sellCostCurrency,
-							maximumFractionDigits: 2
-						})} recibidos
-					</span>
-				</div>
-			{/if}
-			<div class="form-group">
-				<label class="form-label" for="sell-fees">Comisión</label>
-				<input
-					id="sell-fees"
-					type="number"
-					class="form-input"
-					name="fees"
-					bind:value={sellFees}
-					placeholder="0"
-					min="0"
-					step="0.01"
-				/>
-			</div>
+			<AssetSellCurrencyFields
+				crossCurrency={sellIsCrossCurrency}
+				tradeCurrency={sellTradeCurrency}
+				costCurrency={sellCostCurrency}
+				proceeds={sellProceeds}
+				bind:rate={sellRate}
+				bind:fees={sellFees}
+				bind:feesCurrency={sellFeesCurrency}
+			/>
 			<div class="form-group">
 				<label class="form-label" for="sell-date">Fecha <span class="required">*</span></label>
 				<DatePicker name="transactionDate" bind:value={sellDate} required />

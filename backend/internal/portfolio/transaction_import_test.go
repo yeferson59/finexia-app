@@ -336,3 +336,133 @@ func TestParseDecimalNegativeWithCurrencySymbol(t *testing.T) {
 		t.Fatalf("parseDecimal(\"$ (120.50)\") = %s, want -120.5", got.String())
 	}
 }
+
+// --- cross-currency imports -------------------------------------------------
+
+// A broker statement from a dollar account that traded on European exchanges:
+// each row prices in its own currency and carries the rate the fill settled at.
+// The account currency is stated once, in the upload's defaults, because a
+// statement is one account.
+func TestPreviewMapsTheRateColumnAndSettlesEachRow(t *testing.T) {
+	data := buildXLSX(t, "Sheet1", [][]any{
+		{"Fecha", "Ticker", "Cantidad", "Precio", "Moneda", "Tipo de cambio"},
+		{"05/12/2024", "MC.FR", "0.0241", "606.60", "EUR", "1.0638"},
+		{"11/04/2024", "NOVO-B.CO", "0.201065", "866.60", "DKK", "0.1442"},
+		{"20/02/2024", "AAPL", "5", "195.30", "USD", "1"},
+	})
+
+	svc := newTestServices(new(fakeRepository{}), nil)
+	preview, err := svc.PreviewTransactionImport(data, "estado.xlsx", "", nil,
+		ImportDefaultsDTO{CostCurrency: "USD"})
+	if err != nil {
+		t.Fatalf("preview: %v", err)
+	}
+
+	if preview.SuggestedMapping.FXRate == nil || *preview.SuggestedMapping.FXRate != 5 {
+		t.Fatalf("suggested fxRate = %v, want column 5", preview.SuggestedMapping.FXRate)
+	}
+	if preview.ValidRows != 3 || preview.InvalidRows != 0 {
+		t.Fatalf("valid/invalid = %d/%d, want 3/0 (rows: %+v)", preview.ValidRows, preview.InvalidRows, preview.Rows)
+	}
+
+	for i, want := range []struct{ currency, rate string }{
+		{"EUR", "1.0638"},
+		{"DKK", "0.1442"},
+		// Same currency on both sides: the only rate that is legal there is 1,
+		// and the file happens to state it.
+		{"USD", "1"},
+	} {
+		row := preview.Rows[i]
+		if row.Currency != want.currency || row.FXRate != want.rate || row.CostCurrency != "USD" {
+			t.Errorf("row %d = %s @ %s into %s, want %s @ %s into USD",
+				i, row.Currency, row.FXRate, row.CostCurrency, want.currency, want.rate)
+		}
+	}
+}
+
+// Without the rate column, a file that trades in a currency the account does
+// not hold has no way to say what anything cost. Guessing today's rate is the
+// error the column exists to prevent, so the row is rejected with a message
+// that names both currencies.
+func TestPreviewRejectsACrossCurrencyRowWithNoRate(t *testing.T) {
+	data := buildXLSX(t, "Sheet1", [][]any{
+		{"Fecha", "Ticker", "Cantidad", "Precio", "Moneda"},
+		{"05/12/2024", "MC.FR", "0.0241", "606.60", "EUR"},
+	})
+
+	svc := newTestServices(new(fakeRepository{}), nil)
+	preview, err := svc.PreviewTransactionImport(data, "estado.xlsx", "", nil,
+		ImportDefaultsDTO{CostCurrency: "USD"})
+	if err != nil {
+		t.Fatalf("preview: %v", err)
+	}
+
+	if preview.InvalidRows != 1 {
+		t.Fatalf("invalid rows = %d, want 1", preview.InvalidRows)
+	}
+	if joined := strings.Join(preview.Rows[0].Errors, "; "); !strings.Contains(joined, "falta la tasa de cambio") ||
+		!strings.Contains(joined, "EUR") || !strings.Contains(joined, "USD") {
+		t.Errorf("errors = %q, want one naming both currencies", joined)
+	}
+}
+
+func TestPreviewRejectsARateOnASingleCurrencyRow(t *testing.T) {
+	data := buildXLSX(t, "Sheet1", [][]any{
+		{"Fecha", "Ticker", "Cantidad", "Precio", "Moneda", "Tasa"},
+		{"20/02/2024", "AAPL", "5", "195.30", "USD", "1.0638"},
+		{"21/02/2024", "AAPL", "5", "195.30", "USD", "0"},
+	})
+
+	svc := newTestServices(new(fakeRepository{}), nil)
+	preview, err := svc.PreviewTransactionImport(data, "estado.xlsx", "", nil,
+		ImportDefaultsDTO{CostCurrency: "USD"})
+	if err != nil {
+		t.Fatalf("preview: %v", err)
+	}
+
+	if preview.InvalidRows != 2 {
+		t.Fatalf("invalid rows = %d, want 2 (rows: %+v)", preview.InvalidRows, preview.Rows)
+	}
+	if joined := strings.Join(preview.Rows[0].Errors, "; "); !strings.Contains(joined, "no se convierte en sí misma") {
+		t.Errorf("errors = %q, want the self-conversion refusal", joined)
+	}
+	if joined := strings.Join(preview.Rows[1].Errors, "; "); !strings.Contains(joined, "mayor que 0") {
+		t.Errorf("errors = %q, want the non-positive refusal", joined)
+	}
+}
+
+// An upload with no cost currency is every import written before this field
+// existed: each row settles in the currency it trades in, at 1.
+func TestPreviewWithoutACostCurrencyLeavesEveryRowUnconverted(t *testing.T) {
+	data := buildXLSX(t, "Sheet1", [][]any{
+		{"Fecha", "Ticker", "Cantidad", "Precio", "Moneda"},
+		{"05/12/2024", "MC.FR", "0.0241", "606.60", "EUR"},
+	})
+
+	svc := newTestServices(new(fakeRepository{}), nil)
+	preview, err := svc.PreviewTransactionImport(data, "estado.xlsx", "", nil, ImportDefaultsDTO{})
+	if err != nil {
+		t.Fatalf("preview: %v", err)
+	}
+
+	if preview.InvalidRows != 0 {
+		t.Fatalf("invalid rows = %d, want 0 (rows: %+v)", preview.InvalidRows, preview.Rows)
+	}
+	row := preview.Rows[0]
+	if row.CostCurrency != "EUR" || row.FXRate != "1" {
+		t.Errorf("row = %s @ %s, want EUR @ 1", row.CostCurrency, row.FXRate)
+	}
+}
+
+func TestImportRejectsAnUnknownCostCurrency(t *testing.T) {
+	data := buildXLSX(t, "Sheet1", [][]any{
+		{"Fecha", "Ticker", "Cantidad", "Precio"},
+		{"20/02/2024", "AAPL", "5", "195.30"},
+	})
+
+	svc := newTestServices(new(fakeRepository{}), nil)
+	if _, err := svc.PreviewTransactionImport(data, "estado.xlsx", "", nil,
+		ImportDefaultsDTO{CostCurrency: "dólares"}); err == nil {
+		t.Fatal("expected an unknown cost currency to fail the upload")
+	}
+}

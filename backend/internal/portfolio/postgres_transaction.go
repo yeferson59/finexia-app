@@ -3,6 +3,7 @@ package portfolio
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 
 	"uuid"
@@ -60,7 +61,7 @@ func (r *PostgresRepository) GetTopTransactionByPortfolioID(ctx context.Context,
 func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]Transaction, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fx_rate,
-		       pe.cost_currency, t.fees,
+		       pe.cost_currency, t.fees, t.fees_currency,
 		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at,
 		       a.ticker, a.name
 		FROM transactions t
@@ -90,6 +91,7 @@ func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, 
 			&txn.FXRate,
 			&txn.CostCurrency,
 			&txn.Fees,
+			&txn.FeesCurrency,
 			&txn.TransactionDate,
 			&txn.Notes,
 			&txn.CreatedAt,
@@ -262,7 +264,8 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 
 	rows, err := r.db.Query(ctx, `
 		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fx_rate,
-		       pe.cost_currency, t.fees, t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at
+		       pe.cost_currency, t.fees, t.fees_currency,
+		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at
 		FROM transactions t
 		JOIN portfolio_entries pe ON pe.id = t.entry_id
 		WHERE t.entry_id = $1
@@ -287,6 +290,7 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 			&txn.FXRate,
 			&txn.CostCurrency,
 			&txn.Fees,
+			&txn.FeesCurrency,
 			&txn.TransactionDate,
 			&txn.Notes,
 			&txn.CreatedAt,
@@ -322,7 +326,7 @@ func (r *PostgresRepository) CountAssetTransactions(ctx context.Context, userID,
 func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, limit, offset int) ([]Transaction, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fx_rate,
-		       pe.cost_currency, t.fees,
+		       pe.cost_currency, t.fees, t.fees_currency,
 		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at
 		FROM transactions t
 		JOIN portfolio_entries pe ON pe.id = t.entry_id
@@ -351,6 +355,7 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 			&txn.FXRate,
 			&txn.CostCurrency,
 			&txn.Fees,
+			&txn.FeesCurrency,
 			&txn.TransactionDate,
 			&txn.Notes,
 			&txn.CreatedAt,
@@ -390,16 +395,17 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 			return err
 		}
 
-		tradeCurrency, err := in.Validate(costCurrency)
+		settled, err := in.Validate(costCurrency)
 		if err != nil {
 			return err
 		}
 
 		if err := tx.QueryRow(ctx, `
-		INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, transaction_date, notes)
-		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::numeric, $8::date, $9)
-		RETURNING id, entry_id, type, quantity, price, currency, fx_rate, fees, transaction_date, COALESCE(notes, ''), created_at, updated_at
-	`, entryID, in.Type, in.Quantity.String(), in.Price.String(), tradeCurrency, in.Rate().String(), in.Fees.String(), in.TransactionDate, in.Notes).Scan(
+		INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes)
+		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::numeric, $8::char(3), $9::date, $10)
+		RETURNING id, entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, COALESCE(notes, ''), created_at, updated_at
+	`, entryID, settled.Type, settled.Quantity.String(), settled.Price.String(), settled.Currency,
+			settled.FXRate.String(), settled.Fees.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes).Scan(
 			&txn.ID,
 			&txn.EntryID,
 			&txn.Type,
@@ -408,6 +414,7 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 			&txn.Currency,
 			&txn.FXRate,
 			&txn.Fees,
+			&txn.FeesCurrency,
 			&txn.TransactionDate,
 			&txn.Notes,
 			&txn.CreatedAt,
@@ -418,7 +425,7 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 
 		txn.CostCurrency = costCurrency
 		txn.Price.SetCurrency(txn.Currency)
-		txn.Fees.SetCurrency(txn.Currency)
+		txn.Fees.SetCurrency(txn.FeesCurrency)
 
 		return nil
 	}); err != nil {
@@ -455,7 +462,7 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 			return err
 		}
 
-		tradeCurrency, err := in.Validate(costCurrency)
+		settled, err := in.Validate(costCurrency)
 		if err != nil {
 			return err
 		}
@@ -468,17 +475,19 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 			currency         = $4::char(3),
 			fx_rate          = $5::numeric,
 			fees             = $6::numeric,
-			transaction_date = $7::date,
-			notes            = $8,
+			fees_currency    = $7::char(3),
+			transaction_date = $8::date,
+			notes            = $9,
 			updated_at       = NOW()
-		WHERE id = $9
+		WHERE id = $10
 		  AND entry_id IN (
 			SELECT pe.id FROM portfolio_entries pe
 			JOIN portfolios p ON p.id = pe.portfolio_id
-			WHERE p.user_id = $10
+			WHERE p.user_id = $11
 		  )
-		RETURNING id, entry_id, type, quantity, price, currency, fx_rate, fees, transaction_date, COALESCE(notes, ''), created_at, updated_at
-	`, in.Type, in.Quantity.String(), in.Price.String(), tradeCurrency, in.Rate().String(), in.Fees.String(), in.TransactionDate, in.Notes, txnID, userID).Scan(
+		RETURNING id, entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, COALESCE(notes, ''), created_at, updated_at
+	`, settled.Type, settled.Quantity.String(), settled.Price.String(), settled.Currency, settled.FXRate.String(),
+			settled.Fees.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes, txnID, userID).Scan(
 			&txn.ID,
 			&txn.EntryID,
 			&txn.Type,
@@ -487,6 +496,7 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 			&txn.Currency,
 			&txn.FXRate,
 			&txn.Fees,
+			&txn.FeesCurrency,
 			&txn.TransactionDate,
 			&txn.Notes,
 			&txn.CreatedAt,
@@ -501,7 +511,7 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 
 		txn.CostCurrency = costCurrency
 		txn.Price.SetCurrency(txn.Currency)
-		txn.Fees.SetCurrency(txn.Currency)
+		txn.Fees.SetCurrency(txn.FeesCurrency)
 
 		return nil
 	}); err != nil {
@@ -601,21 +611,38 @@ func (r *PostgresRepository) ImportEntryTransactions(ctx context.Context, userID
 				assetIDs[row.Ticker] = assetID
 			}
 
+			// The position's currency comes back from the upsert for the same
+			// reason it does in CreatePortfolioEntry: a ticker already held in
+			// this portfolio keeps the currency it was opened with, and a file
+			// declaring a different account currency must not be allowed to
+			// reinterpret it.
 			var entryID uuid.UUID
+			var entryCostCurrency money.Currency
 			if err := tx.QueryRow(ctx, `
 			INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date, notes)
 			VALUES ($1::uuid, $2::uuid, $3::uuid, 0, $4::numeric, $5::char(3), $6::date, $7)
 			ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, ''))
 			DO UPDATE SET updated_at = NOW()
-			RETURNING id
-		`, portfolioID, assetID, sourceID, row.Price.String(), row.Currency, row.Date, row.Notes).Scan(&entryID); err != nil {
+			RETURNING id, cost_currency
+		`, portfolioID, assetID, sourceID, row.Price.MulDecimal(row.FXRate).String(), row.CostCurrency, row.Date, row.Notes).Scan(&entryID, &entryCostCurrency); err != nil {
 				return err
 			}
 
+			// The importer builds its own per-row messages in Spanish, but this
+			// is the check that actually gates the write, so the file path and
+			// the HTTP path cannot disagree about what a legal row is. Reaching
+			// it means the preview and the commit saw different data, which
+			// should fail the batch rather than write half of it.
+			settled, err := row.Input().Validate(entryCostCurrency)
+			if err != nil {
+				return fmt.Errorf("row %d: %w", row.RowNumber, err)
+			}
+
 			if _, err := tx.Exec(ctx, `
-			INSERT INTO transactions (entry_id, type, quantity, price, currency, fees, transaction_date, notes)
-			VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::date, $8)
-		`, entryID, row.Type, row.Quantity.String(), row.Price.String(), row.Currency, row.Fees.String(), row.Date, row.Notes); err != nil {
+			INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes)
+			VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::numeric, $8::char(3), $9::date, $10)
+		`, entryID, settled.Type, settled.Quantity.String(), settled.Price.String(), settled.Currency, settled.FXRate.String(),
+				settled.Fees.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes); err != nil {
 				return err
 			}
 

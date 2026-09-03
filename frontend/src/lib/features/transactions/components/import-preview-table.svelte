@@ -30,6 +30,8 @@
 				<th>Precio</th>
 				<th>Comisión</th>
 				<th>Moneda</th>
+				<th>Tasa</th>
+				<th>Cuenta</th>
 				<th>Detalle</th>
 			</tr>
 		</thead>
@@ -51,6 +53,14 @@
 					<td class="mono">{row.price || '—'}</td>
 					<td class="mono">{row.fees || '—'}</td>
 					<td class="mono">{row.currency || '—'}</td>
+					<!-- La tasa y la moneda de la cuenta sin destacar cuando no hubo
+					     conversión: en un extracto de una sola moneda son 1 y la misma
+					     de la fila en cada línea, y llamar la atención sobre ellas
+					     sería ruido en el caso normal. -->
+					<td class="mono" class:muted={row.fxRate === '1'}>{row.fxRate || '—'}</td>
+					<td class="mono" class:muted={row.costCurrency === row.currency}>
+						{row.costCurrency || '—'}
+					</td>
 					<td class="errors-cell">{row.errors.join('; ')}</td>
 				</tr>
 			{/each}
@@ -133,6 +143,10 @@
 
 	.preview-table tr.invalid td {
 		background: rgba(224, 90, 90, 0.05);
+	}
+
+	.muted {
+		color: rgba(236, 234, 229, 0.35);
 	}
 
 	.errors-cell {

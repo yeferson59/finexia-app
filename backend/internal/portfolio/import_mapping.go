@@ -34,6 +34,7 @@ const (
 	fieldPrice     importField = "price"
 	fieldFees      importField = "fees"
 	fieldCurrency  importField = "currency"
+	fieldFXRate    importField = "fxRate"
 	fieldCategory  importField = "category"
 	fieldNotes     importField = "notes"
 )
@@ -53,8 +54,13 @@ var fieldSynonyms = map[importField][]string{
 	fieldPrice:     {"precio", "price", "precio unitario", "precio compra", "precio de compra", "cotizacion", "unit price", "valor unitario", "px"},
 	fieldFees:      {"comision", "comisiones", "fee", "fees", "cargo", "cargos", "gastos", "costos", "commission", "costo transaccion"},
 	fieldCurrency:  {"moneda", "currency", "divisa", "ccy"},
-	fieldCategory:  {"categoria", "category", "tipo de activo", "tipo activo", "asset type", "clase", "clase de activo", "asset class"},
-	fieldNotes:     {"notas", "nota", "notes", "comentario", "comentarios", "observaciones", "observacion", "memo", "detalle"},
+	// "cambio" alone is deliberately absent: it collides with "tipo de cambio"
+	// only harmlessly, but on Spanish broker statements it also heads a percent-
+	// change column, and a percentage silently read as a rate would scale a
+	// whole position's cost.
+	fieldFXRate:   {"tasa", "tasa de cambio", "tipo de cambio", "fx", "fx rate", "rate", "exchange rate", "conversion", "tasa conversion", "cotizacion divisa"},
+	fieldCategory: {"categoria", "category", "tipo de activo", "tipo activo", "asset type", "clase", "clase de activo", "asset class"},
+	fieldNotes:    {"notas", "nota", "notes", "comentario", "comentarios", "observaciones", "observacion", "memo", "detalle"},
 }
 
 var txnTypeSynonyms = map[string]TransactionType{
@@ -115,7 +121,7 @@ func suggestMapping(headers []string) ImportMappingDTO {
 	var cands []cand
 	for _, field := range []importField{
 		fieldDate, fieldType, fieldTicker, fieldAssetName, fieldQuantity,
-		fieldPrice, fieldFees, fieldCurrency, fieldCategory, fieldNotes,
+		fieldPrice, fieldFees, fieldCurrency, fieldFXRate, fieldCategory, fieldNotes,
 	} {
 		for col, header := range headers {
 			if score := matchField(header, field); score > 0 {
@@ -164,6 +170,7 @@ func suggestMapping(headers []string) ImportMappingDTO {
 		Price:     toPtr(fieldPrice),
 		Fees:      toPtr(fieldFees),
 		Currency:  toPtr(fieldCurrency),
+		FXRate:    toPtr(fieldFXRate),
 		Category:  toPtr(fieldCategory),
 		Notes:     toPtr(fieldNotes),
 	}
@@ -186,7 +193,7 @@ func detectHeaderRow(rows [][]string) int {
 		score := 0
 		for _, field := range []importField{
 			fieldDate, fieldType, fieldTicker, fieldAssetName, fieldQuantity,
-			fieldPrice, fieldFees, fieldCurrency, fieldCategory, fieldNotes,
+			fieldPrice, fieldFees, fieldCurrency, fieldFXRate, fieldCategory, fieldNotes,
 		} {
 			for _, header := range rows[i] {
 				if matchField(header, field) >= 2 {

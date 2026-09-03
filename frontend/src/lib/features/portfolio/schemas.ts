@@ -88,6 +88,10 @@ const transactionSchema = z.object({
 	currency: z.string().default('USD'),
 	fxRate,
 	fees: z.coerce.number().min(0).default(0),
+	// Vacía significa «la de la operación», que es donde estuvo la comisión en
+	// todas las filas anteriores a la tasa por transacción. El backend rechaza
+	// cualquiera que no sea esa o la de la posición.
+	feesCurrency: z.coerce.string().trim().toUpperCase().default(''),
 	transactionDate: z.coerce.date(),
 	notes: z.string().optional()
 });

@@ -241,6 +241,43 @@ func TestCreatePortfolioEntryValidatesAgainstTheExistingPosition(t *testing.T) {
 	}
 }
 
+// transaction_fees_in_cost is the SQL half of TransactionInput.FeesInCostCurrency,
+// and the growth series is the only thing that reads it — a series computed on
+// a schedule, whose output nobody checks against a broker statement. So the
+// branch it takes is asserted directly rather than inferred from a total.
+func TestTransactionFeesInCostSQL(t *testing.T) {
+	pool := growthTestPool(t)
+
+	for _, tc := range []struct {
+		name                                 string
+		fees, feesCurrency, currency, fxRate string
+		want                                 string
+	}{
+		// Billed on the fill, in the currency the trade was quoted in: it rode
+		// the same conversion the trade did.
+		{"billed on the fill", "2.00", "EUR", "EUR", "1.0638", "2.12760000"},
+		// Billed to the account: already in the position's currency, and
+		// multiplying it by the trade's rate would invent 6% of cost.
+		{"billed to the account", "2.00", "USD", "EUR", "1.0638", "2.00000000"},
+		// Single-currency row: both branches agree, which is why every row
+		// written before 000029 is unaffected by which one is taken.
+		{"single currency", "2.00", "USD", "USD", "1", "2.00000000"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var got string
+			if err := pool.QueryRow(context.Background(),
+				`SELECT transaction_fees_in_cost($1::numeric, $2::char(3), $3::char(3), $4::numeric)::numeric(20,8)::text`,
+				tc.fees, tc.feesCurrency, tc.currency, tc.fxRate,
+			).Scan(&got); err != nil {
+				t.Fatalf("transaction_fees_in_cost: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("fee in cost currency = %s, want %s", got, tc.want)
+			}
+		})
+	}
+}
+
 // Every row written before 000029 has fx_rate = 1 and both currencies equal, so
 // the rewritten trigger has to reproduce the old numbers exactly. This is the
 // same single-currency position the app has always supported.

@@ -30,7 +30,11 @@ export const actions = {
 		const response = await portfolio.createEntry({ cookies, fetch }, data);
 
 		if (!response.ok || !response.success) {
-			return { success: false };
+			// El backend rechaza combinaciones de moneda y tasa que no pueden ser
+			// ciertas, y el mensaje dice cuál —«USD no se convierte en sí misma a
+			// 1.0638»—. Devolverlo es la diferencia entre corregir un campo y
+			// reintentar a ciegas contra el mismo error.
+			return { success: false, error: response.details || response.message || response.action };
 		}
 
 		redirect(303, `/dashboard/portfolios/${params.id}`);

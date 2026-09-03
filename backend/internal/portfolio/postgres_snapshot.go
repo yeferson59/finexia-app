@@ -254,8 +254,19 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, use
 				-- current rate for both legs — which is what this did before
 				-- fx_rate existed — restates a December purchase at today's
 				-- rate and books the difference as a flow the owner never made.
-				transaction_cash_flow(tx.type, tx.quantity, tx.price, tx.fees)
-					* tx.fx_rate * COALESCE(fxt.rate, 1) AS amount
+				--
+				-- The price and the fee are converted separately and handed in
+				-- already settled, so transaction_cash_flow is left as what its
+				-- own comment says it is: the sign convention, nothing else. It
+				-- cannot be given the raw amounts and one rate, because a
+				-- commission billed to the account never rode the trade's
+				-- conversion and multiplying it by that rate invents a cost.
+				transaction_cash_flow(
+					tx.type,
+					tx.quantity,
+					tx.price * tx.fx_rate,
+					transaction_fees_in_cost(tx.fees, tx.fees_currency, tx.currency, tx.fx_rate)
+				) * COALESCE(fxt.rate, 1) AS amount
 			FROM transactions tx
 			JOIN portfolio_entries pe ON pe.id = tx.entry_id
 			JOIN portfolios pf        ON pf.id = pe.portfolio_id
@@ -353,10 +364,15 @@ func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context
 					  AND ps.created_at >= tx.created_at
 				) AS snapshot_date,
 				-- Historical rate onto the position's own currency, then the
-				-- current one onto the portfolio's base: see the account-wide
-				-- query for why the two cannot be collapsed into one.
-				transaction_cash_flow(tx.type, tx.quantity, tx.price, tx.fees)
-					* tx.fx_rate * COALESCE(fxt.rate, 1) AS amount
+				-- current one onto the portfolio's base, with the fee converted
+				-- on its own side: see the account-wide query for why neither
+				-- pair can be collapsed into one.
+				transaction_cash_flow(
+					tx.type,
+					tx.quantity,
+					tx.price * tx.fx_rate,
+					transaction_fees_in_cost(tx.fees, tx.fees_currency, tx.currency, tx.fx_rate)
+				) * COALESCE(fxt.rate, 1) AS amount
 			FROM transactions tx
 			JOIN portfolio_entries pe ON pe.id = tx.entry_id
 			JOIN portfolios pf        ON pf.id = pe.portfolio_id

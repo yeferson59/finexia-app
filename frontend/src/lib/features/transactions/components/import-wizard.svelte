@@ -31,7 +31,17 @@
 	let preview: ImportPreview | null = $state(null);
 	let result: ImportResult | null = $state(null);
 	let mapping: ImportMapping = $state({ ...emptyMapping });
-	let defaults = $state({ type: 'buy', currency: 'USD', category: 'stock', dateFormat: 'auto' });
+	// `costCurrency` arranca vacía a propósito: vacía significa «cada fila liquida
+	// en la moneda en la que cotiza», que es lo que hacía toda importación
+	// anterior y lo que describe un extracto de una sola moneda. Rellenarla es
+	// una declaración del usuario, no un valor que la app deba suponer.
+	let defaults = $state({
+		type: 'buy',
+		currency: 'USD',
+		costCurrency: '',
+		category: 'stock',
+		dateFormat: 'auto'
+	});
 	let loading = $state(false);
 	let importing = $state(false);
 	let errorMsg = $state('');

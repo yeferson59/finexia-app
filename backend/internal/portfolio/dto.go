@@ -66,10 +66,14 @@ type CreateTransactionRequestDTO struct {
 	// accepted when the two currencies are the same — see
 	// TransactionInput.Validate for why a missing rate is refused rather than
 	// looked up.
-	FXRate          decimal.Decimal `json:"fxRate"`
-	Fees            money.Money     `json:"fees"`
-	TransactionDate time.Time       `json:"transactionDate" validate:"required"`
-	Notes           string          `json:"notes"`
+	FXRate decimal.Decimal `json:"fxRate"`
+	Fees   money.Money     `json:"fees"`
+	// FeesCurrency must be Currency or the position's cost currency. Omitted
+	// means Currency, which is where a commission sat on every row the app could
+	// write before this field existed.
+	FeesCurrency    money.Currency `json:"feesCurrency"`
+	TransactionDate time.Time      `json:"transactionDate" validate:"required"`
+	Notes           string         `json:"notes"`
 }
 
 type UpdateTransactionRequestDTO struct {
@@ -79,6 +83,7 @@ type UpdateTransactionRequestDTO struct {
 	Currency        money.Currency  `json:"currency"`
 	FXRate          decimal.Decimal `json:"fxRate"`
 	Fees            money.Money     `json:"fees"`
+	FeesCurrency    money.Currency  `json:"feesCurrency"`
 	TransactionDate time.Time       `json:"transactionDate"`
 	Notes           string          `json:"notes"`
 }
@@ -94,6 +99,7 @@ func (d CreateTransactionRequestDTO) Input(txnType TransactionType) TransactionI
 		Currency:        d.Currency,
 		FXRate:          d.FXRate,
 		Fees:            d.Fees,
+		FeesCurrency:    d.FeesCurrency,
 		TransactionDate: d.TransactionDate,
 		Notes:           d.Notes,
 	}
@@ -107,6 +113,7 @@ func (d UpdateTransactionRequestDTO) Input(txnType TransactionType) TransactionI
 		Currency:        d.Currency,
 		FXRate:          d.FXRate,
 		Fees:            d.Fees,
+		FeesCurrency:    d.FeesCurrency,
 		TransactionDate: d.TransactionDate,
 		Notes:           d.Notes,
 	}
@@ -146,9 +153,13 @@ type TransactionResponseDTO struct {
 	// EUR" does not say what the trade cost an account funded in dollars, and
 	// the rate does not say what it converts into. With all three the client can
 	// show the line the way the broker's confirmation does.
-	FXRate          string    `json:"fxRate"`
-	CostCurrency    string    `json:"costCurrency,omitempty"`
-	Fees            string    `json:"fees"`
+	FXRate       string `json:"fxRate"`
+	CostCurrency string `json:"costCurrency,omitempty"`
+	Fees         string `json:"fees"`
+	// FeesCurrency is Currency or CostCurrency. It is its own field because a
+	// commission is not always billed on the same side as the fill, and a
+	// client that assumed it was would misstate it by the whole rate.
+	FeesCurrency    string    `json:"feesCurrency,omitempty"`
 	TransactionDate time.Time `json:"transactionDate"`
 	Notes           string    `json:"notes"`
 	CreatedAt       time.Time `json:"createdAt"`
@@ -165,6 +176,7 @@ func NewTransactionResponse(t Transaction) TransactionResponseDTO {
 		FXRate:          transactionRate(t).String(),
 		CostCurrency:    costCurrencyCode(t),
 		Fees:            t.Fees.String(),
+		FeesCurrency:    feesCurrencyCode(t),
 		TransactionDate: t.TransactionDate,
 		Notes:           t.Notes,
 		CreatedAt:       t.CreatedAt,
@@ -194,6 +206,18 @@ func costCurrencyCode(t Transaction) string {
 	return t.CostCurrency.String()
 }
 
+// feesCurrencyCode falls back to the trade currency, which is where a fee sat
+// on every row written before the column existed and is the default the API
+// applies to one that arrives without it. Unlike the cost currency there is no
+// reason to leave it absent: the transaction always knows this one.
+func feesCurrencyCode(t Transaction) string {
+	if t.FeesCurrency == money.XXX {
+		return t.Currency.String()
+	}
+
+	return t.FeesCurrency.String()
+}
+
 func NewTransactionListResponse(txns []Transaction) []TransactionResponseDTO {
 	result := make([]TransactionResponseDTO, 0, len(txns))
 	for _, t := range txns {
@@ -212,6 +236,7 @@ type UserTransactionResponseDTO struct {
 	FXRate          string    `json:"fxRate"`
 	CostCurrency    string    `json:"costCurrency,omitempty"`
 	Fees            string    `json:"fees"`
+	FeesCurrency    string    `json:"feesCurrency,omitempty"`
 	TransactionDate time.Time `json:"transactionDate"`
 	Notes           string    `json:"notes"`
 	CreatedAt       time.Time `json:"createdAt"`
@@ -230,6 +255,7 @@ func NewUserTransactionResponse(t Transaction) UserTransactionResponseDTO {
 		FXRate:          transactionRate(t).String(),
 		CostCurrency:    costCurrencyCode(t),
 		Fees:            t.Fees.String(),
+		FeesCurrency:    feesCurrencyCode(t),
 		TransactionDate: t.TransactionDate,
 		Notes:           t.Notes,
 		CreatedAt:       t.CreatedAt,

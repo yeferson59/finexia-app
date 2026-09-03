@@ -210,8 +210,8 @@ type Transaction struct {
 	EntryID  uuid.UUID       `json:"entryId"`
 	Type     TransactionType `json:"type"`
 	Quantity decimal.Decimal `json:"quantity"`
-	// Price and Fees are in Currency: the currency the trade was quoted in,
-	// which is the asset's own whenever the broker fills on its home exchange.
+	// Price is in Currency: the currency the trade was quoted in, which is the
+	// asset's own whenever the broker fills on its home exchange.
 	Price    money.Money    `json:"price"`
 	Currency money.Currency `json:"currency"`
 	// FXRate is how much of the position's cost currency one unit of Currency
@@ -222,7 +222,12 @@ type Transaction struct {
 	// CostCurrency is the position's, not the transaction's — it comes from the
 	// entry and is repeated here so a transaction read on its own says what
 	// FXRate converts into. Empty on reads that do not join the entry.
-	CostCurrency    money.Currency `json:"costCurrency,omitzero"`
+	CostCurrency money.Currency `json:"costCurrency,omitzero"`
+	// FeesCurrency is Currency or CostCurrency, and says which. A commission
+	// rides the trade's conversion only in the first case: brokers bill it to
+	// the account as often as to the fill, and the confirmation behind this
+	// field quotes a EUR price beside a USD commission.
+	FeesCurrency    money.Currency `json:"feesCurrency,omitzero"`
 	Fees            money.Money    `json:"fees"`
 	TransactionDate time.Time      `json:"transactionDate"`
 	Notes           string         `json:"notes"`
@@ -246,6 +251,7 @@ type TransactionInput struct {
 	Currency        money.Currency
 	FXRate          decimal.Decimal
 	Fees            money.Money
+	FeesCurrency    money.Currency
 	TransactionDate time.Time
 	Notes           string
 }
@@ -263,10 +269,10 @@ func (in TransactionInput) Rate() decimal.Decimal {
 }
 
 // Validate checks the input against the cost currency of the position it will
-// be recorded on, and returns the currency to store when the caller left it
-// unset.
+// be recorded on, and returns a copy with every currency and the rate resolved,
+// so the caller writes the settled values rather than re-deriving them.
 //
-// Two things are refused, both because they would corrupt a cost basis rather
+// Three things are refused, all because they would corrupt a cost basis rather
 // than fail:
 //
 //   - a rate other than 1 between a currency and itself, which is a typo no
@@ -278,31 +284,63 @@ func (in TransactionInput) Rate() decimal.Decimal {
 //     stop. A caller who does not know the historical rate has to say so, and
 //     the client fills the field from the stored rate as a suggestion the owner
 //     can correct against their confirmation.
-func (in TransactionInput) Validate(costCurrency money.Currency) (money.Currency, error) {
-	currency := in.Currency
-	if currency == money.XXX {
-		currency = costCurrency
+//   - a fee currency that is neither of the two the transaction has. A fee in
+//     some third currency has no rate on this row to reach the position with,
+//     and storing it would mean carrying a second historical rate for an amount
+//     that is a rounding error next to the trade.
+//
+// FeesCurrency defaults to the trade currency, not to the account's. That is
+// what every version of this app did while the two were forced to be equal, and
+// what a spreadsheet's single currency column means for the row it tags, so the
+// default changes no existing behaviour. A broker that bills the account
+// instead has to say so — which the forms do, explicitly, on the only screens
+// where the two can differ.
+func (in TransactionInput) Validate(costCurrency money.Currency) (TransactionInput, error) {
+	out := in
+
+	if out.Currency == money.XXX {
+		out.Currency = costCurrency
 	}
 
-	rate := in.Rate()
+	out.FXRate = in.Rate()
 
-	if !rate.IsPos() {
-		return money.XXX, fmt.Errorf("%w: rate must be greater than zero, got %s", ErrTransactionFXRate, rate.String())
+	if !out.FXRate.IsPos() {
+		return in, fmt.Errorf("%w: rate must be greater than zero, got %s", ErrTransactionFXRate, out.FXRate.String())
 	}
 
-	if currency == costCurrency {
-		if !rate.Equal(decimal.One) {
-			return money.XXX, fmt.Errorf("%w: %s does not convert into itself at %s", ErrTransactionFXRate, currency, rate.String())
+	switch {
+	case out.Currency == costCurrency:
+		if !out.FXRate.Equal(decimal.One) {
+			return in, fmt.Errorf("%w: %s does not convert into itself at %s", ErrTransactionFXRate, out.Currency, out.FXRate.String())
 		}
-
-		return currency, nil
+	case in.FXRate.IsZero():
+		return in, fmt.Errorf("%w: the trade is in %s and the position costs in %s, so fxRate is required", ErrTransactionFXRate, out.Currency, costCurrency)
 	}
 
-	if in.FXRate.IsZero() {
-		return money.XXX, fmt.Errorf("%w: the trade is in %s and the position costs in %s, so fxRate is required", ErrTransactionFXRate, currency, costCurrency)
+	if out.FeesCurrency == money.XXX {
+		out.FeesCurrency = out.Currency
 	}
 
-	return currency, nil
+	if out.FeesCurrency != out.Currency && out.FeesCurrency != costCurrency {
+		return in, fmt.Errorf("%w: fees in %s belong to neither the trade (%s) nor the position (%s)", ErrTransactionFeesCurrency, out.FeesCurrency, out.Currency, costCurrency)
+	}
+
+	return out, nil
+}
+
+// FeesInCostCurrency is the Go side of the transaction_fees_in_cost SQL
+// function: the commission expressed in the position's currency, which is the
+// only form in which it can be added to anything else on the position.
+//
+// The two implementations exist because the growth series is computed in SQL
+// and the activity alert in Go; they are kept adjacent in name so a change to
+// one is visibly a change the other needs.
+func (in TransactionInput) FeesInCostCurrency() money.Money {
+	if in.FeesCurrency == in.Currency {
+		return in.Fees.MulDecimal(in.Rate())
+	}
+
+	return in.Fees
 }
 
 // ImportTransactionRow is one validated spreadsheet row, ready to be
@@ -317,8 +355,31 @@ type ImportTransactionRow struct {
 	Price     money.Money
 	Fees      money.Money
 	Currency  money.Currency
-	Date      time.Time
-	Notes     string
+	// FXRate and CostCurrency carry the same meaning they do on a transaction:
+	// the row settled into CostCurrency at FXRate. CostCurrency comes from the
+	// upload's defaults rather than the row, because a statement is one account.
+	FXRate       decimal.Decimal
+	CostCurrency money.Currency
+	Date         time.Time
+	Notes        string
+}
+
+// Input turns an import row into the same shape the HTTP writers use, so the
+// importer is checked by the rule the API is checked by instead of a second
+// copy of it. Fees follow the trade currency, which is what the file's own
+// currency column means for the amounts on the row it tags.
+func (r ImportTransactionRow) Input() TransactionInput {
+	return TransactionInput{
+		Type:            r.Type,
+		Quantity:        r.Quantity,
+		Price:           r.Price,
+		Currency:        r.Currency,
+		FXRate:          r.FXRate,
+		Fees:            r.Fees,
+		FeesCurrency:    r.Currency,
+		TransactionDate: r.Date,
+		Notes:           r.Notes,
+	}
 }
 
 type Snapshot struct {

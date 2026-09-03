@@ -42,6 +42,7 @@
 		{ key: 'assetName', label: 'Nombre del activo', required: false },
 		{ key: 'fees', label: 'Comisiones', required: false },
 		{ key: 'currency', label: 'Moneda', required: false },
+		{ key: 'fxRate', label: 'Tasa de cambio', required: false },
 		{ key: 'category', label: 'Categoría', required: false },
 		{ key: 'notes', label: 'Notas', required: false }
 	];
@@ -148,6 +149,22 @@
 			onchange={onRefreshDefaults}
 			placeholder="USD"
 		/>
+	</div>
+	<div class="form-group">
+		<label class="form-label" for="default-cost-currency">Moneda de la cuenta</label>
+		<input
+			id="default-cost-currency"
+			class="form-input"
+			type="text"
+			maxlength="3"
+			bind:value={defaults.costCurrency}
+			onchange={onRefreshDefaults}
+			placeholder="igual que la fila"
+		/>
+		<p class="field-hint">
+			En la que tu bróker debitó. Déjala vacía si el extracto no convirtió nada; si la rellenas,
+			cada fila en otra moneda necesita su tasa.
+		</p>
 	</div>
 	<div class="form-group">
 		<label class="form-label" for="default-category">Categoría</label>
@@ -269,6 +286,13 @@
 		font-weight: 700;
 		color: var(--text);
 		margin: 1.6rem 0 0.3rem;
+	}
+
+	.field-hint {
+		margin: 0.35rem 0 0;
+		font-size: 0.75rem;
+		color: rgba(236, 234, 229, 0.45);
+		font-style: italic;
 	}
 
 	.section-hint {

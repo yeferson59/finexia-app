@@ -102,8 +102,13 @@ func (h *handler) ExportTransactions(c fiber.Ctx) error {
 	// "Tasa" and "Moneda de coste" sit next to "Moneda" because the three only
 	// mean something together: the price is in Moneda, the rate turns it into
 	// Moneda de coste, and a sheet that showed the price alone would misstate
-	// every cross-currency trade by exactly the rate.
-	headers := []string{"Fecha", "Tipo", "Activo", "Ticker", "Cantidad", "Precio", "Comisiones", "Moneda", "Tasa", "Moneda de coste", "Notas"}
+	// every cross-currency trade by exactly the rate. "Moneda comisión" is
+	// separate from "Moneda" for the same reason it is a separate column in the
+	// table: a commission is billed to the account as often as to the fill.
+	headers := []string{
+		"Fecha", "Tipo", "Activo", "Ticker", "Cantidad", "Precio", "Moneda", "Tasa",
+		"Moneda de coste", "Comisiones", "Moneda comisión", "Notas",
+	}
 	for i, header := range headers {
 		col, _ := excelize.ColumnNumberToName(i + 1)
 		_ = f.SetCellValue(sheet, col+"1", header)
@@ -116,11 +121,12 @@ func (h *handler) ExportTransactions(c fiber.Ctx) error {
 		_ = f.SetCellValue(sheet, "D"+row, t.AssetTicker)
 		_ = f.SetCellValue(sheet, "E"+row, t.Quantity)
 		_ = f.SetCellValue(sheet, "F"+row, t.Price)
-		_ = f.SetCellValue(sheet, "G"+row, t.Fees)
-		_ = f.SetCellValue(sheet, "H"+row, t.Currency)
-		_ = f.SetCellValue(sheet, "I"+row, t.FXRate)
-		_ = f.SetCellValue(sheet, "J"+row, t.CostCurrency)
-		_ = f.SetCellValue(sheet, "K"+row, t.Notes)
+		_ = f.SetCellValue(sheet, "G"+row, t.Currency)
+		_ = f.SetCellValue(sheet, "H"+row, t.FXRate)
+		_ = f.SetCellValue(sheet, "I"+row, t.CostCurrency)
+		_ = f.SetCellValue(sheet, "J"+row, t.Fees)
+		_ = f.SetCellValue(sheet, "K"+row, t.FeesCurrency)
+		_ = f.SetCellValue(sheet, "L"+row, t.Notes)
 	}
 
 	buf, err := f.WriteToBuffer()

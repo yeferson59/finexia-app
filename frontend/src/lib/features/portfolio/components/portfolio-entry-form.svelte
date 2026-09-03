@@ -15,11 +15,20 @@
 	let {
 		portfolioId,
 		platforms,
-		submitError = false
+		submitError = false,
+		submitErrorDetail = ''
 	}: {
 		portfolioId: string;
 		platforms: Platform[];
 		submitError?: boolean;
+		/**
+		 * Lo que dijo el backend, cuando dijo algo.
+		 *
+		 * Un 400 de este endpoint nombra el campo que no puede ser cierto —«USD
+		 * no se convierte en sí misma a 1.0638»— y el mensaje genérico de abajo
+		 * lo tapaba, dejando al usuario reintentando contra el mismo rechazo.
+		 */
+		submitErrorDetail?: string;
 	} = $props();
 
 	let platformId = $state('');
@@ -185,8 +194,12 @@
 		<!-- Error feedback -->
 		{#if submitError}
 			<div class="form-error">
-				No se pudo registrar el activo. Verifica que todos los campos sean correctos e intenta de
-				nuevo.
+				{#if submitErrorDetail}
+					No se pudo registrar el activo: {submitErrorDetail}
+				{:else}
+					No se pudo registrar el activo. Verifica que todos los campos sean correctos e intenta de
+					nuevo.
+				{/if}
 			</div>
 		{/if}
 

@@ -42,12 +42,15 @@ func TestTransactionInputValidate(t *testing.T) {
 	t.Run("same currency with no rate is the ordinary case", func(t *testing.T) {
 		in := TransactionInput{Currency: money.USD, Price: mustUSD(t, "150.00")}
 
-		currency, err := in.Validate(money.USD)
+		settled, err := in.Validate(money.USD)
 		if err != nil {
 			t.Fatalf("Validate: %v", err)
 		}
-		if currency != money.USD {
-			t.Errorf("currency = %q, want USD", currency)
+		if settled.Currency != money.USD || settled.FeesCurrency != money.USD {
+			t.Errorf("currencies = %q/%q, want USD/USD", settled.Currency, settled.FeesCurrency)
+		}
+		if !settled.FXRate.Equal(decimal.One) {
+			t.Errorf("rate = %s, want 1", settled.FXRate)
 		}
 	})
 
@@ -56,12 +59,12 @@ func TestTransactionInputValidate(t *testing.T) {
 	t.Run("an unset currency falls back to the position's", func(t *testing.T) {
 		in := TransactionInput{Price: mustUSD(t, "150.00")}
 
-		currency, err := in.Validate(money.EUR)
+		settled, err := in.Validate(money.EUR)
 		if err != nil {
 			t.Fatalf("Validate: %v", err)
 		}
-		if currency != money.EUR {
-			t.Errorf("currency = %q, want EUR", currency)
+		if settled.Currency != money.EUR {
+			t.Errorf("currency = %q, want EUR", settled.Currency)
 		}
 	})
 
@@ -80,12 +83,17 @@ func TestTransactionInputValidate(t *testing.T) {
 			FXRate:   mustDecimal(t, "1.0638"),
 		}
 
-		currency, err := in.Validate(money.USD)
+		settled, err := in.Validate(money.USD)
 		if err != nil {
 			t.Fatalf("Validate: %v", err)
 		}
-		if currency != money.EUR {
-			t.Errorf("currency = %q, want EUR", currency)
+		if settled.Currency != money.EUR {
+			t.Errorf("currency = %q, want EUR", settled.Currency)
+		}
+		// The fee follows the trade unless the caller says otherwise, which is
+		// what every row written before the column did.
+		if settled.FeesCurrency != money.EUR {
+			t.Errorf("feesCurrency = %q, want EUR", settled.FeesCurrency)
 		}
 	})
 
@@ -114,6 +122,63 @@ func TestTransactionInputValidate(t *testing.T) {
 			t.Fatalf("err = %v, want ErrTransactionFXRate", err)
 		}
 	})
+
+	// The commission the broker charged the dollar account on a euro fill: the
+	// case the fees currency exists for.
+	t.Run("a fee in the account's currency is accepted", func(t *testing.T) {
+		in := TransactionInput{
+			Currency:     money.EUR,
+			Price:        mustEUR(t, "606.60"),
+			FXRate:       mustDecimal(t, "1.0638"),
+			Fees:         mustUSD(t, "0.35"),
+			FeesCurrency: money.USD,
+		}
+
+		settled, err := in.Validate(money.USD)
+		if err != nil {
+			t.Fatalf("Validate: %v", err)
+		}
+		if settled.FeesCurrency != money.USD {
+			t.Errorf("feesCurrency = %q, want USD", settled.FeesCurrency)
+		}
+	})
+
+	t.Run("a fee in a third currency has no rate to reach the position with", func(t *testing.T) {
+		in := TransactionInput{
+			Currency:     money.EUR,
+			Price:        mustEUR(t, "606.60"),
+			FXRate:       mustDecimal(t, "1.0638"),
+			Fees:         mustUSD(t, "0.35"),
+			FeesCurrency: money.GBP,
+		}
+
+		if _, err := in.Validate(money.USD); !errors.Is(err, ErrTransactionFeesCurrency) {
+			t.Fatalf("err = %v, want ErrTransactionFeesCurrency", err)
+		}
+	})
+}
+
+// A commission only adds to the trade once both are in the position's currency,
+// and which of the two rates gets it there depends on which side it was billed
+// on. Getting this backwards is invisible: the number stays plausible and the
+// return moves by the fee times the rate.
+func TestFeesInCostCurrency(t *testing.T) {
+	trade := TransactionInput{
+		Currency:     money.EUR,
+		FXRate:       mustDecimal(t, "1.0638"),
+		Fees:         mustEUR(t, "2.00"),
+		FeesCurrency: money.EUR,
+	}
+	if got := trade.FeesInCostCurrency().RoundBank(4).StringFixed(4); got != "2.1276" {
+		t.Errorf("fee billed on the fill = %s, want 2.1276 (2.00 × 1.0638)", got)
+	}
+
+	account := trade
+	account.Fees = mustUSD(t, "2.00")
+	account.FeesCurrency = money.USD
+	if got := account.FeesInCostCurrency().RoundBank(4).StringFixed(4); got != "2.0000" {
+		t.Errorf("fee billed to the account = %s, want 2.0000 (already there)", got)
+	}
 }
 
 // The arithmetic the whole column exists for, on the position that prompted it:

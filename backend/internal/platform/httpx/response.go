@@ -63,10 +63,29 @@ func Forbidden(c fiber.Ctx, message, details string) error {
 // envelope carrying an action code (docs/API.md §1.2). The status comes from
 // the error's typed Kind — domains tag their errors via httpx.AsNotFound and
 // friends — and an untagged error is a 500.
+//
+// On a 4xx the error's own text is returned as Details, on a 5xx it is not.
+// The split is the whole point: a 4xx says the caller sent something this
+// server will never accept, and naming what — "USD does not convert into itself
+// at 1.0638" — is the difference between fixing one field and retrying blind
+// against the same refusal. A 5xx is the server's problem, its text is written
+// for the operator reading logs, and it can carry a query, a constraint name or
+// a connection string, so it stays in.
+//
+// Handlers keep passing a generic message: it is the headline a client shows
+// when it has nowhere to put the detail, and the detail is additive.
 func FromDomain(c fiber.Ctx, err error, message, action string) error {
-	return c.Status(domainStatus(err)).JSON(dtos.Response{
+	status := domainStatus(err)
+
+	details := ""
+	if status >= fiber.StatusBadRequest && status < fiber.StatusInternalServerError && err != nil {
+		details = err.Error()
+	}
+
+	return c.Status(status).JSON(dtos.Response{
 		Success:   false,
 		Message:   message,
+		Details:   details,
 		Action:    action,
 		Timestamp: time.Now(),
 	})

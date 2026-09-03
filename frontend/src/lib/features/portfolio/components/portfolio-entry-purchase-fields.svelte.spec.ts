@@ -93,4 +93,29 @@ describe('portfolio-entry-purchase-fields.svelte', () => {
 		// antes de guardar, así que es el que la prueba fija.
 		await expect.element(page.getByText('EUR 14.62 × 1.0638 = USD 15.55')).toBeInTheDocument();
 	});
+
+	// El estado que producía un 400 opaco: el interruptor encendido sin haber
+	// cambiado la moneda del precio, así que las dos son la misma y la tasa que
+	// se escriba no puede ser cierta. El backend lo rechaza; el formulario tiene
+	// que decirlo aquí, y no dejar que se envíe.
+	it('no acepta una tasa cuando las dos monedas son la misma', async () => {
+		render(PurchaseFields, {
+			asset: lvmh,
+			quantity: '0.0241',
+			purchasePrice: '606.60',
+			purchaseDate: '2024-12-05',
+			currency: 'USD',
+			costCurrency: 'USD',
+			fxRate: '',
+			formatCurrency
+		});
+
+		await page.getByText('Mi cuenta liquidó en otra moneda').click();
+
+		const rate = page.getByLabelText('Tasa de la operación');
+		await expect.element(rate).toBeDisabled();
+		await expect
+			.element(page.getByText('no hubo conversión y no hay tasa que aplicar', { exact: false }))
+			.toBeInTheDocument();
+	});
 });

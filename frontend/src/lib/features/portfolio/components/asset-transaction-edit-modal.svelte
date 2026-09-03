@@ -15,6 +15,7 @@
 		currency: 'USD',
 		fxRate: '1',
 		fees: '',
+		feesCurrency: '',
 		transactionDate: '',
 		notes: ''
 	});
@@ -31,6 +32,9 @@
 				currency: txn.currency,
 				fxRate: txn.fxRate ?? '1',
 				fees: txn.fees,
+				// La que trae la transacción, no un valor por defecto: editar una
+				// nota no puede reinterpretar de qué lado se cobró la comisión.
+				feesCurrency: txn.feesCurrency ?? txn.currency,
 				transactionDate: txn.transactionDate.split('T')[0],
 				notes: txn.notes
 			};
@@ -104,6 +108,7 @@
 		<input type="hidden" name="currency" value={editForm.currency} />
 		{#if !editIsCrossCurrency}
 			<input type="hidden" name="fxRate" value={editForm.fxRate || '1'} />
+			<input type="hidden" name="feesCurrency" value={editForm.feesCurrency || editForm.currency} />
 		{/if}
 
 		<div class="form-row">
@@ -227,6 +232,18 @@
 						step="any"
 						required
 					/>
+				</div>
+				<div class="form-group">
+					<label class="form-label" for="edit-fees-currency">Moneda de la comisión</label>
+					<select
+						id="edit-fees-currency"
+						class="form-select"
+						name="feesCurrency"
+						bind:value={editForm.feesCurrency}
+					>
+						<option value={editCostCurrency}>{editCostCurrency}</option>
+						<option value={editForm.currency}>{editForm.currency}</option>
+					</select>
 				</div>
 			</div>
 		{/if}

@@ -51,5 +51,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP FUNCTION IF EXISTS transaction_fees_in_cost(NUMERIC, CHAR, CHAR, NUMERIC);
+
 ALTER TABLE transactions DROP CONSTRAINT IF EXISTS chk_transactions_fx_rate_positive;
+ALTER TABLE transactions DROP COLUMN IF EXISTS fees_currency;
 ALTER TABLE transactions DROP COLUMN IF EXISTS fx_rate;
