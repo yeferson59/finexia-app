@@ -2,6 +2,7 @@
 	import PageHeader from '$lib/ui/page-header.svelte';
 	import Button from '$lib/ui/button.svelte';
 	import { AssetCreateForm, AssetsTable, ImportCard, type ImportResult } from '$lib/features/admin';
+	import { flash } from '$lib/shared/flash.svelte';
 
 	import type { PageProps } from './$types';
 
@@ -9,18 +10,7 @@
 
 	let showCreateForm = $state(false);
 	let showImportForm = $state(false);
-	let createMessage = $state<string | null>(null);
-
-	$effect(() => {
-		if (form?.createSuccess) {
-			showCreateForm = false;
-			createMessage = 'Activo creado correctamente.';
-			setTimeout(() => (createMessage = null), 4000);
-		}
-		if (form?.importSuccess) {
-			showImportForm = false;
-		}
-	});
+	const created = flash();
 
 	const importResult = $derived((form?.importResult ?? null) as ImportResult | null);
 </script>
@@ -36,8 +26,8 @@
 >
 	{#snippet actions()}
 		<div class="header-actions">
-			{#if createMessage}
-				<span class="sync-success">{createMessage}</span>
+			{#if created.text}
+				<span class="sync-success">{created.text}</span>
 			{/if}
 			<Button
 				variant="secondary"
@@ -60,7 +50,13 @@
 </PageHeader>
 
 {#if showCreateForm}
-	<AssetCreateForm error={form?.createError ?? ''} />
+	<AssetCreateForm
+		error={form?.createError ?? ''}
+		onSuccess={() => {
+			showCreateForm = false;
+			created.show('Activo creado correctamente.');
+		}}
+	/>
 {/if}
 
 {#if showImportForm}
@@ -69,6 +65,7 @@
 		action="importAssets"
 		error={form?.importError ?? ''}
 		result={importResult}
+		onSuccess={() => (showImportForm = false)}
 	>
 		{#snippet hint()}
 			El archivo debe tener columnas <code>ticker</code>, <code>name</code>,

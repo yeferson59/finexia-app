@@ -9,14 +9,21 @@
 	import Card from '$lib/ui/card.svelte';
 	import Input from '$lib/ui/input.svelte';
 	import Button from '$lib/ui/button.svelte';
+	import { actionData, actionError } from '$lib/shared/form';
 	import { INVITE_ROLES } from '../admin';
 
 	interface Props {
 		/** `form` de la página, para el error o el acuse de la invitación. */
 		form: Record<string, unknown> | null;
+		/**
+		 * Se llama cuando la invitación sale. La página cierra el panel desde
+		 * aquí y no desde el `form` común, que también cambia con el resto de
+		 * actions de la pantalla (banear, eliminar, revocar…).
+		 */
+		onSuccess?: () => void;
 	}
 
-	let { form }: Props = $props();
+	let { form, onSuccess }: Props = $props();
 
 	// Estado local del formulario: la página lo desmonta cuando la invitación
 	// sale, así que vuelve vacío la próxima vez que se abre.
@@ -24,6 +31,11 @@
 	let inviteEmail = $state('');
 	let inviteRole = $state('customer');
 	let inviting = $state(false);
+
+	// La pantalla tiene seis actions y un solo `form`: sin filtrar por acción,
+	// un borrado fallido pintaba «No se pudo eliminar el usuario» aquí dentro.
+	const error = $derived(actionError(form, 'inviteUser'));
+	const invited = $derived(actionData<string>(form, 'inviteUser', 'invited'));
 </script>
 
 <div class="create-form-card">
@@ -37,9 +49,10 @@
 			action="?/inviteUser"
 			use:enhance={() => {
 				inviting = true;
-				return async ({ update }) => {
+				return async ({ result, update }) => {
 					inviting = false;
 					await update();
+					if (result.type === 'success') onSuccess?.();
 				};
 			}}
 		>
@@ -61,11 +74,11 @@
 					</select>
 				</div>
 			</div>
-			{#if form?.error}
-				<p class="form-error">{form.error}</p>
+			{#if error}
+				<p class="form-error">{error}</p>
 			{/if}
-			{#if form?.invited}
-				<p class="form-success">Invitación enviada a {form.invited}.</p>
+			{#if invited}
+				<p class="form-success">Invitación enviada a {invited}.</p>
 			{/if}
 			<div class="form-actions">
 				<Button type="submit" loading={inviting}>Enviar invitación</Button>

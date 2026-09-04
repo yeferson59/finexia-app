@@ -6,9 +6,14 @@
 
 	interface Props {
 		error?: string;
+		/**
+		 * Se llama cuando el envío sale bien. La página cierra el panel desde aquí
+		 * y no desde el `form` común, que también cambia con el resto de actions.
+		 */
+		onSuccess?: () => void;
 	}
 
-	let { error = '' }: Props = $props();
+	let { error = '', onSuccess }: Props = $props();
 
 	let creating = $state(false);
 </script>
@@ -19,9 +24,10 @@
 		action="?/createRate"
 		use:enhance={() => {
 			creating = true;
-			return async ({ update }) => {
+			return async ({ result, update }) => {
 				creating = false;
 				await update();
+				if (result.type === 'success') onSuccess?.();
 			};
 		}}
 	>

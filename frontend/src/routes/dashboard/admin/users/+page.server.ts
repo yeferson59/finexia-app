@@ -39,17 +39,20 @@ export const actions = {
 			role: fd.get('role') ?? ''
 		});
 
-		if (!parsed.success) return fail(400, { error: parsed.error.issues[0].message });
+		if (!parsed.success) {
+			return fail(400, { action: 'inviteUser', error: parsed.error.issues[0].message });
+		}
 
 		const res = await user.inviteUser({ cookies, fetch }, parsed.data);
 
 		if (!res.ok) {
 			return fail(res.status, {
+				action: 'inviteUser',
 				error: res.details ?? res.message ?? 'No se pudo enviar la invitación'
 			});
 		}
 
-		return { success: true, invited: parsed.data.email };
+		return { action: 'inviteUser', success: true, invited: parsed.data.email };
 	},
 
 	resendInvitation: async ({ request, cookies, fetch }) => {
@@ -100,11 +103,16 @@ export const actions = {
 	deleteUser: async ({ request, cookies, fetch }) => {
 		const fd = await request.formData();
 		const parsed = rowIdSchema.safeParse(fd.get('id') ?? '');
-		if (!parsed.success) return fail(400, { error: 'ID de usuario requerido' });
+		if (!parsed.success) return fail(400, { deleteError: 'ID de usuario requerido', deleteId: '' });
 
 		const res = await user.deleteUser({ cookies, fetch }, parsed.data);
-		if (!res.ok) return fail(res.status, { error: 'No se pudo eliminar el usuario' });
-		return { success: true };
+		if (!res.ok) {
+			return fail(res.status, {
+				deleteError: 'No se pudo eliminar el usuario',
+				deleteId: parsed.data
+			});
+		}
+		return { action: 'deleteUser', success: true };
 	},
 
 	banUser: async ({ request, cookies, fetch }) => {

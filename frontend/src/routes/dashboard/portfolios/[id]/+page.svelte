@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { PortfolioGrowth } from '$lib/features/dashboard';
 	import { privacy } from '$lib/shared/privacy.svelte';
+	import { flash } from '$lib/shared/flash.svelte';
 	import {
 		PortfolioEditForm,
 		PortfolioSummaryCards,
@@ -24,8 +25,8 @@
 	const growth = $derived(data.growth);
 
 	let isEditing = $state(false);
-	let submitSuccess = $state(false);
 	let submitError = $state('');
+	const saved = flash(3000);
 
 	// Group entries by ticker so the same asset held in multiple platforms
 	// appears as a single row with aggregated quantity and cost basis.
@@ -89,7 +90,7 @@
 </script>
 
 <svelte:head>
-	<title>Portafolio - FINEXIA</title>
+	<title>{portfolio?.name ?? 'Portafolio'} - FINEXIA</title>
 	<meta name="description" content="Detalle de posiciones y asignación de portafolio" />
 </svelte:head>
 
@@ -101,8 +102,8 @@
 	onAddAsset={addAsset}
 />
 
-{#if submitSuccess}
-	<div class="alert alert-success">Portafolio actualizado correctamente.</div>
+{#if saved.text}
+	<div class="alert alert-success">{saved.text}</div>
 {/if}
 
 {#if submitError}
@@ -115,9 +116,11 @@
 		{risks}
 		onCancel={() => (isEditing = false)}
 		onSaved={() => {
-			submitSuccess = true;
+			// El error de un intento anterior tiene que irse con el acuse nuevo:
+			// si no, la pantalla mostraba las dos alertas a la vez.
+			submitError = '';
 			isEditing = false;
-			setTimeout(() => (submitSuccess = false), 3000);
+			saved.show('Portafolio actualizado correctamente.');
 		}}
 		onError={(msg) => (submitError = msg)}
 	/>

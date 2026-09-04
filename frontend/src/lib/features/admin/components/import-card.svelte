@@ -20,9 +20,14 @@
 		hint: Snippet;
 		error?: string;
 		result?: ImportResult | null;
+		/**
+		 * Se llama cuando el envío sale bien. La página cierra el panel desde aquí
+		 * y no desde el `form` común, que también cambia con el resto de actions.
+		 */
+		onSuccess?: () => void;
 	}
 
-	let { title, action, hint, error = '', result = null }: Props = $props();
+	let { title, action, hint, error = '', result = null, onSuccess }: Props = $props();
 
 	let importing = $state(false);
 </script>
@@ -35,9 +40,10 @@
 		enctype="multipart/form-data"
 		use:enhance={() => {
 			importing = true;
-			return async ({ update }) => {
+			return async ({ result, update }) => {
 				importing = false;
 				await update();
+				if (result.type === 'success') onSuccess?.();
 			};
 		}}
 	>

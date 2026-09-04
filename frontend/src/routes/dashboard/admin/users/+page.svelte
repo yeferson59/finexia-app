@@ -8,10 +8,6 @@
 	const { data, form }: PageProps = $props();
 
 	let showInviteForm = $state(false);
-
-	$effect(() => {
-		if (form && 'success' in form && form.success) showInviteForm = false;
-	});
 </script>
 
 <svelte:head>
@@ -36,7 +32,7 @@
 </PageHeader>
 
 {#if showInviteForm}
-	<InviteUserForm {form} />
+	<InviteUserForm {form} onSuccess={() => (showInviteForm = false)} />
 {/if}
 
 {#if data.invitations.length > 0}

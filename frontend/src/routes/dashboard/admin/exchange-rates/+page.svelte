@@ -8,6 +8,7 @@
 		ImportCard,
 		type ImportResult
 	} from '$lib/features/admin';
+	import { flash } from '$lib/shared/flash.svelte';
 
 	import type { PageProps } from './$types';
 
@@ -15,25 +16,9 @@
 
 	let showCreateForm = $state(false);
 	let showImportForm = $state(false);
-	let createMessage = $state<string | null>(null);
 	let refreshing = $state(false);
-	let refreshMessage = $state<string | null>(null);
-
-	$effect(() => {
-		if (form?.createSuccess) {
-			showCreateForm = false;
-			createMessage = 'Tasa de cambio creada correctamente.';
-			setTimeout(() => (createMessage = null), 4000);
-		}
-		if (form?.importSuccess) {
-			showImportForm = false;
-		}
-		if (form?.refreshSuccess) {
-			const count = (form.refreshedCount as number) ?? 0;
-			refreshMessage = `${count} tasa${count === 1 ? '' : 's'} actualizada${count === 1 ? '' : 's'} desde el feed.`;
-			setTimeout(() => (refreshMessage = null), 4000);
-		}
-	});
+	const created = flash();
+	const refreshed = flash();
 
 	const importResult = $derived((form?.importResult ?? null) as ImportResult | null);
 </script>
@@ -49,11 +34,11 @@
 >
 	{#snippet actions()}
 		<div class="header-actions">
-			{#if createMessage}
-				<span class="sync-success">{createMessage}</span>
+			{#if created.text}
+				<span class="sync-success">{created.text}</span>
 			{/if}
-			{#if refreshMessage}
-				<span class="sync-success">{refreshMessage}</span>
+			{#if refreshed.text}
+				<span class="sync-success">{refreshed.text}</span>
 			{/if}
 			{#if form?.refreshError}
 				<span class="sync-error">{form.refreshError}</span>
@@ -68,9 +53,15 @@
 				action="?/refreshRates"
 				use:enhance={() => {
 					refreshing = true;
-					return async ({ update }) => {
+					return async ({ result, update }) => {
 						refreshing = false;
 						await update({ reset: false });
+						if (result.type === 'success') {
+							const count = Number(result.data?.refreshedCount ?? 0);
+							refreshed.show(
+								`${count} tasa${count === 1 ? '' : 's'} actualizada${count === 1 ? '' : 's'} desde el feed.`
+							);
+						}
 					};
 				}}
 			>
@@ -99,7 +90,13 @@
 </PageHeader>
 
 {#if showCreateForm}
-	<ExchangeRateCreateForm error={form?.createError ?? ''} />
+	<ExchangeRateCreateForm
+		error={form?.createError ?? ''}
+		onSuccess={() => {
+			showCreateForm = false;
+			created.show('Tasa de cambio creada correctamente.');
+		}}
+	/>
 {/if}
 
 {#if showImportForm}
@@ -108,6 +105,7 @@
 		action="importRates"
 		error={form?.importError ?? ''}
 		result={importResult}
+		onSuccess={() => (showImportForm = false)}
 	>
 		{#snippet hint()}
 			El archivo debe tener columnas <code>fromCurrency</code>, <code>toCurrency</code> y

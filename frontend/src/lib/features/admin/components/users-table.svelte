@@ -116,6 +116,9 @@
 								{#if form?.banError && form?.banId === user.id}
 									<p class="row-error">{form.banError}</p>
 								{/if}
+								{#if form?.deleteError && form?.deleteId === user.id}
+									<p class="row-error">{form.deleteError}</p>
+								{/if}
 							{/if}
 						</td>
 					</tr>

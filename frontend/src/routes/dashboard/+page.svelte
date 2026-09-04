@@ -105,6 +105,7 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
+		.growth-section,
 		.grid-item {
 			animation: none;
 		}

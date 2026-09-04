@@ -31,6 +31,9 @@ Sustituye al antiguo cajón de sastre `lib/utils.ts`, repartido por tema.
   (`ReturnSeriesPoint`) se declara estructuralmente para no importar de
   `lib/api`.
 - `config/features.ts` — feature flags (`investments`, `selfRegistration`).
+- `flash.svelte.ts` — `flash()`, acuse temporal que se retira solo. Estaba
+  copiado en tres pantallas del dashboard y las tres copias dejaban el
+  `setTimeout` vivo al desmontar y compartían reloj entre dos acuses seguidos.
 - `form.ts` — reparto del `form` de una página entre sus secciones
   (`actionSucceeded`, `actionError`, `actionData`), que usan ajustes y
   notificaciones.

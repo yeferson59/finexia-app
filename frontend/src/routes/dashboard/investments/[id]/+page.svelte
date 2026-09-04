@@ -13,8 +13,11 @@
 </script>
 
 <svelte:head>
-	<title>{investment?.name} - FINEXIA</title>
-	<meta name="description" content={investment?.description} />
+	<title>{investment ? `${investment.name} - FINEXIA` : 'Inversión no encontrada - FINEXIA'}</title>
+	<meta
+		name="description"
+		content={investment?.description ?? 'Producto de inversión no encontrado'}
+	/>
 </svelte:head>
 
 <InvestmentDetail {id} onBack={handleBack} />
