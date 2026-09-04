@@ -449,15 +449,21 @@ type AssetHolding struct {
 
 // PlatformStats is the result of joining investment_sources with portfolio_entries stats.
 type PlatformStats struct {
-	ID                   uuid.UUID      `json:"id"`
-	Name                 string         `json:"name"`
-	Description          string         `json:"description"`
-	SourceType           SourceType     `json:"sourceType"`
-	IsActive             bool           `json:"isActive"`
-	CreatedAt            time.Time      `json:"createdAt"`
-	UpdatedAt            time.Time      `json:"updatedAt"`
-	Investments          int64          `json:"investments"`
+	ID          uuid.UUID  `json:"id"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	SourceType  SourceType `json:"sourceType"`
+	IsActive    bool       `json:"isActive"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	UpdatedAt   time.Time  `json:"updatedAt"`
+	Investments int64      `json:"investments"`
+	// TotalValue is the cost basis: what the owner put in, at weighted-average
+	// cost. The name predates there being anything else to compare it against
+	// and is kept because clients read it; MarketValue is what the same
+	// positions are worth now, in the same currency and over the same rows, so
+	// the two subtract into a real gain.
 	TotalValue           string         `json:"totalValue"`
+	MarketValue          string         `json:"marketValue"`
 	DisplayCurrency      money.Currency `json:"displayCurrency"`
 	PositionsUnconverted int64          `json:"positionsUnconverted"`
 }

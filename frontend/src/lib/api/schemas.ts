@@ -284,9 +284,26 @@ export const platformSchema = z.object({
 	type: z.string().optional(),
 	isActive: z.boolean(),
 	investments: z.number(),
+	/** Lo invertido: cantidad × coste medio, en `displayCurrency`. */
 	totalValue: z.string(),
 	/**
-	 * Moneda en la que viene `totalValue`. El total suma posiciones compradas
+	 * Métricas de la plataforma, todas en `displayCurrency` y sobre las mismas
+	 * posiciones que `totalValue`, así que la resta entre coste y mercado es una
+	 * ganancia y no el choque de dos alcances distintos.
+	 *
+	 * `percent` es la parte del total invertido de la cuenta que vive en esta
+	 * plataforma — lo que hace legible el orden — y viene en 0 cuando la
+	 * plataforma se lee sola, porque una participación necesita el conjunto.
+	 *
+	 * Opcionales mientras convivan backends viejos: sin ellas la vista enseña lo
+	 * invertido y calla el resto, en vez de inventar una ganancia de cero.
+	 */
+	marketValue: z.string().optional(),
+	gainLoss: z.string().optional(),
+	gainLossPct: z.number().optional(),
+	percent: z.number().optional(),
+	/**
+	 * Moneda en la que vienen los importes. El total suma posiciones compradas
 	 * en monedas distintas, así que sin esto la cifra no tiene unidad — y la
 	 * vista le ponía un "$" fijo. Opcional mientras convivan backends viejos.
 	 */

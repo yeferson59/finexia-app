@@ -41,25 +41,57 @@ const platformStatsSelect = `
 		-- ROUND for the reason 000025 gives: an inverted or hopped rate carries
 		-- twenty-odd decimals of its own, and the total leaves here as text for
 		-- a decimal that errors past nineteen.
-		ROUND(COALESCE(SUM(pe.quantity * pe.price * COALESCE(fx.rate, 1)), 0), 8)::text AS total_value,
+		ROUND(COALESCE(SUM(pe.quantity * pe.price * COALESCE(fx.cost_rate, 1)), 0), 8)::text AS total_value,
+		-- What the platform is worth now, against what it cost above. The two
+		-- are summed over the same rows and converted into the same currency, so
+		-- their difference is a gain rather than an artefact of two scopes.
+		ROUND(COALESCE(SUM(pe.quantity * v.price * COALESCE(fx.value_rate, 1)), 0), 8)::text AS market_value,
 		target.currency AS display_currency,
-		(COUNT(pe.id) FILTER (WHERE fx.rate IS NULL))::bigint AS positions_unconverted
+		-- A position counts as unconverted when either leg failed: the cost and
+		-- the market value are looked up separately, and a total that is right
+		-- on one side and nominal on the other is still a mixed-currency total.
+		(COUNT(pe.id) FILTER (
+			WHERE fx.cost_rate IS NULL OR fx.value_rate IS NULL
+		))::bigint AS positions_unconverted
 	FROM investment_sources is_
 	JOIN users u ON u.id = is_.user_id
 	CROSS JOIN LATERAL (
 		SELECT COALESCE(NULLIF(%s::text, ''), u.preferred_currency)::CHAR(3) AS currency
 	) target
 	LEFT JOIN portfolio_entries pe ON pe.source_id = is_.id
-	-- One lateral per entry so the sum and the count read the same rate.
+	LEFT JOIN assets a              ON a.id = pe.asset_id
+	LEFT JOIN user_asset_prices uap ON uap.asset_id = pe.asset_id AND uap.user_id = is_.user_id
+	-- The price and the currency it is quoted in are picked together, the way
+	-- the holdings query picks them: a position valued at its own cost is an
+	-- amount in the cost currency, not in the asset's, and converting it as if
+	-- it were the asset's is how a position with no market price gets valued
+	-- through the wrong rate.
 	LEFT JOIN LATERAL (
-		SELECT fx_rate(is_.user_id, pe.cost_currency, target.currency) AS rate
+		SELECT
+			COALESCE(uap.price, a.current_price, pe.price) AS price,
+			CASE
+				WHEN COALESCE(uap.price, a.current_price) IS NOT NULL
+					THEN COALESCE(a.currency, pe.cost_currency)
+				ELSE pe.cost_currency
+			END AS currency
+	) v ON TRUE
+	-- One lateral per entry so every sum and count reads the same two rates.
+	LEFT JOIN LATERAL (
+		SELECT
+			fx_rate(is_.user_id, pe.cost_currency, target.currency) AS cost_rate,
+			fx_rate(is_.user_id, v.currency, target.currency)       AS value_rate
 	) fx ON TRUE`
 
 func (r *PostgresRepository) GetPlatformsWithStats(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]PlatformStats, error) {
+	// Ordered by what the owner has put in, biggest first. Creation order said
+	// nothing about the account — the platform opened last is not the one that
+	// matters — and a list meant to answer "where is my money" has to open on
+	// the answer. Ties break by name so the order is stable between reads
+	// instead of drifting with whatever the planner returns.
 	rows, err := r.db.Query(ctx, fmt.Sprintf(platformStatsSelect, "$2")+`
 		WHERE is_.user_id = $1
 		GROUP BY is_.id, target.currency
-		ORDER BY is_.created_at DESC
+		ORDER BY COALESCE(SUM(pe.quantity * pe.price * COALESCE(fx.cost_rate, 1)), 0) DESC, is_.name ASC
 	`, userID, currencyParam(displayCurrency))
 	if err != nil {
 		return nil, err
@@ -73,7 +105,7 @@ func (r *PostgresRepository) GetPlatformsWithStats(ctx context.Context, userID u
 		if err := rows.Scan(
 			&p.ID, &p.Name, &p.Description, &p.SourceType,
 			&p.IsActive, &p.CreatedAt, &p.UpdatedAt,
-			&p.Investments, &p.TotalValue,
+			&p.Investments, &p.TotalValue, &p.MarketValue,
 			&p.DisplayCurrency, &p.PositionsUnconverted,
 		); err != nil {
 			return nil, err
@@ -108,7 +140,7 @@ func (r *PostgresRepository) UpdatePlatform(ctx context.Context, userID, sourceI
 	`, sourceID, userID, "").Scan(
 		&p.ID, &p.Name, &p.Description, &p.SourceType,
 		&p.IsActive, &p.CreatedAt, &p.UpdatedAt,
-		&p.Investments, &p.TotalValue,
+		&p.Investments, &p.TotalValue, &p.MarketValue,
 		&p.DisplayCurrency, &p.PositionsUnconverted,
 	); err != nil {
 		return PlatformStats{}, err

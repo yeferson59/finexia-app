@@ -415,8 +415,23 @@ type PlatformResponseDTO struct {
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 	Investments int64     `json:"investments"`
-	TotalValue  string    `json:"totalValue"`
-	// The currency TotalValue is in, and how many of the entries behind it
+	// TotalValue is what the platform cost and MarketValue what it is worth;
+	// GainLoss is the difference and GainLossPct that difference over the cost.
+	// All four are in DisplayCurrency.
+	TotalValue  string  `json:"totalValue"`
+	MarketValue string  `json:"marketValue"`
+	GainLoss    string  `json:"gainLoss"`
+	GainLossPct float64 `json:"gainLossPct"`
+	// Percent is this platform's share of everything the account has invested,
+	// which is what makes the ordering readable: "the biggest" means little
+	// until it is "the biggest, and it holds 62% of the money". It is a share of
+	// the cost basis, not of market value, so it answers where the money was put
+	// rather than where it happens to have grown.
+	//
+	// Zero when the platform is read on its own: a share needs the whole set,
+	// and inventing 100% for a single row would be worse than saying nothing.
+	Percent float64 `json:"percent"`
+	// The currency the amounts are in, and how many of the entries behind them
 	// could not be converted into it. See PlatformStats for why both travel
 	// with the amount.
 	DisplayCurrency      string `json:"displayCurrency"`
@@ -424,6 +439,8 @@ type PlatformResponseDTO struct {
 }
 
 func newPlatformResponse(p PlatformStats) PlatformResponseDTO {
+	gain, pct := gainOf(p.TotalValue, p.MarketValue)
+
 	return PlatformResponseDTO{
 		ID:          p.ID,
 		Name:        p.Name,
@@ -434,10 +451,76 @@ func newPlatformResponse(p PlatformStats) PlatformResponseDTO {
 		UpdatedAt:   p.UpdatedAt,
 		Investments: p.Investments,
 		TotalValue:  p.TotalValue,
+		MarketValue: p.MarketValue,
+		GainLoss:    gain,
+		GainLossPct: pct,
 
 		DisplayCurrency:      p.DisplayCurrency.String(),
 		PositionsUnconverted: p.PositionsUnconverted,
 	}
+}
+
+// NewPlatformListResponse builds the listing, filling in each platform's share
+// of the account's invested total.
+//
+// The share is computed here and not in SQL because it only means anything
+// across the whole set: the same query serves the re-read of a single platform
+// after an edit, where a window function would confidently report 100%. The
+// shares are computed over exactly the rows being returned, the same way the
+// allocation's are, so the column adds to 100 on screen.
+func NewPlatformListResponse(platforms []PlatformStats) []PlatformResponseDTO {
+	invested := make([]string, len(platforms))
+	for i, p := range platforms {
+		invested[i] = p.TotalValue
+	}
+	shares := percentShares(invested)
+
+	result := make([]PlatformResponseDTO, 0, len(platforms))
+	for i, p := range platforms {
+		dto := newPlatformResponse(p)
+		dto.Percent = shares[i]
+		result = append(result, dto)
+	}
+
+	return result
+}
+
+// gainOf turns a cost and a market value into the gain between them and that
+// gain as a percentage of the cost.
+//
+// Both run on the decimal engine rather than through float64, for the reason
+// percentShares gives: these amounts are summed in Postgres at eight decimals
+// and a float round trip drifts against the totals they came from. An amount
+// that will not parse reads as zero, the same as everywhere else these strings
+// are read.
+//
+// A cost of zero yields a zero percentage rather than an infinity: a platform
+// that has been fully sold, or that holds only positions valued at cost, has no
+// base to express a return against, and the amount beside it already says so.
+func gainOf(cost, market string) (string, float64) {
+	costDec, err := decimal.NewFromString(cost)
+	if err != nil {
+		costDec = decimal.Zero
+	}
+
+	marketDec, err := decimal.NewFromString(market)
+	if err != nil {
+		marketDec = decimal.Zero
+	}
+
+	gain := marketDec.Sub(costDec)
+	if !costDec.IsPos() {
+		return gain.String(), 0
+	}
+
+	// Scaled to a percentage before dividing, the same way percentShares does
+	// it and for the same reason.
+	pct, err := gain.Mul(oneHundred).Div(costDec)
+	if err != nil {
+		return gain.String(), 0
+	}
+
+	return gain.String(), pct.RoundHAZ(2).InexactFloat64()
 }
 
 // HoldingResponseDTO is a flattened representation of a portfolio entry joined

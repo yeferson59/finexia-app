@@ -218,12 +218,7 @@ func (h *handler) GetPlatforms(c fiber.Ctx) error {
 		return httpx.FromDomain(c, err, "", "")
 	}
 
-	dtos := make([]PlatformResponseDTO, 0, len(platforms))
-	for _, p := range platforms {
-		dtos = append(dtos, newPlatformResponse(p))
-	}
-
-	return httpx.OK(c, "", "", dtos)
+	return httpx.OK(c, "", "", NewPlatformListResponse(platforms))
 }
 
 func (h *handler) UpdatePlatform(c fiber.Ctx) error {

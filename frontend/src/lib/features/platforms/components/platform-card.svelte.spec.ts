@@ -63,3 +63,46 @@ describe('platform-card.svelte', () => {
 		expect(onView).toHaveBeenCalledWith('p1');
 	});
 });
+
+describe('platform-card.svelte · métricas', () => {
+	const withMetrics = {
+		...platform,
+		marketValue: '13750.55',
+		gainLoss: '1250.05',
+		gainLossPct: 10,
+		percent: 62.5
+	};
+
+	it('muestra la ganancia y su porcentaje sobre lo invertido', async () => {
+		render(PlatformCard, { platform: withMetrics, onView: () => {} });
+
+		await expect.element(page.getByText('Ganancia')).toBeInTheDocument();
+		await expect.element(page.getByText('+10.00%')).toBeInTheDocument();
+	});
+
+	it('dice qué parte de la cuenta vive en esta plataforma', async () => {
+		render(PlatformCard, { platform: withMetrics, onView: () => {} });
+
+		// Es lo que hace legible el orden: «la más grande» dice poco hasta que
+		// es «la más grande, y tiene el 62,5% del dinero».
+		await expect.element(page.getByText('62.5% de la cuenta')).toBeInTheDocument();
+	});
+
+	it('marca la pérdida como pérdida', async () => {
+		render(PlatformCard, {
+			platform: { ...withMetrics, gainLoss: '-830.20', gainLossPct: -6.64 },
+			onView: () => {}
+		});
+
+		await expect.element(page.getByText('-6.64%')).toBeInTheDocument();
+	});
+
+	// Ausente no es cero: un backend anterior a estas métricas no afirma que la
+	// plataforma no haya ganado nada, así que la tarjeta no lo afirma tampoco.
+	it('calla la ganancia cuando el backend no la manda', async () => {
+		render(PlatformCard, { platform, onView: () => {} });
+
+		await expect.element(page.getByText('Invertido')).toBeInTheDocument();
+		await expect.element(page.getByText('Ganancia')).not.toBeInTheDocument();
+	});
+});

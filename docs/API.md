@@ -414,6 +414,38 @@ dólares devolvía sus importes nominales sumados: un número en ninguna moneda,
 inflado en cuanto entraba una de unidad menor. El cliente, además, no tenía cómo
 saberlo — lo pintaba con un «$» fijo.
 
+#### Métricas por plataforma
+
+`GET /portfolios/sources` devuelve las plataformas **ordenadas por lo invertido,
+de mayor a menor** (empates por nombre, para que el orden no cambie entre
+lecturas). El orden por fecha de creación no decía nada de la cuenta: la
+plataforma abierta más tarde no es la que importa.
+
+Cada fila lleva, toda en `displayCurrency`:
+
+| Campo | Valor |
+|---|---|
+| `totalValue` | Lo invertido: cantidad × coste medio ponderado |
+| `marketValue` | Lo que vale hoy, sobre **las mismas posiciones** y en la misma moneda |
+| `gainLoss` | `marketValue − totalValue` |
+| `gainLossPct` | Esa diferencia sobre lo invertido, en % |
+| `percent` | Parte del total invertido de la cuenta que vive en esta plataforma |
+| `investments` | Número de posiciones |
+| `positionsUnconverted` | Posiciones contadas a valor nominal por falta de tasa **en cualquiera de las dos patas** |
+
+`percent` es lo que hace legible el orden: «la más grande» dice poco hasta que
+es «la más grande, y tiene el 62% del dinero». Es participación sobre el coste,
+no sobre el valor de mercado, así que responde dónde se puso el dinero y no
+dónde resultó que creció.
+
+Viene en `0` cuando la plataforma se lee sola —la relectura tras un `PATCH`—:
+una participación necesita el conjunto, e inventar un 100% para una fila sería
+peor que no decir nada. `gainLoss` sí viaja ahí, porque no lo necesita.
+
+El precio de cada posición y la moneda en la que cotiza se eligen juntos, igual
+que en `/portfolios/holdings`: una posición sin precio de mercado se valora a su
+propio coste, que es un importe en la moneda de coste y no en la del activo.
+
 #### Eliminar una posición no es eliminar una transacción
 
 `DELETE /portfolios/transactions/:txnId` quita una operación y deja que la

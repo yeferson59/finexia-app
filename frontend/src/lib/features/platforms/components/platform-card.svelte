@@ -10,7 +10,17 @@
 		isActive: boolean;
 		investments: number;
 		totalValue: string;
-		/** Moneda real de `totalValue`, la informe el backend o no. */
+		/**
+		 * Métricas nuevas: ausentes contra un backend anterior.
+		 *
+		 * `marketValue` no está aquí a propósito: la tarjeta es un resumen y la
+		 * ganancia ya lo resume mejor que el importe bruto. Vive en el detalle,
+		 * donde hay sitio para las dos cifras y su diferencia.
+		 */
+		gainLoss?: string;
+		gainLossPct?: number;
+		percent?: number;
+		/** Moneda real de los importes, la informe el backend o no. */
 		displayCurrency?: string;
 		/** Posiciones incluidas en el total sin convertir, por falta de tasa. */
 		positionsUnconverted?: number;
@@ -30,6 +40,13 @@
 	function fmtMoney(value: string): string {
 		return privacy.money(formatCurrency(parseFloat(value) || 0, currency));
 	}
+
+	// La ganancia se muestra solo si el backend la manda. Un `?? 0` la
+	// convertiría en «esta plataforma no ganó ni perdió nada», que es una
+	// afirmación, no la ausencia de un dato.
+	const gain = $derived(platform.gainLoss !== undefined ? parseFloat(platform.gainLoss) : null);
+	const gainPct = $derived(platform.gainLossPct);
+	const share = $derived(platform.percent);
 
 	function getStatusColor(status: boolean) {
 		return status === true ? 'var(--green)' : 'var(--red)';
@@ -55,7 +72,23 @@
 		<div class="stat-item">
 			<span class="stat-label">Invertido</span>
 			<span class="stat-value">{fmtMoney(platform.totalValue)}</span>
+			{#if share !== undefined && share > 0}
+				<span class="stat-note">{share.toFixed(1)}% de la cuenta</span>
+			{/if}
 		</div>
+		{#if gain !== null}
+			<div class="stat-item">
+				<span class="stat-label">Ganancia</span>
+				<span class="stat-value" class:up={gain > 0} class:down={gain < 0}>
+					{fmtMoney(platform.gainLoss ?? '0')}
+				</span>
+				{#if gainPct !== undefined}
+					<span class="stat-note" class:up={gain > 0} class:down={gain < 0}>
+						{gainPct > 0 ? '+' : ''}{gainPct.toFixed(2)}%
+					</span>
+				{/if}
+			</div>
+		{/if}
 	</div>
 
 	{#if unconverted > 0}
@@ -146,9 +179,25 @@
 		letter-spacing: 0.3px;
 	}
 
+	.stat-note {
+		font-size: 0.72rem;
+		color: rgba(236, 234, 229, 0.45);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.up {
+		color: var(--green);
+	}
+
+	.down {
+		color: var(--red);
+	}
+
 	.card-stats {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		/* Tres métricas donde antes había dos, y en una tarjeta estrecha la
+		   tercera baja de línea en vez de espachurrar las otras. */
+		grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
 		gap: 1rem;
 		padding: 1rem;
 		background: var(--border);
