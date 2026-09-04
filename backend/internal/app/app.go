@@ -21,6 +21,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/health"
 	"github.com/yeferson59/finexia-app/internal/market"
 	"github.com/yeferson59/finexia-app/internal/marketing"
+	"github.com/yeferson59/finexia-app/internal/mcp"
 	"github.com/yeferson59/finexia-app/internal/notification"
 	"github.com/yeferson59/finexia-app/internal/platform/cache"
 	"github.com/yeferson59/finexia-app/internal/platform/config"
@@ -203,6 +204,7 @@ type modules struct {
 	user         *user.Module
 	market       *market.Module
 	portfolio    *portfolio.Module
+	mcp          *mcp.Module
 	notification *notification.Service
 }
 
@@ -334,6 +336,17 @@ func (a *App) buildModules() *modules {
 		}),
 	})
 
+	// mcp re-serves the reads above to MCP clients, so it is built last: it
+	// consumes both services through its own interfaces and adds no dependency
+	// of its own beyond the guard every /mcp call is behind.
+	mcpModule := mcp.New(mcp.Deps{
+		Portfolios: portfolioModule.Service(),
+		Assets:     marketService,
+		AuthMiddl:  authModule,
+		Limiter:    userLimiter,
+		Log:        a.deps.Log,
+	})
+
 	return new(modules{
 		health:       health.New(),
 		marketing:    marketingModule,
@@ -341,6 +354,7 @@ func (a *App) buildModules() *modules {
 		user:         userModule,
 		market:       marketModule,
 		portfolio:    portfolioModule,
+		mcp:          mcpModule,
 		notification: notification.NewService(userService, portfolioModule.Service(), a.deps.Mail, notificationConfig(a.deps.Envs)),
 	})
 }
@@ -365,6 +379,7 @@ func (a *App) mountRoutes(mods *modules) {
 	mods.marketing.Routes(a.fiber)
 	mods.user.Routes(a.fiber)
 	mods.portfolio.Routes(a.fiber)
+	mods.mcp.Routes(a.fiber)
 }
 
 // startScheduler builds the job runner and scheduler, registers every job and

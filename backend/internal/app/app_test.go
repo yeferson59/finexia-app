@@ -170,6 +170,12 @@ func TestAppWiresAndRoutes(t *testing.T) {
 	// handler.
 	assertGuarded(fiber.MethodDelete, "/users/waitlist/:id", 4)
 
+	// The MCP endpoint answers with one user's private holdings, so it is
+	// gated like the /portfolios family rather than living in the public zone.
+	if status := request("POST", "/mcp", "Authorization", "Bearer bogus-token"); status != fiber.StatusUnauthorized {
+		t.Errorf("POST /mcp = %d, want 401 with an invalid token", status)
+	}
+
 	// The avatar route (docs/API.md §2.3) is public: without a token the
 	// request must get past the JWT gate and reach the handler chain.
 	if status := request("GET", "/users/0b7f9c7e-1111-4222-8333-444455556666/avatar"); status == fiber.StatusBadRequest || status == fiber.StatusUnauthorized {

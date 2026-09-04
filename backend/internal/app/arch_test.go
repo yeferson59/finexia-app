@@ -21,7 +21,7 @@ const modulePath = "github.com/yeferson59/finexia-app/internal/"
 var domainSegments = map[string]bool{
 	"app": true, "auth": true, "user": true, "portfolio": true,
 	"market": true, "marketing": true, "notification": true,
-	"scheduler": true, "health": true, "routes": true,
+	"mcp": true, "scheduler": true, "health": true, "routes": true,
 	"handlers": true, "services": true, "repositories": true,
 	"entities": true, "dtos": true, "middlewares": true,
 }
@@ -113,7 +113,7 @@ func TestIdentityStaysALeaf(t *testing.T) {
 func TestModulesOwnTheirConfig(t *testing.T) {
 	for _, dir := range []string{
 		"auth", "user", "portfolio", "market", "marketing",
-		"notification", "scheduler", "health",
+		"notification", "mcp", "scheduler", "health",
 	} {
 		for file, imports := range internalImports(t, dir) {
 			for _, imp := range imports {
@@ -153,7 +153,7 @@ func TestServiceFirstModulesStayIndependent(t *testing.T) {
 func TestNothingImportsCompositionRoot(t *testing.T) {
 	for _, dir := range []string{
 		"auth", "user", "portfolio", "market", "marketing",
-		"notification", "scheduler", "health", "platform", "identity",
+		"notification", "mcp", "scheduler", "health", "platform", "identity",
 	} {
 		for file, imports := range internalImports(t, dir) {
 			for _, imp := range imports {
@@ -219,7 +219,7 @@ func serviceAccessorCalls(t *testing.T, dir string) map[string][]string {
 func TestOnlyAppCallsServiceAccessors(t *testing.T) {
 	for _, dir := range []string{
 		"auth", "user", "portfolio", "market", "marketing",
-		"notification", "scheduler", "health", "platform", "identity",
+		"notification", "mcp", "scheduler", "health", "platform", "identity",
 	} {
 		for file, calls := range serviceAccessorCalls(t, dir) {
 			for _, pos := range calls {

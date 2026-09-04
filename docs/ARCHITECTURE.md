@@ -40,6 +40,8 @@ backend/
     ├── market/                  # catálogo de assets, exchange rates, claves BYO-key y sync por usuario
     ├── marketing/               # waitlist
     ├── notification/            # resumen semanal por email
+    ├── mcp/                     # servidor Model Context Protocol: reexpone las
+    │                            # lecturas de portfolio y market como tools
     │
     ├── scheduler/               # runner genérico Job/Scheduler.Register
     ├── health/                  # health check
@@ -115,11 +117,14 @@ graph TD
         notification --> user
         notification --> market
         notification --> portfolio
+        mcp --> portfolio
+        mcp --> market
 
         user -. guards .-> auth
         marketing -. guards .-> auth
         portfolio -. guards .-> auth
         market -. guards .-> auth
+        mcp -. guards .-> auth
         market -. holdings .-> portfolio
     end
     identity[identity<br/>tipos compartidos]
@@ -131,6 +136,7 @@ graph TD
     app --> market
     app --> marketing
     app --> notification
+    app --> mcp
     app --> scheduler
 
     auth --> identity
@@ -318,6 +324,50 @@ que el import de transacciones escriba la pertenencia: crea activos desde antes
 de todo esto, y sin ella el ticker importado quedaría en la cartera del usuario
 pero ausente del buscador con el que añade el siguiente.
 
+### Servidor MCP
+
+`internal/mcp` expone las lecturas de `portfolio` y `market` como *tools* del
+Model Context Protocol, en `POST /mcp`, con el mismo bearer token que el resto
+de la API. **Es transporte, no dominio**: no toca la base de datos ni decide
+qué significa un número — cada tool responde con un caso de uso que ya existe,
+leído por las interfaces `PortfolioReader` y `MarketReader` que el propio
+módulo declara. Una tool que necesitara consultar o calcular algo sería la
+señal de que ese caso de uso pertenece al módulo dueño del dato.
+
+Tres decisiones no son de estilo:
+
+**Toda la superficie es de solo lectura.** Al otro lado hay un modelo eligiendo
+solo qué tool llamar: el daño de una lectura equivocada es una respuesta
+equivocada, el de una escritura equivocada es un coste medio corrupto. Añadir
+una tool de escritura es una función más en `tools_*.go` y `ReadOnlyHint: false`
+— lo que está deliberadamente aplazado es la decisión, no el cableado.
+
+**El servidor MCP se construye por request, no por proceso.** Las tools se
+cierran sobre el `caller` autenticado, de modo que no existe argumento con el
+que pedir la cartera de otro usuario: el aislamiento es estructural en vez de
+una comprobación que se pueda olvidar. El coste —inferir los schemas JSON por
+reflexión en cada llamada— lo elimina un `SchemaCache` compartido.
+
+**El transporte va en modo `Stateless` + `JSONResponse`.** No es una limitación
+del adaptador: fasthttp respeta `Flush` desde la v1.73, así que un
+`text/event-stream` sí atraviesa Fiber (comprobado). Son dos decisiones.
+`Stateless` significa que no se guarda sesión en memoria entre peticiones, de
+modo que una segunda réplica detrás del proxy responde la siguiente llamada de
+un cliente igual de bien que la primera, sin *sticky routing* y sin nada que
+perder en un despliegue; es además hacia donde va la especificación (SEP-2567).
+A cambio, el servidor no puede iniciar peticiones propias —no hay canal abierto
+donde contestarlas— y `GET`/`DELETE` responden 405. `JSONResponse` se sigue de
+eso: sin tráfico servidor→cliente que intercalar, el stream de un `POST`
+llevaría exactamente un mensaje, es decir un cuerpo JSON envuelto en marcado
+SSE. Lo único que esto renuncia son las *progress notifications* durante una
+tool larga —sobreviven al modo stateless, pero solo sobre event stream—, y
+bastaría con quitar `JSONResponse` si alguna tool llegara a durar lo bastante.
+
+La identidad sí cruza una frontera real: el handler MCP es `net/http` y nunca ve
+un `fiber.Ctx`, así que no puede llamar a `httpx.Identity`. `bindCaller` copia
+lo que el middleware de `auth` dejó en los locals al `c.Context()`, y
+`adaptor.HTTPHandlerWithContext` lo transporta hasta el otro lado.
+
 ## 4. Blindaje automatizado
 
 Las reglas 1, 2 y 5 se verifican en CI mediante un **arch-test**
@@ -369,7 +419,8 @@ dos minutos después de la apertura registraría los valores de ayer.
 ## 6. Cobertura de tests
 
 Medición tras el cierre de los cabos sueltos de BYO-key
-(`go test ./... -coverprofile`), **total 55.8%** (línea base de Fase 0: 42.6%,
+(`go test ./... -coverprofile`), **total 55.8%** — la fila de `mcp` se midió
+aparte, al añadirse el módulo, y no está incluida en ese total — (línea base de Fase 0: 42.6%,
 sobre un layout distinto en el que `repositories/`, `routes/` y `scheduler/`
 eran paquetes separados al 0%):
 
@@ -380,6 +431,7 @@ eran paquetes separados al 0%):
 | `platform/secretbox` | 86.0% | cifrado de sobre, AAD y rotación de KEK |
 | `notification` | 80.0% | servicio puro, bien cubierto |
 | `platform/spreadsheet` | 72.4% | parser de importación compartido |
+| `mcp` | 68.5% | tools, mapeo a DTOs y aislamiento por usuario, extremo a extremo sobre el router |
 | `portfolio` | 63.6% | servicio + handlers HTTP; `postgres.go` sin tests unitarios |
 | `app` | 62.9% | cableado y registro de rutas/jobs |
 | `market` | 53.2% | catálogo, exchange rates, sync y credenciales BYO-key |

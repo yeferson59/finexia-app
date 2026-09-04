@@ -798,6 +798,56 @@ espacia sus llamadas para no agotar la cuota personal (13 s entre peticiones a
 Alpha Vantage), así que una cartera grande no cabe en una petición HTTP. El
 resto lo recoge el job diario.
 
+### 2.11 MCP — Model Context Protocol (JWT)
+
+| Método | Path | Descripción |
+|---|---|---|
+| POST | `/mcp` | Endpoint JSON-RPC del servidor MCP |
+| GET/DELETE | `/mcp` | 405 (el transporte va en modo *stateless*) |
+
+**No sigue el sobre de §1.1**: es la única ruta de la API que no lo hace,
+porque el cuerpo es JSON-RPC 2.0, que trae su propio sobre (`result` / `error`)
+y lo define el protocolo. El resto de convenciones sí aplican: mismo bearer
+token que todo lo demás, mismo limitador por usuario y un 401 —ese sí, en el
+sobre normal— cuando el token falta o no vale.
+
+La petición necesita `Content-Type: application/json` y un `Accept` que ofrezca
+`application/json` **y** `text/event-stream`, aunque la respuesta siempre sea
+JSON: lo exige la especificación del transporte *streamable HTTP*.
+
+Las *tools* son todas de solo lectura y responden siempre con los datos de
+**quien llama** — el id de usuario sale de los locals de autenticación y no hay
+argumento con el que nombrar a otro:
+
+| Tool | Devuelve |
+|---|---|
+| `list_portfolios` | Carteras con coste, valor de mercado y resultado |
+| `get_holdings` | Posiciones consolidadas por activo, sumadas entre carteras |
+| `get_allocation` | Reparto por categoría de activo, todo en una moneda |
+| `list_recent_transactions` | Últimas transacciones (`limit`, máx. 200) |
+| `get_portfolio_growth` | Serie de valor desde los snapshots (`period`: `1M`/`3M`/`6M`/`1Y`) |
+| `list_platforms` | Plataformas con lo que se tiene en cada una |
+| `search_assets` | Catálogo de activos (`query`, `limit`, máx. 100) |
+| `list_exchange_rates` | Tasas compartidas más recientes |
+
+Las que aceptan `currency` toman un ISO 4217 de la lista de §2.9; omitirlo
+reporta en la moneda preferida de la cuenta. Un código no soportado vuelve como
+*tool error* —no como error de protocolo— con la lista de los aceptados.
+
+Configuración de un cliente MCP:
+
+```json
+{
+  "mcpServers": {
+    "finexia": {
+      "type": "http",
+      "url": "https://finexia.me/mcp",
+      "headers": { "Authorization": "Bearer <access token>" }
+    }
+  }
+}
+```
+
 ---
 
 ## 3. Reglas de no-regresión
