@@ -132,6 +132,16 @@ function refreshSetCookie(account) {
 	return `refresh_token=${account.refreshToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000`;
 }
 
+/**
+ * Tokens MCP creados durante la sesión del stub.
+ *
+ * Es el único estado mutable que guarda: el flujo que prueba la suite —crear un
+ * token y verlo en la lista— no se puede montar con una fixture fija, porque lo
+ * que hay que comprobar es justo que aparezca lo que se acaba de crear. El
+ * proceso se levanta por corrida de Playwright, así que se vacía solo.
+ */
+const mcpTokens = [];
+
 const server = createServer(async (req, res) => {
 	const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
 	if (!url.pathname.startsWith(API_PREFIX)) {
@@ -193,6 +203,60 @@ const server = createServer(async (req, res) => {
 	}
 	if (route === 'GET /auth/2fa') {
 		return send(res, 200, envelope({ enabled: false, pendingSetup: false, recoveryCodesLeft: 0 }));
+	}
+
+	// ---- Tokens MCP ----
+	//
+	// El stub los guarda en memoria porque el flujo que interesa probar es de
+	// dos pasos: crear un token y verlo aparecer en la lista. El secreto se
+	// devuelve solo aquí, igual que en el backend real.
+	if (route === 'GET /auth/mcp-tokens') {
+		return send(res, 200, envelope(mcpTokens));
+	}
+	if (route === 'POST /auth/mcp-tokens') {
+		const body = JSON.parse((await readBody(req)).toString() || '{}');
+
+		if (mcpTokens.some((t) => t.name.toLowerCase() === String(body.name ?? '').toLowerCase())) {
+			return send(res, 409, errorEnvelope('you already have a token with that name'));
+		}
+
+		const created = {
+			id: `mcp-${mcpTokens.length + 1}`,
+			name: body.name,
+			last4: 'a3f9',
+			expiresAt: body.expiresInDays === 0 ? null : FUTURE,
+			lastUsedAt: null,
+			rotatedAt: null,
+			createdAt: NOW,
+			expired: false
+		};
+		mcpTokens.push(created);
+
+		return send(
+			res,
+			201,
+			envelope({ ...created, token: 'fnx_mcp_e2e-secreto' }, 'MCP token created')
+		);
+	}
+	if (path.startsWith('/auth/mcp-tokens/') && path.endsWith('/rotate') && req.method === 'POST') {
+		await readBody(req);
+		const id = path.slice('/auth/mcp-tokens/'.length, -'/rotate'.length);
+		const token = mcpTokens.find((t) => t.id === id);
+		if (!token) return send(res, 404, errorEnvelope('mcp token not found'));
+
+		token.rotatedAt = NOW;
+		token.lastUsedAt = null;
+
+		return send(res, 200, envelope({ ...token, token: 'fnx_mcp_e2e-rotado' }, 'MCP token rotated'));
+	}
+	if (path.startsWith('/auth/mcp-tokens/') && req.method === 'DELETE') {
+		const id = path.slice('/auth/mcp-tokens/'.length);
+		const index = mcpTokens.findIndex((t) => t.id === id);
+		if (index === -1) return send(res, 404, errorEnvelope('mcp token not found'));
+
+		mcpTokens.splice(index, 1);
+
+		return send(res, 200, envelope(null, 'MCP token deleted'));
 	}
 
 	// ---- Users ----

@@ -2,7 +2,8 @@
  * Feature `settings` — superficie pública.
  *
  * Las secciones de `routes/dashboard/settings`, una por tarjeta: perfil,
- * apariencia, seguridad (contraseña), 2FA, datos de mercado y sesiones activas.
+ * apariencia, seguridad (contraseña), 2FA, datos de mercado, tokens MCP y
+ * sesiones activas.
  * Todas leen el mismo `form` de la página y se quedan solo con el resultado de
  * sus propias acciones (ver `settings.ts`).
  *
@@ -15,6 +16,7 @@ export { default as AppearanceSection } from './components/appearance-section.sv
 export { default as PasswordSection } from './components/password-section.svelte';
 export { default as TwoFactorSection } from './components/two-factor-section.svelte';
 export { default as MarketCredentials } from './components/market-credentials.svelte';
+export { default as MCPTokensSection } from './components/mcp-tokens-section.svelte';
 export { default as SessionsSection } from './components/sessions-section.svelte';
 
 export * from './settings';

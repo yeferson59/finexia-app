@@ -342,9 +342,13 @@ func (a *App) buildModules() *modules {
 	mcpModule := mcp.New(mcp.Deps{
 		Portfolios: portfolioModule.Service(),
 		Assets:     marketService,
-		AuthMiddl:  authModule,
-		Limiter:    userLimiter,
-		Log:        a.deps.Log,
+		// MCPAuth, not the module itself: /mcp is reached by clients that are
+		// configured once and run unattended, so its guard also accepts the
+		// personal access tokens the settings screen mints, on top of the
+		// session's access token every other route takes.
+		AuthMiddl: authModule.MCPAuth(),
+		Limiter:   userLimiter,
+		Log:       a.deps.Log,
 	})
 
 	return new(modules{

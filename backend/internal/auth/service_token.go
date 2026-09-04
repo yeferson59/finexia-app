@@ -356,16 +356,24 @@ func (s *service) Logout(ctx context.Context, userID uuid.UUID, accessToken, raw
 // CleanupExpiredAuth prunes refresh tokens that can no longer be redeemed and
 // sessions that expired with no live refresh token left. Without this, both
 // tables grow unboundedly: rows are only ever deleted on explicit logout.
-func (s *service) CleanupExpiredAuth(ctx context.Context) (int64, int64, error) {
+func (s *service) CleanupExpiredAuth(ctx context.Context) (int64, int64, int64, error) {
 	refreshTokens, err := s.stores.RefreshTokens.DeleteExpiredRefreshTokens(ctx)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 
 	sessions, err := s.stores.Sessions.DeleteExpiredSessions(ctx)
 	if err != nil {
-		return 0, refreshTokens, err
+		return 0, refreshTokens, 0, err
 	}
 
-	return sessions, refreshTokens, nil
+	// Swept last and long after the fact: an expired MCP token stops
+	// authenticating the moment it expires, but it stays listed so the user
+	// finds out from the settings screen why their client stopped working.
+	mcpTokens, err := s.stores.MCPTokens.DeleteExpiredMCPTokens(ctx)
+	if err != nil {
+		return sessions, refreshTokens, 0, err
+	}
+
+	return sessions, refreshTokens, mcpTokens, nil
 }

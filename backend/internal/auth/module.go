@@ -49,6 +49,7 @@ func New(deps Deps) *Module {
 		Verifications:  pg,
 		PasswordResets: pg,
 		Invitations:    pg,
+		MCPTokens:      pg,
 		Waitlist:       deps.Waitlist,
 		Users:          deps.Users,
 	}, deps.Cfg, deps.Storage, deps.Mail, deps.Geo, deps.Log)
@@ -124,6 +125,14 @@ func (m *Module) Routes(router fiber.Router) {
 	auth.Post("/2fa/enable", m.handler.twoFactorEnable)
 	auth.Post("/2fa/disable", m.handler.twoFactorDisable)
 	auth.Post("/2fa/recovery-codes", m.handler.twoFactorRecoveryCodes)
+
+	// Personal access tokens for /mcp. The writes go through the per-user
+	// limiter for the same reason the password change does: they are the
+	// endpoints that mint and destroy credentials.
+	auth.Get("/mcp-tokens", m.handler.listMCPTokens)
+	auth.Post("/mcp-tokens", m.limiter, m.handler.createMCPToken)
+	auth.Post("/mcp-tokens/:id/rotate", m.limiter, m.handler.rotateMCPToken)
+	auth.Delete("/mcp-tokens/:id", m.limiter, m.handler.deleteMCPToken)
 
 	auth.Get("/session", m.handler.getSession)
 	auth.Get("/sessions", m.handler.listSessions)

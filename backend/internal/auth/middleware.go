@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"strings"
+
 	jwtware "github.com/gofiber/contrib/v3/jwt"
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
@@ -49,4 +51,73 @@ func (m *Module) RequireAuth() fiber.Handler {
 			return c.Next()
 		},
 	})
+}
+
+// RequireMCPAuth gates /mcp, which is reached by two kinds of caller: a browser
+// carrying the session's access token, and an MCP client carrying one of the
+// personal access tokens the settings screen mints.
+//
+// The credential is chosen by prefix rather than by trying both. A token that
+// says fnx_mcp_ is answered by the store that owns those, and a JWT by the
+// existing guard, so a rejected request fails against the scheme it actually
+// claimed — otherwise every bad MCP token would be reported as a bad JWT, and
+// the logs would name the wrong subsystem for every one of them.
+//
+// Both paths leave the same three locals behind, which is what lets everything
+// downstream — bindCaller, the rate limiter, httpx.Identity — stay unaware that
+// there is more than one way to authenticate here.
+func (m *Module) RequireMCPAuth() fiber.Handler {
+	jwtGuard := m.RequireAuth()
+
+	return func(c fiber.Ctx) error {
+		raw := bearerToken(c)
+		if !looksLikeMCPToken(raw) {
+			return jwtGuard(c)
+		}
+
+		userID, role, err := m.service.AuthenticateMCPToken(c, raw)
+		if err != nil {
+			// Deliberately one answer for every failure: unknown, expired,
+			// revoked and belonging-to-a-banned-account are the same 401, so
+			// the response cannot be used to tell live tokens from dead ones.
+			return httpx.Unauthorized(c, "Invalid MCP token", "the token is unknown, expired or was revoked")
+		}
+
+		c.Locals(httpx.LocalUserID, userID.String())
+		c.Locals(httpx.LocalToken, raw)
+		c.Locals(httpx.LocalRole, role)
+
+		return c.Next()
+	}
+}
+
+// MCPGuard adapts this module to the one-method guard dependency the mcp module
+// declares, substituting RequireMCPAuth for RequireAuth.
+//
+// It exists so mcp keeps depending on "something that guards a route" and
+// nothing else: which credentials satisfy that guard is an auth decision, and
+// this is where it stays.
+type MCPGuard struct{ module *Module }
+
+// MCPAuth returns the guard the composition root passes to the mcp module.
+func (m *Module) MCPAuth() MCPGuard {
+	return MCPGuard{module: m}
+}
+
+func (g MCPGuard) RequireAuth() fiber.Handler {
+	return g.module.RequireMCPAuth()
+}
+
+// bearerToken returns the credential presented in the Authorization header,
+// stripped of its scheme. An absent or non-Bearer header yields "", which no
+// prefix check will claim.
+func bearerToken(c fiber.Ctx) string {
+	const scheme = "Bearer "
+
+	header := c.Get(fiber.HeaderAuthorization)
+	if len(header) <= len(scheme) || !strings.EqualFold(header[:len(scheme)], scheme) {
+		return ""
+	}
+
+	return strings.TrimSpace(header[len(scheme):])
 }

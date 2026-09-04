@@ -29,6 +29,8 @@ import type {
 	marketProviderSchema,
 	marketRateSchema,
 	marketSyncResultSchema,
+	mcpTokenSchema,
+	mcpTokenSecretSchema,
 	pageMetaSchema,
 	pagedTransactionsSchema,
 	platformSchema,
@@ -165,6 +167,12 @@ export type ActiveSession = z.infer<typeof activeSessionSchema>;
 
 /** Estado de la verificación en dos pasos (`GET /auth/2fa`). */
 export type TwoFactorStatus = z.infer<typeof twoFactorStatusSchema>;
+
+/** Token personal del endpoint MCP (`GET /auth/mcp-tokens`). */
+export type MCPToken = z.infer<typeof mcpTokenSchema>;
+
+/** Token recién creado o rotado: el único que lleva el secreto. */
+export type MCPTokenSecret = z.infer<typeof mcpTokenSecretSchema>;
 
 /** Proveedor de datos de mercado para el que se puede aportar una clave. */
 export type MarketProvider = z.infer<typeof marketProviderSchema>;

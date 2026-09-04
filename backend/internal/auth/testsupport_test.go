@@ -68,6 +68,15 @@ type fakeRepository struct {
 	revokeInvitation    func(ctx context.Context, id uuid.UUID) error
 	acceptInvitation    func(ctx context.Context, invitationID uuid.UUID, name, email, role, passwordHash string) (identity.User, error)
 
+	createMCPToken         func(ctx context.Context, userID uuid.UUID, name, tokenHash, last4 string, expiresAt *time.Time) (MCPToken, error)
+	listMCPTokens          func(ctx context.Context, userID uuid.UUID) ([]MCPToken, error)
+	countMCPTokens         func(ctx context.Context, userID uuid.UUID) (int, error)
+	getMCPTokenByHash      func(ctx context.Context, tokenHash string) (mcpTokenIdentity, error)
+	rotateMCPToken         func(ctx context.Context, userID, id uuid.UUID, tokenHash, last4 string, expiresAt *time.Time) (MCPToken, error)
+	deleteMCPToken         func(ctx context.Context, userID, id uuid.UUID) error
+	touchMCPToken          func(ctx context.Context, id uuid.UUID) error
+	deleteExpiredMCPTokens func(ctx context.Context) (int64, error)
+
 	listWaitlist       func(ctx context.Context, offset, limit uint) ([]marketing.Waitlist, uint, error)
 	setWaitlistInvited func(ctx context.Context, email string) error
 }
@@ -80,6 +89,7 @@ var (
 	_ VerificationStore  = (*fakeRepository)(nil)
 	_ PasswordResetStore = (*fakeRepository)(nil)
 	_ InvitationStore    = (*fakeRepository)(nil)
+	_ MCPTokenStore      = (*fakeRepository)(nil)
 	_ WaitlistStore      = (*fakeRepository)(nil)
 	_ UserReader         = (*fakeRepository)(nil)
 )
@@ -97,9 +107,42 @@ func testStores(f *fakeRepository) Stores {
 		Verifications:  f,
 		PasswordResets: f,
 		Invitations:    f,
+		MCPTokens:      f,
 		Waitlist:       f,
 		Users:          f,
 	}
+}
+
+func (f *fakeRepository) CreateMCPToken(ctx context.Context, userID uuid.UUID, name, tokenHash, last4 string, expiresAt *time.Time) (MCPToken, error) {
+	return f.createMCPToken(ctx, userID, name, tokenHash, last4, expiresAt)
+}
+
+func (f *fakeRepository) ListMCPTokens(ctx context.Context, userID uuid.UUID) ([]MCPToken, error) {
+	return f.listMCPTokens(ctx, userID)
+}
+
+func (f *fakeRepository) CountMCPTokens(ctx context.Context, userID uuid.UUID) (int, error) {
+	return f.countMCPTokens(ctx, userID)
+}
+
+func (f *fakeRepository) GetMCPTokenByHash(ctx context.Context, tokenHash string) (mcpTokenIdentity, error) {
+	return f.getMCPTokenByHash(ctx, tokenHash)
+}
+
+func (f *fakeRepository) RotateMCPToken(ctx context.Context, userID, id uuid.UUID, tokenHash, last4 string, expiresAt *time.Time) (MCPToken, error) {
+	return f.rotateMCPToken(ctx, userID, id, tokenHash, last4, expiresAt)
+}
+
+func (f *fakeRepository) DeleteMCPToken(ctx context.Context, userID, id uuid.UUID) error {
+	return f.deleteMCPToken(ctx, userID, id)
+}
+
+func (f *fakeRepository) TouchMCPToken(ctx context.Context, id uuid.UUID) error {
+	return f.touchMCPToken(ctx, id)
+}
+
+func (f *fakeRepository) DeleteExpiredMCPTokens(ctx context.Context) (int64, error) {
+	return f.deleteExpiredMCPTokens(ctx)
 }
 
 func (f *fakeRepository) GetAccountByEmail(ctx context.Context, email string) (identity.User, error) {

@@ -7,6 +7,8 @@ import { apiRequest, apiRequestSafe, type ApiEvent, type ApiResult } from './cli
 import type {
 	ActiveSession,
 	InvitationItem,
+	MCPToken,
+	MCPTokenSecret,
 	Paginated,
 	TwoFactorStatus,
 	UserItem,
@@ -16,6 +18,8 @@ import type {
 import {
 	activeSessionSchema,
 	invitationItemSchema,
+	mcpTokenSchema,
+	mcpTokenSecretSchema,
 	paginatedSchema,
 	twoFactorStatusSchema,
 	userItemSchema,
@@ -235,4 +239,55 @@ export function regenerateRecoveryCodes(
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(body)
 	});
+}
+
+// --- Tokens del endpoint MCP ---------------------------------------------
+//
+// El secreto solo viaja en la respuesta de crear y de rotar. Ninguna de estas
+// funciones lo guarda en ningún sitio: se lo devuelve a la action, que lo pone
+// una vez en el `form` de la página y ahí acaba su vida.
+
+/** `GET /auth/mcp-tokens` — tokens del usuario, sin secreto. */
+export function getMCPTokens(event: ApiEvent): Promise<ApiResult<MCPToken[]>> {
+	return apiRequestSafe(event, '/auth/mcp-tokens', {}, z.array(mcpTokenSchema));
+}
+
+/** `POST /auth/mcp-tokens` — crea uno y devuelve su secreto, una sola vez. */
+export function createMCPToken(
+	event: ApiEvent,
+	body: { name: string; expiresInDays: number }
+): Promise<ApiResult<MCPTokenSecret>> {
+	return apiRequest<MCPTokenSecret>(
+		event,
+		'/auth/mcp-tokens',
+		{
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body)
+		},
+		mcpTokenSecretSchema
+	);
+}
+
+/** `POST /auth/mcp-tokens/:id/rotate` — reemplaza el secreto del token. */
+export function rotateMCPToken(
+	event: ApiEvent,
+	id: string,
+	body: { expiresInDays: number }
+): Promise<ApiResult<MCPTokenSecret>> {
+	return apiRequest<MCPTokenSecret>(
+		event,
+		`/auth/mcp-tokens/${id}/rotate`,
+		{
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body)
+		},
+		mcpTokenSecretSchema
+	);
+}
+
+/** `DELETE /auth/mcp-tokens/:id` — revoca el token. */
+export function deleteMCPToken(event: ApiEvent, id: string): Promise<ApiResult<unknown>> {
+	return apiRequest<unknown>(event, `/auth/mcp-tokens/${id}`, { method: 'DELETE' });
 }

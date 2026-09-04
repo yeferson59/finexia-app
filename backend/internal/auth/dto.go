@@ -156,3 +156,37 @@ type TwoFactorSetupResponseDTO struct {
 type TwoFactorEnableResponseDTO struct {
 	RecoveryCodes []string `json:"recoveryCodes"`
 }
+
+// CreateMCPTokenRequestDTO mints a personal access token for the MCP endpoint.
+//
+// ExpiresInDays is a pointer because three cases have to stay distinct and two
+// of them are spelled with the same zero: absent means "the default lifetime",
+// an explicit 0 means "no expiry", and any other value is that many days.
+type CreateMCPTokenRequestDTO struct {
+	Name          string `json:"name"          validate:"required,max=60"`
+	ExpiresInDays *int   `json:"expiresInDays" validate:"omitempty,min=0,max=365"`
+}
+
+// RotateMCPTokenRequestDTO replaces a token's secret. Its only field is the
+// new lifetime, with the same three cases as creation.
+type RotateMCPTokenRequestDTO struct {
+	ExpiresInDays *int `json:"expiresInDays" validate:"omitempty,min=0,max=365"`
+}
+
+// expiryDays resolves the absent case to the default, so the service is given
+// one number and no optionality to re-interpret.
+func (d CreateMCPTokenRequestDTO) expiryDays() int {
+	return mcpExpiryDays(d.ExpiresInDays)
+}
+
+func (d RotateMCPTokenRequestDTO) expiryDays() int {
+	return mcpExpiryDays(d.ExpiresInDays)
+}
+
+func mcpExpiryDays(days *int) int {
+	if days == nil {
+		return DefaultMCPTokenExpiryDays
+	}
+
+	return *days
+}

@@ -3,6 +3,7 @@
 	import {
 		AppearanceSection,
 		MarketCredentials,
+		MCPTokensSection,
 		PasswordSection,
 		ProfileSection,
 		SessionsSection,
@@ -30,6 +31,7 @@
 	<PasswordSection {form} />
 	<TwoFactorSection twoFactor={data.twoFactor} {form} />
 	<MarketCredentials credentials={data.marketCredentials} {form} />
+	<MCPTokensSection tokens={data.mcpTokens} mcpUrl={data.mcpUrl} {form} />
 	<SessionsSection sessions={data.sessions} {form} />
 </div>
 

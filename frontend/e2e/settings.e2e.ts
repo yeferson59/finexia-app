@@ -24,4 +24,26 @@ test.describe('settings', () => {
 			page.getByRole('heading', { name: 'Verificación en dos pasos (2FA)' })
 		).toBeVisible();
 	});
+
+	test('creates an MCP token, shows the secret once and lists it', async ({ page }) => {
+		await login(page);
+		await page.goto('/dashboard/settings');
+
+		await expect(page.getByRole('heading', { name: 'Acceso para asistentes (MCP)' })).toBeVisible();
+
+		await page.locator('form[action="?/createMcpToken"] input[name="name"]').fill('Claude Desktop');
+		await page.getByRole('button', { name: 'Crear token' }).click();
+
+		// El secreto se muestra una sola vez, aquí: no hay endpoint que lo repita.
+		// `exact` porque también aparece dentro del ejemplo de configuración, que
+		// es el mismo token en otro contexto y no otra aparición que comprobar.
+		await expect(page.getByText('fnx_mcp_e2e-secreto', { exact: true })).toBeVisible();
+
+		// Y el token queda en la lista, ya sin secreto.
+		await expect(page.getByText('····a3f9')).toBeVisible();
+
+		await page.reload();
+		await expect(page.getByText('fnx_mcp_e2e-secreto', { exact: true })).toBeHidden();
+		await expect(page.getByText('····a3f9')).toBeVisible();
+	});
 });

@@ -102,6 +102,52 @@ describe('user module', () => {
 		expect(init.method).toBe('PATCH');
 		expect(init.body).toBe(JSON.stringify({ ban: true }));
 	});
+
+	it('createMCPToken POSTs the name and the lifetime to /auth/mcp-tokens', async () => {
+		const { event, fetch } = authedEvent(
+			jsonResponse({ success: true, data: { id: 't1', token: 'fnx_mcp_x' } })
+		);
+
+		const res = await user.createMCPToken(event, { name: 'Claude Desktop', expiresInDays: 90 });
+
+		const [url, init] = lastCall(fetch);
+		expect(url).toContain('/auth/mcp-tokens');
+		expect(init.method).toBe('POST');
+		expect(init.body).toBe(JSON.stringify({ name: 'Claude Desktop', expiresInDays: 90 }));
+		// El secreto solo llega aquí: es la respuesta de crear, y nada lo guarda.
+		expect((res.data as { token: string } | null)?.token).toBe('fnx_mcp_x');
+	});
+
+	it('rotateMCPToken POSTs to /auth/mcp-tokens/:id/rotate', async () => {
+		const { event, fetch } = authedEvent(jsonResponse({ success: true, data: {} }));
+
+		await user.rotateMCPToken(event, 't1', { expiresInDays: 0 });
+
+		const [url, init] = lastCall(fetch);
+		expect(url).toContain('/auth/mcp-tokens/t1/rotate');
+		expect(init.method).toBe('POST');
+		expect(init.body).toBe(JSON.stringify({ expiresInDays: 0 }));
+	});
+
+	it('deleteMCPToken sends a DELETE to /auth/mcp-tokens/:id', async () => {
+		const { event, fetch } = authedEvent(jsonResponse({ success: true }));
+
+		await user.deleteMCPToken(event, 't1');
+
+		const [url, init] = lastCall(fetch);
+		expect(url).toContain('/auth/mcp-tokens/t1');
+		expect(init.method).toBe('DELETE');
+	});
+
+	it('getMCPTokens reads /auth/mcp-tokens with the Bearer header', async () => {
+		const { event, fetch } = authedEvent(jsonResponse({ success: true, data: [] }));
+
+		await user.getMCPTokens(event);
+
+		const [url, init] = lastCall(fetch);
+		expect(url).toContain('/auth/mcp-tokens');
+		expect((init.headers as Record<string, string>).Authorization).toBe('Bearer access-1');
+	});
 });
 
 describe('auth module (public)', () => {

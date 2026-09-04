@@ -2,7 +2,8 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import * as user from '$lib/api/user';
 import * as market from '$lib/api/market';
-import type { ActiveSession, MarketCredential, TwoFactorStatus } from '$lib/api/types';
+import { env } from '$env/dynamic/private';
+import type { ActiveSession, MarketCredential, MCPToken, TwoFactorStatus } from '$lib/api/types';
 import {
 	ALLOWED_AVATAR_TYPES,
 	MAX_AVATAR_BYTES,
@@ -10,6 +11,10 @@ import {
 	enableTwoFactorSchema,
 	marketKeySchema,
 	marketProviderSchema,
+	mcpTokenError,
+	mcpTokenExpirySchema,
+	mcpTokenIdSchema,
+	mcpTokenNameSchema,
 	profileSchema,
 	sessionIdSchema,
 	setupTwoFactorSchema,
@@ -25,18 +30,32 @@ export const load: PageServerLoad = async ({ locals, fetch, cookies }) => {
 	let twoFactor: TwoFactorStatus = { enabled: false, pendingSetup: false, recoveryCodesLeft: 0 };
 	// Nunca contiene la clave: solo proveedor, last4 y estado.
 	let marketCredentials: MarketCredential[] = [];
+	// Tampoco contiene el secreto: solo nombre, last4 y fechas.
+	let mcpTokens: MCPToken[] = [];
 
-	const [sessionsRes, twoFactorRes, credentialsRes] = await Promise.all([
+	const [sessionsRes, twoFactorRes, credentialsRes, mcpTokensRes] = await Promise.all([
 		user.getSessions(event),
 		user.getTwoFactorStatus(event),
-		market.getMarketCredentials(event)
+		market.getMarketCredentials(event),
+		user.getMCPTokens(event)
 	]);
 
 	if (sessionsRes.ok) sessions = sessionsRes.data ?? [];
 	if (twoFactorRes.ok && twoFactorRes.data) twoFactor = twoFactorRes.data;
 	if (credentialsRes.ok) marketCredentials = credentialsRes.data ?? [];
+	if (mcpTokensRes.ok) mcpTokens = mcpTokensRes.data ?? [];
 
-	return { user: locals.user, sessions, twoFactor, marketCredentials };
+	return {
+		user: locals.user,
+		sessions,
+		twoFactor,
+		marketCredentials,
+		mcpTokens,
+		// El cliente MCP habla con el backend directamente, no con esta app, así
+		// que la URL que hay que pegar en su configuración es la del API. Se
+		// resuelve aquí porque BASE_API es privada y no llega al navegador.
+		mcpUrl: `${env.BASE_API}/mcp`
+	};
 };
 
 export const actions = {
@@ -377,6 +396,70 @@ export const actions = {
 			marketSyncCount: res.data?.prices?.length ?? 0,
 			marketSyncRateCount: res.data?.rates?.length ?? 0
 		};
+	},
+
+	// --- Tokens MCP --------------------------------------------------------
+	//
+	// El secreto solo existe en la respuesta de crear y de rotar: acaba en el
+	// `form` de la página, que lo muestra una vez, y en ningún otro sitio.
+
+	createMcpToken: async ({ request, fetch, cookies }) => {
+		const action = 'createMcpToken';
+		const formData = await request.formData();
+
+		const name = mcpTokenNameSchema.safeParse(formData.get('name'));
+		if (!name.success) return fail(400, { action, error: name.error.issues[0].message });
+
+		const days = mcpTokenExpirySchema.safeParse(formData.get('expiresInDays'));
+		if (!days.success) return fail(400, { action, error: days.error.issues[0].message });
+
+		const res = await user.createMCPToken(
+			{ cookies, fetch },
+			{ name: name.data, expiresInDays: days.data }
+		);
+
+		if (!res.ok) {
+			return fail(res.status, { action, error: mcpTokenError(action, res.status, res.details) });
+		}
+
+		return { action, success: true, mcpToken: res.data };
+	},
+
+	rotateMcpToken: async ({ request, fetch, cookies }) => {
+		const action = 'rotateMcpToken';
+		const formData = await request.formData();
+
+		const tokenId = mcpTokenIdSchema.safeParse(formData.get('tokenId'));
+		if (!tokenId.success) return fail(400, { action, error: 'Token no válido' });
+
+		const days = mcpTokenExpirySchema.safeParse(formData.get('expiresInDays'));
+		if (!days.success) return fail(400, { action, error: days.error.issues[0].message });
+
+		const res = await user.rotateMCPToken({ cookies, fetch }, tokenId.data, {
+			expiresInDays: days.data
+		});
+
+		if (!res.ok) {
+			return fail(res.status, { action, error: mcpTokenError(action, res.status, res.details) });
+		}
+
+		return { action, success: true, mcpToken: res.data };
+	},
+
+	deleteMcpToken: async ({ request, fetch, cookies }) => {
+		const action = 'deleteMcpToken';
+		const formData = await request.formData();
+
+		const tokenId = mcpTokenIdSchema.safeParse(formData.get('tokenId'));
+		if (!tokenId.success) return fail(400, { action, error: 'Token no válido' });
+
+		const res = await user.deleteMCPToken({ cookies, fetch }, tokenId.data);
+
+		if (!res.ok) {
+			return fail(res.status, { action, error: mcpTokenError(action, res.status, res.details) });
+		}
+
+		return { action, success: true };
 	},
 
 	revokeOtherSessions: async ({ fetch, cookies }) => {

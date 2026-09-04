@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
 	countOtherSessions,
 	describeDevice,
+	formatMCPTokenDate,
 	formatSessionDate,
+	issuedMCPToken,
 	issuedRecoveryCodes
 } from './settings';
-import { profileSchema } from './schemas';
+import { mcpTokenExpirySchema, mcpTokenNameSchema, profileSchema } from './schemas';
 import type { ActiveSession } from '$lib/api/types';
 
 describe('issuedRecoveryCodes', () => {
@@ -101,5 +103,59 @@ describe('profileSchema', () => {
 		const parsed = parse('ARS');
 		expect(parsed.success).toBe(false);
 		expect(parsed.success === false && parsed.error.issues[0].message).toContain('USD');
+	});
+});
+
+describe('issuedMCPToken', () => {
+	const token = {
+		id: 't1',
+		name: 'Claude Desktop',
+		last4: 'a3f9',
+		expiresAt: null,
+		lastUsedAt: null,
+		rotatedAt: null,
+		createdAt: '2026-03-01T10:00:00Z',
+		expired: false,
+		token: 'fnx_mcp_secreto'
+	};
+
+	it('lo recoge tanto al crear como al rotar', () => {
+		expect(issuedMCPToken({ action: 'createMcpToken', success: true, mcpToken: token })).toEqual(
+			token
+		);
+		expect(issuedMCPToken({ action: 'rotateMcpToken', success: true, mcpToken: token })).toEqual(
+			token
+		);
+	});
+
+	it('no lo muestra en otras acciones ni en un intento fallido', () => {
+		expect(issuedMCPToken({ action: 'deleteMcpToken', success: true })).toBeNull();
+		expect(issuedMCPToken({ action: 'createMcpToken', error: 'Ya tienes un token' })).toBeNull();
+		expect(issuedMCPToken(null)).toBeNull();
+	});
+});
+
+describe('formatMCPTokenDate', () => {
+	it('devuelve — cuando no hay fecha: un token sin usar y uno sin caducidad', () => {
+		expect(formatMCPTokenDate(null)).toBe('—');
+	});
+
+	it('formatea una fecha real', () => {
+		expect(formatMCPTokenDate('2026-03-01T10:00:00Z')).not.toBe('—');
+	});
+});
+
+describe('schemas de tokens MCP', () => {
+	it('exige un nombre y recorta los espacios', () => {
+		expect(mcpTokenNameSchema.safeParse('   ').success).toBe(false);
+		expect(mcpTokenNameSchema.parse('  Claude Desktop  ')).toBe('Claude Desktop');
+		expect(mcpTokenNameSchema.safeParse('x'.repeat(61)).success).toBe(false);
+	});
+
+	it('acepta el 0 como «sin caducidad» y rechaza más de un año', () => {
+		expect(mcpTokenExpirySchema.parse('0')).toBe(0);
+		expect(mcpTokenExpirySchema.parse('90')).toBe(90);
+		expect(mcpTokenExpirySchema.safeParse('366').success).toBe(false);
+		expect(mcpTokenExpirySchema.safeParse('-1').success).toBe(false);
 	});
 });

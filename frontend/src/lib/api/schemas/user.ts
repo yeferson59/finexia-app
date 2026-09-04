@@ -68,6 +68,32 @@ export const twoFactorStatusSchema = z.object({
 	recoveryCodesLeft: z.number()
 });
 
+/**
+ * Token personal del endpoint MCP (`GET /auth/mcp-tokens`).
+ *
+ * No hay campo para el secreto, igual que en `marketCredentialSchema` y por el
+ * mismo motivo: el backend solo guarda su hash, así que un listado no puede
+ * devolverlo. `last4` es lo único que queda para reconocer cuál es cuál.
+ */
+export const mcpTokenSchema = z.object({
+	id: z.string(),
+	name: z.string(),
+	last4: z.string(),
+	expiresAt: z.string().nullable(),
+	lastUsedAt: z.string().nullable(),
+	rotatedAt: z.string().nullable(),
+	createdAt: z.string(),
+	expired: z.boolean()
+});
+
+/**
+ * Lo mismo, con el secreto: es la respuesta de crear y de rotar, las dos únicas
+ * veces que el token viaja en claro.
+ */
+export const mcpTokenSecretSchema = mcpTokenSchema.extend({
+	token: z.string()
+});
+
 /** Proveedor de datos de mercado para el que se puede aportar una clave. */
 export const marketProviderSchema = z.enum(['finnhub', 'alphavantage']);
 

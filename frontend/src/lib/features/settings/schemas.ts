@@ -83,3 +83,32 @@ export const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 /** Tamaño máximo del avatar antes de comprimir, en bytes. */
 export const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+
+// --- Tokens del endpoint MCP ---------------------------------------------
+
+/**
+ * Nombre con el que se reconoce un token en la lista. Es su única señal de
+ * identidad —del secreto solo quedan cuatro caracteres—, así que no puede
+ * quedar en blanco; el máximo es el de la columna del backend.
+ */
+export const mcpTokenNameSchema = z
+	.string()
+	.trim()
+	.min(1, 'Ponle un nombre para reconocerlo después')
+	.max(60, 'El nombre no puede superar 60 caracteres');
+
+/**
+ * Caducidad en días.
+ *
+ * El 0 es «sin caducidad», no un campo vacío: llega de un desplegable con
+ * opciones fijas, así que se valida como número y no como texto libre. El
+ * máximo es el mismo que aplica el backend.
+ */
+export const mcpTokenExpirySchema = z.coerce
+	.number('Elige una caducidad')
+	.int()
+	.min(0, 'Elige una caducidad')
+	.max(365, 'La caducidad máxima es de 365 días');
+
+/** Identificador del token sobre el que actúan rotar y eliminar. */
+export const mcpTokenIdSchema = z.uuid();

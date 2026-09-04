@@ -17,7 +17,8 @@ import (
 // This file holds the shared repository type plus the AccountStore
 // implementation. The other stores live in siblings named after them
 // (postgres_session.go, postgres_refresh_token.go, postgres_twofactor.go,
-// postgres_verification.go, postgres_password_reset.go, postgres_invitation.go)
+// postgres_verification.go, postgres_password_reset.go, postgres_invitation.go,
+// postgres_mcp_token.go)
 // so no single file carries the whole persistence surface.
 
 // PostgresRepository is the single pgx-backed implementation of every store
@@ -33,6 +34,7 @@ var (
 	_ TwoFactorStore     = (*PostgresRepository)(nil)
 	_ VerificationStore  = (*PostgresRepository)(nil)
 	_ PasswordResetStore = (*PostgresRepository)(nil)
+	_ MCPTokenStore      = (*PostgresRepository)(nil)
 )
 
 func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {

@@ -165,7 +165,35 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 | GET | `/auth/sessions` | Lista de sesiones activas |
 | DELETE | `/auth/sessions/:id` | Revoca una sesión |
 | POST | `/auth/sessions/revoke-others` | Revoca las demás sesiones |
+| GET | `/auth/mcp-tokens` | Tokens personales para `/mcp` (sin el secreto) |
+| POST | `/auth/mcp-tokens` | Crea uno y devuelve su secreto, una sola vez |
+| POST | `/auth/mcp-tokens/:id/rotate` | Reemplaza el secreto del token |
+| DELETE | `/auth/mcp-tokens/:id` | Revoca el token |
 | POST | `/auth/logout` | Cierra la sesión actual |
+
+#### Tokens del endpoint MCP
+
+Un cliente MCP se configura una vez y luego funciona solo, así que no puede
+usar el access token: dura minutos y se renueva con una cookie que él no tiene.
+Estos son la credencial pensada para eso — larga, revocable desde ajustes y
+válida **solo en `/mcp`**.
+
+`POST /auth/mcp-tokens` acepta `name` (1–60 caracteres, único por usuario) y
+`expiresInDays`. Ese campo distingue tres casos: **ausente** son 90 días, **0**
+es sin caducidad y cualquier otro valor son esos días, hasta 365. Un usuario
+puede tener 10 tokens a la vez.
+
+El secreto (`fnx_mcp_…`) viaja **solo** en la respuesta de crear y de rotar: el
+backend guarda su SHA-256, de modo que el listado devuelve nombre, `last4` y
+fechas, y no hay ningún endpoint capaz de volver a mostrarlo. Rotar reemplaza el
+secreto en la misma fila —el token conserva id, nombre y fecha de creación— y el
+anterior deja de valer en el acto, sin ventana de gracia.
+
+| Código | Cuándo |
+|---|---|
+| 400 | Nombre en blanco, o `expiresInDays` negativo o mayor que 365 |
+| 404 | El token no existe, o no es de quien llama (misma respuesta a propósito) |
+| 409 | Ya hay un token con ese nombre, o se alcanzaron los 10 |
 
 ### 2.6 Users (JWT; *admin* donde se indica)
 
@@ -798,7 +826,7 @@ espacia sus llamadas para no agotar la cuota personal (13 s entre peticiones a
 Alpha Vantage), así que una cartera grande no cabe en una petición HTTP. El
 resto lo recoge el job diario.
 
-### 2.11 MCP — Model Context Protocol (JWT)
+### 2.11 MCP — Model Context Protocol (token MCP o JWT)
 
 | Método | Path | Descripción |
 |---|---|---|
@@ -807,9 +835,14 @@ resto lo recoge el job diario.
 
 **No sigue el sobre de §1.1**: es la única ruta de la API que no lo hace,
 porque el cuerpo es JSON-RPC 2.0, que trae su propio sobre (`result` / `error`)
-y lo define el protocolo. El resto de convenciones sí aplican: mismo bearer
-token que todo lo demás, mismo limitador por usuario y un 401 —ese sí, en el
-sobre normal— cuando el token falta o no vale.
+y lo define el protocolo. El resto de convenciones sí aplican: mismo limitador
+por usuario y un 401 —ese sí, en el sobre normal— cuando el token falta o no
+vale.
+
+Es también la única ruta que acepta **dos credenciales**: un token personal de
+§2.5 (`Authorization: Bearer fnx_mcp_…`) o el access token de una sesión viva.
+El prefijo decide cuál se comprueba, así que un token MCP inválido se rechaza
+como token MCP y no como JWT.
 
 La petición necesita `Content-Type: application/json` y un `Accept` que ofrezca
 `application/json` **y** `text/event-stream`, aunque la respuesta siempre sea
@@ -842,7 +875,7 @@ Configuración de un cliente MCP:
     "finexia": {
       "type": "http",
       "url": "https://finexia.me/mcp",
-      "headers": { "Authorization": "Bearer <access token>" }
+      "headers": { "Authorization": "Bearer fnx_mcp_<token de ajustes>" }
     }
   }
 }

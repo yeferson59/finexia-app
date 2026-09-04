@@ -62,6 +62,24 @@ type RefreshTokenStore interface {
 	DeleteExpiredRefreshTokens(ctx context.Context) (int64, error)
 }
 
+// MCPTokenStore covers the personal access tokens an MCP client authenticates
+// with. Every mutation is scoped to the owner in the statement itself, so the
+// service never has to compare a user id it was handed against one it read.
+//
+// GetMCPTokenByHash returns an unexported type on purpose: an authenticated
+// token's row carries the account behind it, and nothing outside this package
+// can name it, so it cannot end up in a response.
+type MCPTokenStore interface {
+	CreateMCPToken(ctx context.Context, userID uuid.UUID, name, tokenHash, last4 string, expiresAt *time.Time) (MCPToken, error)
+	ListMCPTokens(ctx context.Context, userID uuid.UUID) ([]MCPToken, error)
+	CountMCPTokens(ctx context.Context, userID uuid.UUID) (int, error)
+	GetMCPTokenByHash(ctx context.Context, tokenHash string) (mcpTokenIdentity, error)
+	RotateMCPToken(ctx context.Context, userID, id uuid.UUID, tokenHash, last4 string, expiresAt *time.Time) (MCPToken, error)
+	DeleteMCPToken(ctx context.Context, userID, id uuid.UUID) error
+	TouchMCPToken(ctx context.Context, id uuid.UUID) error
+	DeleteExpiredMCPTokens(ctx context.Context) (int64, error)
+}
+
 type TwoFactorStore interface {
 	GetTwoFactor(ctx context.Context, userID uuid.UUID) (TwoFactor, error)
 	UpsertTwoFactorSecret(ctx context.Context, userID uuid.UUID, secret string) error
@@ -114,6 +132,7 @@ type Stores struct {
 	Verifications  VerificationStore
 	PasswordResets PasswordResetStore
 	Invitations    InvitationStore
+	MCPTokens      MCPTokenStore
 	// Waitlist is implemented by the marketing module, not by the module's
 	// own PostgresRepository.
 	Waitlist WaitlistStore
