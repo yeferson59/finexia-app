@@ -7,7 +7,7 @@ import (
 )
 
 type authService interface {
-	CleanupExpiredAuth(ctx context.Context) (int64, int64, int64, error)
+	CleanupExpiredAuth(ctx context.Context) (CleanupCounts, error)
 }
 
 type CleanupJob struct {
@@ -30,12 +30,13 @@ func (s *CleanupJob) Name() string {
 // Designed to be called as a goroutine: go job.Start(ctx).
 // Exits cleanly when ctx is cancelled.
 func (s *CleanupJob) Run(ctx context.Context) error {
-	sessions, refreshTokens, mcpTokens, err := s.svc.CleanupExpiredAuth(ctx)
+	counts, err := s.svc.CleanupExpiredAuth(ctx)
 
 	s.log.Info(ctx, "auth cleanup completed",
-		logger.Int64("deleted_sessions", sessions),
-		logger.Int64("deleted_refresh_tokens", refreshTokens),
-		logger.Int64("deleted_mcp_tokens", mcpTokens),
+		logger.Int64("deleted_sessions", counts.Sessions),
+		logger.Int64("deleted_refresh_tokens", counts.RefreshTokens),
+		logger.Int64("deleted_mcp_tokens", counts.MCPTokens),
+		logger.Int64("deleted_oauth_rows", counts.OAuth),
 		logger.Err(err),
 	)
 

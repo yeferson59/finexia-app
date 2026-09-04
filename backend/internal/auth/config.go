@@ -23,8 +23,16 @@ type Config struct {
 	LoginLockout time.Duration
 	// Environment gates production-only behavior (e.g. Secure cookies).
 	Environment string
-	// FrontendURL is the base URL used to build links in emails.
+	// FrontendURL is the base URL used to build links in emails, and where the
+	// OAuth consent screen lives — the API holds no session cookie, so the
+	// browser has to be sent to the origin that does.
 	FrontendURL string
+	// PublicURL is this API's own base URL. The OAuth metadata is built from
+	// it, which makes it load-bearing rather than cosmetic: a client checks the
+	// issuer against the origin it fetched the document from, so a PublicURL
+	// that does not match how the API is actually reached fails every
+	// connection at discovery.
+	PublicURL string
 	// InvitationExpiry is how long an invitation token stays valid.
 	InvitationExpiry time.Duration
 	// PasswordResetExpiry is how long a password-reset token stays valid.

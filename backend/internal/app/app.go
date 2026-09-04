@@ -481,6 +481,7 @@ func authConfig(env *config.EnvConfig) auth.Config {
 		LoginLockout:            env.LoginLockout,
 		Environment:             env.Environment,
 		FrontendURL:             env.FrontendURL,
+		PublicURL:               env.PublicURL,
 		InvitationExpiry:        env.InvitationExpiry,
 		PasswordResetExpiry:     env.PasswordResetExpiry,
 		EmailVerificationExpiry: env.EmailVerificationExpiry,

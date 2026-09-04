@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"time"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/paginate"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -50,6 +52,7 @@ func New(deps Deps) *Module {
 		PasswordResets: pg,
 		Invitations:    pg,
 		MCPTokens:      pg,
+		OAuth:          pg,
 		Waitlist:       deps.Waitlist,
 		Users:          deps.Users,
 	}, deps.Cfg, deps.Storage, deps.Mail, deps.Geo, deps.Log)
@@ -134,13 +137,65 @@ func (m *Module) Routes(router fiber.Router) {
 	auth.Post("/mcp-tokens/:id/rotate", m.limiter, m.handler.rotateMCPToken)
 	auth.Delete("/mcp-tokens/:id", m.limiter, m.handler.deleteMCPToken)
 
+	// The consent screen's two calls. They sit behind the session guard
+	// because that is the entire point of them: the authorization code is
+	// minted for whoever is logged in here, and nothing the client sent can
+	// name a different user.
+	auth.Get("/oauth/consent/:id", m.handler.getOAuthConsent)
+	auth.Post("/oauth/consent/:id", m.limiter, m.handler.decideOAuthConsent)
+
+	// Connected applications: what the user has approved, and the button that
+	// takes it back.
+	auth.Get("/oauth-grants", m.handler.listOAuthGrants)
+	auth.Delete("/oauth-grants/:id", m.limiter, m.handler.revokeOAuthGrant)
+
 	auth.Get("/session", m.handler.getSession)
 	auth.Get("/sessions", m.handler.listSessions)
 	auth.Delete("/sessions/:id", m.handler.revokeSession)
 	auth.Post("/sessions/revoke-others", m.handler.revokeOtherSessions)
 	auth.Post("/logout", m.handler.logout)
 
+	m.oauthRoutes(router)
 	m.userRoutes(router)
+}
+
+// oauthRoutes registers the authorization server: the two discovery documents
+// and the three endpoints a client drives itself.
+//
+// All five are public and mounted at the root rather than under /auth, because
+// their paths are not this module's to choose. RFC 8414 and RFC 9728 derive the
+// well-known paths from the issuer and the resource, and a client builds them
+// from the URL it already has — so a document served anywhere else is a
+// document no client will ever look for.
+//
+// None of them is a hole in the guard. /register creates a client that can do
+// nothing until a user approves it, /authorize only parks a request and sends
+// the browser to a screen that *is* session-guarded, and /token spends a code
+// that only that screen can mint.
+func (m *Module) oauthRoutes(router fiber.Router) {
+	wellKnown := router.Group("/.well-known")
+	wellKnown.Use(oauthPublicCORS)
+
+	// Both spellings of each document. The spec derives the path from the
+	// resource ("/mcp" → the /mcp suffix), and clients in the wild ask for the
+	// bare path as well; serving one and not the other is a discovery failure
+	// that looks exactly like an unreachable server.
+	wellKnown.Get("/oauth-protected-resource", m.handler.protectedResourceMetadata)
+	wellKnown.Get("/oauth-protected-resource/mcp", m.handler.protectedResourceMetadata)
+	wellKnown.Get("/oauth-authorization-server", m.handler.authorizationServerMetadata)
+	wellKnown.Get("/oauth-authorization-server/mcp", m.handler.authorizationServerMetadata)
+
+	oauth := router.Group("/oauth")
+	oauth.Use(oauthPublicCORS)
+
+	// Registration writes a row for an unauthenticated caller, so it gets a
+	// limit of its own on top of the global one. Twenty an hour per address is
+	// far more than the once-per-install this endpoint exists for, and far less
+	// than it takes to fill the table.
+	oauth.Post("/register", httpx.RateLimiter(20, time.Hour, true), m.handler.registerOAuthClient)
+
+	oauth.Get("/authorize", m.handler.authorize)
+	oauth.Post("/token", m.handler.token)
 }
 
 // userRoutes registers this module's endpoints that answer under /users: the

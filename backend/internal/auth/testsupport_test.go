@@ -77,6 +77,23 @@ type fakeRepository struct {
 	touchMCPToken          func(ctx context.Context, id uuid.UUID) error
 	deleteExpiredMCPTokens func(ctx context.Context) (int64, error)
 
+	createOAuthClient          func(ctx context.Context, c oauthClient) error
+	getOAuthClient             func(ctx context.Context, clientID string) (oauthClient, error)
+	createAuthorizationRequest func(ctx context.Context, req pendingAuthorization) (uuid.UUID, error)
+	getAuthorizationRequest    func(ctx context.Context, id uuid.UUID) (pendingAuthorization, error)
+	deleteAuthorizationRequest func(ctx context.Context, id uuid.UUID) error
+	createAuthorizationCode    func(ctx context.Context, codeHash string, c authorizationCode) error
+	consumeAuthorizationCode   func(ctx context.Context, codeHash string) (authorizationCode, bool, error)
+	upsertOAuthGrant           func(ctx context.Context, userID uuid.UUID, clientID, scope, resource, accessHash string, accessExpiresAt time.Time, refreshHash string, refreshExpiresAt *time.Time) (uuid.UUID, error)
+	getGrantByAccessToken      func(ctx context.Context, tokenHash string) (oauthGrantIdentity, error)
+	getGrantByRefreshToken     func(ctx context.Context, tokenHash string) (grantRefresh, error)
+	rotateGrantTokens          func(ctx context.Context, id uuid.UUID, accessHash string, accessExpiresAt time.Time, refreshHash string, refreshExpiresAt *time.Time) error
+	touchOAuthGrant            func(ctx context.Context, id uuid.UUID) error
+	listOAuthGrants            func(ctx context.Context, userID uuid.UUID) ([]OAuthGrant, error)
+	deleteOAuthGrant           func(ctx context.Context, userID, id uuid.UUID) error
+	deleteOAuthGrantsForClient func(ctx context.Context, userID uuid.UUID, clientID string) (int64, error)
+	deleteExpiredOAuthRows     func(ctx context.Context) (int64, error)
+
 	listWaitlist       func(ctx context.Context, offset, limit uint) ([]marketing.Waitlist, uint, error)
 	setWaitlistInvited func(ctx context.Context, email string) error
 }
@@ -90,6 +107,7 @@ var (
 	_ PasswordResetStore = (*fakeRepository)(nil)
 	_ InvitationStore    = (*fakeRepository)(nil)
 	_ MCPTokenStore      = (*fakeRepository)(nil)
+	_ OAuthStore         = (*fakeRepository)(nil)
 	_ WaitlistStore      = (*fakeRepository)(nil)
 	_ UserReader         = (*fakeRepository)(nil)
 )
@@ -108,6 +126,7 @@ func testStores(f *fakeRepository) Stores {
 		PasswordResets: f,
 		Invitations:    f,
 		MCPTokens:      f,
+		OAuth:          f,
 		Waitlist:       f,
 		Users:          f,
 	}
@@ -143,6 +162,70 @@ func (f *fakeRepository) TouchMCPToken(ctx context.Context, id uuid.UUID) error 
 
 func (f *fakeRepository) DeleteExpiredMCPTokens(ctx context.Context) (int64, error) {
 	return f.deleteExpiredMCPTokens(ctx)
+}
+
+func (f *fakeRepository) CreateOAuthClient(ctx context.Context, c oauthClient) error {
+	return f.createOAuthClient(ctx, c)
+}
+
+func (f *fakeRepository) GetOAuthClient(ctx context.Context, clientID string) (oauthClient, error) {
+	return f.getOAuthClient(ctx, clientID)
+}
+
+func (f *fakeRepository) CreateAuthorizationRequest(ctx context.Context, req pendingAuthorization) (uuid.UUID, error) {
+	return f.createAuthorizationRequest(ctx, req)
+}
+
+func (f *fakeRepository) GetAuthorizationRequest(ctx context.Context, id uuid.UUID) (pendingAuthorization, error) {
+	return f.getAuthorizationRequest(ctx, id)
+}
+
+func (f *fakeRepository) DeleteAuthorizationRequest(ctx context.Context, id uuid.UUID) error {
+	return f.deleteAuthorizationRequest(ctx, id)
+}
+
+func (f *fakeRepository) CreateAuthorizationCode(ctx context.Context, codeHash string, c authorizationCode) error {
+	return f.createAuthorizationCode(ctx, codeHash, c)
+}
+
+func (f *fakeRepository) ConsumeAuthorizationCode(ctx context.Context, codeHash string) (authorizationCode, bool, error) {
+	return f.consumeAuthorizationCode(ctx, codeHash)
+}
+
+func (f *fakeRepository) UpsertOAuthGrant(ctx context.Context, userID uuid.UUID, clientID, scope, resource, accessHash string, accessExpiresAt time.Time, refreshHash string, refreshExpiresAt *time.Time) (uuid.UUID, error) {
+	return f.upsertOAuthGrant(ctx, userID, clientID, scope, resource, accessHash, accessExpiresAt, refreshHash, refreshExpiresAt)
+}
+
+func (f *fakeRepository) GetGrantByAccessToken(ctx context.Context, tokenHash string) (oauthGrantIdentity, error) {
+	return f.getGrantByAccessToken(ctx, tokenHash)
+}
+
+func (f *fakeRepository) GetGrantByRefreshToken(ctx context.Context, tokenHash string) (grantRefresh, error) {
+	return f.getGrantByRefreshToken(ctx, tokenHash)
+}
+
+func (f *fakeRepository) RotateGrantTokens(ctx context.Context, id uuid.UUID, accessHash string, accessExpiresAt time.Time, refreshHash string, refreshExpiresAt *time.Time) error {
+	return f.rotateGrantTokens(ctx, id, accessHash, accessExpiresAt, refreshHash, refreshExpiresAt)
+}
+
+func (f *fakeRepository) TouchOAuthGrant(ctx context.Context, id uuid.UUID) error {
+	return f.touchOAuthGrant(ctx, id)
+}
+
+func (f *fakeRepository) ListOAuthGrants(ctx context.Context, userID uuid.UUID) ([]OAuthGrant, error) {
+	return f.listOAuthGrants(ctx, userID)
+}
+
+func (f *fakeRepository) DeleteOAuthGrant(ctx context.Context, userID, id uuid.UUID) error {
+	return f.deleteOAuthGrant(ctx, userID, id)
+}
+
+func (f *fakeRepository) DeleteOAuthGrantsForClient(ctx context.Context, userID uuid.UUID, clientID string) (int64, error) {
+	return f.deleteOAuthGrantsForClient(ctx, userID, clientID)
+}
+
+func (f *fakeRepository) DeleteExpiredOAuthRows(ctx context.Context) (int64, error) {
+	return f.deleteExpiredOAuthRows(ctx)
 }
 
 func (f *fakeRepository) GetAccountByEmail(ctx context.Context, email string) (identity.User, error) {
@@ -529,6 +612,11 @@ func testConfig() Config {
 		JWTRefreshDuration:     30 * 24 * time.Hour,
 		RefreshGracePeriod:     30 * time.Second,
 		TwoFactorPendingExpiry: 5 * time.Minute,
+		// Both are load-bearing for the OAuth flow rather than decorative: the
+		// issuer in the metadata is built from PublicURL, and the consent
+		// redirect from FrontendURL.
+		PublicURL:   "https://api.finexia.test",
+		FrontendURL: "https://finexia.test",
 	}
 }
 

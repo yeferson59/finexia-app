@@ -4,6 +4,7 @@
 		AppearanceSection,
 		MarketCredentials,
 		MCPTokensSection,
+		OAuthGrantsSection,
 		PasswordSection,
 		ProfileSection,
 		SessionsSection,
@@ -32,6 +33,7 @@
 	<TwoFactorSection twoFactor={data.twoFactor} {form} />
 	<MarketCredentials credentials={data.marketCredentials} {form} />
 	<MCPTokensSection tokens={data.mcpTokens} mcpUrl={data.mcpUrl} {form} />
+	<OAuthGrantsSection grants={data.oauthGrants} {form} />
 	<SessionsSection sessions={data.sessions} {form} />
 </div>
 

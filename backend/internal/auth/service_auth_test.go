@@ -698,15 +698,16 @@ func TestCleanupExpiredAuth(t *testing.T) {
 			deleteExpiredRefreshTokens: func(context.Context) (int64, error) { return 7, nil },
 			deleteExpiredSessions:      func(context.Context) (int64, error) { return 3, nil },
 			deleteExpiredMCPTokens:     func(context.Context) (int64, error) { return 2, nil },
+			deleteExpiredOAuthRows:     func(context.Context) (int64, error) { return 5, nil },
 		})
 		svc := newTestService(repo, newMemStorage())
 
-		sessions, refreshTokens, mcpTokens, err := svc.CleanupExpiredAuth(context.Background())
+		counts, err := svc.CleanupExpiredAuth(context.Background())
 		if err != nil {
 			t.Fatalf("CleanupExpiredAuth: %v", err)
 		}
-		if sessions != 3 || refreshTokens != 7 || mcpTokens != 2 {
-			t.Errorf("got sessions=%d refreshTokens=%d mcpTokens=%d, want 3, 7 and 2", sessions, refreshTokens, mcpTokens)
+		if counts != (CleanupCounts{Sessions: 3, RefreshTokens: 7, MCPTokens: 2, OAuth: 5}) {
+			t.Errorf("counts = %+v, want 3 sessions, 7 refresh tokens, 2 mcp tokens and 5 oauth rows", counts)
 		}
 	})
 
@@ -716,7 +717,7 @@ func TestCleanupExpiredAuth(t *testing.T) {
 		})
 		svc := newTestService(repo, newMemStorage())
 
-		if _, _, _, err := svc.CleanupExpiredAuth(context.Background()); err == nil {
+		if _, err := svc.CleanupExpiredAuth(context.Background()); err == nil {
 			t.Fatal("expected error from refresh token cleanup")
 		}
 	})

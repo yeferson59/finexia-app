@@ -1,7 +1,12 @@
 import type { Actions, PageServerLoad } from './$types';
 import * as auth from '$lib/api/auth';
 import { redirect, fail } from '@sveltejs/kit';
-import { parseRefreshSetCookie, setAccessCookie, setRefreshCookie } from '$lib/server/session';
+import {
+	parseRefreshSetCookie,
+	setAccessCookie,
+	setRefreshCookie,
+	takeReturnTo
+} from '$lib/server/session';
 import { features } from '$lib/shared/config/features';
 import { loginSchema, twoFactorSchema, registerSchema } from '$lib/features/auth';
 
@@ -70,7 +75,7 @@ export const actions = {
 			setRefreshCookie(cookies, rotatedRefresh.value, rotatedRefresh.maxAge);
 		}
 
-		return redirect(302, '/dashboard');
+		return redirect(302, takeReturnTo(cookies) ?? '/dashboard');
 	},
 	twoFactor: async ({ request, cookies, fetch }) => {
 		const formData = await request.formData();
@@ -127,7 +132,7 @@ export const actions = {
 			setRefreshCookie(cookies, rotatedRefresh.value, rotatedRefresh.maxAge);
 		}
 
-		return redirect(302, '/dashboard');
+		return redirect(302, takeReturnTo(cookies) ?? '/dashboard');
 	},
 	register: async ({ request }) => {
 		const formData = await request.formData();

@@ -353,27 +353,64 @@ func (s *service) Logout(ctx context.Context, userID uuid.UUID, accessToken, raw
 	return nil
 }
 
+// CleanupCounts is what one sweep removed, per table.
+//
+// A struct rather than a row of int64 returns because there are now four of
+// them and they are all the same type: a caller that swapped two would compile,
+// run, and log the wrong numbers forever.
+type CleanupCounts struct {
+	Sessions      int64
+	RefreshTokens int64
+	MCPTokens     int64
+	// OAuth counts the two short-lived authorization tables together. They are
+	// swept as one because neither is interesting on its own — both are rows a
+	// flow left behind, and the only question is whether the sweep is running.
+	OAuth int64
+}
+
 // CleanupExpiredAuth prunes refresh tokens that can no longer be redeemed and
 // sessions that expired with no live refresh token left. Without this, both
 // tables grow unboundedly: rows are only ever deleted on explicit logout.
-func (s *service) CleanupExpiredAuth(ctx context.Context) (int64, int64, int64, error) {
+//
+// It stops at the first failure and returns what it had counted so far, so a
+// broken store is visible in the log next to the sweeps that did run.
+func (s *service) CleanupExpiredAuth(ctx context.Context) (CleanupCounts, error) {
+	var counts CleanupCounts
+
 	refreshTokens, err := s.stores.RefreshTokens.DeleteExpiredRefreshTokens(ctx)
 	if err != nil {
-		return 0, 0, 0, err
+		return counts, err
 	}
+
+	counts.RefreshTokens = refreshTokens
 
 	sessions, err := s.stores.Sessions.DeleteExpiredSessions(ctx)
 	if err != nil {
-		return 0, refreshTokens, 0, err
+		return counts, err
 	}
+
+	counts.Sessions = sessions
 
 	// Swept last and long after the fact: an expired MCP token stops
 	// authenticating the moment it expires, but it stays listed so the user
 	// finds out from the settings screen why their client stopped working.
 	mcpTokens, err := s.stores.MCPTokens.DeleteExpiredMCPTokens(ctx)
 	if err != nil {
-		return sessions, refreshTokens, 0, err
+		return counts, err
 	}
 
-	return sessions, refreshTokens, mcpTokens, nil
+	counts.MCPTokens = mcpTokens
+
+	// The OAuth flow rows are the opposite case: nobody ever sees them, they
+	// are created by unauthenticated callers, and a parked consent nobody
+	// answered is pure residue. Without this sweep they are the one table here
+	// an anonymous client can grow.
+	oauthRows, err := s.stores.OAuth.DeleteExpiredOAuthRows(ctx)
+	if err != nil {
+		return counts, err
+	}
+
+	counts.OAuth = oauthRows
+
+	return counts, nil
 }

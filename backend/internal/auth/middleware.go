@@ -69,42 +69,87 @@ func (m *Module) RequireAuth() fiber.Handler {
 	})
 }
 
-// RequireMCPAuth gates /mcp, which is reached by two kinds of caller: a browser
-// carrying the session's access token, and an MCP client carrying one of the
-// personal access tokens the settings screen mints.
+// RequireMCPAuth gates /mcp, which is reached by three kinds of caller: a
+// browser carrying the session's access token, an MCP client carrying one of
+// the personal access tokens the settings screen mints, and a remote connector
+// carrying an OAuth access token it obtained for itself.
 //
-// The credential is chosen by prefix rather than by trying both. A token that
-// says fnx_mcp_ is answered by the store that owns those, and a JWT by the
-// existing guard, so a rejected request fails against the scheme it actually
-// claimed — otherwise every bad MCP token would be reported as a bad JWT, and
-// the logs would name the wrong subsystem for every one of them.
+// The credential is chosen by prefix rather than by trying each in turn. A
+// token that says fnx_oat_ is answered by the grant store, fnx_mcp_ by the
+// personal-token store, and anything else by the JWT guard, so a rejected
+// request fails against the scheme it actually claimed — otherwise a bad token
+// of one kind would be reported as a bad token of whichever kind happened to be
+// checked last, and the logs would name the wrong subsystem every time.
 //
-// Both paths leave the same three locals behind, which is what lets everything
-// downstream — bindCaller, the rate limiter, httpx.Identity — stay unaware that
-// there is more than one way to authenticate here.
+// All three paths leave the same three locals behind, which is what lets
+// everything downstream — bindCaller, the rate limiter, httpx.Identity — stay
+// unaware that there is more than one way to authenticate here.
 func (m *Module) RequireMCPAuth() fiber.Handler {
 	jwtGuard := m.RequireAuth()
 
 	return func(c fiber.Ctx) error {
 		raw := bearerToken(c)
-		if !looksLikeMCPToken(raw) {
-			return jwtGuard(c)
+
+		var err error
+
+		switch {
+		case looksLikeOAuthToken(raw):
+			err = m.authenticateOAuthBearer(c, raw)
+		case looksLikeMCPToken(raw):
+			err = m.authenticateMCPBearer(c, raw)
+		default:
+			err = jwtGuard(c)
 		}
 
-		userID, role, err := m.service.AuthenticateMCPToken(c, raw)
-		if err != nil {
-			// Deliberately one answer for every failure: unknown, expired,
-			// revoked and belonging-to-a-banned-account are the same 401, so
-			// the response cannot be used to tell live tokens from dead ones.
-			return httpx.Unauthorized(c, "Invalid MCP token", "the token is unknown, expired or was revoked")
+		// The challenge is written last, over whatever the inner guard wrote,
+		// because on /mcp there is only one useful thing to say to a refused
+		// caller and none of the three guards knows it: where to go and
+		// authorize. RFC 9728 §5.1 has the client read the resource metadata
+		// URL off this header, and a 401 without it is what a connector reports
+		// as "couldn't connect" — it has been told no, and nothing else.
+		if c.Response().StatusCode() == fiber.StatusUnauthorized {
+			c.Set(fiber.HeaderWWWAuthenticate, m.service.mcpChallengeHeader())
 		}
 
-		c.Locals(httpx.LocalUserID, userID.String())
-		c.Locals(httpx.LocalToken, raw)
-		c.Locals(httpx.LocalRole, role)
-
-		return c.Next()
+		return err
 	}
+}
+
+// authenticateOAuthBearer accepts a token minted by this server's own
+// authorization flow.
+func (m *Module) authenticateOAuthBearer(c fiber.Ctx, raw string) error {
+	userID, role, err := m.service.AuthenticateOAuthToken(c, raw)
+	if err != nil {
+		// One answer for every failure — unknown, expired, revoked, banned
+		// account — so the response cannot be used to tell live tokens from
+		// dead ones.
+		return httpx.Unauthorized(c, "Invalid access token", "the token is unknown, expired or was revoked")
+	}
+
+	bindMCPIdentity(c, userID.String(), raw, role)
+
+	return c.Next()
+}
+
+// authenticateMCPBearer accepts a personal access token from the settings
+// screen.
+func (m *Module) authenticateMCPBearer(c fiber.Ctx, raw string) error {
+	userID, role, err := m.service.AuthenticateMCPToken(c, raw)
+	if err != nil {
+		return httpx.Unauthorized(c, "Invalid MCP token", "the token is unknown, expired or was revoked")
+	}
+
+	bindMCPIdentity(c, userID.String(), raw, role)
+
+	return c.Next()
+}
+
+// bindMCPIdentity writes the three locals every downstream reader expects, so
+// the two non-JWT paths cannot drift apart in what they leave behind.
+func bindMCPIdentity(c fiber.Ctx, userID, token, role string) {
+	c.Locals(httpx.LocalUserID, userID)
+	c.Locals(httpx.LocalToken, token)
+	c.Locals(httpx.LocalRole, role)
 }
 
 // MCPGuard adapts this module to the one-method guard dependency the mcp module

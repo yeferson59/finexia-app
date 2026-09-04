@@ -83,6 +83,12 @@ Otros helpers de estado directo: `responseBadRequest` (400),
   rotada en cada refresh.
 - **RBAC:** las rutas marcadas *admin* exigen además rol `admin`
   (middleware `RequireAdmin`); la violación responde `403`.
+- **Credenciales de `/mcp`:** esa ruta —y solo esa— acepta además un token
+  personal (`fnx_mcp_…`, §2.5) y un access token OAuth (`fnx_oat_…`, §2.12). El
+  prefijo decide contra qué almacén se comprueba cada uno.
+- **Falta de credencial:** `401`, nunca `400`. Un cliente MCP empieza siempre
+  con una llamada sin credencial y necesita ese `401` —con su cabecera
+  `WWW-Authenticate`— para saber dónde autorizarse.
 
 ### 1.4 Middlewares globales
 
@@ -169,6 +175,10 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 | POST | `/auth/mcp-tokens` | Crea uno y devuelve su secreto, una sola vez |
 | POST | `/auth/mcp-tokens/:id/rotate` | Reemplaza el secreto del token |
 | DELETE | `/auth/mcp-tokens/:id` | Revoca el token |
+| GET | `/auth/oauth/consent/:id` | Petición OAuth pendiente, para la pantalla de consentimiento |
+| POST | `/auth/oauth/consent/:id` | Aprueba o deniega, y devuelve a dónde redirigir |
+| GET | `/auth/oauth-grants` | Aplicaciones conectadas por OAuth |
+| DELETE | `/auth/oauth-grants/:id` | Desconecta una aplicación |
 | POST | `/auth/logout` | Cierra la sesión actual |
 
 #### Tokens del endpoint MCP
@@ -839,10 +849,22 @@ y lo define el protocolo. El resto de convenciones sí aplican: mismo limitador
 por usuario y un 401 —ese sí, en el sobre normal— cuando el token falta o no
 vale.
 
-Es también la única ruta que acepta **dos credenciales**: un token personal de
-§2.5 (`Authorization: Bearer fnx_mcp_…`) o el access token de una sesión viva.
-El prefijo decide cuál se comprueba, así que un token MCP inválido se rechaza
-como token MCP y no como JWT.
+Es también la única ruta que acepta **tres credenciales**: un token personal de
+§2.5 (`Authorization: Bearer fnx_mcp_…`), un access token OAuth de §2.12
+(`fnx_oat_…`) o el access token de una sesión viva. El prefijo decide cuál se
+comprueba, así que un token MCP inválido se rechaza como token MCP y no como
+JWT.
+
+Un `401` de esta ruta lleva siempre la cabecera que dice cómo autorizarse:
+
+```
+WWW-Authenticate: Bearer realm="finexia",
+  resource_metadata="https://api.finexia.me/.well-known/oauth-protected-resource/mcp"
+```
+
+Es lo que convierte un rechazo en el arranque del flujo de §2.12 en vez de en un
+callejón sin salida: sin ese parámetro, un cliente que recibe un `401` sabe solo
+que le dijeron que no.
 
 La petición necesita `Content-Type: application/json` y un `Accept` que ofrezca
 `application/json` **y** `text/event-stream`, aunque la respuesta siempre sea
@@ -892,6 +914,92 @@ El conector remoto de claude.ai **no** sirve para esto: solo sabe autenticarse
 por OAuth 2.1 con registro dinámico de cliente, y no hay dónde pegarle un token
 personal. Mientras `/mcp` se guarde con bearer, el cliente tiene que ser uno que
 permita fijar la cabecera.
+
+### 2.12 OAuth 2.1 — servidor de autorización para `/mcp` (público)
+
+| Método | Path | Descripción |
+|---|---|---|
+| GET | `/.well-known/oauth-protected-resource` | RFC 9728: qué es `/mcp` y quién emite tokens para él |
+| GET | `/.well-known/oauth-protected-resource/mcp` | Igual (la ruta que deriva la spec del recurso) |
+| GET | `/.well-known/oauth-authorization-server` | RFC 8414: endpoints y capacidades |
+| GET | `/.well-known/oauth-authorization-server/mcp` | Igual |
+| POST | `/oauth/register` | RFC 7591: registro dinámico de cliente |
+| GET | `/oauth/authorize` | Inicia la autorización; redirige al consentimiento |
+| POST | `/oauth/token` | `authorization_code` y `refresh_token` |
+
+**Por qué existe.** Los tokens de §2.5 sirven a un cliente que el usuario
+instala y configura. Un conector remoto —el de claude.ai y los que vienen
+detrás— no tiene dónde pegar uno: solo sabe registrarse, mandar al usuario a
+autorizar y canjear un código. Sin esto, ese tipo de cliente no puede conectarse
+en absoluto, y el error que enseña es «no se pudo conectar al servidor».
+
+**Alcance.** Estos tokens autentican **solo `/mcp`**, con un único ámbito
+`mcp:read`, de solo lectura. No abren el REST API ni crean sesión de navegador.
+
+**No siguen el sobre de §1.1**, por lo mismo que `/mcp`: RFC 6749 §5.1/§5.2,
+RFC 7591 §3.2 y RFC 8414 §3.2 definen el cuerpo, y un cliente lo parsea por esa
+forma o no lo parsea. Los errores viajan como
+`{"error": "...", "error_description": "..."}`.
+
+#### El flujo, de principio a fin
+
+1. El cliente llama a `/mcp` sin credencial y recibe `401` con
+   `WWW-Authenticate: … resource_metadata="…"`.
+2. Lee esa metadata, y desde ella la del servidor de autorización.
+3. `POST /oauth/register` con sus `redirect_uris`. Devuelve `client_id` (y
+   `client_secret` solo si pidió `token_endpoint_auth_method` distinto de
+   `none`).
+4. Abre `/oauth/authorize` en el navegador con PKCE. El servidor valida y
+   redirige a `FRONTEND_URL/oauth/consent?request=<id>`; por el navegador viaja
+   **solo ese id**.
+5. El usuario aprueba (iniciando sesión antes si hace falta). El backend emite el
+   código y redirige a la `redirect_uri` registrada con `code` y `state`.
+6. `POST /oauth/token` (form-encoded) con `code` y `code_verifier`. Devuelve
+   `access_token` (`fnx_oat_…`, 1 h), `refresh_token` (`fnx_ort_…`, 30 días) y
+   `scope`.
+7. El cliente llama a `/mcp` con el access token, y lo renueva con el refresh
+   antes de que caduque. Renovar **rota los dos**.
+
+#### Lo que se rechaza, y por qué
+
+- **PKCE obligatorio y solo `S256`.** OAuth 2.1 quita `plain`, que no prueba
+  nada que no pueda producir quien intercepte la petición. Un `/authorize` sin
+  `code_challenge` se rechaza.
+- **`redirect_uri` se compara literalmente** contra las registradas. Ni prefijo,
+  ni normalización, ni ignorar la query: de ahí ha salido todo *open redirect*
+  de un servidor OAuth. Solo se aceptan `https`, `http` en loopback (RFC 8252) y
+  esquemas privados de apps nativas.
+- **Un error que no se pueda redirigir, no se redirige.** Mientras el cliente y
+  la `redirect_uri` no estén verificados, `/authorize` responde con una página,
+  no con un `302`: mandar el error a una URI sin verificar permite enumerar
+  `client_id`s registrados apuntando a un servidor propio. Superadas esas dos
+  comprobaciones, el resto de errores sí van al cliente (RFC 6749 §4.1.2.1).
+- **Un código reutilizado revoca la concesión entera.** Presentar dos veces el
+  mismo código es la firma de uno interceptado, así que no basta con rechazar el
+  segundo intento: se borran todas las concesiones de ese cliente para ese
+  usuario, y los tokens que salieron del primer canje dejan de valer (RFC 6749
+  §10.5).
+- **`resource` (RFC 8707) se comprueba.** Un token emitido aquí es para
+  `PUBLIC_URL/mcp`; pedir otro recurso responde `invalid_target`.
+
+#### Revocación
+
+`DELETE /auth/oauth-grants/:id` (§2.5) borra la fila, y con ella el access y el
+refresh. El siguiente `/mcp` de esa aplicación es un `401` y su siguiente
+refresh un `invalid_grant`: no hay ventana.
+
+#### Configuración
+
+`PUBLIC_URL` es el `issuer` de la metadata. Un cliente compara ese valor con el
+origen desde el que descargó el documento, así que si no coincide con cómo se
+llega de verdad al API, **todas** las conexiones fallan en el descubrimiento.
+`FRONTEND_URL` es a dónde se manda el navegador a consentir.
+
+| Código | Cuándo |
+|---|---|
+| 400 | `invalid_request`, `invalid_grant`, `invalid_scope`, `invalid_client_metadata`, `invalid_redirect_uri`, `invalid_target`, `unsupported_grant_type` |
+| 401 | `invalid_client` — el cliente no existe o su secreto no vale |
+| 403 | `access_denied` — el usuario dijo que no |
 
 ---
 

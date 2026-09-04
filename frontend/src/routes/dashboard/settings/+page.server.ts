@@ -3,7 +3,14 @@ import { fail } from '@sveltejs/kit';
 import * as user from '$lib/api/user';
 import * as market from '$lib/api/market';
 import { env } from '$env/dynamic/private';
-import type { ActiveSession, MarketCredential, MCPToken, TwoFactorStatus } from '$lib/api/types';
+import { mcpCredentialActions } from './mcp-credentials.server';
+import type {
+	ActiveSession,
+	MarketCredential,
+	MCPToken,
+	OAuthGrant,
+	TwoFactorStatus
+} from '$lib/api/types';
 import {
 	ALLOWED_AVATAR_TYPES,
 	MAX_AVATAR_BYTES,
@@ -11,10 +18,6 @@ import {
 	enableTwoFactorSchema,
 	marketKeySchema,
 	marketProviderSchema,
-	mcpTokenError,
-	mcpTokenExpirySchema,
-	mcpTokenIdSchema,
-	mcpTokenNameSchema,
 	profileSchema,
 	sessionIdSchema,
 	setupTwoFactorSchema,
@@ -32,18 +35,23 @@ export const load: PageServerLoad = async ({ locals, fetch, cookies }) => {
 	let marketCredentials: MarketCredential[] = [];
 	// Tampoco contiene el secreto: solo nombre, last4 y fechas.
 	let mcpTokens: MCPToken[] = [];
+	// Aplicaciones externas que pasaron por el consentimiento OAuth. Tampoco
+	// llevan token: el backend solo guarda hashes.
+	let oauthGrants: OAuthGrant[] = [];
 
-	const [sessionsRes, twoFactorRes, credentialsRes, mcpTokensRes] = await Promise.all([
+	const [sessionsRes, twoFactorRes, credentialsRes, mcpTokensRes, grantsRes] = await Promise.all([
 		user.getSessions(event),
 		user.getTwoFactorStatus(event),
 		market.getMarketCredentials(event),
-		user.getMCPTokens(event)
+		user.getMCPTokens(event),
+		user.listOAuthGrants(event)
 	]);
 
 	if (sessionsRes.ok) sessions = sessionsRes.data ?? [];
 	if (twoFactorRes.ok && twoFactorRes.data) twoFactor = twoFactorRes.data;
 	if (credentialsRes.ok) marketCredentials = credentialsRes.data ?? [];
 	if (mcpTokensRes.ok) mcpTokens = mcpTokensRes.data ?? [];
+	if (grantsRes.ok) oauthGrants = grantsRes.data ?? [];
 
 	return {
 		user: locals.user,
@@ -51,6 +59,7 @@ export const load: PageServerLoad = async ({ locals, fetch, cookies }) => {
 		twoFactor,
 		marketCredentials,
 		mcpTokens,
+		oauthGrants,
 		// El cliente MCP habla con el backend directamente, no con esta app, así
 		// que la URL que hay que pegar en su configuración es la del API. Se
 		// resuelve aquí porque BASE_API es privada y no llega al navegador.
@@ -398,69 +407,10 @@ export const actions = {
 		};
 	},
 
-	// --- Tokens MCP --------------------------------------------------------
-	//
-	// El secreto solo existe en la respuesta de crear y de rotar: acaba en el
-	// `form` de la página, que lo muestra una vez, y en ningún otro sitio.
-
-	createMcpToken: async ({ request, fetch, cookies }) => {
-		const action = 'createMcpToken';
-		const formData = await request.formData();
-
-		const name = mcpTokenNameSchema.safeParse(formData.get('name'));
-		if (!name.success) return fail(400, { action, error: name.error.issues[0].message });
-
-		const days = mcpTokenExpirySchema.safeParse(formData.get('expiresInDays'));
-		if (!days.success) return fail(400, { action, error: days.error.issues[0].message });
-
-		const res = await user.createMCPToken(
-			{ cookies, fetch },
-			{ name: name.data, expiresInDays: days.data }
-		);
-
-		if (!res.ok) {
-			return fail(res.status, { action, error: mcpTokenError(action, res.status, res.details) });
-		}
-
-		return { action, success: true, mcpToken: res.data };
-	},
-
-	rotateMcpToken: async ({ request, fetch, cookies }) => {
-		const action = 'rotateMcpToken';
-		const formData = await request.formData();
-
-		const tokenId = mcpTokenIdSchema.safeParse(formData.get('tokenId'));
-		if (!tokenId.success) return fail(400, { action, error: 'Token no válido' });
-
-		const days = mcpTokenExpirySchema.safeParse(formData.get('expiresInDays'));
-		if (!days.success) return fail(400, { action, error: days.error.issues[0].message });
-
-		const res = await user.rotateMCPToken({ cookies, fetch }, tokenId.data, {
-			expiresInDays: days.data
-		});
-
-		if (!res.ok) {
-			return fail(res.status, { action, error: mcpTokenError(action, res.status, res.details) });
-		}
-
-		return { action, success: true, mcpToken: res.data };
-	},
-
-	deleteMcpToken: async ({ request, fetch, cookies }) => {
-		const action = 'deleteMcpToken';
-		const formData = await request.formData();
-
-		const tokenId = mcpTokenIdSchema.safeParse(formData.get('tokenId'));
-		if (!tokenId.success) return fail(400, { action, error: 'Token no válido' });
-
-		const res = await user.deleteMCPToken({ cookies, fetch }, tokenId.data);
-
-		if (!res.ok) {
-			return fail(res.status, { action, error: mcpTokenError(action, res.status, res.details) });
-		}
-
-		return { action, success: true };
-	},
+	// Las acciones de credenciales para clientes MCP —tokens personales y
+	// aplicaciones OAuth— viven aparte: son un dominio propio y esta página ya
+	// estaba en el límite de líneas que comprueba `check:arch`.
+	...mcpCredentialActions,
 
 	revokeOtherSessions: async ({ fetch, cookies }) => {
 		const res = await user.revokeOtherSessions({ cookies, fetch });

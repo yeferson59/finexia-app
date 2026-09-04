@@ -190,3 +190,13 @@ func mcpExpiryDays(days *int) int {
 
 	return *days
 }
+
+// OAuthConsentDecisionDTO is the user's answer on the consent screen.
+//
+// It carries the decision and nothing else on purpose: which client, which
+// scopes and which redirect URI are all read from the parked request that the
+// id in the path names, so a tampered body can change what the user said but
+// never what they said it about.
+type OAuthConsentDecisionDTO struct {
+	Approved bool `json:"approved"`
+}

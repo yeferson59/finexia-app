@@ -80,6 +80,43 @@ type MCPTokenStore interface {
 	DeleteExpiredMCPTokens(ctx context.Context) (int64, error)
 }
 
+// OAuthStore covers the authorization server that fronts /mcp: the registered
+// clients, the two short-lived rows a flow passes through, and the standing
+// grants those flows produce.
+//
+// It is the largest store here, and it stays one interface because every method
+// belongs to a single flow whose steps have to agree about the row shapes they
+// hand each other. Splitting it by table would put the code and the grant in
+// different interfaces even though issuing a token reads one and writes the
+// other in the same call.
+//
+// GetGrantByAccessToken and GetGrantByRefreshToken return unexported types for
+// the reason GetMCPTokenByHash does: an authenticated identity is not a DTO and
+// must not become one by accident.
+type OAuthStore interface {
+	CreateOAuthClient(ctx context.Context, c oauthClient) error
+	GetOAuthClient(ctx context.Context, clientID string) (oauthClient, error)
+
+	CreateAuthorizationRequest(ctx context.Context, req pendingAuthorization) (uuid.UUID, error)
+	GetAuthorizationRequest(ctx context.Context, id uuid.UUID) (pendingAuthorization, error)
+	DeleteAuthorizationRequest(ctx context.Context, id uuid.UUID) error
+
+	CreateAuthorizationCode(ctx context.Context, codeHash string, c authorizationCode) error
+	// ConsumeAuthorizationCode reports whether this call is the one that
+	// claimed the code. A false with no error is a replay, not a failure.
+	ConsumeAuthorizationCode(ctx context.Context, codeHash string) (authorizationCode, bool, error)
+
+	UpsertOAuthGrant(ctx context.Context, userID uuid.UUID, clientID, scope, resource, accessHash string, accessExpiresAt time.Time, refreshHash string, refreshExpiresAt *time.Time) (uuid.UUID, error)
+	GetGrantByAccessToken(ctx context.Context, tokenHash string) (oauthGrantIdentity, error)
+	GetGrantByRefreshToken(ctx context.Context, tokenHash string) (grantRefresh, error)
+	RotateGrantTokens(ctx context.Context, id uuid.UUID, accessHash string, accessExpiresAt time.Time, refreshHash string, refreshExpiresAt *time.Time) error
+	TouchOAuthGrant(ctx context.Context, id uuid.UUID) error
+	ListOAuthGrants(ctx context.Context, userID uuid.UUID) ([]OAuthGrant, error)
+	DeleteOAuthGrant(ctx context.Context, userID, id uuid.UUID) error
+	DeleteOAuthGrantsForClient(ctx context.Context, userID uuid.UUID, clientID string) (int64, error)
+	DeleteExpiredOAuthRows(ctx context.Context) (int64, error)
+}
+
 type TwoFactorStore interface {
 	GetTwoFactor(ctx context.Context, userID uuid.UUID) (TwoFactor, error)
 	UpsertTwoFactorSecret(ctx context.Context, userID uuid.UUID, secret string) error
@@ -133,6 +170,7 @@ type Stores struct {
 	PasswordResets PasswordResetStore
 	Invitations    InvitationStore
 	MCPTokens      MCPTokenStore
+	OAuth          OAuthStore
 	// Waitlist is implemented by the marketing module, not by the module's
 	// own PostgresRepository.
 	Waitlist WaitlistStore

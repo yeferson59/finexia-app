@@ -112,3 +112,6 @@ export const mcpTokenExpirySchema = z.coerce
 
 /** Identificador del token sobre el que actúan rotar y eliminar. */
 export const mcpTokenIdSchema = z.uuid();
+
+/** Id de una aplicación conectada por OAuth, para desconectarla. */
+export const oauthGrantIdSchema = z.uuid();

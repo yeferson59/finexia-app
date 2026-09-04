@@ -9,7 +9,10 @@ import {
 import type { SessionResponse } from '$lib/server/types';
 
 // Private areas must never be indexed even if a URL leaks past robots.txt.
-const PRIVATE_PREFIXES = ['/dashboard', '/auth'];
+// /oauth is here for both reasons: the consent screen needs the session
+// resolved to know who is approving, and an authorization request id has no
+// business in a search index.
+const PRIVATE_PREFIXES = ['/dashboard', '/auth', '/oauth'];
 
 function withRobots(event: Parameters<Handle>[0]['event'], response: Response): Response {
 	if (PRIVATE_PREFIXES.some((prefix) => event.url.pathname.startsWith(prefix))) {

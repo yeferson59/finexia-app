@@ -176,6 +176,34 @@ func TestAppWiresAndRoutes(t *testing.T) {
 		t.Errorf("POST /mcp = %d, want 401 with an invalid token", status)
 	}
 
+	// A missing credential is 401 too, not 400. It is how every MCP client
+	// starts — one unauthenticated call — and a 400 there is a hard failure it
+	// reports as an unreachable server.
+	if status := request("POST", "/mcp"); status != fiber.StatusUnauthorized {
+		t.Errorf("POST /mcp = %d, want 401 with no credential at all", status)
+	}
+
+	// The OAuth discovery documents must answer without a credential: they are
+	// what a client reads *before* it has one, so a guard in front of either
+	// makes the whole authorization flow unreachable.
+	for _, path := range []string{
+		"/.well-known/oauth-protected-resource",
+		"/.well-known/oauth-protected-resource/mcp",
+		"/.well-known/oauth-authorization-server",
+		"/.well-known/oauth-authorization-server/mcp",
+	} {
+		if status := request("GET", path); status != fiber.StatusOK {
+			t.Errorf("GET %s = %d, want 200 without any credential", path, status)
+		}
+	}
+
+	// Registration is open by design (there is no operator to provision an MCP
+	// client), so it must not sit behind the gate either. An empty body is a
+	// 400 from the handler, which is enough to prove it was reached.
+	if status := request("POST", "/oauth/register"); status != fiber.StatusBadRequest {
+		t.Errorf("POST /oauth/register = %d, want 400 for an empty body", status)
+	}
+
 	// The avatar route (docs/API.md §2.3) is public: without a token the
 	// request must get past the JWT gate and reach the handler chain.
 	if status := request("GET", "/users/0b7f9c7e-1111-4222-8333-444455556666/avatar"); status == fiber.StatusBadRequest || status == fiber.StatusUnauthorized {

@@ -94,6 +94,41 @@ export const mcpTokenSecretSchema = mcpTokenSchema.extend({
 	token: z.string()
 });
 
+/**
+ * Una petición de autorización OAuth esperando aprobación
+ * (`GET /auth/oauth/consent/:id`).
+ *
+ * Todo lo que hay aquí lo escribió el backend leyendo la fila que aparcó en
+ * `/oauth/authorize`; el navegador solo llevó el id. `clientName` y `logoUri`
+ * los eligió quien registró el cliente, así que se pintan como texto y como
+ * imagen, nunca como HTML ni como enlace de confianza.
+ */
+export const oauthConsentSchema = z.object({
+	requestId: z.string(),
+	clientName: z.string(),
+	clientUri: z.string().optional(),
+	logoUri: z.string().optional(),
+	redirectUri: z.string(),
+	scopes: z.array(z.string()),
+	expiresAt: z.string()
+});
+
+/**
+ * Una aplicación conectada (`GET /auth/oauth-grants`).
+ *
+ * No hay campo para los tokens, por el mismo motivo que en `mcpTokenSchema`:
+ * el backend solo guarda sus hashes. Lo que identifica la conexión es el nombre
+ * del cliente y cuándo se usó por última vez.
+ */
+export const oauthGrantSchema = z.object({
+	id: z.string(),
+	clientName: z.string(),
+	clientUri: z.string().optional(),
+	scopes: z.array(z.string()),
+	lastUsedAt: z.string().nullable(),
+	createdAt: z.string()
+});
+
 /** Proveedor de datos de mercado para el que se puede aportar una clave. */
 export const marketProviderSchema = z.enum(['finnhub', 'alphavantage']);
 

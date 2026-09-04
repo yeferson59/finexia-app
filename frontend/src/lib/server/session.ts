@@ -58,6 +58,63 @@ export function clearSessionCookies(cookies: Cookies) {
 	cookies.delete(REFRESH_COOKIE, { path: '/' });
 }
 
+/**
+ * Cookie de "vuelve aquí después de iniciar sesión".
+ *
+ * Existe por una página concreta: el consentimiento OAuth. A esa se llega desde
+ * un enlace que abre el cliente MCP, así que llegar sin sesión es lo normal, y
+ * mandar al usuario a `/dashboard` tras el login pierde la petición que estaba
+ * autorizando — el cliente se queda esperando un código que ya nunca llega.
+ *
+ * Va en cookie y no en query porque las acciones de formulario de SvelteKit
+ * postean a `?/login`, lo que se lleva por delante cualquier parámetro que
+ * hubiera en la URL.
+ */
+const RETURN_COOKIE = 'finexia_return_to';
+
+// Un minuto de margen sobre lo que tarda un login. Más allá de eso, quien
+// vuelva es alguien que abandonó el flujo, y llevarlo a una pantalla de
+// consentimiento caducada es peor que llevarlo al dashboard.
+const RETURN_COOKIE_MAX_AGE = 15 * 60;
+
+/**
+ * Guarda a dónde volver. Solo acepta rutas locales: cualquier cosa que empiece
+ * por `//` o traiga esquema es un redirect abierto esperando a que alguien lo
+ * encadene con un login legítimo, así que se descarta en silencio.
+ */
+export function setReturnTo(cookies: Cookies, path: string) {
+	if (!isLocalPath(path)) return;
+
+	cookies.set(RETURN_COOKIE, path, {
+		path: '/',
+		httpOnly: true,
+		secure: !dev,
+		maxAge: RETURN_COOKIE_MAX_AGE,
+		sameSite: 'lax'
+	});
+}
+
+/**
+ * Lee el destino y lo consume: es de un solo uso, para que un login posterior
+ * no reenvíe a una pantalla que ya se resolvió.
+ */
+export function takeReturnTo(cookies: Cookies): string | null {
+	const target = cookies.get(RETURN_COOKIE);
+	if (!target) return null;
+
+	cookies.delete(RETURN_COOKIE, { path: '/' });
+
+	return isLocalPath(target) ? target : null;
+}
+
+/**
+ * Se valida al escribir *y* al leer. Escribir vale para lo que este código
+ * genera; leer vale para lo que llegue en una cookie que el navegador ya tenía.
+ */
+function isLocalPath(path: string): boolean {
+	return path.startsWith('/') && !path.startsWith('//') && !path.includes('\\');
+}
+
 // Single-flight: concurrent requests carrying the same refresh token (e.g. link
 // preload racing with the click navigation) must not each POST /auth/refresh.
 // The backend rotates the refresh token on every call, so two concurrent calls

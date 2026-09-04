@@ -15,6 +15,7 @@ export type {
 	MarketCredential,
 	MCPToken,
 	MCPTokenSecret,
+	OAuthGrant,
 	TwoFactorStatus
 } from '$lib/api/types';
 export { actionSucceeded, actionError, actionData } from '$lib/shared/form';

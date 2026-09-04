@@ -9,6 +9,8 @@ import type {
 	InvitationItem,
 	MCPToken,
 	MCPTokenSecret,
+	OAuthConsent,
+	OAuthGrant,
 	Paginated,
 	TwoFactorStatus,
 	UserItem,
@@ -20,6 +22,8 @@ import {
 	invitationItemSchema,
 	mcpTokenSchema,
 	mcpTokenSecretSchema,
+	oauthConsentSchema,
+	oauthGrantSchema,
 	paginatedSchema,
 	twoFactorStatusSchema,
 	userItemSchema,
@@ -290,4 +294,52 @@ export function rotateMCPToken(
 /** `DELETE /auth/mcp-tokens/:id` — revoca el token. */
 export function deleteMCPToken(event: ApiEvent, id: string): Promise<ApiResult<unknown>> {
 	return apiRequest<unknown>(event, `/auth/mcp-tokens/${id}`, { method: 'DELETE' });
+}
+
+// --- OAuth: consentimiento y aplicaciones conectadas -----------------------
+
+/**
+ * `GET /auth/oauth/consent/:id` — la petición de autorización que la pantalla
+ * de consentimiento va a mostrar.
+ *
+ * El id es lo único que llegó por el navegador: cliente, ámbitos y URI de
+ * retorno salen de la fila que el backend aparcó en `/oauth/authorize`, así que
+ * un id manipulado no puede cambiar *sobre qué* se pregunta, solo apuntar a
+ * otra petición (que no será suya y devolverá 404).
+ */
+export function getOAuthConsent(
+	event: ApiEvent,
+	requestId: string
+): Promise<ApiResult<OAuthConsent>> {
+	return apiRequestSafe(event, `/auth/oauth/consent/${requestId}`, {}, oauthConsentSchema);
+}
+
+/**
+ * `POST /auth/oauth/consent/:id` — aprueba o deniega, y devuelve a dónde hay
+ * que enviar el navegador.
+ *
+ * El redirect lo calcula el backend a partir de la URI registrada del cliente,
+ * nunca de nada que venga del formulario: es la diferencia entre un flujo OAuth
+ * y un redirect abierto.
+ */
+export function decideOAuthConsent(
+	event: ApiEvent,
+	requestId: string,
+	approved: boolean
+): Promise<ApiResult<{ redirectTo: string }>> {
+	return apiRequest<{ redirectTo: string }>(event, `/auth/oauth/consent/${requestId}`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ approved })
+	});
+}
+
+/** `GET /auth/oauth-grants` — aplicaciones externas con acceso a `/mcp`. */
+export function listOAuthGrants(event: ApiEvent): Promise<ApiResult<OAuthGrant[]>> {
+	return apiRequestSafe(event, '/auth/oauth-grants', {}, z.array(oauthGrantSchema));
+}
+
+/** `DELETE /auth/oauth-grants/:id` — desconecta una aplicación. */
+export function revokeOAuthGrant(event: ApiEvent, grantId: string): Promise<ApiResult<unknown>> {
+	return apiRequest<unknown>(event, `/auth/oauth-grants/${grantId}`, { method: 'DELETE' });
 }

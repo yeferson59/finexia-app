@@ -31,6 +31,8 @@ import type {
 	marketSyncResultSchema,
 	mcpTokenSchema,
 	mcpTokenSecretSchema,
+	oauthConsentSchema,
+	oauthGrantSchema,
 	pageMetaSchema,
 	pagedTransactionsSchema,
 	platformSchema,
@@ -173,6 +175,12 @@ export type MCPToken = z.infer<typeof mcpTokenSchema>;
 
 /** Token recién creado o rotado: el único que lleva el secreto. */
 export type MCPTokenSecret = z.infer<typeof mcpTokenSecretSchema>;
+
+/** Petición de autorización OAuth pendiente de aprobar. */
+export type OAuthConsent = z.infer<typeof oauthConsentSchema>;
+
+/** Aplicación externa a la que el usuario dio acceso a `/mcp`. */
+export type OAuthGrant = z.infer<typeof oauthGrantSchema>;
 
 /** Proveedor de datos de mercado para el que se puede aportar una clave. */
 export type MarketProvider = z.infer<typeof marketProviderSchema>;
