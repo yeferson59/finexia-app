@@ -106,6 +106,18 @@ func TestPlatformsAreOrderedByWhatIsInvested(t *testing.T) {
 		t.Errorf("alpha share = %v, want 60", alpha.Percent)
 	}
 
+	// One position, one asset, one portfolio — and priced from the operator's
+	// column, so the gain above is a real movement and not a position valued at
+	// the cost it is being compared against.
+	if alpha.Investments != 1 || alpha.Assets != 1 || alpha.Portfolios != 1 {
+		t.Errorf("alpha spread = %d positions / %d assets / %d portfolios, want 1/1/1",
+			alpha.Investments, alpha.Assets, alpha.Portfolios)
+	}
+	if alpha.PositionsPricedManual != 1 || alpha.PositionsAtCost != 0 || alpha.PositionsPricedOwn != 0 {
+		t.Errorf("alpha pricing = %d own / %d manual / %d at cost, want 0/1/0",
+			alpha.PositionsPricedOwn, alpha.PositionsPricedManual, alpha.PositionsAtCost)
+	}
+
 	// zeta is the smallest but the only one that gained.
 	zeta := dtos[2]
 	if zeta.GainLoss != "20" || zeta.GainLossPct != 20 {
@@ -113,6 +125,73 @@ func TestPlatformsAreOrderedByWhatIsInvested(t *testing.T) {
 	}
 	if zeta.Percent != 10 {
 		t.Errorf("zeta share = %v, want 10", zeta.Percent)
+	}
+}
+
+// A position sold in full is not something the platform holds, and the three
+// counts that describe what it holds have to say so.
+//
+// It contributed nothing to either total already — quantity zero multiplies
+// away — but it was counted as an open position, and its currency was counted
+// as unconvertible, so a platform emptied years ago reported positions it no
+// longer had and an fx warning over an amount of zero.
+func TestSoldOutPositionsDoNotCountAsHeld(t *testing.T) {
+	pool := growthTestPool(t)
+	repo := NewPostgresRepository(pool)
+	ctx := context.Background()
+	userID := platformsByWeight(t, pool)
+
+	// A second position on the same platform, in a currency this account has no
+	// rate for, and sold down to nothing.
+	var sourceID, portfolioID uuid.UUID
+	if err := pool.QueryRow(ctx,
+		`SELECT id, (SELECT id FROM portfolios WHERE user_id = $1 LIMIT 1)
+		 FROM investment_sources WHERE user_id = $1 AND name = 'alpha'`,
+		userID).Scan(&sourceID, &portfolioID); err != nil {
+		t.Fatalf("locate alpha: %v", err)
+	}
+
+	assetID := uuid.New()
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO assets (id, ticker, name, asset_type, currency)
+		 VALUES ($1, $2, 'sold out', 'stock', 'JPY')`,
+		assetID, uuid.New().String()[:8]); err != nil {
+		t.Fatalf("insert asset: %v", err)
+	}
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO portfolio_entries
+		   (portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date)
+		 VALUES ($1, $2, $3, 0, 900, 'JPY', now())`,
+		portfolioID, assetID, sourceID); err != nil {
+		t.Fatalf("insert sold-out entry: %v", err)
+	}
+
+	platforms, err := repo.GetPlatformsWithStats(ctx, userID, money.USD)
+	if err != nil {
+		t.Fatalf("GetPlatformsWithStats: %v", err)
+	}
+
+	var alpha PlatformStats
+	for _, p := range platforms {
+		if p.Name == "alpha" {
+			alpha = p
+		}
+	}
+	if alpha.Name == "" {
+		t.Fatalf("alpha missing from %v", names(platforms))
+	}
+
+	if alpha.Investments != 1 || alpha.Assets != 1 {
+		t.Errorf("alpha = %d positions / %d assets, want 1/1: the sold-out one is not held",
+			alpha.Investments, alpha.Assets)
+	}
+	if alpha.PositionsUnconverted != 0 {
+		t.Errorf("alpha unconverted = %d, want 0: nothing is being added at face value",
+			alpha.PositionsUnconverted)
+	}
+	if alpha.TotalValue != "600.00000000" || alpha.MarketValue != "540.00000000" {
+		t.Errorf("alpha cost/market = %q/%q, want 600/540 unchanged",
+			alpha.TotalValue, alpha.MarketValue)
 	}
 }
 

@@ -414,7 +414,12 @@ type PlatformResponseDTO struct {
 	IsActive    bool      `json:"isActive"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
-	Investments int64     `json:"investments"`
+	// Investments is the platform's open positions; Assets and Portfolios are
+	// how many distinct assets and portfolios those positions span. See
+	// PlatformStats for why the two counts beside the first are worth having.
+	Investments int64 `json:"investments"`
+	Assets      int64 `json:"assets"`
+	Portfolios  int64 `json:"portfolios"`
 	// TotalValue is what the platform cost and MarketValue what it is worth;
 	// GainLoss is the difference and GainLossPct that difference over the cost.
 	// All four are in DisplayCurrency.
@@ -436,6 +441,13 @@ type PlatformResponseDTO struct {
 	// with the amount.
 	DisplayCurrency      string `json:"displayCurrency"`
 	PositionsUnconverted int64  `json:"positionsUnconverted"`
+	// How MarketValue was priced, adding up to Investments. Without them a
+	// GainLoss of zero is ambiguous: it is what a flat platform reports and
+	// also what one whose positions have no market price reports, because such
+	// a position is valued at the cost it is being compared against.
+	PositionsPricedOwn    int64 `json:"positionsPricedOwn"`
+	PositionsPricedManual int64 `json:"positionsPricedManual"`
+	PositionsAtCost       int64 `json:"positionsAtCost"`
 }
 
 func newPlatformResponse(p PlatformStats) PlatformResponseDTO {
@@ -450,13 +462,18 @@ func newPlatformResponse(p PlatformStats) PlatformResponseDTO {
 		CreatedAt:   p.CreatedAt,
 		UpdatedAt:   p.UpdatedAt,
 		Investments: p.Investments,
+		Assets:      p.Assets,
+		Portfolios:  p.Portfolios,
 		TotalValue:  p.TotalValue,
 		MarketValue: p.MarketValue,
 		GainLoss:    gain,
 		GainLossPct: pct,
 
-		DisplayCurrency:      p.DisplayCurrency.String(),
-		PositionsUnconverted: p.PositionsUnconverted,
+		DisplayCurrency:       p.DisplayCurrency.String(),
+		PositionsUnconverted:  p.PositionsUnconverted,
+		PositionsPricedOwn:    p.PositionsPricedOwn,
+		PositionsPricedManual: p.PositionsPricedManual,
+		PositionsAtCost:       p.PositionsAtCost,
 	}
 }
 

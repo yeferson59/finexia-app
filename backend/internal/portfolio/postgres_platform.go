@@ -38,6 +38,11 @@ const platformStatsSelect = `
 		is_.created_at,
 		is_.updated_at,
 		COUNT(pe.id)::bigint AS investments,
+		-- What the positions are spread over. A count of positions alone does
+		-- not say whether ten of them are ten companies or one company held in
+		-- ten portfolios, and those are different accounts.
+		COUNT(DISTINCT pe.asset_id)::bigint     AS assets,
+		COUNT(DISTINCT pe.portfolio_id)::bigint AS portfolios,
 		-- ROUND for the reason 000025 gives: an inverted or hopped rate carries
 		-- twenty-odd decimals of its own, and the total leaves here as text for
 		-- a decimal that errors past nineteen.
@@ -52,13 +57,40 @@ const platformStatsSelect = `
 		-- on one side and nominal on the other is still a mixed-currency total.
 		(COUNT(pe.id) FILTER (
 			WHERE fx.cost_rate IS NULL OR fx.value_rate IS NULL
-		))::bigint AS positions_unconverted
+		))::bigint AS positions_unconverted,
+		-- Where the market value came from, the same three-way split
+		-- portfolio_summary reports and for the same reason: a position with no
+		-- price is carried at its own cost, so it contributes exactly zero to
+		-- the gain. A platform whose positions are all at cost shows a gain of
+		-- zero that means "not priced", not "did not move", and only these
+		-- counts can tell the two apart.
+		--
+		-- They are taken over pe.id rather than over the asset, so the three add
+		-- up to investments exactly.
+		(COUNT(pe.id) FILTER (WHERE uap.price IS NOT NULL))::bigint AS positions_priced_own,
+		(COUNT(pe.id) FILTER (
+			WHERE uap.price IS NULL AND a.current_price IS NOT NULL
+		))::bigint AS positions_priced_manual,
+		(COUNT(pe.id) FILTER (
+			WHERE COALESCE(uap.price, a.current_price) IS NULL
+		))::bigint AS positions_at_cost
 	FROM investment_sources is_
 	JOIN users u ON u.id = is_.user_id
 	CROSS JOIN LATERAL (
 		SELECT COALESCE(NULLIF(%s::text, ''), u.preferred_currency)::CHAR(3) AS currency
 	) target
-	LEFT JOIN portfolio_entries pe ON pe.source_id = is_.id
+	-- quantity > 0 rides on the join and not on a WHERE, because the WHERE would
+	-- turn the outer join inner and drop every platform that holds nothing —
+	-- and a platform the owner just created has to appear in the list that is
+	-- meant to show it to them.
+	--
+	-- The filter itself is what the holdings and the allocation already apply:
+	-- a position sold in full is not something the platform holds. It cost
+	-- nothing to leave in — quantity zero contributes zero to both sums — but it
+	-- was being counted as a position, and its currency was being counted as
+	-- unconvertible, so a platform emptied years ago reported open positions and
+	-- an fx warning over an amount of zero.
+	LEFT JOIN portfolio_entries pe ON pe.source_id = is_.id AND pe.quantity > 0
 	LEFT JOIN assets a              ON a.id = pe.asset_id
 	LEFT JOIN user_asset_prices uap ON uap.asset_id = pe.asset_id AND uap.user_id = is_.user_id
 	-- The price and the currency it is quoted in are picked together, the way
@@ -105,8 +137,10 @@ func (r *PostgresRepository) GetPlatformsWithStats(ctx context.Context, userID u
 		if err := rows.Scan(
 			&p.ID, &p.Name, &p.Description, &p.SourceType,
 			&p.IsActive, &p.CreatedAt, &p.UpdatedAt,
-			&p.Investments, &p.TotalValue, &p.MarketValue,
+			&p.Investments, &p.Assets, &p.Portfolios,
+			&p.TotalValue, &p.MarketValue,
 			&p.DisplayCurrency, &p.PositionsUnconverted,
+			&p.PositionsPricedOwn, &p.PositionsPricedManual, &p.PositionsAtCost,
 		); err != nil {
 			return nil, err
 		}
@@ -140,8 +174,10 @@ func (r *PostgresRepository) UpdatePlatform(ctx context.Context, userID, sourceI
 	`, sourceID, userID, "").Scan(
 		&p.ID, &p.Name, &p.Description, &p.SourceType,
 		&p.IsActive, &p.CreatedAt, &p.UpdatedAt,
-		&p.Investments, &p.TotalValue, &p.MarketValue,
+		&p.Investments, &p.Assets, &p.Portfolios,
+		&p.TotalValue, &p.MarketValue,
 		&p.DisplayCurrency, &p.PositionsUnconverted,
+		&p.PositionsPricedOwn, &p.PositionsPricedManual, &p.PositionsAtCost,
 	); err != nil {
 		return PlatformStats{}, err
 	}

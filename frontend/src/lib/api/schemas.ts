@@ -283,8 +283,21 @@ export const platformSchema = z.object({
 	/** Alias histórico de `sourceType` en algunas vistas/formularios. */
 	type: z.string().optional(),
 	isActive: z.boolean(),
+	/** Posiciones abiertas: las vendidas del todo ya no son algo que se tenga. */
 	investments: z.number(),
-	/** Lo invertido: cantidad × coste medio, en `displayCurrency`. */
+	/**
+	 * Sobre cuántos activos y portafolios se reparten esas posiciones. Diez
+	 * posiciones son una cuenta distinta si son diez empresas que si son una
+	 * empresa repetida en diez portafolios.
+	 */
+	assets: z.number().optional(),
+	portfolios: z.number().optional(),
+	/**
+	 * Lo invertido: cantidad × coste medio ponderado, en `displayCurrency`.
+	 *
+	 * Es el coste de lo que **sigue en cartera** — `quantity` es lo que queda
+	 * tras las ventas — y no incluye comisiones ni lo que una venta realizó.
+	 */
 	totalValue: z.string(),
 	/**
 	 * Métricas de la plataforma, todas en `displayCurrency` y sobre las mismas
@@ -313,6 +326,18 @@ export const platformSchema = z.object({
 	 * había tasa para su moneda: si es > 0 el total mezcla monedas.
 	 */
 	positionsUnconverted: z.number().optional(),
+	/**
+	 * De dónde salió `marketValue`, y suman `investments`.
+	 *
+	 * Una posición sin precio de mercado se valora a su propio coste, que es
+	 * justo contra lo que se la compara: aporta cero a la ganancia. Así que una
+	 * `gainLoss` de cero es lo que informa una plataforma plana y también una
+	 * cuyas posiciones no tienen precio, y solo `positionsAtCost` distingue «no
+	 * se movió» de «no está valorada».
+	 */
+	positionsPricedOwn: z.number().optional(),
+	positionsPricedManual: z.number().optional(),
+	positionsAtCost: z.number().optional(),
 	createdAt: z.string()
 });
 

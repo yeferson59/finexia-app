@@ -430,8 +430,10 @@ Cada fila lleva, toda en `displayCurrency`:
 | `gainLoss` | `marketValue − totalValue` |
 | `gainLossPct` | Esa diferencia sobre lo invertido, en % |
 | `percent` | Parte del total invertido de la cuenta que vive en esta plataforma |
-| `investments` | Número de posiciones |
+| `investments` | Posiciones **abiertas** |
+| `assets` / `portfolios` | Activos y portafolios distintos sobre los que se reparten |
 | `positionsUnconverted` | Posiciones contadas a valor nominal por falta de tasa **en cualquiera de las dos patas** |
+| `positionsPricedOwn` / `positionsPricedManual` / `positionsAtCost` | De dónde salió `marketValue`; suman `investments` |
 
 `percent` es lo que hace legible el orden: «la más grande» dice poco hasta que
 es «la más grande, y tiene el 62% del dinero». Es participación sobre el coste,
@@ -445,6 +447,32 @@ peor que no decir nada. `gainLoss` sí viaja ahí, porque no lo necesita.
 El precio de cada posición y la moneda en la que cotiza se eligen juntos, igual
 que en `/portfolios/holdings`: una posición sin precio de mercado se valora a su
 propio coste, que es un importe en la moneda de coste y no en la del activo.
+
+##### Qué cuenta como posición, y qué no
+
+Solo las que tienen `quantity > 0`, el mismo filtro que aplican
+`/portfolios/holdings` y la asignación: una posición vendida del todo no es algo
+que la plataforma tenga. Nunca aportó a los importes —cantidad cero multiplica y
+desaparece— pero sí se contaba en `investments` y, si su moneda no tenía tasa,
+en `positionsUnconverted`: una plataforma vaciada hace años informaba posiciones
+que ya no existían y un aviso de cambio sobre un importe de cero.
+
+##### Por qué hacen falta los tres contadores de precio
+
+Una posición sin precio de mercado se valora **a su propio coste**, que es justo
+contra lo que se la compara, así que aporta exactamente cero a `gainLoss`. Un
+`gainLoss` de cero es entonces lo que informa una plataforma plana y también una
+que nadie ha valorado, y `positionsAtCost` es lo único que las separa. Se toman
+sobre la posición y no sobre el activo, así que los tres suman `investments`.
+
+##### Qué no incluye lo invertido
+
+`totalValue` es el coste de lo que **sigue en cartera**: `quantity` es el neto
+que queda tras las ventas, así que una posición vendida a medias arrastra la
+mitad de su coste. No lleva comisiones —el coste medio que escribe el trigger de
+`recalculate_avg_cost` es un precio, no un desembolso— ni lo que una venta
+realizó; para el dinero que entró y salió de verdad está el flujo de caja de
+`transaction_cash_flow` (000027).
 
 #### Eliminar una posición no es eliminar una transacción
 

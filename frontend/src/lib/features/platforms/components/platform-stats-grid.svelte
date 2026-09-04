@@ -22,6 +22,40 @@
 		gain: number | null;
 		formatCurrency: (value: string) => string;
 	} = $props();
+
+	/**
+	 * Sobre qué se reparten las posiciones. Va de nota bajo el contador en vez
+	 * de en tarjetas propias: son dos números que solo significan algo pegados
+	 * al que cuentan, y cuatro tarjetas ya son las que caben.
+	 */
+	const spread = $derived.by(() => {
+		const parts: string[] = [];
+		if (platform.assets !== undefined) {
+			parts.push(`${platform.assets} ${platform.assets === 1 ? 'activo' : 'activos'}`);
+		}
+		if (platform.portfolios !== undefined && platform.portfolios > 0) {
+			parts.push(
+				`${platform.portfolios} ${platform.portfolios === 1 ? 'portafolio' : 'portafolios'}`
+			);
+		}
+		return parts.join(' · ');
+	});
+
+	/**
+	 * Cuántas posiciones siguen valoradas a su propio coste.
+	 *
+	 * Es lo que hace legible la ganancia: una posición sin precio de mercado se
+	 * valora al coste contra el que se la compara, así que aporta exactamente
+	 * cero. Sin este número, una ganancia de cero puede ser una plataforma que
+	 * no se movió o una que nadie ha valorado, y son cosas distintas.
+	 */
+	const atCost = $derived(platform.positionsAtCost ?? 0);
+
+	/**
+	 * Cuando *todas* lo están, la ganancia no es una cifra pequeña: es cero por
+	 * construcción, y decirlo entero merece un aviso y no una nota al pie.
+	 */
+	const allAtCost = $derived(platform.investments > 0 && atCost === platform.investments);
 </script>
 
 <div class="stats-grid">
@@ -36,6 +70,9 @@
 		<div class="stat-content">
 			<span class="stat-label">Posiciones</span>
 			<span class="stat-value">{platform.investments}</span>
+			{#if spread}
+				<span class="stat-note">{spread}</span>
+			{/if}
 		</div>
 	</div>
 	<div class="stat-card">
@@ -64,6 +101,14 @@
 			<div class="stat-content">
 				<span class="stat-label">Valor de Mercado</span>
 				<span class="stat-value">{formatCurrency(platform.marketValue)}</span>
+				<!-- Cuando lo están todas, el aviso de abajo lo dice entero y esta
+				     nota sería la mitad del mismo mensaje. -->
+				{#if atCost > 0 && !allAtCost}
+					<span class="stat-note">
+						{atCost}
+						{atCost === 1 ? 'posición valorada' : 'posiciones valoradas'} a coste
+					</span>
+				{/if}
 			</div>
 		</div>
 	{/if}
@@ -91,6 +136,14 @@
 		</div>
 	{/if}
 </div>
+
+{#if allAtCost}
+	<p class="fx-note">
+		Ninguna posición de esta plataforma tiene precio de mercado guardado, así que se valoran a su
+		propio coste: el valor de mercado repite lo invertido y la ganancia sale en cero porque no hay
+		con qué compararla, no porque no se haya movido.
+	</p>
+{/if}
 
 {#if unconverted > 0}
 	<p class="fx-note">

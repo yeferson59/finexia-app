@@ -456,16 +456,36 @@ type PlatformStats struct {
 	IsActive    bool       `json:"isActive"`
 	CreatedAt   time.Time  `json:"createdAt"`
 	UpdatedAt   time.Time  `json:"updatedAt"`
-	Investments int64      `json:"investments"`
+	// Investments counts the platform's open positions — entries still holding
+	// something. A position sold in full is not one of them, the same rule the
+	// holdings and the allocation apply.
+	Investments int64 `json:"investments"`
+	// Assets and Portfolios are what those positions are spread over: the same
+	// ten positions are a different account when they are ten companies than
+	// when they are one company held in ten portfolios.
+	Assets     int64 `json:"assets"`
+	Portfolios int64 `json:"portfolios"`
 	// TotalValue is the cost basis: what the owner put in, at weighted-average
 	// cost. The name predates there being anything else to compare it against
 	// and is kept because clients read it; MarketValue is what the same
 	// positions are worth now, in the same currency and over the same rows, so
 	// the two subtract into a real gain.
+	//
+	// Both are the cost and value of what is *still held*: quantity is the net
+	// left after sales, so a position sold down to half carries half its cost.
+	// Neither includes commissions — the average cost the trigger writes is a
+	// price, not a cash outlay — and neither counts what a sale realised.
 	TotalValue           string         `json:"totalValue"`
 	MarketValue          string         `json:"marketValue"`
 	DisplayCurrency      money.Currency `json:"displayCurrency"`
 	PositionsUnconverted int64          `json:"positionsUnconverted"`
+	// Where MarketValue came from, partitioning Investments exactly. A position
+	// with no price is carried at its own cost and contributes zero to the
+	// gain, so a platform reporting no gain at all is either flat or unpriced,
+	// and only these three counts separate the two.
+	PositionsPricedOwn    int64 `json:"positionsPricedOwn"`
+	PositionsPricedManual int64 `json:"positionsPricedManual"`
+	PositionsAtCost       int64 `json:"positionsAtCost"`
 }
 
 // SummaryView is the result of joining portfolios + risks + portfolio_summary view.

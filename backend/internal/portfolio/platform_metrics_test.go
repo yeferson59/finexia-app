@@ -102,3 +102,45 @@ func TestSinglePlatformResponseClaimsNoShare(t *testing.T) {
 		t.Errorf("gainLoss = %q, want 1000: the gain does not need one", dto.GainLoss)
 	}
 }
+
+// The counts that describe what a platform holds travel with the amounts, and
+// the three pricing ones partition the positions exactly.
+//
+// That partition is the point: a platform whose positions have no market price
+// is valued at the cost it is being compared against, so it reports a gain of
+// zero — the same figure a genuinely flat platform reports. PositionsAtCost is
+// what separates "did not move" from "not priced".
+func TestPlatformResponseCarriesWhatItHolds(t *testing.T) {
+	dto := newPlatformResponse(PlatformStats{
+		Name:            "mixta",
+		Investments:     5,
+		Assets:          3,
+		Portfolios:      2,
+		TotalValue:      "1000.00",
+		MarketValue:     "1000.00",
+		DisplayCurrency: money.USD,
+
+		PositionsPricedOwn:    1,
+		PositionsPricedManual: 2,
+		PositionsAtCost:       2,
+	})
+
+	if dto.Assets != 3 || dto.Portfolios != 2 {
+		t.Errorf("spread = %d assets / %d portfolios, want 3/2", dto.Assets, dto.Portfolios)
+	}
+
+	sum := dto.PositionsPricedOwn + dto.PositionsPricedManual + dto.PositionsAtCost
+	if sum != dto.Investments {
+		t.Errorf("pricing counts add to %d, want %d: the three partition the positions",
+			sum, dto.Investments)
+	}
+
+	// Flat on the face of it, and the counts are the only thing that says two of
+	// the five never had a price to move.
+	if dto.GainLoss != "0" || dto.GainLossPct != 0 {
+		t.Errorf("gain = %q / %v, want 0 / 0", dto.GainLoss, dto.GainLossPct)
+	}
+	if dto.PositionsAtCost == 0 {
+		t.Error("positionsAtCost = 0: a zero gain would then be indistinguishable from an unpriced one")
+	}
+}
