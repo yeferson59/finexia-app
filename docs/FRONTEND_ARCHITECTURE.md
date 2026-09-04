@@ -24,7 +24,9 @@ frontend/src/
 └── lib/
     ├── api/          # capa de acceso al backend (server-only)
     │   ├── client.ts     # authedFetch/authedFetchSafe: auth, refresh y redirección
-    │   ├── schemas.ts    # contratos HTTP como schemas Zod, espejo de docs/API.md
+    │   ├── schemas/      # contratos HTTP como schemas Zod, espejo de docs/API.md,
+    │   │                 #   por dominio: pagination · portfolio · transactions ·
+    │   │                 #   platforms · market · user
     │   ├── types.ts      # los tipos, derivados de los schemas con z.infer
     │   └── auth.ts · portfolio.ts · transactions.ts · platforms.ts ·
     │     market.ts · user.ts · marketing.ts
@@ -63,14 +65,14 @@ api/  ui/        ← acceso al backend · design system (no se conocen entre sí
 shared/          ← utilidades transversales sin dominio
 ```
 
-| Regla | Motivo |
-|---|---|
-| `lib/shared` no importa de `features`, `api` ni `ui` | Es la capa más baja: todos dependen de ella. |
-| `lib/ui` no conoce dominios (ni `features` ni `api`) | El design system se reutiliza; recibe todo por props o snippets. |
-| `lib/api` no depende de la UI ni de `features` | Es el acceso al backend, no sabe cómo se pinta. |
-| Una feature no importa de otra feature | Lo compartido baja a `ui`, `api` o `shared`. Dentro de una feature todo es relativo. |
-| `routes/` importa `$lib/features/<x>`, nunca sus internos | El `index.ts` es el contrato de la feature; lo demás puede cambiar sin avisar. |
-| `routes/` no importa `lib/api/client` | Los paths y los tipos viven en los módulos de dominio de `lib/api`. |
+| Regla                                                     | Motivo                                                                               |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `lib/shared` no importa de `features`, `api` ni `ui`      | Es la capa más baja: todos dependen de ella.                                         |
+| `lib/ui` no conoce dominios (ni `features` ni `api`)      | El design system se reutiliza; recibe todo por props o snippets.                     |
+| `lib/api` no depende de la UI ni de `features`            | Es el acceso al backend, no sabe cómo se pinta.                                      |
+| Una feature no importa de otra feature                    | Lo compartido baja a `ui`, `api` o `shared`. Dentro de una feature todo es relativo. |
+| `routes/` importa `$lib/features/<x>`, nunca sus internos | El `index.ts` es el contrato de la feature; lo demás puede cambiar sin avisar.       |
+| `routes/` no importa `lib/api/client`                     | Los paths y los tipos viven en los módulos de dominio de `lib/api`.                  |
 
 **Todas fallan el CI**: están implementadas con `no-restricted-imports` por
 directorio en [`eslint.config.js`](../frontend/eslint.config.js).
@@ -81,7 +83,7 @@ un barrel de JS no puede reexportar un side-effect de CSS.
 
 ## 3. Convenciones
 
-- **Contratos del backend en un solo sitio.** `lib/api/schemas.ts` los define
+- **Contratos del backend en un solo sitio.** `lib/api/schemas/` los define
   como schemas Zod, mantenidos a mano contra [`API.md`](./API.md), y
   `lib/api/types.ts` los deriva con `z.infer`: el tipo no puede desalinearse de
   su schema. Ninguna feature redeclara un shape del backend: lo importa de
@@ -117,12 +119,12 @@ un barrel de JS no puede reexportar un side-effect de CSS.
 
 ## 4. Pruebas
 
-| Nivel | Dónde | Qué cubre |
-|---|---|---|
-| Unit (node) | `*.spec.ts` junto al módulo | Helpers puros, schemas, capa de API, sesión. |
-| Componente (browser) | `*.svelte.spec.ts` | Render y comportamiento de componentes de `ui` y de features. |
-| E2E (Playwright) | `frontend/e2e/*.e2e.ts` | Flujos completos contra el stub `e2e/mocks/mock-api.mjs`, escrito contra `docs/API.md`. |
-| Contrato del stub | `e2e/mocks/contract.spec.ts` | Que las fixtures del stub cumplan los schemas de `lib/api`, para que la suite E2E no pase en verde sobre formas que el backend no envía. |
+| Nivel                | Dónde                        | Qué cubre                                                                                                                                |
+| -------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit (node)          | `*.spec.ts` junto al módulo  | Helpers puros, schemas, capa de API, sesión.                                                                                             |
+| Componente (browser) | `*.svelte.spec.ts`           | Render y comportamiento de componentes de `ui` y de features.                                                                            |
+| E2E (Playwright)     | `frontend/e2e/*.e2e.ts`      | Flujos completos contra el stub `e2e/mocks/mock-api.mjs`, escrito contra `docs/API.md`.                                                  |
+| Contrato del stub    | `e2e/mocks/contract.spec.ts` | Que las fixtures del stub cumplan los schemas de `lib/api`, para que la suite E2E no pase en verde sobre formas que el backend no envía. |
 
 ```bash
 cd frontend
@@ -145,12 +147,12 @@ llame al cliente HTTP, que no reaparezcan los caminos del legacy
 
 ## 5. Dónde poner código nuevo
 
-| Si es… | Va a… |
-|---|---|
-| Una llamada nueva al backend | `lib/api/<dominio>.ts` + su schema en `lib/api/schemas.ts` (el tipo sale solo) |
-| Un componente de un dominio | `lib/features/<feature>/components/` (y al `index.ts` solo si lo usa `routes/` u otra área) |
-| Un helper puro de un dominio | `lib/features/<feature>/<feature>.ts` con su spec |
-| La validación de un formulario | `lib/features/<feature>/schemas.ts` |
-| Un componente reutilizable sin dominio | `lib/ui/` |
-| Un formateador o utilidad transversal | `lib/shared/` |
-| Una página | `routes/`: loader delgado + composición |
+| Si es…                                 | Va a…                                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Una llamada nueva al backend           | `lib/api/<dominio>.ts` + su schema en `lib/api/schemas/<dominio>.ts` (el tipo sale solo)    |
+| Un componente de un dominio            | `lib/features/<feature>/components/` (y al `index.ts` solo si lo usa `routes/` u otra área) |
+| Un helper puro de un dominio           | `lib/features/<feature>/<feature>.ts` con su spec                                           |
+| La validación de un formulario         | `lib/features/<feature>/schemas.ts`                                                         |
+| Un componente reutilizable sin dominio | `lib/ui/`                                                                                   |
+| Un formateador o utilidad transversal  | `lib/shared/`                                                                               |
+| Una página                             | `routes/`: loader delgado + composición                                                     |

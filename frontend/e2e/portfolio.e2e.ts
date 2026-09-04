@@ -30,9 +30,12 @@ test.describe('portfolio detail', () => {
 		await page.getByRole('button', { name: '+ Agregar' }).click();
 		await expect(page.getByRole('button', { name: 'Registrar transacción' })).toBeVisible();
 
+		await page.keyboard.press('Escape');
+		await expect(page.getByRole('dialog', { name: 'Registrar transacción' })).not.toBeVisible();
+
 		// La venta rápida se abre desde el lote de compra del historial.
 		await page.getByRole('button', { name: 'Vender' }).click();
-		await expect(page.getByText('Vender desde compra')).toBeVisible();
+		await expect(page.getByRole('dialog', { name: 'Vender posición' })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Confirmar Venta Total' })).toBeVisible();
 	});
 

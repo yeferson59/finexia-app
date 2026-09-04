@@ -1,41 +1,25 @@
 <script lang="ts">
 	/**
-	 * Tarjeta de formulario de las pantallas de catálogo (activos y tasas).
+	 * Estilo de los campos que comparten el alta y el import de las pantallas de
+	 * catálogo (activos y tasas), con `:global` acotado a este envoltorio.
 	 *
-	 * Interna de la feature. Aporta el título y, con `:global` acotado a la
-	 * tarjeta, el estilo de los campos que comparten el alta y el import de las
-	 * dos pantallas (`.form-grid`, `.field-input`, `.form-error`…).
+	 * Interna de la feature. Aportaba también el título y la tarjeta; los pone
+	 * ahora el `Modal` que aloja el formulario, que es quien tiene el encabezado.
 	 */
 	import type { Snippet } from 'svelte';
-	import Card from '$lib/ui/card.svelte';
 
 	interface Props {
-		title: string;
 		children: Snippet;
 	}
 
-	let { title, children }: Props = $props();
+	let { children }: Props = $props();
 </script>
 
 <div class="create-form-wrap">
-	<Card padding="md">
-		<h2 class="form-title">{title}</h2>
-		{@render children()}
-	</Card>
+	{@render children()}
 </div>
 
 <style>
-	.create-form-wrap {
-		margin-bottom: 1.5rem;
-	}
-
-	.form-title {
-		font-size: 0.95rem;
-		font-weight: 600;
-		color: var(--text);
-		margin: 0 0 1.25rem 0;
-	}
-
 	.create-form-wrap :global(.form-grid) {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -106,5 +90,6 @@
 	.create-form-wrap :global(.form-actions) {
 		display: flex;
 		justify-content: flex-end;
+		gap: 0.75rem;
 	}
 </style>

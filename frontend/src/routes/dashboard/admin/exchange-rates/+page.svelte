@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import PageHeader from '$lib/ui/page-header.svelte';
 	import Button from '$lib/ui/button.svelte';
+	import Modal from '$lib/ui/modal.svelte';
 	import {
 		ExchangeRateCreateForm,
 		ExchangeRatesTable,
@@ -69,42 +70,44 @@
 					Actualizar desde el feed
 				</Button>
 			</form>
-			<Button
-				variant="secondary"
-				size="sm"
-				type="button"
-				onclick={() => (showCreateForm = !showCreateForm)}
-			>
-				{showCreateForm ? 'Cancelar' : '+ Nueva Tasa'}
+			<Button variant="secondary" size="sm" type="button" onclick={() => (showCreateForm = true)}>
+				Nueva tasa
 			</Button>
-			<Button
-				variant="secondary"
-				size="sm"
-				type="button"
-				onclick={() => (showImportForm = !showImportForm)}
-			>
-				{showImportForm ? 'Cancelar' : 'Importar CSV/Excel'}
+			<Button variant="secondary" size="sm" type="button" onclick={() => (showImportForm = true)}>
+				Importar CSV/Excel
 			</Button>
 		</div>
 	{/snippet}
 </PageHeader>
 
-{#if showCreateForm}
+<Modal
+	open={showCreateForm}
+	title="Nueva tasa de cambio"
+	description="Las tasas son compartidas: la que guardes aquí la usan todas las cuentas."
+	onClose={() => (showCreateForm = false)}
+	size="lg"
+>
 	<ExchangeRateCreateForm
 		error={form?.createError ?? ''}
+		onCancel={() => (showCreateForm = false)}
 		onSuccess={() => {
 			showCreateForm = false;
 			created.show('Tasa de cambio creada correctamente.');
 		}}
 	/>
-{/if}
+</Modal>
 
-{#if showImportForm}
+<Modal
+	open={showImportForm}
+	title="Importar tasas desde CSV/Excel"
+	onClose={() => (showImportForm = false)}
+	size="lg"
+>
 	<ImportCard
-		title="Importar tasas desde CSV/Excel"
 		action="importRates"
 		error={form?.importError ?? ''}
 		result={importResult}
+		onCancel={() => (showImportForm = false)}
 		onSuccess={() => (showImportForm = false)}
 	>
 		{#snippet hint()}
@@ -112,7 +115,7 @@
 			<code>rate</code>. Se admite .csv, .xlsx y .xls.
 		{/snippet}
 	</ImportCard>
-{/if}
+</Modal>
 
 <ExchangeRatesTable rates={data.rates} {form} />
 

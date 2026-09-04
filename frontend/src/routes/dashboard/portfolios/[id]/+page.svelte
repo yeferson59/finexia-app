@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import Modal from '$lib/ui/modal.svelte';
 	import { PortfolioGrowth } from '$lib/features/dashboard';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { flash } from '$lib/shared/flash.svelte';
@@ -110,21 +111,28 @@
 	<div class="alert alert-error">{submitError}</div>
 {/if}
 
-{#if isEditing && portfolio}
-	<PortfolioEditForm
-		{portfolio}
-		{risks}
-		onCancel={() => (isEditing = false)}
-		onSaved={() => {
-			// El error de un intento anterior tiene que irse con el acuse nuevo:
-			// si no, la pantalla mostraba las dos alertas a la vez.
-			submitError = '';
-			isEditing = false;
-			saved.show('Portafolio actualizado correctamente.');
-		}}
-		onError={(msg) => (submitError = msg)}
-	/>
-{/if}
+<Modal
+	open={isEditing && !!portfolio}
+	title="Editar portafolio"
+	onClose={() => (isEditing = false)}
+	size="lg"
+>
+	{#if portfolio}
+		<PortfolioEditForm
+			{portfolio}
+			{risks}
+			onCancel={() => (isEditing = false)}
+			onSaved={() => {
+				// El error de un intento anterior tiene que irse con el acuse nuevo:
+				// si no, la pantalla mostraba las dos alertas a la vez.
+				submitError = '';
+				isEditing = false;
+				saved.show('Portafolio actualizado correctamente.');
+			}}
+			onError={(msg) => (submitError = msg)}
+		/>
+	{/if}
+</Modal>
 
 {#if unconverted.length > 0}
 	<p class="alert alert-warning">

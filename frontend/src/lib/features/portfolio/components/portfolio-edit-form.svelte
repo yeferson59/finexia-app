@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { untrack } from 'svelte';
-	import Card from '$lib/ui/card.svelte';
 	import { PORTFOLIO_TYPES } from '../portfolio';
 
 	interface EditablePortfolio {
@@ -47,91 +46,78 @@
 	});
 </script>
 
-<Card variant="elevated" padding="sm">
-	<form
-		method="POST"
-		action="?/updatePortfolio"
-		class="edit-form"
-		use:enhance={() => {
-			isSubmitting = true;
-			return async ({ result, update }) => {
-				if (result.type === 'success') {
-					onSaved();
-				} else if (result.type === 'failure') {
-					onError(
-						(result.data as { error?: string })?.error ?? 'Error al actualizar el portafolio.'
-					);
-				}
-				await update({ reset: false });
-				isSubmitting = false;
-			};
-		}}
-	>
-		<h3 class="edit-title">Editar portafolio</h3>
+<form
+	method="POST"
+	action="?/updatePortfolio"
+	class="edit-form"
+	use:enhance={() => {
+		isSubmitting = true;
+		return async ({ result, update }) => {
+			if (result.type === 'success') {
+				onSaved();
+			} else if (result.type === 'failure') {
+				onError((result.data as { error?: string })?.error ?? 'Error al actualizar el portafolio.');
+			}
+			await update({ reset: false });
+			isSubmitting = false;
+		};
+	}}
+>
+	<div class="form-group">
+		<label for="edit-name">Nombre</label>
+		<input id="edit-name" name="name" type="text" bind:value={editName} required minlength="2" />
+	</div>
+
+	<div class="form-group">
+		<label for="edit-description">Descripción</label>
+		<textarea id="edit-description" name="description" rows="2" bind:value={editDescription}
+		></textarea>
+	</div>
+
+	<div class="form-row">
+		<div class="form-group">
+			<label for="edit-type">Tipo</label>
+			<select id="edit-type" name="type" bind:value={editType}>
+				{#each PORTFOLIO_TYPES as pt (pt.value)}
+					<option value={pt.value}>{pt.label}</option>
+				{/each}
+			</select>
+		</div>
 
 		<div class="form-group">
-			<label for="edit-name">Nombre</label>
-			<input id="edit-name" name="name" type="text" bind:value={editName} required minlength="2" />
+			<label for="edit-risk">Nivel de riesgo</label>
+			<select id="edit-risk" name="riskId" bind:value={editRiskId}>
+				{#each risks as risk (risk.id)}
+					<option value={risk.id}>{risk.name}</option>
+				{/each}
+			</select>
 		</div>
+	</div>
 
-		<div class="form-group">
-			<label for="edit-description">Descripción</label>
-			<textarea id="edit-description" name="description" rows="2" bind:value={editDescription}
-			></textarea>
-		</div>
+	<div class="form-check">
+		<input
+			id="edit-default"
+			name="isDefault"
+			type="checkbox"
+			bind:checked={editIsDefault}
+			value="true"
+		/>
+		<label for="edit-default">Portafolio por defecto</label>
+	</div>
 
-		<div class="form-row">
-			<div class="form-group">
-				<label for="edit-type">Tipo</label>
-				<select id="edit-type" name="type" bind:value={editType}>
-					{#each PORTFOLIO_TYPES as pt (pt.value)}
-						<option value={pt.value}>{pt.label}</option>
-					{/each}
-				</select>
-			</div>
-
-			<div class="form-group">
-				<label for="edit-risk">Nivel de riesgo</label>
-				<select id="edit-risk" name="riskId" bind:value={editRiskId}>
-					{#each risks as risk (risk.id)}
-						<option value={risk.id}>{risk.name}</option>
-					{/each}
-				</select>
-			</div>
-		</div>
-
-		<div class="form-check">
-			<input
-				id="edit-default"
-				name="isDefault"
-				type="checkbox"
-				bind:checked={editIsDefault}
-				value="true"
-			/>
-			<label for="edit-default">Portafolio por defecto</label>
-		</div>
-
-		<div class="form-actions">
-			<button type="button" class="btn-cancel" onclick={onCancel}>Cancelar</button>
-			<button type="submit" class="btn-save" disabled={isSubmitting}>
-				{isSubmitting ? 'Guardando…' : 'Guardar cambios'}
-			</button>
-		</div>
-	</form>
-</Card>
+	<div class="form-actions">
+		<button type="button" class="btn-cancel" onclick={onCancel}>Cancelar</button>
+		<button type="submit" class="btn-save" disabled={isSubmitting}>
+			{isSubmitting ? 'Guardando…' : 'Guardar cambios'}
+		</button>
+	</div>
+</form>
 
 <style>
 	.edit-form {
 		display: flex;
 		flex-direction: column;
 		gap: 1.25rem;
-	}
-
-	.edit-title {
-		margin: 0 0 0.25rem;
-		font-size: 1rem;
-		font-weight: 600;
-		color: var(--text);
 	}
 
 	.form-group {

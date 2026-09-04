@@ -36,7 +36,6 @@
 	let sellDate = $state(todayLocalDateString());
 	let sellNotes = $state('');
 	let isSellSubmitting = $state(false);
-	let sellPanelEl = $state<HTMLElement | null>(null);
 
 	$effect(() => {
 		if (transaction) {
@@ -50,7 +49,6 @@
 			sellRate = '';
 			sellNotes = '';
 			sellDate = todayLocalDateString();
-			setTimeout(() => sellPanelEl?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
 		}
 	});
 
@@ -111,8 +109,8 @@
 	);
 </script>
 
-<div class="sell-panel" bind:this={sellPanelEl}>
-	<AssetSellPanelHeader {transaction} {formatCurrency} {onClose} />
+<div class="sell-panel">
+	<AssetSellPanelHeader {transaction} {formatCurrency} />
 
 	<div class="sell-mode-toggle">
 		<button
@@ -290,12 +288,8 @@
 </div>
 
 <style>
+	/* El marco lo pone el modal; aquí sólo queda el ritmo vertical. */
 	.sell-panel {
-		margin-bottom: 1.5rem;
-		padding: 1.25rem;
-		border: 1px solid rgba(224, 90, 90, 0.3);
-		border-radius: 10px;
-		background: rgba(224, 90, 90, 0.05);
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;

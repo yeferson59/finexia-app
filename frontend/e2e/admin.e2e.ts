@@ -47,9 +47,14 @@ test.describe('admin', () => {
 		await login(page, ADMIN_EMAIL);
 		await page.goto('/dashboard/admin/assets');
 
-		await page.getByRole('button', { name: '+ Nuevo Activo' }).click();
+		await page.getByRole('button', { name: 'Nuevo activo' }).click();
 		await expect(page.getByRole('heading', { name: 'Nuevo activo' })).toBeVisible();
 		await expect(page.locator('#ticker')).toBeVisible();
+
+		// Cada alta es un modal, así que hay que cerrar uno para abrir el otro.
+		// Escape lo trae el `<dialog>` nativo.
+		await page.keyboard.press('Escape');
+		await expect(page.getByRole('heading', { name: 'Nuevo activo' })).not.toBeVisible();
 
 		await page.getByRole('button', { name: 'Importar CSV/Excel' }).click();
 		await expect(
@@ -72,7 +77,7 @@ test.describe('admin', () => {
 		await expect(row.getByText('TRM (automática)')).toBeVisible();
 		await expect(page.locator('tr', { hasText: 'EUR/USD' }).getByText('Manual')).toBeVisible();
 
-		await page.getByRole('button', { name: '+ Nueva Tasa' }).click();
+		await page.getByRole('button', { name: 'Nueva tasa' }).click();
 		await expect(page.getByRole('heading', { name: 'Nueva tasa de cambio' })).toBeVisible();
 		await expect(page.locator('#fromCurrency')).toBeVisible();
 	});

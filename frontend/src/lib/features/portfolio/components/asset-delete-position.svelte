@@ -14,6 +14,8 @@
 	 */
 	import { enhance } from '$app/forms';
 	import { goto, invalidateAll } from '$app/navigation';
+	import Modal from '$lib/ui/modal.svelte';
+	import Button from '$lib/ui/button.svelte';
 	import { resolve } from '$app/paths';
 	import { formatCalendarDate } from '$lib/shared/format/date';
 	import type { Holding } from '$lib/api/types';
@@ -80,18 +82,8 @@
 	{/each}
 </section>
 
-{#if confirming}
-	<div
-		class="modal-backdrop"
-		role="button"
-		tabindex="0"
-		aria-label="Cerrar modal"
-		onclick={close}
-		onkeydown={(e) => e.key === 'Enter' && close()}
-	></div>
-	<div class="modal" role="dialog" aria-modal="true" aria-label="Eliminar posición">
-		<h3>Eliminar posición</h3>
-
+<Modal open={!!confirming} title="Eliminar posición" onClose={close} size="sm">
+	{#if confirming}
 		<p class="summary">
 			<strong>{confirming.ticker}</strong> — {entryLabel(confirming)}
 		</p>
@@ -106,7 +98,7 @@
 		</p>
 
 		{#if deleteError}
-			<p class="error">{deleteError}</p>
+			<p class="error" role="alert">{deleteError}</p>
 		{/if}
 
 		<form
@@ -140,16 +132,13 @@
 		>
 			<input type="hidden" name="entryId" value={confirming.id} />
 			<div class="modal-actions">
-				<button type="button" class="btn-cancel" onclick={close} disabled={isDeleting}>
-					Cancelar
-				</button>
-				<button type="submit" class="btn-confirm" disabled={isDeleting}>
-					{isDeleting ? 'Eliminando…' : 'Eliminar posición'}
-				</button>
+				<Button type="button" variant="ghost" onclick={close} disabled={isDeleting}>Cancelar</Button
+				>
+				<Button type="submit" variant="danger" loading={isDeleting}>Eliminar posición</Button>
 			</div>
 		</form>
-	</div>
-{/if}
+	{/if}
+</Modal>
 
 <style>
 	.danger-zone {
@@ -215,35 +204,6 @@
 		border-color: rgba(224, 90, 90, 0.6);
 	}
 
-	.modal-backdrop {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.65);
-		z-index: 40;
-		border: none;
-	}
-
-	.modal {
-		position: fixed;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		z-index: 50;
-		width: min(440px, calc(100vw - 2rem));
-		padding: 1.5rem;
-		border: 1px solid rgba(224, 90, 90, 0.3);
-		border-radius: 14px;
-		background: var(--surface);
-		box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
-	}
-
-	.modal h3 {
-		margin: 0 0 1rem;
-		font-size: 1.1rem;
-		font-weight: 600;
-		color: var(--text);
-	}
-
 	.summary {
 		margin: 0 0 0.6rem;
 		font-size: 0.9rem;
@@ -271,35 +231,5 @@
 		display: flex;
 		gap: 0.75rem;
 		justify-content: flex-end;
-	}
-
-	.btn-cancel {
-		padding: 0.55rem 1.1rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.2);
-		border-radius: 7px;
-		background: transparent;
-		color: rgba(236, 234, 229, 0.6);
-		font-size: 0.88rem;
-		font-weight: 600;
-		font-family: var(--font-body);
-		cursor: pointer;
-	}
-
-	.btn-confirm {
-		padding: 0.55rem 1.25rem;
-		border: none;
-		border-radius: 7px;
-		background: rgba(224, 90, 90, 0.9);
-		color: #fff;
-		font-size: 0.88rem;
-		font-weight: 700;
-		font-family: var(--font-body);
-		cursor: pointer;
-	}
-
-	.btn-confirm:disabled,
-	.btn-cancel:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
 	}
 </style>

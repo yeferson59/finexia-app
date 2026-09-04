@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import Card from '$lib/ui/card.svelte';
 	import { PLATFORM_TYPES, type Platform } from '../platforms';
 
 	let {
@@ -16,91 +15,66 @@
 	let isSubmitting = $state(false);
 </script>
 
-<Card variant="elevated" padding="none">
-	<div class="panel-body">
-		<h2 class="section-title">Editar Plataforma</h2>
-
-		<form
-			method="POST"
-			action="?/update"
-			class="platform-form"
-			use:enhance={() => {
-				isSubmitting = true;
-				return async ({ result, update }) => {
-					await update({ reset: false });
-					isSubmitting = false;
-					if (result.type === 'success' && result.data?.success) {
-						onSaved();
-					}
-				};
-			}}
-		>
-			<div class="form-group">
-				<label for="name" class="form-label">Nombre <span class="required">*</span></label>
-				<input
-					id="name"
-					name="name"
-					type="text"
-					value={platform.name}
-					class="form-input"
-					required
-				/>
-			</div>
-
-			<div class="form-group">
-				<label for="description" class="form-label">Descripción</label>
-				<textarea id="description" name="description" class="form-textarea" rows="3"
-					>{platform.description}</textarea
-				>
-			</div>
-
-			<div class="form-row">
-				<div class="form-group">
-					<label for="type" class="form-label">Tipo <span class="required">*</span></label>
-					<select id="type" name="type" class="form-select" required>
-						{#each PLATFORM_TYPES.entries() as [key, label] (key)}
-							<option value={key} selected={key === platform.sourceType}>{label}</option>
-						{/each}
-					</select>
-				</div>
-
-				<div class="form-group">
-					<label for="isActive" class="form-label">Estado</label>
-					<select id="isActive" name="isActive" class="form-select">
-						<option value="true" selected={platform.isActive}>Activo</option>
-						<option value="false" selected={!platform.isActive}>Inactivo</option>
-					</select>
-				</div>
-			</div>
-
-			<div class="form-actions">
-				<button type="button" onclick={onCancel} class="btn btn-secondary"> Cancelar </button>
-				<button type="submit" disabled={isSubmitting} class="btn btn-primary">
-					{#if isSubmitting}
-						<span class="spinner"></span>
-						Guardando...
-					{:else}
-						Guardar Cambios
-					{/if}
-				</button>
-			</div>
-		</form>
+<form
+	method="POST"
+	action="?/update"
+	class="platform-form"
+	use:enhance={() => {
+		isSubmitting = true;
+		return async ({ result, update }) => {
+			await update({ reset: false });
+			isSubmitting = false;
+			if (result.type === 'success' && result.data?.success) {
+				onSaved();
+			}
+		};
+	}}
+>
+	<div class="form-group">
+		<label for="name" class="form-label">Nombre <span class="required">*</span></label>
+		<input id="name" name="name" type="text" value={platform.name} class="form-input" required />
 	</div>
-</Card>
+
+	<div class="form-group">
+		<label for="description" class="form-label">Descripción</label>
+		<textarea id="description" name="description" class="form-textarea" rows="3"
+			>{platform.description}</textarea
+		>
+	</div>
+
+	<div class="form-row">
+		<div class="form-group">
+			<label for="type" class="form-label">Tipo <span class="required">*</span></label>
+			<select id="type" name="type" class="form-select" required>
+				{#each PLATFORM_TYPES.entries() as [key, label] (key)}
+					<option value={key} selected={key === platform.sourceType}>{label}</option>
+				{/each}
+			</select>
+		</div>
+
+		<div class="form-group">
+			<label for="isActive" class="form-label">Estado</label>
+			<select id="isActive" name="isActive" class="form-select">
+				<option value="true" selected={platform.isActive}>Activo</option>
+				<option value="false" selected={!platform.isActive}>Inactivo</option>
+			</select>
+		</div>
+	</div>
+
+	<div class="form-actions">
+		<button type="button" onclick={onCancel} class="btn btn-secondary"> Cancelar </button>
+		<button type="submit" disabled={isSubmitting} class="btn btn-primary">
+			{#if isSubmitting}
+				<span class="spinner"></span>
+				Guardando...
+			{:else}
+				Guardar Cambios
+			{/if}
+		</button>
+	</div>
+</form>
 
 <style>
-	.panel-body {
-		padding: 1.75rem;
-	}
-
-	.section-title {
-		margin: 0 0 1.5rem;
-		font-size: 1.15rem;
-		font-weight: 400;
-		color: var(--text);
-		font-family: var(--font-display);
-	}
-
 	.platform-form {
 		display: flex;
 		flex-direction: column;

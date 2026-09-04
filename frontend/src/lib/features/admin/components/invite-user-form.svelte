@@ -6,7 +6,6 @@
 	 * de un solo uso y la persona elige la suya.
 	 */
 	import { enhance } from '$app/forms';
-	import Card from '$lib/ui/card.svelte';
 	import Input from '$lib/ui/input.svelte';
 	import Button from '$lib/ui/button.svelte';
 	import { actionData, actionError } from '$lib/shared/form';
@@ -21,9 +20,11 @@
 		 * actions de la pantalla (banear, eliminar, revocar…).
 		 */
 		onSuccess?: () => void;
+		/** Cierra el modal sin enviar. */
+		onCancel?: () => void;
 	}
 
-	let { form, onSuccess }: Props = $props();
+	let { form, onSuccess, onCancel }: Props = $props();
 
 	// Estado local del formulario: la página lo desmonta cuando la invitación
 	// sale, así que vuelve vacío la próxima vez que se abre.
@@ -38,85 +39,67 @@
 	const invited = $derived(actionData<string>(form, 'inviteUser', 'invited'));
 </script>
 
-<div class="create-form-card">
-	<Card padding="md">
-		<h2 class="form-title">Invitar a un nuevo usuario</h2>
-		<p class="form-hint">
-			Enviaremos un enlace seguro de un solo uso para que la persona cree su propia contraseña.
-		</p>
-		<form
-			method="POST"
-			action="?/inviteUser"
-			use:enhance={() => {
-				inviting = true;
-				return async ({ result, update }) => {
-					inviting = false;
-					await update();
-					if (result.type === 'success') onSuccess?.();
-				};
-			}}
-		>
-			<div class="form-row">
-				<Input label="Nombre (opcional)" name="name" bind:value={inviteName} />
-				<Input
-					label="Correo electrónico"
-					name="email"
-					type="email"
-					bind:value={inviteEmail}
-					required
-				/>
-				<div class="field">
-					<span class="field-label">Rol</span>
-					<select class="select" name="role" bind:value={inviteRole}>
-						{#each INVITE_ROLES as role (role.value)}
-							<option value={role.value}>{role.label}</option>
-						{/each}
-					</select>
-				</div>
-			</div>
-			{#if error}
-				<p class="form-error">{error}</p>
-			{/if}
-			{#if invited}
-				<p class="form-success">Invitación enviada a {invited}.</p>
-			{/if}
-			<div class="form-actions">
-				<Button type="submit" loading={inviting}>Enviar invitación</Button>
-			</div>
-		</form>
-	</Card>
-</div>
+<form
+	method="POST"
+	action="?/inviteUser"
+	use:enhance={() => {
+		inviting = true;
+		return async ({ result, update }) => {
+			inviting = false;
+			await update();
+			if (result.type === 'success') onSuccess?.();
+		};
+	}}
+>
+	<div class="form-row">
+		<Input label="Nombre (opcional)" name="name" bind:value={inviteName} />
+		<Input label="Correo electrónico" name="email" type="email" bind:value={inviteEmail} required />
+		<div class="field">
+			<span class="field-label">Rol</span>
+			<select class="select" name="role" bind:value={inviteRole}>
+				{#each INVITE_ROLES as role (role.value)}
+					<option value={role.value}>{role.label}</option>
+				{/each}
+			</select>
+		</div>
+	</div>
+	{#if error}
+		<p class="form-error">{error}</p>
+	{/if}
+	{#if invited}
+		<p class="form-success">Invitación enviada a {invited}.</p>
+	{/if}
+	<div class="form-actions">
+		{#if onCancel}
+			<Button type="button" variant="ghost" onclick={onCancel}>Cancelar</Button>
+		{/if}
+		<Button type="submit" loading={inviting}>Enviar invitación</Button>
+	</div>
+</form>
 
 <style>
-	.create-form-card {
-		margin-bottom: 1.5rem;
-	}
-
-	.form-title {
-		font-size: 0.95rem;
-		font-weight: 600;
-		color: var(--text);
-		margin: 0 0 0.35rem 0;
-	}
-
-	.form-hint {
-		font-size: 0.82rem;
-		color: var(--text-dim);
-		margin: 0 0 1.25rem 0;
-	}
-
+	/* Dentro del modal no hay ancho para tres columnas: nombre y correo
+	   comparten línea y el rol baja a la suya. */
 	.form-row {
 		display: grid;
-		grid-template-columns: 1fr 1fr auto;
+		grid-template-columns: 1fr 1fr;
 		gap: 1rem;
 		margin-bottom: 1rem;
 		align-items: end;
 	}
 
 	.field {
+		grid-column: 1 / -1;
+	}
+
+	.field {
 		display: flex;
 		flex-direction: column;
 		gap: 0.4rem;
+	}
+
+	.select {
+		width: 100%;
 	}
 
 	.field-label {
@@ -156,10 +139,11 @@
 
 	.form-actions {
 		display: flex;
+		gap: 0.75rem;
 		justify-content: flex-end;
 	}
 
-	@media (max-width: 768px) {
+	@media (max-width: 640px) {
 		.form-row {
 			grid-template-columns: 1fr;
 		}

@@ -2,7 +2,7 @@
 	/** Alta manual de una tasa de cambio del catálogo compartido. */
 	import { enhance } from '$app/forms';
 	import Button from '$lib/ui/button.svelte';
-	import AdminFormCard from './admin-form-card.svelte';
+	import AdminFormFields from './admin-form-fields.svelte';
 
 	interface Props {
 		error?: string;
@@ -11,14 +11,16 @@
 		 * y no desde el `form` común, que también cambia con el resto de actions.
 		 */
 		onSuccess?: () => void;
+		/** Cierra el modal sin enviar. */
+		onCancel?: () => void;
 	}
 
-	let { error = '', onSuccess }: Props = $props();
+	let { error = '', onSuccess, onCancel }: Props = $props();
 
 	let creating = $state(false);
 </script>
 
-<AdminFormCard title="Nueva tasa de cambio">
+<AdminFormFields>
 	<form
 		method="POST"
 		action="?/createRate"
@@ -76,7 +78,10 @@
 			<p class="form-error">{error}</p>
 		{/if}
 		<div class="form-actions">
+			{#if onCancel}
+				<Button type="button" variant="ghost" onclick={onCancel}>Cancelar</Button>
+			{/if}
 			<Button type="submit" loading={creating}>Crear tasa</Button>
 		</div>
 	</form>
-</AdminFormCard>
+</AdminFormFields>

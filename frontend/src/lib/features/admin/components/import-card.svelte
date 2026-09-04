@@ -9,11 +9,10 @@
 	import type { Snippet } from 'svelte';
 	import { enhance } from '$app/forms';
 	import Button from '$lib/ui/button.svelte';
-	import AdminFormCard from './admin-form-card.svelte';
+	import AdminFormFields from './admin-form-fields.svelte';
 	import { summarizeImport, type ImportResult } from '../admin';
 
 	interface Props {
-		title: string;
 		/** Nombre de la form action, sin el `?/`. */
 		action: string;
 		/** Descripción de las columnas que espera el archivo. */
@@ -25,14 +24,16 @@
 		 * y no desde el `form` común, que también cambia con el resto de actions.
 		 */
 		onSuccess?: () => void;
+		/** Cierra el modal sin enviar. */
+		onCancel?: () => void;
 	}
 
-	let { title, action, hint, error = '', result = null, onSuccess }: Props = $props();
+	let { action, hint, error = '', result = null, onSuccess, onCancel }: Props = $props();
 
 	let importing = $state(false);
 </script>
 
-<AdminFormCard {title}>
+<AdminFormFields>
 	<p class="import-hint">{@render hint()}</p>
 	<form
 		method="POST"
@@ -49,6 +50,9 @@
 	>
 		<div class="import-row">
 			<input type="file" name="file" accept=".csv,.xlsx,.xls" class="field-input" required />
+			{#if onCancel}
+				<Button type="button" variant="ghost" onclick={onCancel}>Cancelar</Button>
+			{/if}
 			<Button type="submit" loading={importing}>Importar</Button>
 		</div>
 		{#if error}
@@ -67,7 +71,7 @@
 			{/if}
 		</div>
 	{/if}
-</AdminFormCard>
+</AdminFormFields>
 
 <style>
 	.import-hint {

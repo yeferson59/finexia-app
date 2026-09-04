@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import Modal from '$lib/ui/modal.svelte';
 	import type { Holding, Transaction } from '$lib/api/types';
 	import type { AssetActionResult, TxnMeta } from '../asset';
 	import AssetTransactionForm from './asset-transaction-form.svelte';
 	import AssetSellPanel from './asset-sell-panel.svelte';
 	import AssetTransactionsTable from './asset-transactions-table.svelte';
-	import AssetTransactionEditModal from './asset-transaction-edit-modal.svelte';
-	import AssetTransactionDeleteDialog from './asset-transaction-delete-dialog.svelte';
+	import AssetTransactionEditForm from './asset-transaction-edit-form.svelte';
+	import AssetTransactionDeleteConfirm from './asset-transaction-delete-confirm.svelte';
 
 	let {
 		portfolioId,
@@ -69,31 +70,39 @@
 					· página {currentPage} de {totalPages}
 				{/if}
 			</span>
-			<button class="btn-add" onclick={() => (showAddForm = !showAddForm)}>
-				{#if showAddForm}
-					Cancelar
-				{:else}
-					+ Agregar
-				{/if}
+			<button class="btn-add" type="button" onclick={() => (showAddForm = true)}>
+				+ Agregar
 			</button>
 		</div>
 	</header>
 
-	{#if showAddForm}
+	<Modal
+		open={showAddForm}
+		title="Registrar transacción"
+		onClose={() => (showAddForm = false)}
+		size="lg"
+	>
 		<AssetTransactionForm {entries} {formError} onCancel={() => (showAddForm = false)} />
-	{/if}
+	</Modal>
 
-	{#if sellFromTxn}
-		<AssetSellPanel
-			transaction={sellFromTxn}
-			{entries}
-			{marketPrice}
-			fallbackCurrency={entries[0]?.costCurrency ?? 'USD'}
-			formError={formError && !showAddForm}
-			{formatCurrency}
-			onClose={() => (sellFromTxn = null)}
-		/>
-	{/if}
+	<Modal
+		open={!!sellFromTxn}
+		title="Vender posición"
+		onClose={() => (sellFromTxn = null)}
+		size="lg"
+	>
+		{#if sellFromTxn}
+			<AssetSellPanel
+				transaction={sellFromTxn}
+				{entries}
+				{marketPrice}
+				fallbackCurrency={entries[0]?.costCurrency ?? 'USD'}
+				formError={formError && !showAddForm}
+				{formatCurrency}
+				onClose={() => (sellFromTxn = null)}
+			/>
+		{/if}
+	</Modal>
 
 	<AssetTransactionsTable
 		{transactions}
@@ -106,17 +115,26 @@
 	/>
 </section>
 
-{#if editingTxn}
-	<AssetTransactionEditModal transaction={editingTxn} onClose={() => (editingTxn = null)} />
-{/if}
+<Modal open={!!editingTxn} title="Editar transacción" onClose={() => (editingTxn = null)} size="lg">
+	{#if editingTxn}
+		<AssetTransactionEditForm transaction={editingTxn} onClose={() => (editingTxn = null)} />
+	{/if}
+</Modal>
 
-{#if deletingTxn}
-	<AssetTransactionDeleteDialog
-		transaction={deletingTxn}
-		{formatAmount}
-		onClose={() => (deletingTxn = null)}
-	/>
-{/if}
+<Modal
+	open={!!deletingTxn}
+	title="Eliminar transacción"
+	onClose={() => (deletingTxn = null)}
+	size="sm"
+>
+	{#if deletingTxn}
+		<AssetTransactionDeleteConfirm
+			transaction={deletingTxn}
+			{formatAmount}
+			onClose={() => (deletingTxn = null)}
+		/>
+	{/if}
+</Modal>
 
 <style>
 	.panel {

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageHeader from '$lib/ui/page-header.svelte';
 	import Button from '$lib/ui/button.svelte';
+	import Modal from '$lib/ui/modal.svelte';
 	import { AssetCreateForm, AssetsTable, ImportCard, type ImportResult } from '$lib/features/admin';
 	import { flash } from '$lib/shared/flash.svelte';
 
@@ -29,42 +30,44 @@
 			{#if created.text}
 				<span class="sync-success">{created.text}</span>
 			{/if}
-			<Button
-				variant="secondary"
-				size="sm"
-				type="button"
-				onclick={() => (showCreateForm = !showCreateForm)}
-			>
-				{showCreateForm ? 'Cancelar' : '+ Nuevo Activo'}
+			<Button variant="secondary" size="sm" type="button" onclick={() => (showCreateForm = true)}>
+				Nuevo activo
 			</Button>
-			<Button
-				variant="secondary"
-				size="sm"
-				type="button"
-				onclick={() => (showImportForm = !showImportForm)}
-			>
-				{showImportForm ? 'Cancelar' : 'Importar CSV/Excel'}
+			<Button variant="secondary" size="sm" type="button" onclick={() => (showImportForm = true)}>
+				Importar CSV/Excel
 			</Button>
 		</div>
 	{/snippet}
 </PageHeader>
 
-{#if showCreateForm}
+<Modal
+	open={showCreateForm}
+	title="Nuevo activo"
+	description="Se añade al catálogo compartido, así que queda disponible para todas las cuentas."
+	onClose={() => (showCreateForm = false)}
+	size="lg"
+>
 	<AssetCreateForm
 		error={form?.createError ?? ''}
+		onCancel={() => (showCreateForm = false)}
 		onSuccess={() => {
 			showCreateForm = false;
 			created.show('Activo creado correctamente.');
 		}}
 	/>
-{/if}
+</Modal>
 
-{#if showImportForm}
+<Modal
+	open={showImportForm}
+	title="Importar activos desde CSV/Excel"
+	onClose={() => (showImportForm = false)}
+	size="lg"
+>
 	<ImportCard
-		title="Importar activos desde CSV/Excel"
 		action="importAssets"
 		error={form?.importError ?? ''}
 		result={importResult}
+		onCancel={() => (showImportForm = false)}
 		onSuccess={() => (showImportForm = false)}
 	>
 		{#snippet hint()}
@@ -73,7 +76,7 @@
 			.csv, .xlsx y .xls.
 		{/snippet}
 	</ImportCard>
-{/if}
+</Modal>
 
 <AssetsTable assets={data.assets} {form} />
 

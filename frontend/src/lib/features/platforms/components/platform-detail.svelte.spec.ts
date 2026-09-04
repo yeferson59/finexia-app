@@ -25,7 +25,7 @@ describe('platform-detail.svelte', () => {
 			.element(page.getByRole('heading', { name: 'Interactive Brokers' }))
 			.toBeInTheDocument();
 		// broker -> "Bróker" via PLATFORM_TYPES
-		await expect.element(page.getByText('Bróker').first()).toBeInTheDocument();
+		await expect.element(page.getByText(/Bróker/).first()).toBeInTheDocument();
 	});
 
 	it('labels the invested total with the currency the backend reports', async () => {

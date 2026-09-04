@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/shared/css';
 
-	type Variant = 'primary' | 'secondary' | 'ghost' | 'tertiary';
+	type Variant = 'primary' | 'secondary' | 'ghost' | 'tertiary' | 'danger';
 	type Size = 'sm' | 'md' | 'lg';
 
 	interface Props {
@@ -34,7 +34,8 @@
 		primary: 'btn-primary',
 		secondary: 'btn-secondary',
 		ghost: 'btn-ghost',
-		tertiary: 'btn-tertiary'
+		tertiary: 'btn-tertiary',
+		danger: 'btn-danger'
 	};
 
 	const sizeClasses: Record<Size, string> = {
@@ -120,6 +121,18 @@
 		background: var(--border);
 		border-color: var(--amber);
 		color: var(--amber);
+	}
+
+	/* Danger variant: la acción que borra, en las confirmaciones. */
+	.btn-danger {
+		background: var(--red);
+		border: 1.5px solid var(--red);
+		color: #1a0606;
+	}
+
+	.btn-danger:hover:not(:disabled) {
+		background: #e97070;
+		border-color: #e97070;
 	}
 
 	/* Tertiary variant */

@@ -6,7 +6,7 @@
  * catálogo compartido (activos y tasas de cambio). `admin.ts` aporta las
  * constantes y los formateadores, y reexporta los contratos de `$lib/api/types`.
  *
- * `admin-section`, `admin-form-card` y `admin-table-card` son el chrome interno
+ * `admin-section`, `admin-form-fields` y `admin-table-card` son el chrome interno
  * que comparten esas pantallas y no forman parte de la superficie pública.
  */
 export { default as InviteUserForm } from './components/invite-user-form.svelte';

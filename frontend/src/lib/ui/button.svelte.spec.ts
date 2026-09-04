@@ -27,6 +27,14 @@ describe('button.svelte', () => {
 		await expect.element(button).toHaveClass('btn-lg');
 	});
 
+	// La acción que borra, en las confirmaciones. Cada diálogo pintaba su propio
+	// rojo hasta que los cuatro pasaron por el `Modal` compartido.
+	it('applies the danger variant for destructive actions', async () => {
+		render(Button, { variant: 'danger', children: text('Eliminar') });
+
+		await expect.element(page.getByRole('button', { name: 'Eliminar' })).toHaveClass('btn-danger');
+	});
+
 	it('is disabled when either disabled or loading is set', async () => {
 		const { rerender } = await render(Button, { disabled: true, children: text('X') });
 		await expect.element(page.getByRole('button')).toBeDisabled();
