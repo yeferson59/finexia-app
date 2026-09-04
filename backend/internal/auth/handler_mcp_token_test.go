@@ -293,18 +293,17 @@ func TestRotateMCPTokenEndpointWithoutABody(t *testing.T) {
 // TestMCPTokenEndpointsRequireASession: they mint and destroy credentials, so
 // they sit behind the same gate as everything else under /auth.
 //
-// The two statuses are jwtware's, shared by every guarded route in the app: a
-// missing Authorization header is a malformed request (400) and a header
-// carrying something that is not a valid session is a rejected one (401). What
-// this test is for is the part that matters either way — the store is never
-// reached without a session.
+// Both failures answer 401, which is the guard's own answer rather than
+// jwtware's default: a missing Authorization header is an unauthenticated
+// request, not a malformed one. What this test is for is the part that matters
+// either way — the store is never reached without a session.
 func TestMCPTokenEndpointsRequireASession(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		bearer     string
 		wantStatus int
 	}{
-		{name: "no header", bearer: "", wantStatus: fiber.StatusBadRequest},
+		{name: "no header", bearer: "", wantStatus: fiber.StatusUnauthorized},
 		{name: "not a session", bearer: "Bearer nonsense", wantStatus: fiber.StatusUnauthorized},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

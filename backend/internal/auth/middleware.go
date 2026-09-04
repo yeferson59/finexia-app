@@ -27,6 +27,22 @@ import (
 func (m *Module) RequireAuth() fiber.Handler {
 	return jwtware.New(jwtware.Config{
 		SigningKey: jwtware.SigningKey{Key: []byte(m.cfg.JWTSecret)},
+		// jwtware's default answers a *missing* Authorization header with 400
+		// and a present-but-bad one with 401, in plain text. Both are wrong
+		// here: no credential is not a malformed request, it is an
+		// unauthenticated one, and every other error in this API travels in the
+		// httpx envelope.
+		//
+		// The status is what an MCP client acts on. A client's first call to
+		// /mcp carries no credential by design — it expects the 401 that names
+		// the scheme and starts the authorization flow — and reads a 400 as a
+		// broken server instead, which is exactly what "MCP server returned
+		// 400" in Claude's connector is.
+		ErrorHandler: func(c fiber.Ctx, err error) error {
+			c.Set(fiber.HeaderWWWAuthenticate, `Bearer realm="finexia"`)
+
+			return httpx.Unauthorized(c, "Unauthorized", err.Error())
+		},
 		SuccessHandler: func(c fiber.Ctx) error {
 			jwtToken := jwtware.FromContext(c)
 			claims, ok := jwtToken.Claims.(jwt.MapClaims)

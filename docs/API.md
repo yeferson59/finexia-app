@@ -874,12 +874,24 @@ Configuración de un cliente MCP:
   "mcpServers": {
     "finexia": {
       "type": "http",
-      "url": "https://finexia.me/mcp",
+      "url": "https://api.finexia.me/mcp",
       "headers": { "Authorization": "Bearer fnx_mcp_<token de ajustes>" }
     }
   }
 }
 ```
+
+En Claude Code, lo mismo en una orden:
+
+```sh
+claude mcp add --transport http finexia https://api.finexia.me/mcp \
+  --header "Authorization: Bearer fnx_mcp_<token de ajustes>"
+```
+
+El conector remoto de claude.ai **no** sirve para esto: solo sabe autenticarse
+por OAuth 2.1 con registro dinámico de cliente, y no hay dónde pegarle un token
+personal. Mientras `/mcp` se guarde con bearer, el cliente tiene que ser uno que
+permita fijar la cabecera.
 
 ---
 
