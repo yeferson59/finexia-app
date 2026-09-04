@@ -8,7 +8,6 @@ import (
 	"uuid"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/adaptor"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -42,10 +41,10 @@ func (c caller) isAdmin() bool {
 
 type callerKey struct{}
 
-func withCaller(ctx context.Context, c caller) context.Context {
-	return context.WithValue(ctx, callerKey{}, c)
-}
-
+// callerFrom reads the caller back out on the net/http side. The context it is
+// given is the *fasthttp.RequestCtx the adaptation hands to the handler, and
+// that type answers Value from its user values — which is what makes the key
+// bindCaller wrote visible here.
 func callerFrom(ctx context.Context) (caller, bool) {
 	c, ok := ctx.Value(callerKey{}).(caller)
 
@@ -53,26 +52,27 @@ func callerFrom(ctx context.Context) (caller, bool) {
 }
 
 // bindCaller copies the identity the auth middleware wrote into the request
-// locals onto the request's context.Context.
+// locals onto the fasthttp request, as a user value.
 //
 // This is the bridge across the transport boundary. The MCP handler is a
-// net/http handler behind the Fiber adaptor, so it never sees a fiber.Ctx and
-// cannot call httpx.Identity for itself; adaptor.HTTPHandlerWithContext
-// forwards whatever c.Context() holds, which makes the context the one place
-// the caller can travel through.
+// net/http handler behind Fiber's adaptation, so it never sees a fiber.Ctx and
+// cannot call httpx.Identity for itself. A user value is what survives that
+// crossing: the adaptation serves the handler a request whose context is the
+// RequestCtx itself, so what is set here is what getServer can read.
 func bindCaller(c fiber.Ctx) error {
 	userID, _, role, err := httpx.Identity(c)
 	if err != nil {
 		return httpx.Unauthorized(c, "Invalid identity", err.Error())
 	}
 
-	c.SetContext(withCaller(c, caller{userID: userID, role: role}))
+	c.RequestCtx().SetUserValue(callerKey{}, caller{userID: userID, role: role})
 
 	return c.Next()
 }
 
-// transport builds the MCP endpoint: the SDK's streamable HTTP handler, wrapped
-// for Fiber.
+// transport builds the MCP endpoint: the SDK's streamable HTTP handler, which
+// Routes registers as-is — Fiber v3 takes a net/http handler natively and
+// adapts it itself, so there is nothing here to wrap.
 //
 // Neither option is a workaround for the adaptor. fasthttp's adaptor does honour
 // Flush since v1.73 — an event stream reaches the client through it — so both
@@ -93,12 +93,10 @@ func bindCaller(c fiber.Ctx) error {
 // survive stateless mode, but only over an event stream. Dropping JSONResponse
 // is all that would take, and no tool here runs long enough to want it.
 func (m *Module) transport() http.Handler {
-	handler := mcpsdk.NewStreamableHTTPHandler(m.getServer, new(mcpsdk.StreamableHTTPOptions{
+	return mcpsdk.NewStreamableHTTPHandler(m.getServer, new(mcpsdk.StreamableHTTPOptions{
 		Stateless:    true,
 		JSONResponse: true,
 	}))
-
-	return handler
 }
 
 // getServer returns the MCP server that will answer this request, bound to the
@@ -110,12 +108,7 @@ func (m *Module) transport() http.Handler {
 // without an identity, which RequireAuth already rules out, so it is a wiring
 // bug and is logged as one.
 func (m *Module) getServer(r *http.Request) *mcpsdk.Server {
-	ctx, ok := adaptor.LocalContextFromHTTPRequest(r)
-	if !ok {
-		m.log.Error(r.Context(), "mcp: request context missing; route not mounted through adaptor.HTTPHandlerWithContext")
-
-		return nil
-	}
+	ctx := r.Context()
 
 	c, ok := callerFrom(ctx)
 	if !ok {

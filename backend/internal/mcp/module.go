@@ -79,9 +79,9 @@ type Module struct {
 	// are inferred by reflection once for the process rather than once per
 	// call. See newServer for why a server is built per request at all.
 	schemas *mcpsdk.SchemaCache
-	// handler is the MCP transport, adapted to Fiber. Built once in New: it
-	// holds no per-request state of its own, since the caller travels in the
-	// request context and the session is stateless.
+	// handler is the MCP transport. Built once in New: it holds no per-request
+	// state of its own, since the caller travels in the request context and the
+	// session is stateless.
 	handler http.Handler
 }
 
@@ -115,10 +115,13 @@ func New(deps Deps) *Module {
 	return m
 }
 
-// Routes mounts the single MCP endpoint. GET and DELETE are registered
-// alongside POST so the SDK answers them with the 405 the spec asks for in
-// stateless mode, instead of Fiber answering with a 404 that a client reads as
-// "wrong URL".
+// Routes mounts the single MCP endpoint. The handler is registered as the
+// net/http handler it is: Fiber v3 adapts those natively, and bindCaller hands
+// the identity across on the fasthttp request rather than on a wrapper.
+//
+// GET and DELETE are registered alongside POST so the SDK answers them with the
+// 405 the spec asks for in stateless mode, instead of Fiber answering with a
+// 404 that a client reads as "wrong URL".
 func (m *Module) Routes(router fiber.Router) {
 	endpoint := router.Group("/mcp")
 
