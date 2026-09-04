@@ -2,6 +2,8 @@ package portfolio
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 
 	"uuid"
@@ -232,4 +234,119 @@ func names(platforms []PlatformStats) []string {
 	}
 
 	return out
+}
+
+// Deleting a platform that positions still point at is refused, not attempted.
+//
+// It used to be attempted, and the schema's own contradiction turned it into a
+// 500 with the reason only in the server log — see ErrPlatformHasPositions. The
+// three cases here are the three answers the caller can get.
+func TestDeletingAPlatformWithPositionsIsRefused(t *testing.T) {
+	pool := growthTestPool(t)
+	repo := NewPostgresRepository(pool)
+	ctx := context.Background()
+	userID := platformsByWeight(t, pool)
+
+	sourceID := func(name string) uuid.UUID {
+		t.Helper()
+		var id uuid.UUID
+		if err := pool.QueryRow(ctx,
+			`SELECT id FROM investment_sources WHERE user_id = $1 AND name = $2`,
+			userID, name).Scan(&id); err != nil {
+			t.Fatalf("locate %s: %v", name, err)
+		}
+
+		return id
+	}
+
+	t.Run("a platform holding a position", func(t *testing.T) {
+		id := sourceID("alpha")
+
+		err := repo.DeletePlatform(ctx, userID, id)
+		if !errors.Is(err, ErrPlatformHasPositions) {
+			t.Fatalf("err = %v, want ErrPlatformHasPositions", err)
+		}
+		// The count reaches the message: on a 4xx the error's own text is what
+		// FromDomain returns as the envelope's details.
+		if !strings.Contains(err.Error(), "1 position(s)") {
+			t.Errorf("message = %q, want it to name how many are in the way", err)
+		}
+
+		var alive int64
+		if err := pool.QueryRow(ctx,
+			`SELECT count(*) FROM investment_sources WHERE id = $1`, id).Scan(&alive); err != nil {
+			t.Fatalf("re-read: %v", err)
+		}
+		if alive != 1 {
+			t.Error("the platform was deleted anyway: a refusal has to leave it standing")
+		}
+	})
+
+	// The block counts entries, not open positions. A platform whose only
+	// position was sold in full reports zero positions everywhere else in the
+	// API and still cannot be deleted, because the row is still referenced —
+	// which is exactly why the message says "closed ones included".
+	t.Run("a platform holding only a sold-out position", func(t *testing.T) {
+		id := sourceID("zeta")
+		if _, err := pool.Exec(ctx,
+			`UPDATE portfolio_entries SET quantity = 0 WHERE source_id = $1`, id); err != nil {
+			t.Fatalf("sell it down: %v", err)
+		}
+
+		stats, err := repo.GetPlatformsWithStats(ctx, userID, money.USD)
+		if err != nil {
+			t.Fatalf("GetPlatformsWithStats: %v", err)
+		}
+		for _, p := range stats {
+			if p.ID == id && p.Investments != 0 {
+				t.Fatalf("zeta = %d open positions, want 0", p.Investments)
+			}
+		}
+
+		if err := repo.DeletePlatform(ctx, userID, id); !errors.Is(err, ErrPlatformHasPositions) {
+			t.Fatalf("err = %v, want ErrPlatformHasPositions", err)
+		}
+	})
+
+	t.Run("an empty platform is deleted", func(t *testing.T) {
+		id := uuid.New()
+		if _, err := pool.Exec(ctx,
+			`INSERT INTO investment_sources (id, user_id, name, source_type)
+			 VALUES ($1, $2, 'sin nada', 'broker')`, id, userID); err != nil {
+			t.Fatalf("insert: %v", err)
+		}
+
+		if err := repo.DeletePlatform(ctx, userID, id); err != nil {
+			t.Fatalf("DeletePlatform: %v", err)
+		}
+
+		var alive int64
+		if err := pool.QueryRow(ctx,
+			`SELECT count(*) FROM investment_sources WHERE id = $1`, id).Scan(&alive); err != nil {
+			t.Fatalf("re-read: %v", err)
+		}
+		if alive != 0 {
+			t.Error("the platform survived a delete that reported success")
+		}
+	})
+
+	// Somebody else's platform does not exist as far as this caller is
+	// concerned, and must not be described by a count of what it holds.
+	t.Run("a platform that is not this user's", func(t *testing.T) {
+		other := platformsByWeight(t, pool)
+		id := func() uuid.UUID {
+			var id uuid.UUID
+			if err := pool.QueryRow(ctx,
+				`SELECT id FROM investment_sources WHERE user_id = $1 AND name = 'alpha'`,
+				other).Scan(&id); err != nil {
+				t.Fatalf("locate the other account's alpha: %v", err)
+			}
+
+			return id
+		}()
+
+		if err := repo.DeletePlatform(ctx, userID, id); !errors.Is(err, ErrPlatformNotFound) {
+			t.Fatalf("err = %v, want ErrPlatformNotFound", err)
+		}
+	})
 }

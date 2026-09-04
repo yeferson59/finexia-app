@@ -474,6 +474,31 @@ mitad de su coste. No lleva comisiones —el coste medio que escribe el trigger 
 realizó; para el dinero que entró y salió de verdad está el flujo de caja de
 `transaction_cash_flow` (000027).
 
+#### Eliminar una plataforma que todavía tiene posiciones
+
+`DELETE /portfolios/sources/:id` **se niega** con un `409` cuando quedan
+posiciones que la apuntan, y `details` dice cuántas. No es una política elegida
+aquí, es la única respuesta honesta que permite el esquema:
+`portfolio_entries.source_id` es `NOT NULL` y su clave ajena dice
+`ON DELETE SET NULL` (migración 000003), dos reglas que se contradicen en cuanto
+se borra una plataforma con algo encima. Postgres intentaba anular la columna, el
+`NOT NULL` lo rechazaba, y al cliente le llegaba un `500` con el motivo sólo en
+el log del servidor.
+
+Arrastrar las posiciones con la plataforma tampoco es la salida: son el
+historial de operaciones del dueño, y un clic en un botón de borrar no es
+consentimiento para borrarlo. Así que la petición se rechaza, no se destruye
+nada, y se dice qué hay que quitar antes.
+
+El bloqueo cuenta **todas** las entradas, incluidas las vendidas del todo:
+siguen apuntando a la fila y seguirían rompiendo el borrado. Por eso ese número
+puede ser mayor que el `investments` que informa el listado, que sólo cuenta
+posiciones abiertas — una plataforma que enseña «0 posiciones» puede aun así
+rechazar el borrado, y el mensaje lo dice.
+
+Las otras dos respuestas no cambian: `404` si la plataforma no es de quien la
+pide, `200` cuando no queda nada que la apunte.
+
 #### Eliminar una posición no es eliminar una transacción
 
 `DELETE /portfolios/transactions/:txnId` quita una operación y deja que la

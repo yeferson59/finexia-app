@@ -4,6 +4,17 @@
 	let { platformName, onCancel }: { platformName: string; onCancel: () => void } = $props();
 
 	let isDeleting = $state(false);
+
+	/**
+	 * El motivo por el que el borrado no se hizo.
+	 *
+	 * El backend se niega a borrar una plataforma que todavía apuntan posiciones
+	 * —no las arrastra consigo: son el historial del dueño— y devuelve un 409
+	 * diciendo qué hay que quitar antes. Sin esto, la acción del servidor
+	 * devolvía ese motivo y nadie lo leía: el modal se quedaba igual, sin
+	 * explicar nada, y parecía que el botón no funcionaba.
+	 */
+	let error = $state<string | null>(null);
 </script>
 
 <div class="modal-overlay">
@@ -13,6 +24,9 @@
 			¿Estás seguro de que deseas eliminar <strong>{platformName}</strong>? Esta acción no se puede
 			deshacer.
 		</p>
+		{#if error}
+			<p class="modal-error" role="alert">{error}</p>
+		{/if}
 		<div class="modal-actions">
 			<button onclick={onCancel} class="btn btn-secondary"> Cancelar </button>
 			<form
@@ -20,9 +34,21 @@
 				action="?/delete"
 				use:enhance={() => {
 					isDeleting = true;
-					return async ({ update }) => {
-						await update();
+					error = null;
+					return async ({ result, update }) => {
 						isDeleting = false;
+
+						// Un borrado que sale bien redirige, así que sólo llega
+						// aquí con datos cuando fue rechazado. En ese caso el modal
+						// se queda abierto con el motivo: cerrarlo obligaría a
+						// releer la página para descubrir que no pasó nada.
+						const data = result.type === 'success' ? result.data : undefined;
+						if (typeof data?.error === 'string') {
+							error = data.error;
+							return;
+						}
+
+						await update();
 					};
 				}}
 			>
@@ -72,6 +98,18 @@
 		margin: 0 0 1.5rem;
 		color: rgba(236, 234, 229, 0.7);
 		line-height: 1.6;
+	}
+
+	/* En rojo y no en ámbar: no es un matiz sobre lo que va a pasar, es que no
+	   pasó. Gana al `.modal-content p` de arriba por ser más específico. */
+	.modal-content p.modal-error {
+		margin: 0 0 1.5rem;
+		padding: 0.7rem 0.9rem;
+		border: 1px solid var(--red);
+		border-radius: 8px;
+		background: rgba(214, 69, 69, 0.1);
+		color: var(--text);
+		font-size: 0.85rem;
 	}
 
 	.modal-actions {

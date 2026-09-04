@@ -24,6 +24,26 @@ var (
 	ErrExchangeRateNotFound      = httpx.AsNotFound(errors.New("exchange rate not found"))
 )
 
+// ErrPlatformHasPositions refuses to delete a platform that positions still
+// point at.
+//
+// The refusal is not a policy invented here, it is the only honest answer the
+// schema can give. portfolio_entries.source_id is NOT NULL and its foreign key
+// says ON DELETE SET NULL (migration 000003), two rules that contradict each
+// other the moment a platform holding anything is deleted: Postgres tries to
+// null the column, the NOT NULL rejects it, and what reached the client was a
+// 500 with a constraint name in the log and nothing in the response. Deleting
+// the positions along with the platform is not a fix either — they are the
+// owner's trade history, and a stray click on a delete button is not consent to
+// erase it.
+//
+// So the answer is 409: the request is refused, nothing is destroyed, and the
+// caller is told what to remove first. It counts *every* entry, including
+// positions sold down to nothing, because those still reference the row and
+// would still break the delete — which is why the count here can exceed the
+// open positions PlatformStats.Investments reports.
+var ErrPlatformHasPositions = httpx.AsConflict(errors.New("platform still has positions"))
+
 // ErrTransactionFXRate rejects a transaction whose currency and exchange rate
 // contradict each other or the position they are being recorded on. It is a 400
 // rather than a 422 for the same reason the rest of this module's input errors

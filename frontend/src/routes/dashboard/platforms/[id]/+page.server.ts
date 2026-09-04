@@ -44,6 +44,24 @@ export const actions: Actions = {
 	delete: async ({ cookies, fetch, params }) => {
 		const res = await platforms.deleteSource({ cookies, fetch }, params.id);
 
+		// Un 409 no es un fallo del servidor: es la plataforma diciendo que
+		// todavía la apuntan posiciones, y el backend se niega en vez de
+		// borrarlas. Devolvía «Error al eliminar la plataforma» para eso y para
+		// una caída de red por igual, así que el usuario no tenía forma de saber
+		// que le bastaba con quitar las posiciones primero.
+		//
+		// El motivo se escribe aquí y no se copia del `details` del backend: ese
+		// texto está en inglés y nombra tablas, y esta es la pantalla donde hay
+		// que decir qué hacer a continuación.
+		if (res.status === 409) {
+			return {
+				success: false,
+				error:
+					'No se puede eliminar: la plataforma todavía tiene posiciones registradas, ' +
+					'incluidas las que ya vendiste. Elimina esas posiciones primero.'
+			};
+		}
+
 		if (!res.ok) return { success: false, error: 'Error al eliminar la plataforma' };
 
 		redirect(303, '/dashboard/platforms');

@@ -311,6 +311,27 @@ const server = createServer(async (req, res) => {
 	if (route === 'GET /portfolios/sources') {
 		return send(res, 200, envelope(sources));
 	}
+	// El backend se niega a borrar una plataforma que todavía apuntan
+	// posiciones: no las arrastra consigo, porque son el historial del dueño.
+	// El stub reproduce las dos respuestas —409 con el motivo, 200 cuando no
+	// queda nada que la apunte— para que el flujo de la UI se pruebe contra la
+	// forma real y no contra un borrado que siempre funciona.
+	if (req.method === 'DELETE' && /^\/portfolios\/sources\/[0-9a-f-]{36}$/.test(path)) {
+		const source = sources.find((s) => s.id === path.split('/')[3]);
+		if (!source) {
+			return send(res, 404, errorEnvelope('Platform not found'));
+		}
+		if (source.investments > 0) {
+			return send(res, 409, {
+				success: false,
+				message: 'Error deleting platform',
+				details: `platform still has positions: ${source.investments} position(s), closed ones included, still reference it`,
+				action: 'Could not delete platform',
+				timestamp: NOW
+			});
+		}
+		return send(res, 200, envelope(null, 'Platform deleted'));
+	}
 	if (route === 'GET /portfolios/assets') {
 		const search = (url.searchParams.get('search') ?? '').toLowerCase();
 		const filtered = search

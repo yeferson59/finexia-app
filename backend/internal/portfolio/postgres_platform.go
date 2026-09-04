@@ -2,10 +2,12 @@ package portfolio
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"uuid"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
@@ -185,16 +187,76 @@ func (r *PostgresRepository) UpdatePlatform(ctx context.Context, userID, sourceI
 	return p, nil
 }
 
+// pgNotNullViolation is the SQLSTATE Postgres returns when a NOT NULL column is
+// set to NULL (23502) — here, the referential action described on
+// ErrPlatformHasPositions firing on portfolio_entries.source_id.
+const pgNotNullViolation = "23502"
+
+// DeletePlatform removes a platform, or refuses to when positions still point
+// at it. See ErrPlatformHasPositions for why refusing is the only honest answer
+// available.
+//
+// The three outcomes — gone, missing, still in use — are resolved in one
+// statement so a caller cannot observe a state between the check and the
+// delete. `held` is what makes the refusal specific: the DELETE is guarded by
+// it, so a platform with anything on it is never even attempted, and the count
+// travels into the message the client reads.
+//
+// The foreign key stays the real guard, though, and the SQLSTATE below is not
+// belt-and-braces. Every CTE here reads one snapshot, so a position inserted by
+// another transaction after that snapshot is invisible to `held`: the DELETE
+// proceeds, and the referential trigger — which runs against a current one —
+// raises 23502. Mapping it to the same error is what keeps that race a 409
+// explaining itself rather than the 500 this function used to return in the
+// ordinary case.
 func (r *PostgresRepository) DeletePlatform(ctx context.Context, userID, sourceID uuid.UUID) error {
-	tag, err := r.db.Exec(ctx, `
-		DELETE FROM investment_sources WHERE id = $1 AND user_id = $2
-	`, sourceID, userID)
+	var (
+		found bool
+		held  int64
+	)
+
+	err := r.db.QueryRow(ctx, `
+		WITH target AS (
+			SELECT id FROM investment_sources
+			WHERE id = $1 AND user_id = $2
+		),
+		held AS (
+			SELECT COUNT(*)::bigint AS n
+			FROM portfolio_entries
+			WHERE source_id IN (SELECT id FROM target)
+		),
+		gone AS (
+			DELETE FROM investment_sources
+			WHERE id IN (SELECT id FROM target)
+			  AND (SELECT n FROM held) = 0
+			RETURNING id
+		)
+		SELECT EXISTS (SELECT 1 FROM target), (SELECT n FROM held)
+	`, sourceID, userID).Scan(&found, &held)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) &&
+			pgErr.Code == pgNotNullViolation &&
+			pgErr.TableName == "portfolio_entries" &&
+			pgErr.ColumnName == "source_id" {
+			return ErrPlatformHasPositions
+		}
+
 		return err
 	}
 
-	if tag.RowsAffected() == 0 {
+	// Asked before the count: a platform that is not this user's does not exist
+	// as far as this caller is concerned, and answering "it still has 4
+	// positions" would say otherwise about somebody else's row.
+	if !found {
 		return ErrPlatformNotFound
+	}
+
+	if held > 0 {
+		// Wrapped rather than replaced, so errors.Is still matches while the
+		// number reaches the response: on a 4xx, FromDomain returns the error's
+		// own text as the envelope's details.
+		return fmt.Errorf("%w: %d position(s), closed ones included, still reference it", ErrPlatformHasPositions, held)
 	}
 
 	return nil

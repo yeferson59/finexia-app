@@ -3,6 +3,7 @@ package portfolio
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -348,6 +349,40 @@ func TestHandlerPlatformCRUD(t *testing.T) {
 		}
 		if deleted != sourceID {
 			t.Errorf("deleted = %s, want %s", deleted, sourceID)
+		}
+	})
+
+	// A platform positions still point at cannot be deleted, and the refusal has
+	// to arrive as a refusal: a 409 whose details say what is in the way. It used
+	// to arrive as a 500 with the reason only in the server log.
+	t.Run("refuses to delete a platform that still has positions", func(t *testing.T) {
+		repo := new(fakeRepository{
+			deletePlatform: func(context.Context, uuid.UUID, uuid.UUID) error {
+				return fmt.Errorf("%w: %d position(s), closed ones included, still reference it",
+					ErrPlatformHasPositions, 4)
+			},
+		})
+		app := newTestModule(t, repo, userID, "user")
+
+		resp := do(t, app, http.MethodDelete, "/portfolios/sources/"+sourceID.String())
+		if resp.StatusCode != fiber.StatusConflict {
+			t.Fatalf("status = %d, want 409", resp.StatusCode)
+		}
+
+		var body struct {
+			Success bool   `json:"success"`
+			Details string `json:"details"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if body.Success {
+			t.Error("success = true on a refused delete")
+		}
+		// The whole point of the 409 over the 500: on a 4xx the error's own text
+		// travels, so the caller learns what to remove first.
+		if !strings.Contains(body.Details, "4 position(s)") {
+			t.Errorf("details = %q, want it to name what is in the way", body.Details)
 		}
 	})
 
