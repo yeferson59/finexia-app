@@ -1,6 +1,6 @@
 <script lang="ts">
 	/**
-	 * Moneda en la que se miran los totales del panel.
+	 * Moneda en la que se miran los importes de la pantalla.
 	 *
 	 * Era un par de pestañas cuando solo había USD y COP. Con la lista completa
 	 * de monedas convertibles no caben en la cabecera, así que es un desplegable:
@@ -8,6 +8,11 @@
 	 *
 	 * Solo cambia la vista: la preferencia de la cuenta se toca en ajustes, y es
 	 * la que manda cuando no hay parámetro en la URL.
+	 *
+	 * Vivía dentro del panel. Bajó aquí cuando la vista consolidada de activos
+	 * pasó a necesitarlo: allí los pesos de cada activo solo significan algo si
+	 * todas las filas llegan convertidas a la misma moneda, y la página ya leía
+	 * `?currency=` sin que nada permitiera ponerlo.
 	 */
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';

@@ -2,54 +2,58 @@
  * Vista consolidada de activos: lo que el usuario tiene de cada uno sumando
  * todos sus portafolios (`GET /portfolios/holdings`).
  *
- * Responde a una pregunta que ninguna otra pantalla contesta —«¿cuánto tengo de
- * X?»—: las posiciones del detalle solo suman dentro de su portafolio y el
- * donut del panel pliega todo a ocho clases de activo, así que un activo
- * repartido entre tres portafolios no tenía una sola fila en ninguna parte.
+ * Responde a dos preguntas que ninguna otra pantalla contesta: «¿cuánto tengo
+ * de X?» —las posiciones del detalle solo suman dentro de su portafolio, y el
+ * reparto del panel pliega todo a ocho clases de activo, así que un activo
+ * repartido entre tres portafolios no tenía una sola fila en ninguna parte— y
+ * «¿está mi dinero en pocas manos?», que es lo que mide la barra de
+ * concentración.
  *
  * Helpers puros: sin Svelte y sin red. Los contratos vienen de `$lib/api/types`.
  */
 import type { AssetHolding } from '$lib/api/types';
 import { formatAssetType } from '$lib/shared/format/asset-type';
-import { buildSlices } from '$lib/shared/chart/pie';
 
 export type { AssetHolding };
 
 /**
- * Colores de las porciones, en orden fijo.
+ * Cuántos activos se dibujan con su propio color antes de agrupar la cola.
  *
- * No son los de `ASSET_TYPE_COLORS`: allí el color **es** la clase de activo, y
- * aquí cada porción es un activo distinto, así que dos acciones saldrían del
- * mismo color y la gráfica no distinguiría nada. Son los mismos tonos de la
- * marca reescalonados a la banda de luminosidad que pide un fondo oscuro
- * (OKLCH L≈0.63): a la claridad original, siete tonos seguidos sobre este fondo
- * se empastan entre sí. Validados para daltonismo por pares contiguos.
- *
- * Se reparten por posición en el ranking, no por activo: la torta es un «los N
- * mayores» y su leyenda va al lado, así que el orden es el dato. Como no hay
- * ningún filtro que cambie el conjunto, no hay repintado que confunda.
+ * No está para que la barra «se lea» —una barra apilada aguanta muchas más
+ * franjas que una torta— sino para que la cola no se coma el dibujo: una
+ * cartera de doscientas posiciones son ciento ochenta franjas de menos de un
+ * píxel, y lo que se ve entonces es la separación entre ellas, no los datos.
  */
-export const ASSET_SERIES_COLORS = [
-	'#bb7900',
-	'#6383e3',
-	'#00a363',
-	'#a170c6',
-	'#c56f41',
-	'#3794bf',
-	'#a48609'
-];
+export const BAND_MAX = 12;
 
-/** Gris del agregado «Otros»: no es una serie más, es el resto. */
-export const OTHERS_COLOR = '#8a8780';
+/** Gris cálido de la cola agrupada: no es un puesto más, es lo que queda. */
+export const REST_COLOR = '#4a4642';
 
 /**
- * Cuántos activos se dibujan por separado antes de agrupar en «Otros».
+ * Color de una franja según su puesto en el ranking.
  *
- * Uno menos que colores hay, porque la regla de abajo admite una porción extra
- * cuando sobra un solo activo: así el índice nunca da la vuelta al arreglo y
- * dos porciones no pueden salir del mismo color.
+ * Un solo tono —el ámbar con el que toda la aplicación pinta el valor de
+ * mercado— aclarándose hacia el activo mayor. El puesto es un orden, no una
+ * categoría: la luminosidad es el canal que dice «orden», y el matiz el que
+ * dice «grupo». Los siete matices que había antes afirmaban siete grupos de un
+ * dato que solo tiene un eje, y encima no sobrevivían a la comprobación de
+ * daltonismo: dos acciones distintas salían del mismo color, y el azul y el
+ * morado quedaban a una diferencia que en protanopia no existe. Con un matiz
+ * único no hay pareja que confundir.
+ *
+ * En OKLCH y no en HSL porque la luminosidad de OKLab sí es perceptual: los
+ * pasos intermedios del ámbar en HSL se apelotonan y los oscuros se separan de
+ * más, que es justo lo contrario de lo que necesita una escala de puestos.
  */
-export const PIE_MAX_SLICES = ASSET_SERIES_COLORS.length - 1;
+export function rankColor(index: number, count: number): string {
+	const t = count <= 1 ? 0 : Math.min(index, count - 1) / (count - 1);
+	const lightness = 0.78 - t * 0.34;
+	// La croma baja con la luminosidad: mantenerla arriba saca del gamut los
+	// pasos oscuros y el navegador los recorta todos al mismo naranja plano.
+	const chroma = 0.13 - t * 0.055;
+
+	return `oklch(${lightness.toFixed(3)} ${chroma.toFixed(3)} 71)`;
+}
 
 /** Fila de la tabla: el holding del backend ya convertido a números. */
 export interface AssetHoldingRow {
@@ -111,68 +115,101 @@ export function toAssetHoldingRows(holdings: AssetHolding[]): AssetHoldingRow[] 
 	}));
 }
 
-/** Porción de la torta de concentración. */
-export interface ConcentrationSlice {
-	/** Clave de la porción: el ticker, o `__others__` para el agregado. */
+/** Franja de la barra de concentración: un activo, o la cola agrupada. */
+export interface BandSegment {
+	/** Clave de la franja: el ticker, o `__rest__` para la cola. */
 	key: string;
 	label: string;
 	value: number;
+	/**
+	 * Ancho de la franja, en porcentaje de la barra.
+	 *
+	 * No es `percent`. Los anchos tienen que sumar 100 o la barra deja un hueco
+	 * al final, y los pesos del backend no suman 100 exacto: están redondeados a
+	 * dos decimales y se calculan sobre un total que incluye posiciones que aquí
+	 * no se dibujan. Así que el ancho se reparte aquí y el peso se imprime tal
+	 * como vino.
+	 */
+	width: number;
+	/** Peso sobre el total, el que calculó el backend. Es el que se imprime. */
 	percent: number;
 	color: string;
-	/** Cuántos activos hay detrás: 1, salvo en «Otros». */
+	/** Cuántos activos hay detrás: 1, salvo en la cola. */
 	assets: number;
 }
 
 /**
- * Reparte las filas en porciones: los `max` mayores por separado y el resto
- * agrupado en «Otros».
+ * Reparte las filas en franjas: los `max` mayores con su color y el resto
+ * agrupado al final.
  *
- * Agrupar no es un adorno: pasado un puñado de porciones la torta deja de
- * leerse, y las colas de una cartera diversificada son decenas de rebanadas de
- * un grado. El detalle no se pierde —está en la tabla de al lado, entera.
- *
- * Los porcentajes son los que calculó el backend sobre el total convertido; no
- * se recalculan aquí para que la torta y la columna «peso» no puedan discrepar.
- * «Otros» es la suma de los suyos.
+ * Ordenadas de mayor a menor, que es lo que convierte la barra en una lectura:
+ * la mitad izquierda es la mitad del dinero, y lo que se mira es cuántas
+ * franjas caben en ella.
  */
-export function buildConcentration(
-	rows: AssetHoldingRow[],
-	max = PIE_MAX_SLICES
-): ConcentrationSlice[] {
+export function buildBand(rows: AssetHoldingRow[], max = BAND_MAX): BandSegment[] {
 	const ranked = [...rows].sort((a, b) => b.value - a.value).filter((row) => row.value > 0);
+	const total = ranked.reduce((sum, row) => sum + row.value, 0);
 
-	// Un solo activo de más no merece una rebanada «Otros» que lo esconda y
-	// ocupe lo mismo: con `max + 1` filas caben todas.
+	if (total <= 0) return [];
+
+	// Un solo activo de más no merece una franja «resto» que lo esconda y ocupe
+	// lo mismo: con `max + 1` caben todos.
 	const cut = ranked.length <= max + 1 ? ranked.length : max;
 	const head = ranked.slice(0, cut);
 	const tail = ranked.slice(cut);
+	const count = head.length + (tail.length > 0 ? 1 : 0);
 
-	const slices: ConcentrationSlice[] = head.map((row, i) => ({
+	const segments: BandSegment[] = head.map((row, i) => ({
 		key: row.ticker,
 		label: row.ticker,
 		value: row.value,
+		width: (row.value / total) * 100,
 		percent: row.percent,
-		color: ASSET_SERIES_COLORS[i],
+		color: rankColor(i, count),
 		assets: 1
 	}));
 
 	if (tail.length > 0) {
-		slices.push({
-			key: '__others__',
-			label: 'Otros',
-			value: tail.reduce((sum, row) => sum + row.value, 0),
+		const value = tail.reduce((sum, row) => sum + row.value, 0);
+		segments.push({
+			key: '__rest__',
+			label: 'Resto',
+			value,
+			width: (value / total) * 100,
 			percent: tail.reduce((sum, row) => sum + row.percent, 0),
-			color: OTHERS_COLOR,
+			color: REST_COLOR,
 			assets: tail.length
 		});
 	}
 
-	return slices;
+	return segments;
 }
 
-/** Las porciones con su geometría, listas para pintar. */
-export function buildConcentrationSlices(rows: AssetHoldingRow[], max = PIE_MAX_SLICES) {
-	return buildSlices(buildConcentration(rows, max));
+/**
+ * Cuántos de los mayores activos hacen falta para llegar a la mitad del valor.
+ *
+ * Es la lectura de la barra puesta en número: la marca del centro cae en la
+ * mitad del dinero —los anchos son proporcionales al valor, así que el punto
+ * medio lo es por construcción— y esto dice cuántas franjas quedan a su
+ * izquierda. Dos, y la cartera está concentrada; quince, y está repartida.
+ *
+ * Cuenta sobre el ranking entero, no sobre las franjas dibujadas: si la mitad
+ * del valor no se alcanza hasta el activo dieciocho, eso es exactamente lo que
+ * hay que poder decir.
+ */
+export function halfValueCount(rows: AssetHoldingRow[]): number {
+	const ranked = [...rows].sort((a, b) => b.value - a.value).filter((row) => row.value > 0);
+	const half = ranked.reduce((sum, row) => sum + row.value, 0) / 2;
+
+	if (half <= 0) return 0;
+
+	let running = 0;
+	for (let i = 0; i < ranked.length; i++) {
+		running += ranked[i].value;
+		if (running >= half) return i + 1;
+	}
+
+	return ranked.length;
 }
 
 /**

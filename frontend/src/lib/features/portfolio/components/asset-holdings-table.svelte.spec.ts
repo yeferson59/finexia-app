@@ -21,6 +21,7 @@ const row: AssetHoldingRow = {
 };
 
 const props = {
+	maxValue: 9002.7,
 	displayCurrency: 'USD',
 	formatValue: (v: number) => `$${v.toFixed(2)}`,
 	onGoToPortfolios: () => {}
@@ -33,16 +34,32 @@ describe('asset-holdings-table.svelte', () => {
 		await expect.element(page.getByText('AAPL')).toBeInTheDocument();
 		await expect.element(page.getByText('Apple Inc.')).toBeInTheDocument();
 		await expect.element(page.getByText('Acciones')).toBeInTheDocument();
-		await expect.element(page.getByText('42', { exact: true })).toBeInTheDocument();
-		await expect.element(page.getByText('37.5%')).toBeInTheDocument();
+		await expect.element(page.getByText('42 uds')).toBeInTheDocument();
+		// Con la coma de es-CO, como el resto de las cifras de la página: el
+		// peso se escapaba por `toFixed` y escribía un punto.
+		await expect.element(page.getByText('37,5%')).toBeInTheDocument();
+	});
+
+	// La barra es el fondo de la fila y su escala es la mayor posición de toda
+	// la cartera, no la de la página que se esté viendo: si se reescalara por
+	// hoja, la primera fila de cada una saldría llena.
+	it('scales the row bar against the whole portfolio, not the page', async () => {
+		render(AssetHoldingsTable, { ...props, maxValue: 18005.4, rows: [row] });
+
+		await expect
+			.element(page.getByRole('row', { name: /AAPL/ }))
+			.toHaveAttribute('style', '--bar: 50.00%;');
 	});
 
 	// Cuántos portafolios comparten el activo es lo que esta vista sabe y el
-	// detalle de cada portafolio no puede decir.
-	it('says in how many portfolios the asset is held', async () => {
-		render(AssetHoldingsTable, { ...props, rows: [row] });
+	// detalle de cada portafolio no puede decir. Solo se dice cuando hay más de
+	// uno: una columna entera de «1» no informaba de nada.
+	it('says in how many portfolios the asset is held, only when it is shared', async () => {
+		const { rerender } = await render(AssetHoldingsTable, { ...props, rows: [row] });
+		await expect.element(page.getByText(/, en 2 portafolios/)).toBeInTheDocument();
 
-		await expect.element(page.getByRole('cell', { name: '2', exact: true })).toBeInTheDocument();
+		await rerender({ ...props, rows: [{ ...row, portfolios: 1 }] });
+		await expect.element(page.getByText(/, en \d+ portafolios/)).not.toBeInTheDocument();
 	});
 
 	// Sin precio de mercado no hay número que represente al activo: cada
@@ -53,8 +70,7 @@ describe('asset-holdings-table.svelte', () => {
 			rows: [{ ...row, marketPrice: null, priceSource: 'cost' }]
 		});
 
-		await expect.element(page.getByText('a coste')).toBeInTheDocument();
-		await expect.element(page.getByText('—')).toBeInTheDocument();
+		await expect.element(page.getByText('a coste, sin precio de mercado')).toBeInTheDocument();
 	});
 
 	// Un importe sin tasa va a valor nominal y mezcla monedas con el resto de
@@ -62,7 +78,7 @@ describe('asset-holdings-table.svelte', () => {
 	it('flags a value no rate could convert', async () => {
 		render(AssetHoldingsTable, { ...props, rows: [{ ...row, fxConverted: false }] });
 
-		await expect.element(page.getByText('sin convertir')).toBeInTheDocument();
+		await expect.element(page.getByText('sin convertir a USD')).toBeInTheDocument();
 	});
 
 	// Aquí no hay un portafolio al que agregar —la vista los atraviesa todos—,

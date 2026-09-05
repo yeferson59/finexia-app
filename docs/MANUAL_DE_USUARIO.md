@@ -352,29 +352,29 @@ Lo mismo aparece al **vender** y al **registrar o editar una transacción** de u
 
 Los portafolios contestan a "cómo tengo repartido el dinero". **Mis Activos** contesta a la otra pregunta: **cuánto tengo de cada cosa**, sin importar en qué portafolio esté. Si compraste AAPL en tres portafolios distintos, aquí es una sola fila con la suma.
 
-![Vista Mis Activos con el valor total, la concentración por activo y la tabla consolidada](img/manual/18-mis-activos.png)
+![Vista Mis Activos con el valor total, la barra de concentración y la lista consolidada](img/manual/18-mis-activos.png)
 
 La página se abre desde **Mis Activos**, en el menú lateral, y tiene tres partes:
 
-- **Los totales:** el **valor total** de todo lo que tienes, en la moneda de tu cuenta, y cuántos **activos distintos** te quedan una vez consolidados.
-- **Concentración por activo:** una dona con el peso de cada activo sobre el total. Al señalar una porción —o su entrada en la leyenda— el centro pasa a mostrar ese activo con su porcentaje. Los más pequeños se agrupan en **Otros**, con el número de activos que engloba. Funciona igual con el teclado y cada entrada dice su peso, así que el reparto se puede leer sin depender del color.
-- **Tus activos:** la tabla, con una fila por activo.
+- **El valor total:** lo que suma todo lo que tienes, en la moneda que elijas arriba a la derecha, y en cuántos activos distintos está repartido. Es la cifra a la que se refieren todos los porcentajes de la página.
+- **Cómo está repartido:** una sola barra con la cartera entera, cortada de mayor a menor. Cada franja es un activo y su ancho es lo que pesa, así que **el punto medio de la barra es la mitad de tu dinero**: la marca del centro lo señala y el pie dice cuántos activos caben a su izquierda. Dos, y tu dinero está en pocas manos; quince, y está repartido. Al señalar una franja —o la fila del activo en la lista de abajo— el pie pasa a decir su importe y su peso.
+- **Tus activos:** la lista, con una fila por activo. El **buscador** de la cabecera filtra por nombre o por símbolo.
 
 | Columna | Qué dice |
 |---|---|
-| **Activo** | Ticker y nombre |
-| **Tipo** | Acción, ETF, cripto, bono, efectivo… |
-| **Cantidad** | Las unidades sumadas de todos tus portafolios |
-| **Precio** | Lo que vale una unidad hoy |
+| **Activo** | Ticker y nombre. Si lo tienes en más de un portafolio, lo dice debajo |
+| **Clase** | Acción, ETF, cripto, bono, efectivo… |
+| **Posición** | Las unidades sumadas de todos tus portafolios, y a cómo está una |
 | **Valor** | Lo que suma esa tenencia, en la moneda de la cabecera |
-| **Peso** | Cuánto pesa sobre el total, en barra y en porcentaje |
-| **Portafolios** | En cuántos de tus portafolios lo tienes |
+| **Peso** | Cuánto pesa sobre el total |
 
-La tabla se pagina de quince en quince; la dona siempre reparte la cartera entera, no la página que estés viendo, para que las porciones no cambien al pasar de hoja.
+El fondo de cada fila es una barra: mide la posición contra la mayor que tengas, así que de un vistazo se ve cuáles son las grandes sin tener que leer los porcentajes. La escala es la de la cartera entera, no la de la hoja que estés viendo.
+
+La lista se pagina de quince en quince; la barra de concentración siempre reparte la cartera entera, no la página ni el resultado de la búsqueda.
 
 Dos detalles al leerla:
 
-- El **precio** va en la moneda en la que cotiza el activo, no en la de la columna *Valor*: es lo que vale una unidad en su mercado, no lo que se convirtió. Cuando no hay precio de mercado (apartado 7.3), la fila lo dice con la etiqueta **a coste**.
+- El **precio por unidad** va en la moneda en la que cotiza el activo, no en la de la columna *Valor*: es lo que vale una unidad en su mercado, no lo que se convirtió. Cuando no hay precio de mercado (apartado 7.3), la fila lo dice con la etiqueta **a coste, sin precio de mercado**.
 - Si algún activo está en una moneda para la que no hay tasa de cambio, entra en el total **sin convertir** y la página lo avisa arriba. En ese caso el total y los pesos mezclan monedas, así que tómalos como una aproximación.
 
 ---
@@ -801,7 +801,7 @@ En **Guía de usuario**, en el menú lateral. Puedes leerlo dentro de la aplicac
 Sí. Los menús, formularios y tablas se recorren con **Tab**, y la gráfica de crecimiento del Dashboard admite las flechas para ir día a día (sección 5.1).
 
 **¿Dónde veo cuánto tengo de un activo en total?**
-En **Mis Activos**, en el menú lateral: una fila por activo con la cantidad sumada de todos tus portafolios, lo que vale, cuánto pesa sobre el total y en cuántos portafolios lo tienes (sección 8).
+En **Mis Activos**, en el menú lateral: una fila por activo con la cantidad sumada de todos tus portafolios, lo que vale y cuánto pesa sobre el total, más un buscador para dar con uno concreto (sección 8).
 
 **Compré en una moneda y mi cuenta está en otra. ¿Cómo lo registro?**
 Marca **"Mi cuenta liquidó en otra moneda"** en el formulario e indica la moneda de tu cuenta y la tasa de ese día, la de la confirmación del bróker (apartado 7.4). Lo mismo vale al vender y al registrar transacciones sueltas.

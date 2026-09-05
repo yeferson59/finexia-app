@@ -28,9 +28,10 @@ export { default as AssetTransactionHistory } from './components/asset-transacti
 export { default as AssetDeletePosition } from './components/asset-delete-position.svelte';
 
 // Vista consolidada de activos (`dashboard/assets`): lo que el usuario tiene
-// de cada activo sumando todos sus portafolios.
-export { default as AssetConcentration } from './components/asset-concentration.svelte';
-export { default as AssetHoldingsTable } from './components/asset-holdings-table.svelte';
+// de cada activo sumando todos sus portafolios. `asset-holdings-table` es
+// interno de la lista, que es la que sabe del buscador y de las hojas.
+export { default as AssetConcentrationBand } from './components/asset-concentration-band.svelte';
+export { default as AssetHoldingsList } from './components/asset-holdings-list.svelte';
 
 export * from './portfolio';
 export * from './asset-holdings';

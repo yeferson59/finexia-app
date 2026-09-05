@@ -9,7 +9,7 @@
 	 * descompone en vez de repetirla.
 	 */
 	import { resolve } from '$app/paths';
-	import CurrencyToggle from './currency-toggle.svelte';
+	import CurrencySelect from '$lib/ui/currency-select.svelte';
 	import ExchangeRateNote from './exchange-rate-note.svelte';
 	import Sparkline from './sparkline.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
@@ -104,7 +104,7 @@
 
 	<div class="side">
 		<div class="rate">
-			<CurrencyToggle {currency} />
+			<CurrencySelect {currency} />
 			<ExchangeRateNote rate={displayRate} />
 		</div>
 

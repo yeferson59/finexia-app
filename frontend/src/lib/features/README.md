@@ -19,9 +19,11 @@ features/<feature>/
 ```
 
 No todo componente entra en `index.ts`: los que solo usa otro componente de la
-misma feature (`currency-toggle` dentro de `net-worth-card`, `asset-combobox`
+misma feature (`exchange-rate-note` dentro de `wealth-headline`, `asset-combobox`
 dentro de `portfolio-entry-form`, los pasos del historial de transacciones…) se
-importan por ruta relativa y no forman parte de la superficie pública.
+importan por ruta relativa y no forman parte de la superficie pública. Cuando
+uno deja de ser interno porque una segunda feature lo necesita, no se exporta:
+baja a `lib/ui`, que es lo que hizo el selector de moneda.
 
 ## Reglas de dependencia
 
