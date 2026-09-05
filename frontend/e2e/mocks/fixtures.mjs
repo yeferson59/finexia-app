@@ -440,7 +440,36 @@ export function topTransaction(portfolioId) {
 
 // --- Plataformas y tasas ----------------------------------------------------
 
-/** Valor custodiado en cada plataforma, repartiendo las posiciones por tipo. */
+/**
+ * Valor custodiado en cada plataforma, repartiendo las posiciones por tipo.
+ *
+ * `totalValue` es lo **invertido** y `marketValue` lo que vale hoy, como en el
+ * backend: si el stub mandara el valor de mercado en los dos, la vista pintaría
+ * una ganancia de cero y la pantalla que la explica no se podría probar.
+ */
+const platformFigures = (holdings) => {
+	const cost = sum(holdings.map(costOf));
+	const value = sum(holdings.map(valueOf));
+
+	return {
+		investments: holdings.length,
+		assets: holdings.length,
+		// Cada plataforma del stub custodia las posiciones de un solo portafolio.
+		portfolios: 1,
+		totalValue: money(cost),
+		marketValue: money(value),
+		gainLoss: money(value - cost),
+		gainLossPct: Number((((value - cost) / cost) * 100).toFixed(2)),
+		displayCurrency: 'USD',
+		positionsPricedOwn: holdings.length,
+		positionsPricedManual: 0,
+		positionsAtCost: 0,
+		positionsUnconverted: 0
+	};
+};
+
+const PLATFORM_COST = sum(PORTFOLIOS.map((p) => sum(p.holdings.map(costOf))));
+
 export const sources = [
 	{
 		id: IDS.platform,
@@ -448,31 +477,32 @@ export const sources = [
 		description: 'Acciones y ETFs',
 		sourceType: 'broker',
 		isActive: true,
-		investments: 5,
-		totalValue: money(sum(PORTFOLIOS[0].holdings.map(valueOf))),
+		...platformFigures(PORTFOLIOS[0].holdings),
 		createdAt: NOW
 	},
 	{
 		id: IDS.platformExchange,
 		name: 'Exchange Demo',
 		description: 'Criptomonedas',
-		sourceType: 'exchange',
+		sourceType: 'crypto_wallet',
 		isActive: true,
-		investments: 3,
-		totalValue: money(sum(PORTFOLIOS[1].holdings.map(valueOf))),
+		...platformFigures(PORTFOLIOS[1].holdings),
 		createdAt: NOW
 	},
 	{
 		id: IDS.platformBank,
 		name: 'Banco Demo',
 		description: 'Renta fija y efectivo',
-		sourceType: 'bank',
+		sourceType: 'investment_bank',
 		isActive: true,
-		investments: 2,
-		totalValue: money(sum(PORTFOLIOS[2].holdings.map(valueOf))),
+		...platformFigures(PORTFOLIOS[2].holdings),
 		createdAt: NOW
 	}
-];
+	// `percent` necesita el conjunto, así que se reparte una vez construidas.
+].map((source) => ({
+	...source,
+	percent: Number(((Number(source.totalValue) / PLATFORM_COST) * 100).toFixed(2))
+}));
 
 // `source` reproduce el reparto real: el feed público solo publica USD/COP (la
 // TRM), y todo lo demás lo escribió un administrador.

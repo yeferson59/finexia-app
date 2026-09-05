@@ -24,6 +24,7 @@ const BASE = `http://127.0.0.1:${APP_PORT}`;
 /** Fixtures del stub, iguales que en `e2e/helpers.ts`. */
 const USER = { email: 'user@finexia.test', password: 'Password123!' };
 const PORTFOLIO_ID = '11111111-1111-4111-8111-111111111111';
+const PLATFORM_ID = '33333333-3333-4333-8333-333333333333';
 
 const DESKTOP = { width: 1440, height: 900, deviceScaleFactor: 2 };
 const MOBILE = { width: 390, height: 844, deviceScaleFactor: 3 };
@@ -176,7 +177,9 @@ try {
 		['11-notificaciones', '/dashboard/notifications', false],
 		['12-configuracion', '/dashboard/settings', true],
 		['13-activo-detalle', `/dashboard/portfolios/${PORTFOLIO_ID}/assets/AAPL`, true],
-		['17-guia', '/dashboard/guia', false]
+		['17-guia', '/dashboard/guia', false],
+		['18-mis-activos', '/dashboard/assets', true],
+		['19-plataforma-detalle', `/dashboard/platforms/${PLATFORM_ID}`, false]
 	];
 
 	for (const [name, path, fullPage] of pages) {

@@ -20,11 +20,11 @@ export interface ManualMeta {
 }
 
 export const manual: ManualMeta = {
-	version: '1.7',
-	date: 'Agosto 2026',
-	bytes: 2971179,
-	generatedAt: '2026-09-05T02:02:45.152Z',
-	sourceHash: '3b518acae0747a0e89e534a12493cc4b80cee299c6f24e902103bb3c81de28b8',
+	version: '1.8',
+	date: 'Septiembre 2026',
+	bytes: 3308493,
+	generatedAt: '2026-09-05T16:46:06.308Z',
+	sourceHash: '1b065bbd36fd22e5296225491506896fb22a6978388579a360328f1edaac86d5',
 	sections: [
 		{
 			number: 1,
@@ -56,42 +56,50 @@ export const manual: ManualMeta = {
 		},
 		{
 			number: 8,
-			title: 'Plataformas'
+			title: 'Mis Activos (vista consolidada)'
 		},
 		{
 			number: 9,
-			title: 'Transacciones'
+			title: 'Plataformas'
 		},
 		{
 			number: 10,
-			title: 'Importación masiva de transacciones (Excel/CSV)'
+			title: 'Transacciones'
 		},
 		{
 			number: 11,
-			title: 'Reportes y exportaciones'
+			title: 'Importación masiva de transacciones (Excel/CSV)'
 		},
 		{
 			number: 12,
-			title: 'Notificaciones'
+			title: 'Reportes y exportaciones'
 		},
 		{
 			number: 13,
-			title: 'Configuración de la cuenta'
+			title: 'Notificaciones'
 		},
 		{
 			number: 14,
-			title: 'Seguridad: 2FA y sesiones'
+			title: 'Configuración de la cuenta'
 		},
 		{
 			number: 15,
-			title: 'Preguntas frecuentes (FAQ)'
+			title: 'Seguridad: 2FA y sesiones'
 		},
 		{
 			number: 16,
-			title: 'Solución de problemas'
+			title: 'Conectar un asistente de IA (MCP)'
 		},
 		{
 			number: 17,
+			title: 'Preguntas frecuentes (FAQ)'
+		},
+		{
+			number: 18,
+			title: 'Solución de problemas'
+		},
+		{
+			number: 19,
 			title: 'Glosario'
 		}
 	]

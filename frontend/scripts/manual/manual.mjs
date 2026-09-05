@@ -27,7 +27,7 @@ export const META = join(ROOT, 'frontend', 'src', 'lib', 'features', 'guide', 'm
  * la huella, así que el check pedirá regenerar aunque el manual no haya
  * cambiado ni una coma.
  */
-export const TEMPLATE_VERSION = 2;
+export const TEMPLATE_VERSION = 3;
 
 /**
  * Huella de todo lo que acaba dentro del PDF: el texto del manual, cada
@@ -217,6 +217,30 @@ export function renderHtml(markdown) {
 		background: #f2f3f5;
 		padding: 1px 4px;
 		border-radius: 3px;
+	}
+
+	/*
+	 * Bloques de código (la configuración de un cliente MCP). El bloque se lleva
+	 * el fondo y el código de dentro se queda liso: si no, cada línea arrastra su
+	 * propio recuadro. Y envuelve, porque una línea larga en un PDF no se puede
+	 * desplazar: o cabe, o se pierde. (Sin comillas invertidas: esto vive dentro
+	 * de una plantilla de cadena.)
+	 */
+	pre {
+		margin: 12px 0;
+		padding: 10px 12px;
+		background: #f2f3f5;
+		border-radius: 4px;
+		white-space: pre-wrap;
+		word-break: break-word;
+		page-break-inside: avoid;
+	}
+
+	pre code {
+		padding: 0;
+		background: none;
+		font-size: 8.5pt;
+		line-height: 1.5;
 	}
 
 	blockquote {

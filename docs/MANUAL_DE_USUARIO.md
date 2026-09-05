@@ -1,7 +1,7 @@
 # Manual de Usuario — FINEXIA
 
-**Versión del documento:** 1.7
-**Fecha:** Agosto 2026
+**Versión del documento:** 1.8
+**Fecha:** Septiembre 2026
 **Aplicación:** Finexia — Plataforma de gestión y seguimiento de portafolios de inversión
 
 ---
@@ -15,16 +15,18 @@
 5. [Dashboard (panel principal)](#5-dashboard-panel-principal)
 6. [Portafolios](#6-portafolios)
 7. [Posiciones y activos](#7-posiciones-y-activos)
-8. [Plataformas](#8-plataformas)
-9. [Transacciones](#9-transacciones)
-10. [Importación masiva de transacciones (Excel/CSV)](#10-importación-masiva-de-transacciones-excelcsv)
-11. [Reportes y exportaciones](#11-reportes-y-exportaciones)
-12. [Notificaciones](#12-notificaciones)
-13. [Configuración de la cuenta](#13-configuración-de-la-cuenta)
-14. [Seguridad: 2FA y sesiones](#14-seguridad-2fa-y-sesiones)
-15. [Preguntas frecuentes (FAQ)](#15-preguntas-frecuentes-faq)
-16. [Solución de problemas](#16-solución-de-problemas)
-17. [Glosario](#17-glosario)
+8. [Mis Activos (vista consolidada)](#8-mis-activos-vista-consolidada)
+9. [Plataformas](#9-plataformas)
+10. [Transacciones](#10-transacciones)
+11. [Importación masiva de transacciones (Excel/CSV)](#11-importación-masiva-de-transacciones-excelcsv)
+12. [Reportes y exportaciones](#12-reportes-y-exportaciones)
+13. [Notificaciones](#13-notificaciones)
+14. [Configuración de la cuenta](#14-configuración-de-la-cuenta)
+15. [Seguridad: 2FA y sesiones](#15-seguridad-2fa-y-sesiones)
+16. [Conectar un asistente de IA (MCP)](#16-conectar-un-asistente-de-ia-mcp)
+17. [Preguntas frecuentes (FAQ)](#17-preguntas-frecuentes-faq)
+18. [Solución de problemas](#18-solución-de-problemas)
+19. [Glosario](#19-glosario)
 
 ---
 
@@ -113,7 +115,7 @@ Si intentas iniciar sesión sin haber verificado tu correo, la aplicación te lo
 
 ### 3.5 Cerrar sesión
 
-Usa el botón **Cerrar Sesión** situado en la parte inferior de la barra lateral. También puedes cerrar sesiones abiertas en otros dispositivos desde **Configuración → Sesiones activas** (ver sección 14.3).
+Usa el botón **Cerrar Sesión** situado en la parte inferior de la barra lateral. También puedes cerrar sesiones abiertas en otros dispositivos desde **Configuración → Sesiones activas** (ver sección 15.3).
 
 ---
 
@@ -137,12 +139,13 @@ Es el menú de navegación. Sus secciones son:
 |---|---|
 | **Dashboard** | Vista general: patrimonio neto, crecimiento y actividad reciente |
 | **Portafolios** | Crear y gestionar tus portafolios y sus posiciones |
+| **Mis Activos** | Cuánto tienes de cada activo, sumando todos tus portafolios |
 | **Plataformas** | Registrar los brokers/exchanges/bancos donde tienes activos |
 | **Transacciones** | Historial de operaciones e importación desde Excel/CSV |
 | **Reportes** | Estadísticas, calendario de rendimiento y descargas en Excel |
 | **Notificaciones** | Preferencias de avisos por correo y en la app |
 | **Guía de usuario** | Este manual, para consultarlo en pantalla o descargarlo |
-| **Configuración** | Perfil, apariencia, contraseña, 2FA, sesiones y claves de datos de mercado |
+| **Configuración** | Perfil, apariencia, contraseña, 2FA, sesiones, claves de datos de mercado y acceso para asistentes |
 
 En la parte inferior de la barra lateral está el botón **Cerrar Sesión**.
 
@@ -268,7 +271,7 @@ La página de detalle muestra:
 
 ### 6.4 Editar un portafolio
 
-En el detalle del portafolio, pulsa **Editar portafolio** para modificar su nombre, descripción, tipo, riesgo o monto objetivo, y guarda los cambios.
+En el detalle del portafolio, pulsa **Editar portafolio**: el formulario se abre en una ventana sobre la página con el nombre, la descripción, el tipo, el nivel de riesgo y el monto objetivo. Al guardar, la ventana se cierra y la página confirma que se actualizó.
 
 ---
 
@@ -279,14 +282,14 @@ Una **posición** representa la tenencia de un activo concreto dentro de un port
 ### 7.1 Añadir una posición
 
 1. Entra al **detalle del portafolio** y pulsa **Añadir posición / activo**.
-2. **Busca el activo** escribiendo su ticker o nombre (p. ej. `AAPL`, `Bitcoin`). La aplicación busca en el catálogo de activos disponible.
-3. Indica:
+2. Elige la **plataforma** donde tienes el activo, de tu lista de Plataformas.
+3. **Busca el activo** escribiendo su ticker o nombre (p. ej. `AAPL`, `Bitcoin`). La aplicación busca en el catálogo de activos disponible.
+4. Completa los **detalles de compra**:
    - **Cantidad** — número de unidades que posees.
-   - **Precio de compra** — precio por unidad (p. ej. `150.50`).
-   - **Fecha de compra** y **categoría** del activo.
-   - **Plataforma** — dónde tienes el activo (de tu lista de Plataformas).
-   - **Notas** (opcional) — cualquier comentario sobre la posición.
-4. Guarda. La posición aparecerá en la lista del portafolio y sus importes se sumarán al valor total.
+   - **Precio de compra** — precio por unidad (p. ej. `150.50`), con el selector de **moneda de la operación** al lado: llega puesta la del activo, y se cambia si tu bróker la ejecutó en otra. Se admiten todos los decimales que haga falta, así que un precio de `0.00004182` se guarda tal cual y no redondeado.
+   - **Fecha de compra**.
+5. Si tu cuenta liquidó en una moneda distinta de la de la operación, marca **"Mi cuenta liquidó en otra moneda"** e indica la moneda y la tasa (apartado 7.4).
+6. Añade las **notas** que quieras y guarda. La posición aparecerá en la lista del portafolio y sus importes se sumarán al valor total.
 
 > **¿No aparece el activo que buscas?** El buscador te ofrece **Crear "TICKER"**. Rellena nombre, tipo y moneda (el mercado es opcional) y el activo queda disponible al instante para seguir con la posición. Los activos que creas los ves solo tú, hasta que el equipo de Finexia los incorpore al catálogo general. Puedes añadir hasta 50 activos nuevos cada 24 horas.
 
@@ -303,11 +306,18 @@ La vista incluye:
 - **Información del Activo:** tipo, exchange donde cotiza, moneda, porcentaje de **asignación** dentro del portafolio, número de **transacciones** y **ROI** (retorno sobre la inversión).
 - **Historial de Transacciones:** todas las compras y ventas de ese activo, con tipo, fecha, cantidad, precio, comisión, total y notas.
 
-Desde esta misma vista puedes **registrar nuevas operaciones**: el botón **+ Agregar** crea una transacción nueva, y cada fila del historial ofrece acciones para **editar** la operación o registrar una **venta** (ver sección 9).
+Desde esta misma vista se gestiona todo el historial. Cada acción abre su propia ventana sobre la página:
+
+- **+ Agregar** — registra una transacción nueva sobre esta posición (sección 10.2).
+- **Vender** — abre el panel de venta con el lote de esa fila, entero o en parte (sección 10.4).
+- **Editar** — corrige cualquier dato de una operación ya registrada.
+- **Eliminar** — borra una operación. El diálogo enseña el tipo, la fecha y el total de la que vas a quitar, porque en una tabla todas las filas se parecen y esto no se puede deshacer. La posición se recalcula con las que queden; si era la última, la cantidad pasa a 0.
+
+Al final de la página está **Eliminar posición**, que no es lo mismo: quita la posición del portafolio **junto con todas sus transacciones**, y por eso el diálogo dice cuántas se van con ella. Ten en cuenta que hay una posición por plataforma —el mismo ticker comprado en dos brókers son dos posiciones—, así que cada una se elimina por separado.
 
 ### 7.3 Precios de los activos
 
-Los precios vienen de proveedores de datos de mercado (Finnhub, Alpha Vantage), y **Finexia no tiene cuenta con ninguno de ellos**: la clave la pones tú, en *Configuración → Datos de mercado* (sección 13.4). Es gratis y se tarda un minuto; el manual lo explica ahí.
+Los precios vienen de proveedores de datos de mercado (Finnhub, Alpha Vantage), y **Finexia no tiene cuenta con ninguno de ellos**: la clave la pones tú, en *Configuración → Datos de mercado* (sección 14.4). Es gratis y se tarda un minuto; el manual lo explica ahí.
 
 Qué cambia según tengas clave o no:
 
@@ -321,62 +331,155 @@ Sin clave la aplicación **no inventa un precio ni usa el de otro usuario**: los
 
 Un administrador puede además fijar a mano el precio de un activo del catálogo. Ese precio sí lo ve todo el mundo, y se usa solo cuando tú no tienes dato propio para ese activo.
 
+### 7.4 Cuando la operación y tu cuenta van en monedas distintas
+
+Un activo puede cotizar en una moneda y tu cuenta liquidar en otra: compras un ETF que cotiza en euros desde una cuenta en dólares y el bróker convierte por su cuenta. Son dos cifras distintas —el precio al que se ejecutó y lo que salió de tu cuenta— y Finexia guarda las dos.
+
+En el formulario de compra hay un interruptor: **"Mi cuenta liquidó en otra moneda"**. Mientras esté apagado no hay nada que decidir, porque la operación y la cuenta van en la misma moneda. Al encenderlo aparecen dos campos:
+
+- **Moneda de la cuenta** — aquella en la que el bróker debitó el importe. Es la moneda en la que queda el coste de la posición.
+- **Tasa de la operación** — cuántas unidades de la moneda de la cuenta costaba una de la moneda de la operación **ese día**.
+
+> **Copia la tasa de la confirmación del bróker, no la de hoy.** La de hoy convierte una compra vieja a un precio que nunca pagaste, y deja mal el coste de la posición y, con él, toda su ganancia. Por eso los campos están detrás de un interruptor en vez de a la vista: una casilla de tasa siempre visible invita a rellenarla con la cotización del momento.
+
+Si dejas las dos monedas iguales con el interruptor encendido, la aplicación te lo dice junto al campo y guarda la tasa como 1: una moneda no se convierte en sí misma.
+
+Lo mismo aparece al **vender** y al **registrar o editar una transacción** de una posición de este tipo, con un añadido: un selector para decir en cuál de las dos monedas te cobraron la **comisión**. Y junto a la tasa verás siempre el importe que resulta en la moneda de tu cuenta, para contrastarlo con el que te debitaron antes de guardar.
+
 ---
 
-## 8. Plataformas
+## 8. Mis Activos (vista consolidada)
 
-Las **plataformas** son los lugares donde custodias tus activos: brokers, exchanges de criptomonedas, bancos, etc. Registrarlas te permite saber siempre **dónde** está cada inversión.
+Los portafolios contestan a "cómo tengo repartido el dinero". **Mis Activos** contesta a la otra pregunta: **cuánto tengo de cada cosa**, sin importar en qué portafolio esté. Si compraste AAPL en tres portafolios distintos, aquí es una sola fila con la suma.
+
+![Vista Mis Activos con el valor total, la concentración por activo y la tabla consolidada](img/manual/18-mis-activos.png)
+
+La página se abre desde **Mis Activos**, en el menú lateral, y tiene tres partes:
+
+- **Los totales:** el **valor total** de todo lo que tienes, en la moneda de tu cuenta, y cuántos **activos distintos** te quedan una vez consolidados.
+- **Concentración por activo:** una dona con el peso de cada activo sobre el total. Al señalar una porción —o su entrada en la leyenda— el centro pasa a mostrar ese activo con su porcentaje. Los más pequeños se agrupan en **Otros**, con el número de activos que engloba. Funciona igual con el teclado y cada entrada dice su peso, así que el reparto se puede leer sin depender del color.
+- **Tus activos:** la tabla, con una fila por activo.
+
+| Columna | Qué dice |
+|---|---|
+| **Activo** | Ticker y nombre |
+| **Tipo** | Acción, ETF, cripto, bono, efectivo… |
+| **Cantidad** | Las unidades sumadas de todos tus portafolios |
+| **Precio** | Lo que vale una unidad hoy |
+| **Valor** | Lo que suma esa tenencia, en la moneda de la cabecera |
+| **Peso** | Cuánto pesa sobre el total, en barra y en porcentaje |
+| **Portafolios** | En cuántos de tus portafolios lo tienes |
+
+La tabla se pagina de quince en quince; la dona siempre reparte la cartera entera, no la página que estés viendo, para que las porciones no cambien al pasar de hoja.
+
+Dos detalles al leerla:
+
+- El **precio** va en la moneda en la que cotiza el activo, no en la de la columna *Valor*: es lo que vale una unidad en su mercado, no lo que se convirtió. Cuando no hay precio de mercado (apartado 7.3), la fila lo dice con la etiqueta **a coste**.
+- Si algún activo está en una moneda para la que no hay tasa de cambio, entra en el total **sin convertir** y la página lo avisa arriba. En ese caso el total y los pesos mezclan monedas, así que tómalos como una aproximación.
+
+---
+
+## 9. Plataformas
+
+Las **plataformas** son los lugares donde custodias tus activos: brokers, exchanges de criptomonedas, bancos, etc. Registrarlas te permite saber siempre **dónde** está cada inversión y **qué parte** guarda cada sitio.
 
 > **Recuerda:** Finexia solo guarda el nombre y la descripción de la plataforma. **Nunca** se conecta a ella ni almacena tus credenciales.
 
-### 8.1 Ver tus plataformas
+### 9.1 Ver tus plataformas
 
-![Listado de plataformas registradas con su tipo, número de inversiones y valor total](img/manual/07-plataformas.png)
+![Listado de plataformas ordenadas por lo que guarda cada una, con la barra de reparto encima](img/manual/07-plataformas.png)
 
-En **Plataformas** aparece la sección **"Tus Plataformas"** con las que hayas registrado: para cada una se muestra su tipo (broker, exchange, banco…), el número de inversiones asociadas y el valor total que tienes en ella. Si aún no tienes ninguna, verás el mensaje "No hay plataformas registradas" con la opción de crear la primera.
+La página abre con el **reparto de tu dinero**: el total de la cuenta y una barra en la que cada tramo es una plataforma, del tamaño de lo que guarda. Debajo, la tabla las ordena **de mayor a menor**, y la regla de color bajo cada nombre repite su tramo de la barra con el mismo tono.
 
-### 8.2 Añadir una plataforma
+| Columna | Qué dice |
+|---|---|
+| **Plataforma** | Nombre, tipo (bróker, casa de bolsa, billetera cripto…) y qué porcentaje de la cuenta guarda |
+| **Posiciones** | Cuántas posiciones abiertas custodia |
+| **Invertido** | Lo que te costó lo que sigue en cartera, en la moneda de tu cuenta |
+| **Ganancia** | La diferencia frente al valor de mercado, en importe y en porcentaje |
+
+La lista se pagina de doce en doce. Si todavía no tienes ninguna plataforma, la página te ofrece crear la primera.
+
+> **La columna de ganancia aparece y desaparece.** Solo se dibuja si al menos una plataforma tiene con qué calcularla: sin precios de mercado (apartado 7.3) sería una columna de guiones, que se lee como un dato que falta y no como uno que no existe.
+
+### 9.2 Añadir una plataforma
 
 1. Pulsa **Añadir plataforma**.
 2. Introduce:
    - **Nombre** — p. ej. "Interactive Brokers", "Binance", "Mi banco".
    - **Descripción** — información adicional (opcional).
+   - **Tipo de plataforma** — bróker, banco de inversión, plataforma de trading, neobank, DeFi, billetera cripto, fondos mutuos, casa de bolsa u otro.
 3. Guarda. La plataforma quedará disponible para asociarla a posiciones y transacciones.
 
-### 8.3 Editar o eliminar una plataforma
+### 9.3 Detalle de una plataforma
 
-Desde la tarjeta o el detalle de la plataforma puedes **editar** sus datos o **eliminarla**. Ten en cuenta que la eliminación es permanente; si la plataforma tiene posiciones asociadas, revisa primero su contenido.
+![Detalle de una plataforma con lo invertido, lo que vale hoy, la diferencia y las posiciones](img/manual/19-plataforma-detalle.png)
+
+Al pulsar el nombre de una plataforma se abre su ficha. Bajo el título van su tipo y la fecha de alta, y después las cifras, en línea porque solo significan algo leídas juntas —la diferencia **es** la resta de las otras dos—:
+
+- **Invertido** — lo que te costaron las posiciones que custodia, y qué porcentaje de tu cuenta representa.
+- **Vale hoy** — su valor de mercado. Debajo, cuántas posiciones se están valorando a su propio coste por no tener precio.
+- **Diferencia** — la ganancia o la pérdida, en importe y en porcentaje sobre lo invertido.
+- **Posiciones** — cuántas hay, y sobre cuántos **activos** y **portafolios** se reparten: diez posiciones son una cosa muy distinta si son diez empresas que si son una empresa repetida en diez portafolios.
+
+La ficha avisa cuando toca. Si **ninguna** posición tiene precio de mercado, explica que el valor de mercado repite lo invertido y que la ganancia sale en cero porque no hay con qué compararla, no porque la plataforma no se haya movido. Y si alguna posición se contó en su propia moneda por falta de tasa de cambio, también lo dice: entonces el total suma monedas distintas.
+
+### 9.4 Editar o eliminar una plataforma
+
+**Editar** abre el formulario en una ventana sobre la ficha, con el nombre, la descripción y el tipo.
+
+**Eliminar** pide confirmación y es permanente. Una plataforma que todavía tenga posiciones registradas —**incluidas las que ya vendiste**, porque siguen siendo tu historial— **no se puede eliminar**: Finexia se niega y te lo explica en el propio diálogo en lugar de arrastrar tus posiciones con ella. Elimina primero esas posiciones (apartado 7.2) y vuelve a intentarlo.
 
 ---
 
-## 9. Transacciones
+## 10. Transacciones
 
 Las **transacciones** son las operaciones de compra y venta que dan forma a tus posiciones. Mantenerlas al día es la clave para que los valores, ganancias y reportes sean fieles a la realidad.
 
-### 9.1 Ver el historial
+### 10.1 Ver el historial
 
 ![Historial de transacciones con fecha, activo, tipo de operación e importe](img/manual/08-transacciones.png)
 
 La sección **Transacciones** muestra el historial de operaciones más recientes de todos tus portafolios, con fecha, activo, tipo de operación (compra o venta), cantidad, precio e importe. Desde el detalle de cada posición (sección 7.2) puedes ver el historial filtrado por activo.
 
-### 9.2 Registrar una transacción
+### 10.2 Registrar una transacción
 
-1. Entra a la posición correspondiente (portafolio → posición) o usa la acción **Nueva transacción**.
-2. Indica:
-   - **Tipo de operación** — compra o venta.
-   - **Fecha** de la operación.
-   - **Cantidad** de unidades.
-   - **Precio** por unidad.
-   - **Comisiones** u otros costes, si aplica.
-3. Guarda. La posición y el portafolio se recalculan automáticamente.
+Las transacciones se registran desde la posición a la que pertenecen: entra al **portafolio**, abre la **posición** y pulsa **+ Agregar**. (Para cargar muchas de golpe, usa la importación de la sección 11.)
 
-### 9.3 Editar una transacción
+1. Elige el **tipo de operación**. El formulario se adapta a lo que elijas:
 
-Si cometiste un error, abre la transacción desde el historial y pulsa **Editar**. Corrige los datos y guarda; los totales se actualizarán.
+   | Tipo | Qué pide |
+   |---|---|
+   | **Compra**, **Venta** | Cantidad, precio unitario y comisión |
+   | **Dividendo**, **Interés**, **Comisión** | Solo el importe |
+   | **Transferencia de entrada**, **Transferencia de salida** | Cantidad y precio |
+   | **Split** | Las nuevas unidades recibidas |
+
+2. Indica la **fecha** y, si tienes el mismo activo en más de una plataforma, en cuál de ellas fue.
+3. Añade la **comisión**, si la hubo, y las **notas** que quieras.
+4. Si la operación se liquidó en otra moneda, indica la **tasa** (apartado 7.4). Al lado verás el **coste en la moneda de tu cuenta** que sale de lo que llevas tecleado, para contrastarlo con lo que te debitaron.
+5. Guarda. La posición y el portafolio se recalculan automáticamente.
+
+### 10.3 Editar o eliminar una transacción
+
+En el historial de la posición, cada fila tiene sus acciones:
+
+- **Editar** — abre la operación en una ventana con todos sus datos, la tasa incluida. Corrige lo que haga falta y guarda; los totales se actualizan.
+- **Eliminar** — la borra tras una confirmación que muestra el tipo, la fecha y el total de esa fila, porque en la tabla todas se parecen. La posición se recalcula con las que queden; si era la última, la cantidad pasa a 0. No se puede deshacer.
+
+### 10.4 Registrar una venta
+
+El botón **Vender** de una fila del historial abre el panel de venta con ese lote:
+
+- Vende **el lote entero** o **una parte**; en ese caso indícala **por unidades o por importe**, lo que tengas a mano de la confirmación del bróker.
+- El **precio** llega sugerido del mercado: cámbialo por el que se ejecutó de verdad.
+- Si la venta liquidó en otra moneda, indica la **tasa** y en cuál de las dos monedas te cobraron la **comisión** (apartado 7.4). Debajo verás lo que recibiría tu cuenta con lo tecleado.
+
+La venta se registra como una transacción más, así que aparece en el historial y se puede editar o eliminar como cualquier otra.
 
 ---
 
-## 10. Importación masiva de transacciones (Excel/CSV)
+## 11. Importación masiva de transacciones (Excel/CSV)
 
 Si ya llevas tu registro en una hoja de cálculo, no necesitas volver a teclearlo todo: Finexia puede **importar tus transacciones desde un archivo Excel o CSV**. La propia página lo resume así: *"Sube el Excel donde llevas tu registro de inversiones: detectamos tus columnas y las adaptamos automáticamente."*
 
@@ -384,14 +487,14 @@ El proceso tiene tres pasos, indicados en la parte superior: **1 · Archivo**, *
 
 ![Primer paso de la importación: elegir portafolio de destino, plataforma y subir el archivo](img/manual/09-importar-transacciones.png)
 
-### 10.1 Paso 1 — Archivo
+### 11.1 Paso 1 — Archivo
 
 1. Ve a **Transacciones → Importar**.
 2. Selecciona el **Portafolio destino** (dónde se crearán las transacciones) y la **Plataforma / broker** a la que corresponden.
 3. **Arrastra tu Excel** a la zona de carga **o haz clic para buscarlo** en tu equipo. Se admiten los formatos **.xlsx** y **.csv**, con un tamaño máximo de **8 MB**. No importa cómo se llamen tus columnas: podrás asignarlas en el siguiente paso.
 4. La aplicación analizará el archivo ("Analizando tu archivo…"). Si el libro tiene varias hojas, selecciona la **hoja** que contiene las transacciones.
 
-### 10.2 Paso 2 — Columnas y vista previa
+### 11.2 Paso 2 — Columnas y vista previa
 
 En la pantalla **"Asigna tus columnas"** la aplicación te dice cuántas columnas detectó en tu archivo y en qué fila están los encabezados, y te propone una **asignación sugerida** que puedes ajustar.
 
@@ -400,11 +503,12 @@ En la pantalla **"Asigna tus columnas"** la aplicación te dice cuántas columna
 En esta pantalla:
 
 - Si el libro tiene varias hojas, elige la **Hoja** correcta (al cambiarla, la aplicación vuelve a sugerir la asignación).
-- Asigna cada dato a una columna de tu archivo. Los campos **Fecha**, **Ticker/Símbolo**, **Cantidad** y **Precio** son obligatorios (marcados con `*`); **Tipo de operación**, **Nombre del activo**, **Comisiones**, **Moneda**, **Categoría** y **Notas** son opcionales — puedes dejarlos en **"— No usar —"**.
-- En **Valores por defecto** defines lo que se aplicará a las filas donde tu archivo no tenga ese dato: tipo de operación, moneda, categoría y formato de fecha (con detección automática).
+- Asigna cada dato a una columna de tu archivo. Los campos **Fecha**, **Ticker/Símbolo**, **Cantidad** y **Precio** son obligatorios (marcados con `*`); **Tipo de operación**, **Nombre del activo**, **Comisiones**, **Moneda**, **Tasa de cambio**, **Categoría** y **Notas** son opcionales — puedes dejarlos en **"— No usar —"**.
+- En **Valores por defecto** defines lo que se aplicará a las filas donde tu archivo no tenga ese dato: tipo de operación, moneda, **moneda de la cuenta**, categoría y formato de fecha (con detección automática).
+- La **moneda de la cuenta** es aquella en la que tu bróker debitó (apartado 7.4). Déjala vacía si tu extracto no convirtió nada; si la rellenas, cada fila que venga en otra moneda necesita su **tasa de cambio**, así que conviene mapear también esa columna. La vista previa trae una columna **Tasa** para comprobarlo fila a fila.
 - La **vista previa** resume el resultado con contadores —en el ejemplo de arriba, "8 filas · 6 listas para importar · 2 con errores (se omitirán)"— y muestra las filas interpretadas: las válidas con ✓ y las que se omitirán con ✗ y el **motivo del error** en la columna **Detalle** (fecha no reconocida, precio vacío…), para que puedas corregir tu archivo si lo deseas.
 
-### 10.3 Paso 3 — Resultado
+### 11.3 Paso 3 — Resultado
 
 1. Cuando la asignación sea correcta, pulsa **Importar N transacciones** (el botón indica cuántas filas válidas se crearán). Si prefieres empezar de nuevo, usa **Elegir otro archivo**.
 2. Las transacciones se crearán en el portafolio elegido y verás el **resultado** del proceso: cuántas se importaron, cuántas se omitieron y el detalle de los errores, si los hubo.
@@ -417,13 +521,13 @@ En esta pantalla:
 
 ---
 
-## 11. Reportes y exportaciones
+## 12. Reportes y exportaciones
 
 La sección **Reportes** ("Gestiona y descarga documentos financieros de tu cuenta") concentra el análisis de rendimiento.
 
 ![Página de reportes con el calendario de rendimiento, las estadísticas clave, la proyección de crecimiento y las descargas](img/manual/10-reportes.png)
 
-### 11.1 Reportes en pantalla
+### 12.1 Reportes en pantalla
 
 - **Rentabilidad mensual (%):** calendario con el rendimiento de cada mes, un panel por año (verás tantos paneles como años cubra tu historial). Arriba de cada panel está el **acumulado del año**, y debajo la **leyenda de la escala de color** (de rojo intenso para caídas de más del 1 % a verde intenso para subidas del 2 % o más). Los meses sin dato aparecen con un guion.
 
@@ -454,7 +558,7 @@ La sección **Reportes** ("Gestiona y descarga documentos financieros de tu cuen
 
   **No es una previsión de mercado**, y por eso la aplicación se abstiene de mostrarla cuando tienes menos de seis meses de historial —en ese caso te dice cuántos días llevas y cuántos faltan— o cuando el ritmo es tan extremo que proyectarlo daría cifras absurdas.
 
-### 11.2 Descargas en Excel (XLSX)
+### 12.2 Descargas en Excel (XLSX)
 
 En la parte inferior de la página encontrarás las tarjetas de descarga; pulsa **Descargar** en la que necesites:
 
@@ -476,18 +580,18 @@ Los archivos se descargan directamente a tu equipo en formato Excel (XLSX) y pue
 
 ---
 
-## 12. Notificaciones
+## 13. Notificaciones
 
 ![Preferencias de notificaciones por correo electrónico y alertas en la app](img/manual/11-notificaciones.png)
 
 En **Notificaciones** configuras cómo quieres que Finexia te avise:
 
-### 12.1 Correo electrónico
+### 13.1 Correo electrónico
 
 - **Alertas de actividad:** recibe un correo cuando ocurra actividad relevante en tu cuenta.
 - **Resumen semanal:** un correo periódico con el resumen de la evolución de tus portafolios.
 
-### 12.2 Alertas en la app
+### 13.2 Alertas en la app
 
 Activa o desactiva los avisos que se muestran dentro de la propia aplicación.
 
@@ -495,28 +599,29 @@ Marca o desmarca cada opción según tu preferencia; los cambios se guardan en t
 
 ---
 
-## 13. Configuración de la cuenta
+## 14. Configuración de la cuenta
 
 La página **Configuración** agrupa todo lo relativo a tu cuenta, en secciones:
 
 ![Página de configuración con el perfil, la apariencia, la seguridad y las sesiones activas](img/manual/12-configuracion.png)
 
-### 13.1 Perfil
+### 14.1 Perfil
 
 - Edita tu **nombre** y datos personales.
 - **Sube o cambia tu avatar** (imagen de perfil), que se mostrará en la cabecera y en tu perfil.
+- Elige tu **moneda preferida**: es en la que se muestran los totales del Dashboard y de Mis Activos. Solo aparecen las monedas a las que la aplicación sabe convertir.
 - Tu correo electrónico identifica tu cuenta.
 
-### 13.2 Apariencia
+### 14.2 Apariencia
 
 Ajusta las preferencias visuales de la aplicación (tema/aspecto de la interfaz) a tu gusto. Los cambios se aplican de inmediato y quedan guardados en tus preferencias.
 
-### 13.3 Seguridad
+### 14.3 Seguridad
 
 - **Cambiar contraseña:** introduce tu contraseña actual y la nueva. Usa contraseñas largas y únicas.
-- **Verificación en dos pasos (2FA)** y **Sesiones activas:** ver sección 14.
+- **Verificación en dos pasos (2FA)** y **Sesiones activas:** ver sección 15.
 
-### 13.4 Datos de mercado (tu clave de proveedor)
+### 14.4 Datos de mercado (tu clave de proveedor)
 
 Aquí es donde das de alta la clave con la que Finexia consulta los precios de tus activos. Sin ella tus posiciones se valoran a precio de compra (sección 7.3).
 
@@ -541,11 +646,15 @@ Por cada clave guardada verás:
 
 > **La clave no se puede volver a leer, ni siquiera tú.** Se guarda cifrada y Finexia nunca la devuelve: por eso el campo aparece siempre vacío y cambiarla significa escribirla entera otra vez. Si la pierdes, genera una nueva en el proveedor. Si prefieres dejar de usarla, **Eliminar** la borra de verdad.
 
+### 14.5 Acceso para asistentes y aplicaciones conectadas
+
+En la parte baja de la página están las credenciales con las que un asistente de IA puede leer tus carteras: **Acceso para asistentes (MCP)**, donde creas, rotas y eliminas tus tokens, y **Aplicaciones conectadas**, donde retiras el acceso a las aplicaciones que hayas autorizado. Las dos se explican enteras en la sección 16.
+
 ---
 
-## 14. Seguridad: 2FA y sesiones
+## 15. Seguridad: 2FA y sesiones
 
-### 14.1 Activar la verificación en dos pasos (2FA)
+### 15.1 Activar la verificación en dos pasos (2FA)
 
 La 2FA añade una segunda barrera al inicio de sesión: además de tu contraseña, necesitarás un código temporal generado por tu aplicación de autenticación.
 
@@ -556,13 +665,13 @@ La 2FA añade una segunda barrera al inicio de sesión: además de tu contraseñ
 
 A partir de ese momento, cada inicio de sesión pedirá el código temporal.
 
-### 14.2 Códigos de recuperación y desactivación
+### 15.2 Códigos de recuperación y desactivación
 
 - **Usar un código de recuperación:** en el segundo paso del login, introduce uno de tus códigos de recuperación en lugar del código temporal. Cada código sirve **una sola vez**.
 - **Regenerar códigos:** desde la sección 2FA puedes generar una nueva lista (la anterior queda invalidada).
 - **Desactivar 2FA:** desde la misma sección, confirmando con un código válido. Tu cuenta volverá a protegerse solo con contraseña (no recomendado).
 
-### 14.3 Sesiones activas
+### 15.3 Sesiones activas
 
 En **Configuración → Sesiones activas** verás todos los dispositivos/navegadores con sesión abierta en tu cuenta, con información para identificarlos (dispositivo, ubicación aproximada y última actividad).
 
@@ -571,7 +680,95 @@ En **Configuración → Sesiones activas** verás todos los dispositivos/navegad
 
 ---
 
-## 15. Preguntas frecuentes (FAQ)
+## 16. Conectar un asistente de IA (MCP)
+
+Finexia también puede responder a través de un **asistente de IA**: preguntarle a Claude —o a cualquier cliente que hable **MCP** (*Model Context Protocol*)— cuánto tienes en cripto, qué compraste el mes pasado o cómo está repartida tu cartera, y que conteste con **tus** datos.
+
+Lo primero, porque es lo que importa: **el acceso es de solo lectura**. Un asistente conectado puede consultar tus carteras; no puede crear, modificar ni borrar nada, ni entrar al resto de la aplicación. Y llega solo hasta donde tú le dejes: la conexión se corta desde **Configuración** cuando quieras.
+
+Hay dos formas de conectarlo, según lo que sepa hacer tu cliente:
+
+| Forma | Cuándo usarla |
+|---|---|
+| **Token personal** | El cliente pide una dirección y una cabecera de autorización. Es el caso de Claude Desktop, Claude Code y la mayoría |
+| **Autorización (OAuth)** | El cliente sabe conectarse solo: te lleva a una pantalla de Finexia donde apruebas la conexión |
+
+### 16.1 Crear un token
+
+En **Configuración → Acceso para asistentes (MCP)**:
+
+1. Escribe un **nombre** que te diga después cuál es cuál: "Claude Desktop", "Portátil del trabajo".
+2. Elige la **caducidad**: 30 días, 90 días (lo recomendado), 1 año o sin caducidad.
+3. Pulsa **Crear token**.
+
+El **secreto se muestra una sola vez**, justo después de crearlo, con un botón para copiarlo y un ejemplo de configuración listo para pegar. Finexia guarda solo su huella, así que nadie —tú incluido— puede volver a leerlo: si lo pierdes, rota el token y reconfigura el cliente.
+
+Cada token de la lista muestra su nombre, sus **cuatro últimos caracteres**, su estado (**Activo**, **Sin usar** mientras nadie lo haya usado todavía, o **Caducado**), cuándo se usó por última vez, cuándo caduca y cuándo se creó. Y dos acciones:
+
+- **Rotar** — cambia el secreto por uno nuevo y lo enseña una vez. El anterior deja de funcionar en el acto: es lo que hay que hacer si crees que se filtró.
+- **Eliminar** — revoca el token para siempre.
+
+### 16.2 Configurar el cliente
+
+La página de ajustes muestra la **dirección del endpoint** que hay que pegar en tu cliente. Con esa dirección y el token, la configuración de un cliente MCP tiene esta forma:
+
+```json
+{
+  "mcpServers": {
+    "finexia": {
+      "type": "http",
+      "url": "https://api.finexia.me/mcp",
+      "headers": { "Authorization": "Bearer fnx_mcp_…" }
+    }
+  }
+}
+```
+
+En Claude Code, la misma conexión se añade con una orden:
+
+```
+claude mcp add --transport http finexia https://api.finexia.me/mcp \
+  --header "Authorization: Bearer fnx_mcp_…"
+```
+
+> **Trata el token como una contraseña.** Da acceso de lectura a todas tus carteras. No lo pegues en un chat ni lo subas a un repositorio y, si tienes dudas, rótalo: no cuesta nada y el anterior queda inservible.
+
+### 16.3 Autorizar una aplicación (OAuth)
+
+Los clientes que saben conectarse solos no necesitan que copies nada: al añadir Finexia te llevan a una pantalla de la propia aplicación donde se te pide permiso.
+
+Esa pantalla dice **qué aplicación** lo pide, **qué está pidiendo** —leer tus carteras, posiciones, transacciones y datos de mercado, sin poder cambiar nada— y **a dónde volverá** al terminar. Antes de pulsar **Autorizar**, comprueba dos cosas:
+
+- Que el nombre sea el de la aplicación desde la que **acabas de pedir** la conexión. Si la pantalla aparece sin que tú hayas hecho nada, cancela.
+- Que la dirección de retorno sea la que esperas de ella. El nombre y el logotipo los eligió quien registró el cliente, y registrarse es abierto: son texto de un desconocido. La dirección de retorno es el dato que sí se puede contrastar.
+
+**Cancelar** no conecta nada y no tiene ninguna consecuencia.
+
+### 16.4 Retirar el acceso
+
+En **Configuración → Aplicaciones conectadas** están las aplicaciones que autorizaste, con los permisos que tienen, cuándo las conectaste y cuándo las usaron por última vez. **Desconectar** corta el acceso al instante, y es la única forma de retirárselo: mientras nadie lo corte, el cliente renueva su permiso solo.
+
+Los tokens personales se revocan desde la sección de al lado, con **Eliminar** (apartado 16.1).
+
+### 16.5 Qué puede consultar un asistente
+
+Con la conexión hecha, el asistente puede preguntar por:
+
+- Tus **portafolios**, con su valor, su coste y su ganancia.
+- Lo que tienes de cada **activo**, sumado entre portafolios.
+- Tu **asignación** por tipo de activo.
+- La **evolución** de un portafolio a lo largo del tiempo.
+- Tus **transacciones recientes**.
+- Tus **plataformas**, el **catálogo de activos** y las **tasas de cambio**.
+
+Dos cosas que conviene saber para leer sus respuestas:
+
+- Los importes van **cada uno con su moneda**, y dos cifras en monedas distintas no se comparan sin convertirlas antes.
+- Una posición sin precio de mercado (apartado 7.3) se valora a lo que costó, así que su ganancia es exactamente cero. El asistente recibe de dónde salió cada precio, y ese cero no es un rendimiento.
+
+---
+
+## 17. Preguntas frecuentes (FAQ)
 
 **¿Finexia se conecta a mis brokers o plataformas?**
 No. Finexia nunca accede a tus plataformas ni te pide credenciales. Tú registras manualmente dónde tienes tus activos, así que la información siempre está bajo tu control.
@@ -580,7 +777,7 @@ No. Finexia nunca accede a tus plataformas ni te pide credenciales. Tú registra
 Sí, puedes crear tantos como necesites, cada uno con su moneda, tipo, nivel de riesgo y monto objetivo propios.
 
 **¿Cómo se calculan los valores de mis posiciones?**
-Cantidad × precio, convertido a la moneda del portafolio. El precio es, por este orden: el último que trajo **tu** clave de datos de mercado; si no tienes clave, el precio manual que haya fijado un administrador para ese activo; y si tampoco lo hay, tu propio precio de compra. Las tasas de cambio siguen la misma regla. Ver secciones 7.3 y 13.4.
+Cantidad × precio, convertido a la moneda del portafolio. El precio es, por este orden: el último que trajo **tu** clave de datos de mercado; si no tienes clave, el precio manual que haya fijado un administrador para ese activo; y si tampoco lo hay, tu propio precio de compra. Las tasas de cambio siguen la misma regla. Ver secciones 7.3 y 14.4.
 
 **¿Puedo importar mi histórico desde Excel?**
 Sí. Usa **Transacciones → Importar**: sube el archivo (.xlsx o .csv, máximo 8 MB), asigna las columnas, revisa la vista previa (incluidas las filas omitidas) y confirma. Nada se guarda hasta que confirmas.
@@ -603,9 +800,21 @@ En **Guía de usuario**, en el menú lateral. Puedes leerlo dentro de la aplicac
 **¿Puedo usar la aplicación solo con el teclado?**
 Sí. Los menús, formularios y tablas se recorren con **Tab**, y la gráfica de crecimiento del Dashboard admite las flechas para ir día a día (sección 5.1).
 
+**¿Dónde veo cuánto tengo de un activo en total?**
+En **Mis Activos**, en el menú lateral: una fila por activo con la cantidad sumada de todos tus portafolios, lo que vale, cuánto pesa sobre el total y en cuántos portafolios lo tienes (sección 8).
+
+**Compré en una moneda y mi cuenta está en otra. ¿Cómo lo registro?**
+Marca **"Mi cuenta liquidó en otra moneda"** en el formulario e indica la moneda de tu cuenta y la tasa de ese día, la de la confirmación del bróker (apartado 7.4). Lo mismo vale al vender y al registrar transacciones sueltas.
+
+**¿Puedo eliminar una posición o una transacción?**
+Sí. Una transacción se elimina desde su fila en el historial; la posición entera, desde **Eliminar posición**, al final de la ficha del activo, y se lleva todas sus transacciones con ella (apartado 7.2).
+
+**¿Puedo conectar Finexia con Claude u otro asistente de IA?**
+Sí, en modo **solo lectura**: crea un token en **Configuración → Acceso para asistentes (MCP)** y pégalo en tu cliente, o autoriza la conexión desde el propio asistente si sabe hacerlo por sí mismo. Podrá consultar tus carteras, nunca modificarlas (sección 16).
+
 ---
 
-## 16. Solución de problemas
+## 18. Solución de problemas
 
 | Problema | Causa probable | Solución |
 |---|---|---|
@@ -617,14 +826,19 @@ Sí. Los menús, formularios y tablas se recorren con **Tab**, y la gráfica de 
 | Mi sesión se cerró sola | La sesión fue revocada o expiró | Inicia sesión de nuevo; revisa **Sesiones activas** si no fuiste tú |
 | Una importación omite filas | Datos incompletos o formatos no interpretables | Revisa el detalle de **Filas omitidas**, corrige el archivo y repite la vista previa |
 | Los valores no cuadran con mi broker | No tienes clave de datos de mercado (se valora a coste), faltan transacciones, o el precio aún no se ha refrescado | Configura tu clave en **Configuración → Datos de mercado** y pulsa **Sincronizar**; completa el historial de transacciones |
-| Mi ganancia/pérdida sale exactamente 0 | Sin clave de datos de mercado se valora a precio de compra, así que no hay nada que comparar | Configura tu clave (sección 13.4) |
+| Mi ganancia/pérdida sale exactamente 0 | Sin clave de datos de mercado se valora a precio de compra, así que no hay nada que comparar | Configura tu clave (sección 14.4) |
 | El estado de mi clave aparece como "sin cuota" | Has agotado el límite diario o por minuto de tu plan gratuito | No hace falta hacer nada: se reintenta en la siguiente sincronización |
+| No puedo eliminar una plataforma | Todavía tiene posiciones registradas, incluidas las que ya vendiste | Elimina primero esas posiciones y vuelve a intentarlo (apartado 9.4) |
+| El total de **Mis Activos** mezcla monedas | Falta la tasa de cambio de la moneda de algún activo | Es un aviso, no un error: la página dice cuántos activos van sin convertir. Espera a que haya tasa o lee ese importe en su propia moneda |
+| Una compra en otra moneda no cuadra con lo que me debitaron | La tasa registrada no es la del día de la operación | Edita la transacción y pon la tasa de la confirmación del bróker (apartado 7.4) |
+| Perdí el token de mi asistente | El secreto solo se muestra al crearlo o al rotarlo | Pulsa **Rotar** en ese token y reconfigura el cliente con el nuevo (apartado 16.1) |
+| Mi asistente dice que no tiene acceso | El token caducó o se eliminó, o desconectaste la aplicación | Revisa el estado del token en **Configuración**; crea uno nuevo, o vuelve a autorizar la aplicación (sección 16) |
 
 Si el problema persiste, contacta con el equipo de soporte de Finexia.
 
 ---
 
-## 17. Glosario
+## 19. Glosario
 
 | Término | Definición |
 |---|---|
@@ -646,6 +860,13 @@ Si el problema persiste, contacta con el equipo de soporte de Finexia.
 | **Códigos de recuperación** | Códigos de un solo uso para acceder si pierdes tu aplicación de autenticación |
 | **Lista de espera** | Registro público para solicitar acceso anticipado a la plataforma |
 | **Invitación** | Enlace enviado a tu correo para crear una cuenta |
+| **Moneda de la operación** | Aquella en la que se ejecutó la compra o la venta: la del mercado donde cotiza el activo |
+| **Moneda de la cuenta** | Aquella en la que tu bróker debitó o abonó el importe, y en la que queda el coste de la posición |
+| **Tasa de la operación** | Cuántas unidades de la moneda de la cuenta costaba una de la moneda de la operación ese día |
+| **Concentración** | Cuánto pesa un activo sobre todo lo que tienes, sin importar en qué portafolio esté |
+| **MCP** | *Model Context Protocol*: el estándar por el que un asistente de IA se conecta a una aplicación para consultar sus datos |
+| **Token de acceso (MCP)** | Credencial que creas en Configuración para que un cliente MCP lea tus carteras; no sirve para nada más |
+| **OAuth** | Forma de autorizar una aplicación externa sin darle tu contraseña: apruebas la conexión en una pantalla de Finexia y la retiras cuando quieras |
 | **XLSX** | Formato de archivo de Excel usado en las exportaciones |
 
 ---
