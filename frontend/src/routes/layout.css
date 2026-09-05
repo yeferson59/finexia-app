@@ -15,8 +15,20 @@
 	--border: rgba(255, 255, 255, 0.07);
 	--border-strong: rgba(255, 255, 255, 0.12);
 	--text: #eceae5;
-	--text-muted: #8a8780;
-	--text-dim: #555250;
+	/*
+	 * Los tres escalones del texto, todos por encima del 4,5:1 que pide WCAG AA
+	 * sobre `--bg`: 16,6:1, 7,1:1 y 4,8:1.
+	 *
+	 * `--text-dim` estaba en #555250, que da 2,6:1: por debajo del mínimo para
+	 * cualquier texto, y lo llevaban las cabeceras de columna, los pies de las
+	 * gráficas y las ayudas de los formularios —o sea, texto que informa, no
+	 * decoración—. Subirlo solo a él dejaba los dos grises a 4,8 y 5,6, tan
+	 * cerca que la jerarquía de tres niveles se venía abajo, así que la rampa se
+	 * reparte entera: cada escalón está a algo más del doble de contraste que el
+	 * siguiente.
+	 */
+	--text-muted: #9f9992;
+	--text-dim: #807b74;
 	--amber: #d4912a;
 	--amber-light: #e8a535;
 	--green: #22c97e;

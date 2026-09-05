@@ -1,20 +1,14 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import Modal from '$lib/ui/modal.svelte';
 	import { PortfolioGrowth } from '$lib/features/dashboard';
-	import { privacy } from '$lib/shared/privacy.svelte';
 	import { flash } from '$lib/shared/flash.svelte';
 	import {
 		PortfolioEditForm,
-		PortfolioSummaryCards,
-		PortfolioStatsCards,
-		AllocationDonut,
-		HoldingsTable,
 		PortfolioDetailHeader,
+		PortfolioHeadline,
+		PortfolioPositions,
 		groupHoldings,
-		computeTypeBreakdown,
-		realReturnPct
+		computeTypeBreakdown
 	} from '$lib/features/portfolio';
 	import type { PageProps } from './$types';
 
@@ -22,7 +16,6 @@
 
 	const portfolio = $derived(data.portfolio);
 	const risks = $derived(data.risks);
-	const topTransaction = $derived(data.topTransaction);
 	const growth = $derived(data.growth);
 
 	let isEditing = $state(false);
@@ -35,54 +28,14 @@
 
 	const totalValue = $derived(holdings.reduce((sum, h) => sum + h.value, 0));
 	const totalCost = $derived(holdings.reduce((sum, h) => sum + h.costBasis, 0));
-	const totalGainLoss = $derived(totalValue - totalCost);
-	const totalGainLossPct = $derived(totalCost > 0 ? (totalGainLoss / totalCost) * 100 : 0);
 	const baseCurrency = $derived(portfolio?.baseCurrency?.trim() || 'USD');
-
-	// Rentabilidad ponderada por tiempo del historial: lo que rindió el dinero,
-	// sin que un aporte cuente como ganancia.
-	const realReturn = $derived(realReturnPct(growth?.points));
 
 	// Posiciones que el backend no pudo convertir por falta de tasa: sus
 	// importes están en su moneda nativa, así que los totales de arriba mezclan
 	// monedas y hay que decirlo en vez de presentarlos como comparables.
 	const unconverted = $derived(holdings.filter((h) => !h.fxConverted));
 
-	const capitalPct = $derived(totalValue > 0 ? (totalCost / totalValue) * 100 : 0);
-	const gainPct = $derived(totalValue > 0 ? (totalGainLoss / totalValue) * 100 : 0);
-	const bestHolding = $derived(
-		holdings.length > 0 ? holdings.reduce((a, b) => (a.gainLossPct > b.gainLossPct ? a : b)) : null
-	);
-	const worstHolding = $derived(
-		holdings.length > 0 ? holdings.reduce((a, b) => (a.gainLossPct < b.gainLossPct ? a : b)) : null
-	);
-	const topConcentration = $derived(
-		holdings.length > 0 ? holdings.reduce((a, b) => (a.allocation > b.allocation ? a : b)) : null
-	);
-
-	function formatCurrency(value: number): string {
-		return privacy.money(
-			new Intl.NumberFormat('es-CO', {
-				style: 'currency',
-				currency: baseCurrency,
-				minimumFractionDigits: 2
-			}).format(value)
-		);
-	}
-
 	const typeBreakdown = $derived(computeTypeBreakdown(holdings));
-
-	function goBack() {
-		goto(resolve('/dashboard/portfolios'));
-	}
-
-	function addAsset() {
-		goto(resolve('/dashboard/portfolios/[id]/add', { id: params.id }));
-	}
-
-	function viewAssetDetails(symbol: string) {
-		goto(resolve('/dashboard/portfolios/[id]/assets/[symbol]', { id: params.id, symbol }));
-	}
 
 	function startEditing() {
 		submitError = '';
@@ -98,17 +51,18 @@
 <PortfolioDetailHeader
 	name={portfolio?.name ?? 'Portafolio'}
 	description={portfolio?.description}
-	onBack={goBack}
+	riskName={portfolio?.riskName}
+	holdingsCount={holdings.length}
+	portfolioId={params.id}
 	onEdit={startEditing}
-	onAddAsset={addAsset}
 />
 
 {#if saved.text}
-	<div class="alert alert-success">{saved.text}</div>
+	<p class="notice ok">{saved.text}</p>
 {/if}
 
 {#if submitError}
-	<div class="alert alert-error">{submitError}</div>
+	<p class="notice bad">{submitError}</p>
 {/if}
 
 <Modal
@@ -135,79 +89,62 @@
 </Modal>
 
 {#if unconverted.length > 0}
-	<p class="alert alert-warning">
+	<p class="notice fx">
 		Sin tasa de cambio para {unconverted.map((h) => `${h.symbol} (${h.currency})`).join(', ')}: esos
 		importes van sin convertir a {baseCurrency}, así que los totales de abajo mezclan monedas.
 	</p>
 {/if}
 
-<PortfolioSummaryCards
-	{totalValue}
-	{totalCost}
-	{baseCurrency}
-	{totalGainLoss}
-	{totalGainLossPct}
-	{realReturn}
-	riskName={portfolio?.riskName}
-	holdingsCount={holdings.length}
-	{formatCurrency}
-/>
+<PortfolioHeadline value={totalValue} cost={totalCost} {baseCurrency} />
 
 {#if growth}
-	<section class="growth-section" aria-label="Crecimiento del portafolio">
-		<!-- Con el formateador de la página: sus tarjetas escriben «US$ 45.035,10»
-		     y la gráfica tiene que decir el mismo número igual. -->
-		<PortfolioGrowth data={growth.points} summary={growth.summary} formatMoney={formatCurrency} />
+	<section class="growth" aria-label="Crecimiento del portafolio">
+		<!-- `bare`, como en el panel: ya no hay tarjetas alrededor con las que
+		     tuviera que competir. Y sin formateador propio, para que escriba los
+		     importes igual que el resto de la aplicación. -->
+		<PortfolioGrowth bare data={growth.points} summary={growth.summary} />
 	</section>
 {/if}
 
-<PortfolioStatsCards
-	{totalValue}
-	{totalCost}
-	{capitalPct}
-	{gainPct}
-	{bestHolding}
-	{worstHolding}
-	{topConcentration}
-	{topTransaction}
-	{formatCurrency}
+<PortfolioPositions
+	{holdings}
+	{typeBreakdown}
+	topTransaction={data.topTransaction}
+	portfolioId={params.id}
+	{baseCurrency}
 />
 
-{#if typeBreakdown.length > 0}
-	<AllocationDonut {typeBreakdown} {totalValue} {formatCurrency} />
-{/if}
-
-<HoldingsTable {holdings} {formatCurrency} onViewAsset={viewAssetDetails} onAddAsset={addAsset} />
-
 <style>
-	.alert {
-		margin-bottom: 1.25rem;
-		padding: 0.85rem 1.25rem;
-		border-radius: 10px;
-		font-size: 0.9rem;
-	}
-
-	.alert-success {
-		background: rgba(34, 197, 94, 0.12);
-		border: 1px solid rgba(34, 197, 94, 0.3);
-		color: var(--green);
-	}
-
-	.alert-error {
-		background: rgba(239, 68, 68, 0.12);
-		border: 1px solid rgba(239, 68, 68, 0.3);
-		color: var(--red);
-	}
-
-	.alert-warning {
-		margin-top: 0;
-		background: rgba(212, 145, 42, 0.1);
-		border: 1px solid rgba(212, 145, 42, 0.3);
-		color: rgba(236, 234, 229, 0.8);
+	/*
+	 * Los avisos: filete de color y prosa, como en el resto del panel. Eran
+	 * cajas con borde y fondo tintado que competían con la cifra de al lado.
+	 */
+	.notice {
+		max-width: 68ch;
+		margin: 0 0 1.5rem;
+		padding-left: 0.75rem;
+		border-left: 2px solid;
+		font-size: 0.85rem;
 		line-height: 1.5;
 	}
 
-	.growth-section {
-		margin-bottom: 1.5rem;
+	.notice.ok {
+		border-color: var(--green);
+		color: var(--green);
+	}
+
+	.notice.bad {
+		border-color: var(--red);
+		color: var(--red);
+	}
+
+	.notice.fx {
+		border-color: rgba(212, 145, 42, 0.45);
+		color: var(--text-muted);
+	}
+
+	.growth {
+		padding: 2rem 0;
+		border-bottom: 1px solid var(--border);
 	}
 </style>

@@ -234,20 +234,29 @@ Un **portafolio** agrupa un conjunto de posiciones (activos) con un objetivo com
 
 ### 6.1 Ver tus portafolios
 
-![Listado de portafolios con el valor total y la ganancia global](img/manual/04-portafolios.png)
+![Listado de portafolios con su barra de capital y ganancia y el total al pie](img/manual/04-portafolios.png)
 
-En **Portafolios** verás:
+En **Portafolios** verás una fila por portafolio, ordenadas de mayor a menor valor:
 
-- Un **encabezado con el valor total** y la ganancia/pérdida global de todos tus portafolios.
-- La sección **"Tus Portafolios"**, con una tarjeta por portafolio mostrando su valor, rendimiento, tipo y moneda.
+| Columna | Qué dice |
+|---|---|
+| **Portafolio** | El nombre y, debajo, la descripción que escribiste al crearlo y cuántas posiciones tiene. El que la aplicación usa por defecto lleva la marca **predeterminado** |
+| **Riesgo** | El perfil que le pusiste: conservador, moderado o agresivo |
+| **Capital y ganancia** | La barra. Lo azul es el capital que invertiste; lo verde, lo que ha ganado desde entonces. Si el portafolio está en pérdida, la barra se queda corta y una marca roja señala dónde estaba tu capital |
+| **Valor** | Lo que vale hoy, en la moneda de tu cuenta |
+| **Rendimiento** | Cuánto ha ganado o perdido sobre lo que costó |
 
-Pulsa sobre cualquier portafolio para abrir su **detalle**.
+Las barras se miden todas contra el portafolio más grande, así que su largo se compara directamente entre filas. **Al pie** de la lista está el total: lo que suman todos, el capital invertido entre todos y el rendimiento conjunto.
+
+Pulsa el **nombre** de cualquier portafolio para abrir su **detalle**.
+
+Si algún portafolio está en una moneda para la que no hay tasa de cambio, se sigue listando con su importe en su propia moneda, pero queda fuera del total: sumarlo daría una cifra que no está en ninguna moneda. La página lo avisa debajo de la lista.
 
 ### 6.2 Crear un portafolio
 
 ![Formulario de creación de un portafolio](img/manual/06-crear-portafolio.png)
 
-1. En **Portafolios**, pulsa **Crear / Añadir portafolio**.
+1. En **Portafolios**, pulsa **Crear portafolio**.
 2. Completa el formulario:
    - **Nombre del Portafolio** (obligatorio) — p. ej. "Mi Portafolio Principal".
    - **Descripción** (opcional) — el propósito del portafolio.
@@ -259,15 +268,25 @@ Pulsa sobre cualquier portafolio para abrir su **detalle**.
 
 ### 6.3 Detalle de un portafolio
 
-![Detalle de un portafolio con sus indicadores, la distribución por tipo y las posiciones](img/manual/05-portafolio-detalle.png)
+![Detalle de un portafolio con su valor, la gráfica de crecimiento y las posiciones](img/manual/05-portafolio-detalle.png)
 
-La página de detalle muestra:
+La página de detalle tiene tres partes, en este orden:
 
-- **Indicadores principales:** valor de mercado, ganancia/pérdida total, **rentabilidad real** y riesgo/número de activos. La rentabilidad real es la del portafolio limpia de aportes y retiros —la misma cuenta que explica el apartado 5.2—, así que puede no parecerse a la ganancia sobre costo de al lado; aparece como `—` hasta que el portafolio acumule al menos dos cierres diarios.
-- **Distribución por tipo:** gráfica con el reparto del portafolio por tipo de activo.
-- **Posiciones:** la lista de activos que componen el portafolio, con su cantidad, precio de compra, precio de mercado y rendimiento. Desde aquí puedes añadir posiciones nuevas o entrar al detalle de cada activo.
-- **Crecimiento:** evolución histórica del portafolio, con el mismo conmutador **Valor / %** que la gráfica del Dashboard.
-- **Mayor transacción:** la operación de mayor importe registrada en el portafolio.
+- **Valor de mercado:** lo que vale hoy el portafolio, y debajo de qué capital viene: *«+$7.884,60 sobre los $37.150,50 que invertiste (+21,22%)»*. La barra reparte esa cifra entre lo que pusiste y lo que ha ganado, igual que en el listado (apartado 6.1).
+- **Crecimiento:** la evolución del portafolio, con el mismo conmutador **Valor / %** y los mismos periodos que la gráfica del Dashboard. Sus cuatro cifras se refieren al **periodo elegido**, no a toda la vida del portafolio, así que la ganancia que muestran puede no coincidir con la de arriba. Entre ellas está la **rentabilidad real**: la del portafolio limpia de aportes y retiros —la misma cuenta que explica el apartado 5.2—, que aparece como `—` hasta que el portafolio acumule al menos dos cierres diarios.
+- **Posiciones:** los activos del portafolio, de mayor a menor peso.
+
+| Columna | Qué dice |
+|---|---|
+| **Activo** | El símbolo y el nombre. Pulsa el símbolo para entrar a su detalle |
+| **Clase** | Acción, ETF, cripto, bono, efectivo… |
+| **Peso** | Cuánto pesa sobre el portafolio, en barra y en porcentaje. La barra va de 0 a 100 %, así que se ve de un vistazo si una sola posición se ha comido el portafolio |
+| **Valor** | Lo que vale esa tenencia, en la moneda base del portafolio |
+| **Rendimiento** | Cuánto ha ganado o perdido sobre lo que costó |
+
+Sobre la tabla, dos líneas resumen lo que costaría encontrar recorriéndola: el **reparto por clase de activo** (*«Acciones 54,4%, ETFs 45,6%»*) y **cuál ha rendido más y cuál menos**. Debajo de la tabla se anota la **mayor operación** registrada en el portafolio.
+
+Desde el encabezado puedes **Editar** el portafolio o **Agregar activo**.
 
 ### 6.4 Editar un portafolio
 

@@ -66,7 +66,7 @@
 		font-weight: 600;
 		letter-spacing: 0.09em;
 		text-transform: uppercase;
-		color: rgba(236, 234, 229, 0.45);
+		color: var(--text-dim);
 	}
 
 	.stats-list {
@@ -116,6 +116,6 @@
 		margin: 0.1rem 0 0;
 		font-size: 0.62rem;
 		line-height: 1.4;
-		color: rgba(236, 234, 229, 0.38);
+		color: var(--text-dim);
 	}
 </style>

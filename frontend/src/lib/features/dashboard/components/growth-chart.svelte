@@ -276,7 +276,7 @@
 	}
 
 	.axis {
-		fill: rgba(236, 234, 229, 0.42);
+		fill: var(--text-dim);
 		font-size: 9px;
 		font-family: var(--font-mono);
 	}

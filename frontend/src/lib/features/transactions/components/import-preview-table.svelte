@@ -146,7 +146,7 @@
 	}
 
 	.muted {
-		color: rgba(236, 234, 229, 0.35);
+		color: var(--text-dim);
 	}
 
 	.errors-cell {

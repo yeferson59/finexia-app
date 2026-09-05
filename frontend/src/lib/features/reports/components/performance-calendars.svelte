@@ -206,7 +206,7 @@
 	.month-cell.null-cell {
 		background: rgba(255, 255, 255, 0.022);
 		border-color: transparent;
-		color: rgba(236, 234, 229, 0.28);
+		color: var(--text-dim);
 	}
 
 	.scale {
@@ -236,14 +236,14 @@
 
 	.partial {
 		margin-left: 0.1rem;
-		color: rgba(236, 234, 229, 0.45);
+		color: var(--text-dim);
 	}
 
 	.footnote {
 		margin: 0.6rem 0 0;
 		font-size: 0.6rem;
 		line-height: 1.5;
-		color: rgba(236, 234, 229, 0.38);
+		color: var(--text-dim);
 	}
 
 	@media (max-width: 1024px) {

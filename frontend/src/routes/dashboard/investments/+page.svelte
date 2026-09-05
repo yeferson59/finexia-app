@@ -131,7 +131,7 @@
 		font-size: 0.72rem;
 		letter-spacing: 0.7px;
 		text-transform: uppercase;
-		color: rgba(236, 234, 229, 0.46);
+		color: var(--text-dim);
 	}
 
 	.spotlight h2 {

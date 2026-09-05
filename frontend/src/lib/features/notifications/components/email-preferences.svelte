@@ -121,7 +121,7 @@
 	.toggle-hint {
 		margin: 0;
 		font-size: 0.775rem;
-		color: rgba(236, 234, 229, 0.45);
+		color: var(--text-dim);
 		line-height: 1.55;
 	}
 </style>

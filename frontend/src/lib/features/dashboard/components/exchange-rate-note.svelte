@@ -69,7 +69,7 @@
 
 	.meta {
 		font-size: 0.66rem;
-		color: rgba(236, 234, 229, 0.45);
+		color: var(--text-dim);
 	}
 
 	@media (max-width: 480px) {

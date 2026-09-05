@@ -1,6 +1,51 @@
 import { expect, test } from '@playwright/test';
 import { TEST_PORTFOLIO_ID, login } from './helpers';
 
+/*
+ * El listado: una fila por portafolio, ordenadas de mayor a menor, con la barra
+ * que reparte cada una entre el capital que se puso y lo que ha ganado.
+ */
+test.describe('portfolio list', () => {
+	test('ranks the portfolios and totals them at the foot', async ({ page }) => {
+		await login(page);
+		await page.goto('/dashboard/portfolios');
+
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Portafolios');
+
+		// De mayor a menor valor, que es lo que hace legible la escalera.
+		const names = page.locator('tbody th a');
+		await expect(names).toHaveText(['Cartera Principal', 'Reserva', 'Cripto']);
+
+		// La descripción que escribió el dueño, no la etiqueta del tipo.
+		await expect(page.locator('tbody tr').first()).toContainText(
+			'Acciones y ETFs a largo plazo, 5 posiciones'
+		);
+		await expect(page.locator('tbody tr').first()).toContainText('Moderado');
+
+		// El total vive al pie de su columna, no en una tarjeta encima.
+		const foot = page.locator('tfoot tr');
+		await expect(foot).toContainText('3 portafolios, 10 posiciones abiertas');
+		await expect(foot).toContainText('$89,406.10');
+		await expect(foot).toContainText('+14,02%');
+	});
+
+	test('opens a portfolio from its name', async ({ page }) => {
+		await login(page);
+		await page.goto('/dashboard/portfolios');
+
+		await page.getByRole('link', { name: 'Cripto' }).click();
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Cripto');
+	});
+
+	test('sends someone with nothing to the create form', async ({ page }) => {
+		await login(page);
+		await page.goto('/dashboard/portfolios');
+
+		await page.getByRole('link', { name: 'Crear portafolio' }).click();
+		await page.waitForURL('**/dashboard/portfolios/add');
+	});
+});
+
 test.describe('portfolio detail', () => {
 	test('renders the portfolio with its holdings', async ({ page }) => {
 		await login(page);
@@ -8,7 +53,31 @@ test.describe('portfolio detail', () => {
 
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('Cartera Principal');
 		await expect(page.getByText('AAPL').first()).toBeVisible();
-		await expect(page.getByText('Moderado').first()).toBeVisible();
+		await expect(page.getByText('Riesgo moderado, 5 activos')).toBeVisible();
+
+		// El valor sale una vez, en la cifra de arriba, con el capital del que
+		// viene. Antes volvía a salir en el centro del donut y en dos tarjetas.
+		const headline = page.locator('section[aria-labelledby="market-value"]');
+		await expect(headline).toContainText('$45,035.10');
+		await expect(headline).toContainText('sobre los $37,150.50 que invertiste');
+		await expect(headline).toContainText('+21,22%');
+	});
+
+	// Cuatro tarjetas —mejor activo, peor activo, concentración y el donut por
+	// tipo— eran lecturas de esta misma lista. Ahora la lista está ordenada y
+	// dos frases dicen lo que costaba encontrar en ella.
+	test('the positions list carries what the stat cards used to', async ({ page }) => {
+		await login(page);
+		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}`);
+
+		const positions = page.locator('section[aria-labelledby="positions-title"]');
+		await expect(positions).toContainText('Acciones 54,4%, ETFs 45,6%.');
+		await expect(positions).toContainText('NVDA es la que más ha rendido');
+		await expect(positions).toContainText('CSPX, la que menos');
+		await expect(positions).toContainText('La mayor operación registrada aquí: NVDA');
+
+		// De mayor a menor peso: la primera fila es la posición dominante.
+		await expect(positions.locator('tbody th').first()).toContainText('VWCE');
 	});
 
 	test('asset detail shows the position summary and its transactions', async ({ page }) => {

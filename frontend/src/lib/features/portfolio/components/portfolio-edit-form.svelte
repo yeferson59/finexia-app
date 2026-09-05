@@ -207,7 +207,7 @@
 	}
 
 	.btn-cancel:hover {
-		border-color: rgba(236, 234, 229, 0.4);
+		border-color: var(--text-dim);
 		color: var(--text);
 	}
 

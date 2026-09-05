@@ -6,12 +6,19 @@
  * `$lib/api/types` (única fuente de verdad) y se reexportan para que los
  * componentes de la feature no tengan que conocer la capa de API.
  */
-import type { GrowthDataPoint, GrowthSummary, Holding, TopTransaction } from '$lib/api/types';
+import type {
+	GrowthDataPoint,
+	GrowthSummary,
+	Holding,
+	PortfolioSummary,
+	TopTransaction
+} from '$lib/api/types';
 import { formatSignedPercent } from '$lib/shared/format/percent';
 import { timeWeightedReturn } from '$lib/shared/finance/returns';
 import { assetTypeColor, formatAssetType } from '$lib/shared/format/asset-type';
+import { formatPortfolioType } from '$lib/shared/format/portfolio-type';
 
-export type { GrowthDataPoint, GrowthSummary, TopTransaction };
+export type { GrowthDataPoint, GrowthSummary, PortfolioSummary, TopTransaction };
 
 export const PORTFOLIO_TYPES: { value: string; label: string }[] = [
 	{ value: 'stocks_etfs', label: 'Acciones y ETF' },
@@ -222,4 +229,138 @@ export function riskTone(name: string): 'success' | 'warning' | 'danger' | 'neut
 	if (n.includes('moderado')) return 'warning';
 	if (n.includes('alto')) return 'danger';
 	return 'neutral';
+}
+
+// ---------------------------------------------------------------------------
+// Listado de portafolios (`dashboard/portfolios`)
+// ---------------------------------------------------------------------------
+
+/**
+ * Una fila del listado: el resumen del backend con sus cifras ya en números.
+ *
+ * El listado compara portafolios entre sí, así que lo que necesita de cada uno
+ * es su tamaño y cómo le va, más lo que dice qué es: el nombre que le puso su
+ * dueño, lo que escribió sobre él y su nivel de riesgo.
+ */
+export interface PortfolioRow {
+	id: string;
+	name: string;
+	/** Lo que escribió el dueño. Vacía si no escribió nada. */
+	description: string;
+	/** Etiqueta de la combinación de clases: la reserva por si no hay descripción. */
+	typeLabel: string;
+	riskName: string;
+	isDefault: boolean;
+	positions: number;
+	/** Moneda del importe: la de visualización si se pudo convertir, si no la suya. */
+	currency: string;
+	value: number;
+	cost: number;
+	gain: number;
+	gainPct: number;
+	/**
+	 * `false` cuando no había tasa hacia la moneda pedida: los importes se
+	 * quedaron en la moneda base del portafolio, así que ni se suman con los
+	 * demás ni se comparan con ellos.
+	 */
+	converted: boolean;
+	/** Posiciones que el propio portafolio suma sin convertir. */
+	unconverted: number;
+}
+
+const toNumber = (raw: string | undefined): number => parseFloat(raw ?? '') || 0;
+
+/**
+ * Convierte los resúmenes en filas, de mayor a menor valor.
+ *
+ * El orden es lo que hace legible una escalera: la primera barra es la más
+ * larga y las demás se leen contra ella. Los portafolios que no se pudieron
+ * convertir van al final, juntos: su importe está en otra moneda y ponerlos
+ * entre los demás invitaría a comparar barras que miden cosas distintas.
+ */
+export function toPortfolioRows(
+	summaries: PortfolioSummary[],
+	displayCurrency: string
+): PortfolioRow[] {
+	const rows = summaries.map((summary): PortfolioRow => {
+		const currency = summary.displayCurrency || summary.baseCurrency || displayCurrency;
+
+		return {
+			id: summary.id,
+			name: summary.name,
+			description: summary.description ?? '',
+			typeLabel: formatPortfolioType(summary.type),
+			riskName: summary.riskName,
+			isDefault: summary.isDefault ?? false,
+			positions: summary.totalPositions,
+			currency,
+			value: toNumber(summary.totalMarketValue),
+			cost: toNumber(summary.totalCostBase),
+			gain: toNumber(summary.totalGainLoss),
+			gainPct: toNumber(summary.totalGainLossPct),
+			converted: currency === displayCurrency,
+			unconverted: summary.positionsUnconverted ?? 0
+		};
+	});
+
+	return rows.sort((a, b) => {
+		if (a.converted !== b.converted) return a.converted ? -1 : 1;
+		return b.value - a.value;
+	});
+}
+
+/**
+ * Escala del carril de las barras: el mayor importe que hay que dibujar.
+ *
+ * Es el máximo entre los valores y los costes, no solo entre los valores: en un
+ * portafolio en pérdida el coste queda por fuera del extremo de la barra, y con
+ * el carril escalado solo a los valores esa parte se salía del ancho.
+ *
+ * Sale de la lista entera y no de la hoja que se esté viendo: si se reescalara
+ * por hoja, la primera barra de cada una llegaría al final y parecería el mayor
+ * portafolio de todos.
+ */
+export function portfolioBarScale(rows: PortfolioRow[]): number {
+	return rows
+		.filter((row) => row.converted)
+		.reduce((top, row) => Math.max(top, row.value, row.cost), 0);
+}
+
+/** Lo que suman las filas que están en la misma moneda. */
+export interface PortfolioTotals {
+	value: number;
+	cost: number;
+	gain: number;
+	gainPct: number;
+	positions: number;
+	/** Filas sumadas. */
+	counted: number;
+	/** Filas que se listan pero no se suman: están en otra moneda. */
+	excluded: number;
+}
+
+/**
+ * Totales del listado.
+ *
+ * Solo suma lo convertido. Un portafolio en otra moneda se sigue listando —es
+ * suyo y tiene que verlo— pero no entra en el total: sumarlo daría una cifra
+ * que no está en ninguna moneda.
+ */
+export function portfolioTotals(rows: PortfolioRow[]): PortfolioTotals {
+	const counted = rows.filter((row) => row.converted);
+	const value = counted.reduce((sum, row) => sum + row.value, 0);
+	const cost = counted.reduce((sum, row) => sum + row.cost, 0);
+
+	return {
+		value,
+		cost,
+		gain: value - cost,
+		// Sobre lo que costó, que es la misma cuenta que hace el backend por
+		// portafolio. Sin coste no hay porcentaje que calcular, y un 0 se leería
+		// como un portafolio que no se movió.
+		gainPct: cost > 0 ? ((value - cost) / cost) * 100 : 0,
+		positions: counted.reduce((sum, row) => sum + row.positions, 0),
+		counted: counted.length,
+		excluded: rows.length - counted.length
+	};
 }

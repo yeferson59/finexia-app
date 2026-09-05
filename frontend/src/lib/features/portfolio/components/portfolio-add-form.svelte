@@ -300,7 +300,7 @@
 
 	.input::placeholder,
 	.textarea::placeholder {
-		color: rgba(236, 234, 229, 0.4);
+		color: var(--text-dim);
 	}
 
 	.input:disabled,

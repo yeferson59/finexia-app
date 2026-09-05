@@ -76,6 +76,6 @@
 	.panel :global(.empty-text) {
 		margin: 0;
 		font-size: 0.85rem;
-		color: rgba(236, 234, 229, 0.45);
+		color: var(--text-dim);
 	}
 </style>

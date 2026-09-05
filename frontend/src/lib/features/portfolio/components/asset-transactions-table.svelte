@@ -176,7 +176,7 @@
 		margin: 0;
 		padding: 1.5rem;
 		text-align: center;
-		color: rgba(236, 234, 229, 0.4);
+		color: var(--text-dim);
 		font-size: 0.9rem;
 	}
 
@@ -307,7 +307,7 @@
 		display: block;
 		font-size: 0.7rem;
 		font-weight: 500;
-		color: rgba(236, 234, 229, 0.45);
+		color: var(--text-dim);
 		font-variant-numeric: tabular-nums;
 	}
 
@@ -321,7 +321,7 @@
 	.fees {
 		font-family: var(--font-mono);
 		font-variant-numeric: tabular-nums;
-		color: rgba(236, 234, 229, 0.4);
+		color: var(--text-dim);
 		font-size: 0.85rem;
 	}
 
@@ -333,7 +333,7 @@
 	}
 
 	.notes {
-		color: rgba(236, 234, 229, 0.4);
+		color: var(--text-dim);
 		font-size: 0.85rem;
 		font-style: italic;
 		overflow: hidden;
@@ -349,7 +349,7 @@
 		border: 1.5px solid rgba(212, 145, 42, 0.3);
 		border-radius: 6px;
 		background: transparent;
-		color: rgba(212, 145, 42, 0.6);
+		color: var(--amber);
 		cursor: pointer;
 		transition: all 0.2s ease;
 		flex-shrink: 0;
@@ -369,7 +369,7 @@
 		border: 1.5px solid rgba(224, 90, 90, 0.3);
 		border-radius: 6px;
 		background: transparent;
-		color: rgba(224, 90, 90, 0.6);
+		color: var(--red);
 		cursor: pointer;
 		transition: all 0.2s ease;
 		flex-shrink: 0;

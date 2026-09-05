@@ -29,17 +29,16 @@
 		data: GrowthDataPoint[];
 		summary: GrowthSummary;
 		/**
-		 * Sin la caja: en el panel la gráfica va sobre el fondo de la página, que
-		 * ya no apila tarjetas. El detalle de portafolio la sigue queriendo
-		 * enmarcada, porque allí sí convive con otras.
+		 * Sin la caja: la gráfica va sobre el fondo de la página, separada por un
+		 * filete como el resto de las secciones. Lo usan tanto el panel como el
+		 * detalle de portafolio, que dejó de apilar tarjetas alrededor.
 		 */
 		bare?: boolean;
 		/**
-		 * Cómo escribir un importe. Quien la incruste puede imponer el suyo para
-		 * que la tarjeta no discrepe de las cifras que tiene al lado: el detalle
-		 * de portafolio escribe «US$ 45.035,10» en sus tarjetas y le pasa ese
-		 * mismo formateador. Sin él manda el ayudante compartido, que es lo que
-		 * usa el panel.
+		 * Cómo escribir un importe, para quien necesite imponer un formato propio.
+		 * Sin él manda el ayudante compartido, que es lo que usan tanto el panel
+		 * como el detalle de portafolio desde que este dejó de escribir sus
+		 * importes con un `Intl` hecho a mano.
 		 */
 		formatMoney?: (value: number) => string;
 	} = $props();
@@ -400,7 +399,7 @@
 		margin: 0.6rem 0 0;
 		font-size: 0.72rem;
 		line-height: 1.5;
-		color: rgba(236, 234, 229, 0.42);
+		color: var(--text-dim);
 	}
 
 	.legend {

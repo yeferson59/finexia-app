@@ -1,66 +1,31 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import PageHeader from '$lib/ui/page-header.svelte';
 	import Pagination from '$lib/ui/pagination.svelte';
-	import { privacy } from '$lib/shared/privacy.svelte';
-	import { FALLBACK_CURRENCY, partitionByCurrency } from '$lib/shared/currency';
-	import { PortfolioCard, formatPct } from '$lib/features/portfolio';
+	import { FALLBACK_CURRENCY } from '$lib/shared/currency';
+	import {
+		PortfolioList,
+		portfolioBarScale,
+		portfolioTotals,
+		toPortfolioRows
+	} from '$lib/features/portfolio';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
 
-	const portfolios = $derived(data.portfolios ?? []);
 	/** Moneda de la cuenta: en ella pide el layout los resúmenes ya convertidos. */
 	const displayCurrency = $derived(data.currency ?? FALLBACK_CURRENCY);
+	const rows = $derived(toPortfolioRows(data.portfolios ?? [], displayCurrency));
 
-	const PER_PAGE = 9;
+	const totals = $derived(portfolioTotals(rows));
+	// Escala y totales salen de la lista entera, no de la hoja: si se calcularan
+	// por hoja, la primera barra de cada una llegaría al final del carril y el
+	// pie diría un total distinto en cada página.
+	const scale = $derived(portfolioBarScale(rows));
+
+	const PER_PAGE = 12;
 	let page = $state(1);
-	const pagedPortfolios = $derived(portfolios.slice((page - 1) * PER_PAGE, page * PER_PAGE));
-
-	// Los totales de arriba son sumas, así que solo pueden incluir lo que está
-	// en la misma moneda. Un portafolio sin tasa hacia ella se sigue listando
-	// —con su propio importe, que la tarjeta etiqueta— pero no entra en la suma.
-	const split = $derived(partitionByCurrency(portfolios, displayCurrency));
-	const counted = $derived(split.converted);
-	const excluded = $derived(split.unconverted.length);
-
-	const totalMarketValue = $derived(
-		counted.reduce((s, p) => s + (parseFloat(p.totalMarketValue) || 0), 0)
-	);
-	const totalCostBase = $derived(
-		counted.reduce((s, p) => s + (parseFloat(p.totalCostBase) || 0), 0)
-	);
-	const totalGainLoss = $derived(totalMarketValue - totalCostBase);
-	const totalGainLossPct = $derived(totalCostBase > 0 ? (totalGainLoss / totalCostBase) * 100 : 0);
-
-	function fmt(value: number, currency: string = displayCurrency): string {
-		return privacy.money(
-			new Intl.NumberFormat('es-CO', {
-				style: 'currency',
-				currency,
-				minimumFractionDigits: 0,
-				maximumFractionDigits: 0
-			}).format(value)
-		);
-	}
-
-	function openPortfolio(id: string) {
-		goto(resolve('/dashboard/portfolios/[id]', { id }));
-	}
-
-	function createPortfolio() {
-		goto(resolve('/dashboard/portfolios/add'));
-	}
-
-	// Peso de cada portafolio sobre el valor de mercado total (barra de progreso).
-	// Un portafolio que no entró en el total tampoco tiene peso sobre él: su
-	// importe está en otra moneda y el cociente no significaría nada.
-	function allocation(p: (typeof portfolios)[number]): number {
-		if (!counted.includes(p) || totalMarketValue <= 0) return 0;
-
-		return ((parseFloat(p.totalMarketValue) || 0) / totalMarketValue) * 100;
-	}
+	const pagedRows = $derived(rows.slice((page - 1) * PER_PAGE, page * PER_PAGE));
 </script>
 
 <svelte:head>
@@ -70,207 +35,82 @@
 
 <PageHeader
 	title="Portafolios"
-	subtitle="Gestiona tus múltiples portafolios de inversión en un solo lugar."
+	subtitle="Cómo tienes agrupado tu dinero, y cómo le va a cada grupo."
 >
 	{#snippet actions()}
-		<button onclick={createPortfolio} class="btn-create-portfolio">
-			<svg
-				width="18"
-				height="18"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-			>
-				<path d="M12 5v14M5 12h14" />
-			</svg>
-			Crear Portafolio
-		</button>
+		<a class="create" href={resolve('/dashboard/portfolios/add')}>Crear portafolio</a>
 	{/snippet}
 </PageHeader>
 
-<section class="summary-cards">
-	<article class="panel summary-card">
-		<p class="eyebrow">Valor de mercado</p>
-		<h2 class="hero-value">{fmt(totalMarketValue)}</h2>
-		<p class="hero-delta">Costo base: {fmt(totalCostBase)}</p>
-	</article>
-
-	<article class="panel summary-card">
-		<p class="eyebrow">Portafolios activos</p>
-		<h2 class="hero-value">{portfolios.length}</h2>
-		<p class="hero-delta">
-			{portfolios.reduce((s, p) => s + p.totalPositions, 0)} activos en total
-		</p>
-	</article>
-
-	<article class="panel summary-card">
-		<p class="eyebrow">Ganancia / Pérdida total</p>
-		<h2 class="hero-value {totalGainLoss >= 0 ? 'positive' : 'negative'}">
-			{fmt(totalGainLoss)}
-		</h2>
-		<p class="hero-delta {totalGainLoss >= 0 ? 'positive' : 'negative'}">
-			{formatPct(totalGainLossPct)} sobre costo
-		</p>
-	</article>
-</section>
-
-{#if excluded > 0}
-	<p class="fx-note">
-		{excluded === 1 ? 'Un portafolio queda' : `${excluded} portafolios quedan`} fuera de estos totales:
-		no hay tasa para pasarlo{excluded === 1 ? '' : 's'} a {displayCurrency}. Cada tarjeta muestra su
-		importe en su propia moneda.
+{#if data.success === false}
+	<!-- El listado vacío y «no pudimos traerlo» se veían igual: una página en
+	     blanco. Quien no tiene portafolios necesita una invitación a crear uno,
+	     y quien sí los tiene necesita saber que el fallo no es suyo. -->
+	<p class="failure">
+		No pudimos cargar tus portafolios. Vuelve a intentarlo en un momento; tus datos siguen ahí.
 	</p>
+{:else}
+	<PortfolioList rows={pagedRows} {totals} {scale} {displayCurrency} />
+
+	{#if totals.excluded > 0}
+		<p class="fx">
+			{totals.excluded === 1 ? 'Un portafolio queda' : `${totals.excluded} portafolios quedan`} fuera
+			del total: no hay tasa para pasarlo{totals.excluded === 1 ? '' : 's'} a {displayCurrency}. Su
+			fila enseña el importe en su propia moneda.
+		</p>
+	{/if}
+
+	<Pagination bind:page total={rows.length} perPage={PER_PAGE} label="portafolios" />
 {/if}
 
-<section class="portfolios-section">
-	<h2 class="section-title">Tus Portafolios</h2>
-
-	<div class="portfolios-grid">
-		{#each pagedPortfolios as portfolio (portfolio.id)}
-			<PortfolioCard
-				{portfolio}
-				allocation={allocation(portfolio)}
-				formatCurrency={fmt}
-				onOpen={openPortfolio}
-			/>
-		{/each}
-	</div>
-
-	<Pagination bind:page total={portfolios.length} perPage={PER_PAGE} label="portafolios" />
-</section>
-
 <style>
-	.btn-create-portfolio {
-		display: flex;
+	/*
+	 * La acción principal, en el tono de la marca pero sin el salto y el halo
+	 * que tenía: es un enlace a un formulario, no un acontecimiento. Y es un
+	 * enlace de verdad, así que se puede abrir en otra pestaña.
+	 */
+	.create {
+		display: inline-flex;
 		align-items: center;
-		gap: 0.6rem;
-		padding: 0.85rem 1.5rem;
-		border: none;
-		border-radius: 10px;
+		padding: 0.6rem 1.15rem;
+		border-radius: 9px;
 		background: var(--amber);
 		color: #0d0800;
-		font-weight: 700;
-		font-family: var(--font-body);
-		font-size: 0.95rem;
-		cursor: pointer;
-		transition: all 0.3s ease;
-		letter-spacing: 0.3px;
+		font-size: 0.88rem;
+		font-weight: 600;
+		text-decoration: none;
 		white-space: nowrap;
+		transition: background 0.2s ease;
 	}
 
-	.btn-create-portfolio:hover {
-		transform: translateY(-2px);
-		box-shadow: 0 10px 25px rgba(212, 145, 42, 0.25);
+	.create:hover {
+		background: var(--amber-light);
 	}
 
-	.summary-cards {
-		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-		gap: 1rem;
-		margin-bottom: 3rem;
-	}
-
-	/* Mismo aviso de "falta una tasa" que las tarjetas y el panel. Sube el
-	   margen inferior de las tarjetas para quedar pegado a ellas. */
-	.fx-note {
-		margin: -2rem 0 3rem;
-		padding: 0.5rem 0.7rem;
-		border: 1px solid rgba(212, 145, 42, 0.3);
-		border-radius: 8px;
-		background: rgba(212, 145, 42, 0.08);
-		color: rgba(236, 234, 229, 0.75);
-		font-size: 0.78rem;
-		line-height: 1.4;
-	}
-
-	.summary-card {
-		padding: 1.35rem;
-	}
-
-	.eyebrow {
-		margin: 0 0 0.55rem;
-		font-size: 0.72rem;
-		letter-spacing: 0.7px;
-		text-transform: uppercase;
-		color: rgba(236, 234, 229, 0.46);
-	}
-
-	.hero-value {
-		font-family: var(--font-mono);
-		font-variant-numeric: tabular-nums;
+	.failure {
+		max-width: 56ch;
 		margin: 0;
-		font-size: 1.6rem;
-		color: var(--text);
+		padding: 2.5rem 0;
+		font-size: 0.9rem;
+		line-height: 1.5;
+		color: var(--text-muted);
 	}
 
-	.hero-value.positive {
-		color: var(--green);
+	/* Mismo aviso de «falta una tasa» que el panel y la vista de activos:
+	   filete ámbar y prosa, no una caja de alerta. */
+	.fx {
+		max-width: 62ch;
+		margin: 1.25rem 0 0;
+		padding-left: 0.75rem;
+		border-left: 2px solid rgba(212, 145, 42, 0.45);
+		font-size: 0.8rem;
+		line-height: 1.5;
+		color: var(--text-muted);
 	}
 
-	.hero-value.negative {
-		color: var(--red);
-	}
-
-	.hero-delta {
-		margin: 0.4rem 0 0;
-		font-size: 0.82rem;
-		color: rgba(236, 234, 229, 0.55);
-	}
-
-	.hero-delta.positive {
-		color: var(--green);
-	}
-
-	.hero-delta.negative {
-		color: var(--red);
-	}
-
-	.panel {
-		border: 1px solid var(--border-strong);
-		border-radius: 16px;
-		background: var(--surface);
-		box-shadow:
-			0 20px 60px rgba(0, 0, 0, 0.3),
-			inset 0 1px 0 rgba(255, 255, 255, 0.05);
-		backdrop-filter: blur(16px);
-	}
-
-	.portfolios-section {
-		margin-top: 2rem;
-	}
-
-	.section-title {
-		font-size: 1.3rem;
-		font-weight: 400;
-		color: var(--text);
-		font-family: var(--font-display);
-		margin: 0 0 1.5rem;
-	}
-
-	.portfolios-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-		gap: 1.5rem;
-	}
-
-	@media (max-width: 1024px) {
-		.summary-cards {
-			grid-template-columns: 1fr;
-		}
-
-		.portfolios-grid {
-			grid-template-columns: 1fr;
-		}
-	}
-
-	@media (max-width: 768px) {
-		.summary-cards {
-			grid-template-columns: 1fr;
-		}
-
-		.portfolios-grid {
-			grid-template-columns: 1fr;
+	@media (prefers-reduced-motion: reduce) {
+		.create {
+			transition: none;
 		}
 	}
 </style>

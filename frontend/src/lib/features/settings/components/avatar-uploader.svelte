@@ -223,6 +223,6 @@
 	.avatar-hint {
 		margin: 0;
 		font-size: 0.75rem;
-		color: rgba(236, 234, 229, 0.4);
+		color: var(--text-dim);
 	}
 </style>

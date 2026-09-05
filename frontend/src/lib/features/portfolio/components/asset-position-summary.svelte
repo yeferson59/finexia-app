@@ -140,7 +140,7 @@
 
 	.metric-unit {
 		font-size: 0.7rem;
-		color: rgba(236, 234, 229, 0.4);
+		color: var(--text-dim);
 		margin-left: 0.25rem;
 	}
 
@@ -148,7 +148,7 @@
 		margin: 0.3rem 0 0;
 		font-size: 0.7rem;
 		letter-spacing: 0.5px;
-		color: rgba(236, 234, 229, 0.35);
+		color: var(--text-dim);
 		font-family: var(--font-mono);
 	}
 

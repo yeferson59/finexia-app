@@ -227,13 +227,13 @@
 		margin: 0.5rem 0 0;
 		font-size: 0.72rem;
 		line-height: 1.5;
-		color: rgba(236, 234, 229, 0.42);
+		color: var(--text-dim);
 	}
 
 	.empty-chart {
 		padding: 3rem 2rem;
 		text-align: center;
-		color: rgba(236, 234, 229, 0.45);
+		color: var(--text-dim);
 		font-size: 0.82rem;
 		border: 1px dashed var(--border);
 		border-radius: 8px;
@@ -249,7 +249,7 @@
 		margin-top: 0.4rem;
 		font-family: var(--font-mono);
 		font-size: 0.72rem;
-		color: rgba(236, 234, 229, 0.35);
+		color: var(--text-dim);
 	}
 
 	.sr-only {

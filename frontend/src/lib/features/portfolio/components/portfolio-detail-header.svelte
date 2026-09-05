@@ -1,79 +1,80 @@
 <script lang="ts">
+	/*
+	 * Quién es este portafolio y qué se puede hacer con él.
+	 *
+	 * La vuelta al listado es un enlace y no un botón con una flecha suelta:
+	 * dice a dónde lleva, se abre en otra pestaña y el teclado la encuentra.
+	 */
+	import { resolve } from '$app/paths';
+
 	let {
 		name,
 		description,
-		onBack,
-		onEdit,
-		onAddAsset
+		riskName,
+		holdingsCount,
+		portfolioId,
+		onEdit
 	}: {
 		name: string;
 		description?: string | null;
-		onBack: () => void;
+		riskName?: string;
+		holdingsCount: number;
+		portfolioId: string;
 		onEdit: () => void;
-		onAddAsset: () => void;
 	} = $props();
 </script>
 
-<header class="page-header">
-	<div class="header-top">
-		<div>
-			<button onclick={onBack} class="btn-back" aria-label="Volver a portafolios">
-				<svg
-					width="20"
-					height="20"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<path d="M19 12H5M12 19l-7-7 7-7" />
-				</svg>
-			</button>
-			<h1 class="page-title">{name}</h1>
-			<p class="page-subtitle">
-				{description || 'Visión detallada de posiciones y asignación.'}
+<header class="head">
+	<a class="back" href={resolve('/dashboard/portfolios')}>Volver a portafolios</a>
+
+	<div class="row">
+		<div class="who">
+			<h1>{name}</h1>
+			{#if description}
+				<p class="description">{description}</p>
+			{/if}
+			<p class="meta">
+				{riskName ? `Riesgo ${riskName.toLowerCase()}` : 'Sin nivel de riesgo'},
+				{holdingsCount === 1 ? '1 activo' : `${holdingsCount} activos`}
 			</p>
 		</div>
-		<div class="header-actions">
-			<button onclick={onEdit} class="btn-edit" aria-label="Editar portafolio">
-				<svg
-					width="16"
-					height="16"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-					<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-				</svg>
-				Editar
-			</button>
-			<button onclick={onAddAsset} class="btn-add-asset">
-				<svg
-					width="18"
-					height="18"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<path d="M12 5v14M5 12h14" />
-				</svg>
-				Agregar Activo
-			</button>
+
+		<div class="actions">
+			<button type="button" class="edit" onclick={onEdit}>Editar</button>
+			<a class="add" href={resolve('/dashboard/portfolios/[id]/add', { id: portfolioId })}>
+				Agregar activo
+			</a>
 		</div>
 	</div>
 </header>
 
 <style>
-	.page-header {
+	.head {
 		margin-bottom: 2rem;
-		padding-bottom: 1.5rem;
+		padding-bottom: 1.75rem;
 		border-bottom: 1px solid var(--border);
 	}
 
-	.header-top {
+	.back {
+		display: inline-block;
+		margin-bottom: 1.1rem;
+		font-size: 0.82rem;
+		color: var(--text-muted);
+		text-decoration: none;
+	}
+
+	.back::before {
+		content: '←';
+		margin-right: 0.4rem;
+	}
+
+	.back:hover {
+		color: var(--text);
+		text-decoration: underline;
+		text-underline-offset: 3px;
+	}
+
+	.row {
 		display: flex;
 		align-items: flex-start;
 		justify-content: space-between;
@@ -81,113 +82,86 @@
 		flex-wrap: wrap;
 	}
 
-	.header-top > div {
-		display: flex;
-		align-items: flex-start;
-		gap: 1rem;
+	.who {
+		min-width: 0;
 	}
 
-	.page-title {
-		margin: 0 0 0.5rem;
-		font-size: 2.35rem;
+	h1 {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: clamp(2rem, 4vw, 2.75rem);
 		font-weight: 300;
+		line-height: 1.05;
 		letter-spacing: -0.02em;
 		color: var(--text);
-		font-family: var(--font-display);
+		overflow-wrap: anywhere;
 	}
 
-	.page-subtitle {
-		margin: 0;
-		color: rgba(236, 234, 229, 0.62);
-		font-size: 1rem;
+	.description {
+		max-width: 58ch;
+		margin: 0.6rem 0 0;
+		font-size: 0.95rem;
+		font-weight: 300;
+		line-height: 1.45;
+		color: var(--text-muted);
 	}
 
-	.btn-back {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 40px;
-		height: 40px;
-		padding: 0;
-		margin-right: 1rem;
-		border: 1px solid rgba(212, 145, 42, 0.3);
-		border-radius: 8px;
-		background: var(--border);
-		color: var(--amber);
-		cursor: pointer;
-		transition: all 0.3s ease;
+	.meta {
+		margin: 0.35rem 0 0;
+		font-size: 0.85rem;
+		color: var(--text-dim);
 	}
 
-	.btn-back:hover {
-		background: rgba(212, 145, 42, 0.2);
-		border-color: rgba(212, 145, 42, 0.5);
-		transform: translateX(-2px);
-	}
-
-	.header-actions {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		flex-wrap: wrap;
-	}
-
-	.btn-edit {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 1.25rem;
-		border: 1px solid rgba(212, 145, 42, 0.4);
-		border-radius: 10px;
-		background: transparent;
-		color: var(--amber);
-		font-weight: 600;
-		font-family: var(--font-body);
-		font-size: 0.9rem;
-		cursor: pointer;
-		transition: all 0.3s ease;
-		white-space: nowrap;
-	}
-
-	.btn-edit:hover {
-		background: rgba(212, 145, 42, 0.12);
-		border-color: rgba(212, 145, 42, 0.7);
-	}
-
-	.btn-add-asset {
+	.actions {
 		display: flex;
 		align-items: center;
 		gap: 0.6rem;
-		padding: 0.85rem 1.5rem;
-		border: none;
-		border-radius: 10px;
+		flex-shrink: 0;
+	}
+
+	.edit,
+	.add {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.6rem 1.15rem;
+		border-radius: 9px;
+		font-family: var(--font-body);
+		font-size: 0.88rem;
+		font-weight: 600;
+		text-decoration: none;
+		white-space: nowrap;
+		cursor: pointer;
+		transition:
+			background 0.2s ease,
+			border-color 0.2s ease;
+	}
+
+	.edit {
+		border: 1px solid var(--border-strong);
+		background: none;
+		color: var(--text);
+	}
+
+	.edit:hover {
+		border-color: var(--text-dim);
+		background: var(--panel);
+	}
+
+	.add {
+		border: 1px solid var(--amber);
 		background: var(--amber);
 		color: #0d0800;
-		font-weight: 700;
-		font-family: var(--font-body);
-		font-size: 0.95rem;
-		cursor: pointer;
-		transition: all 0.3s ease;
-		letter-spacing: 0.3px;
-		white-space: nowrap;
 	}
 
-	.btn-add-asset:hover {
-		transform: translateY(-2px);
-		box-shadow: 0 10px 25px rgba(212, 145, 42, 0.25);
+	.add:hover {
+		border-color: var(--amber-light);
+		background: var(--amber-light);
 	}
 
-	@media (max-width: 768px) {
-		.page-title {
-			font-size: 1.85rem;
-		}
-
-		.header-top {
-			flex-direction: column;
-		}
-
-		.btn-add-asset {
-			width: 100%;
-			justify-content: center;
+	@media (prefers-reduced-motion: reduce) {
+		.edit,
+		.add {
+			transition: none;
 		}
 	}
 </style>

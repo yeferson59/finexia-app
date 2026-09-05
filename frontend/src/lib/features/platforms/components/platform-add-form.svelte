@@ -173,7 +173,7 @@
 
 	.form-input::placeholder,
 	.form-textarea::placeholder {
-		color: rgba(236, 234, 229, 0.4);
+		color: var(--text-dim);
 	}
 
 	.form-input:focus,

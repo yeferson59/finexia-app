@@ -3,9 +3,13 @@ import {
 	groupHoldings,
 	computeTypeBreakdown,
 	formatPct,
+	portfolioBarScale,
+	portfolioTotals,
 	realReturnPct,
+	toPortfolioRows,
 	type RawHolding
 } from './portfolio';
+import type { PortfolioSummary } from '$lib/api/types';
 import { portfolioEntrySchema } from './schemas';
 
 // Un portafolio en USD: los totales en moneda base coinciden con
@@ -265,5 +269,152 @@ describe('portfolioEntrySchema', () => {
 		const base = { ...entry, costCurrency: 'USD', currency: 'EUR' };
 		expect(portfolioEntrySchema.safeParse({ ...base, fxRate: '0' }).success).toBe(false);
 		expect(portfolioEntrySchema.safeParse({ ...base, fxRate: '-1.0638' }).success).toBe(false);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Listado de portafolios
+// ---------------------------------------------------------------------------
+
+function summary(over: Partial<PortfolioSummary> = {}): PortfolioSummary {
+	return {
+		id: over.name ?? 'p1',
+		name: 'Cartera Principal',
+		description: 'Acciones y ETFs a largo plazo',
+		type: 'stocks_etfs',
+		baseCurrency: 'USD',
+		displayCurrency: 'USD',
+		riskName: 'Moderado',
+		totalPositions: 5,
+		totalCostBase: '1000',
+		totalMarketValue: '1200',
+		totalGainLoss: '200',
+		totalGainLossPct: '20',
+		...over
+	};
+}
+
+describe('toPortfolioRows', () => {
+	// El orden es lo que hace legible una escalera: la barra más larga primero
+	// y las demás leídas contra ella.
+	it('ordena de mayor a menor valor', () => {
+		const rows = toPortfolioRows(
+			[
+				summary({ name: 'B', totalMarketValue: '500' }),
+				summary({ name: 'A', totalMarketValue: '900' })
+			],
+			'USD'
+		);
+
+		expect(rows.map((r) => r.name)).toEqual(['A', 'B']);
+	});
+
+	// Su importe está en otra moneda: ponerlo entre los demás invitaría a
+	// comparar barras que miden cosas distintas.
+	it('manda al final lo que no se pudo convertir, aunque valga más', () => {
+		const rows = toPortfolioRows(
+			[
+				summary({ name: 'EUR', displayCurrency: 'EUR', totalMarketValue: '9000' }),
+				summary({ name: 'USD', totalMarketValue: '100' })
+			],
+			'USD'
+		);
+
+		expect(rows.map((r) => r.name)).toEqual(['USD', 'EUR']);
+		expect(rows.map((r) => r.converted)).toEqual([true, false]);
+	});
+
+	// Lo que escribió el dueño es mejor descripción que la etiqueta del tipo;
+	// la etiqueta es la reserva para quien no escribió nada.
+	it('conserva la descripción del dueño y la etiqueta del tipo como reserva', () => {
+		const [written] = toPortfolioRows([summary()], 'USD');
+		expect(written.description).toBe('Acciones y ETFs a largo plazo');
+		expect(written.typeLabel).toBe('Acciones & ETFs');
+
+		const [blank] = toPortfolioRows([summary({ description: undefined })], 'USD');
+		expect(blank.description).toBe('');
+		expect(blank.typeLabel).toBe('Acciones & ETFs');
+	});
+
+	it('etiqueta el importe con la moneda en la que de verdad está', () => {
+		const [row] = toPortfolioRows(
+			[summary({ displayCurrency: undefined, baseCurrency: 'COP' })],
+			'USD'
+		);
+
+		expect(row.currency).toBe('COP');
+		expect(row.converted).toBe(false);
+	});
+});
+
+describe('portfolioBarScale', () => {
+	// En pérdida, el capital queda por fuera del extremo de la barra: con el
+	// carril escalado solo a los valores, ese tramo se salía del ancho.
+	it('cuenta también los costes, no solo los valores', () => {
+		const rows = toPortfolioRows(
+			[summary({ totalMarketValue: '800', totalCostBase: '1500' })],
+			'USD'
+		);
+
+		expect(portfolioBarScale(rows)).toBe(1500);
+	});
+
+	it('deja fuera de la escala lo que está en otra moneda', () => {
+		const rows = toPortfolioRows(
+			[
+				summary({ name: 'A', totalMarketValue: '100', totalCostBase: '100' }),
+				summary({ name: 'B', displayCurrency: 'EUR', totalMarketValue: '9000' })
+			],
+			'USD'
+		);
+
+		expect(portfolioBarScale(rows)).toBe(100);
+	});
+
+	it('sin filas no hay escala', () => {
+		expect(portfolioBarScale([])).toBe(0);
+	});
+});
+
+describe('portfolioTotals', () => {
+	// Sumar un portafolio en otra moneda daría una cifra que no está en
+	// ninguna: se lista, pero no entra en el total.
+	it('suma solo lo que está en la moneda pedida y cuenta lo que dejó fuera', () => {
+		const rows = toPortfolioRows(
+			[
+				summary({ name: 'A', totalMarketValue: '1200', totalCostBase: '1000' }),
+				summary({ name: 'B', totalMarketValue: '800', totalCostBase: '1000' }),
+				summary({ name: 'C', displayCurrency: 'EUR', totalMarketValue: '5000' })
+			],
+			'USD'
+		);
+		const totals = portfolioTotals(rows);
+
+		expect(totals.value).toBe(2000);
+		expect(totals.cost).toBe(2000);
+		expect(totals.gain).toBe(0);
+		expect(totals.counted).toBe(2);
+		expect(totals.excluded).toBe(1);
+	});
+
+	it('calcula el rendimiento sobre lo que costó', () => {
+		const rows = toPortfolioRows(
+			[summary({ totalMarketValue: '1250', totalCostBase: '1000' })],
+			'USD'
+		);
+
+		expect(portfolioTotals(rows).gainPct).toBeCloseTo(25, 10);
+	});
+
+	// Sin coste no hay porcentaje que calcular, y un 0 se leería como un
+	// portafolio que no se movió.
+	it('no inventa un rendimiento sin coste', () => {
+		const rows = toPortfolioRows(
+			[summary({ totalMarketValue: '0', totalCostBase: '0', totalPositions: 0 })],
+			'USD'
+		);
+
+		expect(portfolioTotals(rows).gainPct).toBe(0);
+		expect(portfolioTotals(rows).positions).toBe(0);
 	});
 });

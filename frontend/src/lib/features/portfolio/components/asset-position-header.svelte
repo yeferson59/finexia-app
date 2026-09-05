@@ -88,7 +88,7 @@
 	.price-label {
 		margin: 0;
 		font-size: 0.8rem;
-		color: rgba(236, 234, 229, 0.4);
+		color: var(--text-dim);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 	}

@@ -322,7 +322,7 @@
 	.field-hint {
 		margin: 0.4rem 0 0;
 		font-size: 0.8rem;
-		color: rgba(236, 234, 229, 0.4);
+		color: var(--text-dim);
 		font-style: italic;
 	}
 

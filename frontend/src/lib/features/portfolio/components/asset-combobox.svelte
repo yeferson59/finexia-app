@@ -206,7 +206,7 @@
 		right: 0.75rem;
 		background: transparent;
 		border: none;
-		color: rgba(236, 234, 229, 0.4);
+		color: var(--text-dim);
 		font-size: 0.85rem;
 		cursor: pointer;
 		padding: 0.2rem 0.3rem;
@@ -270,7 +270,7 @@
 
 	.option-type {
 		font-size: 0.68rem;
-		color: rgba(236, 234, 229, 0.4);
+		color: var(--text-dim);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 		font-weight: 600;
@@ -293,7 +293,7 @@
 
 	.option-meta {
 		font-size: 0.75rem;
-		color: rgba(236, 234, 229, 0.4);
+		color: var(--text-dim);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -302,7 +302,7 @@
 	.option-price {
 		font-family: var(--font-mono);
 		font-size: 0.82rem;
-		color: rgba(212, 145, 42, 0.7);
+		color: var(--amber);
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 		flex-shrink: 0;

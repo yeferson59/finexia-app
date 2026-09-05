@@ -367,7 +367,7 @@
 
 	.sell-label-hint {
 		font-weight: 400;
-		color: rgba(236, 234, 229, 0.4);
+		color: var(--text-dim);
 		text-transform: none;
 		letter-spacing: 0;
 		font-size: 0.75rem;
