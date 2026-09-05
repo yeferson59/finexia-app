@@ -92,13 +92,19 @@
 			pulsado, y basta con que ese detalle se pierda —un `Button` que no
 			propague `name`, un envío por Enter— para que "cancelar" mande un
 			"autorizar". Aquí cada botón solo puede enviar lo que tiene al lado.
+
+			El id va en el cuerpo y no en la URL porque `action="?/decide"`
+			reemplaza la query entera: el `?request=…` con el que se llegó a
+			esta página no sobrevive al POST.
 		-->
 		<div class="actions">
 			<form method="POST" action="?/decide" onsubmit={() => (submitting = true)}>
+				<input type="hidden" name="request" value={consent.requestId} />
 				<input type="hidden" name="decision" value="deny" />
 				<Button type="submit" variant="secondary" disabled={submitting}>Cancelar</Button>
 			</form>
 			<form method="POST" action="?/decide" onsubmit={() => (submitting = true)}>
+				<input type="hidden" name="request" value={consent.requestId} />
 				<input type="hidden" name="decision" value="approve" />
 				<Button type="submit" variant="primary" disabled={submitting}>Autorizar</Button>
 			</form>

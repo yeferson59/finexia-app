@@ -49,15 +49,21 @@ export const actions = {
 	 * Aprueba o deniega. El destino lo calcula el backend a partir de la URI
 	 * registrada del cliente, nunca de nada que venga del formulario: es lo que
 	 * separa un flujo OAuth de un redirect abierto.
+	 *
+	 * El id se lee del cuerpo, no de `url.searchParams`: `action="?/decide"`
+	 * reemplaza la query entera, así que el `?request=…` del `load` ya no está
+	 * aquí. Que venga del formulario no cambia nada de lo que hay que confiar —
+	 * es un identificador opaco de una fila del servidor, y quien aprueba lo
+	 * decide la sesión, no este campo.
 	 */
 	decide: async (event) => {
-		const requestId = event.url.searchParams.get('request');
+		const formData = await event.request.formData();
+		const requestId = formData.get('request');
 
-		if (!requestId) {
+		if (typeof requestId !== 'string' || requestId === '') {
 			error(400, 'Falta el identificador de la petición de autorización.');
 		}
 
-		const formData = await event.request.formData();
 		const approved = formData.get('decision') === 'approve';
 
 		const result = await user.decideOAuthConsent(event, requestId, approved);
