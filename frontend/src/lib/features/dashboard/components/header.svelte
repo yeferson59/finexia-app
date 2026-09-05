@@ -1,6 +1,22 @@
 <script lang="ts">
+	/*
+	 * Barra superior del panel.
+	 *
+	 * Ahora dice en qué sección está el usuario: antes solo repetía la marca —que
+	 * ya estaba en el menú— y tres botones, así que ocupaba 72 px sin aportar un
+	 * dato. El nombre sale de la misma lista que pinta el menú (`nav.ts`), de
+	 * modo que los dos no pueden discrepar.
+	 *
+	 * Se fueron dos cosas que engañaban: el botón de tres puntos «Configuración»,
+	 * que no tenía manejador y no hacía nada al pulsarlo, y el punto rojo de
+	 * notificaciones, que estaba encendido siempre —hubiera o no algo que leer—
+	 * porque nadie le pasaba un contador.
+	 */
 	import { resolve } from '$app/paths';
 	import { privacy } from '$lib/shared/privacy.svelte';
+	import { page } from '$app/state';
+	import Icon from './icon.svelte';
+	import { sectionTitle } from '../nav';
 
 	interface Props {
 		sidebarOpen?: boolean;
@@ -8,308 +24,186 @@
 	}
 
 	let { sidebarOpen = $bindable(false), data }: Props = $props();
+
+	const section = $derived(sectionTitle(page.url.pathname));
+	const initial = $derived(data.user.name.trim().charAt(0).toUpperCase());
 </script>
 
-<header class="dashboard-header">
-	<div class="header-content">
+<header class="header">
+	<button
+		class="menu"
+		onclick={() => (sidebarOpen = !sidebarOpen)}
+		aria-label="Abrir el menú de secciones"
+		aria-expanded={sidebarOpen}
+		aria-controls="dashboard-sidebar"
+	>
+		<Icon name="menu" size={20} width={2} />
+	</button>
+
+	<p class="section">{section}</p>
+
+	<div class="actions">
 		<button
-			class="menu-toggle"
-			onclick={() => (sidebarOpen = !sidebarOpen)}
-			aria-label="Toggle menu"
-			aria-expanded={sidebarOpen}
-			aria-controls="dashboard-sidebar"
+			class="action"
+			onclick={() => privacy.toggle()}
+			aria-pressed={privacy.hidden}
+			title={privacy.hidden ? 'Mostrar los importes' : 'Ocultar los importes'}
 		>
-			<svg
-				width="24"
-				height="24"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
+			<Icon name={privacy.hidden ? 'eye-off' : 'eye'} size={18} />
+			<span class="sr-only">{privacy.hidden ? 'Mostrar los importes' : 'Ocultar los importes'}</span
 			>
-				<line x1="3" y1="12" x2="21" y2="12"></line>
-				<line x1="3" y1="6" x2="21" y2="6"></line>
-				<line x1="3" y1="18" x2="21" y2="18"></line>
-			</svg>
 		</button>
 
-		<a class="header-brand" href={resolve('/dashboard')} aria-label="Finexia, ir al inicio">
-			<svg
-				class="brand-icon"
-				width="30"
-				height="30"
-				viewBox="0 0 30 30"
-				fill="none"
-				aria-hidden="true"
-			>
-				<rect width="30" height="30" rx="7" fill="var(--amber)" />
-				<path
-					d="M7 22L12.5 14.5L16.5 18.5L23 9"
-					stroke="#0c0a06"
-					stroke-width="2.6"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				/>
-			</svg>
-			<span class="brand-name">FINEXIA</span>
+		<a class="action" href={resolve('/dashboard/notifications')} aria-label="Notificaciones">
+			<Icon name="bell" size={18} />
 		</a>
 
-		<div class="header-actions">
-			<button
-				class="icon-button"
-				onclick={() => privacy.toggle()}
-				aria-label={privacy.hidden ? 'Mostrar valores' : 'Ocultar valores'}
-				aria-pressed={privacy.hidden}
-				title={privacy.hidden ? 'Mostrar valores' : 'Ocultar valores'}
-			>
-				{#if privacy.hidden}
-					<svg
-						width="20"
-						height="20"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path
-							d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
-						></path>
-						<path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
-						<path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"></path>
-						<line x1="1" y1="1" x2="23" y2="23"></line>
-					</svg>
-				{:else}
-					<svg
-						width="20"
-						height="20"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-						<circle cx="12" cy="12" r="3"></circle>
-					</svg>
-				{/if}
-			</button>
-
-			<a href={resolve('/dashboard/notifications')} class="icon-button" aria-label="Notificaciones">
-				<svg
-					width="20"
-					height="20"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-					<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-				</svg>
-				<span class="notification-badge"></span>
-			</a>
-
-			<button class="icon-button" aria-label="Configuración">
-				<svg
-					width="20"
-					height="20"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<circle cx="12" cy="12" r="1"></circle>
-					<circle cx="19" cy="12" r="1"></circle>
-					<circle cx="5" cy="12" r="1"></circle>
-				</svg>
-			</button>
-
-			<div class="user-profile">
-				{#if data.user.image && data.user.image !== 'avatar.png'}
-					<img src={data.user.image} alt="Avatar" class="avatar avatar-img" />
-				{:else}
-					<div class="avatar" aria-hidden="true">
-						{data.user.name.trim().charAt(0).toUpperCase()}
-					</div>
-				{/if}
-				<div class="user-info">
-					<p class="user-name">{data.user.name}</p>
-					<p class="user-email">{data.user.email}</p>
-				</div>
-			</div>
-		</div>
+		<a class="user" href={resolve('/dashboard/settings')}>
+			{#if data.user.image && data.user.image !== 'avatar.png'}
+				<img src={data.user.image} alt="" class="avatar" />
+			{:else}
+				<span class="avatar" aria-hidden="true">{initial}</span>
+			{/if}
+			<span class="who">
+				<span class="name">{data.user.name}</span>
+				<span class="mail">{data.user.email}</span>
+			</span>
+		</a>
 	</div>
 </header>
 
 <style>
-	.dashboard-header {
+	.header {
 		position: fixed;
 		top: 0;
-		left: 0;
 		right: 0;
-		height: 72px;
-		background: rgba(8, 9, 10, 0.82);
-		backdrop-filter: blur(16px);
-		-webkit-backdrop-filter: blur(16px);
-		border-bottom: 1px solid var(--border);
-		z-index: 40;
-	}
-
-	.header-content {
-		max-width: 1600px;
-		margin: 0 auto;
-		height: 100%;
+		left: var(--rail);
+		z-index: 20;
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		padding: 0 2rem;
-		gap: 2rem;
+		gap: 1rem;
+		height: var(--header-h);
+		padding: 0 1.75rem;
+		background: color-mix(in srgb, var(--bg) 88%, transparent);
+		backdrop-filter: blur(14px);
+		-webkit-backdrop-filter: blur(14px);
+		border-bottom: 1px solid var(--border);
 	}
 
-	.menu-toggle {
+	.menu {
 		display: none;
-		background: none;
+		padding: 0.4rem;
+		margin-left: -0.4rem;
 		border: none;
+		background: none;
 		color: var(--text-muted);
 		cursor: pointer;
-		padding: 0.5rem;
-		transition: color 0.2s ease;
 	}
 
-	.menu-toggle:hover {
+	.section {
+		margin: 0;
+		font-size: 0.95rem;
+		font-weight: 500;
 		color: var(--text);
 	}
 
-	.header-brand {
+	.actions {
 		display: flex;
 		align-items: center;
-		gap: 0.65rem;
-		flex-shrink: 0;
-	}
-
-	.brand-icon {
-		flex-shrink: 0;
-	}
-
-	.brand-name {
-		font-family: var(--font-display);
-		font-weight: 600;
-		font-size: 1.25rem;
-		letter-spacing: 0.1em;
-		color: var(--text);
-	}
-
-	.header-actions {
-		display: flex;
-		align-items: center;
-		gap: 1.5rem;
+		gap: 0.35rem;
 		margin-left: auto;
 	}
 
-	.icon-button {
-		background: none;
-		border: none;
-		color: var(--text-muted);
-		cursor: pointer;
-		padding: 0.5rem;
+	.action {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		transition: color 0.2s ease;
-		position: relative;
+		width: 34px;
+		height: 34px;
+		border: none;
+		border-radius: 8px;
+		background: none;
+		color: var(--text-muted);
+		cursor: pointer;
 		text-decoration: none;
+		transition:
+			background 0.15s ease,
+			color 0.15s ease;
 	}
 
-	.icon-button:hover {
+	.action:hover {
+		background: var(--panel);
 		color: var(--text);
 	}
 
-	.notification-badge {
-		position: absolute;
-		top: 4px;
-		right: 4px;
-		width: 6px;
-		height: 6px;
-		background: var(--amber);
-		border-radius: 50%;
-	}
-
-	.user-profile {
+	.user {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
-		padding-left: 1rem;
-		border-left: 1px solid var(--border);
+		gap: 0.6rem;
+		margin-left: 0.5rem;
+		padding: 0.3rem 0.5rem 0.3rem 0.3rem;
+		border-radius: 999px;
+		text-decoration: none;
+		transition: background 0.15s ease;
+	}
+
+	.user:hover {
+		background: var(--panel);
 	}
 
 	.avatar {
-		width: 36px;
-		height: 36px;
-		border-radius: 50%;
-		background: var(--surface-3);
-		border: 1px solid var(--border-strong);
-		color: var(--amber);
-		font-family: var(--font-mono);
-		font-size: 0.8rem;
-		font-weight: 600;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		width: 30px;
+		height: 30px;
 		flex-shrink: 0;
-	}
-
-	.avatar-img {
+		border-radius: 50%;
+		background: var(--panel-2);
 		object-fit: cover;
+		color: var(--text);
+		font-size: 0.8rem;
+		font-weight: 600;
 	}
 
-	.user-info {
+	.who {
 		display: flex;
 		flex-direction: column;
-		gap: 0.1rem;
+		min-width: 0;
 	}
 
-	.user-name {
-		font-size: 0.85rem;
-		font-weight: 500;
+	.name {
+		font-size: 0.8rem;
 		color: var(--text);
-		margin: 0;
 	}
 
-	.user-email {
-		font-family: var(--font-mono);
+	.mail {
 		font-size: 0.7rem;
 		color: var(--text-dim);
-		margin: 0;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
 
 	@media (max-width: 1024px) {
-		.menu-toggle {
-			display: flex;
-		}
-
-		.user-info {
-			display: none;
-		}
-
-		.header-content {
-			padding: 0 1.5rem;
-			gap: 1rem;
-		}
-	}
-
-	@media (max-width: 768px) {
-		.dashboard-header {
-			height: 64px;
-		}
-
-		.header-content {
+		.header {
+			left: 0;
 			padding: 0 1rem;
 		}
 
-		.header-actions {
-			gap: 1rem;
+		.menu {
+			display: flex;
 		}
 
-		.brand-name {
+		.who {
 			display: none;
 		}
 	}

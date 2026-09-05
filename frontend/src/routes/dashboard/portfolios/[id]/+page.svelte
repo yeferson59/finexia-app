@@ -155,7 +155,9 @@
 
 {#if growth}
 	<section class="growth-section" aria-label="Crecimiento del portafolio">
-		<PortfolioGrowth data={growth.points} summary={growth.summary} />
+		<!-- Con el formateador de la página: sus tarjetas escriben «US$ 45.035,10»
+		     y la gráfica tiene que decir el mismo número igual. -->
+		<PortfolioGrowth data={growth.points} summary={growth.summary} formatMoney={formatCurrency} />
 	</section>
 {/if}
 

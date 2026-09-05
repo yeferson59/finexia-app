@@ -4,8 +4,9 @@
 	import Stat from '$lib/ui/stat.svelte';
 	import GrowthChart from './growth-chart.svelte';
 	import GrowthControls from './growth-controls.svelte';
+	import GrowthReadout from './growth-readout.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
-	import { currencySymbol, formatCompactCurrency } from '$lib/shared/format/money';
+	import { formatCompactCurrency, formatCurrency } from '$lib/shared/format/money';
 	import { formatPercent, formatSignedPercent } from '$lib/shared/format/percent';
 	import { timeWeightedReturn } from '$lib/shared/finance/returns';
 	import {
@@ -21,8 +22,27 @@
 
 	const {
 		data = [],
-		summary = { firstDate: '', initialValue: '0', currentValue: '0', totalGrowthPct: '0' }
-	}: { data: GrowthDataPoint[]; summary: GrowthSummary } = $props();
+		summary = { firstDate: '', initialValue: '0', currentValue: '0', totalGrowthPct: '0' },
+		bare = false,
+		formatMoney = undefined
+	}: {
+		data: GrowthDataPoint[];
+		summary: GrowthSummary;
+		/**
+		 * Sin la caja: en el panel la gráfica va sobre el fondo de la página, que
+		 * ya no apila tarjetas. El detalle de portafolio la sigue queriendo
+		 * enmarcada, porque allí sí convive con otras.
+		 */
+		bare?: boolean;
+		/**
+		 * Cómo escribir un importe. Quien la incruste puede imponer el suyo para
+		 * que la tarjeta no discrepe de las cifras que tiene al lado: el detalle
+		 * de portafolio escribe «US$ 45.035,10» en sus tarjetas y le pasa ese
+		 * mismo formateador. Sin él manda el ayudante compartido, que es lo que
+		 * usa el panel.
+		 */
+		formatMoney?: (value: number) => string;
+	} = $props();
 
 	let selectedPeriod = $state<Period>('Todo');
 	/*
@@ -53,7 +73,6 @@
 	);
 
 	const activePoint = $derived(activeIndex === null ? null : (points[activeIndex] ?? null));
-	const activeGain = $derived(activePoint ? activePoint.mv - activePoint.cb : 0);
 
 	/*
 	 * La rentabilidad del tramo a la vista, limpia de aportes y retiros.
@@ -102,7 +121,6 @@
 	 * fijo en la tarjeta, así que unas cifras en pesos se leían como dólares.
 	 */
 	const currency = $derived((summary.currency || 'USD').trim().toUpperCase());
-	const symbol = $derived(currencySymbol(currency));
 
 	/*
 	 * Fechas cuyo total incluye algún portafolio que no se pudo convertir: sus
@@ -126,8 +144,15 @@
 		}).format(v);
 	}
 
+	/*
+	 * Por `formatCurrency` y no componiendo símbolo + número a mano: esta
+	 * tarjeta escribía «$89.406,10» mientras la cifra grande de la misma página
+	 * decía «$89,406.10», porque una pasaba por el ayudante compartido —que da a
+	 * cada moneda el locale en el que se lee— y la otra formateaba en es-CO
+	 * fuera cual fuera la moneda. Dos formatos para el mismo número.
+	 */
 	function fmtMoney(v: number): string {
-		return privacy.money(symbol + fmt(v));
+		return formatMoney ? formatMoney(v) : privacy.money(formatCurrency(v, currency));
 	}
 
 	/** Etiquetas del eje: el importe abreviado, que es lo que cabe entre marcas. */
@@ -180,9 +205,13 @@
 	}
 </script>
 
-<div class="growth-card">
+<div class="growth-card" class:bare>
 	<div class="card-top">
-		<CardHeader eyebrow="Portafolio" title="Crecimiento del portafolio" divider={false} />
+		{#if bare}
+			<h2 class="growth-title">Crecimiento</h2>
+		{:else}
+			<CardHeader eyebrow="Portafolio" title="Crecimiento del portafolio" divider={false} />
+		{/if}
 		<GrowthControls
 			{view}
 			period={selectedPeriod}
@@ -210,13 +239,13 @@
 		     con el periodo en la etiqueta porque, a diferencia de las otras tres,
 		     mide el tramo que se está viendo. -->
 		<Stat
-			label="Rentabilidad real · {selectedPeriod}"
+			label="Rentabilidad real, {selectedPeriod}"
 			tone={realReturnPct === null ? 'default' : realReturnPct >= 0 ? 'positive' : 'negative'}
 			value={realReturnPct === null ? '—' : fmtPct(realReturnPct)}
 		/>
 		<!-- El código va en la etiqueta porque el símbolo no siempre distingue:
 		     en es-CO el peso y el dólar comparten el "$". -->
-		<Stat label="Valor actual · {currency}" tone="highlight" value={fmtMoney(currentVal)} />
+		<Stat label="Valor actual en {currency}" tone="highlight" value={fmtMoney(currentVal)} />
 	</div>
 
 	{#if unconvertedDates > 0}
@@ -233,47 +262,14 @@
 			description="El gráfico se dibuja a medida que el sistema registra las capturas diarias de tu portafolio."
 		/>
 	{:else}
-		<!-- El detalle del punto señalado. Sin `aria-live`: la gráfica es un
-		     `slider` y su `aria-valuetext` ya lo anuncia; duplicarlo aquí haría
-		     que el lector de pantalla lo dijera dos veces. -->
-		<p class="readout">
-			{#if activePoint}
-				<span class="readout-date">{fmtLongDate(activePoint.date)}</span>
-				<span class="readout-item">
-					<i class="swatch value"></i>{labels.primary}
-					<b>{formatValue(activePoint.mv)}</b>
-				</span>
-				<span class="readout-item">
-					<i class="swatch cost"></i>{labels.secondary}
-					<b>{formatValue(activePoint.cb)}</b>
-				</span>
-				<!-- La diferencia entre los dos trazos: en dinero es la ganancia de ese
-				     día; en porcentaje, cuánto se separan las dos lecturas, que es
-				     justo lo que aportaron los movimientos de dinero. Aquella se tiñe
-				     de verde o rojo porque es ganar o perder; esta va en gris: que la
-				     rentabilidad vaya por encima de la ganancia sobre coste no es
-				     bueno ni malo, solo dice cuándo entró el dinero. -->
-				<span
-					class="readout-item"
-					class:up={!isPercent && activeGain >= 0}
-					class:down={!isPercent && activeGain < 0}
-				>
-					{isPercent ? 'Diferencia' : 'Ganancia'}
-					<b>
-						{#if isPercent}
-							{fmtPct(activeGain)}
-						{:else}
-							{activeGain >= 0 ? '+' : '−'}{fmtMoney(Math.abs(activeGain))}
-						{/if}
-					</b>
-				</span>
-			{:else}
-				<span class="readout-hint">
-					Pasa el cursor por la gráfica —o enfócala y usa las flechas— para ver el detalle de cada
-					día.
-				</span>
-			{/if}
-		</p>
+		<GrowthReadout
+			point={activePoint}
+			primaryLabel={labels.primary}
+			secondaryLabel={labels.secondary}
+			{isPercent}
+			{formatValue}
+			formatDate={fmtLongDate}
+		/>
 
 		<GrowthChart
 			{points}
@@ -319,6 +315,55 @@
 		backdrop-filter: blur(10px);
 	}
 
+	.growth-card.bare {
+		background: none;
+		border: none;
+		border-radius: 0;
+		padding: 0;
+		backdrop-filter: none;
+		/* En el panel la gráfica comparte fila con el extracto, así que su ancho no
+		   se deduce del de la ventana: las cuatro métricas se reparten según lo que
+		   mida la columna, no la pantalla. */
+		container-type: inline-size;
+	}
+
+	@container (max-width: 620px) {
+		.growth-card.bare .metrics-row {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+
+	.growth-title {
+		margin: 0;
+		font-family: var(--font-body);
+		font-size: 1.05rem;
+		font-weight: 500;
+		color: var(--text);
+	}
+
+	/*
+	 * Las etiquetas de las métricas, en caja normal y con la tipografía del
+	 * resto del panel. `Stat` las pinta en versalitas monoespaciadas para el
+	 * resto de la aplicación, y aquí eso era el mismo antetítulo repetido cuatro
+	 * veces bajo un titular que ya no lo lleva. Solo en modo `bare`, así que el
+	 * detalle de portafolio no se entera.
+	 */
+	.growth-card.bare :global(.stat-label) {
+		font-family: var(--font-body);
+		font-size: 0.75rem;
+		letter-spacing: normal;
+		text-transform: none;
+		color: var(--text-dim);
+	}
+
+	.growth-card.bare .divider {
+		display: none;
+	}
+
+	.growth-card.bare .metrics-row {
+		margin-top: 1.25rem;
+	}
+
 	.card-top {
 		display: flex;
 		flex-wrap: wrap;
@@ -347,65 +392,6 @@
 		margin: -0.75rem 0 1.25rem;
 		font-size: 0.8rem;
 		color: rgba(212, 145, 42, 0.85);
-	}
-
-	/* Alto fijo: el detalle aparece y desaparece sin mover la gráfica. */
-	.readout {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.5rem 1.25rem;
-		min-height: 2.4rem;
-		margin: 0 0 0.5rem;
-		font-size: 0.78rem;
-		color: var(--text-muted);
-	}
-
-	.readout-date {
-		font-family: var(--font-mono);
-		font-size: 0.7rem;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: var(--text-dim);
-	}
-
-	.readout-item {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-	}
-
-	.readout-item b {
-		font-family: var(--font-mono);
-		font-weight: 600;
-		font-variant-numeric: tabular-nums;
-		color: var(--text);
-	}
-
-	.readout-item.up b {
-		color: var(--green);
-	}
-
-	.readout-item.down b {
-		color: var(--red);
-	}
-
-	.swatch {
-		width: 10px;
-		height: 2px;
-		border-radius: 1px;
-	}
-
-	.swatch.value {
-		background: var(--amber);
-	}
-
-	.swatch.cost {
-		background: rgba(236, 234, 229, 0.4);
-	}
-
-	.readout-hint {
-		color: var(--text-dim);
 	}
 
 	/* Solo en la vista de porcentaje: las dos líneas se separan y hay que decir
@@ -443,11 +429,11 @@
 	}
 
 	.legend-line.gray {
-		border-top: 1.5px dashed rgba(236, 234, 229, 0.28);
+		border-top: 1.5px dashed var(--cost);
 	}
 
 	@media (max-width: 768px) {
-		.growth-card {
+		.growth-card:not(.bare) {
 			padding: 1.5rem;
 		}
 	}
@@ -462,10 +448,6 @@
 		.card-top {
 			flex-direction: column;
 			align-items: flex-start;
-		}
-
-		.readout {
-			min-height: 3.4rem;
 		}
 	}
 </style>

@@ -24,7 +24,7 @@ test.describe('auth', () => {
 		await login(page);
 		await expect(page).toHaveURL(/\/dashboard$/);
 
-		await page.getByRole('button', { name: 'Cerrar Sesión' }).click();
+		await page.getByRole('button', { name: 'Cerrar sesión' }).click();
 		await page.waitForURL('**/auth');
 
 		// The session cookies are gone: protected routes bounce back to /auth.

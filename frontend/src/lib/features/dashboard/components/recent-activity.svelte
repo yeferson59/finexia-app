@@ -1,351 +1,219 @@
 <script lang="ts">
+	/*
+	 * Los últimos movimientos, como un extracto.
+	 *
+	 * Cada fila llevaba un cuadro de color con un icono —ámbar para compras,
+	 * verde para dividendos, azul para transferencias—: tres paletas más en una
+	 * página que ya usaba el verde para las ganancias, y ninguna decía nada que
+	 * no dijera el propio título de la fila. El signo del importe basta para
+	 * saber si el dinero entró o salió.
+	 */
 	import { resolve } from '$app/paths';
-	import CardHeader from '$lib/ui/card-header.svelte';
-	import EmptyState from '$lib/ui/empty-state.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCalendarDate } from '$lib/shared/format/date';
-
-	function fmtMoney(value: number): string {
-		return privacy.money(
-			'$' +
-				new Intl.NumberFormat('es-CO', {
-					minimumFractionDigits: 2,
-					maximumFractionDigits: 2
-				}).format(value)
-		);
-	}
+	import { formatCurrency } from '$lib/shared/format/money';
 
 	interface Transaction {
 		id: string;
-		entryId: string;
 		type: string;
 		quantity: string;
 		price: string;
 		currency: string;
-		fees: string;
 		transactionDate: string;
-		notes: string;
-		createdAt: string;
 		assetTicker: string;
 		assetName: string;
 	}
 
 	const { transactions = [] }: { transactions: Transaction[] } = $props();
 
-	const typeMap: Record<string, { label: string; activityType: string; icon: string }> = {
-		buy: { label: 'Compra de Activo', activityType: 'purchase', icon: 'buy' },
-		sell: { label: 'Venta de Activo', activityType: 'sale', icon: 'sell' },
-		dividend: { label: 'Dividendo Recibido', activityType: 'dividend', icon: 'dividend' },
-		interest: { label: 'Interés Recibido', activityType: 'dividend', icon: 'dividend' },
-		transfer_in: { label: 'Transferencia Recibida', activityType: 'deposit', icon: 'deposit' },
-		transfer_out: { label: 'Transferencia Realizada', activityType: 'transfer', icon: 'transfer' },
-		split: { label: 'División de Acciones', activityType: 'deposit', icon: 'deposit' },
-		fee: { label: 'Cargo / Comisión', activityType: 'sale', icon: 'sell' }
+	const LABELS: Record<string, string> = {
+		buy: 'Compra',
+		sell: 'Venta',
+		dividend: 'Dividendo',
+		interest: 'Interés',
+		transfer_in: 'Transferencia recibida',
+		transfer_out: 'Transferencia enviada',
+		split: 'División de acciones',
+		fee: 'Comisión'
 	};
 
-	function getActivityMeta(type: string) {
-		return typeMap[type] ?? { label: type, activityType: 'purchase', icon: 'buy' };
+	/** Movimientos que meten dinero en la cartera; el resto lo sacan. */
+	const INCOMING = ['dividend', 'interest', 'transfer_in', 'split'];
+
+	function total(tx: Transaction): number {
+		return (parseFloat(tx.quantity) || 0) * (parseFloat(tx.price) || 0);
 	}
 
-	function calcTotal(quantity: string, price: string): number {
-		return (parseFloat(quantity) || 0) * (parseFloat(price) || 0);
-	}
-
-	function isPositive(type: string): boolean {
-		return ['dividend', 'interest', 'transfer_in', 'split'].includes(type);
-	}
-
-	function formatDate(dateString: string): string {
-		const [year, month, day] = dateString.split('T')[0].split('-').map(Number);
-		const target = Date.UTC(year, month - 1, day);
+	/** «Hoy» y «Ayer» se leen antes que una fecha, y son los dos casos frecuentes. */
+	function when(iso: string): string {
+		const [year, month, day] = iso.split('T')[0].split('-').map(Number);
 		const now = new Date();
-		const startOfToday = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-		const dayDiff = Math.round((target - startOfToday) / 86400000);
+		const days = Math.round(
+			(Date.UTC(year, month - 1, day) -
+				Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) /
+				86400000
+		);
 
-		if (dayDiff === 0) return 'Hoy';
-		if (dayDiff === -1) return 'Ayer';
-		return formatCalendarDate(dateString, { month: 'short', day: 'numeric' });
+		if (days === 0) return 'Hoy';
+		if (days === -1) return 'Ayer';
+		return formatCalendarDate(iso, { day: 'numeric', month: 'short' });
 	}
 </script>
 
-<div class="activity-card">
-	<CardHeader eyebrow="Movimientos" title="Actividad Reciente">
-		{#snippet action()}
-			<a href={resolve('/dashboard/transactions')} class="view-all">Ver todo →</a>
-		{/snippet}
-	</CardHeader>
+<section class="activity" aria-labelledby="activity-title">
+	<header class="head">
+		<h2 id="activity-title">Movimientos</h2>
+		<a class="all" href={resolve('/dashboard/transactions')}>Ver todos</a>
+	</header>
 
-	<div class="activity-list">
-		{#if transactions.length === 0}
-			<EmptyState
-				size="sm"
-				title="Sin actividad reciente"
-				description="Tus compras, ventas y dividendos aparecerán aquí en cuanto los registres."
-			>
-				{#snippet action()}
-					<a href={resolve('/dashboard/transactions/import')} class="empty-cta">Importar CSV</a>
-				{/snippet}
-			</EmptyState>
-		{:else}
+	{#if transactions.length === 0}
+		<p class="empty">
+			Tus compras, ventas y dividendos aparecerán aquí en cuanto los registres.
+			<a href={resolve('/dashboard/transactions/import')}>Importar un CSV</a>
+		</p>
+	{:else}
+		<ul class="list">
 			{#each transactions as tx (tx.id)}
-				{@const meta = getActivityMeta(tx.type)}
-				{@const total = calcTotal(tx.quantity, tx.price)}
-				{@const positive = isPositive(tx.type)}
-				<article class={`activity-item activity-${meta.activityType}`}>
-					<div class={`activity-icon ${meta.activityType}`}>
-						{#if meta.icon === 'buy'}
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-								<path
-									d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"
-								></path>
-							</svg>
-						{:else if meta.icon === 'dividend'}
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-								<path
-									d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"
-								></path>
-							</svg>
-						{:else if meta.icon === 'deposit'}
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-								<path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path>
-							</svg>
-						{:else if meta.icon === 'sell'}
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-								<path
-									d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"
-								></path>
-							</svg>
-						{:else}
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-								<path
-									d="M16 8v-2c0-.55-.45-1-1-1H9c-.55 0-1 .45-1 1v2H6v2h2v7c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-7h2V8h-2zm-3 8h-4v-7h4v7z"
-								></path>
-							</svg>
-						{/if}
+				{@const incoming = INCOMING.includes(tx.type)}
+				<li class="row">
+					<div class="what">
+						<p class="kind">{LABELS[tx.type] ?? tx.type}</p>
+						<p class="asset">{tx.assetName} ({tx.assetTicker})</p>
 					</div>
-
-					<div class="activity-info">
-						<p class="activity-title">{meta.label}</p>
-						<p class="activity-description">{tx.assetName} ({tx.assetTicker})</p>
-					</div>
-
-					<div class="activity-details">
-						<p class="activity-amount" class:positive>
-							{positive ? '+' : '-'}{fmtMoney(total)}
+					<div class="figures">
+						<p class="amount" class:incoming>
+							{incoming ? '+' : '−'}{privacy.money(
+								formatCurrency(Math.abs(total(tx)), tx.currency || 'USD')
+							)}
 						</p>
-						<time class="activity-date" datetime={tx.transactionDate}
-							>{formatDate(tx.transactionDate)}</time
-						>
+						<time class="date" datetime={tx.transactionDate}>{when(tx.transactionDate)}</time>
 					</div>
-				</article>
+				</li>
 			{/each}
-		{/if}
-	</div>
+		</ul>
 
-	<div class="card-footer">
-		<a href={resolve('/dashboard/reports')} class="footer-link">Descargar extracto →</a>
-	</div>
-</div>
+		<a class="statement" href={resolve('/dashboard/reports')}>Descargar el extracto</a>
+	{/if}
+</section>
 
 <style>
-	.activity-card {
-		background: var(--surface);
-		border: 1px solid var(--border-strong);
-		border-radius: 14px;
-		padding: 2rem;
-		backdrop-filter: blur(10px);
+	.activity {
 		display: flex;
 		flex-direction: column;
-		height: 100%;
-	}
-
-	.view-all {
-		font-size: 0.8rem;
-		color: var(--amber);
-		text-decoration: none;
-		font-weight: 500;
-		white-space: nowrap;
-		transition: color 0.2s ease;
-	}
-
-	.view-all:hover {
-		color: var(--amber-light);
-	}
-
-	.activity-list {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-		margin-bottom: 1.5rem;
-		overflow-y: auto;
-		/* overflow-y: auto forces overflow-x to compute to auto; pin it hidden so a
-		   long asset name or ticker can never surface a horizontal scrollbar here. */
-		overflow-x: hidden;
-		max-height: 400px;
-	}
-
-	.empty-cta {
-		display: inline-block;
-		padding: 0.55rem 1.1rem;
-		border: 1px solid var(--border-strong);
-		border-radius: 6px;
-		color: var(--text);
-		font-size: 0.8rem;
-		font-weight: 600;
-		text-decoration: none;
-		transition:
-			background 0.2s ease,
-			border-color 0.2s ease,
-			color 0.2s ease;
-	}
-
-	.empty-cta:hover {
-		background: rgba(212, 145, 42, 0.06);
-		border-color: rgba(212, 145, 42, 0.4);
-		color: var(--amber-light);
-	}
-
-	.activity-item {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		padding: 1rem;
-		border-radius: 8px;
-		transition: background 0.25s ease;
-	}
-
-	.activity-item:hover {
-		background: var(--surface);
-	}
-
-	.activity-icon {
-		width: 38px;
-		height: 38px;
-		border-radius: 8px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-		border: 1px solid var(--border);
-		color: var(--text-muted);
-	}
-
-	.activity-icon.purchase {
-		background: rgba(212, 145, 42, 0.12);
-		border-color: rgba(212, 145, 42, 0.25);
-		color: var(--amber-light);
-	}
-
-	.activity-icon.deposit,
-	.activity-icon.dividend {
-		background: rgba(34, 201, 126, 0.12);
-		border-color: rgba(34, 201, 126, 0.25);
-		color: var(--green);
-	}
-
-	.activity-icon.sale,
-	.activity-icon.transfer {
-		background: rgba(107, 140, 239, 0.12);
-		border-color: rgba(107, 140, 239, 0.25);
-		color: #6b8cef;
-	}
-
-	.activity-info {
-		flex: 1;
 		min-width: 0;
 	}
 
-	.activity-title {
-		font-size: 0.875rem;
+	.head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-bottom: 1.25rem;
+	}
+
+	h2 {
+		margin: 0;
+		font-family: var(--font-body);
+		font-size: 1.05rem;
 		font-weight: 500;
 		color: var(--text);
-		margin: 0 0 0.2rem 0;
-		overflow-wrap: anywhere;
 	}
 
-	.activity-description {
-		font-size: 0.775rem;
+	.all,
+	.statement {
+		font-size: 0.8rem;
 		color: var(--text-muted);
+		text-decoration: none;
+		white-space: nowrap;
+	}
+
+	.all:hover,
+	.statement:hover {
+		color: var(--text);
+		text-decoration: underline;
+		text-underline-offset: 3px;
+	}
+
+	.statement {
+		align-self: flex-start;
+		margin-top: 1.25rem;
+	}
+
+	.list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
 		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	/*
+	 * La única superficie levantada de la página, y por eso significa algo: cada
+	 * fila es un objeto suelto del extracto, no una sección.
+	 */
+	.row {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 0.7rem 0.85rem;
+		border-radius: 8px;
+		background: var(--panel);
+	}
+
+	.what {
+		min-width: 0;
+	}
+
+	.kind {
+		margin: 0;
+		font-size: 0.85rem;
+		color: var(--text);
+	}
+
+	.asset {
+		margin: 0.15rem 0 0;
+		font-size: 0.75rem;
+		color: var(--text-dim);
 		overflow-wrap: anywhere;
 	}
 
-	.activity-details {
+	.figures {
+		flex-shrink: 0;
 		text-align: right;
 	}
 
-	.activity-amount {
+	.amount {
+		margin: 0;
 		font-family: var(--font-mono);
 		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--text);
-		margin: 0 0 0.2rem 0;
 		font-variant-numeric: tabular-nums;
+		color: var(--text);
 	}
 
-	.activity-amount.positive {
+	.amount.incoming {
 		color: var(--green);
 	}
 
-	.activity-date {
+	.date {
+		display: block;
+		margin-top: 0.15rem;
 		font-family: var(--font-mono);
 		font-size: 0.7rem;
 		color: var(--text-dim);
+	}
+
+	.empty {
 		margin: 0;
+		font-size: 0.85rem;
+		line-height: 1.6;
+		color: var(--text-dim);
 	}
 
-	.card-footer {
-		border-top: 1px solid var(--border);
-		padding-top: 1.25rem;
-	}
-
-	.footer-link {
-		font-size: 0.8rem;
-		color: var(--amber);
-		text-decoration: none;
-		font-weight: 500;
-		transition: color 0.2s ease;
-		display: inline-block;
-	}
-
-	.footer-link:hover {
-		color: var(--amber-light);
-	}
-
-	.activity-list::-webkit-scrollbar {
-		width: 4px;
-	}
-
-	.activity-list::-webkit-scrollbar-track {
-		background: transparent;
-	}
-
-	.activity-list::-webkit-scrollbar-thumb {
-		background: var(--border-strong);
-		border-radius: 2px;
-	}
-
-	.activity-list::-webkit-scrollbar-thumb:hover {
-		background: rgba(212, 145, 42, 0.4);
-	}
-
-	@media (max-width: 768px) {
-		.activity-card {
-			padding: 1.5rem;
-		}
-
-		.activity-list {
-			max-height: 300px;
-		}
-
-		.activity-icon {
-			width: 36px;
-			height: 36px;
-		}
-
-		.activity-title {
-			font-size: 0.85rem;
-		}
+	.empty a {
+		color: var(--text-muted);
+		text-decoration: underline;
+		text-underline-offset: 3px;
 	}
 </style>

@@ -61,23 +61,27 @@
 
 	.tab-group {
 		display: flex;
-		gap: 0.2rem;
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid var(--border);
-		border-radius: 8px;
+		gap: 0.15rem;
 		padding: 0.2rem;
+		border: 1px solid var(--border);
+		border-radius: 9px;
 		flex-shrink: 0;
 	}
 
+	/*
+	 * La misma forma que el conmutador de «Dónde está»: en el panel los dos
+	 * viven a dos dedos uno de otro y son la misma clase de control. El activo
+	 * era una pastilla ámbar, que en esta página es el color del valor de
+	 * mercado y no el de «pestaña seleccionada».
+	 */
 	.tab-btn {
-		padding: 0.3rem 0.65rem;
+		padding: 0.35rem 0.75rem;
 		border: none;
-		background: transparent;
-		color: var(--text-dim);
-		border-radius: 6px;
-		font-size: 0.72rem;
-		font-weight: 600;
-		font-family: var(--font-mono);
+		border-radius: 7px;
+		background: none;
+		color: var(--text-muted);
+		font-family: inherit;
+		font-size: 0.8rem;
 		cursor: pointer;
 		transition:
 			background 0.15s ease,
@@ -85,12 +89,11 @@
 	}
 
 	.tab-btn.active {
-		background: rgba(212, 145, 42, 0.18);
-		color: var(--amber-light);
+		background: var(--panel-2, rgba(255, 255, 255, 0.08));
+		color: var(--text);
 	}
 
 	.tab-btn:hover:not(.active) {
-		background: rgba(255, 255, 255, 0.05);
 		color: var(--text);
 	}
 </style>

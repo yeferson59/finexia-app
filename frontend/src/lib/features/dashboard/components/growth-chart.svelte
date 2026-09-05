@@ -224,26 +224,33 @@
 
 	<!-- Los mismos datos que dibuja el SVG, con las dos series y la fecha
 	     completa: es la única vía de acceso para quien no puede leer la gráfica,
-	     así que no puede quedarse corta respecto a lo que promete el título. -->
-	<table class="sr-only">
-		<caption>{caption}</caption>
-		<thead>
-			<tr>
-				<th scope="col">Fecha</th>
-				<th scope="col">{primaryLabel}</th>
-				<th scope="col">{secondaryLabel}</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each points as point (point.date)}
+	     así que no puede quedarse corta respecto a lo que promete el título.
+
+	     El `sr-only` va en el div y no en la tabla: para una tabla, `height` es
+	     un mínimo y no un máximo, así que las reglas de ocultación no la
+	     recortaban y sus 1.700 px de filas se sumaban al alto del documento.
+	     La página terminaba con una franja vacía del tamaño de la serie. -->
+	<div class="sr-only">
+		<table>
+			<caption>{caption}</caption>
+			<thead>
 				<tr>
-					<th scope="row"><time datetime={point.date}>{formatFullDate(point.date)}</time></th>
-					<td>{formatValue(point.mv)}</td>
-					<td>{formatValue(point.cb)}</td>
+					<th scope="col">Fecha</th>
+					<th scope="col">{primaryLabel}</th>
+					<th scope="col">{secondaryLabel}</th>
 				</tr>
-			{/each}
-		</tbody>
-	</table>
+			</thead>
+			<tbody>
+				{#each points as point (point.date)}
+					<tr>
+						<th scope="row"><time datetime={point.date}>{formatFullDate(point.date)}</time></th>
+						<td>{formatValue(point.mv)}</td>
+						<td>{formatValue(point.cb)}</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
 </div>
 
 <style>
@@ -279,9 +286,14 @@
 		stroke-width: 1.25;
 	}
 
+	/*
+	 * El capital invertido, en frío contra el ámbar del valor de mercado: el
+	 * dinero que se puso y lo que el mercado hizo con él. Era un gris sin
+	 * identidad que se confundía con la rejilla.
+	 */
 	.line-cost {
 		fill: none;
-		stroke: rgba(236, 234, 229, 0.3);
+		stroke: var(--cost);
 		stroke-width: 1.5;
 		stroke-dasharray: 6 4;
 		stroke-linecap: round;
@@ -308,8 +320,10 @@
 		stroke-dasharray: 3 3;
 	}
 
+	/* Anillo del color del fondo: es lo que mantiene el punto legible donde
+	   cruza la línea, en vez de un borde dibujado alrededor. */
 	.cursor-dot {
-		stroke: #08090a;
+		stroke: var(--bg);
 		stroke-width: 2;
 	}
 
@@ -318,7 +332,19 @@
 	}
 
 	.cursor-dot.cost {
-		fill: rgba(236, 234, 229, 0.6);
+		fill: var(--cost);
+	}
+
+	/*
+	 * En pantallas estrechas el lienzo se encoge y con él el texto del SVG, que
+	 * va en unidades del viewBox: a 370 px de ancho las marcas de los ejes
+	 * quedaban en unos 5,5 px reales. Subir el cuerpo aquí las devuelve al
+	 * borde de lo legible sin tocar la geometría, que es compartida.
+	 */
+	@media (max-width: 600px) {
+		.axis {
+			font-size: 12px;
+		}
 	}
 
 	/* Fuera de la vista pero en el árbol de accesibilidad. */

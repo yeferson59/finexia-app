@@ -44,7 +44,7 @@ test.describe('dashboard charts', () => {
 		await expect(series.getByRole('cell').first()).toHaveText(/^[+-]?\d+,\d%$/);
 
 		// Y la cifra del periodo va con las otras métricas, no escondida en el SVG.
-		await expect(card.getByText('Rentabilidad real · Todo')).toBeVisible();
+		await expect(card.getByText('Rentabilidad real, Todo')).toBeVisible();
 	});
 
 	test('la gráfica ofrece sus dos series como tabla para el lector de pantalla', async ({
@@ -65,18 +65,69 @@ test.describe('dashboard charts', () => {
 		await expect(firstRow.locator('time')).toHaveAttribute('datetime', /^\d{4}-\d{2}-\d{2}$/);
 	});
 
-	test('la asignación de activos enlaza leyenda y porción', async ({ page }) => {
+	// La tabla accesible de la gráfica se ocultaba con `height: 1px`, que para
+	// una tabla es un mínimo y no un máximo: sus filas seguían ocupando sitio y
+	// la página terminaba en una franja vacía tan alta como la serie.
+	test('la tabla oculta de la gráfica no alarga la página', async ({ page }) => {
+		await login(page);
+		await page.getByRole('slider').first().waitFor();
+
+		const slack = await page.evaluate(() => {
+			const doc = document.documentElement.scrollHeight;
+			const last = document.querySelector('section[aria-label="Crecimiento del portafolio"]');
+			const bottom = last!.getBoundingClientRect().bottom + window.scrollY;
+			return doc - bottom;
+		});
+
+		expect(slack).toBeLessThan(400);
+	});
+});
+
+test.describe('el reparto del patrimonio', () => {
+	test('lee el mismo total por plataforma, por portafolio y por tipo', async ({ page }) => {
 		await login(page);
 
-		// El fixture reparte el patrimonio entre cinco categorías.
-		const legendEntry = page.getByRole('button', { name: /^Acciones/ });
-		await expect(legendEntry).toBeVisible();
+		const where = page.getByRole('region', { name: 'Dónde está' });
 
-		await legendEntry.click();
-		await expect(legendEntry).toHaveAttribute('aria-pressed', 'true');
+		// Abre por el primer corte con datos, que en el fixture son las plataformas.
+		await expect(where.getByRole('tab', { name: 'Plataforma' })).toHaveAttribute(
+			'aria-selected',
+			'true'
+		);
+		await expect(where.getByRole('link', { name: 'Broker Demo' })).toBeVisible();
+		await expect(where.getByText('5 posiciones abiertas')).toBeVisible();
 
-		// Al fijar una categoría, el centro del donut deja de mostrar el total.
-		await expect(page.locator('.hole-label')).toHaveText('ACCIONES');
+		// Cada fila dice su participación también para el lector de pantalla: la
+		// barra es la única forma visual de leerla.
+		await expect(where.getByText(/^\d+,\d% del total$/).first()).toBeAttached();
+
+		await where.getByRole('tab', { name: 'Portafolio' }).click();
+		await expect(where.getByRole('link', { name: 'Cartera Principal' })).toBeVisible();
+		await expect(where.getByRole('link', { name: 'Cripto' })).toBeVisible();
+		await expect(where.getByRole('link', { name: 'Reserva' })).toBeVisible();
+		await expect(where.getByText('Acciones & ETFs')).toBeVisible();
+
+		// El reparto por clase de activo no tiene rendimiento que enseñar —el
+		// endpoint no lo devuelve—, así que la última columna cambia de sentido.
+		await where.getByRole('tab', { name: 'Tipo de activo' }).click();
+		await expect(where.getByRole('columnheader', { name: 'Del total' })).toBeVisible();
+		await expect(where.getByRole('rowheader', { name: 'Acciones', exact: true })).toBeVisible();
+	});
+
+	test('las pestañas del reparto se recorren con las flechas', async ({ page }) => {
+		await login(page);
+
+		const where = page.getByRole('region', { name: 'Dónde está' });
+		const first = where.getByRole('tab', { name: 'Plataforma' });
+
+		await first.focus();
+		await first.press('ArrowRight');
+
+		await expect(where.getByRole('tab', { name: 'Portafolio' })).toBeFocused();
+		await expect(where.getByRole('tab', { name: 'Portafolio' })).toHaveAttribute(
+			'aria-selected',
+			'true'
+		);
 	});
 });
 
@@ -84,21 +135,29 @@ test.describe('dashboard', () => {
 	test('renders the main widgets with data from the backend', async ({ page }) => {
 		await login(page);
 
-		// Net worth card.
-		await expect(page.getByText('Patrimonio Neto')).toBeVisible();
+		// La cifra, una sola vez y en grande.
+		await expect(page.getByRole('heading', { name: 'Patrimonio total', level: 1 })).toBeVisible();
+		await expect(page.getByText(/sobre lo invertido/)).toBeVisible();
 
-		// Growth and summary sections.
+		await expect(page.getByRole('region', { name: 'Dónde está' })).toBeVisible();
 		await expect(page.locator('section[aria-label="Crecimiento del portafolio"]')).toBeVisible();
-		await expect(page.locator('section[aria-label="Resumen financiero"]')).toBeVisible();
 
-		// Portfolio summary and recent activity fed by the API fixtures.
-		await expect(page.getByText('Cartera Principal').first()).toBeVisible();
+		// Movimientos alimentados por los fixtures de la API.
+		await expect(page.getByRole('heading', { name: 'Movimientos' })).toBeVisible();
 		await expect(page.getByText('AAPL').first()).toBeVisible();
+	});
 
-		// Los tres portafolios del fixture, con su tipo ya traducido.
-		await expect(page.getByRole('link', { name: 'Cripto' })).toBeVisible();
-		await expect(page.getByRole('link', { name: 'Reserva' })).toBeVisible();
-		await expect(page.getByText('Acciones & ETFs')).toBeVisible();
+	// La cabecera no decía en qué sección estaba el usuario; ahora sale del mismo
+	// listado que pinta el menú, así que los dos no pueden discrepar.
+	test('la cabecera nombra la sección abierta', async ({ page }) => {
+		await login(page);
+
+		// `banner` es la barra superior del panel; las páginas traen además su
+		// propio `<header>` con el título, y `header` a secas casa con los dos.
+		await expect(page.getByRole('banner').getByText('Resumen')).toBeVisible();
+
+		await page.getByRole('link', { name: 'Plataformas' }).click();
+		await expect(page.getByRole('banner').getByText('Plataformas')).toBeVisible();
 	});
 
 	// Enseñar la tasa es el motivo de que la aplicación la traiga: una cifra en
@@ -107,7 +166,7 @@ test.describe('dashboard', () => {
 		await login(page);
 
 		// En dólares no hay conversión que enseñar, así que la línea no está.
-		await expect(page.getByText(/^1\s/)).toBeHidden();
+		await expect(page.getByText(/^1\s*USD\s*=/)).toBeHidden();
 
 		await page.getByLabel('Moneda de visualización').selectOption('COP');
 

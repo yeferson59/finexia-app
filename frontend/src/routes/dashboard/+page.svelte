@@ -1,13 +1,11 @@
 <script lang="ts">
 	import {
-		NetWorthCard,
-		PortfolioOverview,
-		AssetAllocation,
+		WealthHeadline,
+		Breakdown,
 		RecentActivity,
 		PortfolioGrowth,
 		MarketKeyNotice
 	} from '$lib/features/dashboard';
-	import PageHeader from '$lib/ui/page-header.svelte';
 
 	import type { PageProps } from './$types';
 
@@ -15,105 +13,60 @@
 </script>
 
 <svelte:head>
-	<title>Dashboard - FINEXIA</title>
+	<title>Panel - FINEXIA</title>
 	<meta name="description" content="Tu panel de control de inversiones y patrimonio" />
 </svelte:head>
 
-<PageHeader
-	eyebrow="Resumen"
-	titleId="dashboard-title"
-	subtitle="Aquí está tu patrimonio, de un vistazo."
->
-	Hola, <em>{data.user.name}</em>
-</PageHeader>
-
 <MarketKeyNotice hasUsableKey={data.hasUsableKey} hasBrokenKey={data.hasBrokenKey} />
 
-<section class="net-worth-section" aria-labelledby="dashboard-title">
-	<NetWorthCard
-		summaries={data.portfolioSummaries}
-		currency={data.currency}
-		displayRate={data.displayRate}
-	/>
-</section>
+<WealthHeadline
+	summaries={data.portfolioSummaries}
+	currency={data.currency}
+	displayRate={data.displayRate}
+	series={data.portfolioGrowth.points}
+/>
 
-<section class="growth-section" aria-label="Crecimiento del portafolio">
-	<PortfolioGrowth data={data.portfolioGrowth.points} summary={data.portfolioGrowth.summary} />
-</section>
+<Breakdown
+	platforms={data.platforms}
+	summaries={data.portfolioSummaries}
+	allocation={data.allocation}
+	currency={data.currency}
+/>
 
-<section class="content-grid" aria-label="Resumen financiero">
-	<div class="grid-item full-width">
-		<PortfolioOverview summaries={data.portfolioSummaries} currency={data.currency} />
-	</div>
+<div class="lower">
+	<section class="growth" aria-label="Crecimiento del portafolio">
+		<PortfolioGrowth
+			bare
+			data={data.portfolioGrowth.points}
+			summary={data.portfolioGrowth.summary}
+		/>
+	</section>
 
-	<div class="grid-item">
-		<AssetAllocation allocation={data.allocation} />
-	</div>
-
-	<div class="grid-item">
-		<RecentActivity transactions={data.recentTransactions} />
-	</div>
-</section>
+	<RecentActivity transactions={data.recentTransactions} />
+</div>
 
 <style>
-	.net-worth-section {
-		margin-bottom: 2rem;
-	}
-
-	.growth-section {
-		margin-bottom: 2rem;
-		animation: fade-in 0.5s ease-out both;
-		animation-delay: 0.05s;
-	}
-
-	.content-grid {
+	/*
+	 * Las dos lecturas secundarias, una al lado de otra: cómo ha ido el
+	 * patrimonio en el tiempo y qué ha pasado esta semana. La gráfica manda,
+	 * así que se lleva el ancho que sobra; el extracto tiene un ancho fijo
+	 * porque son cifras cortas y crecer no lo mejora.
+	 */
+	.lower {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-		gap: 2rem;
+		grid-template-columns: minmax(0, 1fr) 300px;
+		gap: 3rem;
+		padding-top: 2rem;
 	}
 
-	.grid-item {
-		animation: fade-in 0.5s ease-out;
-		animation-fill-mode: both;
+	.growth {
+		min-width: 0;
 	}
 
-	.grid-item:nth-child(1) {
-		animation-delay: 0.1s;
-	}
-
-	.grid-item:nth-child(2) {
-		animation-delay: 0.2s;
-	}
-
-	.grid-item:nth-child(3) {
-		animation-delay: 0.3s;
-	}
-
-	.grid-item.full-width {
-		grid-column: 1 / -1;
-	}
-
-	@keyframes fade-in {
-		from {
-			opacity: 0;
-			transform: translateY(10px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.growth-section,
-		.grid-item {
-			animation: none;
-		}
-	}
-
-	@media (max-width: 1024px) {
-		.content-grid {
+	@media (max-width: 1080px) {
+		.lower {
 			grid-template-columns: minmax(0, 1fr);
+			gap: 2.5rem;
 		}
 	}
 </style>

@@ -3,11 +3,13 @@ import { redirect } from '@sveltejs/kit';
 import * as auth from '$lib/api/auth';
 import * as portfolio from '$lib/api/portfolio';
 import * as transactions from '$lib/api/transactions';
+import * as platforms from '$lib/api/platforms';
 import * as market from '$lib/api/market';
 import { ACCESS_COOKIE, REFRESH_COOKIE, clearSessionCookies } from '$lib/server/session';
 import { resolveDisplayCurrency } from '$lib/shared/currency';
 import type {
 	AllocationItem,
+	Platform,
 	PortfolioGrowth,
 	PortfolioSummary,
 	UserTransaction
@@ -29,15 +31,26 @@ export const load: PageServerLoad = async ({ cookies, fetch, url, locals }) => {
 		locals.user?.preferredCurrency
 	);
 
-	const [transactionsRes, summaryRes, allocationRes, growthRes, credentialsRes, ratesRes] =
-		await Promise.all([
-			transactions.getRecent(event),
-			portfolio.getSummaries(event, currency),
-			portfolio.getAllocation(event, currency),
-			portfolio.getAggregateGrowth(event, { currency }),
-			market.getMarketCredentials(event),
-			market.getLatestExchangeRates(event)
-		]);
+	const [
+		transactionsRes,
+		summaryRes,
+		allocationRes,
+		growthRes,
+		platformsRes,
+		credentialsRes,
+		ratesRes
+	] = await Promise.all([
+		transactions.getRecent(event),
+		portfolio.getSummaries(event, currency),
+		portfolio.getAllocation(event, currency),
+		portfolio.getAggregateGrowth(event, { currency }),
+		// El panel enseña dónde está custodiado el dinero, no solo cómo lo agrupó
+		// el usuario: son dos lecturas del mismo total y la de plataformas es la
+		// que da sentido a que la aplicación exista.
+		platforms.getSources(event, currency),
+		market.getMarketCredentials(event),
+		market.getLatestExchangeRates(event)
+	]);
 
 	const recentTransactions: UserTransaction[] =
 		transactionsRes.ok && transactionsRes.success && Array.isArray(transactionsRes.data)
@@ -50,6 +63,11 @@ export const load: PageServerLoad = async ({ cookies, fetch, url, locals }) => {
 	const allocation: AllocationItem[] =
 		allocationRes.ok && allocationRes.success && Array.isArray(allocationRes.data)
 			? allocationRes.data
+			: [];
+
+	const userPlatforms: Platform[] =
+		platformsRes.ok && platformsRes.success && Array.isArray(platformsRes.data)
+			? platformsRes.data
 			: [];
 
 	let portfolioGrowth: PortfolioGrowth = {
@@ -80,6 +98,7 @@ export const load: PageServerLoad = async ({ cookies, fetch, url, locals }) => {
 	return {
 		recentTransactions,
 		portfolioSummaries,
+		platforms: userPlatforms,
 		allocation,
 		portfolioGrowth,
 		currency,

@@ -8,7 +8,7 @@
 	 * presentar un número que parece de mercado y no lo es.
 	 */
 	import { resolve } from '$app/paths';
-	import Card from '$lib/ui/card.svelte';
+	import Icon from './icon.svelte';
 
 	interface Props {
 		/** Estado de las claves del usuario: se avisa cuando no hay ninguna usable. */
@@ -21,61 +21,54 @@
 </script>
 
 {#if !hasUsableKey}
-	<Card variant="elevated" padding="none">
-		<div class="notice">
-			<span class="icon" aria-hidden="true">
-				<svg
-					width="18"
-					height="18"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<circle cx="12" cy="12" r="10"></circle>
-					<line x1="12" y1="8" x2="12" y2="12"></line>
-					<line x1="12" y1="16" x2="12.01" y2="16"></line>
-				</svg>
-			</span>
-			<div class="body">
-				<p class="title">
-					{#if hasBrokenKey}
-						Tu clave de datos de mercado no está funcionando
-					{:else}
-						Estás viendo tus posiciones valoradas a precio de compra
-					{/if}
-				</p>
-				<p class="text">
-					{#if hasBrokenKey}
-						El proveedor rechazó tu clave o agotó su cuota, así que no se han podido actualizar los
-						precios. Mientras tanto, las posiciones se valoran a su precio de compra.
-					{:else}
-						Finexia usa tu propia clave de proveedor para consultar precios, de modo que la cuota y
-						los datos son tuyos. Sin clave no hay valoración de mercado.
-					{/if}
-				</p>
-				<a class="link" href="{resolve('/dashboard/settings')}#datos-de-mercado">
-					{hasBrokenKey ? 'Revisar mi clave' : 'Configurar mi clave'} →
-				</a>
-			</div>
+	<div class="notice" role="status">
+		<span class="icon"><Icon name="alert" size={17} /></span>
+		<div class="body">
+			<p class="title">
+				{#if hasBrokenKey}
+					Tu clave de datos de mercado no está funcionando
+				{:else}
+					Estás viendo tus posiciones valoradas a precio de compra
+				{/if}
+			</p>
+			<p class="text">
+				{#if hasBrokenKey}
+					El proveedor rechazó tu clave o agotó su cuota, así que no se han podido actualizar los
+					precios. Mientras tanto, las posiciones se valoran a su precio de compra.
+				{:else}
+					Finexia usa tu propia clave de proveedor para consultar precios, de modo que la cuota y
+					los datos son tuyos. Sin clave no hay valoración de mercado.
+				{/if}
+			</p>
+			<a class="link" href="{resolve('/dashboard/settings')}#datos-de-mercado">
+				{hasBrokenKey ? 'Revisar mi clave' : 'Configurar mi clave'}
+			</a>
 		</div>
-	</Card>
+	</div>
 {/if}
 
 <style>
+	/*
+	 * Un aviso, no una tarjeta. Estaba montado sobre `Card variant="elevated"`
+	 * —con su sombra de 60 px— y pintaba con tokens que este proyecto no define
+	 * (`--color-warning`, `--color-text-primary`), así que se quedaba siempre en
+	 * los literales del respaldo y no seguía a la paleta.
+	 */
 	.notice {
 		display: flex;
 		gap: 0.85rem;
 		align-items: flex-start;
-		padding: 1rem 1.25rem;
-		border-left: 3px solid var(--color-warning, #e0a800);
-		border-radius: 0.5rem;
+		margin-bottom: 2rem;
+		padding: 0.9rem 1.1rem;
+		border: 1px solid rgba(212, 145, 42, 0.28);
+		border-radius: 10px;
+		background: rgba(212, 145, 42, 0.06);
 	}
 
 	.icon {
 		flex-shrink: 0;
 		margin-top: 0.1rem;
-		color: var(--color-warning, #e0a800);
+		color: var(--amber-light);
 	}
 
 	.body {
@@ -83,28 +76,24 @@
 	}
 
 	.title {
-		margin: 0 0 0.25rem;
-		font-size: 0.9rem;
-		font-weight: 600;
-		color: var(--color-text-primary, #f5f5f5);
+		margin: 0 0 0.2rem;
+		font-size: 0.88rem;
+		font-weight: 500;
+		color: var(--text);
 	}
 
 	.text {
+		max-width: 68ch;
 		margin: 0 0 0.5rem;
-		font-size: 0.83rem;
-		line-height: 1.5;
-		color: var(--color-text-muted, #9a9a9a);
+		font-size: 0.82rem;
+		line-height: 1.55;
+		color: var(--text-muted);
 	}
 
 	.link {
-		font-size: 0.83rem;
-		font-weight: 500;
-		color: var(--color-accent, #d4af37);
-		text-decoration: none;
-	}
-
-	.link:hover,
-	.link:focus-visible {
+		font-size: 0.82rem;
+		color: var(--amber-light);
 		text-decoration: underline;
+		text-underline-offset: 3px;
 	}
 </style>

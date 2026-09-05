@@ -7,107 +7,82 @@
 	let sidebarOpen = $state(false);
 </script>
 
-<div class="dashboard-container">
-	<div class="dashboard-scanlines" aria-hidden="true"></div>
-	<DashboardHeader bind:sidebarOpen {data} />
+<div class="shell">
 	<Sidebar {sidebarOpen} user={data.user} />
+	<DashboardHeader bind:sidebarOpen {data} />
+
 	{#if sidebarOpen}
-		<button
-			class="sidebar-backdrop"
-			onclick={() => (sidebarOpen = false)}
-			aria-label="Cerrar menú lateral"
+		<button class="scrim" onclick={() => (sidebarOpen = false)} aria-label="Cerrar el menú"
 		></button>
 	{/if}
 
-	<main class="dashboard-main">
-		<div class="dashboard-content">
+	<main class="main">
+		<div class="content">
 			{@render children()}
 		</div>
 	</main>
 </div>
 
 <style>
-	.dashboard-container {
-		position: relative;
-		display: flex;
+	/*
+	 * Medidas del chrome. Viven aquí y no en `layout.css` porque solo existen en
+	 * el panel: la portada pública y el login comparten los colores y las
+	 * tipografías, pero no tienen ni menú lateral ni barra superior.
+	 */
+	.shell {
+		--rail: 232px;
+		--header-h: 60px;
+		/*
+		 * Dos niveles de superficie, no cuatro. Uno para el fondo y otro para lo
+		 * que de verdad es un objeto suelto —una fila de movimiento, la sección
+		 * abierta del menú—; el panel tenía cuatro y cinco tarjetas idénticas
+		 * flotando sobre él, así que ninguna decía nada por estar levantada.
+		 */
+		--panel: rgba(255, 255, 255, 0.04);
+		--panel-2: rgba(255, 255, 255, 0.08);
+		/*
+		 * El capital invertido, frente al ámbar del valor de mercado: el dinero
+		 * que pusiste se lee frío y lo que el mercado hizo con él, cálido.
+		 * Validado contra el ámbar — ΔE 20,9 en visión normal y 18,4 en protanopia
+		 * —, que es lo que hace que las dos líneas de la gráfica se distingan.
+		 */
+		--cost: #73819c;
+
 		min-height: 100dvh;
-		overflow-x: hidden;
-		background:
-			radial-gradient(ellipse 80% 50% at 70% -10%, rgba(212, 145, 42, 0.06), transparent 60%),
-			var(--bg);
+		background: var(--bg);
 		color: var(--text);
 	}
 
-	/* Subtle film-grain scanline texture carried over from the landing page */
-	.dashboard-scanlines {
-		position: fixed;
-		inset: 0;
-		z-index: 0;
-		pointer-events: none;
-		background: repeating-linear-gradient(
-			0deg,
-			transparent,
-			transparent 3px,
-			rgba(255, 255, 255, 0.006) 3px,
-			rgba(255, 255, 255, 0.006) 4px
-		);
+	.main {
+		margin-left: var(--rail);
+		padding: calc(var(--header-h) + 2.25rem) 2.25rem 4rem;
 	}
 
-	.dashboard-main {
-		position: relative;
-		z-index: 1;
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		min-width: 0;
-		margin-top: 72px;
-		margin-left: 280px;
-		transition: margin-left 0.3s ease;
-	}
-
-	.dashboard-content {
-		flex: 1;
-		padding: 2rem;
-		max-width: 1600px;
-		width: 100%;
+	/* Centrada en el hueco que deja el menú, no pegada a él: con el ancho tope
+	   aplicado al propio `main` una pantalla de 1920 dejaba medio metro de vacío
+	   solo a la derecha. */
+	.content {
+		max-width: 1180px;
 		margin: 0 auto;
 	}
 
-	.sidebar-backdrop {
+	.scrim {
 		display: none;
 	}
 
 	@media (max-width: 1024px) {
-		.dashboard-main {
+		.main {
 			margin-left: 0;
+			padding: calc(var(--header-h) + 1.5rem) 1.25rem 3rem;
 		}
 
-		.dashboard-content {
-			padding: 1.5rem;
-		}
-
-		.sidebar-backdrop {
+		.scrim {
 			display: block;
 			position: fixed;
-			inset: 72px 0 0;
-			z-index: 20;
+			inset: 0;
+			z-index: 25;
 			border: none;
-			background: rgba(8, 10, 14, 0.5);
-			backdrop-filter: blur(2px);
-		}
-	}
-
-	@media (max-width: 768px) {
-		.dashboard-main {
-			margin-top: 64px;
-		}
-
-		.dashboard-content {
-			padding: 1rem;
-		}
-
-		.sidebar-backdrop {
-			inset: 64px 0 0;
+			background: rgba(4, 5, 6, 0.6);
 		}
 	}
 </style>

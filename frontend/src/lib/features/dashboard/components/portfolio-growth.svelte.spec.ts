@@ -38,7 +38,11 @@ describe('portfolio-growth.svelte', () => {
 	it('muestra la ganancia real, no la subida del valor desde el primer snapshot', async () => {
 		render(PortfolioGrowth, { data: points, summary });
 
-		await expect.element(page.getByText('−$342,88')).toBeInTheDocument();
+		// El importe pasa por `formatCurrency`, que da a cada moneda el locale en
+		// el que se lee: el dólar en en-US. Antes esta tarjeta lo componía a mano
+		// en es-CO y escribía «$342,88» junto a la cifra grande del panel, que
+		// decía «$342.88» para el mismo número.
+		await expect.element(page.getByText('−$342.88')).toBeInTheDocument();
 		await expect.element(page.getByText('-25,61%')).toBeInTheDocument();
 		// El +310,11% de crecimiento del valor ya no se presenta como rendimiento.
 		expect(document.body.textContent).not.toContain('310,11');
@@ -51,7 +55,7 @@ describe('portfolio-growth.svelte', () => {
 
 		render(PortfolioGrowth, { data: points, summary: older });
 
-		await expect.element(page.getByText('−$342,88')).toBeInTheDocument();
+		await expect.element(page.getByText('−$342.88')).toBeInTheDocument();
 	});
 
 	// El backend convierte la serie entera a una moneda y la nombra. El símbolo
@@ -63,8 +67,9 @@ describe('portfolio-growth.svelte', () => {
 			summary: { ...summary, currency: 'COP', currentValue: '4000000.00' }
 		});
 
-		await expect.element(page.getByText('Valor actual · COP')).toBeInTheDocument();
-		await expect.element(page.getByText('$4.000.000,00')).toBeInTheDocument();
+		await expect.element(page.getByText('Valor actual en COP')).toBeInTheDocument();
+		// El peso no tiene céntimos en el uso corriente, y `formatCurrency` lo sabe.
+		await expect.element(page.getByText(/\$\s?4\.000\.000/)).toBeInTheDocument();
 	});
 
 	it('avisa de las fechas cuyo total incluye portafolios sin convertir', async () => {
@@ -91,14 +96,14 @@ describe('portfolio-growth.svelte', () => {
 	it('publica la rentabilidad real del periodo, aparte del rendimiento sobre costo', async () => {
 		render(PortfolioGrowth, { data: points, summary });
 
-		await expect.element(page.getByText('Rentabilidad real · Todo')).toBeInTheDocument();
+		await expect.element(page.getByText('Rentabilidad real, Todo')).toBeInTheDocument();
 		await expect.element(page.getByText('-43,6%')).toBeInTheDocument();
 	});
 
 	it('no publica rentabilidad real sin un tramo que medir', async () => {
 		render(PortfolioGrowth, { data: [points[0]], summary });
 
-		await expect.element(page.getByText('Rentabilidad real · Todo')).toBeInTheDocument();
+		await expect.element(page.getByText('Rentabilidad real, Todo')).toBeInTheDocument();
 		expect(document.body.textContent).not.toContain('%,');
 	});
 });
