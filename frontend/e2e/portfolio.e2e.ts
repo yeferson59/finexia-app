@@ -80,30 +80,57 @@ test.describe('portfolio detail', () => {
 		await expect(positions.locator('tbody th').first()).toContainText('VWCE');
 	});
 
-	test('asset detail shows the position summary and its transactions', async ({ page }) => {
+	// Doce tarjetas —seis de «Resumen de Posición» y seis de «Información del
+	// Activo»— se han quedado en una cifra y tres frases. La mitad de aquellas
+	// repetía algo que ya estaba en la misma pantalla.
+	test('asset detail states the position once, in the portfolio currency', async ({ page }) => {
 		await login(page);
 		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}/assets/AAPL`);
 
 		await expect(page.getByRole('heading', { level: 1 })).toContainText('AAPL');
-		await expect(page.getByRole('heading', { name: 'Resumen de Posición' })).toBeVisible();
-		await expect(page.getByRole('heading', { name: 'Información del Activo' })).toBeVisible();
+		// La vuelta dice a dónde lleva, en vez de un «Volver» a secas.
+		await expect(page.getByRole('link', { name: 'Volver a Cartera Principal' })).toBeVisible();
+
+		const headline = page.locator('section[aria-labelledby="position-value"]');
+		await expect(headline).toContainText('Tienes 42 acciones');
+		await expect(headline).toContainText('$9,002.70');
+		await expect(headline).toContainText('+$1,929.90 sobre los $7,072.80 que invertiste (+27,29%)');
+		// Las tarjetas «precio promedio» y «precio actual», comparadas entre sí.
+		await expect(headline).toContainText('Pagaste $168.40 por acción; hoy cotiza a $214.35.');
+		// La tarjeta «asignación», situada dentro de su portafolio.
+		await expect(headline).toContainText('Es el 20,0% de Cartera Principal.');
 
 		// La transacción de compra del fixture aparece en el historial.
-		await expect(page.getByText('Compra').first()).toBeVisible();
+		await expect(page.getByRole('rowheader', { name: /Compra/ })).toBeVisible();
+	});
+
+	// El precio unitario de un interés se cotiza por debajo del céntimo: con dos
+	// decimales salía «$0.00» en la misma fila que su total de $19.95.
+	test('asset detail keeps a sub-cent unit price readable', async ({ page }) => {
+		await login(page);
+		await page.goto('/dashboard/portfolios/11111111-1111-4111-8111-111111111113/assets/USD');
+
+		// Y un activo cuyo valor no se ha movido no lleva ni signo ni color de
+		// ganancia.
+		await expect(page.getByText('Vale lo mismo que los $9,500.00 que invertiste.')).toBeVisible();
+
+		const row = page.getByRole('row').filter({ hasText: 'Interés' });
+		await expect(row).toContainText('$0.0021');
+		await expect(row).toContainText('$19.95');
 	});
 
 	test('asset detail opens the add-transaction and quick-sell forms', async ({ page }) => {
 		await login(page);
 		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}/assets/AAPL`);
 
-		await page.getByRole('button', { name: '+ Agregar' }).click();
+		await page.getByRole('button', { name: 'Registrar movimiento' }).click();
 		await expect(page.getByRole('button', { name: 'Registrar transacción' })).toBeVisible();
 
 		await page.keyboard.press('Escape');
 		await expect(page.getByRole('dialog', { name: 'Registrar transacción' })).not.toBeVisible();
 
 		// La venta rápida se abre desde el lote de compra del historial.
-		await page.getByRole('button', { name: 'Vender' }).click();
+		await page.getByRole('button', { name: /^Vender/ }).click();
 		await expect(page.getByRole('dialog', { name: 'Vender posición' })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Confirmar Venta Total' })).toBeVisible();
 	});
@@ -115,7 +142,10 @@ test.describe('portfolio detail', () => {
 		await login(page);
 		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}/assets/AAPL`);
 
-		await page.getByRole('button', { name: 'Eliminar transacción' }).first().click();
+		await page
+			.getByRole('button', { name: /^Eliminar el / })
+			.first()
+			.click();
 
 		const dialog = page.getByRole('dialog', { name: 'Eliminar transacción' });
 		await expect(dialog).toBeVisible();
@@ -126,7 +156,7 @@ test.describe('portfolio detail', () => {
 		// Al confirmar, el diálogo se cierra y la página se recarga con lo que
 		// responda el backend.
 		await expect(dialog).toBeHidden();
-		await expect(page.getByRole('heading', { name: 'Historial de Transacciones' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Movimientos' })).toBeVisible();
 	});
 
 	test('adds an entry through the add-asset form', async ({ page }) => {

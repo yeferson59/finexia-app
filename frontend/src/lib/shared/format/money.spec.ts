@@ -70,3 +70,24 @@ describe('formatCompactCurrency', () => {
 		expect(formatCompactCurrency(-15000, 'USD')).toBe('$-15k');
 	});
 });
+
+describe('formatCurrency con maxDigits', () => {
+	/*
+	 * El interés de una cuenta se cotiza a 0,0021 por dólar: con dos decimales
+	 * la ficha del activo escribía «$0.00» en la misma fila que su total de
+	 * $19.95, y la fila dejaba de cuadrar.
+	 */
+	it('keeps a sub-cent unit price readable', () => {
+		expect(formatCurrency(0.0021, 'USD', 6)).toBe('$0.0021');
+	});
+
+	// El mínimo no se mueve, así que un importe normal no arrastra ceros.
+	it('does not pad an ordinary amount with the extra digits', () => {
+		expect(formatCurrency(1234.5, 'USD', 6)).toBe('$1,234.50');
+	});
+
+	// Un techo por debajo del mínimo de la moneda no puede recortarla.
+	it('never drops below the currency minimum', () => {
+		expect(formatCurrency(1234.5, 'USD', 0)).toBe('$1,234.50');
+	});
+});

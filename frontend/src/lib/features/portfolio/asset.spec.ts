@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Holding } from '$lib/api/types';
-import { computePosition, priceLabelFor, txnModeFor } from './asset';
+import { computePosition, formatUnits, priceLabelFor, txnModeFor, unitNoun } from './asset';
 
 function holding(partial: Partial<Holding>): Holding {
 	return {
@@ -129,5 +129,33 @@ describe('priceLabelFor', () => {
 		expect(priceLabelFor('dividend')).toBe('Monto del dividendo');
 		expect(priceLabelFor('interest')).toBe('Monto del interés');
 		expect(priceLabelFor('fee')).toBe('Monto de la comisión');
+	});
+});
+
+describe('unitNoun', () => {
+	// «42 AAPL» usaba el ticker de unidad de medida. Lo que se tiene son
+	// acciones, y de un ETF, participaciones.
+	it('names what each asset class is counted in', () => {
+		expect(unitNoun('stock', 1)).toBe('acción');
+		expect(unitNoun('stock', 42)).toBe('acciones');
+		expect(unitNoun('etf', 120)).toBe('participaciones');
+		expect(unitNoun('bond', 1)).toBe('título');
+	});
+
+	// Inventarle un nombre propio a cripto o al efectivo arriesga más de lo que
+	// aclara, y una clase que el backend añada no puede quedarse sin palabra.
+	it('falls back to plain units for anything else', () => {
+		expect(unitNoun('crypto', 0.15)).toBe('unidades');
+		expect(unitNoun('cash', 9500)).toBe('unidades');
+		expect(unitNoun('esoteric', 1)).toBe('unidad');
+	});
+});
+
+describe('formatUnits', () => {
+	it('writes the amount with es-CO separators and its unit', () => {
+		expect(formatUnits(42, 'stock')).toBe('42 acciones');
+		expect(formatUnits(1, 'stock')).toBe('1 acción');
+		expect(formatUnits(0.15, 'crypto')).toBe('0,15 unidades');
+		expect(formatUnits(9500, 'cash')).toBe('9.500 unidades');
 	});
 });

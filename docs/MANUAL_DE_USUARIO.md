@@ -314,25 +314,25 @@ Una **posición** representa la tenencia de un activo concreto dentro de un port
 
 ### 7.2 Detalle de un activo en el portafolio
 
-Al pulsar sobre una posición se abre la vista del activo dentro de ese portafolio (el botón **Volver** te devuelve al detalle del portafolio).
+Al pulsar sobre una posición se abre la vista del activo dentro de ese portafolio. El enlace de arriba, **Volver a**, nombra el portafolio del que saliste.
 
-![Detalle del activo AAPL con el resumen de posición, la información del activo y el historial de transacciones](img/manual/13-activo-detalle.png)
+![Detalle del activo AAPL con lo que tienes, la barra de capital y ganancia, y la tabla de movimientos](img/manual/13-activo-detalle.png)
 
-La vista incluye:
+Arriba está el ticker, el nombre del activo, qué es y dónde cotiza. Debajo, lo que tienes aquí:
 
-- El **precio de mercado** actual del activo, junto a su ticker, nombre, tipo y exchange.
-- **Resumen de Posición:** cantidad total, precio promedio de compra, precio actual, costo total, valor de mercado y **ganancia/pérdida** en importe y porcentaje.
-- **Información del Activo:** tipo, exchange donde cotiza, moneda, porcentaje de **asignación** dentro del portafolio, número de **transacciones** y **ROI** (retorno sobre la inversión).
-- **Historial de Transacciones:** todas las compras y ventas de ese activo, con tipo, fecha, cantidad, precio, comisión, total y notas.
+- **Cuántas unidades tienes** y **cuánto valen** hoy, en la moneda base del portafolio.
+- **Cuánto has ganado o perdido** sobre lo que invertiste, en importe y en porcentaje. La barra reparte esa cifra: la parte fría es el capital que pusiste y la cálida, la ganancia. Es la misma barra del listado de portafolios (apartado 6.1), así que se lee igual.
+- **Cuánto pagaste por unidad** frente a lo que cotiza hoy. Si compraste en una moneda y el activo cotiza en otra, la vista lo advierte: esos dos precios no se restan entre sí.
+- **Cuánto pesa** esta posición dentro del portafolio.
 
-Desde esta misma vista se gestiona todo el historial. Cada acción abre su propia ventana sobre la página:
+Debajo, **Movimientos** lista todo lo que has registrado de este activo, del más reciente al más antiguo, con su fecha, cantidad, precio, comisión y total. Cada acción abre su propia ventana sobre la página:
 
-- **+ Agregar** — registra una transacción nueva sobre esta posición (sección 10.2).
-- **Vender** — abre el panel de venta con el lote de esa fila, entero o en parte (sección 10.4).
+- **Registrar movimiento** — arriba, junto al nombre del activo: anota una compra, una venta, un dividendo o cualquier otro movimiento sobre esta posición (sección 10.2).
+- **Vender** — solo en las filas de compra y de transferencia de entrada, que son las que trajeron unidades. Abre el panel de venta con ese lote, entero o en parte (sección 10.4).
 - **Editar** — corrige cualquier dato de una operación ya registrada.
 - **Eliminar** — borra una operación. El diálogo enseña el tipo, la fecha y el total de la que vas a quitar, porque en una tabla todas las filas se parecen y esto no se puede deshacer. La posición se recalcula con las que queden; si era la última, la cantidad pasa a 0.
 
-Al final de la página está **Eliminar posición**, que no es lo mismo: quita la posición del portafolio **junto con todas sus transacciones**, y por eso el diálogo dice cuántas se van con ella. Ten en cuenta que hay una posición por plataforma —el mismo ticker comprado en dos brókers son dos posiciones—, así que cada una se elimina por separado.
+Al final de la página está **Quitar esta posición**, que no es lo mismo: la saca del portafolio **junto con todas sus transacciones**, y por eso el diálogo dice cuántas se van con ella. Ten en cuenta que hay una posición por plataforma —el mismo ticker comprado en dos brókers son dos posiciones—, así que cada una se elimina por separado.
 
 ### 7.3 Precios de los activos
 
@@ -826,7 +826,7 @@ En **Mis Activos**, en el menú lateral: una fila por activo con la cantidad sum
 Marca **"Mi cuenta liquidó en otra moneda"** en el formulario e indica la moneda de tu cuenta y la tasa de ese día, la de la confirmación del bróker (apartado 7.4). Lo mismo vale al vender y al registrar transacciones sueltas.
 
 **¿Puedo eliminar una posición o una transacción?**
-Sí. Una transacción se elimina desde su fila en el historial; la posición entera, desde **Eliminar posición**, al final de la ficha del activo, y se lleva todas sus transacciones con ella (apartado 7.2).
+Sí. Una transacción se elimina desde su fila en **Movimientos**; la posición entera, desde **Quitar esta posición**, al final de la ficha del activo, y se lleva todas sus transacciones con ella (apartado 7.2).
 
 **¿Puedo conectar Finexia con Claude u otro asistente de IA?**
 Sí, en modo **solo lectura**: crea un token en **Configuración → Acceso para asistentes (MCP)** y pégalo en tu cliente, o autoriza la conexión desde el propio asistente si sabe hacerlo por sí mismo. Podrá consultar tus carteras, nunca modificarlas (sección 16).

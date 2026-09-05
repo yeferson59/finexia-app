@@ -9,14 +9,22 @@ const CURRENCY_LOCALES: Record<string, string> = {
  * Formats a monetary amount with its currency symbol, using the locale that
  * currency is conventionally displayed in (e.g. "$1,234.50" for USD,
  * "$1.234" for COP — COP has no minor unit in everyday use).
+ *
+ * `maxDigits` sube el techo de decimales para un precio unitario más pequeño
+ * que la unidad mínima de su moneda: el interés diario de una cuenta o el
+ * dividendo por acción salían como «$0.00» al lado de su propio total. El
+ * mínimo no cambia, así que un importe normal sigue escribiéndose igual y no
+ * arrastra ceros.
  */
-export function formatCurrency(value: number, currencyCode: string): string {
+export function formatCurrency(value: number, currencyCode: string, maxDigits?: number): string {
 	const locale = CURRENCY_LOCALES[currencyCode] ?? 'es-CO';
+	const digits = currencyCode === 'COP' ? 0 : 2;
+
 	return new Intl.NumberFormat(locale, {
 		style: 'currency',
 		currency: currencyCode,
-		minimumFractionDigits: currencyCode === 'COP' ? 0 : 2,
-		maximumFractionDigits: currencyCode === 'COP' ? 0 : 2
+		minimumFractionDigits: digits,
+		maximumFractionDigits: Math.max(digits, maxDigits ?? digits)
 	}).format(value);
 }
 

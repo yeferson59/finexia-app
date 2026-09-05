@@ -19,6 +19,7 @@
 	import { resolve } from '$app/paths';
 	import { formatCalendarDate } from '$lib/shared/format/date';
 	import type { Holding } from '$lib/api/types';
+	import { formatUnits } from '../asset';
 
 	let {
 		portfolioId,
@@ -43,12 +44,12 @@
 
 	const knownCount = $derived(entries.length === 1 ? transactionsCount : null);
 
-	function entryLabel(entry: Holding): string {
-		return `${entry.costCurrency} · ${formatCalendarDate(entry.entryDate, {
+	function entryDate(entry: Holding): string {
+		return formatCalendarDate(entry.entryDate, {
 			year: 'numeric',
-			month: 'short',
+			month: 'long',
 			day: 'numeric'
-		})}`;
+		});
 	}
 
 	function close() {
@@ -57,25 +58,22 @@
 	}
 </script>
 
-<section class="danger-zone">
-	<h3 class="danger-title">Eliminar posición</h3>
-	<p class="danger-hint">
-		Quita la posición del portafolio junto con todas sus transacciones. No se puede deshacer.
+<section class="remove" aria-labelledby="remove-title">
+	<h2 class="title" id="remove-title">Quitar esta posición</h2>
+	<p class="hint">
+		Se va del portafolio con todas sus transacciones, y no se puede deshacer. Para corregir una
+		cifra sin perder el historial, edita el movimiento que la trajo.
 	</p>
 
 	{#each entries as entry (entry.id)}
-		<div class="entry-row">
-			<div>
-				<p class="entry-label">{entryLabel(entry)}</p>
-				<p class="entry-detail">
-					{parseFloat(entry.quantity).toLocaleString('es-CO', { maximumFractionDigits: 8 })} unidades
-					· {formatAmount(
-						(parseFloat(entry.quantity) || 0) * (parseFloat(entry.price) || 0),
-						entry.costCurrency
-					)} de coste
-				</p>
-			</div>
-			<button type="button" class="btn-delete" onclick={() => (confirming = entry)}>
+		<div class="entry">
+			<p class="detail">
+				{formatUnits(parseFloat(entry.quantity) || 0, entry.assetType)}, {formatAmount(
+					(parseFloat(entry.quantity) || 0) * (parseFloat(entry.price) || 0),
+					entry.costCurrency
+				)} de coste, desde el {entryDate(entry)}
+			</p>
+			<button type="button" class="remove-entry" onclick={() => (confirming = entry)}>
 				Eliminar
 			</button>
 		</div>
@@ -85,7 +83,10 @@
 <Modal open={!!confirming} title="Eliminar posición" onClose={close} size="sm">
 	{#if confirming}
 		<p class="summary">
-			<strong>{confirming.ticker}</strong> — {entryLabel(confirming)}
+			<strong>{confirming.ticker}</strong>, {formatUnits(
+				parseFloat(confirming.quantity) || 0,
+				confirming.assetType
+			)} desde el {entryDate(confirming)}
 		</p>
 		<p class="warning">
 			{#if knownCount !== null}
@@ -141,67 +142,75 @@
 </Modal>
 
 <style>
-	.danger-zone {
-		margin-top: 1.5rem;
-		padding: 1.25rem;
-		border: 1px solid rgba(224, 90, 90, 0.25);
-		border-radius: 12px;
-		background: rgba(224, 90, 90, 0.04);
+	/*
+	 * El borrado no es una zona aparte con su propio fondo rojo: es el último
+	 * apartado de la ficha, escrito en el mismo tono que los demás. El rojo se
+	 * guarda para el botón que lo hace y para el diálogo que lo confirma, que
+	 * es donde de verdad hay algo que perder.
+	 */
+	.remove {
+		padding: 2rem 0 0;
 	}
 
-	.danger-title {
-		margin: 0 0 0.35rem;
-		font-size: 1rem;
-		font-weight: 600;
-		color: rgba(224, 90, 90, 0.9);
-	}
-
-	.danger-hint {
-		margin: 0 0 1rem;
-		font-size: 0.85rem;
-		color: rgba(236, 234, 229, 0.5);
-	}
-
-	.entry-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-		padding: 0.75rem 0;
-		border-top: 1px solid rgba(224, 90, 90, 0.15);
-	}
-
-	.entry-label {
+	.title {
 		margin: 0;
-		font-size: 0.9rem;
-		font-weight: 600;
+		font-family: var(--font-body);
+		font-size: 1.05rem;
+		font-weight: 500;
 		color: var(--text);
 	}
 
-	.entry-detail {
-		margin: 0.2rem 0 0;
-		font-size: 0.8rem;
-		color: rgba(236, 234, 229, 0.5);
+	.hint {
+		max-width: 64ch;
+		margin: 0.5rem 0 0;
+		font-size: 0.85rem;
+		line-height: 1.5;
+		color: var(--text-muted);
+	}
+
+	.entry {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem 1rem;
+		margin-top: 1.1rem;
+		padding-top: 1.1rem;
+		border-top: 1px solid var(--border);
+	}
+
+	.detail {
+		margin: 0;
+		font-size: 0.85rem;
+		color: var(--text-muted);
 		font-variant-numeric: tabular-nums;
 	}
 
-	.btn-delete {
+	.remove-entry {
 		flex-shrink: 0;
-		padding: 0.5rem 1rem;
-		border: 1.5px solid rgba(224, 90, 90, 0.35);
-		border-radius: 8px;
-		background: transparent;
-		color: rgba(224, 90, 90, 0.9);
+		padding: 0.5rem 1.1rem;
+		border: 1px solid var(--border-strong);
+		border-radius: 9px;
+		background: none;
+		color: var(--red);
+		font-family: var(--font-body);
 		font-size: 0.85rem;
 		font-weight: 600;
-		font-family: var(--font-body);
 		cursor: pointer;
-		transition: all 0.2s ease;
+		transition:
+			border-color 0.2s ease,
+			background 0.2s ease;
 	}
 
-	.btn-delete:hover {
-		background: rgba(224, 90, 90, 0.12);
-		border-color: rgba(224, 90, 90, 0.6);
+	.remove-entry:hover {
+		border-color: var(--red);
+		background: rgba(224, 90, 90, 0.1);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.remove-entry {
+			transition: none;
+		}
 	}
 
 	.summary {
@@ -213,18 +222,17 @@
 	.warning {
 		margin: 0 0 1.1rem;
 		font-size: 0.85rem;
-		color: rgba(236, 234, 229, 0.6);
+		color: var(--text-muted);
 		line-height: 1.5;
 	}
 
 	.error {
 		margin: 0 0 1rem;
-		padding: 0.6rem 0.9rem;
-		border-radius: 6px;
-		background: rgba(224, 90, 90, 0.1);
-		border: 1px solid rgba(224, 90, 90, 0.3);
-		color: rgba(224, 90, 90, 0.9);
+		padding-left: 0.75rem;
+		border-left: 2px solid var(--red);
+		color: var(--red);
 		font-size: 0.85rem;
+		line-height: 1.5;
 	}
 
 	.modal-actions {

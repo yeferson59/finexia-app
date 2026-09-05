@@ -61,6 +61,36 @@ export function priceLabelFor(type: string): string {
 }
 
 /**
+ * Cómo se cuenta cada clase de activo, en singular y plural.
+ *
+ * La ficha decía «42 AAPL», que es el ticker haciendo de unidad de medida. Lo
+ * que se tiene son 42 *acciones*, y de un ETF, participaciones. Es la palabra
+ * que usa quien lo compró, no la que usa la base de datos.
+ */
+const UNIT_NOUNS: Record<string, [string, string]> = {
+	stock: ['acción', 'acciones'],
+	etf: ['participación', 'participaciones'],
+	bond: ['título', 'títulos']
+};
+
+/**
+ * El nombre de la unidad de una clase de activo, en singular o en plural.
+ *
+ * Cripto, efectivo y las clases que el backend añada se quedan en «unidad»:
+ * inventarles un nombre propio arriesga más de lo que aclara.
+ */
+export function unitNoun(assetType: string, count = 2): string {
+	const [one, many] = UNIT_NOUNS[assetType] ?? ['unidad', 'unidades'];
+	return count === 1 ? one : many;
+}
+
+/** La cantidad con el nombre de su unidad: «42 acciones», «0,15 unidades». */
+export function formatUnits(quantity: number, assetType: string): string {
+	const amount = quantity.toLocaleString('es-CO', { maximumFractionDigits: 8 });
+	return `${amount} ${unitNoun(assetType, quantity)}`;
+}
+
+/**
  * Métricas agregadas de la posición en un activo.
  *
  * Conviven tres monedas y conviene no confundirlas: `averageCost` está en

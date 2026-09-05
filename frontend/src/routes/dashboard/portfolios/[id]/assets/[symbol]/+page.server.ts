@@ -37,6 +37,7 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 			entries: [] as Holding[],
 			transactions: [] as Transaction[],
 			portfolioTotalValue: 0,
+			portfolioName: '',
 			baseCurrency: 'USD',
 			txnMeta: DEFAULT_META
 		};
@@ -45,6 +46,9 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 	const allHoldings: Holding[] = response.data.holdings ?? [];
 	const entries = allHoldings.filter((h) => h.ticker === params.symbol);
 	const baseCurrency = response.data.baseCurrency?.trim() || 'USD';
+	// Para que la vuelta diga a dónde lleva. Ya venía en la misma respuesta que
+	// las posiciones: el enlace decía «Volver» a secas por no leerlo.
+	const portfolioName = response.data.name?.trim() ?? '';
 
 	// El denominador de la asignación se suma en moneda base; hacerlo con los
 	// precios nativos mezclaba EUR con USD y daba porcentajes imposibles.
@@ -69,7 +73,14 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 			}
 		: DEFAULT_META;
 
-	return { entries, transactions: transactionsList, portfolioTotalValue, baseCurrency, txnMeta };
+	return {
+		entries,
+		transactions: transactionsList,
+		portfolioTotalValue,
+		portfolioName,
+		baseCurrency,
+		txnMeta
+	};
 };
 
 export const actions: Actions = {

@@ -20,8 +20,7 @@ export { default as PortfolioEntryForm } from './components/portfolio-entry-form
 // rápida, la tabla y el modal de edición son internos de
 // `asset-transaction-history`; `asset-combobox` lo es de `portfolio-entry-form`.
 export { default as AssetPositionHeader } from './components/asset-position-header.svelte';
-export { default as AssetPositionSummary } from './components/asset-position-summary.svelte';
-export { default as AssetInfoPanel } from './components/asset-info-panel.svelte';
+export { default as AssetPositionHeadline } from './components/asset-position-headline.svelte';
 export { default as AssetTransactionHistory } from './components/asset-transaction-history.svelte';
 export { default as AssetDeletePosition } from './components/asset-delete-position.svelte';
 

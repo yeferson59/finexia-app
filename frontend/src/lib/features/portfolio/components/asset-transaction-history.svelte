@@ -13,6 +13,7 @@
 	let {
 		portfolioId,
 		symbol,
+		showAddForm = $bindable(false),
 		entries,
 		transactions,
 		txnMeta,
@@ -23,6 +24,12 @@
 	}: {
 		portfolioId: string;
 		symbol: string;
+		/**
+		 * Abierto el formulario de alta. Lo controla la página porque el botón
+		 * que lo abre vive en la cabecera, junto al nombre del activo: allí es
+		 * la acción principal de la ficha y no una más de la tabla.
+		 */
+		showAddForm?: boolean;
 		entries: Holding[];
 		transactions: Transaction[];
 		txnMeta: TxnMeta;
@@ -34,14 +41,11 @@
 		formatAmount: (value: number, currency: string) => string;
 	} = $props();
 
-	let showAddForm = $state(false);
 	let sellFromTxn = $state<Transaction | null>(null);
 	let editingTxn = $state<Transaction | null>(null);
 	let deletingTxn = $state<Transaction | null>(null);
 
 	const formError = $derived(form?.success === false);
-	const currentPage = $derived(txnMeta.page);
-	const totalPages = $derived(txnMeta.totalPages);
 
 	// Tras crear una transacción (no una edición) se cierra el formulario y se
 	// recarga la página del activo.
@@ -59,21 +63,13 @@
 	});
 </script>
 
-<section class="panel">
-	<header class="panel-header">
-		<h2>Historial de Transacciones</h2>
-		<div class="header-actions">
-			<span>
-				{txnMeta.total}
-				{txnMeta.total === 1 ? 'transacción' : 'transacciones'}
-				{#if totalPages > 1}
-					· página {currentPage} de {totalPages}
-				{/if}
-			</span>
-			<button class="btn-add" type="button" onclick={() => (showAddForm = true)}>
-				+ Agregar
-			</button>
-		</div>
+<section class="movements" aria-labelledby="movements-title">
+	<header class="head">
+		<h2 id="movements-title">Movimientos</h2>
+		<p class="count">
+			{txnMeta.total}
+			{txnMeta.total === 1 ? 'movimiento' : 'movimientos'}
+		</p>
 	</header>
 
 	<Modal
@@ -137,59 +133,35 @@
 </Modal>
 
 <style>
-	.panel {
-		background: var(--surface);
-		border: 1px solid var(--border-strong);
-		border-radius: 16px;
-		padding: 1.75rem;
-		margin-bottom: 1.5rem;
-		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-	}
-
-	.panel-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-		margin-bottom: 1.5rem;
-		padding-bottom: 1rem;
+	.movements {
+		padding: 2rem 0;
 		border-bottom: 1px solid var(--border);
 	}
 
-	.panel-header h2 {
-		margin: 0;
-		font-size: 1.1rem;
-		font-weight: 400;
-		color: var(--text);
-		font-family: var(--font-display);
-	}
-
-	.panel-header span {
-		color: var(--text-dim);
-		font-size: 0.85rem;
-	}
-
-	.header-actions {
+	.head {
 		display: flex;
-		align-items: center;
-		gap: 1rem;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem 1rem;
 	}
 
-	.btn-add {
-		padding: 0.4rem 0.9rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.4);
-		border-radius: 6px;
-		background: transparent;
-		color: var(--amber);
-		font-size: 0.82rem;
-		font-weight: 600;
-		cursor: pointer;
-		transition: all 0.2s ease;
+	h2 {
+		margin: 0;
 		font-family: var(--font-body);
+		font-size: 1.05rem;
+		font-weight: 500;
+		color: var(--text);
 	}
 
-	.btn-add:hover {
-		background: rgba(212, 145, 42, 0.12);
-		border-color: var(--amber);
+	/* El contador que era una tarjeta «TRANSACCIONES 6» arriba del todo. La
+	   página que se está viendo la dice el pie de la tabla, junto a sus
+	   botones, que es donde se cambia. */
+	.count {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		font-variant-numeric: tabular-nums;
+		color: var(--text-dim);
 	}
 </style>

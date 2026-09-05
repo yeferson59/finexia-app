@@ -60,7 +60,7 @@
 			<span class="swatch swatch-cost"></span>capital invertido
 			{#if row.gain < 0}
 				<span class="swatch swatch-short"></span>lo que falta para recuperarlo
-			{:else}
+			{:else if row.gain > 0}
 				<span class="swatch swatch-gain"></span>ganancia
 			{/if}
 		</span>
