@@ -1,7 +1,22 @@
 <script lang="ts">
+	/*
+	 * El asistente para pasar a Finexia el Excel donde el usuario lleva sus
+	 * operaciones: elegir archivo → decir qué es cada columna → confirmar.
+	 *
+	 * Lo que cambió respecto a la versión anterior, que era de la etapa de las
+	 * tarjetas con sombra:
+	 *
+	 *  - Los tres pasos eran cápsulas en versalitas ámbar y, además,
+	 *    `aria-hidden`: decoración que no le decía nada a quien no las ve. Ahora
+	 *    son una lista ordenada de verdad, con el paso actual marcado, y el filete
+	 *    que llevan encima hace de barra de avance.
+	 *  - Cada paso traía su propia copia del CSS de campos, botones y `spinner`,
+	 *    y ya habían empezado a divergir. Los aporta este componente una sola vez.
+	 *  - El aviso de error era una caja roja rellena; ahora es prosa con un filete
+	 *    al lado, el idioma que hablan configuración y el alta de portafolio.
+	 */
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import Card from '$lib/ui/card.svelte';
 	import ImportUploadStep from './import-upload-step.svelte';
 	import ImportMappingStep from './import-mapping-step.svelte';
 	import ImportResultStep from './import-result-step.svelte';
@@ -19,6 +34,12 @@
 		portfolios,
 		platforms
 	}: { portfolios: ImportPortfolioOption[]; platforms: ImportPlatformOption[] } = $props();
+
+	const STEPS: { id: ImportStep; label: string }[] = [
+		{ id: 'upload', label: 'Archivo' },
+		{ id: 'map', label: 'Columnas' },
+		{ id: 'done', label: 'Resultado' }
+	];
 
 	let step: ImportStep = $state('upload');
 	let file: File | null = $state(null);
@@ -46,6 +67,15 @@
 	let importing = $state(false);
 	let errorMsg = $state('');
 
+	const stepIndex = $derived(STEPS.findIndex((s) => s.id === step));
+
+	/*
+	 * Sin portafolio o sin plataforma no hay dónde meter las transacciones. Antes
+	 * se podía subir el archivo, mapearlo entero y descubrirlo al final, con el
+	 * botón de importar apagado y sin decir por qué; ahora se dice en el paso uno.
+	 */
+	const missingDestination = $derived(portfolios.length === 0 || platforms.length === 0);
+
 	const canImport = $derived.by(() => {
 		if (!preview || loading || importing) return false;
 		return (
@@ -58,11 +88,11 @@
 		if (!candidate) return;
 		const name = candidate.name.toLowerCase();
 		if (!name.endsWith('.xlsx') && !name.endsWith('.csv')) {
-			errorMsg = 'Formato no soportado. Sube un archivo .xlsx o .csv.';
+			errorMsg = `«${candidate.name}» no es un .xlsx ni un .csv. Exporta tu hoja a uno de los dos y vuelve a subirla.`;
 			return;
 		}
 		if (candidate.size > 8 * 1024 * 1024) {
-			errorMsg = 'El archivo supera el tamaño máximo de 8 MB.';
+			errorMsg = 'El archivo pasa de 8 MB. Divídelo por años o por cuenta y súbelo por partes.';
 			return;
 		}
 		file = candidate;
@@ -87,7 +117,7 @@
 			});
 			const body = await res.json();
 			if (!res.ok || !body.success) {
-				errorMsg = body?.details || body?.message || 'No se pudo leer el archivo.';
+				errorMsg = body?.details || body?.message || 'No pudimos leer el archivo.';
 				if (step === 'upload') file = null;
 				return;
 			}
@@ -98,7 +128,7 @@
 			}
 			step = 'map';
 		} catch {
-			errorMsg = 'Error de conexión al procesar el archivo.';
+			errorMsg = 'No pudimos conectar para leer el archivo. Inténtalo de nuevo.';
 			if (step === 'upload') file = null;
 		} finally {
 			loading = false;
@@ -139,13 +169,13 @@
 			});
 			const body = await res.json();
 			if (!res.ok || !body.success) {
-				errorMsg = body?.details || body?.message || 'No se pudieron importar las transacciones.';
+				errorMsg = body?.details || body?.message || 'No pudimos importar las transacciones.';
 				return;
 			}
 			result = body.data as ImportResult;
 			step = 'done';
 		} catch {
-			errorMsg = 'Error de conexión al importar las transacciones.';
+			errorMsg = 'No pudimos conectar para importar. Tus transacciones no se han guardado.';
 		} finally {
 			importing = false;
 		}
@@ -162,29 +192,35 @@
 	}
 </script>
 
-<div class="steps" aria-hidden="true">
-	<span class="step-chip" class:active={step === 'upload'}>1 · Archivo</span>
-	<span class="step-chip" class:active={step === 'map'}>2 · Columnas y vista previa</span>
-	<span class="step-chip" class:active={step === 'done'}>3 · Resultado</span>
-</div>
+<div class="wizard">
+	<ol class="steps" aria-label="Pasos de la importación">
+		{#each STEPS as s, i (s.id)}
+			<li
+				class="step"
+				class:reached={i <= stepIndex}
+				aria-current={s.id === step ? 'step' : undefined}
+			>
+				{s.label}
+			</li>
+		{/each}
+	</ol>
 
-{#if errorMsg}
-	<p class="error-banner" role="alert">{errorMsg}</p>
-{/if}
+	{#if errorMsg}
+		<p class="feedback error" role="alert">{errorMsg}</p>
+	{/if}
 
-{#if step === 'upload'}
-	<Card variant="elevated" padding="md">
+	{#if step === 'upload'}
 		<ImportUploadStep
 			{portfolios}
 			{platforms}
 			bind:portfolioId
 			bind:sourceId
 			{loading}
+			{missingDestination}
+			fileName={file?.name}
 			onSelectFile={selectFile}
 		/>
-	</Card>
-{:else if step === 'map' && preview}
-	<Card variant="elevated" padding="md">
+	{:else if step === 'map' && preview}
 		<ImportMappingStep
 			{preview}
 			fileName={file?.name}
@@ -200,49 +236,128 @@
 			onRestart={restart}
 			onImport={doImport}
 		/>
-	</Card>
-{:else if step === 'done' && result}
-	<Card variant="elevated" padding="md">
+	{:else if step === 'done' && result}
 		<ImportResultStep
 			{result}
 			onRestart={restart}
 			onViewTransactions={() => goto(resolve('/dashboard/transactions'))}
 		/>
-	</Card>
-{/if}
+	{/if}
+</div>
 
 <style>
+	/*
+	 * El avance es el filete que llevan los pasos encima, no una cápsula: la misma
+	 * línea que separa los bloques del formulario, encendida hasta donde vas.
+	 */
 	.steps {
-		display: flex;
-		gap: 0.6rem;
-		flex-wrap: wrap;
-		margin-bottom: 1.5rem;
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.75rem;
+		max-width: 32rem;
+		margin: 0 0 1rem;
+		padding: 0;
+		list-style: none;
 	}
 
-	.step-chip {
-		font-family: var(--font-mono);
-		font-size: 0.72rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		padding: 0.4rem 0.8rem;
-		border-radius: 999px;
-		border: 1px solid var(--border);
+	.step {
+		padding-top: 0.55rem;
+		border-top: 2px solid var(--border-strong);
+		font-size: 0.82rem;
+		color: var(--text-dim);
+		transition:
+			color 0.25s ease,
+			border-color 0.25s ease;
+	}
+
+	.step.reached {
+		border-top-color: var(--amber);
 		color: var(--text-muted);
 	}
 
-	.step-chip.active {
-		border-color: var(--amber);
-		color: var(--amber);
-		background: rgba(212, 145, 42, 0.1);
+	.step[aria-current='step'] {
+		color: var(--text);
 	}
 
-	.error-banner {
-		border-radius: 10px;
-		padding: 0.8rem 1rem;
+	/* Solo el margen: la forma y el color de un aviso los pone
+	   `routes/layout.css`. */
+	.feedback {
+		margin: 1.5rem 0 0;
+	}
+
+	/*
+	 * Los campos, sus etiquetas y las ayudas los aporta `ui/rail-section`: los
+	 * pasos de este asistente son bloques de ese carril, igual que los de
+	 * configuración o los del alta de portafolio. Aquí solo queda lo que es de
+	 * este asistente y vive fuera de los bloques.
+	 */
+
+	/* Mono para lo que salió del archivo del usuario: es lo que distingue sus
+	   datos de las palabras de la aplicación. */
+	.wizard :global(.figure) {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.wizard :global(.actions) {
+		display: flex;
+		align-items: center;
+		gap: 1.25rem;
+		flex-wrap: wrap;
+		padding-top: 2.25rem;
+		border-top: 1px solid var(--border-strong);
+	}
+
+	/* Sin el halo ámbar de `ui/button`, como en configuración. */
+	.wizard :global(.actions .btn-primary) {
+		box-shadow: none;
+	}
+
+	.wizard :global(.quiet-action) {
+		border: none;
+		background: none;
+		padding: 0;
+		font-family: var(--font-body);
 		font-size: 0.85rem;
-		margin-bottom: 1.2rem;
-		background: rgba(224, 90, 90, 0.12);
-		border: 1px solid rgba(224, 90, 90, 0.4);
-		color: #e05a5a;
+		color: var(--text-muted);
+		cursor: pointer;
+		transition: color 0.2s ease;
+	}
+
+	.wizard :global(.quiet-action:hover:not(:disabled)) {
+		color: var(--text);
+	}
+
+	.wizard :global(.quiet-action:disabled) {
+		cursor: not-allowed;
+		opacity: 0.6;
+	}
+
+	.wizard :global(.spinner) {
+		display: inline-block;
+		width: 13px;
+		height: 13px;
+		flex-shrink: 0;
+		border: 2px solid rgba(212, 145, 42, 0.25);
+		border-top-color: var(--amber);
+		border-radius: 50%;
+		animation: spin 0.7s linear infinite;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.step,
+		.wizard :global(.quiet-action) {
+			transition: none;
+		}
+
+		.wizard :global(.spinner) {
+			animation-duration: 2s;
+		}
 	}
 </style>

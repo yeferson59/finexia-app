@@ -59,7 +59,7 @@
 		puedas repartir tus posiciones.
 	</p>
 
-	<div class="fields">
+	<div class="fields rail-fields">
 		<div class="field">
 			<label for="name">Nombre</label>
 			<input
@@ -119,101 +119,21 @@
 		color: var(--text-muted);
 	}
 
-	/* Los campos no se estiran a lo ancho de la página: el nombre de un bróker
-	   no se escribe en una caja de mil píxeles. */
+	/*
+	 * La columna de campos es la compartida (`rail-fields`, en
+	 * `routes/layout.css`): aquí estaba copiada entera, con sus etiquetas, sus
+	 * `input` y sus estados, idéntica a la del carril hasta el último píxel. Lo
+	 * único de esta pantalla es dónde se corta: el nombre de un bróker no se
+	 * escribe en una caja de mil píxeles.
+	 */
 	.fields {
-		display: flex;
-		flex-direction: column;
-		gap: 1.35rem;
-		min-width: 0;
 		max-width: 34rem;
 	}
 
-	.field {
-		display: flex;
-		flex-direction: column;
-		gap: 0.45rem;
-	}
-
-	label {
-		font-size: 0.87rem;
-		font-weight: 500;
-		color: var(--text);
-	}
-
-	.optional {
-		font-weight: 400;
-		color: var(--text-dim);
-	}
-
-	input,
-	select,
-	textarea {
-		width: 100%;
-		padding: 0.8rem 0.95rem;
-		border: 1px solid rgba(212, 145, 42, 0.2);
-		border-radius: 8px;
-		background: rgba(255, 255, 255, 0.03);
-		color: var(--text);
-		font-family: var(--font-body);
-		font-size: 0.92rem;
-		box-sizing: border-box;
-		transition: border-color 0.2s ease;
-	}
-
-	input::placeholder,
-	textarea::placeholder {
-		color: var(--text-dim);
-	}
-
-	input:hover:not(:disabled),
-	select:hover:not(:disabled),
-	textarea:hover:not(:disabled) {
-		border-color: rgba(212, 145, 42, 0.35);
-	}
-
-	/* El foco lo pinta la regla global de `layout.css`, que es la misma en toda
-	   la aplicación; aquí solo se enciende el borde. */
-	input:focus,
-	select:focus,
-	textarea:focus {
-		border-color: var(--amber);
-	}
-
-	input:disabled,
-	select:disabled,
-	textarea:disabled {
-		color: var(--text-muted);
-		cursor: not-allowed;
-	}
-
-	textarea {
-		resize: vertical;
-		min-height: 5.5rem;
-		line-height: 1.55;
-	}
-
-	.hint {
-		margin: 0;
-		font-size: 0.8rem;
-		line-height: 1.5;
-		color: var(--text-muted);
-	}
-
-	/* Prosa con un filete del color de lo que dice, no una caja de alerta: el
-	   idioma que ya hablan configuración y notificaciones. */
+	/* Solo el margen: la forma y el color de un aviso los pone
+	   `routes/layout.css`. */
 	.feedback {
-		max-width: 62ch;
 		margin: 0;
-		padding-left: 0.75rem;
-		border-left: 2px solid;
-		font-size: 0.83rem;
-		line-height: 1.5;
-	}
-
-	.feedback.error {
-		border-color: var(--red);
-		color: var(--red);
 	}
 
 	/*
@@ -246,9 +166,6 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		input,
-		select,
-		textarea,
 		.cancel {
 			transition: none;
 		}

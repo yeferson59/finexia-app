@@ -55,14 +55,14 @@
 				<select
 					id="preferredCurrency"
 					name="preferredCurrency"
-					class="field-select"
+					class="field-control field-select"
 					bind:value={profileCurrency}
 				>
 					{#each SUPPORTED_CURRENCIES as code (code)}
 						<option value={code}>{code}</option>
 					{/each}
 				</select>
-				<p class="field-hint">
+				<p class="hint">
 					En esta moneda se muestran los totales del panel. Solo aparecen las que la app puede
 					convertir.
 				</p>
@@ -81,60 +81,23 @@
 </SettingsSection>
 
 <style>
-	/* Mismo aspecto que `ui/input.svelte`, que es el vecino de este campo en el
-	   formulario. No se factoriza al chrome de `settings-section` porque ninguna
-	   otra sección de ajustes tiene un desplegable. */
-	.field {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.field-label {
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: var(--text);
-		letter-spacing: 0.3px;
-	}
-
-	.field-select {
-		width: 100%;
-		padding: 0.875rem 1rem;
+	/*
+	 * El desplegable de moneda es el único de toda la página de ajustes, y su
+	 * aspecto era una copia a mano de `ui/input.svelte` —lo decía el comentario
+	 * que había aquí— con medio punto más de letra y otro tamaño de relleno.
+	 * Ahora pide el mismo control que el resto del panel y solo añade lo suyo:
+	 * la flecha, porque un `<select>` sin `appearance: none` pinta la del
+	 * sistema, que en un panel oscuro se ve blanca.
+	 *
+	 * Doble clase para ganarle en especificidad al `background` de
+	 * `.field-control`, que sin ella borraría la flecha.
+	 */
+	.field-control.field-select {
 		padding-right: 2.5rem;
-		border-radius: 8px;
-		border: 1px solid rgba(212, 145, 42, 0.2);
-		background: rgba(255, 255, 255, 0.03);
-		color: var(--text);
-		font-size: 0.95rem;
-		font-family: var(--font-body);
-		transition: all 0.25s ease;
-		outline: none;
-		box-sizing: border-box;
 		cursor: pointer;
 		appearance: none;
 		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
 		background-repeat: no-repeat;
 		background-position: right 0.9rem center;
-	}
-
-	.field-select:hover {
-		border-color: rgba(212, 145, 42, 0.35);
-	}
-
-	.field-select:focus {
-		border-color: var(--amber);
-		box-shadow: 0 0 0 3px var(--border);
-	}
-
-	.field-select option {
-		background: var(--bg);
-		color: var(--text);
-	}
-
-	.field-hint {
-		margin: 0;
-		font-size: 0.8rem;
-		color: rgba(236, 234, 229, 0.5);
-		line-height: 1.5;
 	}
 </style>

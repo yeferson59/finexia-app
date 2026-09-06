@@ -40,9 +40,22 @@ test.describe('transactions', () => {
 			)
 		});
 
-		await expect(page.getByRole('heading', { name: 'Asigna tus columnas' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Qué es cada columna' })).toBeVisible();
 		await expect(page.getByText('6 listas para importar')).toBeVisible();
-		// Las filas que no se pueden interpretar se anuncian antes de confirmar.
+		// Las filas que no se pueden interpretar se anuncian antes de confirmar,
+		// y el motivo va debajo de su propia fila.
 		await expect(page.getByText('2 con errores')).toBeVisible();
+		await expect(page.getByText('Fecha no reconocida')).toBeVisible();
+
+		// Cada campo enseña los primeros valores de la columna que tiene asignada:
+		// es con lo que se comprueba que la columna elegida es la correcta sin
+		// bajar a la vista previa.
+		const tickerRow = page.locator('li').filter({ has: page.locator('#map-ticker') });
+		await expect(tickerRow).toContainText('NVDA');
+		await expect(tickerRow).toContainText('AAPL');
+
+		// Las columnas opcionales que el archivo no trae no se pintan llenas de
+		// guiones: no se pintan.
+		await expect(page.getByRole('columnheader', { name: 'Comisión' })).toHaveCount(0);
 	});
 });

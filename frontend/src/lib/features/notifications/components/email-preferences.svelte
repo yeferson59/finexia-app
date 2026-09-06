@@ -183,12 +183,11 @@
 		color: var(--text);
 	}
 
+	/* Solo lo que es de aquí: el tamaño y el color de una ayuda los pone
+	   `routes/layout.css`. */
 	.hint {
 		display: block;
 		max-width: 46ch;
 		margin-top: 0.2rem;
-		font-size: 0.8rem;
-		line-height: 1.55;
-		color: var(--text-muted);
 	}
 </style>

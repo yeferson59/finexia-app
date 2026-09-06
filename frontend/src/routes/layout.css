@@ -75,6 +75,178 @@ textarea:focus-visible {
 	outline-offset: 2px;
 }
 
+/*
+ * Las piezas de formulario que comparte todo el panel.
+ *
+ * Estaban escritas en cada componente que las usaba: `.feedback` cinco veces
+ * —idéntica salvo el margen—, `.hint` con seis tamaños distintos para la misma
+ * línea bajo un campo, y el aspecto de un control de texto copiado a mano en
+ * `ui/input.svelte`, en el carril de formularios, en el alta de plataforma y en
+ * el perfil, con dos tamaños de letra. Copiadas divergían; aquí no pueden.
+ *
+ * Van sin `@layer` para ganarle a las bases de `@tailwindcss/forms`, y con
+ * nombres que solo aparecen dentro de un formulario, así que no chocan con el
+ * resto del panel. El margen de cada pieza no está aquí: es lo único que
+ * legítimamente cambia según lo que tenga encima y debajo.
+ */
+
+/* La columna de campos: la aporta `ui/rail-section` en modo `fields`, y la usa
+   cualquier formulario que quiera el mismo carril. */
+.rail-fields {
+	display: flex;
+	flex-direction: column;
+	gap: 1.35rem;
+}
+
+/* Dos campos cortos comparten fila; por debajo de 640 se apilan. */
+.pair {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 1.35rem;
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+	min-width: 0;
+}
+
+.field > label,
+.field-label {
+	font-size: 0.87rem;
+	font-weight: 500;
+	color: var(--text);
+}
+
+/* Se marca lo opcional, no lo obligatorio: cuando casi todo lo es, los
+   asteriscos rojos señalan la pantalla entera. */
+.optional {
+	font-weight: 400;
+	color: var(--text-dim);
+}
+
+/*
+ * El aspecto de un control de texto, una sola vez. Lo llevan `ui/input.svelte`
+ * y el selector de moneda del perfil, que ponen la clase, y los controles
+ * sueltos dentro de una columna de campos, que no la necesitan.
+ *
+ * `dp-select` fuera: son los tres huecos —día, mes, año— del selector de fecha
+ * de `ui/date-picker`, que traen su propio ancho. Con el de aquí, los tres se
+ * estiraban al 100 % y el de en medio se quedaba sin sitio.
+ */
+.field-control,
+.rail-fields
+	:is(
+		input[type='text'],
+		input[type='number'],
+		input[type='password'],
+		input[type='email'],
+		select:not(.dp-select),
+		textarea
+	) {
+	width: 100%;
+	padding: 0.8rem 0.95rem;
+	border: 1px solid rgba(212, 145, 42, 0.2);
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.03);
+	color: var(--text);
+	font-family: var(--font-body);
+	font-size: 0.92rem;
+	box-sizing: border-box;
+	transition: border-color 0.2s ease;
+}
+
+/* El desplegable nativo pinta su lista con el fondo del sistema; sin esto sale
+   texto claro sobre blanco en varias plataformas. */
+.field-control option,
+.rail-fields select option {
+	background: #14120e;
+	color: var(--text);
+}
+
+.field-control::placeholder,
+.rail-fields :is(input, textarea)::placeholder {
+	color: var(--text-dim);
+}
+
+.field-control:hover:not(:disabled),
+.rail-fields :is(input, select:not(.dp-select), textarea):hover:not(:disabled) {
+	border-color: rgba(212, 145, 42, 0.35);
+}
+
+/* El anillo de foco lo pinta la regla `:focus-visible` de más arriba, la misma
+   en toda la aplicación; aquí solo se enciende el borde. */
+.field-control:focus,
+.rail-fields :is(input, select:not(.dp-select), textarea):focus {
+	border-color: var(--amber);
+}
+
+.field-control:disabled,
+.rail-fields :is(input, select:not(.dp-select), textarea):disabled {
+	color: var(--text-muted);
+	cursor: not-allowed;
+}
+
+.rail-fields textarea {
+	resize: vertical;
+	min-height: 5.5rem;
+	line-height: 1.55;
+}
+
+/* La línea que explica un campo, debajo de él. */
+.hint {
+	margin: 0;
+	font-size: 0.83rem;
+	line-height: 1.55;
+	color: var(--text-muted);
+}
+
+.hint a {
+	color: var(--amber);
+}
+
+/*
+ * Los avisos son prosa con un filete del color de lo que dicen, no cajas de
+ * alerta: es el idioma que hablan el panel, configuración y la vista de un
+ * activo. Cada sitio pone su propio margen.
+ */
+.feedback {
+	max-width: 62ch;
+	padding-left: 0.75rem;
+	border-left: 2px solid;
+	font-size: 0.83rem;
+	line-height: 1.5;
+}
+
+.feedback.success {
+	border-color: var(--green);
+	color: var(--green);
+}
+
+.feedback.error {
+	border-color: var(--red);
+	color: var(--red);
+}
+
+.feedback.warning {
+	border-color: rgba(212, 145, 42, 0.45);
+	color: var(--amber);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.field-control,
+	.rail-fields :is(input, select, textarea) {
+		transition: none;
+	}
+}
+
+@media (max-width: 640px) {
+	.pair {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
 @layer components {
 	.rounded-12 {
 		@apply rounded-xl;

@@ -153,18 +153,10 @@
 
 	/* Prosa con un filete rojo, no una caja de alerta: el idioma que ya hablan
 	   configuración y notificaciones. */
+	/* Solo el margen: la forma y el color de un aviso los pone
+	   `routes/layout.css`. */
 	.feedback {
-		max-width: 62ch;
 		margin: 0 0 1.25rem;
-		padding-left: 0.75rem;
-		border-left: 2px solid;
-		font-size: 0.83rem;
-		line-height: 1.5;
-	}
-
-	.feedback.error {
-		border-color: var(--red);
-		color: var(--red);
 	}
 
 	/*

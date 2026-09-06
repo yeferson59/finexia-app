@@ -167,10 +167,10 @@
 		gap: 1rem;
 	}
 
+	/* Solo lo que es de aquí: el tamaño y el color de una ayuda los pone
+	   `routes/layout.css`. */
 	.hint {
-		font-size: 0.78rem;
-		color: var(--text-dim, #8a8780);
-		margin: 0.6rem 0 1rem 0;
+		margin: 0.6rem 0 1rem;
 	}
 
 	.server-error {

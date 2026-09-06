@@ -194,7 +194,7 @@
 							step="any"
 						/>
 					</div>
-					<p class="field-hint">La que el bróker cobró, no siempre la de la ejecución.</p>
+					<p class="hint">La que el bróker cobró, no siempre la de la ejecución.</p>
 				{:else}
 					<input
 						id="txn-fees"
@@ -262,7 +262,7 @@
 			<div class="form-group">
 				<span class="form-label">Moneda de la operación</span>
 				<p class="fx-static">{txnForm.currency}</p>
-				<p class="field-hint">
+				<p class="hint">
 					{assetCurrency} es la moneda en la que cotiza el activo; el precio y la comisión de arriba van
 					en ella.
 				</p>
@@ -282,14 +282,14 @@
 					step="any"
 					required
 				/>
-				<p class="field-hint">
+				<p class="hint">
 					Cuántos {costCurrency} costaba 1 {assetCurrency} ese día, según la confirmación del bróker.
 				</p>
 			</div>
 			<div class="form-group">
 				<span class="form-label">Coste en {costCurrency}</span>
 				<p class="fx-static">{formatIn(settledTotal, costCurrency)}</p>
-				<p class="field-hint">Contrástalo con el importe que te debitaron.</p>
+				<p class="hint">Contrástalo con el importe que te debitaron.</p>
 			</div>
 		</div>
 	{/if}
@@ -352,13 +352,6 @@
 
 	.required {
 		color: var(--red);
-	}
-
-	.field-hint {
-		margin: 0;
-		font-size: 0.75rem;
-		color: var(--text-dim);
-		font-style: italic;
 	}
 
 	.fees-field {

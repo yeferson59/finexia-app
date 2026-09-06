@@ -1,6 +1,21 @@
 <script lang="ts">
-	import type { ImportMapping, ImportPreview, ImportDefaults } from '../types';
+	/*
+	 * Paso dos: decir qué es cada columna del archivo.
+	 *
+	 * Eran once desplegables idénticos, uno por campo, cuyas opciones decían
+	 * «C · Ticker» sin enseñar en ningún momento qué hay dentro de la C. Asignar
+	 * columnas es emparejar, y la pantalla daba dos listas que no se tocaban: el
+	 * usuario tenía que bajar a la tabla de vista previa, comprobar, subir y
+	 * corregir.
+	 *
+	 * Ahora cada campo es una fila que termina en los datos reales de la columna
+	 * elegida, en mono y sacados de las primeras filas del archivo. Si eliges la
+	 * columna equivocada, al lado de «Cantidad» aparecen fechas.
+	 */
+	import Button from '$lib/ui/button.svelte';
+	import RailSection from '$lib/ui/rail-section.svelte';
 	import ImportPreviewTable from './import-preview-table.svelte';
+	import type { ImportMapping, ImportPreview, ImportDefaults } from '../types';
 	import { CATEGORY_OPTIONS, TXN_TYPE_OPTIONS } from '../transactions';
 
 	let {
@@ -33,28 +48,32 @@
 		onImport: () => void;
 	} = $props();
 
-	const mappingFields: { key: keyof ImportMapping; label: string; required: boolean }[] = [
-		{ key: 'date', label: 'Fecha', required: true },
-		{ key: 'ticker', label: 'Ticker / Símbolo', required: true },
-		{ key: 'quantity', label: 'Cantidad', required: true },
-		{ key: 'price', label: 'Precio', required: true },
-		{ key: 'type', label: 'Tipo de operación', required: false },
-		{ key: 'assetName', label: 'Nombre del activo', required: false },
-		{ key: 'fees', label: 'Comisiones', required: false },
-		{ key: 'currency', label: 'Moneda', required: false },
-		{ key: 'fxRate', label: 'Tasa de cambio', required: false },
-		{ key: 'category', label: 'Categoría', required: false },
-		{ key: 'notes', label: 'Notas', required: false }
+	type Field = { key: keyof ImportMapping; label: string };
+
+	/* Las cuatro sin las que no hay transacción. */
+	const REQUIRED: Field[] = [
+		{ key: 'date', label: 'Fecha' },
+		{ key: 'ticker', label: 'Ticker' },
+		{ key: 'quantity', label: 'Cantidad' },
+		{ key: 'price', label: 'Precio' }
 	];
 
-	const fieldLabels: Record<string, string> = {
-		date: 'Fecha',
-		ticker: 'Ticker',
-		quantity: 'Cantidad',
-		price: 'Precio'
-	};
+	const OPTIONAL: Field[] = [
+		{ key: 'type', label: 'Tipo de operación' },
+		{ key: 'assetName', label: 'Nombre del activo' },
+		{ key: 'fees', label: 'Comisiones' },
+		{ key: 'currency', label: 'Moneda' },
+		{ key: 'fxRate', label: 'Tasa de cambio' },
+		{ key: 'category', label: 'Categoría' },
+		{ key: 'notes', label: 'Notas' }
+	];
 
-	function columnLabel(index: number): string {
+	const FIELD_LABELS: Record<string, string> = Object.fromEntries(
+		[...REQUIRED, ...OPTIONAL].map((f) => [f.key, f.label])
+	);
+
+	/** A, B, … Z, AA: cómo nombra las columnas la propia hoja de cálculo. */
+	function columnLetter(index: number): string {
 		let label = '';
 		let n = index;
 		do {
@@ -63,23 +82,91 @@
 		} while (n >= 0);
 		return label;
 	}
+
+	function optionLabel(header: string, index: number): string {
+		const letter = columnLetter(index);
+		return header ? `${header} (${letter})` : `Columna ${letter}`;
+	}
+
+	/** Los primeros valores con contenido de una columna, tal cual venían. */
+	function samples(column: number | null): string[] {
+		if (column === null) return [];
+		const found: string[] = [];
+		for (const row of preview.rows) {
+			const value = row.raw?.[column]?.trim();
+			if (value) found.push(value);
+			if (found.length === 3) break;
+		}
+		return found;
+	}
+
+	const missing = $derived(preview.missingFields.map((f) => FIELD_LABELS[f] ?? f));
+
+	const importLabel = $derived(
+		preview.validRows === 0
+			? 'No hay filas que importar'
+			: preview.validRows === 1
+				? 'Importar 1 transacción'
+				: `Importar ${preview.validRows} transacciones`
+	);
 </script>
 
-<div class="map-header">
-	<div>
-		<h2 class="section-title">Asigna tus columnas</h2>
-		<p class="section-hint">
-			Detectamos <strong>{preview.headers.length}</strong> columnas en
-			<strong>{fileName}</strong> (encabezados en la fila {preview.headerRow}). Revisa la asignación
-			sugerida y ajústala a tu formato.
-		</p>
-	</div>
+{#snippet columnRow(field: Field, required: boolean)}
+	<!--
+		`?? null` y no `=== null`: una asignación sugerida que el backend no manda
+		llega como `undefined`, y con `String(undefined)` el desplegable se queda
+		en blanco, sin coincidir siquiera con «Sin asignar».
+	-->
+	{@const column = mapping[field.key] ?? null}
+	{@const values = samples(column)}
+	<li class="row" class:pending={required && column === null}>
+		<div class="field">
+			<label for={`map-${field.key}`}>
+				{field.label}{#if !required}<span class="optional">&nbsp;(opcional)</span>{/if}
+			</label>
+			<select
+				id={`map-${field.key}`}
+				value={column === null ? '' : String(column)}
+				onchange={(e) => onSetMappingColumn(field.key, e.currentTarget.value)}
+			>
+				<option value="">Sin asignar</option>
+				{#each preview.headers as header, i (i)}
+					<option value={String(i)}>{optionLabel(header, i)}</option>
+				{/each}
+			</select>
+		</div>
+
+		<!-- Sin columna asignada no se dice nada: el propio desplegable ya pone
+		     «Sin asignar», y repetirlo en siete filas seguidas era ruido. -->
+		{#if values.length > 0}
+			<p class="samples figure">
+				{#each values as value, i (i)}
+					<span class="cell">{value}</span>
+				{/each}
+			</p>
+		{:else if required}
+			<p class="samples pending-note">Elige la columna que trae este dato.</p>
+		{/if}
+	</li>
+{/snippet}
+
+<p class="lead">
+	{preview.headers.length} columnas en <span class="figure">{fileName}</span>, con los encabezados
+	en la fila {preview.headerRow}.
+</p>
+
+<RailSection
+	title="Qué es cada columna"
+	description="A la derecha de cada campo van los primeros valores de la columna que elijas. Si no son los que esperabas, la columna es otra."
+	contentMax="none"
+	fields
+>
 	{#if preview.sheets.length > 1}
-		<div class="form-group sheet-select">
-			<label class="form-label" for="sheet">Hoja</label>
+		<div class="field sheet">
+			<label for="sheet">Hoja del archivo</label>
 			<select
 				id="sheet"
-				class="form-select"
+				class="sheet-select"
 				value={sheet}
 				onchange={(e) => onChangeSheet(e.currentTarget.value)}
 			>
@@ -89,302 +176,238 @@
 			</select>
 		</div>
 	{/if}
-</div>
 
-{#if preview.missingFields.length > 0}
-	<p class="warning-banner" role="alert">
-		Faltan columnas obligatorias por asignar:
-		<strong>{preview.missingFields.map((f) => fieldLabels[f] ?? f).join(', ')}</strong>.
-	</p>
-{/if}
+	{#if missing.length > 0}
+		<p class="missing" role="alert">
+			Falta decir de qué columna sale {missing.join(', ')}. Sin eso no se puede importar.
+		</p>
+	{/if}
 
-<div class="mapping-grid">
-	{#each mappingFields as field (field.key)}
-		<div class="form-group">
-			<label class="form-label" for={`map-${field.key}`}>
-				{field.label}
-				{#if field.required}<span class="required">*</span>{/if}
-			</label>
-			<select
-				id={`map-${field.key}`}
-				class="form-select"
-				value={mapping[field.key] === null ? '' : String(mapping[field.key])}
-				onchange={(e) => onSetMappingColumn(field.key, e.currentTarget.value)}
-			>
-				<option value="">— No usar —</option>
-				{#each preview.headers as header, i (i)}
-					<option value={String(i)}>
-						{columnLabel(i)} · {header || '(sin título)'}
-					</option>
+	<ul class="rows">
+		{#each REQUIRED as field (field.key)}
+			{@render columnRow(field, true)}
+		{/each}
+	</ul>
+
+	<p class="group-lead">Y estas otras, si tu archivo las trae.</p>
+
+	<ul class="rows">
+		{#each OPTIONAL as field (field.key)}
+			{@render columnRow(field, false)}
+		{/each}
+	</ul>
+</RailSection>
+
+<RailSection
+	title="Lo que el archivo no diga"
+	description="Los valores con los que se rellenan las filas a las que les falte el dato. No pisan lo que sí venga en una columna."
+	fields
+>
+	<div class="defaults">
+		<div class="field">
+			<label for="default-type">Tipo de operación</label>
+			<select id="default-type" bind:value={defaults.type} onchange={onRefreshDefaults}>
+				{#each TXN_TYPE_OPTIONS as t (t.value)}
+					<option value={t.value}>{t.label}</option>
 				{/each}
 			</select>
 		</div>
-	{/each}
-</div>
 
-<h3 class="section-subtitle">Valores por defecto</h3>
-<p class="section-hint">Se aplican a las filas donde tu archivo no tenga ese dato.</p>
-<div class="defaults-grid">
-	<div class="form-group">
-		<label class="form-label" for="default-type">Tipo de operación</label>
-		<select
-			id="default-type"
-			class="form-select"
-			bind:value={defaults.type}
-			onchange={onRefreshDefaults}
-		>
-			{#each TXN_TYPE_OPTIONS as t (t.value)}
-				<option value={t.value}>{t.label}</option>
-			{/each}
-		</select>
-	</div>
-	<div class="form-group">
-		<label class="form-label" for="default-currency">Moneda</label>
-		<input
-			id="default-currency"
-			class="form-input"
-			type="text"
-			maxlength="3"
-			bind:value={defaults.currency}
-			onchange={onRefreshDefaults}
-			placeholder="USD"
-		/>
-	</div>
-	<div class="form-group">
-		<label class="form-label" for="default-cost-currency">Moneda de la cuenta</label>
-		<input
-			id="default-cost-currency"
-			class="form-input"
-			type="text"
-			maxlength="3"
-			bind:value={defaults.costCurrency}
-			onchange={onRefreshDefaults}
-			placeholder="igual que la fila"
-		/>
-		<p class="field-hint">
-			En la que tu bróker debitó. Déjala vacía si el extracto no convirtió nada; si la rellenas,
-			cada fila en otra moneda necesita su tasa.
-		</p>
-	</div>
-	<div class="form-group">
-		<label class="form-label" for="default-category">Categoría</label>
-		<select
-			id="default-category"
-			class="form-select"
-			bind:value={defaults.category}
-			onchange={onRefreshDefaults}
-		>
-			{#each CATEGORY_OPTIONS as c (c.value)}
-				<option value={c.value}>{c.label}</option>
-			{/each}
-		</select>
-	</div>
-	<div class="form-group">
-		<label class="form-label" for="default-dates">Formato de fecha</label>
-		<select
-			id="default-dates"
-			class="form-select"
-			bind:value={defaults.dateFormat}
-			onchange={onRefreshDefaults}
-		>
-			<option value="auto">Detectar automáticamente</option>
-			<option value="dmy">Día/Mes/Año</option>
-			<option value="mdy">Mes/Día/Año</option>
-		</select>
-	</div>
-</div>
+		<div class="field">
+			<label for="default-category">Categoría</label>
+			<select id="default-category" bind:value={defaults.category} onchange={onRefreshDefaults}>
+				{#each CATEGORY_OPTIONS as c (c.value)}
+					<option value={c.value}>{c.label}</option>
+				{/each}
+			</select>
+		</div>
 
-<ImportPreviewTable {preview} {loading} />
+		<div class="field">
+			<label for="default-currency">Moneda</label>
+			<input
+				id="default-currency"
+				type="text"
+				maxlength="3"
+				bind:value={defaults.currency}
+				onchange={onRefreshDefaults}
+				placeholder="USD"
+			/>
+		</div>
 
-<div class="form-actions">
-	<button type="button" class="btn btn-secondary" onclick={onRestart} disabled={importing}>
+		<div class="field">
+			<label for="default-dates">Formato de fecha</label>
+			<select id="default-dates" bind:value={defaults.dateFormat} onchange={onRefreshDefaults}>
+				<option value="auto">Detectar automáticamente</option>
+				<option value="dmy">Día/Mes/Año</option>
+				<option value="mdy">Mes/Día/Año</option>
+			</select>
+		</div>
+
+		<div class="field wide">
+			<label for="default-cost-currency">Moneda de la cuenta</label>
+			<input
+				id="default-cost-currency"
+				type="text"
+				maxlength="3"
+				bind:value={defaults.costCurrency}
+				onchange={onRefreshDefaults}
+				placeholder="la misma de cada fila"
+			/>
+			<p class="hint">
+				En la que tu bróker debitó. Déjala vacía si el extracto no convirtió nada; si la rellenas,
+				cada fila en otra moneda necesita su tasa.
+			</p>
+		</div>
+	</div>
+</RailSection>
+
+<RailSection
+	title="Antes de importar"
+	description="Las primeras filas tal como quedarán registradas. Las que no se puedan interpretar se quedan fuera y aquí dicen por qué."
+	contentMax="none"
+>
+	<ImportPreviewTable {preview} {loading} />
+</RailSection>
+
+<div class="actions">
+	<Button
+		type="button"
+		variant="primary"
+		onclick={onImport}
+		disabled={!canImport}
+		loading={importing}
+	>
+		{importing ? 'Importando…' : importLabel}
+	</Button>
+	<button type="button" class="quiet-action" onclick={onRestart} disabled={importing}>
 		Elegir otro archivo
-	</button>
-	<button type="button" class="btn btn-primary" onclick={onImport} disabled={!canImport}>
-		{#if importing}
-			<span class="spinner dark"></span> Importando…
-		{:else}
-			Importar {preview.validRows} transacciones
-		{/if}
 	</button>
 </div>
 
 <style>
-	.map-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		gap: 1.5rem;
-		flex-wrap: wrap;
-	}
-
-	.sheet-select {
-		min-width: 180px;
-	}
-
-	.form-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.form-label {
-		font-size: 0.9rem;
-		font-weight: 600;
-		color: var(--text);
-		letter-spacing: 0.3px;
-	}
-
-	.required {
-		color: var(--red, #e05a5a);
-	}
-
-	.form-input,
-	.form-select {
-		padding: 0.7rem 0.9rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.022);
-		color: var(--text);
-		font-size: 0.9rem;
-		font-family: var(--font-body);
-		transition: border-color 0.2s ease;
-	}
-
-	.form-input:focus,
-	.form-select:focus {
-		outline: none;
-		border-color: var(--amber);
-		box-shadow: 0 0 0 3px var(--border);
-	}
-
-	.form-select option {
-		background: #1a1611;
-		color: var(--text);
-	}
-
-	.warning-banner {
-		border-radius: 10px;
-		padding: 0.8rem 1rem;
-		font-size: 0.85rem;
-		margin-bottom: 1.2rem;
-		background: rgba(212, 145, 42, 0.1);
-		border: 1px solid rgba(212, 145, 42, 0.4);
-		color: var(--amber);
-	}
-
-	.section-title {
-		font-family: var(--font-display);
-		font-size: 1.25rem;
-		font-weight: 400;
-		color: var(--text);
-		margin: 0 0 0.4rem;
-	}
-
-	.section-subtitle {
-		font-size: 0.95rem;
-		font-weight: 700;
-		color: var(--text);
-		margin: 1.6rem 0 0.3rem;
-	}
-
-	.field-hint {
-		margin: 0.35rem 0 0;
-		font-size: 0.75rem;
-		color: var(--text-dim);
-		font-style: italic;
-	}
-
-	.section-hint {
-		font-size: 0.85rem;
+	.lead {
+		max-width: 62ch;
+		margin: 1.75rem 0 0.5rem;
+		font-size: 0.88rem;
+		line-height: 1.6;
 		color: var(--text-muted);
-		margin: 0 0 1rem;
 	}
 
-	.mapping-grid,
-	.defaults-grid {
+	/* El filete llega hasta el final del carril; el desplegable, no: los nombres
+	   de hoja son cortos. */
+	.sheet {
+		align-items: flex-start;
+		padding-bottom: 1.5rem;
+		border-bottom: 1px solid var(--border-strong);
+	}
+
+	/* Con su propia clase, y no `.sheet select`: esa empata en especificidad con
+	   el `select { width: 100% }` que aporta el asistente y perdía por orden. */
+	.field.sheet .sheet-select {
+		width: 14rem;
+		max-width: 100%;
+	}
+
+	.missing {
+		max-width: 62ch;
+		margin: 0;
+		padding-left: 0.75rem;
+		border-left: 2px solid var(--red);
+		font-size: 0.83rem;
+		line-height: 1.5;
+		color: var(--red);
+	}
+
+	.rows {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	/*
+	 * Campo, desplegable y datos reales en la misma línea. El tercer carril es el
+	 * que hace el trabajo: es donde se ve si la columna elegida es la correcta.
+	 */
+	.row {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-		gap: 1rem;
-		margin-top: 1rem;
+		grid-template-columns: minmax(0, 18rem) minmax(0, 1fr);
+		align-items: end;
+		gap: 0.5rem 2rem;
+		padding: 1rem 0;
+		border-bottom: 1px solid var(--border);
 	}
 
-	.form-actions {
+	.rows .row:last-child {
+		border-bottom: none;
+	}
+
+	.samples {
 		display: flex;
-		gap: 1rem;
-		justify-content: flex-end;
-		margin-top: 1.8rem;
+		flex-wrap: wrap;
+		gap: 0.35rem 1.5rem;
+		min-width: 0;
+		margin: 0 0 0.7rem;
+		font-size: 0.82rem;
 	}
 
-	.btn {
-		padding: 0.8rem 1.4rem;
-		border: none;
-		border-radius: 10px;
-		font-weight: 700;
-		font-family: var(--font-body);
-		font-size: 0.92rem;
-		cursor: pointer;
-		transition: all 0.25s ease;
-		display: inline-flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.btn-primary {
-		background: var(--amber);
-		color: #0d0800;
-	}
-
-	.btn-primary:hover:not(:disabled) {
-		transform: translateY(-2px);
-		box-shadow: 0 10px 25px rgba(212, 145, 42, 0.25);
-	}
-
-	.btn-primary:disabled {
-		opacity: 0.55;
-		cursor: not-allowed;
-	}
-
-	.btn-secondary {
-		background: transparent;
+	.cell {
+		max-width: 22ch;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 		color: var(--text);
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
 	}
 
-	.btn-secondary:hover:not(:disabled) {
-		border-color: var(--amber);
-		color: var(--amber);
+	/* El segundo y el tercer valor bajan de tono: el primero es el que se lee. */
+	.cell:nth-child(2) {
+		color: var(--text-muted);
 	}
 
-	.spinner {
-		display: inline-block;
-		width: 14px;
-		height: 14px;
-		border: 2px solid rgba(212, 145, 42, 0.3);
-		border-top-color: var(--amber);
-		border-radius: 50%;
-		animation: spin 0.6s linear infinite;
+	.cell:nth-child(3) {
+		color: var(--text-dim);
 	}
 
-	.spinner.dark {
-		border-color: rgba(13, 8, 0, 0.25);
-		border-top-color: #0d0800;
+	.samples.pending-note {
+		font-family: var(--font-body);
+		color: var(--red);
 	}
 
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
+	.group-lead {
+		margin: 0;
+		padding-top: 0.75rem;
+		border-top: 1px solid var(--border-strong);
+		font-size: 0.83rem;
+		color: var(--text-muted);
+	}
+
+	.defaults {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 1.35rem;
+	}
+
+	.wide {
+		grid-column: 1 / -1;
+	}
+
+	@media (max-width: 900px) {
+		.row {
+			grid-template-columns: minmax(0, 1fr);
+			align-items: stretch;
+		}
+
+		.samples {
+			margin-bottom: 0;
 		}
 	}
 
-	@media (max-width: 768px) {
-		.form-actions {
-			flex-direction: column-reverse;
+	@media (max-width: 640px) {
+		.defaults {
+			grid-template-columns: minmax(0, 1fr);
 		}
 
-		.btn {
+		.sheet {
 			width: 100%;
-			justify-content: center;
 		}
 	}
 </style>

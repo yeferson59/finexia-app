@@ -67,6 +67,16 @@
 		width: 100%;
 	}
 
+	/*
+	 * El sitio del ojo lo reserva el campo que lo lleva. Estaba en `ui/input`
+	 * como un `padding-right: 3rem` fijo, así que los cientos de campos sin
+	 * icono de la aplicación escribían con tres centímetros de aire a la
+	 * derecha por culpa de este.
+	 */
+	.password-wrapper :global(.field-control) {
+		padding-right: 3rem;
+	}
+
 	.password-toggle {
 		position: absolute;
 		right: 0.75rem;

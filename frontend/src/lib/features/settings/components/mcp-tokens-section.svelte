@@ -147,7 +147,7 @@
 				<select
 					id="mcpExpiresInDays"
 					name="expiresInDays"
-					class="field-select"
+					class="field-control"
 					bind:value={expiresInDays}
 				>
 					{#each MCP_TOKEN_EXPIRY_OPTIONS as option (option.days)}
@@ -307,32 +307,12 @@
 		flex: 1;
 	}
 
-	/* El mismo aspecto que el campo de al lado, que es de `ui/input`: eran dos
-	   controles de la misma fila con dos alturas, dos bordes y dos grises. */
-	.field-label {
-		display: block;
-		margin-bottom: 0.5rem;
-		font-size: 0.875rem;
-		font-weight: 500;
-		letter-spacing: 0.3px;
-		color: var(--text);
-	}
-
-	.field-select {
-		padding: 0.875rem 1rem;
-		border-radius: 8px;
-		border: 1px solid rgba(212, 145, 42, 0.2);
-		background: rgba(255, 255, 255, 0.03);
-		color: var(--text);
-		font-family: var(--font-body);
-		font-size: 0.95rem;
-		box-sizing: border-box;
+	/* La caducidad y el nombre del token son dos controles de la misma fila, y
+	   ahora piden los dos el mismo campo de `routes/layout.css`: aquí estaba
+	   copiado a mano, medio punto más grande, y el comentario que había decía
+	   justamente que eran «dos alturas, dos bordes y dos grises». */
+	.create-row select {
 		cursor: pointer;
-	}
-
-	.field-select option {
-		background: var(--bg);
-		color: var(--text);
 	}
 
 	/* Filas con filete, como las sesiones y las aplicaciones: los tres son lo

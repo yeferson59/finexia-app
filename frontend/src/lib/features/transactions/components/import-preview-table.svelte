@@ -1,196 +1,216 @@
 <script lang="ts">
+	/*
+	 * Las primeras filas del archivo, ya interpretadas.
+	 *
+	 * Tres cosas de la versión anterior:
+	 *
+	 *  - Doce columnas fijas, y cuatro de ellas —comisión, moneda, tasa y moneda
+	 *    de la cuenta— salían llenas de «—» en la importación normal, que es un
+	 *    extracto en una sola moneda y sin comisión por línea. Ahora una columna
+	 *    solo aparece si alguna fila trae ese dato.
+	 *  - Los errores iban en una celda al final, o sea fuera de la pantalla,
+	 *    detrás de un scroll horizontal, que es donde no sirven. Ahora van debajo
+	 *    de su fila, a todo lo ancho.
+	 *  - La cabecera era una barra oscura en versalitas; es la misma tabla de un
+	 *    pelo que el libro de movimientos.
+	 */
 	import type { ImportPreview } from '../types';
 	import { TXN_TYPE_LABELS } from '../transactions';
 
 	let { preview, loading }: { preview: ImportPreview; loading: boolean } = $props();
+
+	const OPTIONAL_COLUMNS = [
+		{ key: 'fees', label: 'Comisión' },
+		{ key: 'currency', label: 'Moneda' },
+		{ key: 'fxRate', label: 'Tasa' },
+		{ key: 'costCurrency', label: 'Cuenta' }
+	] as const;
+
+	const shownColumns = $derived(
+		OPTIONAL_COLUMNS.filter((column) => preview.rows.some((row) => row[column.key]))
+	);
+
+	/* Fila, fecha, tipo, ticker, cantidad y precio van siempre. */
+	const columnCount = $derived(6 + shownColumns.length);
 </script>
 
-<div class="preview-summary" aria-live="polite">
+<p class="summary" aria-live="polite">
 	{#if loading}
-		<span class="spinner"></span> Actualizando vista previa…
+		<span class="spinner"></span> Actualizando la vista previa…
 	{:else}
-		<span class="count total">{preview.totalRows} filas</span>
-		<span class="count ok">{preview.validRows} listas para importar</span>
-		{#if preview.invalidRows > 0}
-			<span class="count bad">{preview.invalidRows} con errores (se omitirán)</span>
-		{/if}
+		{preview.totalRows} filas: {preview.validRows} listas para importar{#if preview.invalidRows > 0}
+			y {preview.invalidRows} con errores, que se quedan fuera{/if}.
 	{/if}
-</div>
+</p>
 
-<div class="preview-table-wrap">
-	<table class="preview-table">
+<div class="scroll">
+	<table>
+		<caption class="sr-only">
+			Las primeras filas de tu archivo tal como quedarán registradas, con el motivo por el que se
+			omitirán las que no se puedan interpretar
+		</caption>
 		<thead>
 			<tr>
-				<th>Fila</th>
-				<th>Estado</th>
-				<th>Fecha</th>
-				<th>Tipo</th>
-				<th>Ticker</th>
-				<th>Cantidad</th>
-				<th>Precio</th>
-				<th>Comisión</th>
-				<th>Moneda</th>
-				<th>Tasa</th>
-				<th>Cuenta</th>
-				<th>Detalle</th>
+				<th scope="col" class="num">Fila</th>
+				<th scope="col">Fecha</th>
+				<th scope="col">Movimiento</th>
+				<th scope="col">Ticker</th>
+				<th scope="col" class="num">Cantidad</th>
+				<th scope="col" class="num">Precio</th>
+				{#each shownColumns as column (column.key)}
+					<th scope="col" class="num">{column.label}</th>
+				{/each}
 			</tr>
 		</thead>
 		<tbody>
 			{#each preview.rows as row (row.rowNumber)}
 				<tr class:invalid={!row.valid}>
-					<td class="mono">{row.rowNumber}</td>
-					<td>
-						{#if row.valid}
-							<span class="status ok">✓</span>
-						{:else}
-							<span class="status bad">✗</span>
-						{/if}
-					</td>
-					<td class="mono">{row.date || '—'}</td>
-					<td>{TXN_TYPE_LABELS[row.type] ?? row.type ?? '—'}</td>
-					<td class="mono">{row.ticker || '—'}</td>
-					<td class="mono">{row.quantity || '—'}</td>
-					<td class="mono">{row.price || '—'}</td>
-					<td class="mono">{row.fees || '—'}</td>
-					<td class="mono">{row.currency || '—'}</td>
-					<!-- La tasa y la moneda de la cuenta sin destacar cuando no hubo
-					     conversión: en un extracto de una sola moneda son 1 y la misma
-					     de la fila en cada línea, y llamar la atención sobre ellas
-					     sería ruido en el caso normal. -->
-					<td class="mono" class:muted={row.fxRate === '1'}>{row.fxRate || '—'}</td>
-					<td class="mono" class:muted={row.costCurrency === row.currency}>
-						{row.costCurrency || '—'}
-					</td>
-					<td class="errors-cell">{row.errors.join('; ')}</td>
+					<th scope="row" class="num figure line">{row.rowNumber}</th>
+					<td class="figure">{row.date || '—'}</td>
+					<td class="kind">{TXN_TYPE_LABELS[row.type] ?? row.type ?? '—'}</td>
+					<td class="figure ticker">{row.ticker || '—'}</td>
+					<td class="num figure">{row.quantity || '—'}</td>
+					<td class="num figure">{row.price || '—'}</td>
+					{#each shownColumns as column (column.key)}
+						<!-- La tasa y la moneda de la cuenta sin destacar cuando no hubo
+						     conversión: en un extracto de una sola moneda son 1 y la misma
+						     de la fila en cada línea, y llamar la atención sobre ellas
+						     sería ruido en el caso normal. -->
+						<td
+							class="num figure"
+							class:muted={(column.key === 'fxRate' && row.fxRate === '1') ||
+								(column.key === 'costCurrency' && row.costCurrency === row.currency)}
+						>
+							{row[column.key] || '—'}
+						</td>
+					{/each}
 				</tr>
+				{#if !row.valid && row.errors.length > 0}
+					<tr class="why">
+						<td colspan={columnCount}>{row.errors.join('. ')}</td>
+					</tr>
+				{/if}
 			{/each}
 		</tbody>
 	</table>
-	{#if preview.totalRows > preview.rows.length}
-		<p class="table-note">
-			Mostrando las primeras {preview.rows.length} filas de {preview.totalRows}. El total se valida
-			completo al importar.
-		</p>
-	{/if}
 </div>
 
+{#if preview.totalRows > preview.rows.length}
+	<p class="note">
+		Son las primeras {preview.rows.length} de {preview.totalRows} filas. Al importar se revisan todas.
+	</p>
+{/if}
+
 <style>
-	.preview-summary {
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
+	.summary {
 		display: flex;
 		align-items: center;
-		gap: 0.8rem;
-		flex-wrap: wrap;
-		margin: 1.6rem 0 0.8rem;
+		gap: 0.5rem;
+		margin: 0 0 1.25rem;
 		font-size: 0.85rem;
 		color: var(--text-muted);
 	}
 
-	.count {
-		padding: 0.3rem 0.7rem;
-		border-radius: 999px;
-		font-weight: 600;
-		font-size: 0.8rem;
-	}
-
-	.count.total {
-		background: rgba(255, 255, 255, 0.06);
-		color: var(--text);
-	}
-
-	.count.ok {
-		background: rgba(34, 201, 126, 0.12);
-		color: #22c97e;
-	}
-
-	.count.bad {
-		background: rgba(224, 90, 90, 0.12);
-		color: #e05a5a;
-	}
-
-	.preview-table-wrap {
+	.scroll {
 		overflow-x: auto;
-		max-height: 26rem;
-		overflow-y: auto;
-		border: 1px solid var(--border);
-		border-radius: 12px;
+		overscroll-behavior-x: contain;
 	}
 
-	.preview-table {
+	table {
 		width: 100%;
+		min-width: 42rem;
 		border-collapse: collapse;
-		font-size: 0.82rem;
 	}
 
-	.preview-table th {
-		position: sticky;
-		top: 0;
-		background: #1f1a12;
-		color: rgba(236, 234, 229, 0.75);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		font-size: 0.7rem;
+	thead th {
+		padding: 0 0.75rem 0.6rem;
+		border-bottom: 1px solid var(--border);
+		font-size: 0.75rem;
+		font-weight: 400;
+		color: var(--text-dim);
 		text-align: left;
-		padding: 0.7rem 0.8rem;
-		z-index: 1;
-	}
-
-	.preview-table td {
-		padding: 0.55rem 0.8rem;
-		border-top: 1px solid rgba(255, 255, 255, 0.05);
-		color: var(--text);
 		white-space: nowrap;
 	}
 
-	.preview-table tr.invalid td {
-		background: rgba(224, 90, 90, 0.05);
+	tbody th,
+	tbody td {
+		padding: 0.7rem 0.75rem;
+		border-bottom: 1px solid var(--border);
+		font-size: 0.82rem;
+		font-weight: 400;
+		color: var(--text);
+		text-align: left;
+		white-space: nowrap;
+	}
+
+	thead th:first-child,
+	tbody th:first-child {
+		padding-left: 0;
+	}
+
+	thead th:last-child,
+	tbody td:last-child {
+		padding-right: 0;
+	}
+
+	.num {
+		text-align: right;
+	}
+
+	/* El número de fila es la referencia con la que el usuario vuelve a su hoja:
+	   en tono bajo, pero legible. */
+	.line {
+		color: var(--text-dim);
+	}
+
+	.kind {
+		white-space: nowrap;
+	}
+
+	.ticker {
+		letter-spacing: 0.03em;
 	}
 
 	.muted {
 		color: var(--text-dim);
 	}
 
-	.errors-cell {
-		color: #e05a5a;
-		font-size: 0.78rem;
-		max-width: 26rem;
+	/* Lo que no entra se ve de un vistazo, y el motivo va justo debajo y entero,
+	   no en una celda al final de un scroll horizontal. */
+	tbody tr.invalid th,
+	tbody tr.invalid td {
+		background: rgba(224, 90, 90, 0.045);
+		border-bottom-color: transparent;
+	}
+
+	tbody tr.invalid .line {
+		color: var(--red);
+	}
+
+	.why td {
+		padding-top: 0;
+		padding-bottom: 0.7rem;
+		background: rgba(224, 90, 90, 0.045);
+		font-size: 0.79rem;
+		line-height: 1.45;
+		color: var(--red);
 		white-space: normal;
 	}
 
-	.status.ok {
-		color: #22c97e;
-		font-weight: 700;
-	}
-
-	.status.bad {
-		color: #e05a5a;
-		font-weight: 700;
-	}
-
-	.table-note {
-		font-size: 0.78rem;
-		color: var(--text-muted);
-		padding: 0.6rem 0.8rem;
-		margin: 0;
-	}
-
-	.mono {
-		font-family: var(--font-mono);
-		font-variant-numeric: tabular-nums;
-	}
-
-	.spinner {
-		display: inline-block;
-		width: 14px;
-		height: 14px;
-		border: 2px solid rgba(212, 145, 42, 0.3);
-		border-top-color: var(--amber);
-		border-radius: 50%;
-		animation: spin 0.6s linear infinite;
-	}
-
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
+	.note {
+		margin: 0.9rem 0 0;
+		font-size: 0.8rem;
+		color: var(--text-dim);
 	}
 </style>

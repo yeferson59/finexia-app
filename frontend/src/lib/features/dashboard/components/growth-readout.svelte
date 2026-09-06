@@ -58,7 +58,7 @@
 			</b>
 		</span>
 	{:else}
-		<span class="hint">
+		<span class="idle">
 			Pasa el cursor por la gráfica —o enfócala y usa las flechas— para ver el detalle de cada día.
 		</span>
 	{/if}
@@ -120,7 +120,9 @@
 		background: var(--cost);
 	}
 
-	.hint {
+	/* No es la ayuda de un campo, así que no se llama `hint`: es lo que dice el
+	   lector de la gráfica mientras nadie la señala. */
+	.idle {
 		color: var(--text-dim);
 	}
 

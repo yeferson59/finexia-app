@@ -32,9 +32,3 @@
 		</p>
 	{/if}
 </div>
-
-<style>
-	.hint a {
-		color: var(--amber);
-	}
-</style>

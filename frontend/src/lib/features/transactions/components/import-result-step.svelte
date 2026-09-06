@@ -1,4 +1,15 @@
 <script lang="ts">
+	/*
+	 * Paso tres: qué acabó de pasar.
+	 *
+	 * Era una palomita ámbar de 2,2rem centrada, un título y, muy por debajo, las
+	 * filas omitidas en una caja con scroll. Pero cuando algo se queda fuera, eso
+	 * es la noticia: la palomita celebraba una importación a medias y escondía la
+	 * parte que el usuario tiene que arreglar en su hoja. Ahora lo que pasó se
+	 * dice en una frase y lo que falta va justo detrás, con el número de fila
+	 * delante para poder volver al archivo.
+	 */
+	import Button from '$lib/ui/button.svelte';
 	import type { ImportResult } from '../types';
 
 	let {
@@ -10,153 +21,111 @@
 		onRestart: () => void;
 		onViewTransactions: () => void;
 	} = $props();
+
+	const headline = $derived(
+		result.imported === 0
+			? 'No entró ninguna fila.'
+			: result.skipped === 0
+				? `Listo: tus ${result.imported} transacciones están en el portafolio.`
+				: `${result.imported} de ${result.totalRows} filas están en tu portafolio.`
+	);
 </script>
 
-<div class="result-panel">
-	<p class="result-icon" aria-hidden="true">{result.imported > 0 ? '✓' : '!'}</p>
-	<h2 class="section-title">
-		{result.imported > 0
-			? `${result.imported} transacciones importadas`
-			: 'No se importó ninguna transacción'}
-	</h2>
-	<p class="section-hint">
-		{result.totalRows} filas procesadas · {result.imported} importadas · {result.skipped} omitidas por
-		errores.
-	</p>
+<section class="result">
+	<h2>{headline}</h2>
 
-	{#if result.errors.length > 0}
-		<div class="result-errors">
-			<h3 class="section-subtitle">Filas omitidas</h3>
-			<ul>
-				{#each result.errors as err (err.row)}
-					<li><span class="mono">Fila {err.row}:</span> {err.message}</li>
-				{/each}
-			</ul>
-		</div>
+	{#if result.skipped > 0}
+		<p class="lede">
+			{result.skipped === 1 ? 'Una fila se quedó' : `${result.skipped} filas se quedaron`} fuera. Corrígelas
+			en tu hoja y vuelve a subirla: las que ya entraron no se duplican, se omiten por repetidas.
+		</p>
+	{:else if result.imported > 0}
+		<p class="lede">Ya puedes verlas en tu libro de movimientos.</p>
 	{/if}
 
-	<div class="form-actions center">
-		<button type="button" class="btn btn-secondary" onclick={onRestart}>
-			Importar otro archivo
-		</button>
-		<button type="button" class="btn btn-primary" onclick={onViewTransactions}>
+	{#if result.errors.length > 0}
+		<ul class="skipped">
+			{#each result.errors as error (error.row)}
+				<li>
+					<span class="line figure">Fila {error.row}</span>
+					<span class="reason">{error.message}</span>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+
+	<div class="actions">
+		<Button type="button" variant="primary" onclick={onViewTransactions}>
 			Ver mis transacciones
-		</button>
+		</Button>
+		<button type="button" class="quiet-action" onclick={onRestart}> Importar otro archivo </button>
 	</div>
-</div>
+</section>
 
 <style>
-	.section-title {
+	.result {
+		padding-top: 2.25rem;
+		border-top: 1px solid var(--border-strong);
+	}
+
+	h2 {
+		max-width: 24ch;
+		margin: 0;
 		font-family: var(--font-display);
-		font-size: 1.25rem;
-		font-weight: 400;
+		font-size: clamp(1.6rem, 3.5vw, 2.1rem);
+		font-weight: 300;
+		line-height: 1.2;
+		letter-spacing: -0.02em;
 		color: var(--text);
-		margin: 0 0 0.4rem;
 	}
 
-	.section-subtitle {
-		font-size: 0.95rem;
-		font-weight: 700;
-		color: var(--text);
-		margin: 1.6rem 0 0.3rem;
-	}
-
-	.section-hint {
-		font-size: 0.85rem;
+	.lede {
+		max-width: 58ch;
+		margin: 1rem 0 0;
+		font-size: 0.9rem;
+		line-height: 1.6;
 		color: var(--text-muted);
-		margin: 0 0 1rem;
 	}
 
-	.mono {
-		font-family: var(--font-mono);
-		font-variant-numeric: tabular-nums;
-	}
-
-	.result-panel {
-		text-align: center;
-		padding: 1.5rem 0.5rem;
-	}
-
-	.result-icon {
-		font-size: 2.2rem;
-		color: var(--amber);
-		margin: 0 0 0.6rem;
-	}
-
-	.result-errors {
-		text-align: left;
-		max-width: 42rem;
-		margin: 1.5rem auto 0;
-		border: 1px solid var(--border);
-		border-radius: 12px;
-		padding: 1rem 1.2rem;
-		max-height: 16rem;
+	.skipped {
+		max-width: 58ch;
+		margin: 1.75rem 0 0;
+		padding: 0;
+		list-style: none;
+		max-height: 20rem;
 		overflow-y: auto;
 	}
 
-	.result-errors ul {
-		margin: 0.5rem 0 0;
-		padding-left: 1.1rem;
-		font-size: 0.82rem;
-		color: var(--text-muted);
+	.skipped li {
 		display: grid;
-		gap: 0.35rem;
+		grid-template-columns: minmax(0, 5.5rem) minmax(0, 1fr);
+		gap: 0.25rem 1rem;
+		padding: 0.7rem 0;
+		border-bottom: 1px solid var(--border);
+		font-size: 0.83rem;
+		line-height: 1.5;
 	}
 
-	.form-actions {
-		display: flex;
-		gap: 1rem;
-		justify-content: flex-end;
-		margin-top: 1.8rem;
+	.skipped li:last-child {
+		border-bottom: none;
 	}
 
-	.form-actions.center {
-		justify-content: center;
+	.line {
+		color: var(--text-dim);
 	}
 
-	.btn {
-		padding: 0.8rem 1.4rem;
-		border: none;
-		border-radius: 10px;
-		font-weight: 700;
-		font-family: var(--font-body);
-		font-size: 0.92rem;
-		cursor: pointer;
-		transition: all 0.25s ease;
-		display: inline-flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.btn-primary {
-		background: var(--amber);
-		color: #0d0800;
-	}
-
-	.btn-primary:hover:not(:disabled) {
-		transform: translateY(-2px);
-		box-shadow: 0 10px 25px rgba(212, 145, 42, 0.25);
-	}
-
-	.btn-secondary {
-		background: transparent;
+	.reason {
+		min-width: 0;
 		color: var(--text);
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
 	}
 
-	.btn-secondary:hover:not(:disabled) {
-		border-color: var(--amber);
-		color: var(--amber);
+	.actions {
+		margin-top: 2.25rem;
 	}
 
-	@media (max-width: 768px) {
-		.form-actions {
-			flex-direction: column-reverse;
-		}
-
-		.btn {
-			width: 100%;
-			justify-content: center;
+	@media (max-width: 560px) {
+		.skipped li {
+			grid-template-columns: minmax(0, 1fr);
 		}
 	}
 </style>
