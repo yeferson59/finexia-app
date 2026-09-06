@@ -1,6 +1,6 @@
 # Manual de Usuario — FINEXIA
 
-**Versión del documento:** 1.8
+**Versión del documento:** 1.9
 **Fecha:** Septiembre 2026
 **Aplicación:** Finexia — Plataforma de gestión y seguimiento de portafolios de inversión
 
@@ -142,7 +142,7 @@ Es el menú de navegación. Sus secciones son:
 | **Mis Activos** | Cuánto tienes de cada activo, sumando todos tus portafolios |
 | **Plataformas** | Registrar los brokers/exchanges/bancos donde tienes activos |
 | **Transacciones** | Historial de operaciones e importación desde Excel/CSV |
-| **Reportes** | Estadísticas, calendario de rendimiento y descargas en Excel |
+| **Reportes** | Rentabilidad mes a mes, medidas de riesgo, proyección y descargas en Excel |
 | **Notificaciones** | Preferencias de avisos por correo y en la app |
 | **Guía de usuario** | Este manual, para consultarlo en pantalla o descargarlo |
 | **Configuración** | Perfil, apariencia, contraseña, 2FA, sesiones, claves de datos de mercado y acceso para asistentes |
@@ -542,57 +542,71 @@ En esta pantalla:
 
 ## 12. Reportes y exportaciones
 
-La sección **Reportes** ("Gestiona y descarga documentos financieros de tu cuenta") concentra el análisis de rendimiento.
+La sección **Reportes** es la ficha de resultados de tu cuenta: qué rindió tu dinero, cómo se movió para llegar ahí, adónde llegaría si el ritmo se mantuviera, y los archivos para llevártelo todo.
 
-![Página de reportes con el calendario de rendimiento, las estadísticas clave, la proyección de crecimiento y las descargas](img/manual/10-reportes.png)
+![Página de reportes con la cifra de cabecera, la matriz de rentabilidad mes a mes, las medidas de riesgo, la proyección y las descargas](img/manual/10-reportes.png)
 
-### 12.1 Reportes en pantalla
+### 12.1 La cifra de cabecera
 
-- **Rentabilidad mensual (%):** calendario con el rendimiento de cada mes, un panel por año (verás tantos paneles como años cubra tu historial). Arriba de cada panel está el **acumulado del año**, y debajo la **leyenda de la escala de color** (de rojo intenso para caídas de más del 1 % a verde intenso para subidas del 2 % o más). Los meses sin dato aparecen con un guion.
+Lo primero que verás es **lo que rindió tu dinero** en todo el historial, con el periodo que cubre debajo y —a partir de 90 días— la misma cifra llevada a un año.
 
-  Lo que ves es **rendimiento de lo invertido, no variación del saldo**: los aportes y retiros del mes se descuentan antes de calcular el porcentaje, así que ingresar dinero no pinta el mes en verde. El descuento se hace con tus movimientos reales, uno a uno: una compra entra como dinero puesto, una venta sale por lo que cobraste —no por lo que te costó en su día, que es lo que convertiría una plusvalía en pérdida— y un dividendo cuenta como renta que sí ganaste. Los meses que tu historial no cubre enteros van marcados con un asterisco —el mes en el que arranca y el que está en curso—, porque cubren menos días que un mes completo. Esos mismos meses quedan fuera del mejor y el peor mes de las estadísticas: tres días no se comparan con treinta.
+La línea siguiente dice cuánto vale hoy la cuenta, cuánto has puesto y cuál es la diferencia, en dinero y en porcentaje.
 
-  Un detalle a tener en cuenta al empezar: cuando registras una posición que ya tenías comprada, la aplicación la incorpora el día en que se la cuentas, no el día en que la compraste —de tu historial anterior no sabe nada—. Si esa posición llega con ganancia acumulada, esa ganancia aparece entera en su primer día dentro de la aplicación. No es un error de cálculo, es todo lo que se puede saber de un periodo que nadie observó; a partir de ahí, el seguimiento ya es día a día.
+Esas dos cifras —la rentabilidad de arriba y la ganancia sobre coste de abajo— **pueden no parecerse, y ninguna está mal**: la primera encadena lo que rindió tu dinero e ignora *cuándo* aportaste; la segunda es dinero contante y sí depende de eso. Un +30 % de rentabilidad puede convivir con un +10 % sobre coste: significa que la mayor parte de tu capital entró después de la subida. Cuando las dos se separan de verdad, la página te lo explica ahí mismo en vez de dejarte con la contradicción.
 
-- **Estadísticas clave:** doce métricas repartidas en tres bloques.
+Si todavía no hay dos cierres diarios que comparar, la cabecera enseña el saldo y te dice que la rentabilidad espera al cierre de mañana.
 
-  | Bloque | Métricas |
-  |---|---|
-  | **Rendimiento** | Rentabilidad del periodo, rentabilidad anualizada, ganancia / pérdida, ganancia sobre coste, mejor mes y peor mes |
-  | **Riesgo** | Volatilidad anualizada, máxima caída y ratio de Sharpe |
-  | **Historial** | Periodo cubierto, capital invertido y valor actual |
+### 12.2 Rentabilidad mes a mes
 
-  Al pasar el cursor por cualquier métrica verás qué mide exactamente. Las que necesitan más historial del que tienes aparecen como **N/A** con el motivo escrito debajo. Las cifras anuales —rentabilidad anualizada y ratio de Sharpe— comparten el mismo umbral de **90 días**, porque las dos son el mismo historial llevado a un año y anualizar unas pocas semanas da cifras sin sentido.
+Una matriz con **un año por fila y un mes por columna**, del año más reciente al más antiguo, y el **total del año** cerrando cada fila. Así se compara un mes con el de al lado y con el mismo mes del año anterior, que es lo que se suele querer saber. El fondo de cada celda tiñe de verde lo que subió y de rojo lo que bajó, con más intensidad cuanto mayor fue el movimiento; la cifra está escrita en la celda, así que el color no hay que descifrarlo. Los meses sin dato aparecen con un guion.
 
-  La volatilidad es un caso aparte y por eso cambia de nombre: medir cuánto oscila tu cartera de un día al otro necesita tramos (al menos 10), no meses, así que por debajo de los 90 días se publica como **volatilidad por tramo**, sin anualizar y con el aviso al lado. A partir de los 90 pasa a llamarse **volatilidad anualizada**. No compares una con otra: en una serie diaria se llevan un factor de veinte.
+En pantallas estrechas la matriz se desplaza de lado y la columna del año se queda fija, para no perder de vista qué año se está leyendo.
 
-  Dos cosas que conviene tener claras al leer la tarjeta, porque las cifras parecen contradecirse y no lo hacen:
+Lo que ves es **rendimiento de lo invertido, no variación del saldo**: los aportes y retiros del mes se descuentan antes de calcular el porcentaje, así que ingresar dinero no pinta el mes en verde. El descuento se hace con tus movimientos reales, uno a uno: una compra entra como dinero puesto, una venta sale por lo que cobraste —no por lo que te costó en su día, que es lo que convertiría una plusvalía en pérdida— y un dividendo cuenta como renta que sí ganaste. Los meses que tu historial no cubre enteros van marcados con un asterisco —el mes en el que arranca y el que está en curso—, porque cubren menos días que un mes completo. Esos mismos meses quedan fuera del mejor y el peor mes: tres días no se comparan con treinta.
 
-  - **La rentabilidad del periodo no se traduce en la ganancia.** La primera encadena lo que rindió tu dinero e ignora *cuándo* aportaste; la segunda es dinero contante y sí depende de eso. Un +30 % de periodo puede convivir con un +10 % sobre coste: significa que la mayor parte de tu capital entró después de la subida. Ninguna de las dos está mal, miden cosas distintas.
-  - **El ratio de Sharpe no cuadra con la rentabilidad anualizada.** Se calcula por la convención de siempre (media de los tramos anualizada ÷ volatilidad), que no es la rentabilidad compuesta de la primera fila dividida entre la volatilidad. Si multiplicas el Sharpe por la volatilidad no te sale la anualizada, y no es un error. Va en gris y con un aviso al lado a propósito: es una estimación, y con pocos meses de historial su margen de error es lo bastante ancho como para que no debas leerlo como un sello de calidad.
+Un detalle a tener en cuenta al empezar: cuando registras una posición que ya tenías comprada, la aplicación la incorpora el día en que se la cuentas, no el día en que la compraste —de tu historial anterior no sabe nada—. Si esa posición llega con ganancia acumulada, esa ganancia aparece entera en su primer día dentro de la aplicación. No es un error de cálculo, es todo lo que se puede saber de un periodo que nadie observó; a partir de ahí, el seguimiento ya es día a día.
 
-- **Proyección de crecimiento:** estimación a cinco años calculada extrapolando **tu rentabilidad anualizada** sobre el valor actual, sin contar aportes futuros. La tasa que se extrapola va en la píldora de la cabecera (p. ej. **+12,4 % anual**), y cada año muestra dos cifras: su **valor proyectado** y, debajo, el **porcentaje acumulado** desde hoy.
+### 12.3 Cómo se movió
 
-  Las dos dicen lo mismo de dos formas, pero solo una es comparable. El importe depende de cuánto tengas hoy en la cuenta —un aporte de mañana lo mueve entero sin que la proyección haya cambiado de opinión—; el porcentaje es la extrapolación en crudo, y es el que puedes comparar con el de cualquier otra cartera o con lo que rinde una alternativa.
+Cinco medidas, cada una **con su explicación al lado**, en una columna que dice qué mide exactamente (antes había que pasar el cursor por encima, algo que en un móvil no se puede hacer). La que necesita más historial del que tienes aparece como **N/A** y su explicación dice qué le falta.
 
-  **No es una previsión de mercado**, y por eso la aplicación se abstiene de mostrarla cuando tienes menos de seis meses de historial —en ese caso te dice cuántos días llevas y cuántos faltan— o cuando el ritmo es tan extremo que proyectarlo daría cifras absurdas.
+| Medida | Qué mide |
+|---|---|
+| **Mejor mes** y **peor mes** | El mes que más y el que menos rindió, con el mes debajo de la cifra. Los meses incompletos no compiten |
+| **Volatilidad** | Cuánto oscila tu rentabilidad de un día al siguiente |
+| **Máxima caída** | La peor bajada desde un máximo hasta el siguiente suelo: lo que habrías tenido que aguantar, no lo que perdiste |
+| **Ratio de Sharpe** | Cuánta rentabilidad te dio cada unidad de riesgo |
 
-### 12.2 Descargas en Excel (XLSX)
+La volatilidad **cambia de nombre según lo que se pueda afirmar**: medir cuánto oscila tu cartera necesita tramos (al menos 10), no meses, así que por debajo de los 90 días de historial se publica como **volatilidad por tramo**, sin anualizar y con el aviso al lado. A partir de los 90 pasa a llamarse **volatilidad anualizada**. No compares una con otra: en una serie diaria se llevan un factor de veinte.
 
-En la parte inferior de la página encontrarás las tarjetas de descarga; pulsa **Descargar** en la que necesites:
+Y el **ratio de Sharpe no cuadra con la rentabilidad anualizada** de la cabecera, a propósito: se calcula por la convención de siempre (media de los tramos anualizada ÷ volatilidad), que no es la rentabilidad compuesta dividida entre la volatilidad. Si multiplicas el Sharpe por la volatilidad no te sale la anualizada, y no es un error. Va en gris y con un aviso al lado porque es una estimación, y con pocos meses de historial su margen de error es lo bastante ancho como para que no debas leerlo como un sello de calidad.
+
+### 12.4 Si el ritmo se mantiene
+
+La proyección a cinco años extrapola **tu rentabilidad anualizada** sobre el valor actual, sin contar aportes futuros.
+
+La curva dibuja el **porcentaje acumulado desde hoy**, con la línea del cero siempre a la vista: así una tasa que casi no mueve nada dibuja una línea que casi no se mueve, en vez de parecer un desplome por haber estirado unos pocos dólares al alto del gráfico. Debajo, una tabla con **el valor proyectado y el acumulado de cada año**, que es la misma proyección en cifras.
+
+El porcentaje y el importe dicen lo mismo de dos formas, pero solo uno es comparable. El importe depende de cuánto tengas hoy en la cuenta —un aporte de mañana lo mueve entero sin que la proyección haya cambiado de opinión—; el porcentaje es la extrapolación en crudo, y es el que puedes comparar con el de cualquier otra cartera o con lo que rinde una alternativa.
+
+**No es una previsión de mercado**, y por eso la aplicación se abstiene de mostrarla cuando tienes menos de seis meses de historial —en ese caso te dice cuántos días llevas y cuántos faltan— o cuando el ritmo es tan extremo que proyectarlo daría cifras absurdas.
+
+### 12.5 Descargas en Excel (XLSX)
+
+Al final de la página, **Llévate los datos**: cada archivo dice qué trae dentro y baja con el enlace de su fila.
 
 | Reporte | Contenido |
 |---|---|
-| **Resumen mensual** | Resumen mes a mes del portafolio |
-| **Estado de resultados** | Historial completo de transacciones |
-| **Riesgo y volatilidad** | Las métricas de la página, el detalle mensual y la serie de la que salen |
+| **Resumen mensual** | Valor, capital invertido y ganancia de tu cuenta, mes a mes |
+| **Transacciones** | Cada compra, venta y dividendo que has registrado, con sus comisiones |
+| **Riesgo y volatilidad** | Las medidas de la página, el detalle mensual y la serie de la que salen |
 
 El reporte de **riesgo y volatilidad** trae tres hojas:
 
 | Hoja | Contenido |
 |---|---|
-| **Métricas de riesgo** | Las mismas cifras del panel *Estadísticas clave*, cada una con su unidad y una columna que explica cómo se calcula. Una métrica que tu historial todavía no sostiene dice «Sin historial suficiente» en vez de dejar la celda vacía, que se leería como un cero |
-| **Rentabilidad mensual** | El porcentaje de cada mes, el mismo del calendario, con una columna que dice si el mes está completo. Los que no lo están son el primero de tu historial y el que esté en curso |
+| **Métricas de riesgo** | Las cifras de la página, cada una con su unidad y una columna que explica cómo se calcula. Una métrica que tu historial todavía no sostiene dice «Sin historial suficiente» en vez de dejar la celda vacía, que se leería como un cero |
+| **Rentabilidad mensual** | El porcentaje de cada mes, el mismo de la matriz, con una columna que dice si el mes está completo. Los que no lo están son el primero de tu historial y el que esté en curso |
 | **Historial de crecimiento** | La serie diaria: valor, coste, ganancia, rentabilidad y el **aporte neto** de cada día. Con esa última columna puedes rehacer cualquiera de las métricas por tu cuenta y comprobar que cuadran |
 
 Los archivos se descargan directamente a tu equipo en formato Excel (XLSX) y puedes abrirlos con Excel, LibreOffice o Google Sheets.
@@ -811,7 +825,7 @@ Usa uno de tus **códigos de recuperación** para entrar y luego reconfigura la 
 Sí. La interfaz es adaptable; en pantallas pequeñas el menú lateral se abre desde el botón de la cabecera (ver sección 4.4).
 
 **¿Cómo exporto mis datos?**
-Desde **Reportes** puedes descargar en Excel el resumen mensual, el estado de resultados (transacciones) y las métricas de riesgo y volatilidad.
+Desde **Reportes** puedes descargar en Excel el resumen mensual, tus transacciones y las métricas de riesgo y volatilidad.
 
 **¿Dónde encuentro este manual?**
 En **Guía de usuario**, en el menú lateral. Puedes leerlo dentro de la aplicación, abrirlo en una pestaña nueva o descargar el PDF (ver sección 4.5).

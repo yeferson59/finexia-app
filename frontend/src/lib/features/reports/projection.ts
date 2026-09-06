@@ -108,27 +108,71 @@ export function buildGrowthProjection(
 }
 
 /**
- * Canal izquierdo de la gráfica de proyección, en unidades del viewBox.
+ * Geometría de la curva de proyección dentro del viewBox `0 0 600 208`.
  *
- * Son 58 y no 40: con una tasa pequeña las marcas del eje llegan a «$89.41k», y
- * con el margen anterior el `$` y las primeras cifras se salían del viewBox y
- * se veían cortadas.
+ * Lo que se dibuja es el porcentaje acumulado, no el dinero, y el eje incluye
+ * siempre el cero. La gráfica anterior estiraba el rango de los cinco importes
+ * al alto del lienzo: con una tasa del −0,3 % anual, noventa dólares de
+ * diferencia ocupaban todo el canvas y la proyección se veía como un
+ * desplome. Anclada en el cero, una tasa que no mueve nada dibuja una línea
+ * que no se mueve, que es lo que de verdad está pasando.
+ *
+ * Los importes no viajan aquí: van en la tabla de debajo, que es donde una
+ * cifra se lee.
  */
-export const PROJECTION_GUTTER = 58;
+export const PROJECTION_GUTTER = 54;
 
-/** Coordenadas de la gráfica de proyección dentro del viewBox `0 0 600 280`. */
-export function projectionCoordinates(
-	entries: GrowthProjectionEntry[]
-): { x: number; y: number; period: string }[] {
-	if (entries.length === 0) return [];
+const PLOT = { right: 570, top: 22, bottom: 160 };
 
-	const values = entries.map((p) => p.value);
-	const min = Math.min(...values);
-	const range = Math.max(...values) - min || 1;
+/** Marcas del eje, la línea del cero y los trazos de la curva. */
+export interface ProjectionGeometry {
+	points: { x: number; y: number; period: string }[];
+	/** `points` de la polilínea. */
+	line: string;
+	/** El mismo trazo cerrado contra la línea del cero, para el relleno. */
+	area: string;
+	zeroY: number;
+	/** Marcas del eje vertical; la del cero no está, la dibuja su propia línea. */
+	ticks: { y: number; value: number }[];
+}
 
-	return entries.map((point, i) => ({
-		x: PROJECTION_GUTTER + i * 124,
-		y: 230 - ((point.value - min) / range) * 180,
-		period: point.period
+const EMPTY: ProjectionGeometry = { points: [], line: '', area: '', zeroY: PLOT.bottom, ticks: [] };
+
+export function projectionGeometry(entries: GrowthProjectionEntry[]): ProjectionGeometry {
+	if (entries.length === 0) return EMPTY;
+
+	const values = entries.map((entry) => entry.returnPct);
+	// El cero entra siempre en el rango, por arriba o por abajo: es contra él
+	// contra lo que se lee si la curva sube o baja.
+	const lo = Math.min(0, ...values);
+	const top = Math.max(0, ...values);
+	// Con la tasa clavada en cero el rango es nulo: un punto de margen deja la
+	// línea plana en su sitio en vez de dividir entre cero.
+	const hi = top - lo < 1e-9 ? lo + 1 : top;
+	const y = (value: number) => PLOT.bottom - ((value - lo) / (hi - lo)) * (PLOT.bottom - PLOT.top);
+
+	const step = entries.length > 1 ? (PLOT.right - PROJECTION_GUTTER) / (entries.length - 1) : 0;
+
+	const points = entries.map((entry, i) => ({
+		x: PROJECTION_GUTTER + i * step,
+		y: y(entry.returnPct),
+		period: entry.period
 	}));
+
+	const line = points.map((point) => `${point.x},${point.y}`).join(' ');
+	const zeroY = y(0);
+	const last = points[points.length - 1];
+
+	return {
+		points,
+		line,
+		area: `${line} ${last.x},${zeroY} ${points[0].x},${zeroY}`,
+		zeroY,
+		// Cuatro marcas repartidas por el rango, sin la que caería encima de la
+		// línea del cero y repetiría su etiqueta.
+		ticks: Array.from({ length: 4 }, (_, i) => {
+			const value = hi - ((hi - lo) * i) / 3;
+			return { y: y(value), value };
+		}).filter((tick) => Math.abs(tick.y - zeroY) > 6)
+	};
 }

@@ -1,121 +1,206 @@
 <script lang="ts">
 	/*
-	 * Estadísticas del historial: rendimiento, riesgo y de cuánto historial
-	 * salen los dos.
+	 * Cuánto se movió la cuenta para llegar a la cifra de la cabecera: los dos
+	 * meses extremos y las tres medidas de riesgo.
 	 *
-	 * Antes eran dos filas —máxima caída y volatilidad— y la segunda decía `N/A`
-	 * sin explicar por qué, con el resto de la serie sin usar. Ahora los tres
-	 * bloques reparten doce métricas, cada una lleva en `title` qué mide, y la
-	 * que no se puede calcular dice a la vista qué historial le falta.
+	 * Eran doce mosaicos idénticos repartidos en tres bloques con antetítulo en
+	 * versalitas, y lo que cada uno medía vivía en un `title`: en un móvil no se
+	 * abre, con el teclado tampoco, y sin eso «Ratio de Sharpe −0,01» es un
+	 * número sin idioma. Ahora la explicación es una columna de la tabla, que es
+	 * la mitad del dato y no una ayuda opcional.
 	 *
-	 * Una métrica que sí sale puede traer `note`: el reparo que hay que leer con
-	 * la cifra —una estimación de margen amplio, un mes incompleto— y que en el
-	 * `title` no vería nadie.
+	 * Las seis métricas que faltan —rentabilidad, anualizada, periodo, capital,
+	 * valor y ganancia— están en la cabecera de la página: no se repiten aquí.
 	 */
-	import ReportPanel from './report-panel.svelte';
-	import { UNAVAILABLE, type KeyStatGroup } from '../reports';
+	import { UNAVAILABLE, type KeyStat } from '../reports';
 
-	interface Props {
-		groups: KeyStatGroup[];
-	}
-
-	let { groups }: Props = $props();
+	let { stats }: { stats: KeyStat[] } = $props();
 </script>
 
-<ReportPanel class="stats-card" title="Estadísticas clave">
-	{#if groups.length > 0}
-		{#each groups as group (group.title)}
-			<section class="stat-group">
-				<h3>{group.title}</h3>
-				<!-- Etiqueta y valor son un par: `dl` los relaciona, dos `p` no. -->
-				<dl class="stats-list">
-					{#each group.stats as stat (stat.label)}
-						<div class="stat-tile" title={stat.hint}>
-							<dt>{stat.label}</dt>
-							<dd class={stat.tone ?? 'neutral'}>{stat.value}</dd>
-							{#if stat.value === UNAVAILABLE && stat.hint}
-								<!-- Sin esto, `N/A` no distingue «falta historial» de «algo se rompió». -->
-								<p class="reason">{stat.hint}</p>
-							{:else if stat.note}
-								<!-- El reparo de una cifra que sí sale va a la vista, no al `title`:
-								     un Sharpe estimado con tres meses se lee mal sin él. -->
-								<p class="reason">{stat.note}</p>
-							{/if}
-						</div>
-					{/each}
-				</dl>
-			</section>
-		{/each}
-	{:else}
-		<p class="empty-text">
-			Sin datos históricos todavía. Las estadísticas aparecen con el primer cierre diario de tu
-			cartera.
-		</p>
-	{/if}
-</ReportPanel>
+<section class="movement" aria-labelledby="movement">
+	<h2 id="movement">Cómo se movió</h2>
+
+	<table>
+		<thead>
+			<tr>
+				<th scope="col">Medida</th>
+				<th scope="col" class="num">Valor</th>
+				<th scope="col">Qué mide</th>
+			</tr>
+		</thead>
+		<tbody>
+			{#each stats as stat (stat.label)}
+				<tr>
+					<th scope="row">{stat.label}</th>
+					<td class="num value {stat.tone ?? 'neutral'}" class:missing={stat.value === UNAVAILABLE}>
+						{stat.value}
+						{#if stat.detail}
+							<span class="detail">{stat.detail}</span>
+						{/if}
+					</td>
+					<td class="meaning">
+						{stat.hint}
+						{#if stat.note}
+							<!-- El reparo va con la explicación y no bajo la cifra: alineado a la
+							     derecha ocupaba tres renglones en bandera y no había por dónde
+							     empezar a leerlo. -->
+							<span class="note">{stat.note}</span>
+						{/if}
+					</td>
+				</tr>
+			{/each}
+		</tbody>
+	</table>
+</section>
 
 <style>
-	.stat-group + .stat-group {
-		margin-top: 1.1rem;
+	.movement {
+		padding: 2rem 0;
+		border-bottom: 1px solid var(--border);
 	}
 
-	.stat-group h3 {
-		margin: 0 0 0.5rem;
-		font-family: var(--font-mono);
-		font-size: 0.62rem;
-		font-weight: 600;
-		letter-spacing: 0.09em;
-		text-transform: uppercase;
+	h2 {
+		margin: 0 0 1.1rem;
+		font-family: var(--font-body);
+		font-size: 1.05rem;
+		font-weight: 500;
+		color: var(--text);
+	}
+
+	table {
+		width: 100%;
+		border-collapse: collapse;
+	}
+
+	thead th {
+		padding: 0 0.75rem 0.7rem;
+		border-bottom: 1px solid var(--border);
+		font-size: 0.75rem;
+		font-weight: 400;
 		color: var(--text-dim);
+		text-align: left;
 	}
 
-	.stats-list {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-		gap: 0.45rem;
-		margin: 0;
+	thead th.num {
+		text-align: right;
 	}
 
-	.stat-tile {
-		display: grid;
-		align-content: start;
-		gap: 0.2rem;
-		background: rgba(255, 255, 255, 0.022);
-		padding: 0.6rem 0.7rem;
-		border-radius: 8px;
+	thead th:first-child {
+		padding-left: 0;
 	}
 
-	.stat-tile dt,
-	.stat-tile dd {
-		margin: 0;
+	tbody th,
+	tbody td {
+		padding: 0.9rem 0.75rem;
+		border-bottom: 1px solid var(--border);
+		font-size: 0.85rem;
+		font-weight: 400;
+		color: var(--text);
+		text-align: left;
+		vertical-align: top;
 	}
 
-	.stat-tile dt {
-		font-size: 0.68rem;
-		line-height: 1.3;
-		color: rgba(236, 234, 229, 0.62);
+	tbody th:first-child {
+		width: 12rem;
+		padding-left: 0;
 	}
 
-	.stat-tile dd {
+	tbody tr:last-child th,
+	tbody tr:last-child td {
+		border-bottom: none;
+	}
+
+	.num {
+		text-align: right;
+	}
+
+	.value {
+		width: 11rem;
 		font-family: var(--font-mono);
-		font-size: 0.86rem;
-		font-weight: 700;
+		font-size: 0.95rem;
+		font-weight: 600;
 		font-variant-numeric: tabular-nums;
-		color: var(--amber-light);
+		white-space: nowrap;
 	}
 
-	.stat-tile dd.up {
+	.value.up {
 		color: var(--green);
 	}
 
-	.stat-tile dd.down {
+	.value.down {
 		color: var(--red);
 	}
 
-	.reason {
-		margin: 0.1rem 0 0;
-		font-size: 0.62rem;
-		line-height: 1.4;
+	/* Un `N/A` no es una cifra: se aparta del blanco para que no se lea como una
+	   medida más, y la columna de al lado dice qué historial le falta. */
+	.value.missing {
+		font-weight: 400;
 		color: var(--text-dim);
+	}
+
+	/* El mes al que pertenece el máximo, bajo su cifra: era la mitad derecha de
+	   un «+1,7% · Oct 2025» que obligaba a leer dos datos en una línea. */
+	.detail {
+		display: block;
+		margin-top: 0.25rem;
+		font-family: var(--font-body);
+		font-size: 0.75rem;
+		font-weight: 400;
+		line-height: 1.4;
+		color: var(--text-muted);
+		white-space: normal;
+	}
+
+	.note {
+		display: block;
+		margin-top: 0.3rem;
+		font-size: 0.78rem;
+		color: var(--text-dim);
+	}
+
+	.meaning {
+		max-width: 62ch;
+		line-height: 1.5;
+		color: var(--text-muted);
+	}
+
+	/*
+	 * Debajo de esto la explicación no cabe al lado de la cifra. La fila se
+	 * pliega: medida y valor arriba, lo que mide debajo cruzando las dos
+	 * columnas.
+	 */
+	@media (max-width: 860px) {
+		thead {
+			display: none;
+		}
+
+		tbody tr {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr) auto;
+			column-gap: 1rem;
+			padding: 1rem 0;
+			border-bottom: 1px solid var(--border);
+		}
+
+		tbody tr:last-child {
+			border-bottom: none;
+		}
+
+		tbody th,
+		tbody td {
+			width: auto;
+			padding: 0;
+			border: none;
+		}
+
+		.value {
+			width: auto;
+		}
+
+		.meaning {
+			grid-column: 1 / -1;
+			margin-top: 0.55rem;
+			font-size: 0.8rem;
+		}
 	}
 </style>

@@ -2,92 +2,129 @@ import { expect, test } from '@playwright/test';
 import { login } from './helpers';
 
 test.describe('reports', () => {
-	test('renders the analytics panels derived from the growth series', async ({ page }) => {
+	test('opens with what the account returned and over how long', async ({ page }) => {
 		await login(page);
 		await page.goto('/dashboard/reports');
 
-		// Un panel por año: el fixture cubre de junio de 2025 a julio de 2026.
-		const calendars = page.getByRole('heading', { name: 'Rentabilidad mensual (%)' });
-		await expect(calendars).toHaveCount(2);
+		// La cifra de cabecera es la rentabilidad del periodo, no el saldo: la
+		// serie del fixture crece a base de aportes y el saldo mentiría.
+		const headline = page.getByRole('region', { name: 'Lo que rindió tu dinero' });
+		await expect(headline.locator('.amount')).toHaveText(/^[+-]?\d+,\d%$/);
+		// El periodo del fixture: de junio de 2025 a julio de 2026.
+		await expect(headline.getByText(/Del 1 de junio de 2025 al 28 de julio de 2026/)).toBeVisible();
+		await expect(headline.getByText(/Hoy la cuenta vale/)).toBeVisible();
 
-		const calendar2026 = page.getByRole('article').filter({ hasText: '2026' }).first();
-		await expect(calendar2026.getByText('Acumulado del año')).toBeVisible();
-		// El color no es lo único que dice el signo: cada celda lo lleva en su
-		// nombre accesible.
-		await expect(
-			calendar2026.getByRole('img', { name: /^Ene: \+\d+,\d%, positivo$/ })
-		).toBeVisible();
-		await expect(
-			calendar2026.getByRole('img', { name: /^Abr: −?-?\d+,\d%, negativo$/ })
-		).toBeVisible();
-
-		// El mes en el que arranca el historial se marca: su cifra es real, pero
-		// cubre menos días que un mes entero.
-		const calendar2025 = page.getByRole('article').filter({ hasText: '2025' }).first();
-		await expect(calendar2025.getByRole('img', { name: /^Jun: .+, mes parcial$/ })).toBeVisible();
-		await expect(calendar2025.getByRole('img', { name: 'Ene: sin dato' })).toBeVisible();
-
-		// Y el que está en curso también: la serie del fixture se corta el 28 de
-		// julio, así que julio no es comparable con un mes entero tampoco.
-		await expect(calendar2026.getByRole('img', { name: /^Jul: .+, mes parcial$/ })).toBeVisible();
-		await expect(calendar2026.getByRole('img', { name: /^Abr: .+, mes parcial$/ })).toHaveCount(0);
-
-		// Y el pie deja dicho que las cifras son rendimiento, no saldo.
-		await expect(calendar2026.getByText(/no cuentan como rentabilidad/)).toBeVisible();
+		// Y cuando la rentabilidad y la ganancia sobre coste se separan —aquí lo
+		// hacen— la cabecera dice por qué, en vez de dejar dos cifras que parecen
+		// contradecirse.
+		await expect(headline.getByText(/Las dos cifras no dicen lo mismo/)).toBeVisible();
 	});
 
-	test('computes the risk statistics and the projection from the history', async ({ page }) => {
+	test('lays the monthly returns out as one matrix, a year per row', async ({ page }) => {
 		await login(page);
 		await page.goto('/dashboard/reports');
 
-		await expect(page.getByRole('heading', { name: 'Estadísticas clave' })).toBeVisible();
-		// Los tres bloques, y dentro las métricas que antes no se publicaban.
-		// `exact` porque «Riesgo» es prefijo del reporte «Riesgo y volatilidad».
-		for (const group of ['Rendimiento', 'Riesgo', 'Historial']) {
-			await expect(page.getByRole('heading', { name: group, exact: true })).toBeVisible();
-		}
-		for (const stat of ['Máxima caída', 'Ratio de Sharpe', 'Capital invertido']) {
-			await expect(page.locator('.stat-tile').filter({ hasText: stat })).toBeVisible();
+		const matrix = page.getByRole('table', { name: /Rentabilidad de cada mes/ });
+		// Una fila por año: el fixture cubre de junio de 2025 a julio de 2026.
+		await expect(matrix.getByRole('row', { name: /^2026 / })).toBeVisible();
+		await expect(matrix.getByRole('row', { name: /^2025 / })).toBeVisible();
+
+		// La celda se lee con su mes y su año por las cabeceras de la tabla, sin
+		// necesidad de un `aria-label` por celda.
+		const january = matrix
+			.getByRole('row', { name: /^2026 / })
+			.getByRole('cell')
+			.first();
+		await expect(january).toHaveText(/^\+\d+,\d%$/);
+
+		// Los meses sin dato lo dicen en vez de dejar la celda muda.
+		await expect(
+			matrix
+				.getByRole('row', { name: /^2025 / })
+				.getByRole('cell')
+				.first()
+		).toContainText('sin dato');
+
+		// El total del año cierra su fila: era el «acumulado del año» de cada
+		// tarjeta, repetido tantas veces como años.
+		await expect(matrix.getByRole('columnheader', { name: 'Total' })).toBeVisible();
+
+		// Y el pie deja dicho, una sola vez, que las cifras son rendimiento y no
+		// saldo, y qué marca el asterisco de un mes incompleto.
+		await expect(page.getByText(/no cuenta como\s+rentabilidad/)).toHaveCount(1);
+		await expect(page.getByText(/Un asterisco marca el mes/)).toBeVisible();
+	});
+
+	test('publishes each risk measure next to what it measures', async ({ page }) => {
+		await login(page);
+		await page.goto('/dashboard/reports');
+
+		const movement = page.getByRole('region', { name: 'Cómo se movió' });
+
+		// Lo que mide cada cifra se lee: antes vivía en un `title` que en un móvil
+		// no se abre.
+		const drawdown = movement.getByRole('row', { name: /Máxima caída/ });
+		await expect(drawdown).toContainText('La peor bajada desde un máximo');
+
+		for (const label of ['Mejor mes', 'Peor mes', 'Volatilidad anualizada', 'Ratio de Sharpe']) {
+			await expect(movement.getByRole('rowheader', { name: label })).toBeVisible();
 		}
 
-		// Con setenta puntos de historial no queda ninguna métrica sin calcular.
+		// El mes del máximo va aparte de su cifra, no pegado con un punto medio.
+		await expect(movement.getByRole('row', { name: /Mejor mes/ })).toContainText(/de 20\d\d/);
+
+		// Con setenta puntos de historial no queda ninguna medida sin calcular.
 		await expect(page.getByText('N/A')).toHaveCount(0);
 
 		// El Sharpe se publica en gris y con su reparo al lado: es un cociente
 		// estimado, y en verde se leía como un sello de calidad.
-		const sharpe = page.locator('.stat-tile').filter({ hasText: 'Ratio de Sharpe' });
-		await expect(sharpe.locator('dd')).toHaveClass(/neutral/);
+		const sharpe = movement.getByRole('row', { name: /Ratio de Sharpe/ });
+		await expect(sharpe.locator('.value')).toHaveClass(/neutral/);
 		await expect(sharpe.getByText(/margen de error/)).toBeVisible();
 
-		// El mejor y el peor mes salen de meses enteros: junio de 2025 abre el
-		// historial y julio de 2026 sigue en curso, así que ninguno compite.
-		for (const label of ['Mejor mes', 'Peor mes']) {
-			const tile = page.locator('.stat-tile').filter({ hasText: label });
-			await expect(tile.locator('dd')).not.toHaveText(/Jun 2025|Jul 2026/);
+		// Las seis cifras que subieron a la cabecera no se repiten aquí.
+		for (const gone of ['Rentabilidad del periodo', 'Valor actual', 'Periodo cubierto']) {
+			await expect(movement.getByRole('rowheader', { name: gone })).toHaveCount(0);
 		}
-
-		// La rentabilidad del periodo es un porcentaje calculado, no la variación
-		// del saldo: la serie del fixture crece a base de aportes.
-		const period = page.locator('.stat-tile').filter({ hasText: 'Rentabilidad del periodo' });
-		await expect(period.locator('dd')).toHaveText(/^[+-]?\d+,\d%$/);
-
-		// Y más de medio año de historial, así que la proyección se dibuja.
-		await expect(page.getByRole('heading', { name: 'Proyección de crecimiento' })).toBeVisible();
-		await expect(
-			page.getByText('Proyección disponible con al menos 6 meses de historial.')
-		).toHaveCount(0);
-		await expect(page.getByRole('table', { name: /Valor proyectado/ })).toBeAttached();
 	});
 
-	test('offers the downloadable reports', async ({ page }) => {
+	test('projects the accumulated return from zero, with the money in a table', async ({ page }) => {
 		await login(page);
 		await page.goto('/dashboard/reports');
 
-		await expect(page.getByRole('heading', { name: 'Resumen mensual' })).toBeVisible();
-		await expect(page.getByRole('heading', { name: 'Riesgo y volatilidad' })).toBeVisible();
-		await expect(page.getByRole('link', { name: 'Descargar' }).first()).toHaveAttribute(
-			'href',
-			/\/dashboard\/reports\/download\?type=summary/
-		);
+		const projection = page.getByRole('region', { name: 'Si el ritmo se mantiene' });
+		await expect(
+			projection.getByRole('heading', { name: 'Si el ritmo se mantiene' })
+		).toBeVisible();
+		await expect(
+			page.getByText('La proyección necesita al menos seis meses de historial.')
+		).toHaveCount(0);
+
+		// La tabla es la gráfica en cifras, y es visible: la versión oculta para
+		// lectores de pantalla dejaba fuera a quien no puede leer un SVG diminuto.
+		const table = page.getByRole('table', { name: /Valor proyectado/ });
+		await expect(table.getByRole('rowheader', { name: 'Valor proyectado' })).toBeVisible();
+		await expect(table.getByRole('rowheader', { name: 'Acumulado desde hoy' })).toBeVisible();
+		// Cinco años, y el primero es hoy con un acumulado de cero.
+		await expect(table.getByRole('columnheader')).toHaveCount(5);
+		await expect(table.getByRole('columnheader', { name: /hoy/ })).toBeVisible();
+	});
+
+	test('offers the downloadable reports with what each one holds', async ({ page }) => {
+		await login(page);
+		await page.goto('/dashboard/reports');
+
+		const downloads = page.getByRole('region', { name: 'Llévate los datos' });
+		await expect(downloads.getByRole('heading', { name: 'Resumen mensual' })).toBeVisible();
+		await expect(downloads.getByText('Cada compra, venta y dividendo')).toBeVisible();
+
+		// Cada enlace dice qué archivo baja: tres «Descargar» idénticos no se
+		// distinguían con un lector de pantalla.
+		await expect(
+			downloads.getByRole('link', { name: 'Descargar Resumen mensual en XLSX' })
+		).toHaveAttribute('href', /\/dashboard\/reports\/download\?type=summary/);
+		await expect(
+			downloads.getByRole('link', { name: 'Descargar Riesgo y volatilidad en XLSX' })
+		).toBeVisible();
 	});
 });

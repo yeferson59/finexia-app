@@ -1,24 +1,22 @@
 <script lang="ts">
 	/*
-	 * Proyección a cinco años extrapolando el CAGR del historial.
+	 * Adónde llega la cuenta a cinco años si el ritmo del historial se mantiene.
 	 *
-	 * La gráfica es un SVG propio (el proyecto no tiene librería de charts): las
-	 * coordenadas las calcula `projectionCoordinates`, en `reports.ts`.
+	 * La curva dibuja el porcentaje acumulado y el eje incluye siempre el cero.
+	 * Antes dibujaba los importes y estiraba su rango al alto del lienzo: con
+	 * una tasa del −0,3 % anual, los noventa dólares que separaban el primer año
+	 * del último ocupaban el canvas entero y la proyección se leía como un
+	 * desplome. Un ritmo que no mueve nada tiene que dibujar una línea que no se
+	 * mueve.
 	 *
-	 * Antes el área se pintaba encima de la línea y la tapaba, y el eje vertical
-	 * no tenía ni una cifra: la curva subía, pero no se sabía hasta dónde. Ahora
-	 * el relleno va debajo, cada año lleva su valor y la misma tabla está
-	 * disponible para el lector de pantalla.
-	 *
-	 * Cada punto lleva además el porcentaje acumulado, y la cabecera la tasa
-	 * anual de la que sale todo. El importe proyectado depende de cuánto haya
-	 * hoy en la cuenta —un aporte de mañana lo mueve entero sin que la
-	 * proyección haya cambiado de opinión—, así que quien quiera leer lo que
-	 * esta gráfica de verdad extrapola tiene que poder leerlo en porcentaje.
+	 * El dinero está en la tabla de debajo, con una columna por año. Esa tabla
+	 * es la gráfica en cifras, así que sirve igual a quien la lee con un lector
+	 * de pantalla: la versión oculta que había antes desaparece con ella.
 	 */
-	import ReportPanel from './report-panel.svelte';
-	import { formatSignedPercent } from '$lib/shared/format/percent';
-	import { PROJECTION_GUTTER, PROJECTION_MIN_DAYS, projectionCoordinates } from '../projection';
+	import { privacy } from '$lib/shared/privacy.svelte';
+	import { formatCurrency } from '$lib/shared/format/money';
+	import { formatPercent, formatSignedPercent } from '$lib/shared/format/percent';
+	import { PROJECTION_MIN_DAYS, projectionGeometry } from '../projection';
 	import type { GrowthProjectionSeries } from '../projection';
 
 	interface Props {
@@ -26,230 +24,193 @@
 		projection: GrowthProjectionSeries | null;
 		/** Días de historial, para que el estado vacío diga cuánto falta. */
 		historyDays: number;
+		/** Moneda en la que están los importes proyectados. */
+		currency: string;
 	}
 
-	let { projection, historyDays }: Props = $props();
+	let { projection, historyDays, currency }: Props = $props();
 
 	const missingDays = $derived(Math.max(PROJECTION_MIN_DAYS - historyDays, 0));
-
 	const entries = $derived(projection?.entries ?? []);
+	const geometry = $derived(projectionGeometry(entries));
 
-	const points = $derived(projectionCoordinates(entries));
-	const line = $derived(points.map((p) => `${p.x},${p.y}`).join(' '));
-	// El área cierra contra la base del viewBox, de la esquina derecha a la izquierda.
-	const area = $derived(
-		points.length > 0 ? `${line} ${points[points.length - 1].x},230 ${PROJECTION_GUTTER},230` : ''
-	);
-
-	/** Lo que abarca el eje vertical, de la marca más baja a la más alta. */
-	const span = $derived.by(() => {
-		if (entries.length === 0) return 0;
-		const values = entries.map((p) => p.value);
-		return Math.max(...values) - Math.min(...values);
-	});
-
-	/** Marcas del eje vertical: el valor proyectado en cada línea de la rejilla. */
-	const yTicks = $derived.by(() => {
-		if (entries.length === 0) return [];
-		const values = entries.map((p) => p.value);
-		const min = Math.min(...values);
-		const max = Math.max(...values);
-		// `projectionCoordinates` reparte el rango entre y=230 (mínimo) y y=50.
-		return Array.from({ length: 5 }, (_, i) => ({
-			y: 50 + i * 45,
-			value: max - ((max - min) * i) / 4
-		}));
-	});
-
-	/**
-	 * Decimales que hacen falta para que dos marcas contiguas no salgan iguales.
-	 *
-	 * Con una tasa cercana a cero las cinco marcas caben en menos de mil dólares,
-	 * y redondear a miles imprimía «$89k» cinco veces: un eje sin escala, que es
-	 * justo lo que la rejilla venía a resolver.
-	 */
-	function decimalsFor(unit: number): number {
-		const steps = span / unit;
-		if (steps >= 10) return 0;
-		if (steps >= 1) return 1;
-		return 2;
-	}
-
-	function fmtAbbrev(value: number): string {
-		const abs = Math.abs(value);
-		if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(decimalsFor(1_000_000))}M`;
-		if (abs >= 1_000) return `$${(value / 1_000).toFixed(decimalsFor(1_000))}k`;
-		return `$${Math.round(value)}`;
-	}
-
-	function fmtFull(value: number): string {
-		return '$' + new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(value);
-	}
+	const money = (value: number) => privacy.money(formatCurrency(value, currency));
 </script>
 
-<ReportPanel
-	class="projection-card"
-	title="Proyección de crecimiento"
-	badge={projection ? `${formatSignedPercent(projection.annualRatePct)} anual` : ''}
->
-	{#if points.length > 0}
-		<svg
-			class="projection-chart"
-			viewBox="0 0 600 280"
-			preserveAspectRatio="xMidYMid meet"
-			aria-hidden="true"
-		>
-			<defs>
-				<linearGradient id="projectionGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-					<stop offset="0%" style="stop-color: var(--amber); stop-opacity: 0.25" />
-					<stop offset="100%" style="stop-color: var(--amber); stop-opacity: 0" />
-				</linearGradient>
-			</defs>
+<section class="projection" aria-labelledby="projection">
+	<h2 id="projection">Si el ritmo se mantiene</h2>
 
-			{#each yTicks as tick (tick.y)}
-				<line
-					x1={PROJECTION_GUTTER}
-					y1={tick.y}
-					x2="572"
-					y2={tick.y}
-					stroke="var(--border)"
-					stroke-width="1"
-				/>
-				<text x={PROJECTION_GUTTER - 6} y={tick.y + 3.5} text-anchor="end" class="axis">
-					{fmtAbbrev(tick.value)}
+	{#if projection && geometry.points.length > 0}
+		<p class="lead">
+			Tu cuenta ha rendido un {formatSignedPercent(projection.annualRatePct)} anual. Extendido cinco años
+			sobre lo que tienes hoy, sin contar aportes futuros, llegaría aquí.
+		</p>
+
+		<svg class="chart" viewBox="0 0 600 208" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+			{#each geometry.ticks as tick (tick.y)}
+				<line x1="54" y1={tick.y} x2="570" y2={tick.y} stroke="var(--border)" stroke-width="1" />
+				<text x="46" y={tick.y + 3.5} text-anchor="end" class="axis">
+					{formatSignedPercent(tick.value)}
 				</text>
 			{/each}
 
-			<!-- El relleno primero: si va después, tapa la línea que debe destacar. -->
-			<polygon points={area} fill="url(#projectionGradient)" />
+			<!-- El cero se dibuja aparte y más marcado: es la referencia contra la
+			     que se lee si la curva sube o baja. -->
+			<line
+				x1="54"
+				y1={geometry.zeroY}
+				x2="570"
+				y2={geometry.zeroY}
+				stroke="var(--border-strong)"
+				stroke-width="1"
+			/>
+			<text x="46" y={geometry.zeroY + 3.5} text-anchor="end" class="axis zero">
+				{formatPercent(0)}
+			</text>
+
+			<!-- Sin relleno bajo la curva: lo que hay que leer aquí es la distancia
+			     al cero, y un bloque de color entre los dos la tapaba. -->
 			<polyline
-				points={line}
+				points={geometry.line}
 				fill="none"
 				stroke="var(--amber)"
-				stroke-width="3"
+				stroke-width="2.5"
 				stroke-linecap="round"
 				stroke-linejoin="round"
 			/>
 
-			{#each points as point, i (point.period)}
-				<circle
-					cx={point.x}
-					cy={point.y}
-					r="4"
-					fill="var(--amber-light)"
-					stroke="#08090a"
-					stroke-width="2"
-				/>
-				<text x={point.x} y={point.y - 13} text-anchor="middle" class="value-label">
-					{fmtAbbrev(entries[i].value)}
-				</text>
-				<!-- El primer año es el punto de partida: su «+0,0 %» no dice nada y
-				     encima empuja la etiqueta de dinero contra el borde del lienzo. -->
-				{#if i > 0}
-					<text x={point.x} y={point.y - 26} text-anchor="middle" class="pct-label">
-						{formatSignedPercent(entries[i].returnPct)}
-					</text>
-				{/if}
-				<text x={point.x} y="260" text-anchor="middle" class="axis">{point.period}</text>
+			{#each geometry.points as point (point.period)}
+				<circle cx={point.x} cy={point.y} r="3.5" fill="var(--amber-light)" />
+				<text x={point.x} y="192" text-anchor="middle" class="axis">{point.period}</text>
 			{/each}
 		</svg>
 
-		<table class="sr-only">
-			<caption>Valor proyectado del portafolio por año y rentabilidad acumulada desde hoy</caption>
-			<thead>
-				<tr>
-					<th scope="col">Año</th>
-					<th scope="col">Valor proyectado</th>
-					<th scope="col">Acumulado desde hoy</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each entries as entry (entry.period)}
+		<!-- Como la matriz: el `tabindex` es lo que deja desplazar la tabla con el
+		     teclado cuando no cabe entera. -->
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<div class="scroller" role="region" aria-labelledby="projection" tabindex="0">
+			<table>
+				<caption class="sr-only">
+					Valor proyectado de la cuenta y rentabilidad acumulada desde hoy, año por año
+				</caption>
+				<thead>
 					<tr>
-						<td>{entry.period}</td>
-						<td>{fmtFull(entry.value)}</td>
-						<td>{formatSignedPercent(entry.returnPct)}</td>
+						<td class="corner"></td>
+						{#each entries as entry, index (entry.period)}
+							<th scope="col">{entry.period}{index === 0 ? ', hoy' : ''}</th>
+						{/each}
 					</tr>
-				{/each}
-			</tbody>
-		</table>
+				</thead>
+				<tbody>
+					<tr>
+						<th scope="row">Valor proyectado</th>
+						{#each entries as entry (entry.period)}
+							<td>{money(entry.value)}</td>
+						{/each}
+					</tr>
+					<tr>
+						<th scope="row">Acumulado desde hoy</th>
+						{#each entries as entry (entry.period)}
+							<td class="pct" class:up={entry.returnPct > 0} class:down={entry.returnPct < 0}>
+								{formatSignedPercent(entry.returnPct)}
+							</td>
+						{/each}
+					</tr>
+				</tbody>
+			</table>
+		</div>
 
 		<p class="footnote">
-			Extrapola tu rentabilidad anualizada ({formatSignedPercent(projection?.annualRatePct ?? 0)} al año)
-			sobre el valor actual, sin contar aportes futuros. El porcentaje es lo que de verdad se proyecta;
-			el importe se mueve con cada aporte que hagas. No es una previsión de mercado.
+			No es una previsión de mercado: es tu propio ritmo repetido cinco veces. El porcentaje es lo
+			que de verdad se proyecta; el importe se mueve con cada aporte que hagas, sin que la
+			proyección haya cambiado de opinión.
 		</p>
 	{:else}
-		<div class="empty-chart">
-			<p>Proyección disponible con al menos 6 meses de historial.</p>
+		<p class="empty">
+			La proyección necesita al menos seis meses de historial.
 			<!-- Decir cuánto falta ahorra volver cada semana a comprobarlo. -->
-			<p class="countdown">
-				{#if historyDays > 0}
-					Llevas {historyDays}
-					{historyDays === 1 ? 'día' : 'días'}; faltan {missingDays}.
-				{:else}
-					Empieza a contar con el primer cierre diario de tu cartera.
-				{/if}
-			</p>
-		</div>
+			{#if historyDays > 0}
+				Llevas {historyDays}
+				{historyDays === 1 ? 'día' : 'días'}, así que faltan {missingDays}.
+			{:else}
+				Empieza a contar con el primer cierre diario de tu cartera.
+			{/if}
+		</p>
 	{/if}
-</ReportPanel>
+</section>
 
 <style>
-	.projection-chart {
+	.projection {
+		padding: 2rem 0;
+		border-bottom: 1px solid var(--border);
+	}
+
+	h2 {
+		margin: 0 0 0.6rem;
+		font-family: var(--font-body);
+		font-size: 1.05rem;
+		font-weight: 500;
+		color: var(--text);
+	}
+
+	.lead,
+	.empty {
+		max-width: 64ch;
+		margin: 0;
+		font-size: 0.9rem;
+		line-height: 1.5;
+		color: var(--text-muted);
+	}
+
+	.chart {
 		width: 100%;
-		min-height: 280px;
+		max-width: 52rem;
+		min-height: 220px;
+		margin-top: 0.75rem;
 		display: block;
 	}
 
 	.axis {
-		fill: rgba(236, 234, 229, 0.5);
+		fill: var(--text-dim);
 		font-size: 11px;
 		font-family: var(--font-mono);
 	}
 
-	.value-label {
-		fill: var(--amber-light);
-		font-size: 11px;
-		font-weight: 600;
-		font-family: var(--font-mono);
+	/* La marca del cero acompaña a su filete, que es más marcado que el resto. */
+	.zero {
+		fill: var(--text-muted);
 	}
 
-	/* Más apagada que la de dinero: acompaña a la cifra principal, no compite
-	   con ella. */
-	.pct-label {
-		fill: rgba(236, 234, 229, 0.5);
-		font-size: 9.5px;
-		font-family: var(--font-mono);
+	/* Al ancho de la gráfica: la tabla es la misma proyección en cifras, y a lo
+	   ancho de la página se leían como dos bloques distintos. */
+	.scroller {
+		max-width: 52rem;
+		overflow-x: auto;
+		margin-top: 0.5rem;
 	}
 
-	.footnote {
-		margin: 0.5rem 0 0;
-		font-size: 0.72rem;
-		line-height: 1.5;
-		color: var(--text-dim);
+	/*
+	 * Sombra en el borde derecho mientras quede tabla por ver, y solo mientras
+	 * quede: la capa opaca viaja con el contenido (`local`) y tapa a la sombra
+	 * —fija al carril (`scroll`)— justo al llegar al final. Sin ella, en un
+	 * móvil nada dice que a la derecha siguen media docena de columnas.
+	 */
+	.scroller {
+		background:
+			linear-gradient(var(--bg), var(--bg)) right center / 1.25rem 100% no-repeat local,
+			linear-gradient(to left, rgba(8, 9, 10, 0.92), rgba(8, 9, 10, 0)) right center / 2.5rem 100%
+				no-repeat scroll;
 	}
 
-	.empty-chart {
-		padding: 3rem 2rem;
-		text-align: center;
-		color: var(--text-dim);
-		font-size: 0.82rem;
-		border: 1px dashed var(--border);
-		border-radius: 8px;
-		line-height: 1.6;
+	.scroller:focus-visible {
+		outline: 2px solid var(--amber);
+		outline-offset: 4px;
 	}
 
-	.empty-chart p {
-		margin: 0;
-	}
-
-	/* `.empty-chart p` pone `margin: 0`; hace falta ganarle en especificidad. */
-	.empty-chart .countdown {
-		margin-top: 0.4rem;
-		font-family: var(--font-mono);
-		font-size: 0.72rem;
-		color: var(--text-dim);
+	table {
+		width: 100%;
+		min-width: 40rem;
+		border-collapse: collapse;
 	}
 
 	.sr-only {
@@ -261,6 +222,84 @@
 		overflow: hidden;
 		clip-path: inset(50%);
 		white-space: nowrap;
-		border: 0;
+	}
+
+	thead th {
+		padding: 0 0.75rem 0.6rem;
+		border-bottom: 1px solid var(--border);
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		font-weight: 400;
+		color: var(--text-dim);
+		text-align: right;
+	}
+
+	.corner {
+		width: 12rem;
+	}
+
+	tbody th,
+	tbody td {
+		padding: 0.7rem 0.75rem;
+		border-bottom: 1px solid var(--border);
+		font-size: 0.82rem;
+		font-weight: 400;
+		text-align: right;
+	}
+
+	tbody th {
+		padding-left: 0;
+		font-family: var(--font-body);
+		color: var(--text-muted);
+		text-align: left;
+	}
+
+	tbody td {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		color: var(--text);
+		white-space: nowrap;
+	}
+
+	tbody tr:last-child th,
+	tbody tr:last-child td {
+		border-bottom: none;
+	}
+
+	.pct.up {
+		color: var(--green);
+	}
+
+	.pct.down {
+		color: var(--red);
+	}
+
+	.footnote {
+		max-width: 78ch;
+		margin: 0.9rem 0 0;
+		font-size: 0.75rem;
+		line-height: 1.55;
+		color: var(--text-dim);
+	}
+
+	/*
+	 * En un móvil la curva se encoge a un tercio y sus etiquetas quedan en seis
+	 * píxeles: ilegibles, y encima empujando la tabla —que dice lo mismo con
+	 * cifras que sí se leen— fuera de la pantalla. Ahí se queda la tabla sola.
+	 */
+	@media (max-width: 640px) {
+		.chart {
+			display: none;
+		}
+
+		/* Y la columna de las etiquetas se queda con la mitad del ancho de la
+		   pantalla si no se le pone coto. */
+		table {
+			min-width: 32rem;
+		}
+
+		.corner {
+			width: 8.5rem;
+		}
 	}
 </style>

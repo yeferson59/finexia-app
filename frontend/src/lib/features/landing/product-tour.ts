@@ -92,10 +92,10 @@ export const TOUR_VIEWS: TourView[] = [
 		crumb: 'Dashboard / Reportes',
 		title: 'Reportes que puedes llevarte',
 		description:
-			'Rentabilidad mes a mes, estadísticas de tu cartera y proyección a cinco años. Todo descargable en XLSX, porque los datos son tuyos.',
+			'Qué rindió tu dinero mes a mes, con qué riesgo, y adónde llega si el ritmo se mantiene. Todo descargable en XLSX, porque los datos son tuyos.',
 		points: [
-			'Rentabilidad mensual',
-			'Estadísticas clave',
+			'Rentabilidad mes a mes',
+			'Volatilidad y máxima caída',
 			'Proyección a 5 años',
 			'Descarga en XLSX',
 			'Sin bloqueos de exportación'
@@ -145,43 +145,103 @@ export const TOUR_TRANSACTIONS = [
 	{ type: 'Interés', asset: 'CASH', platform: 'Revolut', date: '25 feb', amount: '+$46,80' }
 ];
 
-/** Reportes: rentabilidad mensual del año en curso, en porcentaje. */
-export const TOUR_CALENDAR = [
-	{ month: 'Ene', value: 2.4 },
-	{ month: 'Feb', value: 1.1 },
-	{ month: 'Mar', value: -0.8 },
-	{ month: 'Abr', value: 3.2 },
-	{ month: 'May', value: 0.6 },
-	{ month: 'Jun', value: 1.9 },
-	{ month: 'Jul', value: -1.4 },
-	{ month: 'Ago', value: 2.8 },
-	{ month: 'Sep', value: 0.3 },
-	{ month: 'Oct', value: 1.6 },
-	{ month: 'Nov', value: 2.2 },
-	{ month: 'Dic', value: null }
-];
-
-export const TOUR_KEY_STATS = [
-	{ label: 'Mejor mes', value: '+3,20%' },
-	{ label: 'Peor mes', value: '−1,40%' },
-	{ label: 'Meses en positivo', value: '9 de 11' },
-	{ label: 'Crecimiento anual', value: '+12,40%' }
-];
-
-export const TOUR_REPORTS = [
-	{ title: 'Resumen mensual', format: 'XLSX' },
-	{ title: 'Estado de resultados', format: 'XLSX' },
-	{ title: 'Riesgo y volatilidad', format: 'XLSX' }
+/** Abreviaturas de los meses, como en la matriz del dashboard. */
+export const TOUR_MONTHS = [
+	'Ene',
+	'Feb',
+	'Mar',
+	'Abr',
+	'May',
+	'Jun',
+	'Jul',
+	'Ago',
+	'Sep',
+	'Oct',
+	'Nov',
+	'Dic'
 ];
 
 /**
- * Tramo de color de una celda del calendario, con los mismos cortes que usa el
- * dashboard en `features/reports`.
+ * La cifra de cabecera de la ficha de reportes: lo que rindió el dinero en todo
+ * el historial.
+ *
+ * Es el mismo +12,4 % que enseña el resumen, porque sale de encadenar los dos
+ * años de la matriz de abajo: las cuatro vistas del recorrido cuentan la misma
+ * cuenta.
  */
-export function tourPerformanceClass(value: number | null): string {
-	if (value === null) return 'mk-cal-empty';
-	if (value >= 2) return 'mk-cal-strong-up';
-	if (value >= 0) return 'mk-cal-up';
-	if (value > -1) return 'mk-cal-down';
-	return 'mk-cal-strong-down';
+export const TOUR_RECORD = {
+	label: 'Lo que rindió tu dinero',
+	value: '+12,4%',
+	span: 'Del 1 de enero de 2025 al 30 de noviembre de 2026, 23 meses de historial.',
+	/* El patrimonio y la ganancia son los del resumen: es la misma cuenta. */
+	money: 'Hoy la cuenta vale $248.500,00 sobre los $221.100,00 que has puesto: +$27.400,00.'
+};
+
+/**
+ * Reportes: rentabilidad mes a mes, un año por fila y el total cerrando cada
+ * uno. Diciembre de 2026 va sin dato porque el año sigue en curso.
+ */
+export const TOUR_RETURNS = [
+	{
+		year: '2026',
+		values: [2.4, 1.1, -0.8, 1.6, 0.6, 1.2, -1.4, 2.6, 0.3, -1.1, -1.0, null],
+		total: 5.5
+	},
+	{
+		year: '2025',
+		values: [0.8, 1.2, -1.1, 1.9, 0.5, -0.7, 1.4, 0.6, -1.8, 1.5, 0.9, 1.2],
+		total: 6.5
+	}
+];
+
+/** Las medidas de «Cómo se movió», sacadas de la matriz de arriba. */
+export const TOUR_KEY_STATS = [
+	{ label: 'Mejor mes', detail: 'agosto de 2026', value: '+2,6%' },
+	{ label: 'Peor mes', detail: 'septiembre de 2025', value: '−1,8%' },
+	{ label: 'Volatilidad anualizada', detail: '', value: '4,3%' },
+	{ label: 'Máxima caída', detail: '', value: '−2,1%' },
+	{ label: 'Ratio de Sharpe', detail: '', value: '1,43' }
+];
+
+/**
+ * La proyección: la tasa anual del historial y adónde llega el saldo si se
+ * mantiene. Sale de encadenar los dos años de la matriz sobre los 23 meses que
+ * cubren, así que es el mismo +12,4 % visto por año.
+ */
+export const TOUR_PROJECTION = {
+	rate: '+6,3% anual',
+	columns: [
+		{ period: '2026, hoy', value: '$248.500', accrued: '0,0%' },
+		{ period: '2028', value: '$280.800', accrued: '+13,0%' },
+		{ period: '2031', value: '$337.300', accrued: '+35,7%' }
+	]
+};
+
+/** Los archivos descargables, cada uno con lo que trae dentro. */
+export const TOUR_REPORTS = [
+	{ title: 'Resumen mensual', description: 'Valor, capital y ganancia, mes a mes', format: 'XLSX' },
+	{ title: 'Transacciones', description: 'Cada compra, venta y dividendo', format: 'XLSX' },
+	{
+		title: 'Riesgo y volatilidad',
+		description: 'Las medidas y la serie diaria',
+		format: 'XLSX'
+	}
+];
+
+/**
+ * Fondo de una celda de la matriz: verde lo que subió, rojo lo que bajó, y más
+ * intenso cuanto mayor fue el movimiento.
+ *
+ * Espeja `returnBackground` de `features/reports`, con la misma escala y el
+ * mismo punto de saturación. Está copiado y no importado porque una feature no
+ * importa de otra (docs/FRONTEND_ARCHITECTURE.md); si allí cambia la escala,
+ * aquí también.
+ */
+export function tourReturnBackground(value: number | null): string {
+	if (value === null) return '';
+
+	const intensity = Math.min(Math.abs(value) / 2.5, 1);
+	const alpha = (0.05 + intensity * 0.2).toFixed(3);
+
+	return value < 0 ? `rgba(224, 90, 90, ${alpha})` : `rgba(34, 201, 126, ${alpha})`;
 }

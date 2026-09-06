@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGrowthProjection, historySpanDays, projectionCoordinates } from './projection';
+import { buildGrowthProjection, historySpanDays, projectionGeometry } from './projection';
 import type { GrowthDataPoint, GrowthSummary } from '$lib/api/types';
 
 /** Punto de la serie: valor de mercado y capital invertido a esa fecha. */
@@ -131,31 +131,68 @@ describe('buildGrowthProjection', () => {
 	});
 });
 
-describe('projectionCoordinates', () => {
-	it('reparte los puntos en el eje x y estira los valores al alto del viewBox', () => {
-		const coords = projectionCoordinates([
+describe('projectionGeometry', () => {
+	it('reparte los años por el eje x y dibuja el porcentaje, no el dinero', () => {
+		const geometry = projectionGeometry([
 			{ period: '2026', value: 100, returnPct: 0 },
 			{ period: '2027', value: 150, returnPct: 50 },
 			{ period: '2028', value: 200, returnPct: 100 }
 		]);
 
-		expect(coords.map((c) => c.x)).toEqual([58, 182, 306]);
-		// El mínimo se apoya en la base y el máximo llega al techo del área útil.
-		expect(coords[0].y).toBe(230);
-		expect(coords[2].y).toBe(50);
-		expect(coords[1].y).toBe(140);
+		expect(geometry.points.map((p) => p.x)).toEqual([54, 312, 570]);
+		// El cero se apoya en la base del área útil y el máximo llega al techo.
+		expect(geometry.points[0].y).toBe(160);
+		expect(geometry.points[2].y).toBe(22);
+		expect(geometry.points[1].y).toBe(91);
 	});
 
-	it('no divide por cero cuando todos los valores son iguales', () => {
-		const coords = projectionCoordinates([
+	it('ancla el eje en el cero aunque la proyección solo baje', () => {
+		// Cinco años cayendo un 0,3 % anual: la línea tiene que salir del cero y
+		// quedarse pegada a él. Escalando los importes al alto del lienzo, esa
+		// misma pérdida del 1 % se dibujaba como un desplome de lado a lado.
+		const geometry = projectionGeometry([
+			{ period: '2026', value: 89406, returnPct: 0 },
+			{ period: '2027', value: 89179, returnPct: -0.25 },
+			{ period: '2028', value: 88953, returnPct: -0.5 }
+		]);
+
+		expect(geometry.points[0].y).toBe(geometry.zeroY);
+		expect(geometry.zeroY).toBe(22);
+		expect(geometry.points[2].y).toBe(160);
+	});
+
+	it('cierra el relleno contra la línea del cero, no contra el borde', () => {
+		const geometry = projectionGeometry([
+			{ period: '2026', value: 100, returnPct: 0 },
+			{ period: '2027', value: 150, returnPct: 50 }
+		]);
+
+		expect(geometry.area).toBe(`${geometry.line} 570,${geometry.zeroY} 54,${geometry.zeroY}`);
+	});
+
+	it('no reparte una marca encima de la línea del cero', () => {
+		const geometry = projectionGeometry([
+			{ period: '2026', value: 100, returnPct: 0 },
+			{ period: '2027', value: 150, returnPct: 50 }
+		]);
+
+		// La del cero la dibuja su propia línea, con su etiqueta.
+		expect(geometry.ticks.every((tick) => Math.abs(tick.y - geometry.zeroY) > 6)).toBe(true);
+		expect(geometry.ticks.length).toBeGreaterThan(0);
+	});
+
+	it('no divide por cero con una tasa clavada en cero', () => {
+		const geometry = projectionGeometry([
 			{ period: '2026', value: 100, returnPct: 0 },
 			{ period: '2027', value: 100, returnPct: 0 }
 		]);
 
-		expect(coords.every((c) => c.y === 230)).toBe(true);
+		expect(geometry.points.every((p) => p.y === geometry.zeroY)).toBe(true);
+		expect(geometry.points.every((p) => Number.isFinite(p.y))).toBe(true);
 	});
 
-	it('devuelve una lista vacía sin proyección', () => {
-		expect(projectionCoordinates([])).toEqual([]);
+	it('devuelve una geometría vacía sin proyección', () => {
+		expect(projectionGeometry([]).points).toEqual([]);
+		expect(projectionGeometry([]).line).toBe('');
 	});
 });

@@ -3,7 +3,9 @@ import {
 	UNAVAILABLE,
 	buildKeyStatistics,
 	buildPerformanceCalendars,
-	performanceClass
+	buildRecordSummary,
+	returnBackground,
+	type KeyStat
 } from './reports';
 import { periodReturns } from '$lib/shared/finance/returns';
 import type { GrowthDataPoint, GrowthSummary } from '$lib/api/types';
@@ -43,20 +45,36 @@ const summary = (over: Partial<GrowthSummary> = {}): GrowthSummary => ({
 	...over
 });
 
-/** Todas las métricas de todos los bloques, aplanadas para buscar por etiqueta. */
-function statOf(groups: ReturnType<typeof buildKeyStatistics>, label: string) {
-	const stat = groups.flatMap((group) => group.stats).find((s) => s.label === label);
-	if (!stat) throw new Error(`no hay métrica «${label}»`);
+/** Una medida por su etiqueta. */
+function statOf(stats: KeyStat[], label: string) {
+	const stat = stats.find((s) => s.label === label);
+	if (!stat) throw new Error(`no hay medida «${label}»`);
 	return stat;
 }
 
-describe('performanceClass', () => {
-	it('reparte los tramos de color por rentabilidad', () => {
-		expect(performanceClass(3)).toBe('strong-positive');
-		expect(performanceClass(1.5)).toBe('positive');
-		expect(performanceClass(0)).toBe('flat-positive');
-		expect(performanceClass(-0.5)).toBe('negative');
-		expect(performanceClass(-4)).toBe('strong-negative');
+/** La opacidad del tinte de una celda, para comparar intensidades. */
+function alphaOf(background: string): number {
+	return Number(background.match(/([\d.]+)\)$/)?.[1] ?? 0);
+}
+
+describe('returnBackground', () => {
+	it('tiñe de verde lo que subió y de rojo lo que bajó', () => {
+		expect(returnBackground(1.5)).toMatch(/^rgba\(34, 201, 126,/);
+		expect(returnBackground(-1.5)).toMatch(/^rgba\(224, 90, 90,/);
+		// Un mes plano no es una caída: el cero se queda del lado verde, con el
+		// tinte más tenue de la escala.
+		expect(returnBackground(0)).toMatch(/^rgba\(34, 201, 126,/);
+	});
+
+	it('sube la intensidad con el tamaño del movimiento, y ahí se para', () => {
+		expect(alphaOf(returnBackground(2))).toBeGreaterThan(alphaOf(returnBackground(0.5)));
+		// Un +40 % no puede pintar más que un +3 %: la escala satura antes.
+		expect(alphaOf(returnBackground(40))).toBe(alphaOf(returnBackground(3)));
+	});
+
+	it('no tiñe un mes sin dato', () => {
+		expect(returnBackground(null)).toBe('');
+		expect(returnBackground(Number.NaN)).toBe('');
 	});
 });
 
@@ -220,91 +238,114 @@ describe('buildPerformanceCalendars', () => {
 		expect(calendars.map((c) => c.year)).toEqual(['2026', '2025']);
 	});
 
+	it('compone el total del año con los meses que tienen dato', () => {
+		const [calendar] = buildPerformanceCalendars([
+			point('2026-01-31', '1000', '1000'),
+			point('2026-02-28', '1100', '1000'),
+			point('2026-03-31', '1210', '1000')
+		]);
+
+		// Dos meses del +10 % encadenados: +21 %, no +20 %. Y los diez meses sin
+		// dato no arrastran el total a cero.
+		expect(calendar.total).toBeCloseTo(21, 6);
+	});
+
+	it('deja el total en null cuando ningún mes tiene dato', () => {
+		const calendars = buildPerformanceCalendars([]);
+
+		expect(calendars).toEqual([]);
+	});
+
 	it('devuelve una lista vacía sin historial', () => {
 		expect(buildPerformanceCalendars([])).toEqual([]);
 	});
 });
 
 describe('buildKeyStatistics', () => {
-	it('reparte las métricas en rendimiento, riesgo e historial', () => {
-		const groups = buildKeyStatistics(dailySeries([1000, 1010, 1020]), summary());
+	it('publica las cinco medidas de movimiento y riesgo', () => {
+		const stats = buildKeyStatistics(dailySeries([1000, 1010, 1020]));
 
-		expect(groups.map((g) => g.title)).toEqual(['Rendimiento', 'Riesgo', 'Historial']);
+		expect(stats.map((stat) => stat.label)).toEqual([
+			'Mejor mes',
+			'Peor mes',
+			// Con dos tramos la volatilidad no se anualiza, y la etiqueta lo dice.
+			'Volatilidad por tramo',
+			'Máxima caída',
+			'Ratio de Sharpe'
+		]);
+	});
+
+	it('cada medida explica qué mide, y la explicación se publica', () => {
+		// El texto ya no vive en un `title`: es una columna de la tabla, así que
+		// ninguna medida puede salir sin él.
+		for (const stat of buildKeyStatistics(dailySeries([1000, 1010, 1020]))) {
+			expect(stat.hint.length).toBeGreaterThan(20);
+		}
 	});
 
 	it('mide la mayor caída sobre la rentabilidad, no sobre el saldo', () => {
-		const groups = buildKeyStatistics(
-			[
-				point('2026-01-01', '1000', '1000'),
-				point('2026-01-02', '1200', '1000'),
-				point('2026-01-03', '900', '1000')
-			],
-			summary()
-		);
+		const stats = buildKeyStatistics([
+			point('2026-01-01', '1000', '1000'),
+			point('2026-01-02', '1200', '1000'),
+			point('2026-01-03', '900', '1000')
+		]);
 
-		expect(statOf(groups, 'Máxima caída').value).toBe('-25,0%');
+		expect(statOf(stats, 'Máxima caída').value).toBe('-25,0%');
 	});
 
 	it('no llama caída a un retiro', () => {
-		const groups = buildKeyStatistics(
-			[
-				point('2026-01-01', '2000', '2000'),
-				point('2026-01-02', '1000', '1000'),
-				point('2026-01-03', '1000', '1000')
-			],
-			summary()
-		);
+		const stats = buildKeyStatistics([
+			point('2026-01-01', '2000', '2000'),
+			point('2026-01-02', '1000', '1000'),
+			point('2026-01-03', '1000', '1000')
+		]);
 
-		expect(statOf(groups, 'Máxima caída').value).toBe('0,0%');
+		expect(statOf(stats, 'Máxima caída').value).toBe('0,0%');
 	});
 
 	it('deja el riesgo en N/A con poco historial y dice qué falta', () => {
-		const groups = buildKeyStatistics(dailySeries([1000, 1010, 1020]), summary());
+		const stats = buildKeyStatistics(dailySeries([1000, 1010, 1020]));
 		// Dos tramos no dan ni para medir la oscilación, así que la volatilidad no
 		// sale ni siquiera sin anualizar.
-		const volatility = statOf(groups, 'Volatilidad por tramo');
+		const volatility = statOf(stats, 'Volatilidad por tramo');
 
 		expect(volatility.value).toBe(UNAVAILABLE);
 		expect(volatility.hint).toMatch(/10 tramos de historial; llevas 2\./);
-		expect(statOf(groups, 'Ratio de Sharpe').value).toBe(UNAVAILABLE);
-		expect(statOf(groups, 'Ratio de Sharpe').hint).toMatch(/llevas 2 y 2\./);
+		expect(statOf(stats, 'Ratio de Sharpe').value).toBe(UNAVAILABLE);
+		expect(statOf(stats, 'Ratio de Sharpe').hint).toMatch(/llevas 2 y 2\./);
 	});
 
 	it('calcula volatilidad y Sharpe con una serie diaria suficiente', () => {
 		// Ciento veinte días alternando: pasa el trimestre que piden las cifras
 		// anuales y hay varianza que medir.
 		const values = Array.from({ length: 120 }, (_, i) => 1000 + (i % 2 === 0 ? 0 : 15) + i);
-		const groups = buildKeyStatistics(dailySeries(values), summary());
+		const stats = buildKeyStatistics(dailySeries(values));
 
-		expect(statOf(groups, 'Volatilidad anualizada').value).not.toBe(UNAVAILABLE);
-		expect(statOf(groups, 'Volatilidad anualizada').value).toMatch(/^\d+(\.\d+)*,\d%$/);
-		expect(statOf(groups, 'Ratio de Sharpe').value).not.toBe(UNAVAILABLE);
+		expect(statOf(stats, 'Volatilidad anualizada').value).not.toBe(UNAVAILABLE);
+		expect(statOf(stats, 'Volatilidad anualizada').value).toMatch(/^\d+(\.\d+)*,\d%$/);
+		expect(statOf(stats, 'Ratio de Sharpe').value).not.toBe(UNAVAILABLE);
 	});
 
-	it('no publica ninguna cifra anual por debajo del trimestre', () => {
-		// Sesenta días y sesenta puntos: tramos de sobra, historial no. Las dos
-		// cifras anuales se callan; publicar el Sharpe mientras se ocultaba la
-		// rentabilidad anualizada era enseñar una derivada de un número que se
-		// decía no tener.
+	it('no publica el Sharpe por debajo del trimestre', () => {
+		// Sesenta días y sesenta puntos: tramos de sobra, historial no. Publicarlo
+		// mientras la cabecera se calla la rentabilidad anualizada era enseñar una
+		// derivada de un número que se decía no tener.
 		const values = Array.from({ length: 60 }, (_, i) => 1000 + (i % 2 === 0 ? 0 : 15) + i);
-		const groups = buildKeyStatistics(dailySeries(values), summary());
+		const sharpe = statOf(buildKeyStatistics(dailySeries(values)), 'Ratio de Sharpe');
 
-		for (const label of ['Rentabilidad anualizada', 'Ratio de Sharpe']) {
-			expect(statOf(groups, label).value).toBe(UNAVAILABLE);
-			expect(statOf(groups, label).hint).toMatch(/90 días/);
-		}
-
-		// Lo que no se anualiza sí sale: el periodo entero y su peor caída.
-		expect(statOf(groups, 'Rentabilidad del periodo').value).not.toBe(UNAVAILABLE);
-		expect(statOf(groups, 'Máxima caída').value).not.toBe(UNAVAILABLE);
+		expect(sharpe.value).toBe(UNAVAILABLE);
+		expect(sharpe.hint).toMatch(/90 días/);
+		// Lo que no se anualiza sí sale.
+		expect(statOf(buildKeyStatistics(dailySeries(values)), 'Máxima caída').value).not.toBe(
+			UNAVAILABLE
+		);
 	});
 
 	it('publica la volatilidad sin anualizar mientras no llegue al trimestre', () => {
 		// La dispersión de los tramos converge mucho antes que una media: se mide
 		// con sesenta días, solo que sin el √tramos, y la etiqueta lo dice.
 		const values = Array.from({ length: 60 }, (_, i) => 1000 + (i % 2 === 0 ? 0 : 15) + i);
-		const groups = buildKeyStatistics(dailySeries(values), summary());
-		const volatility = statOf(groups, 'Volatilidad por tramo');
+		const volatility = statOf(buildKeyStatistics(dailySeries(values)), 'Volatilidad por tramo');
 
 		expect(volatility.value).not.toBe(UNAVAILABLE);
 		expect(volatility.note).toMatch(/Sin anualizar/);
@@ -315,10 +356,7 @@ describe('buildKeyStatistics', () => {
 
 	it('anualiza la volatilidad y le quita la nota en cuanto pasa el trimestre', () => {
 		const values = Array.from({ length: 120 }, (_, i) => 1000 + (i % 2 === 0 ? 0 : 15) + i);
-		const volatility = statOf(
-			buildKeyStatistics(dailySeries(values), summary()),
-			'Volatilidad anualizada'
-		);
+		const volatility = statOf(buildKeyStatistics(dailySeries(values)), 'Volatilidad anualizada');
 
 		expect(volatility.value).not.toBe(UNAVAILABLE);
 		expect(volatility.note).toBeUndefined();
@@ -326,35 +364,60 @@ describe('buildKeyStatistics', () => {
 
 	it('no pinta el Sharpe en verde y le pone el reparo al lado', () => {
 		const values = Array.from({ length: 120 }, (_, i) => 1000 + (i % 2 === 0 ? 0 : 15) + i);
-		const sharpe = statOf(buildKeyStatistics(dailySeries(values), summary()), 'Ratio de Sharpe');
+		const sharpe = statOf(buildKeyStatistics(dailySeries(values)), 'Ratio de Sharpe');
 
 		expect(sharpe.tone).toBe('neutral');
 		expect(sharpe.note).toMatch(/margen de error/);
 	});
 
-	it('no anualiza por debajo de un trimestre de historial', () => {
-		const annualized = statOf(
-			buildKeyStatistics(dailySeries(Array.from({ length: 30 }, (_, i) => 1000 + i)), summary()),
-			'Rentabilidad anualizada'
-		);
+	it('nombra el mejor y el peor mes, y el mes va aparte de la cifra', () => {
+		const stats = buildKeyStatistics([
+			point('2026-01-31', '1000', '1000'),
+			point('2026-02-28', '1100', '1000'),
+			point('2026-03-31', '990', '1000')
+		]);
 
-		expect(annualized.value).toBe(UNAVAILABLE);
-		expect(annualized.hint).toMatch(/90 días/);
+		expect(statOf(stats, 'Mejor mes').value).toBe('+10,0%');
+		expect(statOf(stats, 'Mejor mes').detail).toBe('febrero de 2026');
+		expect(statOf(stats, 'Peor mes').value).toBe('-10,0%');
+		expect(statOf(stats, 'Peor mes').detail).toBe('marzo de 2026');
 	});
 
-	it('anualiza en cuanto el historial da', () => {
-		const values = Array.from({ length: 120 }, (_, i) => 1000 + i);
-		const annualized = statOf(
-			buildKeyStatistics(dailySeries(values), summary()),
-			'Rentabilidad anualizada'
-		);
+	it('deja fuera del mejor y el peor mes los que no están enteros', () => {
+		// Junio arranca el 28 y rinde un +20 % en dos días; agosto, entero, un
+		// +5 %. El mejor mes es agosto: dos días no compiten con treinta y uno.
+		const stats = buildKeyStatistics([
+			point('2026-06-28', '1000', '1000'),
+			point('2026-06-30', '1200', '1000'),
+			point('2026-07-31', '1140', '1000'),
+			point('2026-08-31', '1197', '1000')
+		]);
 
-		expect(annualized.value).not.toBe(UNAVAILABLE);
-		expect(annualized.tone).toBe('up');
+		expect(statOf(stats, 'Mejor mes').detail).toBe('agosto de 2026');
+		expect(statOf(stats, 'Peor mes').detail).toBe('julio de 2026');
 	});
 
+	it('marca el mes cuando el historial no tiene ninguno entero', () => {
+		// Diez días de un solo mes: no hay con qué comparar, así que se publica lo
+		// que hay con el mismo asterisco que usa la matriz.
+		const stats = buildKeyStatistics([
+			point('2026-06-10', '1000', '1000'),
+			point('2026-06-20', '1100', '1000')
+		]);
+
+		expect(statOf(stats, 'Mejor mes').value).toBe('+10,0%');
+		expect(statOf(stats, 'Mejor mes').detail).toBe('junio de 2026*');
+		expect(statOf(stats, 'Mejor mes').note).toBe('* Mes incompleto.');
+	});
+
+	it('devuelve una lista vacía sin historial', () => {
+		expect(buildKeyStatistics([])).toEqual([]);
+	});
+});
+
+describe('buildRecordSummary', () => {
 	it('separa la rentabilidad del periodo del dinero aportado', () => {
-		const groups = buildKeyStatistics(
+		const record = buildRecordSummary(
 			[
 				point('2026-01-01', '1000', '1000'),
 				point('2026-01-02', '1100', '1000'),
@@ -364,87 +427,85 @@ describe('buildKeyStatistics', () => {
 		);
 
 		// +10 % y luego un depósito de 4000 que no mueve la rentabilidad.
-		expect(statOf(groups, 'Rentabilidad del periodo').value).toBe('+10,0%');
+		expect(record?.periodReturn).toBeCloseTo(10, 6);
 	});
 
-	it('publica los importes en la moneda del resumen', () => {
-		const groups = buildKeyStatistics(
+	it('trae los importes y la moneda del resumen', () => {
+		const record = buildRecordSummary(
 			[point('2026-01-01', '1000', '1000'), point('2026-01-02', '1200', '1000')],
 			summary({ currency: 'USD', currentValue: '1200', gainLoss: '200', gainLossPct: '20' })
 		);
 
-		expect(statOf(groups, 'Valor actual').value).toBe('$1,200.00');
-		expect(statOf(groups, 'Capital invertido').value).toBe('$1,000.00');
-		expect(statOf(groups, 'Ganancia / pérdida').value).toBe('$200.00');
-		expect(statOf(groups, 'Ganancia sobre coste').value).toBe('+20,0%');
+		expect(record).toMatchObject({
+			value: 1200,
+			cost: 1000,
+			gain: 200,
+			gainPct: 20,
+			currency: 'USD',
+			from: '2026-01-01',
+			to: '2026-01-02'
+		});
 	});
 
 	it('saca la ganancia del último punto cuando el resumen no la trae', () => {
 		const series = [point('2026-01-01', '1000', '1000'), point('2026-01-02', '1200', '1000')];
 
 		for (const missing of [undefined, '']) {
-			const groups = buildKeyStatistics(
+			const record = buildRecordSummary(
 				series,
 				summary({ currentValue: '1200', gainLoss: missing, gainLossPct: missing })
 			);
 
-			expect(statOf(groups, 'Ganancia / pérdida').value).toBe('$200.00');
-			expect(statOf(groups, 'Ganancia sobre coste').value).toBe('+20,0%');
+			expect(record?.gain).toBe(200);
+			expect(record?.gainPct).toBe(20);
 		}
 	});
 
-	it('nombra el mejor y el peor mes', () => {
-		const groups = buildKeyStatistics(
-			[
-				point('2026-01-31', '1000', '1000'),
-				point('2026-02-28', '1100', '1000'),
-				point('2026-03-31', '990', '1000')
-			],
+	it('no anualiza por debajo de un trimestre de historial', () => {
+		const record = buildRecordSummary(
+			dailySeries(Array.from({ length: 30 }, (_, i) => 1000 + i)),
 			summary()
 		);
 
-		expect(statOf(groups, 'Mejor mes').value).toBe('+10,0% · Feb 2026');
-		expect(statOf(groups, 'Peor mes').value).toBe('-10,0% · Mar 2026');
+		expect(record?.periodReturn).not.toBeNull();
+		expect(record?.annualized).toBeNull();
 	});
 
-	it('deja fuera del mejor y el peor mes los que no están enteros', () => {
-		// Junio arranca el 28 y rinde un +20 % en dos días; agosto, entero, un
-		// +5 %. El mejor mes es agosto: dos días no compiten con treinta y uno.
-		const groups = buildKeyStatistics(
-			[
-				point('2026-06-28', '1000', '1000'),
-				point('2026-06-30', '1200', '1000'),
-				point('2026-07-31', '1140', '1000'),
-				point('2026-08-31', '1197', '1000')
-			],
+	it('anualiza en cuanto el historial da', () => {
+		const record = buildRecordSummary(
+			dailySeries(Array.from({ length: 120 }, (_, i) => 1000 + i)),
 			summary()
 		);
 
-		expect(statOf(groups, 'Mejor mes').value).toBe('+5,0% · Ago 2026');
-		expect(statOf(groups, 'Peor mes').value).toBe('-5,0% · Jul 2026');
+		expect(record?.annualized).not.toBeNull();
+		expect(record?.annualized).toBeGreaterThan(record!.periodReturn!);
 	});
 
-	it('marca el mes cuando el historial no tiene ninguno entero', () => {
-		// Diez días de un solo mes: no hay con qué comparar, así que se publica lo
-		// que hay con el mismo asterisco que usa el calendario.
-		const groups = buildKeyStatistics(
-			[point('2026-06-10', '1000', '1000'), point('2026-06-20', '1100', '1000')],
+	it('cuenta los meses que cubre el historial', () => {
+		const record = buildRecordSummary(
+			[point('2025-06-01', '1000', '1000'), point('2026-07-28', '1100', '1000')],
 			summary()
 		);
 
-		expect(statOf(groups, 'Mejor mes').value).toBe('+10,0% · Jun 2026*');
-		expect(statOf(groups, 'Mejor mes').note).toBe('* Mes incompleto.');
+		// Del 1 de junio de 2025 al 28 de julio de 2026: catorce meses.
+		expect(record?.months).toBe(14);
 	});
 
-	it('resume el periodo cubierto', () => {
-		const groups = buildKeyStatistics(dailySeries([1000, 1010, 1020]), summary());
-		const period = statOf(groups, 'Periodo cubierto');
+	it('se calla la rentabilidad sin dos cierres que comparar', () => {
+		// Un punto suelto no es un tramo: la cabecera enseña el saldo y dice que
+		// la rentabilidad espera al cierre de mañana.
+		const record = buildRecordSummary(
+			[point('2026-01-01', '1000', '1000')],
+			summary({ currentValue: '1000' })
+		);
 
-		expect(period.value).toMatch(/2026/);
-		expect(period.hint).toMatch(/3 puntos/);
+		expect(record?.periodReturn).toBeNull();
+		expect(record?.value).toBe(1000);
+		// Y el mínimo de un mes, para que la frase no diga «0 meses de historial».
+		expect(record?.months).toBe(1);
 	});
 
-	it('devuelve una lista vacía sin historial', () => {
-		expect(buildKeyStatistics([], summary())).toEqual([]);
+	it('no hay ficha sin historial', () => {
+		expect(buildRecordSummary([], summary())).toBeNull();
 	});
 });
