@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - backend/cmd/migrator/**
-      - backend/cmd/migrations/**
+      - backend/internal/migrations/**
 
   workflow_dispatch:
     inputs:
