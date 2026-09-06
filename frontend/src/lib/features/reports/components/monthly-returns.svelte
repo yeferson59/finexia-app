@@ -33,7 +33,15 @@
 	     que se sale por la derecha no hay forma de alcanzarlo sin ratón—, y por
 	     eso la regla que lo prohíbe en un elemento sin interacción no aplica. -->
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-	<div class="scroller" role="region" aria-labelledby="monthly-returns" tabindex="0">
+	<!-- Nombre propio, no el del titular de la sección: con los dos llamándose
+	     igual, un lector de pantalla anunciaba dos regiones anidadas con el mismo
+	     nombre y no había forma de saber cuál era la que se desplaza. -->
+	<div
+		class="scroller"
+		role="region"
+		aria-label="Rentabilidad mes a mes, tabla desplazable"
+		tabindex="0"
+	>
 		<table>
 			<caption class="sr-only">
 				Rentabilidad de cada mes y del año entero, del año más reciente al más antiguo. Es
@@ -110,21 +118,17 @@
 		color: var(--text);
 	}
 
-	.scroller {
-		overflow-x: auto;
-	}
-
 	/*
-	 * Sombra en el borde derecho mientras quede tabla por ver, y solo mientras
-	 * quede: la capa opaca viaja con el contenido (`local`) y tapa a la sombra
-	 * —fija al carril (`scroll`)— justo al llegar al final. Sin ella, en un
-	 * móvil nada dice que a la derecha siguen media docena de columnas.
+	 * `position: relative` no es decorativo: sin él, el `sin dato` de cada celda
+	 * —un `.sr-only` en posición absoluta— se escapa del recorte de este carril,
+	 * porque un `overflow` solo recorta descendientes absolutos si él mismo está
+	 * posicionado. Su caja caía en la mitad ancha de la tabla y arrastraba el
+	 * ancho de scroll de la página entera: en un móvil se desplazaba de lado
+	 * todo, titulares y prosa incluidos.
 	 */
 	.scroller {
-		background:
-			linear-gradient(var(--bg), var(--bg)) right center / 1.25rem 100% no-repeat local,
-			linear-gradient(to left, rgba(8, 9, 10, 0.92), rgba(8, 9, 10, 0)) right center / 2.5rem 100%
-				no-repeat scroll;
+		position: relative;
+		overflow-x: auto;
 	}
 
 	.scroller:focus-visible {
@@ -134,9 +138,14 @@
 
 	table {
 		width: 100%;
-		/* Por debajo de esto las celdas se comen su propia cifra; el carril se
-		   desplaza de lado en vez de apretarlas. */
-		min-width: 46rem;
+		/*
+		 * Por debajo de esto las celdas se comen su propia cifra; el carril se
+		 * desplaza de lado en vez de apretarlas. Son 44 y no 46 rem porque a 768
+		 * la tabla se salía ocho píxeles: el año entero se desplazaba para
+		 * enseñar media columna de total, que se lee como un fallo de pintado y
+		 * no como algo que se pueda arrastrar.
+		 */
+		min-width: 44rem;
 		/* Y por encima, el total del año se despegaba de diciembre y quedaba
 		   solo contra el borde de la página. */
 		max-width: 62rem;
@@ -226,12 +235,23 @@
 		color: var(--text-muted);
 	}
 
-	/* El total del año cierra la fila y se lee como su conclusión: con su propio
-	   filete a la izquierda y en el color del signo. */
+	/*
+	 * El total del año cierra la fila y se lee como su conclusión: con su propio
+	 * filete a la izquierda y en el color del signo.
+	 *
+	 * Y se queda quieto, como el año: son los dos extremos entre los que se
+	 * arrastran los meses. Con el total desplazándose fuera de la pantalla, en
+	 * un móvil había que llegar hasta el final para saber cómo cerró el año, que
+	 * es lo primero que se busca.
+	 */
 	.total {
+		position: sticky;
+		right: 0;
 		width: 5rem;
 		padding-right: 0;
+		padding-left: 0.6rem;
 		border-left: 1px solid var(--border);
+		background: var(--bg);
 		font-weight: 600;
 		text-align: right;
 	}
@@ -246,6 +266,18 @@
 
 	td.total.down {
 		color: var(--red);
+	}
+
+	/*
+	 * Donde la tabla ya se arrastra —por debajo de 744, que es cuando sus 44 rem
+	 * dejan de caber en el hueco— la celda es más estrecha: la cifra baja de
+	 * cuerpo para que «+0,3%*» quepa entera dentro de su ficha.
+	 */
+	@media (max-width: 744px) {
+		tbody th,
+		tbody td {
+			font-size: 0.72rem;
+		}
 	}
 
 	.footnote {

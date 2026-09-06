@@ -110,6 +110,31 @@ test.describe('reports', () => {
 		await expect(table.getByRole('columnheader', { name: /hoy/ })).toBeVisible();
 	});
 
+	test('never lets the page scroll sideways on a phone', async ({ page }) => {
+		await page.setViewportSize({ width: 390, height: 844 });
+		await login(page);
+		await page.goto('/dashboard/reports');
+
+		// La matriz y la tabla de la proyección se desplazan dentro de su carril;
+		// la página, no. El `sin dato` de cada celda es un `.sr-only` en posición
+		// absoluta y, si su carril no está posicionado, se escapa del recorte y
+		// arrastra el ancho de scroll de todo el documento: el titular y la prosa
+		// se iban de lado con él.
+		const { doc, viewport } = await page.evaluate(() => ({
+			doc: document.documentElement.scrollWidth,
+			viewport: document.documentElement.clientWidth
+		}));
+
+		expect(doc).toBe(viewport);
+
+		// Y los dos carriles sí se desplazan, que es lo que hace legible una
+		// matriz de trece columnas en un móvil.
+		const matrix = page.getByRole('region', { name: /tabla desplazable/ }).first();
+		const scrolls = await matrix.evaluate((el) => el.scrollWidth > el.clientWidth);
+
+		expect(scrolls).toBe(true);
+	});
+
 	test('offers the downloadable reports with what each one holds', async ({ page }) => {
 		await login(page);
 		await page.goto('/dashboard/reports');

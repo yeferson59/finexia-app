@@ -88,7 +88,13 @@
 		<!-- Como la matriz: el `tabindex` es lo que deja desplazar la tabla con el
 		     teclado cuando no cabe entera. -->
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-		<div class="scroller" role="region" aria-labelledby="projection" tabindex="0">
+		<!-- Con nombre propio, como la matriz: la sección ya se llama así. -->
+		<div
+			class="scroller"
+			role="region"
+			aria-label="Proyección año por año, tabla desplazable"
+			tabindex="0"
+		>
 			<table>
 				<caption class="sr-only">
 					Valor proyectado de la cuenta y rentabilidad acumulada desde hoy, año por año
@@ -183,7 +189,10 @@
 
 	/* Al ancho de la gráfica: la tabla es la misma proyección en cifras, y a lo
 	   ancho de la página se leían como dos bloques distintos. */
+	/* `position: relative` por lo mismo que en la matriz: aquí el que se escapa
+	   es el `caption` accesible de la tabla. */
 	.scroller {
+		position: relative;
 		max-width: 52rem;
 		overflow-x: auto;
 		margin-top: 0.5rem;
@@ -234,8 +243,17 @@
 		text-align: right;
 	}
 
-	.corner {
+	/*
+	 * La columna de las etiquetas se queda quieta mientras los años se
+	 * desplazan: sin ella, a mitad de recorrido no se sabe si la cifra que se
+	 * está leyendo es el valor proyectado o lo acumulado.
+	 */
+	.corner,
+	tbody th {
+		position: sticky;
+		left: 0;
 		width: 12rem;
+		background: var(--bg);
 	}
 
 	tbody th,
