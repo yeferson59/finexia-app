@@ -9,6 +9,10 @@
 		disabled?: boolean;
 		onchange?: (event: Event) => void;
 		class?: string;
+		/* El componente ya reenviaba `...rest` al `<input>`, pero sin firma para
+		   ello: cualquier atributo extra —un `aria-labelledby`, un `required`—
+		   llegaba al DOM y fallaba la comprobación de tipos. Como en `ui/card`. */
+		[key: string]: unknown;
 	}
 
 	let {

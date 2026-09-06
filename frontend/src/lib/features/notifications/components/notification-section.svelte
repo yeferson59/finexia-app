@@ -1,113 +1,116 @@
 <script lang="ts">
 	/**
-	 * Tarjeta de un canal de notificación: icono, título, descripción y contenido.
+	 * Un bloque de la página: a la izquierda qué canal es y a la derecha lo que
+	 * se puede decidir sobre él.
 	 *
-	 * Interna de la feature. Como en `settings`, las clases de nombre genérico
-	 * que usa su contenido (`.feedback`, `.form-actions`) se declaran aquí con
-	 * `:global` acotado a la tarjeta: en una hoja global chocarían con el resto
-	 * del dashboard.
+	 * Sustituye a la tarjeta que envolvía cada canal. La página eran dos tarjetas
+	 * iguales una al lado de la otra, así que el canal que todavía no existe
+	 * ocupaba la mitad de la pantalla para decir que no existe. En un carril cada
+	 * bloque ocupa lo que tiene que contar.
+	 *
+	 * Es el mismo carril que usa la página de configuración, y a propósito: son
+	 * vecinas en el menú y se hojean igual. Aporta con `:global`, acotadas al
+	 * bloque, las clases de formulario que usa su contenido (`.form-actions`,
+	 * `.feedback`): son nombres genéricos que en una hoja global chocarían con el
+	 * resto del panel.
 	 */
 	import type { Snippet } from 'svelte';
-	import Card from '$lib/ui/card.svelte';
 
 	interface Props {
 		title: string;
+		/** Qué es el canal, en una frase; va bajo el título. */
 		description: string;
-		/** Icono del canal, dibujado por quien usa la sección. */
-		icon: Snippet;
-		/** Clase extra del contenedor interno (p. ej. el canal aún no disponible). */
-		class?: string;
 		children: Snippet;
 	}
 
-	let { title, description, icon, class: className = '', children }: Props = $props();
+	let { title, description, children }: Props = $props();
 </script>
 
-<Card variant="elevated" padding="none">
-	<div class="section {className}">
-		<div class="section-header">
-			<div class="section-icon">
-				{@render icon()}
-			</div>
-			<div>
-				<h2 class="section-title">{title}</h2>
-				<p class="section-desc">{description}</p>
-			</div>
-		</div>
+<section class="channel">
+	<div class="rail">
+		<h2>{title}</h2>
+		<p class="description">{description}</p>
+	</div>
+
+	<div class="controls">
 		{@render children()}
 	</div>
-</Card>
+</section>
 
 <style>
-	.section {
-		padding: 1.5rem;
+	.channel {
+		display: grid;
+		grid-template-columns: minmax(0, 17rem) minmax(0, 1fr);
+		gap: 1rem 3rem;
+		padding: 2.25rem 0;
+		border-top: 1px solid var(--border-strong);
 	}
 
-	.section-header {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.875rem;
-		margin-bottom: 1.5rem;
-		padding-bottom: 1.25rem;
-		border-bottom: 1px solid rgba(212, 145, 42, 0.1);
+	.rail {
+		min-width: 0;
 	}
 
-	.section-icon {
-		width: 36px;
-		height: 36px;
-		border-radius: 8px;
-		background: rgba(212, 145, 42, 0.1);
-		border: 1px solid rgba(212, 145, 42, 0.2);
-		color: var(--amber);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-	}
-
-	.section-title {
-		margin: 0 0 0.2rem;
-		font-size: 0.95rem;
-		font-weight: 600;
+	h2 {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: 1.35rem;
+		font-weight: 300;
+		letter-spacing: -0.02em;
 		color: var(--text);
 	}
 
-	.section-desc {
-		margin: 0;
-		font-size: 0.8rem;
-		color: rgba(236, 234, 229, 0.5);
+	.description {
+		max-width: 34ch;
+		margin: 0.5rem 0 0;
+		font-size: 0.83rem;
+		line-height: 1.55;
+		color: var(--text-muted);
 	}
 
-	/* Variante del canal que aún no está disponible: sin formulario, su
-	   contenido se reparte en columna. */
-	.section.coming-soon-section {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
+	.controls {
+		min-width: 0;
+		max-width: 38rem;
 	}
 
-	.section :global(.form-actions) {
+	/* El botón sin el halo ámbar que `ui/button` le pone: el ámbar de esta
+	   página dice qué avisos están encendidos, y encendía también el botón. */
+	.channel :global(.btn-primary) {
+		box-shadow: none;
+	}
+
+	.channel :global(.form-actions) {
 		margin-top: 1.5rem;
-		display: flex;
-		justify-content: flex-end;
 	}
 
-	.section :global(.feedback) {
-		margin: 0.875rem 0 0;
-		font-size: 0.835rem;
-		padding: 0.6rem 0.875rem;
-		border-radius: 6px;
+	/* Los avisos son prosa con un filete del color de lo que dicen, no cajas de
+	   alerta: es el idioma que ya hablan configuración y el panel. */
+	.channel :global(.feedback) {
+		max-width: 62ch;
+		margin: 1rem 0 0;
+		padding-left: 0.75rem;
+		border-left: 2px solid;
+		font-size: 0.83rem;
+		line-height: 1.5;
 	}
 
-	.section :global(.feedback.success) {
-		background: rgba(74, 222, 128, 0.08);
-		border: 1px solid rgba(74, 222, 128, 0.25);
-		color: #4ade80;
+	.channel :global(.feedback.success) {
+		border-color: var(--green);
+		color: var(--green);
 	}
 
-	.section :global(.feedback.error) {
-		background: rgba(224, 90, 90, 0.08);
-		border: 1px solid rgba(224, 90, 90, 0.25);
-		color: var(--red, #e05a5a);
+	.channel :global(.feedback.error) {
+		border-color: var(--red);
+		color: var(--red);
+	}
+
+	@media (max-width: 900px) {
+		.channel {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 1.25rem;
+		}
+
+		.controls {
+			max-width: none;
+		}
 	}
 </style>

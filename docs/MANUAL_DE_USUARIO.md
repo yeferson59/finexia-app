@@ -169,15 +169,15 @@ Todas las funciones descritas en este manual están disponibles también desde e
 
 No hace falta buscar este manual fuera de Finexia: la entrada **Guía de usuario** del menú lateral lo abre dentro de la propia aplicación.
 
-![Página de la guía de usuario con la ficha del documento y el índice de secciones](img/manual/17-guia.png)
+![Página de la guía de usuario con la ficha del documento y el índice de capítulos agrupado](img/manual/17-guia.png)
 
-La página muestra la **versión** y la **fecha** del documento que se está sirviendo, junto con su tamaño, y ofrece tres formas de usarlo:
+Arriba está la ficha del documento —la **versión**, la **fecha** y el **tamaño** del PDF que se está sirviendo— con tres formas de usarlo:
 
 - **Ver la guía aquí** — la abre incrustada en la página, sin salir de la aplicación.
-- **Abrir en una pestaña nueva** — útil para consultarla mientras trabajas en otra sección.
 - **Descargar PDF** — la guarda en tu equipo para leerla sin conexión.
+- **Abrir en pestaña nueva** — útil para consultarla mientras trabajas en otra sección.
 
-Debajo aparece el **índice de secciones**, con la misma numeración que este documento, para saber de un vistazo dónde está cada cosa.
+Debajo está el **índice**, repartido en cuatro bloques —«Para empezar», «El día a día», «Tu cuenta» y «Si te atascas»— para que sepas por dónde buscar sin recorrer los diecinueve títulos. La numeración es la misma que la de este documento: el número que ves en el índice es el capítulo que hay que buscar dentro del PDF.
 
 > **Sobre la versión que ves:** el PDF se genera a partir del manual del repositorio y la aplicación comprueba en cada integración que el archivo publicado corresponde al texto vigente. Si la fecha que ves es antigua, es porque el manual no ha cambiado desde entonces, no porque se haya quedado sin actualizar.
 
@@ -615,20 +615,24 @@ Los archivos se descargan directamente a tu equipo en formato Excel (XLSX) y pue
 
 ## 13. Notificaciones
 
-![Preferencias de notificaciones por correo electrónico y alertas en la app](img/manual/11-notificaciones.png)
+![Preferencias de notificaciones, con la dirección a la que llegan los correos y los avisos que puedes recibir](img/manual/11-notificaciones.png)
 
-En **Notificaciones** configuras cómo quieres que Finexia te avise:
+En **Notificaciones** eliges qué te manda Finexia, y a dónde.
 
-### 13.1 Correo electrónico
+### 13.1 Correo
 
-- **Alertas de actividad:** recibe un correo cuando ocurra actividad relevante en tu cuenta.
-- **Resumen semanal:** un correo periódico con el resumen de la evolución de tus portafolios.
+Lo primero que aparece es **la dirección a la que llegan**, que es la de tu cuenta. Si todavía no la has verificado, la página te lo advierte ahí mismo: mientras no la confirmes no puede salir ningún correo, por mucho que marques las opciones de abajo. Desde ese aviso puedes pedir un enlace de verificación nuevo.
 
-### 13.2 Alertas en la app
+Debajo están los dos correos que Finexia envía hoy:
 
-Activa o desactiva los avisos que se muestran dentro de la propia aplicación.
+- **Alertas de actividad:** un correo cuando ocurra algo que deberías saber en tu cuenta.
+- **Resumen semanal:** un correo cada semana con cómo se movieron tus portafolios.
 
-Marca o desmarca cada opción según tu preferencia; los cambios se guardan en tus preferencias de usuario.
+Marca o desmarca los que quieras y pulsa **Guardar preferencias**. Los cambios no se aplican hasta que guardas.
+
+### 13.2 En la app
+
+Los avisos dentro del propio panel —cambios de precio, movimientos de tus portafolios— **todavía no están disponibles**. Hasta que lleguen, todo lo que Finexia te avisa sale por correo.
 
 ---
 

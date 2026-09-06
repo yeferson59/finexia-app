@@ -70,6 +70,30 @@ const ACCOUNTS = {
 			createdAt: NOW
 		}
 	},
+	// Cuenta sin verificar: la página de notificaciones avisa de que, mientras
+	// la dirección no esté confirmada, no puede salir ningún correo.
+	'sinverificar@finexia.test': {
+		accessToken: 'access-unverified',
+		refreshToken: 'refresh-unverified',
+		user: {
+			name: 'Usuario Sin Verificar',
+			email: 'sinverificar@finexia.test',
+			emailVerified: false,
+			image: '',
+			role: 'customer',
+			preferredCurrency: 'USD',
+			createdAt: NOW,
+			updatedAt: NOW
+		},
+		session: {
+			id: 'session-unverified',
+			userId: 'user-2',
+			expiresAt: FUTURE,
+			ipAddress: null,
+			userAgent: null,
+			createdAt: NOW
+		}
+	},
 	'admin@finexia.test': {
 		accessToken: 'access-admin',
 		refreshToken: 'refresh-admin',
@@ -295,7 +319,7 @@ const server = createServer(async (req, res) => {
 					currentPage: 1,
 					usersForPage: 20,
 					offset: 0,
-					totalUsers: 2,
+					totalUsers: Object.keys(ACCOUNTS).length,
 					totalPages: 1,
 					previous: false,
 					next: false

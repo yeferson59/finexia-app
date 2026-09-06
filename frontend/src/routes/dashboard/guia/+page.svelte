@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { GuideViewer, GuideContents } from '$lib/features/guide';
+	import { GuideViewer, GuideContents, manual } from '$lib/features/guide';
 	import PageHeader from '$lib/ui/page-header.svelte';
 </script>
 
@@ -8,21 +8,14 @@
 	<meta name="description" content="Manual de usuario de Finexia, para consultar o descargar" />
 </svelte:head>
 
+<!-- Sin filete: lo pone la ficha del documento, y dos rayas seguidas no separan
+     nada. Sin antetítulo tampoco: el menú lateral ya dijo dónde estás. -->
 <PageHeader
-	eyebrow="Ayuda"
 	title="Guía de usuario"
-	subtitle="El manual completo de Finexia: léelo aquí mismo o descárgalo para tenerlo a mano."
+	subtitle="Cómo funciona cada parte de Finexia, en {manual.sections
+		.length} capítulos. Léelos aquí o descarga el manual para tenerlo a mano."
+	divider={false}
 />
 
-<div class="stack">
-	<GuideViewer />
-	<GuideContents />
-</div>
-
-<style>
-	.stack {
-		display: flex;
-		flex-direction: column;
-		gap: 2rem;
-	}
-</style>
+<GuideViewer />
+<GuideContents />

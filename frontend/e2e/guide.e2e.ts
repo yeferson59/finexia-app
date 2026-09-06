@@ -9,6 +9,11 @@ test.describe('guía de usuario', () => {
 		await expect(page.getByRole('heading', { name: 'Guía de usuario' })).toBeVisible();
 		await expect(page.getByRole('heading', { name: 'Manual de Usuario de Finexia' })).toBeVisible();
 
+		// El índice va repartido en bloques, no en diecinueve títulos seguidos.
+		await expect(page.getByRole('heading', { name: 'Para empezar' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Si te atascas' })).toBeVisible();
+		await expect(page.getByText('Preguntas frecuentes (FAQ)')).toBeVisible();
+
 		// La descarga apunta al PDF que sirve la aplicación.
 		const download = page.getByRole('link', { name: 'Descargar PDF' });
 		await expect(download).toHaveAttribute('href', /manual-usuario\.pdf$/);

@@ -6,6 +6,8 @@ export const TEST_PLATFORM_ID = '33333333-3333-4333-8333-333333333333';
 
 export const USER_EMAIL = 'user@finexia.test';
 export const ADMIN_EMAIL = 'admin@finexia.test';
+/** Cuenta cuyo correo no está confirmado. */
+export const UNVERIFIED_EMAIL = 'sinverificar@finexia.test';
 export const PASSWORD = 'Password123!';
 
 /** Logs in through the real /auth form and waits for the dashboard. */

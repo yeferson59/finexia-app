@@ -12,27 +12,9 @@
 	<meta name="description" content="Configura tus preferencias de notificaciones en FINEXIA" />
 </svelte:head>
 
-<PageHeader
-	title="Notificaciones"
-	subtitle="Elige cómo y cuándo quieres recibir alertas sobre tu portafolio."
-/>
+<!-- Sin filete: lo pone el primer canal, y dos rayas a cuarenta píxeles una de
+     otra no separan nada. -->
+<PageHeader title="Notificaciones" subtitle="Lo que Finexia te envía, y a dónde." divider={false} />
 
-<div class="notifications-layout">
-	<EmailPreferences preferences={data.preferences} {form} />
-	<InAppAlerts />
-</div>
-
-<style>
-	.notifications-layout {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1.5rem;
-		align-items: start;
-	}
-
-	@media (max-width: 1024px) {
-		.notifications-layout {
-			grid-template-columns: 1fr;
-		}
-	}
-</style>
+<EmailPreferences preferences={data.preferences} user={data.user} {form} />
+<InAppAlerts />
