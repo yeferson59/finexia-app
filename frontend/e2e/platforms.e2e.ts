@@ -28,4 +28,22 @@ test.describe('plataformas', () => {
 		await expect(page).toHaveURL(new RegExp(TEST_PLATFORM_ID));
 		await expect(page.getByRole('heading', { name: 'Broker Demo' })).toBeVisible();
 	});
+
+	test('el alta abre con un tipo ya elegido y dice cuándo no pudo guardar', async ({ page }) => {
+		await login(page);
+		await page.goto('/dashboard/platforms/add');
+
+		// El desplegable arrancaba en «Bróker» —la etiqueta— y los valores de las
+		// opciones son las claves, así que abría sin nada seleccionado y el
+		// navegador cortaba el envío con su propio globo.
+		await expect(page.locator('select[name="type"]')).toHaveValue('broker');
+
+		await page.fill('#name', 'Interactive Brokers');
+		await page.getByRole('button', { name: 'Crear plataforma' }).click();
+
+		// El stub no tiene alta de plataformas. Lo que se comprueba es que el
+		// rechazo se ve: la action devolvía `{ error }` con un 200 y el formulario
+		// no lo leía en ningún sitio, así que el botón parecía no hacer nada.
+		await expect(page.getByText('No pudimos guardar la plataforma')).toBeVisible();
+	});
 });

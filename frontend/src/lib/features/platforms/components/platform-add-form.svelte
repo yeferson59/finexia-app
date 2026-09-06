@@ -1,284 +1,262 @@
 <script lang="ts">
+	/*
+	 * Alta de una plataforma.
+	 *
+	 * Era una tarjeta con sombra y tres campos dentro, con las etiquetas en
+	 * Mayúsculas De Título y un asterisco rojo en las obligatorias. Ahora es una
+	 * columna: tres campos no necesitan el carril de configuración, que gana su
+	 * sitio cuando hay varios bloques que hojear. Lo que sí hacía falta es decir
+	 * antes de empezar qué es una plataforma aquí.
+	 *
+	 * Dos cosas que no eran de estilo:
+	 *
+	 *  - El desplegable arrancaba en «Bróker», que es la *etiqueta* del tipo; los
+	 *    valores de las opciones son las claves (`broker`, `neobank`…). Como no
+	 *    coincidía con ninguna, el `<select>` abría sin nada seleccionado y, al
+	 *    llevar `required`, el navegador cortaba el envío con su propio globo.
+	 *    Ahora arranca en la clave.
+	 *  - La action devolvía `{ error }` y este formulario no lo leía en ningún
+	 *    sitio, así que un alta rechazada por el backend no dejaba rastro en la
+	 *    pantalla.
+	 */
 	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import Button from '$lib/ui/button.svelte';
 	import { PLATFORM_TYPES } from '../platforms';
+	import type { ActionForm } from '$lib/shared/form';
 
-	interface FormData {
-		name: string;
-		description: string;
-		type: string;
-		status: string;
-	}
+	let { form }: { form: ActionForm } = $props();
 
-	let formData: FormData = $state({
-		name: '',
-		description: '',
-		type: 'Bróker',
-		status: 'Activo'
-	});
-
+	let name = $state('');
+	let description = $state('');
+	// La clave, no la etiqueta: es lo que llevan los `value` de las opciones.
+	let type = $state('broker');
 	let isSubmitting = $state(false);
-	let submitSuccess = $state(false);
 
-	function handleCancel() {
-		goto(resolve('/dashboard/platforms'));
-	}
+	const error = $derived((form?.error as string) ?? '');
 </script>
 
-<div class="form-container">
-	<form
-		method="POST"
-		action="/dashboard/platforms/add"
-		class="platform-form"
-		use:enhance={() => {
-			isSubmitting = true;
-			return async ({ update }) => {
-				await update();
-				isSubmitting = false;
-			};
-		}}
-	>
-		<!-- Basic Information Section -->
-		<section class="form-section">
-			<h2 class="section-title">Información Básica</h2>
+<form
+	method="POST"
+	use:enhance={() => {
+		isSubmitting = true;
+		return async ({ update }) => {
+			await update();
+			isSubmitting = false;
+		};
+	}}
+>
+	<!--
+		La duda real de esta pantalla, antes del primer campo. Finexia no se
+		conecta a ningún bróker ni pide credenciales: una plataforma aquí es solo
+		el nombre del sitio donde tienes el dinero, para poder repartir tus
+		posiciones entre ellos. Sin decirlo, quien llega espera que el siguiente
+		paso sea escribir la contraseña de su bróker.
+	-->
+	<p class="lead">
+		Una plataforma es el sitio donde guardas tu dinero: un bróker, una casa de bolsa, una billetera
+		cripto. Finexia no se conecta con ella ni te pedirá sus claves; solo le pone nombre para que
+		puedas repartir tus posiciones.
+	</p>
 
-			<div class="form-group">
-				<label for="name" class="form-label"
-					>Nombre de la Plataforma <span class="required">*</span></label
-				>
-				<input
-					id="name"
-					name="name"
-					type="text"
-					bind:value={formData.name}
-					placeholder="ej: Interactive Brokers"
-					class="form-input"
-					required
-				/>
-			</div>
-
-			<div class="form-group">
-				<label for="description" class="form-label">Descripción</label>
-				<textarea
-					id="description"
-					name="description"
-					bind:value={formData.description}
-					placeholder="Describe qué tipo de inversiones realizas en esta plataforma..."
-					class="form-textarea"
-					rows="4"></textarea>
-			</div>
-
-			<div class="form-row">
-				<div class="form-group">
-					<label for="type" class="form-label"
-						>Tipo de Plataforma <span class="required">*</span></label
-					>
-					<select id="type" name="type" bind:value={formData.type} class="form-select" required>
-						{#each PLATFORM_TYPES.entries() as [key, type] (key)}
-							<option value={key}>{type}</option>
-						{/each}
-					</select>
-				</div>
-			</div>
-		</section>
-
-		<!-- Action Buttons -->
-		<div class="form-actions">
-			<button type="button" onclick={handleCancel} class="btn btn-secondary">Cancelar</button>
-			<button type="submit" disabled={isSubmitting} class="btn btn-primary">
-				{#if isSubmitting}
-					<span class="spinner"></span>
-					Guardando...
-				{:else if submitSuccess}
-					✓ Guardado
-				{:else}
-					Crear Plataforma
-				{/if}
-			</button>
+	<div class="fields">
+		<div class="field">
+			<label for="name">Nombre</label>
+			<input
+				id="name"
+				name="name"
+				type="text"
+				bind:value={name}
+				placeholder="Interactive Brokers"
+				disabled={isSubmitting}
+				required
+				minlength="2"
+			/>
+			<p class="hint">Como la llamas tú. Es el nombre con el que aparecerá en tus posiciones.</p>
 		</div>
-	</form>
-</div>
+
+		<div class="field">
+			<label for="type">Tipo</label>
+			<select id="type" name="type" bind:value={type} disabled={isSubmitting} required>
+				{#each PLATFORM_TYPES.entries() as [key, label] (key)}
+					<option value={key}>{label}</option>
+				{/each}
+			</select>
+		</div>
+
+		<div class="field">
+			<!-- Se marca lo opcional, no lo obligatorio: de tres campos, dos lo
+				     son, así que dos asteriscos rojos señalaban casi todo. -->
+			<label for="description">Notas <span class="optional">(opcional)</span></label>
+			<textarea
+				id="description"
+				name="description"
+				bind:value={description}
+				placeholder="Qué tienes aquí, en qué moneda opera, lo que te sirva para reconocerla."
+				disabled={isSubmitting}
+				rows="3"></textarea>
+		</div>
+
+		{#if error}
+			<p class="feedback error">{error}</p>
+		{/if}
+
+		<div class="actions">
+			<Button type="submit" loading={isSubmitting}>
+				{isSubmitting ? 'Creando…' : 'Crear plataforma'}
+			</Button>
+			<a class="cancel" href={resolve('/dashboard/platforms')}>Cancelar</a>
+		</div>
+	</div>
+</form>
 
 <style>
-	.form-container {
-		max-width: 900px;
+	.lead {
+		max-width: 62ch;
+		margin: 0 0 2rem;
+		font-size: 0.9rem;
+		line-height: 1.65;
+		color: var(--text-muted);
 	}
 
-	.platform-form {
-		display: grid;
-		gap: 2rem;
-		animation: fade-in 0.4s ease-out;
-	}
-
-	.form-section {
-		border: 1px solid var(--border-strong);
-		border-radius: 16px;
-		background: var(--surface);
-		box-shadow:
-			0 20px 60px rgba(0, 0, 0, 0.3),
-			inset 0 1px 0 rgba(255, 255, 255, 0.05);
-		backdrop-filter: blur(16px);
-		padding: 1.75rem;
-	}
-
-	.section-title {
-		margin: 0 0 1.5rem;
-		font-size: 1.15rem;
-		font-weight: 400;
-		color: var(--text);
-		font-family: var(--font-display);
-	}
-
-	.form-group {
+	/* Los campos no se estiran a lo ancho de la página: el nombre de un bróker
+	   no se escribe en una caja de mil píxeles. */
+	.fields {
 		display: flex;
 		flex-direction: column;
-		gap: 0.6rem;
-		margin-bottom: 1.35rem;
+		gap: 1.35rem;
+		min-width: 0;
+		max-width: 34rem;
 	}
 
-	.form-group:last-child {
-		margin-bottom: 0;
+	.field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
 	}
 
-	.form-row {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1.5rem;
-	}
-
-	.form-label {
-		font-size: 0.9rem;
-		font-weight: 600;
+	label {
+		font-size: 0.87rem;
+		font-weight: 500;
 		color: var(--text);
-		letter-spacing: 0.3px;
 	}
 
-	.required {
-		color: var(--red);
-	}
-
-	.form-input,
-	.form-select,
-	.form-textarea {
-		padding: 0.85rem 1rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.022);
-		color: var(--text);
-		font-size: 0.95rem;
-		font-family: var(--font-body);
-		transition: all 0.3s ease;
-	}
-
-	.form-input::placeholder,
-	.form-textarea::placeholder {
+	.optional {
+		font-weight: 400;
 		color: var(--text-dim);
 	}
 
-	.form-input:focus,
-	.form-select:focus,
-	.form-textarea:focus {
-		outline: none;
-		border-color: var(--amber);
-		background: rgba(255, 255, 255, 0.022);
-		box-shadow: 0 0 0 3px var(--border);
-	}
-
-	.form-textarea {
-		resize: vertical;
-		min-height: 100px;
-	}
-
-	.form-actions {
-		display: flex;
-		gap: 1rem;
-		justify-content: flex-end;
-		margin-top: 2rem;
-	}
-
-	.btn {
-		padding: 0.85rem 1.5rem;
-		border: none;
-		border-radius: 10px;
-		font-weight: 700;
+	input,
+	select,
+	textarea {
+		width: 100%;
+		padding: 0.8rem 0.95rem;
+		border: 1px solid rgba(212, 145, 42, 0.2);
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.03);
+		color: var(--text);
 		font-family: var(--font-body);
-		font-size: 0.95rem;
-		cursor: pointer;
-		transition: all 0.3s ease;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-		letter-spacing: 0.3px;
+		font-size: 0.92rem;
+		box-sizing: border-box;
+		transition: border-color 0.2s ease;
 	}
 
-	.btn-primary {
-		background: var(--amber);
-		color: #0d0800;
-		font-weight: 700;
+	input::placeholder,
+	textarea::placeholder {
+		color: var(--text-dim);
 	}
 
-	.btn-primary:hover:not(:disabled) {
-		transform: translateY(-2px);
-		box-shadow: 0 10px 25px rgba(212, 145, 42, 0.25);
+	input:hover:not(:disabled),
+	select:hover:not(:disabled),
+	textarea:hover:not(:disabled) {
+		border-color: rgba(212, 145, 42, 0.35);
 	}
 
-	.btn-primary:disabled {
-		opacity: 0.6;
+	/* El foco lo pinta la regla global de `layout.css`, que es la misma en toda
+	   la aplicación; aquí solo se enciende el borde. */
+	input:focus,
+	select:focus,
+	textarea:focus {
+		border-color: var(--amber);
+	}
+
+	input:disabled,
+	select:disabled,
+	textarea:disabled {
+		color: var(--text-muted);
 		cursor: not-allowed;
 	}
 
-	.btn-secondary {
-		background: transparent;
+	textarea {
+		resize: vertical;
+		min-height: 5.5rem;
+		line-height: 1.55;
+	}
+
+	.hint {
+		margin: 0;
+		font-size: 0.8rem;
+		line-height: 1.5;
+		color: var(--text-muted);
+	}
+
+	/* Prosa con un filete del color de lo que dice, no una caja de alerta: el
+	   idioma que ya hablan configuración y notificaciones. */
+	.feedback {
+		max-width: 62ch;
+		margin: 0;
+		padding-left: 0.75rem;
+		border-left: 2px solid;
+		font-size: 0.83rem;
+		line-height: 1.5;
+	}
+
+	.feedback.error {
+		border-color: var(--red);
+		color: var(--red);
+	}
+
+	/*
+	 * Los botones a la izquierda y en el orden en que se leen, no anclados al
+	 * borde derecho: el ojo viene bajando por los campos y ahí es donde termina.
+	 * Y «Cancelar» es un enlace de verdad al listado, no un botón con `goto`.
+	 */
+	.actions {
+		display: flex;
+		align-items: center;
+		gap: 1.25rem;
+		margin-top: 0.5rem;
+	}
+
+	/* El botón sin el halo ámbar que `ui/button` le pone, como en configuración:
+	   en una pantalla de un solo formulario el halo no jerarquiza nada. */
+	form :global(.btn-primary) {
+		box-shadow: none;
+	}
+
+	.cancel {
+		font-size: 0.85rem;
+		color: var(--text-muted);
+		text-decoration: none;
+		transition: color 0.2s ease;
+	}
+
+	.cancel:hover {
 		color: var(--text);
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
 	}
 
-	.btn-secondary:hover {
-		border-color: var(--amber);
-		background: var(--border);
-		color: var(--amber);
-	}
-
-	.spinner {
-		display: inline-block;
-		width: 14px;
-		height: 14px;
-		border: 2px solid rgba(255, 255, 255, 0.022);
-		border-top-color: #0d0800;
-		border-radius: 50%;
-		animation: spin 0.6s linear infinite;
-	}
-
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
+	@media (prefers-reduced-motion: reduce) {
+		input,
+		select,
+		textarea,
+		.cancel {
+			transition: none;
 		}
 	}
 
-	@keyframes fade-in {
-		from {
-			opacity: 0;
-			transform: translateY(10px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	@media (max-width: 768px) {
-		.form-row {
-			grid-template-columns: 1fr;
-		}
-
-		.form-actions {
-			flex-direction: column-reverse;
-		}
-
-		.btn {
-			width: 100%;
+	@media (max-width: 900px) {
+		.fields {
+			max-width: none;
 		}
 	}
 </style>

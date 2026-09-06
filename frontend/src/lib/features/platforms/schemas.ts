@@ -8,9 +8,11 @@ import { z } from 'zod';
 
 /** Alta de una plataforma (`routes/dashboard/platforms/add`). */
 export const platformCreateSchema = z.object({
-	name: z.coerce.string().min(2),
+	// Con mensaje: es el que ve el usuario cuando el alta se rechaza, y el de
+	// Zod por defecto llega en inglés y hablando de longitudes de cadena.
+	name: z.coerce.string().min(2, 'El nombre necesita al menos dos caracteres.'),
 	description: z.coerce.string().optional(),
-	type: z.coerce.string().min(2)
+	type: z.coerce.string().min(2, 'Elige el tipo de plataforma.')
 });
 
 /** Edición de una plataforma (`routes/dashboard/platforms/[id]`). */

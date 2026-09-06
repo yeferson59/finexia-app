@@ -44,7 +44,7 @@
 
 <PageHeader title="Plataformas" subtitle="Dónde está tu dinero y qué parte guarda cada sitio.">
 	{#snippet actions()}
-		<Button type="button" onclick={addNewPlatform}>Añadir plataforma</Button>
+		<Button type="button" onclick={addNewPlatform}>Crear plataforma</Button>
 	{/snippet}
 </PageHeader>
 
@@ -55,7 +55,7 @@
 			description="Registra el bróker, la casa de bolsa o la billetera donde tienes tu dinero y aparecerá aquí con lo que guarda."
 		>
 			{#snippet action()}
-				<Button type="button" onclick={addNewPlatform}>Añadir la primera</Button>
+				<Button type="button" onclick={addNewPlatform}>Crear la primera</Button>
 			{/snippet}
 		</EmptyState>
 	</Card>

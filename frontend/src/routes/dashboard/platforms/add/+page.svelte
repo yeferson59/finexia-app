@@ -1,16 +1,18 @@
 <script lang="ts">
 	import PageHeader from '$lib/ui/page-header.svelte';
 	import { PlatformAddForm } from '$lib/features/platforms';
+	import type { PageProps } from './$types';
+
+	const { form }: PageProps = $props();
 </script>
 
 <svelte:head>
-	<title>Agregar Plataforma - FINEXIA</title>
+	<title>Crear plataforma - FINEXIA</title>
 	<meta name="description" content="Registra una nueva plataforma de inversión" />
 </svelte:head>
 
-<PageHeader
-	title="Agregar Plataforma de Inversión"
-	subtitle="Completa los datos de tu nueva plataforma para comenzar a rastrear tus inversiones"
-/>
+<!-- Sin subtítulo: lo que hay que saber antes de escribir no cabe en una línea
+     y lo cuenta el propio formulario, sobre el primer campo. -->
+<PageHeader title="Crear plataforma" />
 
-<PlatformAddForm />
+<PlatformAddForm {form} />

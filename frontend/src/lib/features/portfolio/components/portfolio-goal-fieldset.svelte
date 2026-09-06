@@ -1,178 +1,139 @@
 <script lang="ts">
+	/*
+	 * Los dos ajustes sueltos del alta: la meta y si es el portafolio por
+	 * defecto.
+	 *
+	 * Era una tarjeta con leyenda propia, «OBJETIVO FINANCIERO», para dos
+	 * controles. Ahora son dos campos dentro del bloque que los contiene: el
+	 * marco lo pone `portfolio-form-section`.
+	 */
 	let {
 		currency,
 		targetAmount = $bindable(''),
 		isDefault = $bindable(false),
-		error,
 		disabled = false
 	}: {
 		currency: string;
 		targetAmount?: string;
 		isDefault?: boolean;
-		error?: string;
 		disabled?: boolean;
 	} = $props();
 </script>
 
-<fieldset class="form-section">
-	<legend class="section-title">Objetivo Financiero</legend>
-
-	<div class="form-group">
-		<label for="targetAmount" class="label">Monto Objetivo (opcional)</label>
-		<div class="input-with-prefix">
-			<span class="prefix">{currency}</span>
-			<input
-				type="number"
-				id="targetAmount"
-				bind:value={targetAmount}
-				placeholder="0.00"
-				class="input"
-				name="priceValue"
-				class:error={!!error}
-				{disabled}
-				step="0.01"
-				min="0"
-			/>
-		</div>
-		{#if error}
-			<span class="error-message">{error}</span>
-		{/if}
-		<p class="help-text">Define el monto que deseas alcanzar en este portafolio</p>
+<div class="field">
+	<label for="targetAmount">Meta <span class="optional">(opcional)</span></label>
+	<div class="amount">
+		<!-- La moneda va dentro del campo, en gris y sin filete ni fondo propios:
+		     antes era una pastilla ámbar pegada al borde izquierdo que pesaba más
+		     que la cifra que la acompaña. -->
+		<span class="currency" aria-hidden="true">{currency}</span>
+		<input
+			type="number"
+			id="targetAmount"
+			name="priceValue"
+			bind:value={targetAmount}
+			placeholder="0,00"
+			step="0.01"
+			min="0"
+			{disabled}
+		/>
 	</div>
+	<p class="hint">Lo que te gustaría llegar a tener en este portafolio, en {currency}.</p>
+</div>
 
-	<div class="form-group">
-		<label class="checkbox-label" for="isDefault">
-			<input type="checkbox" id="isDefault" name="isDefault" bind:checked={isDefault} {disabled} />
-			<span class="checkbox-content">
-				<span class="checkbox-title">Marcar como portafolio por defecto</span>
-				<span class="checkbox-description">
-					Este portafolio se usará como selección predeterminada
-				</span>
-			</span>
-		</label>
-	</div>
-</fieldset>
+<label class="default">
+	<input type="checkbox" id="isDefault" name="isDefault" bind:checked={isDefault} {disabled} />
+	<span class="text">
+		<span class="name">Usar este portafolio por defecto</span>
+		<span class="description">Vendrá elegido de antemano cuando registres un movimiento.</span>
+	</span>
+</label>
 
 <style>
-	.form-section {
-		display: grid;
-		gap: 1.5rem;
-		padding: 1.5rem;
-		border: 1px solid var(--border-strong);
-		border-radius: 16px;
-		background: var(--surface);
-		backdrop-filter: blur(16px);
-	}
-
-	.section-title {
-		margin: 0 0 0.5rem;
-		font-size: 1.15rem;
-		font-weight: 400;
-		color: var(--amber-light);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
-
-	.form-group {
-		display: grid;
-		gap: 0.6rem;
-	}
-
-	.label {
-		font-size: 0.95rem;
-		font-weight: 600;
-		color: var(--text);
-	}
-
-	.error-message {
-		font-size: 0.8rem;
-		color: var(--red);
-	}
-
-	.help-text {
-		margin: 0;
-		font-size: 0.8rem;
-		color: rgba(236, 234, 229, 0.5);
-	}
-
-	.input-with-prefix {
+	.amount {
 		display: flex;
 		align-items: center;
+		gap: 0.5rem;
+		padding-left: 0.95rem;
 		border: 1px solid rgba(212, 145, 42, 0.2);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.022);
-		overflow: hidden;
-		transition: all 0.3s ease;
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.03);
+		transition: border-color 0.2s ease;
 	}
 
-	.input-with-prefix:focus-within {
+	.amount:hover {
+		border-color: rgba(212, 145, 42, 0.35);
+	}
+
+	.amount:focus-within {
 		border-color: var(--amber);
-		background: rgba(255, 255, 255, 0.022);
-		box-shadow: 0 0 0 3px var(--border);
 	}
 
-	.prefix {
-		padding: 0.85rem;
-		color: var(--amber);
-		font-weight: 600;
-		border-right: 1px solid rgba(212, 145, 42, 0.2);
-		background: var(--surface);
+	.currency {
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		color: var(--text-dim);
 	}
 
-	.input-with-prefix .input {
-		flex: 1;
-		padding: 0.85rem;
+	/*
+	 * El borde y el fondo los pone el contenedor, para que la moneda y la cifra
+	 * se lean como un solo campo. Con el selector de atributo, no con `input` a
+	 * secas: el bloque que envuelve el formulario pinta los campos con
+	 * `:global(input[type='number'])`, que gana a un selector de elemento y
+	 * dejaba aquí una caja dentro de otra.
+	 */
+	.amount input[type='number'] {
 		border: none;
-		background: transparent;
+		border-radius: 0;
+		background: none;
+		padding-left: 0;
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 	}
 
-	.input-with-prefix .input:focus {
-		box-shadow: none;
+	.amount input[type='number']:focus,
+	.amount input[type='number']:hover:not(:disabled) {
+		border: none;
 	}
 
-	.checkbox-label {
-		display: flex;
-		align-items: flex-start;
-		gap: 1rem;
-		padding: 1rem;
-		border: 1px solid var(--border-strong);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.022);
+	.default {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		align-items: start;
+		gap: 0.9rem;
 		cursor: pointer;
-		transition: all 0.3s ease;
 	}
 
-	.checkbox-label:hover {
-		background: var(--border);
-		border-color: rgba(212, 145, 42, 0.3);
-	}
-
-	.checkbox-label input[type='checkbox'] {
-		margin-top: 0.2rem;
-		cursor: pointer;
-		accent-color: var(--amber);
+	.default input[type='checkbox'] {
 		width: 18px;
 		height: 18px;
+		margin: 0.1rem 0 0;
+		cursor: pointer;
 	}
 
-	.checkbox-label input[type='checkbox']:disabled {
-		cursor: not-allowed;
-		opacity: 0.6;
+	.text {
+		min-width: 0;
 	}
 
-	.checkbox-content {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-	}
-
-	.checkbox-title {
-		font-weight: 600;
+	.name {
+		display: block;
+		font-size: 0.9rem;
+		font-weight: 500;
 		color: var(--text);
 	}
 
-	.checkbox-description {
-		font-size: 0.85rem;
-		color: rgba(236, 234, 229, 0.5);
+	.description {
+		display: block;
+		max-width: 46ch;
+		margin-top: 0.2rem;
+		font-size: 0.8rem;
+		line-height: 1.55;
+		color: var(--text-muted);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.amount {
+			transition: none;
+		}
 	}
 </style>

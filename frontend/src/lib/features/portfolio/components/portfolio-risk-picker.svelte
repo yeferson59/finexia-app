@@ -1,4 +1,12 @@
 <script lang="ts">
+	/*
+	 * Elección del nivel de riesgo.
+	 *
+	 * Eran tres cajas con borde y fondo, una debajo de otra: tres tarjetas para
+	 * tres palabras. Ahora son filas con filete, como las opciones de correo de
+	 * notificaciones y las sesiones abiertas de configuración, y la fila entera
+	 * es la etiqueta del radio.
+	 */
 	import type { Risk } from '$lib/api/types';
 
 	let {
@@ -8,11 +16,12 @@
 	}: { risks: Risk[]; selected?: string; disabled?: boolean } = $props();
 </script>
 
-<div class="form-group">
-	<label class="label" for="risk">Nivel de Riesgo *</label>
-	<fieldset class="risk-options">
+<fieldset class="risk">
+	<legend class="field-label">Nivel de riesgo</legend>
+
+	<div class="options">
 		{#each risks as risk (risk.id)}
-			<label class="radio-label">
+			<label class="option">
 				<input
 					type="radio"
 					name="riskId"
@@ -20,79 +29,81 @@
 					bind:group={selected}
 					{disabled}
 					required
+					aria-describedby="risk-{risk.id}"
 				/>
-				<span class="radio-content">
-					<span class="radio-title">{risk.name}</span>
-					<span class="radio-description">{risk.description}</span>
+				<span class="text">
+					<span class="name">{risk.name}</span>
+					<span class="description" id="risk-{risk.id}">{risk.description}</span>
 				</span>
 			</label>
 		{/each}
-	</fieldset>
-</div>
+	</div>
+</fieldset>
 
 <style>
-	.form-group {
-		display: grid;
-		gap: 0.6rem;
+	.risk {
+		min-width: 0;
+		margin: 0;
+		padding: 0;
+		border: none;
 	}
 
-	.label {
-		font-size: 0.95rem;
-		font-weight: 600;
+	.field-label {
+		padding: 0;
+		font-size: 0.87rem;
+		font-weight: 500;
 		color: var(--text);
 	}
 
-	.risk-options {
+	.options {
+		margin-top: 0.45rem;
+	}
+
+	/* El radio delante y la fila entera como etiqueta: puestos en columna se ve
+	   de un vistazo cuál está marcado. */
+	.option {
 		display: grid;
-		gap: 1rem;
-		border: none;
-		padding: 0;
-		margin: 0;
-	}
-
-	.radio-label {
-		display: flex;
-		align-items: flex-start;
-		gap: 1rem;
-		padding: 1rem;
-		border: 1px solid var(--border-strong);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.022);
+		grid-template-columns: auto minmax(0, 1fr);
+		align-items: start;
+		gap: 0.9rem;
+		padding: 0.85rem 0;
+		border-bottom: 1px solid var(--border);
 		cursor: pointer;
-		transition: all 0.3s ease;
 	}
 
-	.radio-label:hover {
-		background: var(--border);
-		border-color: rgba(212, 145, 42, 0.3);
+	.option:last-child {
+		border-bottom: none;
 	}
 
-	.radio-label input[type='radio'] {
-		margin-top: 0.25rem;
-		cursor: pointer;
-		accent-color: var(--amber);
+	.option input[type='radio'] {
 		width: 18px;
 		height: 18px;
+		margin: 0.1rem 0 0;
+		cursor: pointer;
 	}
 
-	.radio-label input[type='radio']:disabled {
+	.option input[type='radio']:disabled {
 		cursor: not-allowed;
 		opacity: 0.6;
 	}
 
-	.radio-content {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
+	.text {
+		min-width: 0;
 	}
 
-	.radio-title {
-		font-weight: 600;
+	.name {
+		display: block;
+		font-size: 0.9rem;
+		font-weight: 500;
 		color: var(--text);
 	}
 
-	.radio-description {
-		font-size: 0.85rem;
-		color: rgba(236, 234, 229, 0.5);
+	.description {
+		display: block;
+		max-width: 46ch;
+		margin-top: 0.2rem;
+		font-size: 0.8rem;
+		line-height: 1.55;
+		color: var(--text-muted);
 	}
 </style>

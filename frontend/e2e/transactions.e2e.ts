@@ -8,6 +8,19 @@ test.describe('transactions', () => {
 
 		await expect(page.getByText('AAPL').first()).toBeVisible();
 		await expect(page.getByText('BTC').first()).toBeVisible();
+
+		// La primera columna dice qué pasó, no un UUID cortado que no se puede
+		// buscar ni cuadrar con el extracto del bróker.
+		await expect(page.getByRole('columnheader', { name: 'Movimiento' })).toBeVisible();
+		await expect(page.getByText(/^TRX-/)).toHaveCount(0);
+
+		// La nota de cada movimiento no se veía en ninguna parte de esta pantalla.
+		await expect(page.getByText('Aporte mensual')).toBeVisible();
+
+		// Un precio por unidad por debajo del céntimo —el interés de la cuenta— se
+		// escribe entero: redondeado a dos decimales salía «$0.00» junto a su
+		// propio total.
+		await expect(page.getByText('$0.0021')).toBeVisible();
 	});
 
 	test('import wizard reaches the mapping step with a preview', async ({ page }) => {

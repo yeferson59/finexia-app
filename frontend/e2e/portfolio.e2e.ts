@@ -44,6 +44,20 @@ test.describe('portfolio list', () => {
 		await page.getByRole('link', { name: 'Crear portafolio' }).click();
 		await page.waitForURL('**/dashboard/portfolios/add');
 	});
+
+	test('the create form says when it could not save', async ({ page }) => {
+		await login(page);
+		await page.goto('/dashboard/portfolios/add');
+
+		await page.fill('#name', 'Retiro');
+		await page.locator('input[name="riskId"]').first().check();
+		await page.getByRole('button', { name: 'Crear portafolio' }).click();
+
+		// El stub no tiene alta de portafolios. Lo que se comprueba es que el
+		// rechazo se ve: la action devolvía `{ success: false }` con un 200 y el
+		// formulario no leía `form`, así que no quedaba ni rastro en pantalla.
+		await expect(page.getByText('No pudimos crear el portafolio')).toBeVisible();
+	});
 });
 
 test.describe('portfolio detail', () => {

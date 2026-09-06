@@ -1,403 +1,202 @@
 <script lang="ts">
-	import PortfolioRiskPicker from './portfolio-risk-picker.svelte';
-	import PortfolioGoalFieldset from './portfolio-goal-fieldset.svelte';
+	/*
+	 * Alta de un portafolio.
+	 *
+	 * Eran tres tarjetas apiladas y centradas en la columna, con las leyendas EN
+	 * VERSALITAS ÁMBAR, un botón «Volver» flotando arriba a la izquierda sin
+	 * alinear con nada, y su propia copia del CSS de los campos. Ahora es el
+	 * carril de configuración, alineado a la izquierda como el resto del panel.
+	 *
+	 * Tres cosas que no eran de estilo:
+	 *
+	 *  - `errors` se declaraba y no se rellenaba nunca, así que el marcado de
+	 *    error de cada campo no podía aparecer.
+	 *  - `submitSuccess` tampoco se ponía nunca a `true`: el aviso verde de
+	 *    «Portafolio creado exitosamente» era código muerto. Y sobra, porque al
+	 *    crear se navega al listado, donde el portafolio ya está.
+	 *  - La action devolvía `{ success: false }` y el formulario no leía `form`,
+	 *    así que un alta rechazada no dejaba ni rastro en pantalla.
+	 */
 	import { enhance } from '$app/forms';
 	import { untrack } from 'svelte';
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import PageHeader from '$lib/ui/page-header.svelte';
+	import Button from '$lib/ui/button.svelte';
 	import { SUPPORTED_CURRENCIES, resolveDisplayCurrency } from '$lib/shared/currency';
+	import type { ActionForm } from '$lib/shared/form';
 	import { PORTFOLIO_TYPES } from '../portfolio';
+	import PortfolioFormSection from './portfolio-form-section.svelte';
+	import PortfolioRiskPicker from './portfolio-risk-picker.svelte';
+	import PortfolioGoalFieldset from './portfolio-goal-fieldset.svelte';
 
 	let {
 		risks,
 		/** Moneda de la cuenta: el arranque más probable para un portafolio nuevo. */
-		defaultCurrency
+		defaultCurrency,
+		form
 	}: {
 		risks: { id: string; name: string; description: string }[];
 		defaultCurrency?: string;
+		form: ActionForm;
 	} = $props();
 
-	interface FormData {
-		name: string;
-		description: string;
-		type: string;
-		riskLevel: string;
-		currency: string;
-		targetAmount: string;
-		isDefault: boolean;
-	}
-
-	let formData: FormData = $state({
-		name: '',
-		description: '',
-		type: 'stocks_etfs',
-		riskLevel: '',
-		// Semilla, no vínculo: a partir de aquí manda lo que elija el usuario.
-		currency: untrack(() => resolveDisplayCurrency(defaultCurrency)),
-		targetAmount: '',
-		isDefault: false
-	});
-
+	let name = $state('');
+	let description = $state('');
+	let type = $state('stocks_etfs');
+	// Semilla, no vínculo: a partir de aquí manda lo que elija el usuario.
+	let currency = $state(untrack(() => resolveDisplayCurrency(defaultCurrency)));
+	let riskId = $state('');
+	let targetAmount = $state('');
+	let isDefault = $state(false);
 	let isSubmitting = $state(false);
-	let submitSuccess = $state(false);
-	let errors: Record<string, string> = $state({});
 
-	// Solo las que la app sabe convertir. La lista anterior ofrecía ARS, que
-	// ninguna fuente cotiza: un portafolio así quedaba siempre sin convertir.
-	const currencies = SUPPORTED_CURRENCIES;
-
-	function handleCancel() {
-		goto(resolve('/dashboard/portfolios'));
-	}
+	const error = $derived((form?.error as string) ?? '');
 </script>
 
-<button class="back-button" onclick={handleCancel} aria-label="Volver a portafolios">
-	<svg
-		width="20"
-		height="20"
-		viewBox="0 0 24 24"
-		fill="none"
-		stroke="currentColor"
-		stroke-width="2"
+<form
+	method="POST"
+	use:enhance={() => {
+		isSubmitting = true;
+		return async ({ update }) => {
+			await update();
+			isSubmitting = false;
+		};
+	}}
+>
+	<PortfolioFormSection
+		title="Cómo lo llamas"
+		description="Puedes tener tantos portafolios como quieras: uno para el retiro, otro para cripto, otro para el fondo de emergencia. El nombre es con el que lo verás en el panel."
 	>
-		<path d="M19 12H5M12 19l-7-7 7-7" />
-	</svg>
-	Volver
-</button>
-
-<main class="form-container">
-	<PageHeader
-		title="Crear Nuevo Portafolio"
-		subtitle="Configura un nuevo portafolio para gestionar tus inversiones"
-	/>
-
-	{#if submitSuccess}
-		<div class="success-message">
-			<svg
-				width="24"
-				height="24"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-			>
-				<polyline points="20 6 9 17 4 12"></polyline>
-			</svg>
-			<span>Portafolio creado exitosamente</span>
+		<div class="field">
+			<label for="name">Nombre</label>
+			<input
+				type="text"
+				id="name"
+				name="name"
+				bind:value={name}
+				placeholder="Retiro"
+				disabled={isSubmitting}
+				required
+				minlength="1"
+			/>
 		</div>
-	{/if}
 
-	<form
-		method="POST"
-		action="/dashboard/portfolios/add"
-		class="form"
-		use:enhance={() => {
-			isSubmitting = true;
-			return async ({ update }) => {
-				await update();
-				isSubmitting = false;
-			};
-		}}
+		<div class="field">
+			<label for="description">Descripción <span class="optional">(opcional)</span></label>
+			<textarea
+				id="description"
+				name="description"
+				bind:value={description}
+				placeholder="Para qué es este dinero y cuándo piensas tocarlo."
+				disabled={isSubmitting}
+				rows="3"></textarea>
+		</div>
+	</PortfolioFormSection>
+
+	<PortfolioFormSection
+		title="Qué guarda y en qué moneda"
+		description="La moneda es en la que hablan sus totales: Finexia convierte a ella lo que compres en otra, así que elígela por dónde quieres leer las cifras, no por dónde compras."
 	>
-		<fieldset class="form-section">
-			<legend class="section-title">Información Básica</legend>
+		<div class="pair">
+			<div class="field">
+				<label for="type">Tipo</label>
+				<select id="type" name="type" bind:value={type} disabled={isSubmitting} required>
+					{#each PORTFOLIO_TYPES as option (option.value)}
+						<option value={option.value}>{option.label}</option>
+					{/each}
+				</select>
+			</div>
 
-			<div class="form-group">
-				<label for="name" class="label">Nombre del Portafolio *</label>
-				<input
-					type="text"
-					id="name"
-					name="name"
-					bind:value={formData.name}
-					placeholder="Ej: Mi Portafolio Principal"
-					class="input"
-					class:error={errors.name}
+			<div class="field">
+				<label for="currency">Moneda</label>
+				<select
+					id="currency"
+					name="currency"
+					bind:value={currency}
 					disabled={isSubmitting}
-				/>
-				{#if errors.name}
-					<span class="error-message">{errors.name}</span>
-				{/if}
+					required
+				>
+					{#each SUPPORTED_CURRENCIES as code (code)}
+						<option value={code}>{code}</option>
+					{/each}
+				</select>
 			</div>
-
-			<div class="form-group">
-				<label for="description" class="label">Descripción (opcional)</label>
-				<textarea
-					id="description"
-					name="description"
-					bind:value={formData.description}
-					placeholder="Describe el propósito de este portafolio"
-					class="textarea"
-					disabled={isSubmitting}
-					rows="3"></textarea>
-			</div>
-		</fieldset>
-
-		<fieldset class="form-section">
-			<legend class="section-title">Características del Portafolio</legend>
-
-			<div class="form-row">
-				<div class="form-group">
-					<label for="type" class="label">Tipo de Portafolio *</label>
-					<select
-						id="type"
-						bind:value={formData.type}
-						name="type"
-						class="select"
-						disabled={isSubmitting}
-					>
-						{#each PORTFOLIO_TYPES as type (type.value)}
-							<option value={type.value}>{type.label}</option>
-						{/each}
-					</select>
-				</div>
-
-				<div class="form-group">
-					<label for="currency" class="label">Moneda *</label>
-					<select
-						id="currency"
-						bind:value={formData.currency}
-						class="select"
-						name="currency"
-						disabled={isSubmitting}
-					>
-						{#each currencies as curr (curr)}
-							<option value={curr}>{curr}</option>
-						{/each}
-					</select>
-				</div>
-			</div>
-
-			<PortfolioRiskPicker {risks} bind:selected={formData.riskLevel} disabled={isSubmitting} />
-		</fieldset>
-
-		<PortfolioGoalFieldset
-			currency={formData.currency}
-			bind:targetAmount={formData.targetAmount}
-			bind:isDefault={formData.isDefault}
-			error={errors.targetAmount}
-			disabled={isSubmitting}
-		/>
-
-		<div class="form-actions">
-			<button type="button" onclick={handleCancel} class="btn-cancel" disabled={isSubmitting}>
-				Cancelar
-			</button>
-			<button type="submit" class="btn-submit" disabled={isSubmitting}>
-				{#if isSubmitting}
-					<span class="spinner"></span>
-					Creando...
-				{:else}
-					Crear Portafolio
-				{/if}
-			</button>
 		</div>
-	</form>
-</main>
+	</PortfolioFormSection>
+
+	<PortfolioFormSection
+		title="Cómo lo quieres seguir"
+		description="El riesgo es una etiqueta tuya: aparece en la ficha del portafolio para reconocer de un vistazo qué es cada uno. La meta y el portafolio por defecto puedes dejarlos en blanco."
+	>
+		<PortfolioRiskPicker {risks} bind:selected={riskId} disabled={isSubmitting} />
+		<PortfolioGoalFieldset {currency} bind:targetAmount bind:isDefault disabled={isSubmitting} />
+	</PortfolioFormSection>
+
+	<div class="close">
+		{#if error}
+			<p class="feedback error">{error}</p>
+		{/if}
+
+		<div class="actions">
+			<Button type="submit" loading={isSubmitting}>
+				{isSubmitting ? 'Creando…' : 'Crear portafolio'}
+			</Button>
+			<a class="cancel" href={resolve('/dashboard/portfolios')}>Cancelar</a>
+		</div>
+	</div>
+</form>
 
 <style>
-	.back-button {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.6rem;
-		margin-bottom: 2rem;
-		padding: 0.7rem 1.2rem;
-		border: 1px solid rgba(212, 145, 42, 0.3);
-		border-radius: 8px;
-		background: var(--surface);
-		color: var(--amber);
-		font-weight: 600;
-		cursor: pointer;
-		transition: all 0.3s ease;
+	.close {
+		padding-top: 2.25rem;
+		border-top: 1px solid var(--border-strong);
 	}
 
-	.back-button:hover {
-		background: var(--border-strong);
-		border-color: rgba(212, 145, 42, 0.5);
-		transform: translateX(-2px);
+	/* Prosa con un filete rojo, no una caja de alerta: el idioma que ya hablan
+	   configuración y notificaciones. */
+	.feedback {
+		max-width: 62ch;
+		margin: 0 0 1.25rem;
+		padding-left: 0.75rem;
+		border-left: 2px solid;
+		font-size: 0.83rem;
+		line-height: 1.5;
 	}
 
-	.form-container {
-		max-width: 800px;
-		margin: 0 auto;
-	}
-
-	.success-message {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		margin-bottom: 2rem;
-		padding: 1rem 1.5rem;
-		border-radius: 12px;
-		background: rgba(34, 201, 126, 0.1);
-		border: 1px solid rgba(34, 201, 126, 0.3);
-		color: var(--green);
-		font-weight: 600;
-	}
-
-	.form {
-		display: grid;
-		gap: 2rem;
-	}
-
-	.form-section {
-		display: grid;
-		gap: 1.5rem;
-		padding: 1.5rem;
-		border: 1px solid var(--border-strong);
-		border-radius: 16px;
-		background: var(--surface);
-		backdrop-filter: blur(16px);
-	}
-
-	.section-title {
-		margin: 0 0 0.5rem;
-		font-size: 1.15rem;
-		font-weight: 400;
-		color: var(--amber-light);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
-
-	.form-row {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1.5rem;
-	}
-
-	.form-group {
-		display: grid;
-		gap: 0.6rem;
-	}
-
-	.label {
-		font-size: 0.95rem;
-		font-weight: 600;
-		color: var(--text);
-	}
-
-	.input,
-	.select,
-	.textarea {
-		padding: 0.85rem;
-		border: 1px solid rgba(212, 145, 42, 0.2);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.022);
-		color: var(--text);
-		font-family: var(--font-body);
-		font-size: 0.95rem;
-		transition: all 0.3s ease;
-	}
-
-	.input:focus,
-	.select:focus,
-	.textarea:focus {
-		outline: none;
-		border-color: var(--amber);
-		background: rgba(255, 255, 255, 0.022);
-		box-shadow: 0 0 0 3px var(--border);
-	}
-
-	.input::placeholder,
-	.textarea::placeholder {
-		color: var(--text-dim);
-	}
-
-	.input:disabled,
-	.select:disabled,
-	.textarea:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
-	}
-
-	.input.error,
-	.input.error:focus {
-		box-shadow: 0 0 0 3px rgba(224, 90, 90, 0.1);
-	}
-
-	.error-message {
-		font-size: 0.8rem;
+	.feedback.error {
+		border-color: var(--red);
 		color: var(--red);
 	}
 
-	.form-actions {
-		display: flex;
-		gap: 1rem;
-		justify-content: flex-end;
-		margin-top: 1rem;
-	}
-
-	.btn-cancel,
-	.btn-submit {
-		padding: 0.85rem 1.8rem;
-		border: none;
-		border-radius: 10px;
-		font-weight: 700;
-		font-family: var(--font-body);
-		font-size: 0.95rem;
-		cursor: pointer;
-		transition: all 0.3s ease;
-		letter-spacing: 0.3px;
-	}
-
-	.btn-cancel {
-		background: transparent;
-		border: 1px solid rgba(212, 145, 42, 0.3);
-		color: var(--amber);
-	}
-
-	.btn-cancel:hover:not(:disabled) {
-		background: var(--border);
-		border-color: rgba(212, 145, 42, 0.5);
-	}
-
-	.btn-submit {
+	/*
+	 * A la izquierda y en el orden en que se leen, no anclados al borde derecho
+	 * de la página: el ojo viene bajando por el carril de campos y ahí es donde
+	 * termina. Y «Cancelar» es un enlace al listado, no un botón con `goto`.
+	 */
+	.actions {
 		display: flex;
 		align-items: center;
-		gap: 0.6rem;
-		background: var(--amber);
-		color: #0d0800;
+		gap: 1.25rem;
 	}
 
-	.btn-submit:hover:not(:disabled) {
-		transform: translateY(-2px);
-		box-shadow: 0 10px 25px rgba(212, 145, 42, 0.25);
+	/* Sin el halo ámbar de `ui/button`, como en configuración. */
+	.actions :global(.btn-primary) {
+		box-shadow: none;
 	}
 
-	.btn-cancel:disabled,
-	.btn-submit:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
+	.cancel {
+		font-size: 0.85rem;
+		color: var(--text-muted);
+		text-decoration: none;
+		transition: color 0.2s ease;
 	}
 
-	.spinner {
-		display: inline-block;
-		width: 14px;
-		height: 14px;
-		border: 2px solid rgba(255, 255, 255, 0.022);
-		border-top-color: #0d0800;
-		border-radius: 50%;
-		animation: spin 0.6s linear infinite;
+	.cancel:hover {
+		color: var(--text);
 	}
 
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
-	@media (max-width: 768px) {
-		.form-row {
-			grid-template-columns: 1fr;
-		}
-
-		.form-actions {
-			flex-direction: column-reverse;
-		}
-
-		.btn-cancel,
-		.btn-submit {
-			width: 100%;
+	@media (prefers-reduced-motion: reduce) {
+		.cancel {
+			transition: none;
 		}
 	}
 </style>

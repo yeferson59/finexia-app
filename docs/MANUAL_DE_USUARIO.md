@@ -257,14 +257,17 @@ Si algún portafolio está en una moneda para la que no hay tasa de cambio, se s
 ![Formulario de creación de un portafolio](img/manual/06-crear-portafolio.png)
 
 1. En **Portafolios**, pulsa **Crear portafolio**.
-2. Completa el formulario:
-   - **Nombre del Portafolio** (obligatorio) — p. ej. "Mi Portafolio Principal".
-   - **Descripción** (opcional) — el propósito del portafolio.
-   - **Tipo de Portafolio** (obligatorio) — la clase de portafolio que corresponda (largo plazo, especulativo…).
-   - **Moneda** (obligatorio) — la moneda base en la que se valorará el portafolio.
-   - **Nivel de Riesgo** (obligatorio) — elige entre los perfiles disponibles: **Conservador** (prioriza preservar el capital), **Moderado** (equilibrio entre crecimiento y estabilidad) o **Agresivo** (busca máximo crecimiento asumiendo alta volatilidad).
-   - **Monto Objetivo** (opcional) — la meta de valor que quieres alcanzar.
-3. Guarda. El nuevo portafolio aparecerá en tu lista.
+2. El formulario va en tres bloques, y cada uno dice a la izquierda qué se decide en él:
+
+   | Bloque | Qué pide |
+   |---|---|
+   | **Cómo lo llamas** | El **nombre** con el que lo verás en el panel, y una **descripción** opcional |
+   | **Qué guarda y en qué moneda** | El **tipo** (acciones y ETF, criptomonedas, bonos…) y la **moneda**: la que hablan sus totales, a la que Finexia convierte lo que compres en otra |
+   | **Cómo lo quieres seguir** | El **nivel de riesgo** —**Conservador**, **Moderado** o **Agresivo**—, una **meta** opcional y si quieres que sea el portafolio que venga elegido de antemano al registrar un movimiento |
+
+3. Pulsa **Crear portafolio**. El nuevo portafolio aparecerá en tu lista. Si algo falla, el formulario lo dice al pie, sobre el botón.
+
+Solo el nombre y el nivel de riesgo hay que rellenarlos a mano: el resto llega con un valor puesto o se puede dejar en blanco, y lo que es opcional lo lleva escrito al lado de su etiqueta.
 
 ### 6.3 Detalle de un portafolio
 
@@ -421,14 +424,15 @@ La lista se pagina de doce en doce. Si todavía no tienes ninguna plataforma, la
 
 > **La columna de ganancia aparece y desaparece.** Solo se dibuja si al menos una plataforma tiene con qué calcularla: sin precios de mercado (apartado 7.3) sería una columna de guiones, que se lee como un dato que falta y no como uno que no existe.
 
-### 9.2 Añadir una plataforma
+### 9.2 Crear una plataforma
 
-1. Pulsa **Añadir plataforma**.
-2. Introduce:
-   - **Nombre** — p. ej. "Interactive Brokers", "Binance", "Mi banco".
-   - **Descripción** — información adicional (opcional).
-   - **Tipo de plataforma** — bróker, banco de inversión, plataforma de trading, neobank, DeFi, billetera cripto, fondos mutuos, casa de bolsa u otro.
-3. Guarda. La plataforma quedará disponible para asociarla a posiciones y transacciones.
+1. Pulsa **Crear plataforma**.
+2. El formulario empieza recordando qué es una plataforma aquí: **Finexia no se conecta con tu bróker ni te pedirá sus claves**. Solo le pones nombre al sitio donde tienes el dinero, para poder repartir tus posiciones entre ellos.
+3. Introduce:
+   - **Nombre** — p. ej. "Interactive Brokers", "Binance", "Mi banco". Es el nombre con el que la verás en tus posiciones.
+   - **Tipo** — bróker, banco de inversión, plataforma de trading, neobank, DeFi, billetera cripto, fondos mutuos, casa de bolsa u otro. Viene con **Bróker** elegido de antemano.
+   - **Notas** (opcional) — lo que te sirva para reconocerla.
+4. Pulsa **Crear plataforma**. La plataforma quedará disponible para asociarla a posiciones y transacciones. Si algo falla, el formulario lo dice ahí mismo, debajo de los campos.
 
 ### 9.3 Detalle de una plataforma
 
@@ -457,9 +461,20 @@ Las **transacciones** son las operaciones de compra y venta que dan forma a tus 
 
 ### 10.1 Ver el historial
 
-![Historial de transacciones con fecha, activo, tipo de operación e importe](img/manual/08-transacciones.png)
+![Historial de transacciones con el tipo de movimiento, el activo, la fecha, la cantidad, el precio unitario y el total](img/manual/08-transacciones.png)
 
-La sección **Transacciones** muestra el historial de operaciones más recientes de todos tus portafolios, con fecha, activo, tipo de operación (compra o venta), cantidad, precio e importe. Desde el detalle de cada posición (sección 7.2) puedes ver el historial filtrado por activo.
+La sección **Transacciones** es el libro de movimientos de todos tus portafolios, del más reciente al más antiguo:
+
+| Columna | Qué dice |
+|---|---|
+| **Movimiento** | Qué fue: compra, venta, dividendo, interés, cargo, transferencia o split. Debajo, la nota que le pusieras |
+| **Activo** | El nombre y, debajo, su símbolo |
+| **Fecha** | El día de la operación |
+| **Cantidad** | Cuántas unidades |
+| **Precio** | Lo que costó cada una. Un precio por debajo del céntimo —el interés diario de una cuenta— se escribe con los decimales que hagan falta, para que cuadre con su total |
+| **Total** | Lo que pagaste o cobraste, ya en la moneda en la que se liquidó. Si la operación cotizó en otra, debajo aparece cuál y a qué tasa |
+
+Desde el detalle de cada posición (sección 7.2) puedes ver el historial filtrado por activo.
 
 ### 10.2 Registrar una transacción
 

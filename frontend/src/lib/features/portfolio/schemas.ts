@@ -11,12 +11,14 @@ import { z } from 'zod';
 
 /** Alta de un portfolio (`routes/dashboard/portfolios/add`). */
 export const portfolioCreateSchema = z.object({
-	name: z.string().min(1),
+	// Con mensaje: son los que ve el usuario cuando el alta se rechaza, y los de
+	// Zod por defecto llegan en inglés y hablando de longitudes de cadena.
+	name: z.string().min(1, 'Ponle un nombre al portafolio.'),
 	description: z.string().nullable(),
-	type: z.string().min(1),
-	riskId: z.uuid(),
-	currency: z.string().min(1),
-	priceValue: z.coerce.number().nonnegative().default(0),
+	type: z.string().min(1, 'Elige qué guarda el portafolio.'),
+	riskId: z.uuid('Elige un nivel de riesgo.'),
+	currency: z.string().min(1, 'Elige la moneda del portafolio.'),
+	priceValue: z.coerce.number().nonnegative('La meta no puede ser negativa.').default(0),
 	isDefault: z.coerce.boolean()
 });
 
