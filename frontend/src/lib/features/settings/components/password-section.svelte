@@ -29,7 +29,10 @@
 	});
 </script>
 
-<SettingsSection title="Seguridad">
+<SettingsSection
+	title="Contraseña"
+	description="Cámbiala si crees que alguien más la conoce. La sesión de este navegador sigue abierta."
+>
 	<form
 		method="POST"
 		action="?/changePassword"
@@ -74,7 +77,7 @@
 			<p class="feedback success">Contraseña actualizada correctamente.</p>
 		{/if}
 		<div class="form-actions">
-			<Button type="submit" loading={passwordLoading}>Cambiar contraseña</Button>
+			<Button type="submit" size="sm" loading={passwordLoading}>Cambiar contraseña</Button>
 		</div>
 	</form>
 </SettingsSection>

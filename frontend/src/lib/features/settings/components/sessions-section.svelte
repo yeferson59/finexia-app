@@ -34,12 +34,10 @@
 	);
 </script>
 
-<SettingsSection title="Sesiones activas">
-	<p class="hint sessions-intro">
-		Estos son los dispositivos con acceso a tu cuenta y a la información de tu patrimonio. Cierra
-		cualquier sesión que no reconozcas.
-	</p>
-
+<SettingsSection
+	title="Sesiones abiertas"
+	description="Los dispositivos que pueden entrar a tu cuenta ahora mismo. Cierra cualquiera que no reconozcas."
+>
 	{#if sessionList.length === 0}
 		<p class="hint">No se pudieron cargar las sesiones activas.</p>
 	{:else}
@@ -47,16 +45,17 @@
 			{#each sessionList as session (session.id)}
 				<li class="session-item">
 					<div class="session-info">
-						<div class="session-device">
-							<span class="session-name">{describeDevice(session.userAgent)}</span>
-							{#if session.current}
-								<span class="session-badge">Este dispositivo</span>
-							{/if}
-						</div>
+						<p class="session-name">
+							{describeDevice(session.userAgent)}{#if session.current}<span class="here">
+									, el que estás usando</span
+								>{/if}
+						</p>
+						<!-- La IP y la hora en mono porque son cadenas de máquina; lo que
+						     las nombra, en prosa, porque lo escribió alguien. -->
 						<p class="session-meta">
-							{session.ipAddress ?? 'IP desconocida'}{session.location
-								? ` · ${session.location}`
-								: ''} · Última actividad: {formatSessionDate(session.lastActiveAt)}
+							Desde <span class="mono">{session.ipAddress ?? 'una IP desconocida'}</span
+							>{#if session.location}, {session.location}{/if}. Última actividad
+							<span class="mono">{formatSessionDate(session.lastActiveAt)}</span>.
 						</p>
 					</div>
 					{#if !session.current}
@@ -72,7 +71,11 @@
 							}}
 						>
 							<input type="hidden" name="sessionId" value={session.id} />
-							<button type="submit" class="btn-revoke" disabled={revokingSessionId === session.id}>
+							<button
+								type="submit"
+								class="row-action danger"
+								disabled={revokingSessionId === session.id}
+							>
 								{revokingSessionId === session.id ? 'Cerrando…' : 'Cerrar sesión'}
 							</button>
 						</form>
@@ -101,7 +104,7 @@
 						};
 					}}
 				>
-					<Button type="submit" variant="secondary" loading={revokeOthersLoading}>
+					<Button type="submit" variant="secondary" size="sm" loading={revokeOthersLoading}>
 						{revokeOthersLoading
 							? 'Cerrando sesiones…'
 							: `Cerrar las demás sesiones (${otherSessionsCount})`}
@@ -113,89 +116,57 @@
 </SettingsSection>
 
 <style>
-	.sessions-intro {
-		margin-bottom: 1.25rem;
-	}
-
+	/* Una lista con filetes, no cajas: son filas de datos, como las del resto
+	   del panel. */
 	.session-list {
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
 	}
 
 	.session-item {
 		display: flex;
-		align-items: center;
+		align-items: baseline;
 		justify-content: space-between;
 		gap: 1rem;
-		padding: 0.875rem 1rem;
-		border: 1px solid rgba(212, 145, 42, 0.12);
-		border-radius: 8px;
-		background: var(--surface-2, rgba(255, 255, 255, 0.02));
+		padding: 0.8rem 0;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.session-item:first-child {
+		padding-top: 0;
+	}
+
+	.session-item:last-child {
+		border-bottom: none;
 	}
 
 	.session-info {
 		min-width: 0;
 	}
 
-	.session-device {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-	}
-
 	.session-name {
-		font-size: 0.875rem;
-		font-weight: 500;
+		margin: 0;
+		font-size: 0.88rem;
 		color: var(--text);
 	}
 
-	.session-badge {
-		font-size: 0.675rem;
-		font-weight: 600;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: var(--amber);
-		background: rgba(212, 145, 42, 0.1);
-		border: 1px solid rgba(212, 145, 42, 0.3);
-		border-radius: 20px;
-		padding: 0.15rem 0.55rem;
+	/* «el que estás usando» era una píldora ESTE DISPOSITIVO. Dice lo mismo
+	   dentro de la frase y sin pedir un renglón para ella sola. */
+	.here {
+		color: var(--text-muted);
 	}
 
 	.session-meta {
-		margin: 0.3rem 0 0;
-		font-size: 0.75rem;
+		margin: 0.25rem 0 0;
+		font-size: 0.78rem;
+		line-height: 1.5;
 		color: var(--text-dim);
-		font-family: var(--font-mono);
 		overflow-wrap: anywhere;
 	}
 
-	.btn-revoke {
-		flex-shrink: 0;
-		padding: 0.4rem 0.875rem;
-		border-radius: 6px;
-		border: 1px solid rgba(224, 90, 90, 0.35);
-		background: rgba(224, 90, 90, 0.06);
-		color: var(--red, #e05a5a);
-		font-size: 0.775rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition:
-			background 0.2s ease,
-			border-color 0.2s ease;
-	}
-
-	.btn-revoke:hover:not(:disabled) {
-		background: rgba(224, 90, 90, 0.14);
-		border-color: rgba(224, 90, 90, 0.6);
-	}
-
-	.btn-revoke:disabled {
-		opacity: 0.6;
-		cursor: default;
+	.mono {
+		font-family: var(--font-mono);
+		font-size: 0.74rem;
 	}
 </style>

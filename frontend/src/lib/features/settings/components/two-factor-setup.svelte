@@ -71,7 +71,7 @@
 				<p class="feedback error">{twoFaEnableError}</p>
 			{/if}
 			<div class="form-actions">
-				<Button type="submit" loading={twoFaConfirmLoading}>Confirmar y activar</Button>
+				<Button type="submit" size="sm" loading={twoFaConfirmLoading}>Confirmar y activar</Button>
 			</div>
 		</form>
 	</div>

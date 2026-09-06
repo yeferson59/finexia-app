@@ -1,14 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import {
 	countOtherSessions,
+	describeAccess,
+	describeConnections,
 	describeDevice,
+	describeIdentity,
 	formatMCPTokenDate,
 	formatSessionDate,
 	issuedMCPToken,
 	issuedRecoveryCodes
 } from './settings';
 import { mcpTokenExpirySchema, mcpTokenNameSchema, profileSchema } from './schemas';
-import type { ActiveSession } from '$lib/api/types';
+import type { ActiveSession, MarketCredential, MCPToken, OAuthGrant } from '$lib/api/types';
 
 describe('issuedRecoveryCodes', () => {
 	it('los recoge tanto al activar 2FA como al regenerarlos', () => {
@@ -157,5 +160,114 @@ describe('schemas de tokens MCP', () => {
 		expect(mcpTokenExpirySchema.parse('90')).toBe(90);
 		expect(mcpTokenExpirySchema.safeParse('366').success).toBe(false);
 		expect(mcpTokenExpirySchema.safeParse('-1').success).toBe(false);
+	});
+});
+
+describe('describeIdentity', () => {
+	const user = {
+		name: 'Usuaria Prueba',
+		email: 'user@finexia.test',
+		emailVerified: true,
+		image: '',
+		role: 'user',
+		preferredCurrency: 'USD',
+		createdAt: '2025-06-14T09:00:00.000Z',
+		updatedAt: '2026-03-14T09:00:00.000Z'
+	};
+
+	it('dice a nombre de quién está la cuenta y desde cuándo', () => {
+		const line = describeIdentity(user);
+
+		expect(line).toContain('Usuaria Prueba');
+		// El correo se lee aquí porque no se puede editar: era un campo de
+		// formulario desactivado.
+		expect(line).toContain('user@finexia.test');
+		expect(line).toMatch(/junio de 2025/);
+	});
+
+	it('se calla la antigüedad cuando la fecha no sirve', () => {
+		const line = describeIdentity({ ...user, createdAt: 'no-es-una-fecha' });
+
+		expect(line).toContain('user@finexia.test');
+		expect(line).not.toMatch(/Es tuya desde/);
+	});
+
+	it('lo dice cuando no hay usuario que describir', () => {
+		expect(describeIdentity(null)).toMatch(/No pudimos cargar/);
+	});
+});
+
+describe('describeAccess', () => {
+	const session = (id: string, current: boolean): ActiveSession => ({
+		id,
+		ipAddress: null,
+		userAgent: null,
+		location: null,
+		createdAt: '2026-03-14T09:00:00.000Z',
+		lastActiveAt: '2026-03-14T09:00:00.000Z',
+		expiresAt: '2026-04-14T09:00:00.000Z',
+		current
+	});
+
+	it('avisa de que solo hay contraseña cuando la 2FA está apagada', () => {
+		expect(
+			describeAccess({ enabled: false, pendingSetup: false, recoveryCodesLeft: 0 }, [
+				session('a', true)
+			])
+		).toBe(
+			'Entras solo con tu contraseña: la verificación en dos pasos está desactivada. La única sesión abierta es la de este navegador.'
+		);
+	});
+
+	it('cuenta las sesiones que no son la de este navegador', () => {
+		const line = describeAccess({ enabled: true, pendingSetup: false, recoveryCodesLeft: 8 }, [
+			session('a', true),
+			session('b', false),
+			session('c', false)
+		]);
+
+		expect(line).toContain('un código de tu autenticador');
+		expect(line).toContain('otras 2 sesiones abiertas');
+	});
+
+	it('habla en singular con una sola sesión ajena', () => {
+		const line = describeAccess(undefined, [session('a', true), session('b', false)]);
+
+		expect(line).toContain('hay otra sesión abierta');
+	});
+
+	it('no inventa sesiones cuando no se pudieron cargar', () => {
+		const line = describeAccess(
+			{ enabled: true, pendingSetup: false, recoveryCodesLeft: 3 },
+			undefined
+		);
+
+		expect(line).not.toMatch(/sesi[oó]n/i);
+	});
+});
+
+describe('describeConnections', () => {
+	const credential = { provider: 'finnhub' } as MarketCredential;
+	const token = { id: 't1' } as MCPToken;
+	const grant = { id: 'g1' } as OAuthGrant;
+
+	it('invita a conectar algo cuando no hay nada', () => {
+		expect(describeConnections([], [], [])).toBe('Todavía no has conectado nada a tu cuenta.');
+		expect(describeConnections(undefined, undefined, undefined)).toBe(
+			'Todavía no has conectado nada a tu cuenta.'
+		);
+	});
+
+	it('enumera lo que hay, con género y número', () => {
+		expect(describeConnections([credential], [token], [grant])).toBe(
+			'Tienes una clave de precios, un token de asistente y una aplicación conectada.'
+		);
+	});
+
+	it('enumera solo lo que hay: «tienes ninguna clave» no es una frase', () => {
+		expect(describeConnections([], [token, token], [])).toBe('Tienes 2 tokens de asistente.');
+		expect(describeConnections([credential], [], [grant])).toBe(
+			'Tienes una clave de precios y una aplicación conectada.'
+		);
 	});
 });

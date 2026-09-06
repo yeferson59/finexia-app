@@ -11,7 +11,6 @@
 	 * pierda, rota el token y reconfigura el cliente.
 	 */
 	import { enhance } from '$app/forms';
-	import Badge from '$lib/ui/badge.svelte';
 	import Button from '$lib/ui/button.svelte';
 	import Input from '$lib/ui/input.svelte';
 	import SettingsSection from './settings-section.svelte';
@@ -78,15 +77,20 @@
 	}
 </script>
 
-<SettingsSection title="Acceso para asistentes (MCP)">
+<SettingsSection
+	title="Asistentes"
+	description="Conecta Claude —u otro cliente MCP— a tus carteras para preguntarle por tus posiciones, tu distribución o tus últimos movimientos."
+>
+	{#snippet aside()}
+		<p class="readonly">
+			El acceso es de solo lectura: un asistente consulta tus datos, nunca los modifica.
+		</p>
+	{/snippet}
+
 	<p class="hint">
-		Conecta Claude —u otro cliente MCP— a tus carteras para poder preguntar por tus posiciones, tu
-		distribución o tus últimos movimientos. El acceso es de <strong>solo lectura</strong>: un
-		asistente puede consultar tus datos, nunca modificarlos.
+		Crea un token, pégalo en la configuración de tu cliente y apúntalo a esta dirección:
 	</p>
-	<p class="hint">
-		Crea un token, pégalo en la configuración de tu cliente y apúntalo a <code>{mcpUrl}</code>.
-	</p>
+	<p class="endpoint"><code>{mcpUrl}</code></p>
 
 	{#if issued}
 		<div class="issued">
@@ -151,7 +155,7 @@
 					{/each}
 				</select>
 			</div>
-			<Button type="submit" loading={creating}>Crear token</Button>
+			<Button type="submit" size="sm" loading={creating}>Crear token</Button>
 		</div>
 	</form>
 
@@ -164,21 +168,26 @@
 			{#each tokenList as token (token.id)}
 				<li class="token" class:is-expired={token.expired}>
 					<div class="token-info">
-						<div class="token-head">
+						<p class="token-head">
 							<span class="token-name">{token.name}</span>
 							<code class="token-last4">····{token.last4}</code>
+						</p>
+						<!-- El estado en la misma frase que las fechas: era una insignia
+						     («CADUCADO», «SIN USAR») encima de un pie con tres datos
+						     encadenados por puntos medios. -->
+						<p class="token-meta" class:is-expired-note={token.expired}>
 							{#if token.expired}
-								<Badge tone="danger">Caducado</Badge>
+								Caducó el {formatMCPTokenDate(token.expiresAt)} y ya no sirve.
 							{:else if !token.lastUsedAt}
-								<Badge tone="neutral">Sin usar</Badge>
+								Sin usar todavía.
 							{:else}
-								<Badge tone="success">Activo</Badge>
+								Último uso {formatMCPTokenDate(token.lastUsedAt)}.
 							{/if}
-						</div>
-						<p class="token-meta">
-							Último uso: {formatMCPTokenDate(token.lastUsedAt)} · Caduca: {token.expiresAt
-								? formatMCPTokenDate(token.expiresAt)
-								: 'nunca'} · Creado: {formatMCPTokenDate(token.createdAt)}
+							{#if !token.expired}
+								{token.expiresAt
+									? `Caduca el ${formatMCPTokenDate(token.expiresAt)}.`
+									: 'No caduca.'}
+							{/if}
 						</p>
 					</div>
 
@@ -196,9 +205,9 @@
 						>
 							<input type="hidden" name="tokenId" value={token.id} />
 							<input type="hidden" name="expiresInDays" value={expiresInDays} />
-							<Button type="submit" variant="secondary" size="sm" loading={rotatingId === token.id}>
-								Rotar
-							</Button>
+							<button type="submit" class="row-action" disabled={rotatingId === token.id}>
+								{rotatingId === token.id ? 'Rotando…' : 'Rotar'}
+							</button>
 						</form>
 						<form
 							method="POST"
@@ -212,46 +221,43 @@
 							}}
 						>
 							<input type="hidden" name="tokenId" value={token.id} />
-							<Button type="submit" variant="ghost" size="sm" loading={deletingId === token.id}>
-								Eliminar
-							</Button>
+							<button type="submit" class="row-action danger" disabled={deletingId === token.id}>
+								{deletingId === token.id ? 'Eliminando…' : 'Eliminar'}
+							</button>
 						</form>
 					</div>
 				</li>
 			{/each}
 		</ul>
 	{:else}
-		<p class="hint empty">Todavía no tienes ningún token. Crea uno para conectar tu asistente.</p>
+		<p class="hint empty">Todavía no hay ninguno. Crea el primero para conectar tu asistente.</p>
 	{/if}
 </SettingsSection>
 
 <style>
-	.hint code {
-		padding: 0.1rem 0.35rem;
-		border-radius: 0.25rem;
-		background: rgb(255 255 255 / 6%);
-		font-size: 0.78rem;
-	}
-
+	/* El único bloque enmarcado de la sección, como los códigos de recuperación:
+	   un secreto que solo se enseña una vez y hay que copiar antes de irse. */
 	.issued {
-		margin: 1rem 0 1.25rem;
-		padding: 1rem;
-		border: 1px solid var(--color-accent, #d4af37);
-		border-radius: 0.75rem;
-		background: rgb(212 175 55 / 6%);
+		margin: 1.25rem 0;
+		padding: 1rem 1.1rem;
+		border: 1px solid rgba(212, 145, 42, 0.35);
+		border-radius: 10px;
+		background: rgba(212, 145, 42, 0.06);
 	}
 
 	.issued-title {
-		margin: 0 0 0.25rem;
-		font-size: 0.9rem;
-		font-weight: 600;
-		color: var(--color-text-primary, #f5f5f5);
+		margin: 0 0 0.3rem;
+		font-size: 0.88rem;
+		font-weight: 500;
+		color: var(--amber-light);
 	}
 
 	.issued-note {
-		margin: 0 0 0.75rem;
+		max-width: 58ch;
+		margin: 0 0 0.85rem;
 		font-size: 0.8rem;
-		color: var(--color-text-muted, #9a9a9a);
+		line-height: 1.5;
+		color: var(--text-muted);
 	}
 
 	.secret-row {
@@ -301,26 +307,38 @@
 		flex: 1;
 	}
 
+	/* El mismo aspecto que el campo de al lado, que es de `ui/input`: eran dos
+	   controles de la misma fila con dos alturas, dos bordes y dos grises. */
 	.field-label {
 		display: block;
-		margin-bottom: 0.35rem;
-		font-size: 0.8rem;
-		color: var(--color-text-secondary, #c4c4c4);
+		margin-bottom: 0.5rem;
+		font-size: 0.875rem;
+		font-weight: 500;
+		letter-spacing: 0.3px;
+		color: var(--text);
 	}
 
 	.field-select {
-		padding: 0.55rem 0.7rem;
-		border: 1px solid var(--color-border, #2a2a2a);
-		border-radius: 0.5rem;
-		background: var(--color-surface, #141414);
-		color: var(--color-text-primary, #f5f5f5);
-		font-size: 0.85rem;
+		padding: 0.875rem 1rem;
+		border-radius: 8px;
+		border: 1px solid rgba(212, 145, 42, 0.2);
+		background: rgba(255, 255, 255, 0.03);
+		color: var(--text);
+		font-family: var(--font-body);
+		font-size: 0.95rem;
+		box-sizing: border-box;
+		cursor: pointer;
 	}
 
+	.field-select option {
+		background: var(--bg);
+		color: var(--text);
+	}
+
+	/* Filas con filete, como las sesiones y las aplicaciones: los tres son lo
+	   mismo —algo que tiene acceso a la cuenta— y se leen igual. */
 	.token-list {
-		display: grid;
-		gap: 0.75rem;
-		margin: 1rem 0 0;
+		margin: 1.25rem 0 0;
 		padding: 0;
 		list-style: none;
 	}
@@ -329,43 +347,46 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.75rem;
-		align-items: center;
+		align-items: baseline;
 		justify-content: space-between;
-		padding: 0.85rem 1rem;
-		border: 1px solid var(--color-border, #2a2a2a);
-		border-radius: 0.75rem;
-		background: var(--color-surface-subtle, rgb(255 255 255 / 2%));
+		padding: 0.8rem 0;
+		border-bottom: 1px solid var(--border);
 	}
 
-	.token.is-expired {
-		opacity: 0.7;
+	.token:last-child {
+		border-bottom: none;
 	}
 
 	.token-head {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.5rem;
-		align-items: center;
+		align-items: baseline;
+		margin: 0;
 	}
 
 	.token-name {
-		font-size: 0.9rem;
-		font-weight: 600;
-		color: var(--color-text-primary, #f5f5f5);
+		font-size: 0.88rem;
+		color: var(--text);
 	}
 
 	.token-last4 {
-		padding: 0.1rem 0.35rem;
-		border-radius: 0.25rem;
-		background: rgb(255 255 255 / 6%);
+		font-family: var(--font-mono);
 		font-size: 0.75rem;
-		color: var(--color-text-secondary, #c4c4c4);
+		color: var(--text-muted);
 	}
 
 	.token-meta {
-		margin: 0.35rem 0 0;
+		margin: 0.25rem 0 0;
 		font-size: 0.78rem;
-		color: var(--color-text-muted, #9a9a9a);
+		line-height: 1.5;
+		color: var(--text-dim);
+	}
+
+	/* Un token caducado no está apagado: hay que verlo para borrarlo. Lo que
+	   cambia es lo que dice de sí mismo. */
+	.is-expired-note {
+		color: var(--red);
 	}
 
 	.token-actions {
@@ -374,13 +395,29 @@
 	}
 
 	.empty {
-		margin-top: 1rem;
+		max-width: 58ch;
 	}
 
-	.feedback.error {
+	/* La dirección del servidor: se copia a mano en la configuración del
+	   cliente, así que va suelta y en mono, no metida en mitad de una frase. */
+	.endpoint {
 		margin: 0.5rem 0 0;
-		font-size: 0.82rem;
-		color: var(--color-danger, #e05260);
+		overflow-x: auto;
+	}
+
+	.endpoint code {
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		color: var(--amber-light);
+		white-space: nowrap;
+	}
+
+	.readonly {
+		max-width: 40ch;
+		margin: 0.7rem 0 0;
+		font-size: 0.78rem;
+		line-height: 1.55;
+		color: var(--text-dim);
 	}
 
 	@media (max-width: 640px) {

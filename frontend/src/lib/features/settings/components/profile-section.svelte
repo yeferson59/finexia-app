@@ -27,8 +27,13 @@
 	const profileError = $derived(actionError(form, 'updateProfile'));
 </script>
 
-<SettingsSection title="Perfil">
-	<AvatarUploader {user} {form} />
+<SettingsSection
+	title="Foto, nombre y moneda"
+	description="Tu foto sale en la barra de arriba, tu nombre en el saludo del panel y la moneda es la de sus totales."
+>
+	{#snippet aside()}
+		<AvatarUploader {user} {form} />
+	{/snippet}
 
 	<form
 		method="POST"
@@ -43,7 +48,8 @@
 	>
 		<div class="form-fields">
 			<Input label="Nombre" name="name" bind:value={profileName} required />
-			<Input label="Correo electrónico" name="email" value={user?.email ?? ''} disabled />
+			<!-- El correo no está: era un campo desactivado, que no se envía ni se
+			     edita. Lo dice el resumen del grupo, que es donde se lee. -->
 			<div class="field">
 				<label class="field-label" for="preferredCurrency">Moneda preferida</label>
 				<select
@@ -69,7 +75,7 @@
 			<p class="feedback success">Perfil actualizado correctamente.</p>
 		{/if}
 		<div class="form-actions">
-			<Button type="submit" loading={profileLoading}>Guardar perfil</Button>
+			<Button type="submit" size="sm" loading={profileLoading}>Guardar cambios</Button>
 		</div>
 	</form>
 </SettingsSection>

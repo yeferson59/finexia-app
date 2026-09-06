@@ -49,7 +49,10 @@
 	});
 </script>
 
-<SettingsSection title="Verificación en dos pasos (2FA)">
+<SettingsSection
+	title="Verificación en dos pasos"
+	description="Un código temporal de tu aplicación de autenticación, además de la contraseña, cada vez que inicias sesión. Es opcional y puedes quitarla cuando quieras."
+>
 	{#if twoFaRecoveryCodes.length > 0}
 		<div class="twofa-recovery" role="status">
 			<p class="twofa-recovery-title">Guarda tus códigos de recuperación</p>
@@ -68,13 +71,10 @@
 	{#if twoFaSetupData}
 		<TwoFactorSetup secret={twoFaSetupData.secret} otpauthUrl={twoFaSetupData.otpauthUrl} {form} />
 	{:else if twoFactor?.enabled}
-		<div class="twofa-status">
-			<span class="twofa-badge enabled">Activada</span>
-			<p class="hint">
-				Tu cuenta pide un código del autenticador en cada inicio de sesión. Te quedan
-				{twoFactor.recoveryCodesLeft} códigos de recuperación sin usar.
-			</p>
-		</div>
+		<p class="state on">
+			Está activada. Te quedan {twoFactor.recoveryCodesLeft}
+			{twoFactor.recoveryCodesLeft === 1 ? 'código' : 'códigos'} de recuperación sin usar.
+		</p>
 
 		{#if twoFaDisableSuccess}
 			<p class="feedback success">La verificación en dos pasos fue desactivada.</p>
@@ -82,14 +82,7 @@
 
 		<TwoFactorManage {form} />
 	{:else}
-		<div class="twofa-status">
-			<span class="twofa-badge">Desactivada</span>
-			<p class="hint">
-				Añade una segunda barrera a tu cuenta: además de tu contraseña, se pedirá un código temporal
-				de una aplicación de autenticación al iniciar sesión. Es opcional y puedes desactivarla
-				cuando quieras.
-			</p>
-		</div>
+		<p class="state">Todavía no la tienes activada. Escribe tu contraseña para empezar.</p>
 
 		{#if twoFaDisableSuccess}
 			<p class="feedback success">La verificación en dos pasos fue desactivada.</p>
@@ -119,44 +112,37 @@
 				<p class="feedback error">{twoFaSetupError}</p>
 			{/if}
 			<div class="form-actions">
-				<Button type="submit" loading={twoFaSetupLoading}>Activar 2FA</Button>
+				<Button type="submit" size="sm" loading={twoFaSetupLoading}>Activar 2FA</Button>
 			</div>
 		</form>
 	{/if}
 </SettingsSection>
 
 <style>
-	.twofa-status {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-		margin-bottom: 1.25rem;
+	/*
+	 * El estado en una frase. Eran dos insignias en versalitas —ACTIVADA,
+	 * DESACTIVADA— que decían menos que la propia frase y obligaban a leer dos
+	 * cosas para entender una.
+	 */
+	.state {
+		max-width: 56ch;
+		margin: 0 0 1.1rem;
+		font-size: 0.88rem;
+		line-height: 1.5;
+		color: var(--text-muted);
 	}
 
-	.twofa-badge {
-		width: fit-content;
-		font-size: 0.675rem;
-		font-weight: 600;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: rgba(236, 234, 229, 0.55);
-		background: rgba(236, 234, 229, 0.06);
-		border: 1px solid rgba(236, 234, 229, 0.2);
-		border-radius: 20px;
-		padding: 0.2rem 0.65rem;
+	.state.on {
+		color: var(--green);
 	}
 
-	.twofa-badge.enabled {
-		color: #4ade80;
-		background: rgba(74, 222, 128, 0.08);
-		border-color: rgba(74, 222, 128, 0.3);
-	}
-
+	/* El único bloque de la página que sigue enmarcado: son unos códigos que
+	   solo se enseñan una vez y que hay que copiar antes de irse. */
 	.twofa-recovery {
 		margin-bottom: 1.5rem;
-		padding: 1rem;
+		padding: 1rem 1.1rem;
 		border: 1px solid rgba(212, 145, 42, 0.35);
-		border-radius: 8px;
+		border-radius: 10px;
 		background: rgba(212, 145, 42, 0.06);
 	}
 

@@ -7,7 +7,14 @@
  * `lib/shared/form`; aquí se reexporta con el nombre que usan las secciones.
  */
 
-import type { ActiveSession, MCPTokenSecret } from '$lib/api/types';
+import type {
+	ActiveSession,
+	MarketCredential,
+	MCPToken,
+	MCPTokenSecret,
+	OAuthGrant,
+	TwoFactorStatus
+} from '$lib/api/types';
 import type { ActionForm } from '$lib/shared/form';
 
 export type {
@@ -130,4 +137,101 @@ export function mcpTokenError(action: string, status: number, details?: string):
 		action === 'createMcpToken' ? 'crear' : action === 'rotateMcpToken' ? 'rotar' : 'eliminar';
 
 	return `No se pudo ${verb} el token. Inténtalo de nuevo.`;
+}
+
+// ---------------------------------------------------------------------------
+// El estado de la cuenta, en una frase
+// ---------------------------------------------------------------------------
+
+/*
+ * Cada grupo de la página abre diciendo cómo está lo que contiene. Sin esto hay
+ * que recorrer dos mil píxeles de formularios para saber si la 2FA está puesta
+ * o si queda una sesión abierta en un ordenador ajeno: el estado vivía repartido
+ * en ocho tarjetas, cada una con su insignia, y ninguna se veía desde la otra.
+ */
+
+/** Enumera en español: «a», «a y b», «a, b y c». */
+function enumerate(parts: string[]): string {
+	if (parts.length <= 1) return parts.join('');
+	return `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}`;
+}
+
+/**
+ * Cuenta con género: «una clave», «3 claves».
+ *
+ * El uno va en letra y el resto en cifra: «1 sesión» se lee como un dato de
+ * tabla en mitad de una frase.
+ */
+function count(n: number, singular: string, plural: string, feminine = false): string {
+	return n === 1 ? `${feminine ? 'una' : 'un'} ${singular}` : `${n} ${plural}`;
+}
+
+/** Cómo se entra a la cuenta hoy: segundo factor y sesiones abiertas. */
+export function describeAccess(
+	twoFactor: TwoFactorStatus | undefined,
+	sessions: ActiveSession[] | undefined
+): string {
+	const factor = twoFactor?.enabled
+		? 'Entras con tu contraseña y un código de tu autenticador.'
+		: 'Entras solo con tu contraseña: la verificación en dos pasos está desactivada.';
+
+	const list = sessions ?? [];
+	if (list.length === 0) return factor;
+
+	const others = countOtherSessions(sessions);
+	const open =
+		others === 0
+			? 'La única sesión abierta es la de este navegador.'
+			: others === 1
+				? 'Además de este navegador hay otra sesión abierta.'
+				: `Además de este navegador hay otras ${others} sesiones abiertas.`;
+
+	return `${factor} ${open}`;
+}
+
+/** Qué hay enchufado a la cuenta: claves de precios, asistentes y aplicaciones. */
+export function describeConnections(
+	credentials: MarketCredential[] | undefined,
+	tokens: MCPToken[] | undefined,
+	grants: OAuthGrant[] | undefined
+): string {
+	const keys = credentials?.length ?? 0;
+	const assistants = tokens?.length ?? 0;
+	const apps = grants?.length ?? 0;
+
+	if (keys + assistants + apps === 0) return 'Todavía no has conectado nada a tu cuenta.';
+
+	// Solo se enumera lo que hay: «tienes ninguna clave» no es una frase. De lo
+	// que falta se ocupa cada sección, que además puede decir qué se pierde uno
+	// —sin clave de precios, las posiciones se valoran a lo que costaron—.
+	const present = [
+		keys > 0 ? count(keys, 'clave de precios', 'claves de precios', true) : '',
+		assistants > 0 ? count(assistants, 'token de asistente', 'tokens de asistente') : '',
+		apps > 0 ? count(apps, 'aplicación conectada', 'aplicaciones conectadas', true) : ''
+	].filter(Boolean);
+
+	return `Tienes ${enumerate(present)}.`;
+}
+
+/** «junio de 2025», para decir desde cuándo existe la cuenta. */
+function formatMonthYear(iso: string): string {
+	const date = new Date(iso);
+	if (Number.isNaN(date.getTime())) return '';
+	return new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' }).format(date);
+}
+
+/**
+ * A nombre de quién está la cuenta.
+ *
+ * El correo se dice aquí porque no se puede cambiar: estaba en un campo de
+ * formulario desactivado, que es una etiqueta disfrazada de control —no se
+ * envía ni se edita— y ocupaba el sitio de uno de verdad.
+ */
+export function describeIdentity(user: App.Locals['user']): string {
+	if (!user) return 'No pudimos cargar los datos de tu cuenta.';
+
+	const since = formatMonthYear(user.createdAt);
+	const opening = `Tu cuenta está a nombre de ${user.name}, con el correo ${user.email}.`;
+
+	return since ? `${opening} Es tuya desde ${since}.` : opening;
 }

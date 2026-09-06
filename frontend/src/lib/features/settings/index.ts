@@ -1,18 +1,21 @@
 /**
  * Feature `settings` — superficie pública.
  *
- * Las secciones de `routes/dashboard/settings`, una por tarjeta: perfil,
- * apariencia, seguridad (contraseña), 2FA, datos de mercado, tokens MCP,
- * aplicaciones conectadas por OAuth y sesiones activas.
- * Todas leen el mismo `form` de la página y se quedan solo con el resultado de
- * sus propias acciones (ver `settings.ts`).
+ * Las secciones de `routes/dashboard/settings`, repartidas en dos grupos:
+ * cómo entras a la cuenta (contraseña, 2FA, sesiones) y qué tienes conectado
+ * (datos de mercado, asistentes MCP, aplicaciones OAuth), con el perfil
+ * abriendo la página. Todas leen el mismo `form` y se quedan solo con el
+ * resultado de sus propias acciones (ver `settings.ts`).
  *
- * `settings-section` (el chrome de tarjeta), `avatar-uploader`,
- * `two-factor-setup` y `two-factor-manage` son internos de sus secciones y no
+ * `settings-section` (el carril y los controles que comparten todas),
+ * `avatar-uploader`, `two-factor-setup` y `two-factor-manage` son internos y no
  * forman parte de la superficie pública.
+ *
+ * La sección «Apariencia» ya no existe: su único contenido era decir que no hay
+ * más de un tema, así que era una sección sobre su propia ausencia.
  */
+export { default as SettingsGroup } from './components/settings-group.svelte';
 export { default as ProfileSection } from './components/profile-section.svelte';
-export { default as AppearanceSection } from './components/appearance-section.svelte';
 export { default as PasswordSection } from './components/password-section.svelte';
 export { default as TwoFactorSection } from './components/two-factor-section.svelte';
 export { default as MarketCredentials } from './components/market-credentials.svelte';

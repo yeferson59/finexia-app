@@ -40,27 +40,28 @@
 	};
 
 	function describeScopes(scopes: string[]): string {
-		return scopes.map((scope) => SCOPE_LABELS[scope] ?? scope).join(' · ');
+		return scopes.map((scope) => SCOPE_LABELS[scope] ?? scope).join(', ');
 	}
 </script>
 
-<SettingsSection title="Aplicaciones conectadas">
-	<p class="hint">
-		Aplicaciones que pediste conectar y a las que autorizaste el acceso a tus carteras. Desconecta
-		cualquiera que ya no uses: su acceso deja de funcionar al instante.
-	</p>
-
+<SettingsSection
+	title="Aplicaciones conectadas"
+	description="Aplicaciones a las que autorizaste el acceso a tus carteras. Al desconectar una, su acceso deja de funcionar al instante."
+>
 	{#if grantList.length === 0}
-		<p class="hint empty">No tienes ninguna aplicación conectada.</p>
+		<p class="hint empty">
+			No hay ninguna. Las que conectes desde otra aplicación —el conector de claude.ai, por ejemplo—
+			aparecerán aquí para que puedas cortarles el acceso.
+		</p>
 	{:else}
 		<ul class="grant-list">
 			{#each grantList as grant (grant.id)}
 				<li class="grant-item">
 					<div class="grant-info">
-						<span class="grant-name">{grant.clientName}</span>
+						<p class="grant-name">{grant.clientName}</p>
 						<p class="grant-meta">
-							{describeScopes(grant.scopes)} · Conectada el {formatMCPTokenDate(grant.createdAt)} · Último
-							uso: {formatMCPTokenDate(grant.lastUsedAt)}
+							{describeScopes(grant.scopes)}. Conectada el {formatMCPTokenDate(grant.createdAt)},
+							con último uso {formatMCPTokenDate(grant.lastUsedAt)}.
 						</p>
 					</div>
 					<form
@@ -76,7 +77,7 @@
 						}}
 					>
 						<input type="hidden" name="grantId" value={grant.id} />
-						<button type="submit" class="btn-revoke" disabled={revokingId === grant.id}>
+						<button type="submit" class="row-action danger" disabled={revokingId === grant.id}>
 							{revokingId === grant.id ? 'Desconectando…' : 'Desconectar'}
 						</button>
 					</form>
@@ -94,32 +95,33 @@
 </SettingsSection>
 
 <style>
-	.hint {
-		font-size: 0.8125rem;
-		line-height: 1.55;
-		color: var(--text-muted);
-	}
-
 	.empty {
-		margin-top: 1rem;
+		max-width: 58ch;
 	}
 
+	/* Filas con filete, como las sesiones: son la misma clase de dato —algo que
+	   tiene acceso a la cuenta— y se leen igual. */
 	.grant-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		margin-top: 1rem;
+		list-style: none;
+		margin: 0;
+		padding: 0;
 	}
 
 	.grant-item {
 		display: flex;
-		align-items: center;
+		align-items: baseline;
 		justify-content: space-between;
 		gap: 1rem;
-		padding: 0.75rem 0.875rem;
-		border: 1px solid var(--border);
-		border-radius: 0.5rem;
-		background: var(--surface);
+		padding: 0.8rem 0;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.grant-item:first-child {
+		padding-top: 0;
+	}
+
+	.grant-item:last-child {
+		border-bottom: none;
 	}
 
 	.grant-info {
@@ -127,50 +129,15 @@
 	}
 
 	.grant-name {
-		font-size: 0.9375rem;
-		font-weight: 500;
+		margin: 0;
+		font-size: 0.88rem;
+		color: var(--text);
 	}
 
 	.grant-meta {
-		margin-top: 0.2rem;
-		font-size: 0.75rem;
+		margin: 0.25rem 0 0;
+		font-size: 0.78rem;
 		line-height: 1.5;
-		color: var(--text-muted);
-	}
-
-	.btn-revoke {
-		flex-shrink: 0;
-		padding: 0.4rem 0.7rem;
-		border: 1px solid var(--border-strong);
-		border-radius: 0.375rem;
-		background: transparent;
-		font-family: var(--font-body);
-		font-size: 0.75rem;
-		color: var(--text-muted);
-		cursor: pointer;
-		transition: all 0.2s;
-	}
-
-	.btn-revoke:hover:not(:disabled) {
-		border-color: var(--red);
-		color: var(--red);
-	}
-
-	.btn-revoke:disabled {
-		cursor: not-allowed;
-		opacity: 0.6;
-	}
-
-	.feedback {
-		margin-top: 0.75rem;
-		font-size: 0.8125rem;
-	}
-
-	.error {
-		color: var(--red);
-	}
-
-	.success {
-		color: var(--green);
+		color: var(--text-dim);
 	}
 </style>

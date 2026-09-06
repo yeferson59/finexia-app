@@ -11,10 +11,9 @@
 	 * escribirla entera de nuevo.
 	 */
 	import { enhance } from '$app/forms';
-	import Card from '$lib/ui/card.svelte';
 	import Input from '$lib/ui/input.svelte';
 	import Button from '$lib/ui/button.svelte';
-	import Badge from '$lib/ui/badge.svelte';
+	import SettingsSection from './settings-section.svelte';
 	import type { MarketCredential, MarketProvider } from '$lib/api/types';
 
 	interface Props {
@@ -54,22 +53,23 @@
 	let deletingProvider = $state<string | null>(null);
 	let syncing = $state(false);
 
-	const STATUS: Record<
-		MarketCredential['status'],
-		{ tone: 'success' | 'danger' | 'warning'; label: string; note: string }
-	> = {
-		active: { tone: 'success', label: 'Activa', note: 'La clave funciona.' },
-		invalid: {
-			tone: 'danger',
-			label: 'No válida',
-			note: 'El proveedor rechazó esta clave. Vuelve a introducirla o genera otra.'
-		},
-		rate_limited: {
-			tone: 'warning',
-			label: 'Sin cuota',
-			note: 'La cuota del plan se agotó. Se reintentará en la próxima sincronización.'
-		}
-	};
+	/*
+	 * El estado de una clave, dicho en una frase. Eran una píldora en versalitas
+	 * («ACTIVA», «NO VÁLIDA») y debajo una nota que explicaba lo mismo: dos
+	 * cosas que leer para entender una.
+	 */
+	const STATUS: Record<MarketCredential['status'], { tone: 'ok' | 'bad' | 'warn'; note: string }> =
+		{
+			active: { tone: 'ok', note: 'Funciona.' },
+			invalid: {
+				tone: 'bad',
+				note: 'El proveedor la rechazó. Vuelve a introducirla o genera otra.'
+			},
+			rate_limited: {
+				tone: 'warn',
+				note: 'La cuota del plan se agotó. Se reintenta en la próxima sincronización.'
+			}
+		};
 
 	function formatDate(iso: string | null): string {
 		if (!iso) return 'nunca';
@@ -91,288 +91,254 @@
 	const hasAnyKey = $derived(credentials.length > 0);
 </script>
 
-<Card variant="elevated" padding="none">
-	<div class="section" id="datos-de-mercado">
-		<h2 class="section-title">Datos de mercado</h2>
-
-		<p class="hint">
-			Finexia no consulta precios con claves propias: usa la tuya, de modo que la cuota y los datos
-			son tuyos. Los precios que trae tu clave solo los ves tú.
+<SettingsSection
+	id="datos-de-mercado"
+	title="Datos de mercado"
+	description="Finexia no consulta precios con claves propias: usa la tuya, así que la cuota y los datos son tuyos. Los precios que trae solo los ves tú."
+>
+	{#snippet aside()}
+		<p class="privacy">
+			Se guarda cifrada y no se puede volver a leer, ni siquiera desde aquí: de ella solo verás sus
+			cuatro últimos caracteres.
 		</p>
-		<p class="hint privacy">
-			Tu clave se guarda cifrada y no se puede volver a leer, ni siquiera desde aquí: solo se
-			muestran sus cuatro últimos caracteres. Para cambiarla, introduce una nueva.
+	{/snippet}
+
+	{#if !hasAnyKey}
+		<p class="feedback warning">
+			Sin ninguna clave, tus posiciones se valoran a su precio de compra y no a precio de mercado.
 		</p>
+	{/if}
 
-		{#if !hasAnyKey}
-			<p class="feedback warning">
-				Sin ninguna clave configurada tus posiciones se valoran a su precio de compra, no a precio
-				de mercado.
-			</p>
-		{/if}
+	<div class="providers">
+		{#each PROVIDERS as provider (provider.id)}
+			{@const stored = byProvider.get(provider.id)}
+			{@const status = stored ? STATUS[stored.status] : null}
+			{@const error = errorFor(provider.id)}
+			{@const success = successFor(provider.id)}
 
-		<div class="providers">
-			{#each PROVIDERS as provider (provider.id)}
-				{@const stored = byProvider.get(provider.id)}
-				{@const status = stored ? STATUS[stored.status] : null}
-				{@const error = errorFor(provider.id)}
-				{@const success = successFor(provider.id)}
-
-				<div class="provider">
-					<div class="provider-head">
-						<div class="provider-id">
-							<span class="provider-name">{provider.name}</span>
-							{#if stored && status}
-								<Badge tone={status.tone}>{status.label}</Badge>
-							{:else}
-								<Badge tone="neutral">Sin configurar</Badge>
-							{/if}
-						</div>
-						<!-- eslint-disable svelte/no-navigation-without-resolve -- resolve() es para rutas internas; estas salen al sitio del proveedor -->
-						<a
-							class="provider-link"
-							href={provider.signupUrl}
-							target="_blank"
-							rel="noopener noreferrer"
-						>
-							Obtener una clave
-						</a>
-						<!-- eslint-enable svelte/no-navigation-without-resolve -->
-					</div>
-
-					<p class="provider-hint">{provider.hint}</p>
-
-					{#if stored && status}
-						<p class="provider-state">
-							Clave <code>····{stored.last4}</code> · verificada {formatDate(stored.lastVerifiedAt)}
-						</p>
-						<p class="provider-state-note" class:is-problem={stored.status !== 'active'}>
-							{status.note}
-						</p>
-					{/if}
-
-					<form
-						method="POST"
-						action="?/saveMarketKey"
-						use:enhance={() => {
-							savingProvider = provider.id;
-							return async ({ update }) => {
-								savingProvider = null;
-								// reset:false conserva el resto del formulario de ajustes;
-								// el campo de la clave se limpia abajo, a mano.
-								await update({ reset: false });
-								keyInputs[provider.id] = '';
-							};
-						}}
+			<div class="provider">
+				<div class="provider-head">
+					<h4 class="provider-name">{provider.name}</h4>
+					<!-- eslint-disable svelte/no-navigation-without-resolve -- resolve() es para rutas internas; estas salen al sitio del proveedor -->
+					<a
+						class="provider-link"
+						href={provider.signupUrl}
+						target="_blank"
+						rel="noopener noreferrer"
 					>
-						<input type="hidden" name="provider" value={provider.id} />
-						<div class="key-row">
-							<Input
-								label={stored ? 'Reemplazar clave' : 'Clave de API'}
-								type="password"
-								name="apiKey"
-								autocomplete="off"
-								placeholder="Pega aquí tu clave"
-								bind:value={keyInputs[provider.id]}
-								required
-							/>
-							<Button type="submit" loading={savingProvider === provider.id}>
-								{stored ? 'Reemplazar' : 'Guardar'}
-							</Button>
-						</div>
-					</form>
-
-					{#if error}
-						<p class="feedback error">{error}</p>
-					{/if}
-					{#if success}
-						<p class="feedback success">{success}</p>
-					{/if}
-
-					{#if stored}
-						<div class="provider-actions">
-							<form
-								method="POST"
-								action="?/verifyMarketKey"
-								use:enhance={() => {
-									verifyingProvider = provider.id;
-									return async ({ update }) => {
-										verifyingProvider = null;
-										await update({ reset: false });
-									};
-								}}
-							>
-								<input type="hidden" name="provider" value={provider.id} />
-								<Button
-									type="submit"
-									variant="secondary"
-									size="sm"
-									loading={verifyingProvider === provider.id}
-								>
-									Verificar
-								</Button>
-							</form>
-							<form
-								method="POST"
-								action="?/deleteMarketKey"
-								use:enhance={() => {
-									deletingProvider = provider.id;
-									return async ({ update }) => {
-										deletingProvider = null;
-										await update({ reset: false });
-									};
-								}}
-							>
-								<input type="hidden" name="provider" value={provider.id} />
-								<Button
-									type="submit"
-									variant="ghost"
-									size="sm"
-									loading={deletingProvider === provider.id}
-								>
-									Eliminar
-								</Button>
-							</form>
-						</div>
-					{/if}
+						Obtener una clave
+					</a>
+					<!-- eslint-enable svelte/no-navigation-without-resolve -->
 				</div>
-			{/each}
-		</div>
 
-		{#if hasAnyKey}
-			<div class="sync-row">
-				<div>
-					<p class="sync-title">Sincronizar ahora</p>
-					<p class="hint">
-						Se actualizan los precios de los activos que tienes, con tu clave. Si no, se hace cada
-						día automáticamente.
+				{#if stored && status}
+					<p class="provider-state" class:is-problem={status.tone !== 'ok'}>
+						{status.note} Termina en <code>{stored.last4}</code> y se verificó
+						{formatDate(stored.lastVerifiedAt)}.
 					</p>
-				</div>
+				{:else}
+					<p class="provider-state">Sin configurar. {provider.hint}</p>
+				{/if}
+
 				<form
 					method="POST"
-					action="?/syncMarketData"
+					action="?/saveMarketKey"
 					use:enhance={() => {
-						syncing = true;
+						savingProvider = provider.id;
 						return async ({ update }) => {
-							syncing = false;
+							savingProvider = null;
+							// reset:false conserva el resto del formulario de ajustes;
+							// el campo de la clave se limpia abajo, a mano.
 							await update({ reset: false });
+							keyInputs[provider.id] = '';
 						};
 					}}
 				>
-					<Button type="submit" loading={syncing}>Sincronizar</Button>
+					<input type="hidden" name="provider" value={provider.id} />
+					<div class="key-row">
+						<Input
+							label={stored ? 'Reemplazar clave' : 'Clave de API'}
+							type="password"
+							name="apiKey"
+							autocomplete="off"
+							placeholder="Pega aquí tu clave"
+							bind:value={keyInputs[provider.id]}
+							required
+						/>
+						<Button type="submit" size="sm" loading={savingProvider === provider.id}>
+							{stored ? 'Reemplazar' : 'Guardar'}
+						</Button>
+					</div>
 				</form>
-			</div>
 
-			{#if form?.marketSyncError}
-				<p class="feedback error">{form.marketSyncError}</p>
-			{/if}
-			{#if form?.marketSyncSuccess}
-				<p class="feedback success">
-					{form.marketSyncCount} precio{form.marketSyncCount === 1 ? '' : 's'} actualizado{form.marketSyncCount ===
-					1
-						? ''
-						: 's'}{form.marketSyncRateCount
-						? ` y ${form.marketSyncRateCount} tasa${form.marketSyncRateCount === 1 ? '' : 's'} de cambio`
-						: ''}.
-				</p>
-			{/if}
-		{/if}
+				{#if error}
+					<p class="feedback error">{error}</p>
+				{/if}
+				{#if success}
+					<p class="feedback success">{success}</p>
+				{/if}
+
+				{#if stored}
+					<div class="provider-actions">
+						<form
+							method="POST"
+							action="?/verifyMarketKey"
+							use:enhance={() => {
+								verifyingProvider = provider.id;
+								return async ({ update }) => {
+									verifyingProvider = null;
+									await update({ reset: false });
+								};
+							}}
+						>
+							<input type="hidden" name="provider" value={provider.id} />
+							<button type="submit" class="row-action" disabled={verifyingProvider === provider.id}>
+								{verifyingProvider === provider.id ? 'Verificando…' : 'Verificar'}
+							</button>
+						</form>
+						<form
+							method="POST"
+							action="?/deleteMarketKey"
+							use:enhance={() => {
+								deletingProvider = provider.id;
+								return async ({ update }) => {
+									deletingProvider = null;
+									await update({ reset: false });
+								};
+							}}
+						>
+							<input type="hidden" name="provider" value={provider.id} />
+							<button
+								type="submit"
+								class="row-action danger"
+								disabled={deletingProvider === provider.id}
+							>
+								{deletingProvider === provider.id ? 'Eliminando…' : 'Eliminar'}
+							</button>
+						</form>
+					</div>
+				{/if}
+			</div>
+		{/each}
 	</div>
-</Card>
+
+	{#if hasAnyKey}
+		<div class="sync-row">
+			<div>
+				<p class="sync-title">Sincronizar ahora</p>
+				<p class="hint">
+					Se actualizan los precios de los activos que tienes, con tu clave. Si no, se hace cada día
+					automáticamente.
+				</p>
+			</div>
+			<form
+				method="POST"
+				action="?/syncMarketData"
+				use:enhance={() => {
+					syncing = true;
+					return async ({ update }) => {
+						syncing = false;
+						await update({ reset: false });
+					};
+				}}
+			>
+				<Button type="submit" size="sm" loading={syncing}>Sincronizar</Button>
+			</form>
+		</div>
+
+		{#if form?.marketSyncError}
+			<p class="feedback error">{form.marketSyncError}</p>
+		{/if}
+		{#if form?.marketSyncSuccess}
+			<p class="feedback success">
+				{form.marketSyncCount} precio{form.marketSyncCount === 1 ? '' : 's'} actualizado{form.marketSyncCount ===
+				1
+					? ''
+					: 's'}{form.marketSyncRateCount
+					? ` y ${form.marketSyncRateCount} tasa${form.marketSyncRateCount === 1 ? '' : 's'} de cambio`
+					: ''}.
+			</p>
+		{/if}
+	{/if}
+</SettingsSection>
 
 <style>
-	.section {
-		padding: 1.75rem;
-	}
-
-	.section-title {
-		margin: 0 0 0.75rem;
-		font-size: 1.05rem;
-		font-weight: 600;
-		color: var(--color-text-primary, #f5f5f5);
-	}
-
-	.hint {
-		margin: 0 0 0.5rem;
-		font-size: 0.85rem;
-		line-height: 1.5;
-		color: var(--color-text-muted, #9a9a9a);
+	/* Lo que le pasa a la clave una vez guardada: va en el carril, con el resto
+	   de lo que explica la sección. */
+	.privacy {
+		max-width: 40ch;
+		margin: 0.7rem 0 0;
+		font-size: 0.78rem;
+		line-height: 1.55;
+		color: var(--text-dim);
 	}
 
 	.privacy {
 		margin-bottom: 1.25rem;
 	}
 
+	/* Dos proveedores separados por un filete, no dos cajas dentro de otra: la
+	   página tenía tres niveles de marco anidados. */
 	.providers {
 		display: grid;
-		gap: 1.25rem;
 	}
 
 	.provider {
-		padding: 1.25rem;
-		border: 1px solid var(--color-border, #2a2a2a);
-		border-radius: 0.75rem;
-		background: var(--color-surface-subtle, rgb(255 255 255 / 2%));
+		padding: 1.1rem 0;
+		border-top: 1px solid var(--border);
+	}
+
+	.provider:first-child {
+		padding-top: 0;
+		border-top: none;
 	}
 
 	.provider-head {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.75rem;
-		align-items: center;
+		gap: 0.5rem 1rem;
+		align-items: baseline;
 		justify-content: space-between;
 	}
 
-	.provider-id {
-		display: flex;
-		gap: 0.6rem;
-		align-items: center;
-	}
-
 	.provider-name {
-		font-size: 0.95rem;
-		font-weight: 600;
-		color: var(--color-text-primary, #f5f5f5);
+		margin: 0;
+		font-family: var(--font-body);
+		font-size: 0.92rem;
+		font-weight: 500;
+		color: var(--text);
 	}
 
 	.provider-link {
 		font-size: 0.8rem;
-		color: var(--color-accent, #d4af37);
+		color: var(--amber);
 		text-decoration: none;
 	}
 
 	.provider-link:hover,
 	.provider-link:focus-visible {
 		text-decoration: underline;
-	}
-
-	.provider-hint {
-		margin: 0.5rem 0 0;
-		font-size: 0.8rem;
-		color: var(--color-text-muted, #9a9a9a);
+		text-underline-offset: 3px;
 	}
 
 	.provider-state {
-		margin: 0.75rem 0 0.15rem;
+		max-width: 56ch;
+		margin: 0.35rem 0 0;
 		font-size: 0.8rem;
-		color: var(--color-text-secondary, #c4c4c4);
+		line-height: 1.5;
+		color: var(--text-muted);
 	}
 
+	/* Los cuatro últimos caracteres, en mono: es la única parte de la clave que
+	   se puede enseñar, y hay que poder compararla con la que tienes delante. */
 	.provider-state code {
-		padding: 0.1rem 0.35rem;
-		border-radius: 0.25rem;
-		background: rgb(255 255 255 / 6%);
-		font-size: 0.78rem;
+		font-family: var(--font-mono);
+		font-size: 0.76rem;
+		color: var(--text);
 	}
 
-	.provider-state-note {
-		margin: 0 0 0.5rem;
-		font-size: 0.78rem;
-		color: var(--color-text-muted, #9a9a9a);
-	}
-
-	.provider-state-note.is-problem {
-		color: var(--color-warning, #e0a800);
+	.provider-state.is-problem {
+		color: var(--amber);
 	}
 
 	.key-row {
@@ -398,16 +364,16 @@
 		gap: 1rem;
 		align-items: center;
 		justify-content: space-between;
-		margin-top: 1.5rem;
-		padding-top: 1.25rem;
-		border-top: 1px solid var(--color-border, #2a2a2a);
+		margin-top: 1.25rem;
+		padding-top: 1.1rem;
+		border-top: 1px solid var(--border);
 	}
 
 	.sync-title {
 		margin: 0 0 0.2rem;
-		font-size: 0.9rem;
-		font-weight: 600;
-		color: var(--color-text-primary, #f5f5f5);
+		font-size: 0.88rem;
+		font-weight: 500;
+		color: var(--text);
 	}
 
 	.sync-row .hint {
@@ -415,29 +381,12 @@
 		max-width: 42ch;
 	}
 
-	.feedback {
-		margin: 0.75rem 0 0;
-		font-size: 0.82rem;
-	}
-
-	.feedback.error {
-		color: var(--color-danger, #e05260);
-	}
-
-	.feedback.success {
-		color: var(--color-success, #4caf7d);
-	}
-
+	/* El aviso de «sin clave» abre la sección, así que separa de lo que sigue. */
 	.feedback.warning {
-		margin-bottom: 1rem;
-		color: var(--color-warning, #e0a800);
+		margin-bottom: 1.25rem;
 	}
 
 	@media (max-width: 640px) {
-		.section {
-			padding: 1.25rem;
-		}
-
 		.key-row {
 			flex-direction: column;
 			align-items: stretch;

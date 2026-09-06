@@ -99,7 +99,7 @@
 			<p class="feedback error">{twoFaRegenError}</p>
 		{/if}
 		<div class="form-actions">
-			<Button type="submit" variant="secondary" loading={twoFaRegenLoading}>
+			<Button type="submit" variant="secondary" size="sm" loading={twoFaRegenLoading}>
 				Regenerar códigos
 			</Button>
 		</div>
@@ -144,7 +144,8 @@
 			<p class="feedback error">{twoFaDisableError}</p>
 		{/if}
 		<div class="form-actions">
-			<Button type="submit" variant="secondary" loading={twoFaDisableLoading}>Desactivar 2FA</Button
+			<Button type="submit" variant="secondary" size="sm" loading={twoFaDisableLoading}
+				>Desactivar 2FA</Button
 			>
 		</div>
 	</form>

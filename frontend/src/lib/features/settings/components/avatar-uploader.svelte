@@ -132,12 +132,12 @@
 				Cambiar foto
 			</button>
 			{#if avatarFile}
-				<Button type="submit" loading={avatarLoading}>
+				<Button type="submit" size="sm" loading={avatarLoading}>
 					{avatarLoading ? 'Subiendo…' : 'Guardar foto'}
 				</Button>
 			{/if}
 		</form>
-		<p class="avatar-hint">JPEG, PNG o WebP · se optimiza automáticamente</p>
+		<p class="avatar-hint">JPEG, PNG o WebP. Se encoge sola antes de subirse.</p>
 		{#if avatarError}
 			<p class="feedback error">{avatarError}</p>
 		{/if}
@@ -148,13 +148,12 @@
 </div>
 
 <style>
+	/* En vertical: vive en el carril de la sección, no encima del formulario. */
 	.avatar-section {
 		display: flex;
-		align-items: center;
-		gap: 1.25rem;
-		margin-bottom: 1.5rem;
-		padding-bottom: 1.5rem;
-		border-bottom: 1px solid rgba(212, 145, 42, 0.1);
+		align-items: flex-start;
+		gap: 0.9rem;
+		margin-top: 1.1rem;
 	}
 
 	.avatar-display {
@@ -202,12 +201,12 @@
 	}
 
 	.btn-pick-file {
-		padding: 0.45rem 1rem;
-		border-radius: 6px;
-		border: 1px solid rgba(212, 145, 42, 0.4);
-		background: rgba(212, 145, 42, 0.08);
-		color: var(--amber);
-		font-size: 0.825rem;
+		padding: 0.4rem 0.85rem;
+		border-radius: 7px;
+		border: 1px solid var(--border-strong);
+		background: transparent;
+		color: var(--text);
+		font-size: 0.8rem;
 		font-weight: 500;
 		cursor: pointer;
 		transition:
@@ -216,13 +215,15 @@
 	}
 
 	.btn-pick-file:hover {
-		background: rgba(212, 145, 42, 0.15);
-		border-color: rgba(212, 145, 42, 0.65);
+		border-color: rgba(212, 145, 42, 0.5);
+		background: var(--panel);
 	}
 
 	.avatar-hint {
+		max-width: 22ch;
 		margin: 0;
-		font-size: 0.75rem;
+		font-size: 0.72rem;
+		line-height: 1.45;
 		color: var(--text-dim);
 	}
 </style>

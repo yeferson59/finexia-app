@@ -1,6 +1,6 @@
 # Manual de Usuario — FINEXIA
 
-**Versión del documento:** 1.9
+**Versión del documento:** 2.0
 **Fecha:** Septiembre 2026
 **Aplicación:** Finexia — Plataforma de gestión y seguimiento de portafolios de inversión
 
@@ -115,7 +115,7 @@ Si intentas iniciar sesión sin haber verificado tu correo, la aplicación te lo
 
 ### 3.5 Cerrar sesión
 
-Usa el botón **Cerrar Sesión** situado en la parte inferior de la barra lateral. También puedes cerrar sesiones abiertas en otros dispositivos desde **Configuración → Sesiones activas** (ver sección 15.3).
+Usa el botón **Cerrar Sesión** situado en la parte inferior de la barra lateral. También puedes cerrar sesiones abiertas en otros dispositivos desde **Configuración → Sesiones abiertas** (ver sección 15.3).
 
 ---
 
@@ -145,7 +145,7 @@ Es el menú de navegación. Sus secciones son:
 | **Reportes** | Rentabilidad mes a mes, medidas de riesgo, proyección y descargas en Excel |
 | **Notificaciones** | Preferencias de avisos por correo y en la app |
 | **Guía de usuario** | Este manual, para consultarlo en pantalla o descargarlo |
-| **Configuración** | Perfil, apariencia, contraseña, 2FA, sesiones, claves de datos de mercado y acceso para asistentes |
+| **Configuración** | Perfil, contraseña, 2FA, sesiones abiertas, claves de datos de mercado y acceso para asistentes |
 
 En la parte inferior de la barra lateral está el botón **Cerrar Sesión**.
 
@@ -336,7 +336,7 @@ Al final de la página está **Quitar esta posición**, que no es lo mismo: la s
 
 ### 7.3 Precios de los activos
 
-Los precios vienen de proveedores de datos de mercado (Finnhub, Alpha Vantage), y **Finexia no tiene cuenta con ninguno de ellos**: la clave la pones tú, en *Configuración → Datos de mercado* (sección 14.4). Es gratis y se tarda un minuto; el manual lo explica ahí.
+Los precios vienen de proveedores de datos de mercado (Finnhub, Alpha Vantage), y **Finexia no tiene cuenta con ninguno de ellos**: la clave la pones tú, en *Configuración → Datos de mercado* (sección 14.3). Es gratis y se tarda un minuto; el manual lo explica ahí.
 
 Qué cambia según tengas clave o no:
 
@@ -634,29 +634,34 @@ Marca o desmarca cada opción según tu preferencia; los cambios se guardan en t
 
 ## 14. Configuración de la cuenta
 
-La página **Configuración** agrupa todo lo relativo a tu cuenta, en secciones:
+La página **Configuración** está repartida en tres bloques, y cada uno abre diciendo cómo está lo suyo: así sabes de un vistazo si algo pide tu atención sin recorrer la página entera.
 
-![Página de configuración con el perfil, la apariencia, la seguridad y las sesiones activas](img/manual/12-configuracion.png)
+![Página de configuración con el perfil, cómo entras a la cuenta y lo que tienes conectado](img/manual/12-configuracion.png)
 
-### 14.1 Perfil
+| Bloque | Qué contiene | Qué te dice al abrirlo |
+|---|---|---|
+| **Tu perfil** | Foto, nombre y moneda | A nombre de quién está la cuenta, con qué correo y desde cuándo |
+| **Cómo entras** | Contraseña, verificación en dos pasos y sesiones abiertas | Si entras solo con contraseña o también con un código, y cuántas sesiones hay abiertas |
+| **Lo que tienes conectado** | Datos de mercado, asistentes y aplicaciones | Qué claves, tokens y aplicaciones tienen acceso a tus carteras |
 
-- Edita tu **nombre** y datos personales.
-- **Sube o cambia tu avatar** (imagen de perfil), que se mostrará en la cabecera y en tu perfil.
+Cada sección tiene a la izquierda qué es y para qué sirve, y a la derecha lo que puedes cambiar.
+
+### 14.1 Tu perfil
+
+- Edita tu **nombre**: es el que aparece en el saludo del panel.
+- **Sube o cambia tu foto**, que se ve en la barra de arriba. Se encoge sola antes de subirse, así que no hace falta que la prepares.
 - Elige tu **moneda preferida**: es en la que se muestran los totales del Dashboard y de Mis Activos. Solo aparecen las monedas a las que la aplicación sabe convertir.
-- Tu correo electrónico identifica tu cuenta.
 
-### 14.2 Apariencia
+Tu **correo electrónico** identifica la cuenta y no se puede cambiar desde aquí; por eso se lee en el resumen del bloque en vez de ocupar un campo de formulario.
 
-Ajusta las preferencias visuales de la aplicación (tema/aspecto de la interfaz) a tu gusto. Los cambios se aplican de inmediato y quedan guardados en tus preferencias.
+### 14.2 Cómo entras
 
-### 14.3 Seguridad
+- **Contraseña:** escribe la actual y la nueva dos veces. La sesión de este navegador sigue abierta después de cambiarla.
+- **Verificación en dos pasos** y **sesiones abiertas:** ver la sección 15. El resumen del bloque te dice si la verificación está puesta y si hay alguna sesión abierta además de la de este navegador.
 
-- **Cambiar contraseña:** introduce tu contraseña actual y la nueva. Usa contraseñas largas y únicas.
-- **Verificación en dos pasos (2FA)** y **Sesiones activas:** ver sección 15.
+### 14.3 Datos de mercado (tu clave de proveedor)
 
-### 14.4 Datos de mercado (tu clave de proveedor)
-
-Aquí es donde das de alta la clave con la que Finexia consulta los precios de tus activos. Sin ella tus posiciones se valoran a precio de compra (sección 7.3).
+Aquí es donde das de alta la clave con la que Finexia consulta los precios de tus activos. Sin ella tus posiciones se valoran a precio de compra (sección 7.3), y la propia sección te lo advierte mientras no tengas ninguna.
 
 **Cómo obtener una clave.** Ambos proveedores tienen plan gratuito y basta con registrarse:
 
@@ -669,19 +674,15 @@ Puedes configurar las dos. Finexia intenta primero Finnhub y recurre a Alpha Van
 
 **Cómo configurarla.** Pega la clave en el campo del proveedor y pulsa **Guardar**. Finexia la comprueba contra el proveedor antes de aceptarla, así que si te equivocas al copiarla te lo dice en el momento en vez de dejarte con una clave que no funciona.
 
-Por cada clave guardada verás:
-
-- Los **cuatro últimos caracteres**, para saber cuál tienes puesta.
-- Su **estado**: *activa*, *sin cuota* (has agotado el límite del día; mañana vuelve sola) o *no válida* (el proveedor la rechazó, normalmente porque la revocaste).
-- **Verificar**, que vuelve a comprobarla, y **Eliminar**, que la borra.
+Por cada clave guardada, una línea te dice **cómo está y cuál es**: si funciona, si se agotó la cuota del día (mañana vuelve sola) o si el proveedor la rechazó, junto con sus **cuatro últimos caracteres** y cuándo se verificó por última vez. Al lado, **Verificar** vuelve a comprobarla y **Eliminar** la borra.
 
 **Sincronizar** pide los precios de tus posiciones en ese momento, sin esperar a la actualización diaria. Con una clave de Alpha Vantage el proceso va despacio a propósito, para no agotar tu cuota: si tienes muchas posiciones puede que no le dé tiempo a todas y las restantes se actualicen en la sincronización de la noche.
 
 > **La clave no se puede volver a leer, ni siquiera tú.** Se guarda cifrada y Finexia nunca la devuelve: por eso el campo aparece siempre vacío y cambiarla significa escribirla entera otra vez. Si la pierdes, genera una nueva en el proveedor. Si prefieres dejar de usarla, **Eliminar** la borra de verdad.
 
-### 14.5 Acceso para asistentes y aplicaciones conectadas
+### 14.4 Asistentes y aplicaciones conectadas
 
-En la parte baja de la página están las credenciales con las que un asistente de IA puede leer tus carteras: **Acceso para asistentes (MCP)**, donde creas, rotas y eliminas tus tokens, y **Aplicaciones conectadas**, donde retiras el acceso a las aplicaciones que hayas autorizado. Las dos se explican enteras en la sección 16.
+Cierran la página las credenciales con las que un asistente de IA puede leer tus carteras: **Asistentes**, donde creas, rotas y eliminas tus tokens, y **Aplicaciones conectadas**, donde retiras el acceso a las aplicaciones que hayas autorizado. Las dos se explican enteras en la sección 16.
 
 ---
 
@@ -691,7 +692,7 @@ En la parte baja de la página están las credenciales con las que un asistente 
 
 La 2FA añade una segunda barrera al inicio de sesión: además de tu contraseña, necesitarás un código temporal generado por tu aplicación de autenticación.
 
-1. Ve a **Configuración → Verificación en dos pasos (2FA)** y pulsa **Activar**.
+1. Ve a **Configuración → Verificación en dos pasos** y pulsa **Activar 2FA**.
 2. **Escanea el código QR** con tu aplicación de autenticación (Google Authenticator, Authy, 1Password, etc.). Si no puedes escanear, usa la **"Clave para ingreso manual"** que se muestra junto al QR.
 3. Introduce el **código de 6 dígitos** que genera la aplicación para confirmar la activación.
 4. **Guarda tus códigos de recuperación.** La aplicación te mostrará una lista de códigos de un solo uso: descárgalos o cópialos y guárdalos en un lugar seguro (gestor de contraseñas, papel en lugar protegido). Son tu única vía de acceso si pierdes el teléfono.
@@ -704,9 +705,9 @@ A partir de ese momento, cada inicio de sesión pedirá el código temporal.
 - **Regenerar códigos:** desde la sección 2FA puedes generar una nueva lista (la anterior queda invalidada).
 - **Desactivar 2FA:** desde la misma sección, confirmando con un código válido. Tu cuenta volverá a protegerse solo con contraseña (no recomendado).
 
-### 15.3 Sesiones activas
+### 15.3 Sesiones abiertas
 
-En **Configuración → Sesiones activas** verás todos los dispositivos/navegadores con sesión abierta en tu cuenta, con información para identificarlos (dispositivo, ubicación aproximada y última actividad).
+En **Configuración → Sesiones abiertas** verás todos los dispositivos/navegadores con sesión abierta en tu cuenta, con información para identificarlos (dispositivo, ubicación aproximada y última actividad).
 
 - **Revocar una sesión:** cierra la sesión de un dispositivo concreto.
 - **Cerrar las demás sesiones:** cierra todas las sesiones excepto la actual. Útil si sospechas que alguien más accedió a tu cuenta (en ese caso, cambia también tu contraseña).
@@ -728,7 +729,7 @@ Hay dos formas de conectarlo, según lo que sepa hacer tu cliente:
 
 ### 16.1 Crear un token
 
-En **Configuración → Acceso para asistentes (MCP)**:
+En **Configuración → Asistentes**:
 
 1. Escribe un **nombre** que te diga después cuál es cuál: "Claude Desktop", "Portátil del trabajo".
 2. Elige la **caducidad**: 30 días, 90 días (lo recomendado), 1 año o sin caducidad.
@@ -843,7 +844,7 @@ Marca **"Mi cuenta liquidó en otra moneda"** en el formulario e indica la moned
 Sí. Una transacción se elimina desde su fila en **Movimientos**; la posición entera, desde **Quitar esta posición**, al final de la ficha del activo, y se lleva todas sus transacciones con ella (apartado 7.2).
 
 **¿Puedo conectar Finexia con Claude u otro asistente de IA?**
-Sí, en modo **solo lectura**: crea un token en **Configuración → Acceso para asistentes (MCP)** y pégalo en tu cliente, o autoriza la conexión desde el propio asistente si sabe hacerlo por sí mismo. Podrá consultar tus carteras, nunca modificarlas (sección 16).
+Sí, en modo **solo lectura**: crea un token en **Configuración → Asistentes** y pégalo en tu cliente, o autoriza la conexión desde el propio asistente si sabe hacerlo por sí mismo. Podrá consultar tus carteras, nunca modificarlas (sección 16).
 
 ---
 
@@ -856,7 +857,7 @@ Sí, en modo **solo lectura**: crea un token en **Configuración → Acceso para
 | El enlace de invitación o de restablecimiento no funciona | Enlace caducado o ya usado | Solicita un nuevo enlace o el reenvío de la invitación |
 | No puedo registrarme | El registro directo está deshabilitado | Únete a la lista de espera para recibir una invitación |
 | El código 2FA no es aceptado | Reloj del teléfono desincronizado o código expirado | Sincroniza la hora del dispositivo y usa el código vigente; como alternativa, un código de recuperación |
-| Mi sesión se cerró sola | La sesión fue revocada o expiró | Inicia sesión de nuevo; revisa **Sesiones activas** si no fuiste tú |
+| Mi sesión se cerró sola | La sesión fue revocada o expiró | Inicia sesión de nuevo; revisa **Sesiones abiertas** si no fuiste tú |
 | Una importación omite filas | Datos incompletos o formatos no interpretables | Revisa el detalle de **Filas omitidas**, corrige el archivo y repite la vista previa |
 | Los valores no cuadran con mi broker | No tienes clave de datos de mercado (se valora a coste), faltan transacciones, o el precio aún no se ha refrescado | Configura tu clave en **Configuración → Datos de mercado** y pulsa **Sincronizar**; completa el historial de transacciones |
 | Mi ganancia/pérdida sale exactamente 0 | Sin clave de datos de mercado se valora a precio de compra, así que no hay nada que comparar | Configura tu clave (sección 14.4) |
