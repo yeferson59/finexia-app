@@ -6,8 +6,8 @@
 </script>
 
 <svelte:head>
-	<title>Agregar Activo al Portafolio - FINEXIA</title>
-	<meta name="description" content="Añade un nuevo activo a tu portafolio de inversiones" />
+	<title>Añadir activo - FINEXIA</title>
+	<meta name="description" content="Añade un activo que ya tienes a tu portafolio" />
 </svelte:head>
 
 <PortfolioEntryForm

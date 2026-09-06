@@ -65,10 +65,12 @@ const fxRate = z.preprocess(
 /** Alta de una posición (`routes/dashboard/portfolios/[id]/add`). */
 export const portfolioEntrySchema = z.object({
 	portfolioId: z.uuid(),
-	assetId: z.uuid(),
-	sourceId: z.uuid(),
-	quantity: z.coerce.number().positive(),
-	price: z.coerce.number().positive(),
+	// Con mensaje: son los que ve el usuario cuando el alta se rechaza, y los de
+	// Zod por defecto llegan en inglés hablando de UUID y de números.
+	assetId: z.uuid('Elige el activo en el buscador.'),
+	sourceId: z.uuid('Elige la plataforma donde tienes el activo.'),
+	quantity: z.coerce.number().positive('La cantidad tiene que ser mayor que cero.'),
+	price: z.coerce.number().positive('El precio por unidad tiene que ser mayor que cero.'),
 	// `costCurrency` es la de la cuenta —en la que el bróker debitó— y
 	// `currency` la de la operación, que es la de cotización del activo. Solo
 	// difieren cuando el bróker convirtió, y entonces `fxRate` es a cuánto.

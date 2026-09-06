@@ -1,4 +1,14 @@
 <script lang="ts">
+	/*
+	 * El activo elegido, en dos renglones.
+	 *
+	 * Era una rejilla de cinco celdas —Ticker, Nombre, Tipo, Exchange, Precio—
+	 * con las etiquetas EN VERSALITAS y los cinco valores en ámbar. Cinco
+	 * etiquetas para cinco datos que sirven a una sola cosa: confirmar que el
+	 * instrumento elegido es el que buscabas. Así se lee de un vistazo, y el
+	 * ámbar queda libre para lo único que de verdad manda aquí, que es el total.
+	 */
+	import { formatAssetType } from '$lib/shared/format/asset-type';
 	import type { Asset } from '$lib/api/types';
 
 	let {
@@ -6,79 +16,64 @@
 		formatCurrency
 	}: { asset: Asset; formatCurrency: (value: number, code?: string) => string } = $props();
 
-	// El precio de mercado está en la moneda del activo, que no tiene por qué
-	// ser aquella en la que se pagará la compra.
+	// El precio de mercado está en la moneda del activo, que no tiene por qué ser
+	// aquella en la que se pagará la compra.
 	const assetCurrency = $derived(asset.currency?.trim().toUpperCase() || undefined);
+
+	/* La frase se compone aquí y no en el marcado: intercalar `{#if}` entre
+	   fragmentos de texto se come los espacios que los separan. */
+	const detail = $derived.by(() => {
+		const type = formatAssetType(asset.assetType);
+		const parts = [asset.exchange ? `${type} en ${asset.exchange}.` : `${type}.`];
+
+		if (asset.currentPrice) {
+			const price = formatCurrency(parseFloat(asset.currentPrice.value), assetCurrency);
+			parts.push(`Cotiza a ${price}.`);
+		}
+
+		return parts.join(' ');
+	});
 </script>
 
-<div class="asset-preview">
-	<div class="preview-item">
-		<span class="preview-label">Ticker</span>
-		<span class="preview-value">{asset.ticker}</span>
-	</div>
-	<div class="preview-item">
-		<span class="preview-label">Nombre</span>
-		<span class="preview-value">{asset.name}</span>
-	</div>
-	<div class="preview-item">
-		<span class="preview-label">Tipo</span>
-		<span class="preview-value">{asset.assetType}</span>
-	</div>
-	<div class="preview-item">
-		<span class="preview-label">Exchange</span>
-		<span class="preview-value">{asset.exchange}</span>
-	</div>
-	{#if asset.currentPrice}
-		<div class="preview-item">
-			<span class="preview-label">Precio de mercado</span>
-			<span class="preview-value"
-				>{formatCurrency(parseFloat(asset.currentPrice.value), assetCurrency)}</span
-			>
-		</div>
-	{/if}
-</div>
+<p class="chosen">
+	<span class="identity">
+		<span class="ticker">{asset.ticker}</span>
+		<span class="name">{asset.name}</span>
+	</span>
+	<span class="detail">{detail}</span>
+</p>
 
 <style>
-	.asset-preview {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 1rem;
-		margin-top: 1rem;
-		padding: 1rem;
-		border-radius: 12px;
-		background: var(--surface);
-		border: 1px solid var(--border-strong);
+	.chosen {
+		margin: 0.65rem 0 0;
+		font-size: 0.85rem;
+		line-height: 1.5;
 	}
 
-	.preview-item {
+	.identity {
 		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
+		align-items: baseline;
+		flex-wrap: wrap;
+		gap: 0.15rem 0.6rem;
 	}
 
-	.preview-label {
-		font-size: 0.75rem;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		color: rgba(236, 234, 229, 0.5);
-		font-weight: 600;
+	/* El ticker en la tipografía de máquina, como en el resto del panel: es una
+	   cadena que se compara carácter a carácter con la del bróker. */
+	.ticker {
+		font-family: var(--font-mono);
+		font-size: 0.9em;
+		font-weight: 500;
+		color: var(--text);
 	}
 
-	.preview-value {
-		font-size: 0.95rem;
-		color: var(--amber);
-		font-weight: 600;
+	.name {
+		font-weight: 500;
+		color: var(--text);
 	}
 
-	@media (max-width: 1024px) {
-		.asset-preview {
-			grid-template-columns: 1fr;
-		}
-	}
-
-	@media (max-width: 768px) {
-		.asset-preview {
-			grid-template-columns: 1fr;
-		}
+	.detail {
+		display: block;
+		margin-top: 0.15rem;
+		color: var(--text-muted);
 	}
 </style>

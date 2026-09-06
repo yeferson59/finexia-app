@@ -31,15 +31,12 @@ const lvmh: Asset = {
 	priceUpdatedAt: null
 };
 
-const formatCurrency = (value: number, code: string) => `${code} ${value.toFixed(2)}`;
-
 const props = {
 	asset: novo,
 	quantity: '0.201065',
 	purchasePrice: '866.60',
 	purchaseDate: '2024-04-11',
-	fxRate: '',
-	formatCurrency
+	fxRate: ''
 };
 
 describe('portfolio-entry-purchase-fields.svelte', () => {
@@ -48,7 +45,7 @@ describe('portfolio-entry-purchase-fields.svelte', () => {
 
 		const select = page.getByLabelText('Moneda de la operación');
 		await expect.element(select).toHaveValue('DKK');
-		await expect.element(page.getByText('Precio por unidad en DKK')).toBeInTheDocument();
+		await expect.element(page.getByText('Lo que costó cada una, en DKK.')).toBeInTheDocument();
 	});
 
 	it('avisa cuando la moneda elegida no es la de cotización del activo', async () => {
@@ -76,22 +73,16 @@ describe('portfolio-entry-purchase-fields.svelte', () => {
 			purchaseDate: '2024-12-05',
 			currency: 'EUR',
 			costCurrency: 'EUR',
-			fxRate: '',
-			formatCurrency
+			fxRate: ''
 		});
 
 		await page.getByText('Mi cuenta liquidó en otra moneda').click();
 
 		await page.getByLabelText('Moneda de la cuenta').selectOptions('USD');
 
-		const rate = page.getByLabelText('Tasa de la operación');
-		await expect.element(rate).toBeInTheDocument();
-		await rate.fill('1.0638');
-
-		// 0.0241 × 606.60 × 1.0638 = 15.55, que es el importe que el bróker
-		// debitó. Es el número con el que el usuario contrasta lo que escribió
-		// antes de guardar, así que es el que la prueba fija.
-		await expect.element(page.getByText('EUR 14.62 × 1.0638 = USD 15.55')).toBeInTheDocument();
+		// La cuenta que sale de esto —el importe que el bróker debitó— la pinta
+		// ahora `portfolio-entry-total`, y allí es donde la fija su prueba.
+		await expect.element(page.getByLabelText('Tasa de la operación')).toBeInTheDocument();
 	});
 
 	// El estado que producía un 400 opaco: el interruptor encendido sin haber
@@ -106,8 +97,7 @@ describe('portfolio-entry-purchase-fields.svelte', () => {
 			purchaseDate: '2024-12-05',
 			currency: 'USD',
 			costCurrency: 'USD',
-			fxRate: '',
-			formatCurrency
+			fxRate: ''
 		});
 
 		await page.getByText('Mi cuenta liquidó en otra moneda').click();

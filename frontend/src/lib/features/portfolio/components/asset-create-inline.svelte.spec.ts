@@ -32,7 +32,7 @@ describe('asset-create-inline.svelte', () => {
 
 		render(AssetCreateInline, { ticker: ' geb ', oncreated, oncancel: () => {} });
 
-		await page.getByRole('button', { name: 'Crear y seleccionar' }).click();
+		await page.getByRole('button', { name: 'Crear activo' }).click();
 
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 		const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -50,7 +50,7 @@ describe('asset-create-inline.svelte', () => {
 		const oncreated = vi.fn();
 
 		render(AssetCreateInline, { ticker: 'GEB', oncreated, oncancel: () => {} });
-		await page.getByRole('button', { name: 'Crear y seleccionar' }).click();
+		await page.getByRole('button', { name: 'Crear activo' }).click();
 
 		await vi.waitFor(() => expect(oncreated).toHaveBeenCalledWith(created));
 	});
@@ -64,7 +64,7 @@ describe('asset-create-inline.svelte', () => {
 		const oncreated = vi.fn();
 
 		render(AssetCreateInline, { ticker: 'GEB', oncreated, oncancel: () => {} });
-		await page.getByRole('button', { name: 'Crear y seleccionar' }).click();
+		await page.getByRole('button', { name: 'Crear activo' }).click();
 
 		await expect
 			.element(page.getByText('has añadido demasiados activos nuevos'))

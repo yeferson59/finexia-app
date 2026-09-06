@@ -79,8 +79,12 @@
 </script>
 
 <form class="create-asset" onsubmit={submit}>
+	<!-- Dice qué se está creando y qué pasa después: es un alta en el catálogo,
+	     no la posición, y al terminar se vuelve al formulario con el activo ya
+	     elegido. -->
 	<p class="create-asset-title">
-		Crear <strong>{normalizedTicker}</strong>
+		Nuevo activo <strong>{normalizedTicker}</strong>. Al crearlo queda elegido y sigues con la
+		posición.
 	</p>
 
 	<div class="create-asset-grid">
@@ -140,41 +144,49 @@
 	<div class="create-asset-actions">
 		<button type="button" class="create-asset-cancel" onclick={oncancel}>Cancelar</button>
 		<button type="submit" class="create-asset-submit" disabled={submitting}>
-			{submitting ? 'Creando…' : 'Crear y seleccionar'}
+			{submitting ? 'Creando…' : 'Crear activo'}
 		</button>
 	</div>
 </form>
 
 <style>
+	/*
+	 * El alta de catálogo, dentro del buscador. Sin el borde ámbar de 1,5 px que
+	 * lo hacía competir con el total: es un desvío del camino principal, no el
+	 * camino.
+	 */
 	.create-asset {
-		margin-top: 0.6rem;
-		padding: 0.9rem 1rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.35);
+		margin-top: 0.65rem;
+		padding: 1rem;
+		border: 1px solid var(--border-strong);
 		border-radius: 10px;
-		background: var(--surface);
+		background: var(--panel, rgba(255, 255, 255, 0.04));
 	}
 
 	.create-asset-title {
-		margin: 0 0 0.75rem;
-		font-size: 0.88rem;
-		color: rgba(236, 234, 229, 0.75);
+		max-width: 56ch;
+		margin: 0 0 0.9rem;
+		font-size: 0.83rem;
+		line-height: 1.55;
+		color: var(--text-muted);
 	}
 
 	.create-asset-title strong {
 		font-family: var(--font-mono);
-		color: var(--amber);
+		font-weight: 500;
+		color: var(--text);
 	}
 
 	.create-asset-grid {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 0.7rem;
+		gap: 0.85rem;
 	}
 
 	.create-asset-field {
 		display: flex;
 		flex-direction: column;
-		gap: 0.3rem;
+		gap: 0.35rem;
 		min-width: 0;
 	}
 
@@ -183,84 +195,110 @@
 	}
 
 	.create-asset-label {
-		font-size: 0.75rem;
-		font-weight: 600;
-		letter-spacing: 0.4px;
-		text-transform: uppercase;
-		color: rgba(236, 234, 229, 0.5);
+		font-size: 0.8rem;
+		font-weight: 500;
+		color: var(--text);
 	}
 
 	.create-asset-optional {
-		text-transform: none;
-		letter-spacing: 0;
 		font-weight: 400;
+		color: var(--text-dim);
 	}
 
-	.create-asset-input {
+	/* Más apretados que los del formulario que los rodea: son un paso dentro de
+	   un campo, y con la misma altura la caja parecía otra pantalla. */
+	.create-asset input.create-asset-input,
+	.create-asset select.create-asset-input {
 		width: 100%;
-		padding: 0.6rem 0.75rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
-		border-radius: 8px;
-		background: rgba(255, 255, 255, 0.022);
+		padding: 0.55rem 0.7rem;
+		border: 1px solid var(--border-strong);
+		border-radius: 7px;
+		background: rgba(255, 255, 255, 0.03);
 		color: var(--text);
-		font-size: 0.9rem;
 		font-family: var(--font-body);
-		transition: all 0.3s ease;
+		font-size: 0.87rem;
+		box-sizing: border-box;
+		transition: border-color 0.2s ease;
 	}
 
-	.create-asset-input:focus {
-		outline: none;
+	.create-asset input.create-asset-input::placeholder {
+		color: var(--text-dim);
+	}
+
+	.create-asset input.create-asset-input:focus,
+	.create-asset select.create-asset-input:focus {
 		border-color: var(--amber);
-		box-shadow: 0 0 0 3px var(--border);
 	}
 
 	.create-asset-error {
-		margin: 0.7rem 0 0;
+		margin: 0.85rem 0 0;
+		padding-left: 0.75rem;
+		border-left: 2px solid var(--red);
 		font-size: 0.82rem;
-		color: #e5736b;
+		line-height: 1.5;
+		color: var(--red);
 	}
 
 	.create-asset-actions {
 		display: flex;
-		justify-content: flex-end;
-		gap: 0.5rem;
-		margin-top: 0.9rem;
+		align-items: center;
+		gap: 1.1rem;
+		margin-top: 1rem;
 	}
 
-	.create-asset-cancel,
 	.create-asset-submit {
-		padding: 0.5rem 0.9rem;
+		padding: 0.5rem 1rem;
+		border: 1px solid var(--border-strong);
 		border-radius: 8px;
-		font-size: 0.85rem;
-		font-weight: 600;
+		background: none;
+		color: var(--text);
+		font-family: var(--font-body);
+		font-size: 0.83rem;
+		font-weight: 500;
 		cursor: pointer;
-		transition: all 0.2s ease;
+		transition:
+			border-color 0.2s ease,
+			background 0.2s ease;
+	}
+
+	.create-asset-submit:hover:not(:disabled) {
+		border-color: var(--text-dim);
+		background: var(--surface-2);
+	}
+
+	.create-asset-submit:disabled {
+		color: var(--text-dim);
+		cursor: default;
 	}
 
 	.create-asset-cancel {
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
-		background: transparent;
-		color: rgba(236, 234, 229, 0.7);
+		order: 1;
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--text-muted);
+		font-family: var(--font-body);
+		font-size: 0.83rem;
+		cursor: pointer;
+		transition: color 0.2s ease;
 	}
 
 	.create-asset-cancel:hover {
 		color: var(--text);
 	}
 
-	.create-asset-submit {
-		border: 1.5px solid var(--amber);
-		background: rgba(212, 145, 42, 0.15);
-		color: var(--amber);
+	@media (prefers-reduced-motion: reduce) {
+		.create-asset input.create-asset-input,
+		.create-asset select.create-asset-input,
+		.create-asset-submit,
+		.create-asset-cancel {
+			transition: none;
+		}
 	}
 
-	.create-asset-submit:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
-	}
-
-	@media (max-width: 480px) {
+	@media (max-width: 520px) {
 		.create-asset-grid {
-			grid-template-columns: 1fr;
+			grid-template-columns: minmax(0, 1fr);
 		}
 	}
 </style>

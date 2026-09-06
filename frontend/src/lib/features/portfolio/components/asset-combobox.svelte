@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { formatAssetType } from '$lib/shared/format/asset-type';
+	import { formatCurrency } from '$lib/shared/format/money';
 	import type { Asset } from '$lib/api/types';
 	import AssetCreateInline from './asset-create-inline.svelte';
 
@@ -76,8 +78,8 @@
 		<input
 			id="asset-search"
 			type="text"
-			class="combobox-input form-input"
-			placeholder="Escribe el ticker o nombre, ej: AAPL, Bitcoin…"
+			class="combobox-input"
+			placeholder="AAPL, Bitcoin, Vanguard…"
 			autocomplete="off"
 			bind:value={search}
 			oninput={onSearchInput}
@@ -119,60 +121,52 @@
 				>
 					<div class="option-left">
 						<span class="option-ticker">{asset.ticker}</span>
-						<span class="option-type">{asset.assetType}</span>
+						<span class="option-type">{formatAssetType(asset.assetType)}</span>
 					</div>
 					<div class="option-right">
 						<span class="option-name">{asset.name}</span>
 						{#if asset.exchange || asset.currency}
 							<span class="option-meta">
-								{[asset.exchange, asset.currency].filter(Boolean).join(' · ')}
+								{[asset.exchange, asset.currency].filter(Boolean).join(', ')}
 							</span>
 						{/if}
 					</div>
 					{#if asset.currentPrice}
 						<span class="option-price">
-							{new Intl.NumberFormat('en-US', {
-								style: 'currency',
-								currency: asset.currency && asset.currency !== 'XXX' ? asset.currency : 'USD',
-								minimumFractionDigits: 2,
-								maximumFractionDigits: 4
-							}).format(parseFloat(asset.currentPrice.value))}
+							{formatCurrency(
+								parseFloat(asset.currentPrice.value),
+								asset.currency && asset.currency !== 'XXX' ? asset.currency : 'USD',
+								4
+							)}
 						</span>
 					{/if}
 				</li>
 			{/each}
 		</ul>
 	{:else if showSuggestions && !isSearching && search.trim().length > 0}
+		<!--
+			Crear un activo y añadirlo al portafolio son dos cosas distintas, y aquí
+			se ven las dos: el catálogo no tiene el instrumento, así que primero se
+			da de alta y después se sigue con la posición.
+		-->
 		<div class="combobox-empty">
-			<span>No se encontró ningún activo con "<strong>{search}</strong>"</span>
+			<span>
+				No hay ningún activo que se llame <strong>{search.trim().toUpperCase()}</strong>. Créalo y
+				sigue con la posición.
+			</span>
 			<button type="button" class="combobox-create" onclick={() => (isCreating = true)}>
-				Crear "{search.trim().toUpperCase()}"
+				Crear {search.trim().toUpperCase()}
 			</button>
 		</div>
 	{/if}
 </div>
 
 <style>
-	.form-input {
-		padding: 0.85rem 1rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.022);
-		color: var(--text);
-		font-size: 0.95rem;
-		font-family: var(--font-body);
-		transition: all 0.3s ease;
-	}
-
-	.form-input::placeholder {
-		color: rgba(236, 234, 229, 0.55);
-	}
-
-	.form-input:focus {
-		outline: none;
-		border-color: var(--amber);
-		background: rgba(255, 255, 255, 0.022);
-		box-shadow: 0 0 0 3px var(--border);
+	/* Los campos los pinta el bloque que envuelve el formulario; aquí solo el
+	   hueco del aspa y del indicador de búsqueda, a la derecha. */
+	.combobox input[type='text'] {
+		width: 100%;
+		padding-right: 2.5rem;
 	}
 
 	.combobox {
@@ -185,18 +179,13 @@
 		align-items: center;
 	}
 
-	.combobox-input {
-		width: 100%;
-		padding-right: 2.5rem;
-	}
-
 	.combobox-spinner {
 		position: absolute;
 		right: 0.9rem;
 		width: 14px;
 		height: 14px;
-		border: 2px solid rgba(212, 145, 42, 0.25);
-		border-top-color: var(--amber);
+		border: 2px solid var(--border-strong);
+		border-top-color: var(--text-muted);
 		border-radius: 50%;
 		animation: spin 0.6s linear infinite;
 	}
@@ -228,8 +217,8 @@
 		list-style: none;
 		margin: 0;
 		padding: 0.35rem 0;
-		background: var(--surface);
-		border: 1.5px solid rgba(212, 145, 42, 0.35);
+		background: #101114;
+		border: 1px solid var(--border-strong);
 		border-radius: 10px;
 		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
 		max-height: 280px;
@@ -248,7 +237,7 @@
 
 	.combobox-option:hover,
 	.combobox-option.selected {
-		background: rgba(212, 145, 42, 0.1);
+		background: var(--surface-2);
 	}
 
 	.option-left {
@@ -258,22 +247,21 @@
 		min-width: 0;
 	}
 
+	/* El ticker en gris y no en ámbar: en esta pantalla el ámbar es el total.
+	   Lo que lo distingue del nombre es la tipografía de máquina. */
 	.option-ticker {
 		font-family: var(--font-mono);
-		font-weight: 700;
-		font-size: 0.92rem;
-		color: var(--amber);
+		font-weight: 500;
+		font-size: 0.9rem;
+		color: var(--text);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 
 	.option-type {
-		font-size: 0.68rem;
+		font-size: 0.72rem;
 		color: var(--text-dim);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		font-weight: 600;
 	}
 
 	.option-right {
@@ -302,7 +290,7 @@
 	.option-price {
 		font-family: var(--font-mono);
 		font-size: 0.82rem;
-		color: var(--amber);
+		color: var(--text-muted);
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 		flex-shrink: 0;
@@ -313,28 +301,45 @@
 		align-items: center;
 		justify-content: space-between;
 		flex-wrap: wrap;
-		gap: 0.5rem;
-		padding: 0.75rem 1rem;
-		font-size: 0.85rem;
-		color: rgba(236, 234, 229, 0.5);
+		gap: 0.75rem;
+		margin-top: 0.65rem;
+		font-size: 0.83rem;
+		line-height: 1.5;
+		color: var(--text-muted);
 	}
 
+	.combobox-empty strong {
+		font-family: var(--font-mono);
+		font-weight: 500;
+		color: var(--text);
+	}
+
+	/* Callado: crear un activo es la salida de emergencia del buscador, no lo
+	   que se viene a hacer a esta pantalla. */
 	.combobox-create {
 		flex-shrink: 0;
-		padding: 0.4rem 0.75rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.45);
+		padding: 0.4rem 0.8rem;
+		border: 1px solid var(--border-strong);
 		border-radius: 8px;
-		background: rgba(212, 145, 42, 0.12);
-		color: var(--amber);
+		background: none;
+		color: var(--text);
 		font-family: var(--font-body);
 		font-size: 0.82rem;
-		font-weight: 600;
 		cursor: pointer;
-		transition: all 0.2s ease;
+		transition:
+			border-color 0.2s ease,
+			background 0.2s ease;
 	}
 
 	.combobox-create:hover {
-		background: rgba(212, 145, 42, 0.2);
+		border-color: var(--text-dim);
+		background: var(--panel);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.combobox-create {
+			transition: none;
+		}
 	}
 
 	@keyframes spin {

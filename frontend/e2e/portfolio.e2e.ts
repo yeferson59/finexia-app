@@ -173,6 +173,34 @@ test.describe('portfolio detail', () => {
 		await expect(page.getByRole('heading', { name: 'Movimientos' })).toBeVisible();
 	});
 
+	/* La misma acción con el mismo nombre de punta a punta: la entrada del
+	   detalle, el título de la pantalla y el botón que la remata. */
+	test('the add-asset flow is called the same from end to end', async ({ page }) => {
+		await login(page);
+		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}`);
+
+		await page.getByRole('link', { name: 'Añadir activo' }).click();
+		await page.waitForURL(`**/dashboard/portfolios/${TEST_PORTFOLIO_ID}/add`);
+
+		await expect(page.getByRole('heading', { level: 1 })).toContainText('Añadir activo');
+		await expect(page.getByRole('button', { name: 'Añadir activo' })).toBeVisible();
+	});
+
+	/* Crear un activo en el catálogo no es lo mismo que añadirlo al portafolio,
+	   y por eso conserva su propio verbo dentro del buscador. */
+	test('offers to create an asset the catalogue does not have', async ({ page }) => {
+		await login(page);
+		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}/add`);
+
+		await page.fill('#asset-search', 'ZZZQ');
+
+		await expect(page.getByText('No hay ningún activo que se llame')).toBeVisible();
+		await page.getByRole('button', { name: 'Crear ZZZQ' }).click();
+
+		await expect(page.getByText('Al crearlo queda elegido y sigues con la posición')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Crear activo' })).toBeVisible();
+	});
+
 	test('adds an entry through the add-asset form', async ({ page }) => {
 		await login(page);
 		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}/add`);
@@ -195,7 +223,7 @@ test.describe('portfolio detail', () => {
 		await page.fill('input[name="quantity"]', '5');
 		await page.fill('input[name="purchasePrice"]', '100');
 
-		await page.getByRole('button', { name: 'Agregar Activo' }).click();
+		await page.getByRole('button', { name: 'Añadir activo' }).click();
 
 		// The action redirects back to the portfolio detail on success.
 		await page.waitForURL(`**/dashboard/portfolios/${TEST_PORTFOLIO_ID}`);

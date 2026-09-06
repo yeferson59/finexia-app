@@ -1,4 +1,12 @@
 <script lang="ts">
+	/*
+	 * Lo que pagaste: cuántas unidades, a qué precio, en qué moneda y qué día.
+	 *
+	 * Era una tarjeta con sombra propia y el total metido dentro, en un recuadro
+	 * que imitaba un campo de formulario pero no se podía escribir. El total ha
+	 * salido de aquí: lo pinta `portfolio-entry-total`, solo, al cierre del
+	 * bloque, porque es lo que hay que mirar antes de guardar.
+	 */
 	import DatePicker from '$lib/ui/date-picker.svelte';
 	import { SUPPORTED_CURRENCIES } from '$lib/shared/currency';
 	import type { Asset } from '$lib/api/types';
@@ -10,8 +18,7 @@
 		purchaseDate = $bindable(),
 		currency = $bindable(),
 		costCurrency = $bindable(),
-		fxRate = $bindable(),
-		formatCurrency
+		fxRate = $bindable()
 	}: {
 		asset: Asset | null;
 		quantity: string;
@@ -23,7 +30,6 @@
 		costCurrency: string;
 		/** Cuánto valía una unidad de `currency` en `costCurrency` ese día. */
 		fxRate: string;
-		formatCurrency: (value: number, code: string) => string;
 	} = $props();
 
 	// La moneda del activo puede no estar en la lista de conversión (DKK, por
@@ -69,338 +75,192 @@
 	 * ser cierta.
 	 */
 	const sameCurrency = $derived(converted && costCurrency === currency);
-
-	const rate = $derived(parseFloat(fxRate) || (converted ? 0 : 1));
-	const units = $derived(parseFloat(quantity) || 0);
-	const unitPrice = $derived(parseFloat(purchasePrice) || 0);
-
-	const tradedTotal = $derived(units * unitPrice);
-	const settledTotal = $derived(tradedTotal * rate);
 </script>
 
-<section class="form-section">
-	<h2 class="section-title">Detalles de Compra</h2>
+<div class="pair">
+	<div class="field">
+		<label for="quantity">Cantidad</label>
+		<input
+			id="quantity"
+			type="number"
+			name="quantity"
+			bind:value={quantity}
+			placeholder="10"
+			min="0"
+			step="any"
+			required
+		/>
+		<p class="hint">Cuántas unidades compraste.</p>
+	</div>
 
-	<div class="form-row">
-		<div class="form-group">
-			<label for="quantity" class="form-label">Cantidad <span class="required">*</span></label>
-			<div class="input-addon">
-				<input
-					id="quantity"
-					type="number"
-					name="quantity"
-					bind:value={quantity}
-					placeholder="1000"
-					class="form-input"
-					min="0"
-					step="any"
-					required
-				/>
-			</div>
-			<p class="field-hint">Número de unidades</p>
-		</div>
-
-		<div class="form-group">
-			<label for="purchasePrice" class="form-label"
-				>Precio de Compra <span class="required">*</span></label
+	<div class="field">
+		<label for="purchasePrice">Precio por unidad</label>
+		<!-- El selector ocupa el sitio del símbolo de dólar fijo que había aquí:
+		     es el mismo hueco, pero ahora dice la verdad sobre el precio. -->
+		<div class="price">
+			<select
+				id="currency"
+				name="currency"
+				bind:value={currency}
+				aria-label="Moneda de la operación"
 			>
-			<!-- El selector ocupa el sitio del símbolo de dólar fijo que había aquí:
-			     es el mismo hueco, pero ahora dice la verdad sobre el precio. -->
-			<div class="price-field">
-				<select
-					id="currency"
-					name="currency"
-					bind:value={currency}
-					class="currency-select"
-					aria-label="Moneda de la operación"
-				>
-					{#each currencyOptions as code (code)}
-						<option value={code}>{code}</option>
-					{/each}
-				</select>
-				<input
-					id="purchasePrice"
-					type="number"
-					name="purchasePrice"
-					bind:value={purchasePrice}
-					placeholder="150.50"
-					class="form-input"
-					min="0"
-					step="any"
-					required
-				/>
-			</div>
-			{#if asset && assetCurrency && currency !== assetCurrency}
-				<p class="field-warning">
-					{asset.ticker} cotiza en {assetCurrency}. Copia el precio tal como lo muestra tu bróker,
-					en la moneda en la que se ejecutó.
-				</p>
-			{:else}
-				<p class="field-hint">Precio por unidad en {currency}</p>
-			{/if}
+				{#each currencyOptions as code (code)}
+					<option value={code}>{code}</option>
+				{/each}
+			</select>
+			<input
+				id="purchasePrice"
+				type="number"
+				name="purchasePrice"
+				bind:value={purchasePrice}
+				placeholder="150.50"
+				min="0"
+				step="any"
+				required
+			/>
 		</div>
-	</div>
-
-	<div class="form-group">
-		<label class="settlement-toggle">
-			<input type="checkbox" bind:checked={converted} />
-			<span>Mi cuenta liquidó en otra moneda</span>
-		</label>
-		<p class="field-hint">
-			Actívalo si el activo cotiza en una moneda y tu cuenta está en otra: el bróker convirtió a una
-			tasa que forma parte de lo que te costó la posición.
-		</p>
-	</div>
-
-	{#if converted}
-		{#if sameCurrency}
-			<!-- La tasa igual va oculta en 1: mientras las dos monedas coincidan no
-			     hubo conversión, y mandar la que esté escrita solo produce el 400. -->
-			<input type="hidden" name="fxRate" value="1" />
+		{#if asset && assetCurrency && currency !== assetCurrency}
+			<p class="warning">
+				{asset.ticker} cotiza en {assetCurrency}. Copia el precio tal como lo muestra tu bróker, en
+				la moneda en la que se ejecutó.
+			</p>
+		{:else}
+			<p class="hint">Lo que costó cada una, en {currency}.</p>
 		{/if}
-		<div class="form-row">
-			<div class="form-group">
-				<label for="costCurrency" class="form-label"
-					>Moneda de la cuenta <span class="required">*</span></label
-				>
-				<select
-					id="costCurrency"
-					name="costCurrency"
-					bind:value={costCurrency}
-					class="currency-select"
-				>
-					{#each currencyOptions as code (code)}
-						<option value={code}>{code}</option>
-					{/each}
-				</select>
-				<p class="field-hint">En la que el bróker debitó el importe</p>
-			</div>
+	</div>
+</div>
 
-			<div class="form-group">
-				<label for="fxRate" class="form-label"
-					>Tasa de la operación <span class="required">*</span></label
-				>
-				<input
-					id="fxRate"
-					type="number"
-					name={sameCurrency ? 'fxRateIgnored' : 'fxRate'}
-					bind:value={fxRate}
-					placeholder="1.0638"
-					class="form-input"
-					min="0"
-					step="any"
-					disabled={sameCurrency}
-					required={converted && !sameCurrency}
-				/>
-				{#if sameCurrency}
-					<p class="field-warning">
-						La operación y la cuenta están las dos en {currency}, así que no hubo conversión y no
-						hay tasa que aplicar. Si el activo cotizó en otra moneda, cámbiala arriba, en el
-						selector que está junto al precio.
-					</p>
-				{:else}
-					<p class="field-hint">
-						Cuántos {costCurrency} costaba 1 {currency} ese día. Cópiala de la confirmación del bróker,
-						no la de hoy: la de hoy convierte la compra a un precio que nunca pagaste.
-					</p>
-				{/if}
-			</div>
-		</div>
-	{:else}
-		<!-- Sin conversión las dos monedas son la misma y la tasa es 1. Van en
-		     campos ocultos para que el cuerpo enviado sea idéntico en los dos
-		     casos y el servidor no tenga que adivinar cuál falta. -->
-		<input type="hidden" name="costCurrency" value={currency} />
+<div class="field">
+	<span class="field-label">Fecha de compra</span>
+	<DatePicker name="purchaseDate" bind:value={purchaseDate} required />
+</div>
+
+<div class="field">
+	<label class="settlement">
+		<input type="checkbox" bind:checked={converted} />
+		<span class="text">
+			<span class="name">Mi cuenta liquidó en otra moneda</span>
+			<span class="description">
+				Márcalo si el activo cotiza en una moneda y tu cuenta está en otra: el bróker convirtió a
+				una tasa que forma parte de lo que te costó la posición.
+			</span>
+		</span>
+	</label>
+</div>
+
+{#if converted}
+	{#if sameCurrency}
+		<!-- La tasa igual va oculta en 1: mientras las dos monedas coincidan no
+		     hubo conversión, y mandar la que esté escrita solo produce el 400. -->
 		<input type="hidden" name="fxRate" value="1" />
 	{/if}
-
-	<div class="form-row">
-		<div class="form-group">
-			<span class="form-label">Fecha de Compra</span>
-			<DatePicker name="purchaseDate" bind:value={purchaseDate} required />
+	<div class="pair">
+		<div class="field">
+			<label for="costCurrency">Moneda de la cuenta</label>
+			<select id="costCurrency" name="costCurrency" bind:value={costCurrency}>
+				{#each currencyOptions as code (code)}
+					<option value={code}>{code}</option>
+				{/each}
+			</select>
+			<p class="hint">En la que el bróker debitó el importe.</p>
 		</div>
 
-		<div class="form-group">
-			<span class="form-label">Valor Total Invertido</span>
-			<div class="value-display">
-				<p class="total-value">{formatCurrency(settledTotal, costCurrency || currency)}</p>
-			</div>
-			{#if converted && !sameCurrency}
-				<!-- El número que el usuario puede contrastar contra la pantalla de
-				     su bróker: si no coincide con el «open value» de allí, la tasa
-				     o el precio están mal, y se ve antes de guardar. -->
-				<p class="field-hint">
-					{formatCurrency(tradedTotal, currency)} × {fxRate || '—'} = {formatCurrency(
-						settledTotal,
-						costCurrency
-					)}
+		<div class="field">
+			<label for="fxRate">Tasa de la operación</label>
+			<input
+				id="fxRate"
+				type="number"
+				name={sameCurrency ? 'fxRateIgnored' : 'fxRate'}
+				bind:value={fxRate}
+				placeholder="1.0638"
+				min="0"
+				step="any"
+				disabled={sameCurrency}
+				required={converted && !sameCurrency}
+			/>
+			{#if sameCurrency}
+				<p class="warning">
+					La operación y la cuenta están las dos en {currency}, así que no hubo conversión y no hay
+					tasa que aplicar. Si el activo cotizó en otra moneda, cámbiala arriba, en el selector que
+					está junto al precio.
+				</p>
+			{:else}
+				<p class="hint">
+					Cuántos {costCurrency} costaba 1 {currency} ese día. Cópiala de la confirmación del bróker,
+					no la de hoy: la de hoy convierte la compra a un precio que nunca pagaste.
 				</p>
 			{/if}
 		</div>
 	</div>
-</section>
+{:else}
+	<!-- Sin conversión las dos monedas son la misma y la tasa es 1. Van en campos
+	     ocultos para que el cuerpo enviado sea idéntico en los dos casos y el
+	     servidor no tenga que adivinar cuál falta. -->
+	<input type="hidden" name="costCurrency" value={currency} />
+	<input type="hidden" name="fxRate" value="1" />
+{/if}
 
 <style>
-	.form-section {
-		border: 1px solid var(--border-strong);
-		border-radius: 16px;
-		background: var(--surface);
-		box-shadow:
-			0 20px 60px rgba(0, 0, 0, 0.3),
-			inset 0 1px 0 rgba(255, 255, 255, 0.05);
-		backdrop-filter: blur(16px);
-		padding: 1.75rem;
-	}
-
-	.section-title {
-		margin: 0 0 1.5rem;
-		font-size: 1.15rem;
-		font-weight: 400;
-		color: var(--text);
-		font-family: var(--font-display);
-	}
-
-	.form-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.6rem;
-		margin-bottom: 1.35rem;
-	}
-
-	.form-group:last-child {
-		margin-bottom: 0;
-	}
-
-	.form-row {
+	/* La moneda pegada al precio: son un solo dato partido en dos controles. */
+	.price {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1.5rem;
-	}
-
-	.form-label {
-		font-size: 0.9rem;
-		font-weight: 600;
-		color: var(--text);
-		letter-spacing: 0.3px;
-	}
-
-	.required {
-		color: var(--red);
-	}
-
-	.form-input {
-		padding: 0.85rem 1rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.022);
-		color: var(--text);
-		font-size: 0.95rem;
-		font-family: var(--font-body);
-		transition: all 0.3s ease;
-	}
-
-	.form-input::placeholder {
-		color: rgba(236, 234, 229, 0.55);
-	}
-
-	.form-input:focus {
-		outline: none;
-		border-color: var(--amber);
-		background: rgba(255, 255, 255, 0.022);
-		box-shadow: 0 0 0 3px var(--border);
-	}
-
-	.field-hint {
-		margin: 0.4rem 0 0;
-		font-size: 0.8rem;
-		color: var(--text-dim);
-		font-style: italic;
-	}
-
-	.field-warning {
-		margin: 0.4rem 0 0;
-		font-size: 0.8rem;
-		color: rgba(212, 145, 42, 0.85);
-	}
-
-	.settlement-toggle {
-		display: flex;
-		align-items: center;
-		gap: 0.6rem;
-		font-size: 0.9rem;
-		font-weight: 600;
-		color: var(--text);
-		cursor: pointer;
-	}
-
-	.settlement-toggle input {
-		width: 1rem;
-		height: 1rem;
-		accent-color: var(--amber);
-		cursor: pointer;
-	}
-
-	.input-addon {
-		position: relative;
-		display: flex;
-		align-items: center;
-	}
-
-	.input-addon .form-input {
-		padding-left: 2.5rem;
-	}
-
-	.price-field {
-		display: grid;
-		grid-template-columns: auto 1fr;
+		grid-template-columns: auto minmax(0, 1fr);
 		gap: 0.5rem;
-		align-items: center;
 	}
 
-	.currency-select {
-		padding: 0.85rem 0.75rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.022);
-		color: var(--text);
-		font-size: 0.9rem;
-		font-weight: 600;
-		font-family: var(--font-body);
-		cursor: pointer;
-		transition: all 0.3s ease;
+	.price select {
+		font-family: var(--font-mono);
+		font-size: 0.85rem;
 	}
 
-	.currency-select:focus {
-		outline: none;
-		border-color: var(--amber);
-		box-shadow: 0 0 0 3px var(--border);
-	}
-
-	.value-display {
+	.price input {
 		font-family: var(--font-mono);
 		font-variant-numeric: tabular-nums;
-		padding: 0.85rem 1rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.022);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		min-height: 44px;
 	}
 
-	.total-value {
-		font-variant-numeric: tabular-nums;
+	/* Aviso en el tono de lo que dice, sin caja: el mismo idioma que el resto
+	   del panel. */
+	.warning {
 		margin: 0;
-		font-size: 1.2rem;
-		font-weight: 700;
+		font-size: 0.8rem;
+		line-height: 1.5;
 		color: var(--amber);
-		font-family: var(--font-body);
 	}
 
-	@media (max-width: 768px) {
-		.form-row {
-			grid-template-columns: 1fr;
-		}
+	/* Como las opciones de correo de notificaciones: la casilla delante y la
+	   fila entera de etiqueta. */
+	.settlement {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		align-items: start;
+		gap: 0.9rem;
+		cursor: pointer;
+	}
+
+	.settlement input[type='checkbox'] {
+		width: 18px;
+		height: 18px;
+		margin: 0.1rem 0 0;
+		cursor: pointer;
+	}
+
+	.text {
+		min-width: 0;
+	}
+
+	.name {
+		display: block;
+		font-size: 0.9rem;
+		font-weight: 500;
+		color: var(--text);
+	}
+
+	.description {
+		display: block;
+		max-width: 52ch;
+		margin-top: 0.2rem;
+		font-size: 0.8rem;
+		line-height: 1.55;
+		color: var(--text-muted);
 	}
 </style>

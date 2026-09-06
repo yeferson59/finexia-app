@@ -105,9 +105,14 @@
 		color: var(--text-dim);
 	}
 
+	/*
+	 * `dp-select` fuera: son los tres huecos —día, mes, año— del selector de
+	 * fecha de `ui/date-picker`, que trae su propio ancho. Con el de aquí, los
+	 * tres se estiraban al 100 % y el de en medio se quedaba sin sitio.
+	 */
 	.section :global(input[type='text']),
 	.section :global(input[type='number']),
-	.section :global(select),
+	.section :global(select:not(.dp-select)),
 	.section :global(textarea) {
 		width: 100%;
 		padding: 0.8rem 0.95rem;
@@ -127,7 +132,7 @@
 	}
 
 	.section :global(input:hover:not(:disabled)),
-	.section :global(select:hover:not(:disabled)),
+	.section :global(select:not(.dp-select):hover:not(:disabled)),
 	.section :global(textarea:hover:not(:disabled)) {
 		border-color: rgba(212, 145, 42, 0.35);
 	}
@@ -135,13 +140,13 @@
 	/* El anillo de foco lo pinta la regla global de `layout.css`, la misma en
 	   toda la aplicación; aquí solo se enciende el borde. */
 	.section :global(input:focus),
-	.section :global(select:focus),
+	.section :global(select:not(.dp-select):focus),
 	.section :global(textarea:focus) {
 		border-color: var(--amber);
 	}
 
 	.section :global(input:disabled),
-	.section :global(select:disabled),
+	.section :global(select:not(.dp-select):disabled),
 	.section :global(textarea:disabled) {
 		color: var(--text-muted);
 		cursor: not-allowed;

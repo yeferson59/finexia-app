@@ -42,7 +42,7 @@
 		<div class="actions">
 			<button type="button" class="edit" onclick={onEdit}>Editar</button>
 			<a class="add" href={resolve('/dashboard/portfolios/[id]/add', { id: portfolioId })}>
-				Agregar activo
+				Añadir activo
 			</a>
 		</div>
 	</div>

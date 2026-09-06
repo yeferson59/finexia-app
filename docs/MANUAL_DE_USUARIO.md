@@ -289,7 +289,7 @@ La página de detalle tiene tres partes, en este orden:
 
 Sobre la tabla, dos líneas resumen lo que costaría encontrar recorriéndola: el **reparto por clase de activo** (*«Acciones 54,4%, ETFs 45,6%»*) y **cuál ha rendido más y cuál menos**. Debajo de la tabla se anota la **mayor operación** registrada en el portafolio.
 
-Desde el encabezado puedes **Editar** el portafolio o **Agregar activo**.
+Desde el encabezado puedes **Editar** el portafolio o **Añadir activo**.
 
 ### 6.4 Editar un portafolio
 
@@ -303,17 +303,19 @@ Una **posición** representa la tenencia de un activo concreto dentro de un port
 
 ### 7.1 Añadir una posición
 
-1. Entra al **detalle del portafolio** y pulsa **Añadir posición / activo**.
-2. Elige la **plataforma** donde tienes el activo, de tu lista de Plataformas.
-3. **Busca el activo** escribiendo su ticker o nombre (p. ej. `AAPL`, `Bitcoin`). La aplicación busca en el catálogo de activos disponible.
-4. Completa los **detalles de compra**:
-   - **Cantidad** — número de unidades que posees.
-   - **Precio de compra** — precio por unidad (p. ej. `150.50`), con el selector de **moneda de la operación** al lado: llega puesta la del activo, y se cambia si tu bróker la ejecutó en otra. Se admiten todos los decimales que haga falta, así que un precio de `0.00004182` se guarda tal cual y no redondeado.
-   - **Fecha de compra**.
-5. Si tu cuenta liquidó en una moneda distinta de la de la operación, marca **"Mi cuenta liquidó en otra moneda"** e indica la moneda y la tasa (apartado 7.4).
-6. Añade las **notas** que quieras y guarda. La posición aparecerá en la lista del portafolio y sus importes se sumarán al valor total.
+Entra al **detalle del portafolio** y pulsa **Añadir activo**. La pantalla va en tres bloques, y cada uno dice a la izquierda qué se decide en él:
 
-> **¿No aparece el activo que buscas?** El buscador te ofrece **Crear "TICKER"**. Rellena nombre, tipo y moneda (el mercado es opcional) y el activo queda disponible al instante para seguir con la posición. Los activos que creas los ves solo tú, hasta que el equipo de Finexia los incorpore al catálogo general. Puedes añadir hasta 50 activos nuevos cada 24 horas.
+| Bloque | Qué pide |
+|---|---|
+| **Qué compraste** | El **activo**. Escribe su ticker o su nombre (p. ej. `AAPL`, `Bitcoin`) y elígelo de la lista; debajo aparece cuál has elegido, dónde cotiza y a cuánto, para confirmar que es el que buscabas |
+| **Cuánto pagaste** | La **cantidad**, el **precio por unidad** con su **moneda** al lado —llega puesta la del activo y se cambia si tu bróker ejecutó en otra—, y la **fecha**. Se admiten todos los decimales que haga falta, así que un precio de `0.00004182` se guarda tal cual. Si tu cuenta liquidó en otra moneda, marca **«Mi cuenta liquidó en otra moneda»** e indica la moneda y la tasa (apartado 7.4) |
+| **Dónde lo tienes** | La **plataforma**, de tu lista de Plataformas, y las **notas** que quieras |
+
+Al cerrar el segundo bloque está el **total invertido**, y debajo la cuenta de la que sale —`12 × $186.90`—, con la conversión desglosada si la hubo. Es el número que puedes contrastar contra la confirmación de tu bróker antes de guardar: si no coincide, el precio o la tasa están mal y se ve sin salir de la pantalla.
+
+Pulsa **Añadir activo**. La posición aparecerá en la lista del portafolio y sus importes se sumarán al valor total.
+
+> **¿No aparece el activo que buscas?** Añadirlo a tu portafolio y crearlo en el catálogo son dos cosas distintas, y el buscador te deja hacer la segunda sin salir: te ofrece **Crear TICKER**. Rellena nombre, tipo y moneda (el mercado es opcional), y al crearlo queda elegido para que sigas con la posición. Los activos que creas los ves solo tú, hasta que el equipo de Finexia los incorpore al catálogo general. Puedes añadir hasta 50 activos nuevos cada 24 horas.
 
 ### 7.2 Detalle de un activo en el portafolio
 

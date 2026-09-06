@@ -1,5 +1,5 @@
 import type { Actions } from './$types';
-import { redirect } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import * as portfolio from '$lib/api/portfolio';
 import { portfolioEntrySchema } from '$lib/features/portfolio';
 
@@ -23,8 +23,15 @@ export const actions = {
 			notes: formData.get('notes')
 		});
 
+		/*
+		 * `fail`, no un objeto suelto: devolver `{ success: false }` responde 200,
+		 * así que el navegador da el alta por buena. Y el mensaje es el del
+		 * schema; `error.message` es el JSON de las incidencias de Zod en crudo, y
+		 * el formulario lo pintaba tal cual detrás de «No se pudo registrar el
+		 * activo:».
+		 */
 		if (!success) {
-			return { success, error: error.message };
+			return fail(400, { success: false, error: error.issues[0].message });
 		}
 
 		const response = await portfolio.createEntry({ cookies, fetch }, data);
@@ -34,7 +41,10 @@ export const actions = {
 			// ciertas, y el mensaje dice cuál —«USD no se convierte en sí misma a
 			// 1.0638»—. Devolverlo es la diferencia entre corregir un campo y
 			// reintentar a ciegas contra el mismo error.
-			return { success: false, error: response.details || response.message || response.action };
+			return fail(response.status >= 400 ? response.status : 400, {
+				success: false,
+				error: response.details || response.message || response.action
+			});
 		}
 
 		redirect(303, `/dashboard/portfolios/${params.id}`);
