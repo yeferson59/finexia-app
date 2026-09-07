@@ -6,7 +6,6 @@
 	 * de un solo uso y la persona elige la suya.
 	 */
 	import { enhance } from '$app/forms';
-	import Input from '$lib/ui/input.svelte';
 	import Button from '$lib/ui/button.svelte';
 	import { actionData, actionError } from '$lib/shared/form';
 	import { INVITE_ROLES } from '../admin';
@@ -40,6 +39,7 @@
 </script>
 
 <form
+	class="rail-fields"
 	method="POST"
 	action="?/inviteUser"
 	use:enhance={() => {
@@ -51,25 +51,42 @@
 		};
 	}}
 >
-	<div class="form-row">
-		<Input label="Nombre (opcional)" name="name" bind:value={inviteName} />
-		<Input label="Correo electrónico" name="email" type="email" bind:value={inviteEmail} required />
+	<div class="field">
+		<label for="invite-email">Correo</label>
+		<input
+			id="invite-email"
+			name="email"
+			type="email"
+			bind:value={inviteEmail}
+			placeholder="persona@correo.com"
+			autocomplete="off"
+			required
+		/>
+	</div>
+
+	<div class="pair">
 		<div class="field">
-			<span class="field-label">Rol</span>
-			<select class="select" name="role" bind:value={inviteRole}>
+			<label for="invite-name">Nombre <span class="optional">(opcional)</span></label>
+			<input id="invite-name" type="text" name="name" bind:value={inviteName} autocomplete="off" />
+		</div>
+		<div class="field">
+			<label for="invite-role">Rol</label>
+			<select id="invite-role" name="role" bind:value={inviteRole}>
 				{#each INVITE_ROLES as role (role.value)}
 					<option value={role.value}>{role.label}</option>
 				{/each}
 			</select>
 		</div>
 	</div>
+
 	{#if error}
-		<p class="form-error">{error}</p>
+		<p class="feedback error" role="alert">{error}</p>
 	{/if}
 	{#if invited}
-		<p class="form-success">Invitación enviada a {invited}.</p>
+		<p class="feedback success">Invitación enviada a {invited}.</p>
 	{/if}
-	<div class="form-actions">
+
+	<div class="actions">
 		{#if onCancel}
 			<Button type="button" variant="ghost" onclick={onCancel}>Cancelar</Button>
 		{/if}
@@ -78,74 +95,10 @@
 </form>
 
 <style>
-	/* Dentro del modal no hay ancho para tres columnas: nombre y correo
-	   comparten línea y el rol baja a la suya. */
-	.form-row {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
-		margin-bottom: 1rem;
-		align-items: end;
-	}
-
-	.field {
-		grid-column: 1 / -1;
-	}
-
-	.field {
+	.actions {
 		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-	}
-
-	.select {
-		width: 100%;
-	}
-
-	.field-label {
-		font-size: 0.8rem;
-		font-weight: 500;
-		color: var(--text-muted);
-	}
-
-	.select {
-		appearance: none;
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: 0.5rem;
-		color: var(--text);
-		font-size: 0.875rem;
-		padding: 0.6rem 0.75rem;
-		min-width: 9rem;
-		cursor: pointer;
-	}
-
-	.select:focus {
-		outline: none;
-		border-color: var(--amber);
-	}
-
-	.form-error {
-		font-size: 0.82rem;
-		color: var(--red);
-		margin: 0 0 0.75rem 0;
-	}
-
-	.form-success {
-		font-size: 0.82rem;
-		color: var(--green);
-		margin: 0 0 0.75rem 0;
-	}
-
-	.form-actions {
-		display: flex;
-		gap: 0.75rem;
 		justify-content: flex-end;
-	}
-
-	@media (max-width: 640px) {
-		.form-row {
-			grid-template-columns: 1fr;
-		}
+		gap: 0.75rem;
+		margin-top: 0.5rem;
 	}
 </style>

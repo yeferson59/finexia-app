@@ -1,17 +1,23 @@
 <script lang="ts">
-	/** Tasas de cambio compartidas, con ajuste manual fila a fila. */
+	/**
+	 * Tasas de cambio compartidas, con ajuste manual fila a fila.
+	 *
+	 * El origen es la única insignia de la tabla y solo la llevan las filas del
+	 * feed: son las que un refresco reescribe, incluida una tasa corregida a
+	 * mano, así que es lo que hay que saber antes de escribir encima. Las
+	 * manuales no llevan marca porque son la norma.
+	 *
+	 * Las dos procedencias envejecen a ritmos distintos y por eso la columna de
+	 * fecha las mide distinto: el feed corre cada hora —dos días sin moverse es
+	 * un feed roto— y una paridad escrita a mano aguanta semanas.
+	 */
 	import { enhance } from '$app/forms';
 	import Badge from '$lib/ui/badge.svelte';
-	import Button from '$lib/ui/button.svelte';
 	import DataTable from '$lib/ui/data-table.svelte';
-	import AdminTableCard from './admin-table-card.svelte';
-	import {
-		formatDateTime,
-		formatRate,
-		rateSourceLabel,
-		rateSourceTone,
-		type ExchangeRate
-	} from '../admin';
+	import EmptyState from '$lib/ui/empty-state.svelte';
+	import AdminBlock from './admin-block.svelte';
+	import { formatDateTime, formatRate, rateSourceLabel, type ExchangeRate } from '../admin';
+	import { STALE_RATE_AFTER_DAYS, describeRates, formatAge, isStale } from '../desk';
 
 	interface Props {
 		rates: ExchangeRate[];
@@ -24,6 +30,14 @@
 	let updatingId = $state<string | null>(null);
 	let rateInputs = $state<Record<string, string>>({});
 
+	/** Un feed parado dos días ya es noticia; una tasa a mano, no. */
+	const FEED_STALE_AFTER_DAYS = 2;
+	const rateIsStale = (rate: ExchangeRate) =>
+		isStale(
+			rate.rateDate,
+			rate.source === 'manual' ? STALE_RATE_AFTER_DAYS : FEED_STALE_AFTER_DAYS
+		);
+
 	$effect(() => {
 		for (const rate of rates) {
 			if (!(rate.id in rateInputs)) {
@@ -33,38 +47,47 @@
 	});
 </script>
 
-<AdminTableCard>
+<AdminBlock title="Tasas compartidas" summary={describeRates(rates)}>
 	{#if rates.length === 0}
-		<p class="empty-state">No hay tasas de cambio en el sistema.</p>
+		<EmptyState
+			title="No hay ninguna tasa guardada"
+			description="Trae la TRM del feed público o escribe la primera paridad a mano."
+		/>
 	{:else}
-		<DataTable>
+		<DataTable caption="Tasas de cambio compartidas, quién las mantiene y de cuándo son">
 			<thead>
 				<tr>
 					<th>Par</th>
-					<th>Tasa actual</th>
+					<th class="num">Tasa</th>
 					<th>Origen</th>
-					<th>Fecha de tasa</th>
-					<th>Actualizado</th>
-					<th>Nueva tasa</th>
+					<th>Fecha de la tasa</th>
+					<th class="num">Nueva tasa</th>
 				</tr>
 			</thead>
 			<tbody>
 				{#each rates as rate (rate.id)}
-					{@const isUpdating = updatingId === rate.id}
-					{@const hasUpdateError = form?.updateError && form?.errorId === rate.id}
-					{@const hasUpdateSuccess = form?.updateSuccess && form?.updatedId === rate.id}
-					<tr class:row-success={hasUpdateSuccess}>
-						<td class="cell-ticker">
-							{rate.fromCurrency}/{rate.toCurrency}
-						</td>
-						<td class="cell-price">{formatRate(rate.rate)}</td>
+					{@const hasError = form?.updateError && form?.errorId === rate.id}
+					{@const saved = form?.updateSuccess && form?.updatedId === rate.id}
+					<tr>
+						<td class="cell-key">{rate.fromCurrency}/{rate.toCurrency}</td>
+						<td class="num">{formatRate(rate.rate)}</td>
 						<td>
-							<Badge tone={rateSourceTone(rate.source)}>{rateSourceLabel(rate.source)}</Badge>
+							{#if rate.source === 'manual'}
+								<span class="by-hand">Manual</span>
+							{:else}
+								<Badge tone="amber">{rateSourceLabel(rate.source)}</Badge>
+							{/if}
 						</td>
-						<td class="cell-date">{formatDateTime(rate.rateDate)}</td>
-						<td class="cell-date">{formatDateTime(rate.createdAt)}</td>
-						<td class="cell-update">
+						<td
+							class="cell-age"
+							class:aged={rateIsStale(rate)}
+							title={formatDateTime(rate.rateDate)}
+						>
+							{formatAge(rate.rateDate)}
+						</td>
+						<td class="num">
 							<form
+								class="edit"
 								method="POST"
 								action="?/updateRate"
 								use:enhance={() => {
@@ -76,42 +99,42 @@
 								}}
 							>
 								<input type="hidden" name="id" value={rate.id} />
-								<div class="update-row">
-									<input
-										type="number"
-										name="rate"
-										class="price-input"
-										class:input-error={hasUpdateError}
-										bind:value={rateInputs[rate.id]}
-										min="0.00000001"
-										step="any"
-										placeholder="0.00"
-										required
-									/>
-									<Button type="submit" size="sm" variant="secondary" loading={isUpdating}>
-										OK
-									</Button>
-								</div>
-								{#if hasUpdateError}
-									<p class="row-error">{form.updateError}</p>
-								{/if}
+								<label class="sr-only" for="rate-{rate.id}">
+									Nueva tasa de {rate.fromCurrency} a {rate.toCurrency}
+								</label>
+								<input
+									id="rate-{rate.id}"
+									type="number"
+									name="rate"
+									class="edit-input"
+									class:invalid={hasError}
+									bind:value={rateInputs[rate.id]}
+									min="0.00000001"
+									step="any"
+									placeholder="0.00"
+									required
+								/>
+								<button class="row-action" type="submit" disabled={updatingId === rate.id}>
+									{updatingId === rate.id ? 'Guardando…' : 'Guardar'}
+								</button>
 							</form>
+							{#if hasError}
+								<p class="row-error">{form.updateError}</p>
+							{:else if saved}
+								<p class="row-note">Tasa guardada</p>
+							{/if}
 						</td>
 					</tr>
 				{/each}
 			</tbody>
 		</DataTable>
 	{/if}
-</AdminTableCard>
+</AdminBlock>
 
-<!--
-	Sin estilos propios: `.cell-ticker` ya lo pinta `AdminTableCard`, igual que
-	en la tabla de activos.
-
-	Aquí hubo un `display: flex` sobre el `<td>`, de cuando el par eran dos
-	textos sueltos en la misma celda. Un `td` en flex deja de ser celda de tabla
-	y su alto pasa a ser el de su contenido en vez del de la fila: medía 45 px
-	contra los 64 px de sus vecinas, así que su fondo y su borde inferior se
-	quedaban cortos y el resalte del hover aparecía mordido en la primera
-	columna.
--->
+<style>
+	/* Sin insignia: lo mantenido a mano es la norma en esta tabla. */
+	.by-hand {
+		font-size: 0.82rem;
+		color: var(--text-dim);
+	}
+</style>

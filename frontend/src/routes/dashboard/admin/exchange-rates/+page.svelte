@@ -28,57 +28,47 @@
 	<title>Tasas de Cambio — Admin — FINEXIA</title>
 </svelte:head>
 
-<PageHeader
-	eyebrow="Administración"
-	title="Tasas de Cambio"
-	subtitle="Tasas compartidas: la TRM la trae un feed público cada hora, el resto se mantiene a mano. Las tasas de mercado las sincroniza cada usuario con su propia clave."
->
+<PageHeader title="Tasas de cambio" subtitle="Las paridades que comparten todas las cuentas.">
 	{#snippet actions()}
-		<div class="header-actions">
-			{#if created.text}
-				<span class="sync-success">{created.text}</span>
-			{/if}
-			{#if refreshed.text}
-				<span class="sync-success">{refreshed.text}</span>
-			{/if}
-			{#if form?.refreshError}
-				<span class="sync-error">{form.refreshError}</span>
-			{/if}
-			<!--
-				Un POST de verdad, no un `onclick`: la acción recarga el `load` de la
-				página al terminar, que es lo que repinta la tabla con las tasas
-				nuevas sin tener que sincronizarlas a mano en el cliente.
-			-->
-			<form
-				method="POST"
-				action="?/refreshRates"
-				use:enhance={() => {
-					refreshing = true;
-					return async ({ result, update }) => {
-						refreshing = false;
-						await update({ reset: false });
-						if (result.type === 'success') {
-							const count = Number(result.data?.refreshedCount ?? 0);
-							refreshed.show(
-								`${count} tasa${count === 1 ? '' : 's'} actualizada${count === 1 ? '' : 's'} desde el feed.`
-							);
-						}
-					};
-				}}
-			>
-				<Button variant="secondary" size="sm" type="submit" loading={refreshing}>
-					Actualizar desde el feed
-				</Button>
-			</form>
-			<Button variant="secondary" size="sm" type="button" onclick={() => (showCreateForm = true)}>
-				Nueva tasa
-			</Button>
-			<Button variant="secondary" size="sm" type="button" onclick={() => (showImportForm = true)}>
-				Importar CSV/Excel
-			</Button>
-		</div>
+		<!--
+			Un POST de verdad, no un `onclick`: la acción recarga el `load` de la
+			página al terminar, que es lo que repinta la tabla con las tasas nuevas
+			sin tener que sincronizarlas a mano en el cliente.
+		-->
+		<form
+			method="POST"
+			action="?/refreshRates"
+			use:enhance={() => {
+				refreshing = true;
+				return async ({ result, update }) => {
+					refreshing = false;
+					await update({ reset: false });
+					if (result.type === 'success') {
+						const count = Number(result.data?.refreshedCount ?? 0);
+						refreshed.show(
+							`${count} tasa${count === 1 ? '' : 's'} actualizada${count === 1 ? '' : 's'} desde el feed.`
+						);
+					}
+				};
+			}}
+		>
+			<button class="row-action" type="submit" disabled={refreshing}>
+				{refreshing ? 'Actualizando…' : 'Actualizar desde el feed'}
+			</button>
+		</form>
+		<button class="row-action" type="button" onclick={() => (showImportForm = true)}>
+			Importar CSV/Excel
+		</button>
+		<Button type="button" onclick={() => (showCreateForm = true)}>Nueva tasa</Button>
 	{/snippet}
 </PageHeader>
+
+{#if created.text || refreshed.text}
+	<p class="feedback success page-flash">{created.text || refreshed.text}</p>
+{/if}
+{#if form?.refreshError}
+	<p class="feedback error page-flash" role="alert">{form.refreshError}</p>
+{/if}
 
 <Modal
 	open={showCreateForm}
@@ -92,7 +82,7 @@
 		onCancel={() => (showCreateForm = false)}
 		onSuccess={() => {
 			showCreateForm = false;
-			created.show('Tasa de cambio creada correctamente.');
+			created.show('Tasa creada. Ya la usan todas las cuentas.');
 		}}
 	/>
 </Modal>
@@ -111,8 +101,8 @@
 		onSuccess={() => (showImportForm = false)}
 	>
 		{#snippet hint()}
-			El archivo debe tener columnas <code>fromCurrency</code>, <code>toCurrency</code> y
-			<code>rate</code>. Se admite .csv, .xlsx y .xls.
+			Una fila por paridad, con las columnas <code>fromCurrency</code>,
+			<code>toCurrency</code> y <code>rate</code>. Se admiten .csv, .xlsx y .xls.
 		{/snippet}
 	</ImportCard>
 </Modal>
@@ -120,21 +110,7 @@
 <ExchangeRatesTable rates={data.rates} {form} />
 
 <style>
-	.header-actions {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-	}
-
-	.sync-success {
-		font-size: 0.82rem;
-		color: var(--green);
-		font-weight: 500;
-	}
-
-	.sync-error {
-		font-size: 0.82rem;
-		color: var(--red);
-		font-weight: 500;
+	.page-flash {
+		margin: -1rem 0 2rem;
 	}
 </style>

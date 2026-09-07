@@ -1,4 +1,9 @@
 <script lang="ts">
+	/*
+	 * Los tres listados son un mismo recorrido: alguien pide acceso, se le
+	 * invita y acaba con cuenta. Van en ese orden y no al revés —los registrados
+	 * abrían la pantalla— porque lo único que espera por ti está al principio.
+	 */
 	import PageHeader from '$lib/ui/page-header.svelte';
 	import Button from '$lib/ui/button.svelte';
 	import Modal from '$lib/ui/modal.svelte';
@@ -16,21 +21,18 @@
 </svelte:head>
 
 <PageHeader
-	eyebrow="Administración"
 	title="Usuarios"
-	subtitle="Invita, gestiona y controla el acceso a la plataforma."
+	subtitle="Quién puede entrar a Finexia, desde que lo pide hasta que tiene cuenta."
 >
 	{#snippet actions()}
-		<Button variant="secondary" size="sm" type="button" onclick={() => (showInviteForm = true)}>
-			Invitar usuario
-		</Button>
+		<Button type="button" onclick={() => (showInviteForm = true)}>Invitar a alguien</Button>
 	{/snippet}
 </PageHeader>
 
 <Modal
 	open={showInviteForm}
-	title="Invitar a un nuevo usuario"
-	description="Enviaremos un enlace seguro de un solo uso para que la persona cree su propia contraseña."
+	title="Invitar a alguien"
+	description="Le enviaremos un enlace de un solo uso para que cree su propia contraseña."
 	onClose={() => (showInviteForm = false)}
 >
 	<InviteUserForm
@@ -40,12 +42,12 @@
 	/>
 </Modal>
 
-{#if data.invitations.length > 0}
-	<InvitationsTable invitations={data.invitations} {form} />
-{/if}
-
 {#if data.waitlist.length > 0}
 	<WaitlistTable waitlist={data.waitlist} {form} />
+{/if}
+
+{#if data.invitations.length > 0}
+	<InvitationsTable invitations={data.invitations} {form} />
 {/if}
 
 <UsersTable users={data.users} meta={data.meta} {form} />

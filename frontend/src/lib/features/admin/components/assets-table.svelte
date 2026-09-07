@@ -1,17 +1,22 @@
 <script lang="ts">
 	/**
-	 * Catálogo de activos con edición del precio manual fila a fila.
+	 * Catálogo de activos, ordenado por lo que más falta hace mirar.
 	 *
 	 * El precio de mercado no se toca desde aquí: lo sincroniza cada usuario con
-	 * su propia clave. Este campo es el respaldo manual del catálogo.
+	 * su propia clave. Este campo es el respaldo manual del catálogo, y por eso
+	 * la tabla se ordena por antigüedad del precio en vez de por ticker: lo que
+	 * lleva semanas sin cambiar es justo lo que hay que corregir, y con cien
+	 * activos en cinco páginas por orden alfabético no aparecía nunca.
 	 */
 	import { enhance } from '$app/forms';
 	import Badge from '$lib/ui/badge.svelte';
-	import Button from '$lib/ui/button.svelte';
 	import DataTable from '$lib/ui/data-table.svelte';
+	import EmptyState from '$lib/ui/empty-state.svelte';
 	import Pagination from '$lib/ui/pagination.svelte';
-	import AdminTableCard from './admin-table-card.svelte';
+	import { formatAssetType } from '$lib/shared/format/asset-type';
+	import AdminBlock from './admin-block.svelte';
 	import { formatDateTime, formatPrice, type Asset } from '../admin';
+	import { describeAssets, formatAge, isStale } from '../desk';
 
 	interface Props {
 		assets: Asset[];
@@ -23,7 +28,12 @@
 
 	const PER_PAGE = 20;
 	let page = $state(1);
-	const pagedAssets = $derived(assets.slice((page - 1) * PER_PAGE, page * PER_PAGE));
+
+	// Sin precio primero (`null` no es «hoy»), después lo más viejo.
+	const ordered = $derived(
+		[...assets].sort((a, b) => (a.priceUpdatedAt ?? '').localeCompare(b.priceUpdatedAt ?? ''))
+	);
+	const pagedAssets = $derived(ordered.slice((page - 1) * PER_PAGE, page * PER_PAGE));
 
 	let updatingId = $state<string | null>(null);
 	let priceInputs = $state<Record<string, string>>({});
@@ -37,44 +47,48 @@
 	});
 </script>
 
-<AdminTableCard>
+<AdminBlock title="Catálogo de activos" summary={describeAssets(assets)}>
 	{#if assets.length === 0}
-		<p class="empty-state">No hay activos en el sistema.</p>
+		<EmptyState
+			title="El catálogo está vacío"
+			description="Crea el primer activo o importa una hoja para que las carteras tengan de dónde elegir."
+		/>
 	{:else}
-		<DataTable>
+		<DataTable caption="Activos del catálogo compartido, su precio manual y cuándo se tocó">
 			<thead>
 				<tr>
 					<th>Ticker</th>
 					<th>Nombre</th>
 					<th>Tipo</th>
-					<th>Origen</th>
-					<th>Precio manual</th>
+					<th class="num">Precio manual</th>
 					<th>Actualizado</th>
-					<th>Nuevo precio</th>
+					<th class="num">Nuevo precio</th>
 				</tr>
 			</thead>
 			<tbody>
 				{#each pagedAssets as asset (asset.id)}
-					{@const isUpdating = updatingId === asset.id}
-					{@const hasUpdateError = form?.updateError && form?.errorId === asset.id}
-					{@const hasUpdateSuccess = form?.updateSuccess && form?.updatedId === asset.id}
-					<tr class:row-success={hasUpdateSuccess}>
-						<td class="cell-ticker">{asset.ticker}</td>
-						<td class="cell-name">{asset.name}</td>
-						<td>
-							<Badge tone="neutral">{asset.assetType}</Badge>
+					{@const stale = isStale(asset.priceUpdatedAt)}
+					{@const hasError = form?.updateError && form?.errorId === asset.id}
+					{@const saved = form?.updateSuccess && form?.updatedId === asset.id}
+					<tr>
+						<td class="cell-key">{asset.ticker}</td>
+						<td class="cell-name">
+							{asset.name}
+							<!-- Solo se marca la excepción: un activo aportado por un
+							     usuario únicamente lo ve quien lo aportó, y crearlo aquí con
+							     el mismo ticker lo cura para todos. -->
+							{#if asset.isCurated === false}
+								<Badge tone="warning">Aportado</Badge>
+							{/if}
 						</td>
-						<td>
-							<!-- Un activo aportado por un usuario solo lo ve quien lo aportó;
-							     crearlo aquí con el mismo ticker lo cura para todos. -->
-							<Badge tone={asset.isCurated ? 'info' : 'warning'}>
-								{asset.isCurated ? 'Catálogo' : 'Aportado'}
-							</Badge>
+						<td>{formatAssetType(asset.assetType)}</td>
+						<td class="num">{formatPrice(asset.currentPrice, asset.currency)}</td>
+						<td class="cell-age" class:aged={stale} title={formatDateTime(asset.priceUpdatedAt)}>
+							{formatAge(asset.priceUpdatedAt)}
 						</td>
-						<td class="cell-price">{formatPrice(asset.currentPrice, asset.currency)}</td>
-						<td class="cell-date">{formatDateTime(asset.priceUpdatedAt)}</td>
-						<td class="cell-update">
+						<td class="num">
 							<form
+								class="edit"
 								method="POST"
 								action="?/updatePrice"
 								use:enhance={() => {
@@ -91,39 +105,38 @@
 									name="currency"
 									value={asset.currentPrice?.currency ?? asset.currency ?? 'USD'}
 								/>
-								<div class="update-row">
-									<input
-										type="number"
-										name="price"
-										class="price-input"
-										class:input-error={hasUpdateError}
-										bind:value={priceInputs[asset.id]}
-										min="0.0001"
-										step="any"
-										placeholder="0.00"
-										required
-									/>
-									<Button type="submit" size="sm" variant="secondary" loading={isUpdating}>
-										OK
-									</Button>
-								</div>
-								{#if hasUpdateError}
-									<p class="row-error">{form.updateError}</p>
-								{/if}
+								<label class="sr-only" for="price-{asset.id}">
+									Nuevo precio de {asset.ticker}
+								</label>
+								<input
+									id="price-{asset.id}"
+									type="number"
+									name="price"
+									class="edit-input"
+									class:invalid={hasError}
+									bind:value={priceInputs[asset.id]}
+									min="0.0001"
+									step="any"
+									placeholder="0.00"
+									required
+								/>
+								<button class="row-action" type="submit" disabled={updatingId === asset.id}>
+									{updatingId === asset.id ? 'Guardando…' : 'Guardar'}
+								</button>
 							</form>
+							{#if hasError}
+								<p class="row-error">{form.updateError}</p>
+							{:else if saved}
+								<p class="row-note">Precio guardado</p>
+							{/if}
 						</td>
 					</tr>
 				{/each}
 			</tbody>
 		</DataTable>
-		<div class="pagination-wrap">
-			<Pagination bind:page total={assets.length} perPage={PER_PAGE} label="activos" />
-		</div>
 	{/if}
-</AdminTableCard>
 
-<style>
-	.pagination-wrap {
-		padding: 0 1.25rem 0.5rem;
-	}
-</style>
+	{#snippet footer()}
+		<Pagination bind:page total={assets.length} perPage={PER_PAGE} label="activos" />
+	{/snippet}
+</AdminBlock>

@@ -1,179 +1,99 @@
 <script lang="ts">
-	import PageHeader from '$lib/ui/page-header.svelte';
-	import Card from '$lib/ui/card.svelte';
-	import Stat from '$lib/ui/stat.svelte';
+	/*
+	 * La portada de administración abre diciendo qué hay que hacer, y por eso el
+	 * `<h1>` es esa frase y no el nombre de la pantalla: dónde estás ya lo dicen
+	 * el menú y la cabecera del panel, y repetirlo aquí gastaba lo único que se
+	 * lee entero antes de decidir a dónde ir.
+	 *
+	 * Sustituye a cuatro tarjetas de cifras y tres de atajos, que se pintaban
+	 * iguales estuviera el sistema al día o hubiera doce precios de hace un mes.
+	 */
 	import { resolve } from '$app/paths';
-	import { goto } from '$app/navigation';
+	import { Worklist, buildWorklist, describeDesk } from '$lib/features/admin';
 
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
 
-	function formatDate(iso: string | null): string {
-		if (!iso) return 'Sin datos';
-		return new Intl.DateTimeFormat('es', {
-			dateStyle: 'medium',
-			timeStyle: 'short'
-		}).format(new Date(iso));
-	}
+	const tasks = $derived(buildWorklist(data.desk));
 </script>
 
 <svelte:head>
-	<title>Admin — FINEXIA</title>
+	<title>Administración — FINEXIA</title>
+	<meta name="description" content="Quién entra a Finexia y qué dicen los datos compartidos" />
 </svelte:head>
 
-<PageHeader
-	eyebrow="Administración"
-	title="Panel de Control"
-	subtitle="Gestión y estado del sistema."
-/>
+<h1 class="state">{describeDesk(tasks)}</h1>
 
-<section class="stats-grid">
-	<Card padding="md">
-		<Stat label="Usuarios registrados" value={data.totalUsers} tone="highlight" />
-	</Card>
-	<Card padding="md">
-		<Stat label="Activos en sistema" value={data.totalAssets} />
-	</Card>
-	<Card padding="md">
-		<Stat label="Tasas de cambio" value={data.totalRates} />
-	</Card>
-	<Card padding="md">
-		<Stat label="Última sincronización" value={formatDate(data.lastSync)} />
-	</Card>
-</section>
+{#if tasks.length > 0}
+	<Worklist {tasks} />
+{/if}
 
-<section class="shortcuts">
-	<h2 class="section-title">Accesos rápidos</h2>
-	<div class="shortcut-grid">
-		<Card padding="md" hover onclick={() => goto(resolve('/dashboard/admin/users'))}>
-			<div class="shortcut-card">
-				<svg
-					width="24"
-					height="24"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.5"
-				>
-					<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-					<circle cx="9" cy="7" r="4"></circle>
-					<path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-					<path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-				</svg>
-				<div>
-					<p class="shortcut-title">Gestionar Usuarios</p>
-					<p class="shortcut-desc">Ver, crear y eliminar usuarios del sistema</p>
-				</div>
-			</div>
-		</Card>
-		<Card padding="md" hover onclick={() => goto(resolve('/dashboard/admin/assets'))}>
-			<div class="shortcut-card">
-				<svg
-					width="24"
-					height="24"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.5"
-				>
-					<ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
-					<path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
-					<path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
-				</svg>
-				<div>
-					<p class="shortcut-title">Gestionar Activos</p>
-					<p class="shortcut-desc">Sincronizar y actualizar precios de activos</p>
-				</div>
-			</div>
-		</Card>
-		<Card padding="md" hover onclick={() => goto(resolve('/dashboard/admin/exchange-rates'))}>
-			<div class="shortcut-card">
-				<svg
-					width="24"
-					height="24"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.5"
-				>
-					<polyline points="17 1 21 5 17 9"></polyline>
-					<path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
-					<polyline points="7 23 3 19 7 15"></polyline>
-					<path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
-				</svg>
-				<div>
-					<p class="shortcut-title">Gestionar Tasas de Cambio</p>
-					<p class="shortcut-desc">Sincronizar y actualizar tasas de cambio de divisas</p>
-				</div>
-			</div>
-		</Card>
-	</div>
-</section>
+<nav class="record" aria-label="Lo que hay guardado">
+	<a class="entry" href={resolve('/dashboard/admin/users')}>
+		<span class="label">Cuentas</span>
+		<span class="figure">{data.totalUsers}</span>
+	</a>
+	<a class="entry" href={resolve('/dashboard/admin/assets')}>
+		<span class="label">Activos del catálogo</span>
+		<span class="figure">{data.totalAssets}</span>
+	</a>
+	<a class="entry" href={resolve('/dashboard/admin/exchange-rates')}>
+		<span class="label">Tasas compartidas</span>
+		<span class="figure">{data.totalRates}</span>
+	</a>
+</nav>
 
 <style>
-	.stats-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-		gap: 1.25rem;
-		margin-bottom: 2.5rem;
-	}
-
-	.shortcuts {
-		animation: fade-in 0.4s ease-out both;
-		animation-delay: 0.1s;
-	}
-
-	.section-title {
-		font-family: var(--font-mono);
-		font-size: 0.625rem;
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.2em;
-		color: var(--text-dim);
-		margin: 0 0 1rem 0;
-	}
-
-	.shortcut-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-		gap: 1rem;
-	}
-
-	.shortcut-card {
-		display: flex;
-		align-items: flex-start;
-		gap: 1rem;
-		color: var(--text-muted);
-	}
-
-	.shortcut-card svg {
-		flex-shrink: 0;
-		color: var(--amber);
-		margin-top: 2px;
-	}
-
-	.shortcut-title {
-		font-size: 0.95rem;
-		font-weight: 600;
+	.state {
+		max-width: 26ch;
+		margin: 0 0 3rem;
+		font-family: var(--font-display);
+		font-size: clamp(1.7rem, 3.4vw, 2.4rem);
+		font-weight: 300;
+		line-height: 1.18;
+		letter-spacing: -0.02em;
 		color: var(--text);
-		margin: 0 0 0.25rem 0;
 	}
 
-	.shortcut-desc {
-		font-size: 0.82rem;
+	/*
+	 * Lo que hay guardado, que no es lo mismo que lo que hay pendiente: las
+	 * cifras van en el color del texto y las de la lista de tareas en el ámbar
+	 * apagado, al mismo cuerpo. Son además las tres únicas puertas de esta
+	 * pantalla, así que hacen de navegación sin necesitar tres tarjetas con
+	 * icono.
+	 */
+	/* Sin filete propio: cuando hay tareas ya lo puso la última de la lista, y
+	   cuando no las hay el titular no necesita que lo subrayen. */
+	.record {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+		gap: 2rem;
+	}
+
+	.entry {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+		text-decoration: none;
+	}
+
+	.label {
+		font-size: 0.83rem;
 		color: var(--text-muted);
-		margin: 0;
 	}
 
-	@keyframes fade-in {
-		from {
-			opacity: 0;
-			transform: translateY(8px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
+	.entry:hover .label {
+		color: var(--text);
+		text-decoration: underline;
+		text-underline-offset: 4px;
+	}
+
+	.figure {
+		font-family: var(--font-mono);
+		font-size: 1.5rem;
+		font-weight: 400;
+		font-variant-numeric: tabular-nums;
+		color: var(--text);
 	}
 </style>

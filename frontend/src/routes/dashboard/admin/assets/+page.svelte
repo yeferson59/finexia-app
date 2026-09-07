@@ -20,25 +20,26 @@
 	<title>Activos — Admin — FINEXIA</title>
 </svelte:head>
 
+<!--
+	Una acción de la pantalla y una de segunda fila. Antes eran dos botones con
+	borde ámbar del mismo peso: dar de alta un activo y subir una hoja no se
+	hacen con la misma frecuencia ni por la misma razón.
+-->
 <PageHeader
-	eyebrow="Administración"
 	title="Activos"
-	subtitle="Catálogo compartido de activos y precio manual. Los precios de mercado los sincroniza cada usuario con su propia clave."
+	subtitle="El catálogo que comparten todas las cuentas, con su precio de respaldo escrito a mano."
 >
 	{#snippet actions()}
-		<div class="header-actions">
-			{#if created.text}
-				<span class="sync-success">{created.text}</span>
-			{/if}
-			<Button variant="secondary" size="sm" type="button" onclick={() => (showCreateForm = true)}>
-				Nuevo activo
-			</Button>
-			<Button variant="secondary" size="sm" type="button" onclick={() => (showImportForm = true)}>
-				Importar CSV/Excel
-			</Button>
-		</div>
+		<button class="row-action" type="button" onclick={() => (showImportForm = true)}>
+			Importar CSV/Excel
+		</button>
+		<Button type="button" onclick={() => (showCreateForm = true)}>Nuevo activo</Button>
 	{/snippet}
 </PageHeader>
+
+{#if created.text}
+	<p class="feedback success page-flash">{created.text}</p>
+{/if}
 
 <Modal
 	open={showCreateForm}
@@ -52,7 +53,7 @@
 		onCancel={() => (showCreateForm = false)}
 		onSuccess={() => {
 			showCreateForm = false;
-			created.show('Activo creado correctamente.');
+			created.show('Activo creado. Ya está en el catálogo.');
 		}}
 	/>
 </Modal>
@@ -71,9 +72,9 @@
 		onSuccess={() => (showImportForm = false)}
 	>
 		{#snippet hint()}
-			El archivo debe tener columnas <code>ticker</code>, <code>name</code>,
-			<code>assetType</code> y <code>currency</code> (opcional: <code>exchange</code>). Se admite
-			.csv, .xlsx y .xls.
+			Una fila por activo, con las columnas <code>ticker</code>, <code>name</code>,
+			<code>assetType</code> y <code>currency</code>. <code>exchange</code> es opcional. Se admiten .csv,
+			.xlsx y .xls.
 		{/snippet}
 	</ImportCard>
 </Modal>
@@ -81,15 +82,7 @@
 <AssetsTable assets={data.assets} {form} />
 
 <style>
-	.header-actions {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-	}
-
-	.sync-success {
-		font-size: 0.82rem;
-		color: var(--green);
-		font-weight: 500;
+	.page-flash {
+		margin: -1rem 0 2rem;
 	}
 </style>
