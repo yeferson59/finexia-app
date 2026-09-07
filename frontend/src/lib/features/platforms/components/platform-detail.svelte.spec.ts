@@ -88,7 +88,7 @@ describe('platform-detail.svelte', () => {
 		await page.getByRole('button', { name: 'Editar' }).click();
 
 		await expect
-			.element(page.getByRole('heading', { name: 'Editar Plataforma' }))
+			.element(page.getByRole('heading', { name: 'Editar plataforma' }))
 			.toBeInTheDocument();
 	});
 

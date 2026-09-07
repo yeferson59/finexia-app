@@ -21,6 +21,9 @@ export default defineConfig({
 				extends: './vite.config.ts',
 				test: {
 					name: 'client',
+					// Los `define` de SvelteKit llegan al navegador sin evaluar; ver
+					// el comentario de `vitest-setup-client.ts`.
+					setupFiles: ['./vitest-setup-client.ts'],
 					browser: {
 						enabled: true,
 						provider: playwright(
@@ -28,7 +31,12 @@ export default defineConfig({
 								? { launchOptions: { executablePath: chromiumExecutablePath } }
 								: {}
 						),
-						instances: [{ browser: 'chromium', headless: true }]
+						instances: [{ browser: 'chromium', headless: true }],
+						// Vitest 5 pasó `exact` a `true`. Las aserciones de este repo
+						// buscan fragmentos —una frase dentro de un párrafo, el símbolo
+						// dentro de una celda que también lleva el nombre del activo—,
+						// que es lo que describe el comportamiento y no la maquetación.
+						locators: { exact: false }
 					},
 					include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
 					exclude: ['src/lib/server/**']

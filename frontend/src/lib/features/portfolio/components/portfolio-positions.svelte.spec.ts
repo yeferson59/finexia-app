@@ -63,7 +63,8 @@ describe('portfolio-positions.svelte', () => {
 		]);
 
 		const symbols = page.getByRole('rowheader');
-		await expect.element(symbols.first()).toHaveTextContent('BIG');
+		// La celda lleva símbolo y nombre, así que el símbolo es un fragmento.
+		await expect.element(symbols.first()).toMatchTextContent('BIG');
 	});
 
 	// Dos tarjetas —«mejor activo» y «peor activo»— decían cuál es la primera y
