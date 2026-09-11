@@ -50,7 +50,7 @@ const hub = money.USD
 // thirty; storing them all would fill the shared table with rows nothing in the
 // app converts and push the dashboard's rate list past being readable. These
 // are the ones an asset in this catalog is plausibly quoted in.
-var majors = []money.Currency{money.EUR, money.GBP, money.CHF, money.JPY, money.CAD, money.AUD, money.CNY, money.MXN, money.BRL}
+var majors = []money.Currency{money.EUR, money.GBP, money.CHF, money.JPY, money.CAD, money.AUD, money.CNY, money.MXN, money.BRL, money.DKK}
 
 var _ marketdata.PublicRateSource = (*Client)(nil)
 
