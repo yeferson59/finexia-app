@@ -53,8 +53,6 @@ jobs:
       - name: Vet
         run: go vet ./...
 
-      # The schema the SQL tests query, built by the project's own migrator so
-      # CI exercises the same path a deployment does.
       - name: Migrate the test database
         env:
           DATABASE_URL: "postgresql://postgres:password@localhost:5432/postgres?sslmode=disable"
