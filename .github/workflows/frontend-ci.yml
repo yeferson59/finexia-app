@@ -52,11 +52,9 @@ jobs:
       - name: Lint (prettier + eslint)
         run: pnpm lint
 
-      - name: Arquitectura (tamaño, routes/ y legacy)
+      - name: Arquitectura (tamaño, routes/ and legacy)
         run: pnpm check:arch
 
-      # El manual y su PDF son dos archivos: sin esto es fácil corregir una
-      # sección y seguir publicando el PDF viejo durante meses.
       - name: Guía de usuario (PDF al día)
         run: pnpm check:manual
 
