@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -92,6 +93,37 @@ func TestUpdateCurrentUser(t *testing.T) {
 			t.Errorf("saved image = %q, want existing %q", saved.Image, existing.Image)
 		}
 	})
+}
+
+// The avatar is saved as a path because the web app serves it at that same
+// path in front of the API (docs/API.md §1.6). A host in the row goes stale the
+// day the API moves, which is why 000033 had to rewrite every avatar before it.
+// A URL is configured on purpose: with an empty one, prefixing it would still
+// produce the bare path and the test would pass for the wrong reason.
+func TestUploadAvatarSavesThePathNotAURL(t *testing.T) {
+	userID := uuid.New()
+
+	var saved string
+	repo := new(fakeRepository{
+		updateImage: func(_ context.Context, id uuid.UUID, image string) (identity.User, error) {
+			saved = image
+
+			return identity.User{ID: id, Image: image}, nil
+		},
+	})
+	store := new(fakeStore{
+		put: func(context.Context, string, string, []byte) error { return nil },
+	})
+
+	svc := newService(repo, store, logger.Noop(), Config{FrontendURL: "https://finexia.test"})
+
+	if _, err := svc.UploadAvatarToS3(context.Background(), userID, strings.NewReader("png"), "image/png"); err != nil {
+		t.Fatalf("UploadAvatarToS3: %v", err)
+	}
+
+	if want := "/users/" + userID.String() + "/avatar"; saved != want {
+		t.Errorf("saved image = %q, want %q", saved, want)
+	}
 }
 
 func TestUpdateUserRejectsDeletedUser(t *testing.T) {

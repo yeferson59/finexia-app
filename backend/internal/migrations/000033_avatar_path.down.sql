@@ -1,0 +1,4 @@
+-- Nothing to undo. The up migration dropped a host that no longer answers, and
+-- the path it left is what the web app serves in front of this API
+-- (frontend/src/lib/api/proxy.ts). Putting the old host back would only break
+-- the images again, so rolling 000033 back leaves the rows as they are.

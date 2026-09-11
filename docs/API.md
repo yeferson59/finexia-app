@@ -117,6 +117,32 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 (`limitKey`/`totalKey` conservan nombres históricos por área, p. ej.
 `usersForPage`/`totalUsers`.)
 
+### 1.6 Quién llega a esta API
+
+El backend vive en una red privada. El navegador nunca lo llama: todo lo que la
+app web necesita lo pide su propio servidor, por `BASE_API`. Lo que sí tiene que
+alcanzarse desde fuera —un cliente MCP, un conector haciendo el descubrimiento
+OAuth, una etiqueta `<img>`— entra por el origen de la app, que reenvía estas
+rutas, y solo estas, a la misma ruta del backend
+(`frontend/src/lib/api/proxy.ts`):
+
+| Path | Sección |
+|---|---|
+| `/mcp` | §2.11 |
+| `/.well-known/oauth-protected-resource` y `/.well-known/oauth-authorization-server`, con y sin `/mcp` | §2.12 |
+| `/oauth/register`, `/oauth/authorize`, `/oauth/token` | §2.12 |
+| `/users/:id/avatar` | §2.3 |
+
+El resto de rutas de este documento no existe desde fuera. El reenvío pasa las
+cabeceras que estas rutas usan (`Authorization`, `Content-Type`, `Accept`, las de
+MCP…) pero **nunca** la cookie de sesión de la app, y devuelve la respuesta tal
+cual, redirecciones incluidas: el `302` de `/oauth/authorize` es para el
+navegador. La IP del cliente y su `User-Agent` llegan en `X-Forwarded-For` y
+`User-Agent`, como en cualquier otra llamada de la app.
+
+De ahí que `PUBLIC_URL` sea el origen de la app web y no el del backend (§2.12,
+«Configuración»).
+
 ---
 
 ## 2. Rutas
@@ -140,6 +166,10 @@ Las rutas marcadas *paginada* aceptan `?page=` y `?limit=` (middleware
 | Método | Path | Descripción |
 |---|---|---|
 | GET | `/users/:id/avatar` | Devuelve el avatar del usuario (S3) |
+
+Tras una subida (`POST /users/me/avatar`) el `image` del usuario guarda esta
+**ruta**, sin host: la sirve la app web, que la reenvía aquí (§1.6), y un host
+escrito en la fila dejaría de valer el día que el API cambiara de sitio.
 
 ### 2.4 Auth — público (con `AuthLimiter`)
 
@@ -951,7 +981,7 @@ Un `401` de esta ruta lleva siempre la cabecera que dice cómo autorizarse:
 
 ```
 WWW-Authenticate: Bearer realm="finexia",
-  resource_metadata="https://api.finexia.me/.well-known/oauth-protected-resource/mcp"
+  resource_metadata="https://finexia.me/.well-known/oauth-protected-resource/mcp"
 ```
 
 Es lo que convierte un rechazo en el arranque del flujo de §2.12 en vez de en un
@@ -981,14 +1011,15 @@ Las que aceptan `currency` toman un ISO 4217 de la lista de §2.9; omitirlo
 reporta en la moneda preferida de la cuenta. Un código no soportado vuelve como
 *tool error* —no como error de protocolo— con la lista de los aceptados.
 
-Configuración de un cliente MCP:
+Configuración de un cliente MCP. La URL es la de la app web: el backend no se
+alcanza desde fuera y la app le reenvía `/mcp` (§1.6).
 
 ```json
 {
   "mcpServers": {
     "finexia": {
       "type": "http",
-      "url": "https://api.finexia.me/mcp",
+      "url": "https://finexia.me/mcp",
       "headers": { "Authorization": "Bearer fnx_mcp_<token de ajustes>" }
     }
   }
@@ -998,7 +1029,7 @@ Configuración de un cliente MCP:
 En Claude Code, lo mismo en una orden:
 
 ```sh
-claude mcp add --transport http finexia https://api.finexia.me/mcp \
+claude mcp add --transport http finexia https://finexia.me/mcp \
   --header "Authorization: Bearer fnx_mcp_<token de ajustes>"
 ```
 
@@ -1086,6 +1117,11 @@ refresh un `invalid_grant`: no hay ventana.
 origen desde el que descargó el documento, así que si no coincide con cómo se
 llega de verdad al API, **todas** las conexiones fallan en el descubrimiento.
 `FRONTEND_URL` es a dónde se manda el navegador a consentir.
+
+Desde fuera se llega al API a través de la app web (§1.6), así que `PUBLIC_URL`
+es el origen de la app: el mismo valor que `FRONTEND_URL`, `https://finexia.me`
+en producción. Apuntarla al backend publicaría como `issuer` una dirección que
+nadie puede alcanzar.
 
 | Código | Cuándo |
 |---|---|

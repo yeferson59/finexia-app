@@ -27,11 +27,12 @@ type Config struct {
 	// OAuth consent screen lives — the API holds no session cookie, so the
 	// browser has to be sent to the origin that does.
 	FrontendURL string
-	// PublicURL is this API's own base URL. The OAuth metadata is built from
-	// it, which makes it load-bearing rather than cosmetic: a client checks the
-	// issuer against the origin it fetched the document from, so a PublicURL
-	// that does not match how the API is actually reached fails every
-	// connection at discovery.
+	// PublicURL is the origin the API is reached at from outside: the web
+	// app's, which forwards /mcp and the OAuth routes here (docs/API.md §1.6).
+	// The OAuth metadata is built from it, which makes it load-bearing rather
+	// than cosmetic: a client checks the issuer against the origin it fetched
+	// the document from, so a PublicURL that does not match how the API is
+	// actually reached fails every connection at discovery.
 	PublicURL string
 	// InvitationExpiry is how long an invitation token stays valid.
 	InvitationExpiry time.Duration

@@ -493,7 +493,6 @@ func authConfig(env *config.EnvConfig) auth.Config {
 // userConfig projects the environment onto the user module's Config.
 func userConfig(env *config.EnvConfig) user.Config {
 	return user.Config{
-		PublicURL:   env.PublicURL,
 		FrontendURL: env.FrontendURL,
 	}
 }

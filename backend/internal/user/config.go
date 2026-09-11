@@ -6,9 +6,6 @@ package user
 // module — and its tests — depend on a small, explicit struct instead of the
 // full Env.
 type Config struct {
-	// PublicURL is the API's own base URL, used to build the absolute avatar
-	// link returned after an upload.
-	PublicURL string
 	// FrontendURL is the base URL used to build links in emails.
 	FrontendURL string
 }

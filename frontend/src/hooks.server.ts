@@ -1,5 +1,8 @@
 import type { Handle, HandleFetch } from '@sveltejs/kit';
+import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
+import { isPublicApiPath, proxyToBackend } from '$lib/api/proxy';
+import { crossSiteFormResponse, isCrossSiteFormSubmission } from '$lib/server/csrf';
 import {
 	ACCESS_COOKIE,
 	REFRESH_COOKIE,
@@ -48,6 +51,21 @@ async function resolveSession(event: Parameters<Handle>[0]['event'], accessToken
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+	// The slice of the backend that has to be reachable from outside — MCP,
+	// OAuth, avatars — comes in here and goes out untouched: the backend lives
+	// on a private network and this app is its only door. It runs before the
+	// session and the CSRF check because it uses neither: the proxy never
+	// forwards cookies. See $lib/api/proxy.
+	if (isPublicApiPath(event.url.pathname)) {
+		return withRobots(event, await proxyToBackend(event));
+	}
+
+	// SvelteKit's own CSRF check, switched off in svelte.config.js because it
+	// cannot exempt the proxy. Like the original, it only runs outside dev.
+	if (!dev && isCrossSiteFormSubmission(event.request, event.url)) {
+		return crossSiteFormResponse(event.request);
+	}
+
 	event.locals.user = null;
 	event.locals.session = null;
 

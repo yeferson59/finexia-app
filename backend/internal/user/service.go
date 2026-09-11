@@ -154,9 +154,13 @@ func (s *service) UploadAvatarToS3(ctx context.Context, userID uuid.UUID, file i
 		return identity.User{}, httpx.AsBadRequest(fmt.Errorf("failed to upload to S3: %w", err))
 	}
 
-	imageURL := fmt.Sprintf("%s/users/%s/avatar", s.cfg.PublicURL, userID.String())
+	// The path, not an absolute URL. The only public door to this API is the web
+	// app, which serves the avatar at this same path (docs/API.md §1.6); a host
+	// written into the row goes stale the day the API moves, which is why
+	// migration 000033 had to strip the old one from every avatar.
+	imagePath := fmt.Sprintf("/users/%s/avatar", userID.String())
 
-	return s.repo.UpdateImage(ctx, userID, imageURL)
+	return s.repo.UpdateImage(ctx, userID, imagePath)
 }
 
 func (s *service) GetAvatarFromS3(ctx context.Context, userID uuid.UUID) (io.ReadCloser, string, error) {

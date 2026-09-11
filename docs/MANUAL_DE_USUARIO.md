@@ -772,7 +772,7 @@ La página de ajustes muestra la **dirección del endpoint** que hay que pegar e
   "mcpServers": {
     "finexia": {
       "type": "http",
-      "url": "https://api.finexia.me/mcp",
+      "url": "https://finexia.me/mcp",
       "headers": { "Authorization": "Bearer fnx_mcp_…" }
     }
   }
@@ -782,7 +782,7 @@ La página de ajustes muestra la **dirección del endpoint** que hay que pegar e
 En Claude Code, la misma conexión se añade con una orden:
 
 ```
-claude mcp add --transport http finexia https://api.finexia.me/mcp \
+claude mcp add --transport http finexia https://finexia.me/mcp \
   --header "Authorization: Bearer fnx_mcp_…"
 ```
 

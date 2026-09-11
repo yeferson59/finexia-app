@@ -15,7 +15,7 @@ negocio vive en `lib/features/<feature>/` y todo el acceso al backend en
 
 ```
 frontend/src/
-├── app.html · app.d.ts · hooks.server.ts   # sesión y guardas globales
+├── app.html · app.d.ts · hooks.server.ts   # sesión, guardas globales y proxy
 ├── routes/                                 # SOLO orquestación y composición
 │   ├── (legal)/ · auth/ · api/ · sitemap.xml/
 │   └── dashboard/                          # portfolios, assets, transactions,
@@ -24,6 +24,7 @@ frontend/src/
 └── lib/
     ├── api/          # capa de acceso al backend (server-only)
     │   ├── client.ts     # authedFetch/authedFetchSafe: auth, refresh y redirección
+    │   ├── proxy.ts      # rutas del backend alcanzables desde fuera: MCP, OAuth, avatares
     │   ├── schemas/      # contratos HTTP como schemas Zod, espejo de docs/API.md,
     │   │                 #   por dominio: pagination · portfolio · transactions ·
     │   │                 #   platforms · market · user

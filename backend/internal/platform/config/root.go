@@ -74,7 +74,7 @@ type EnvConfig struct {
 	// the keys that seal the users' keys, not keys to any provider.
 	MarketKEKKeys           []string      `env:"MARKET_KEK_KEYS,required"`
 	MarketKEKActive         uint8         `env:"MARKET_KEK_ACTIVE" default:"1"`
-	PublicURL               string        `env:"PUBLIC_URL" default:"http://localhost:8080"`
+	PublicURL               string        `env:"PUBLIC_URL" default:"http://localhost:5173"`
 	FrontendURL             string        `env:"FRONTEND_URL" default:"http://localhost:5173"`
 	InvitationExpiry        time.Duration `env:"INVITATION_EXPIRY" default:"4d"`
 	PasswordResetExpiry     time.Duration `env:"PASSWORD_RESET_EXPIRY" default:"1h"`

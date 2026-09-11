@@ -2,7 +2,6 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import * as user from '$lib/api/user';
 import * as market from '$lib/api/market';
-import { env } from '$env/dynamic/private';
 import { mcpCredentialActions } from './mcp-credentials.server';
 import type {
 	ActiveSession,
@@ -24,7 +23,7 @@ import {
 	twoFactorChallengeSchema
 } from '$lib/features/settings';
 
-export const load: PageServerLoad = async ({ locals, fetch, cookies }) => {
+export const load: PageServerLoad = async ({ locals, fetch, cookies, url }) => {
 	const event = { cookies, fetch };
 
 	let sessions: ActiveSession[] = [];
@@ -60,10 +59,10 @@ export const load: PageServerLoad = async ({ locals, fetch, cookies }) => {
 		marketCredentials,
 		mcpTokens,
 		oauthGrants,
-		// El cliente MCP habla con el backend directamente, no con esta app, así
-		// que la URL que hay que pegar en su configuración es la del API. Se
-		// resuelve aquí porque BASE_API es privada y no llega al navegador.
-		mcpUrl: `${env.BASE_API}/mcp`
+		// Un cliente MCP no llega al backend, que vive en una red privada: llega a
+		// esta app, que le reenvía `/mcp` ($lib/api/proxy). La dirección que hay
+		// que pegar en su configuración es, por tanto, la de este mismo origen.
+		mcpUrl: `${url.origin}/mcp`
 	};
 };
 

@@ -196,6 +196,23 @@ const server = createServer(async (req, res) => {
 		});
 	}
 
+	// ---- The public slice the app forwards (docs/API.md §1.6) ----
+	// Just enough to watch a request cross `$lib/api/proxy`: the token endpoint
+	// says back what reached it, cookie included, since the proxy must drop it.
+	if (route === 'POST /oauth/token') {
+		const form = new URLSearchParams((await readBody(req)).toString());
+		return send(res, 200, {
+			access_token: 'fnx_oat_e2e',
+			token_type: 'Bearer',
+			received: { grantType: form.get('grant_type'), cookie: req.headers.cookie ?? null }
+		});
+	}
+
+	if (req.method === 'GET' && /^\/users\/[0-9a-f-]{36}\/avatar$/.test(path)) {
+		res.writeHead(200, { 'content-type': 'image/png' });
+		return res.end(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+	}
+
 	// ---- Everything below requires a valid access token ----
 	const account = accountByToken(req);
 	if (!account) {
