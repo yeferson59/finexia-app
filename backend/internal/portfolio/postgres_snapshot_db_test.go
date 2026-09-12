@@ -47,19 +47,37 @@ func growthTestPool(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
+var (
+	backdatedStart = time.Date(2026, time.June, 28, 0, 0, 0, 0, time.UTC)
+	// backdatedAsOf is the day backdatedPortfolio's series closes on: the one
+	// after its last snapshot, read live from the positions' catalog prices.
+	backdatedAsOf = backdatedStart.AddDate(0, 0, 56)
+)
+
 // backdatedPortfolio plants an account that starts on 2026-06-28 and then loads
 // two positions bought months earlier, each registered after that day's
 // snapshot job had already run — which is how anyone moves an existing
 // portfolio into the app.
 //
-// The market gains 0.25% a day on whatever is held, so the series is worth
-// 1.0025^55 − 1 = +14.72% and nothing else.
-func backdatedPortfolio(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
+// The market gains 0.25% a day on whatever is held. Snapshots cover days 0–55
+// and the catalog prices each asset where day 56 puts it, so the live point at
+// backdatedAsOf keeps the pace: the series is worth 1.0025^56 − 1 = +15.01%,
+// less the sliver the half-weighted deposits take, and nothing else.
+func backdatedPortfolio(t *testing.T, pool *pgxpool.Pool) (userID, portfolioID uuid.UUID) {
 	t.Helper()
 	ctx := context.Background()
 
-	userID, portfolioID := uuid.New(), uuid.New()
-	start := time.Date(2026, time.June, 28, 0, 0, 0, 0, time.UTC)
+	userID, portfolioID = uuid.New(), uuid.New()
+	start := backdatedStart
+	days := dayGapUTC(backdatedStart, backdatedAsOf)
+
+	// What a position is worth held days after the app first saw it.
+	grown := func(cost float64, held int) float64 {
+		for range held {
+			cost *= 1.0025
+		}
+		return cost
+	}
 
 	exec := func(sql string, args ...any) {
 		t.Helper()
@@ -95,8 +113,9 @@ func backdatedPortfolio(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 
 	for i, position := range positions {
 		assetID, entryID := uuid.New(), uuid.New()
-		exec(`INSERT INTO assets (id, ticker, name, asset_type, currency)
-		      VALUES ($1, $2, 'probe', 'stock', 'USD')`, assetID, uuid.New().String()[:8])
+		exec(`INSERT INTO assets (id, ticker, name, asset_type, currency, current_price)
+		      VALUES ($1, $2, 'probe', 'stock', 'USD', $3)`,
+			assetID, uuid.New().String()[:8], grown(position.cost, days-position.knownOn))
 		track(assetID)
 		exec(`INSERT INTO portfolio_entries
 		        (id, portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date)
@@ -118,17 +137,13 @@ func backdatedPortfolio(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 			entryID, position.cost, position.tradeDate, recordedAt)
 	}
 
-	for day := 0; day <= 55; day++ {
+	for day := range days {
 		value, cost := 0.0, 0.0
 		for _, position := range positions {
 			if day < position.knownOn {
 				continue
 			}
-			held := 1.0
-			for range day - position.knownOn {
-				held *= 1.0025
-			}
-			value += position.cost * held
+			value += grown(position.cost, day-position.knownOn)
 			cost += position.cost
 		}
 
@@ -140,20 +155,25 @@ func backdatedPortfolio(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 			portfolioID, date, value, value-cost, (value-cost)/cost*100, date.Add(3*time.Hour))
 	}
 
-	return userID
+	return userID, portfolioID
+}
+
+// dayGapUTC counts whole days between two UTC midnights.
+func dayGapUTC(from, to time.Time) int {
+	return int(to.Sub(from) / (24 * time.Hour))
 }
 
 func TestGrowthSeriesDoesNotCountABackdatedPurchaseAsAWindfall(t *testing.T) {
 	pool := growthTestPool(t)
 	repo := NewPostgresRepository(pool)
-	userID := backdatedPortfolio(t, pool)
+	userID, _ := backdatedPortfolio(t, pool)
 
-	points, err := repo.GetPortfolioGrowthByUserID(context.Background(), userID, money.USD, false, time.Time{})
+	points, err := repo.GetPortfolioGrowthByUserID(context.Background(), userID, money.USD, false, time.Time{}, backdatedAsOf)
 	if err != nil {
 		t.Fatalf("GetPortfolioGrowthByUserID: %v", err)
 	}
-	if len(points) != 56 {
-		t.Fatalf("points = %d, want 56", len(points))
+	if len(points) != 57 {
+		t.Fatalf("points = %d, want 57 (56 snapshots and the live point)", len(points))
 	}
 
 	metrics := BuildGrowthMetrics(points)
@@ -162,11 +182,11 @@ func TestGrowthSeriesDoesNotCountABackdatedPurchaseAsAWindfall(t *testing.T) {
 		t.Fatalf("total return: %v", err)
 	}
 
-	// The market earned 14.72%. Attributing the flows to the trade dates instead
-	// reported 411%, because the money landed on snapshots written before the
-	// positions existed and the days they did appear had nothing to net out.
+	// The market earned about 15%. Attributing the flows to the trade dates
+	// instead reported 411%, because the money landed on snapshots written before
+	// the positions existed and the days they did appear had nothing to net out.
 	if total < 13 || total > 16 {
-		t.Errorf("rentabilidad del periodo = %.1f%%, want ~14.7%%: los aportes se están contando como rentabilidad", total)
+		t.Errorf("rentabilidad del periodo = %.1f%%, want ~15%%: los aportes se están contando como rentabilidad", total)
 	}
 
 	// And no single day may carry a jump only a deposit could explain.
@@ -189,9 +209,9 @@ func TestGrowthSeriesDoesNotCountABackdatedPurchaseAsAWindfall(t *testing.T) {
 func TestGrowthSeriesWithoutACurrencyUsesTheAccountPreferredOne(t *testing.T) {
 	pool := growthTestPool(t)
 	repo := NewPostgresRepository(pool)
-	userID := backdatedPortfolio(t, pool)
+	userID, _ := backdatedPortfolio(t, pool)
 
-	points, err := repo.GetPortfolioGrowthByUserID(context.Background(), userID, money.XXX, false, time.Time{})
+	points, err := repo.GetPortfolioGrowthByUserID(context.Background(), userID, money.XXX, false, time.Time{}, backdatedAsOf)
 	if err != nil {
 		t.Fatalf("GetPortfolioGrowthByUserID: %v", err)
 	}
@@ -207,12 +227,99 @@ func TestGrowthSeriesWithoutACurrencyUsesTheAccountPreferredOne(t *testing.T) {
 	}
 }
 
+// The series closes on a live point, not on the last snapshot. The job runs
+// once a day, and until it did the dashboard printed today's summary above
+// yesterday's series: $1,805.35 as net worth and $1,772.40 as the current value
+// right below it. The closing point has to carry the summary's own figures, it
+// has to replace a row the job already wrote for that day rather than sit next
+// to it, and a purchase no closed day reflects has to land on it as a flow, not
+// as return.
+func TestGrowthSeriesClosesOnTheLiveSummary(t *testing.T) {
+	pool := growthTestPool(t)
+	repo := NewPostgresRepository(pool)
+	ctx := context.Background()
+	userID, portfolioID := backdatedPortfolio(t, pool)
+	track := dropFixture(t, pool, userID)
+
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, sql, args...); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+
+	// A stale row for the closing day, as if the job had already run on it.
+	exec(`INSERT INTO portfolio_snapshots
+	        (portfolio_id, snapshot_date, total_value, currency, total_gain_loss,
+	         total_gain_loss_pct, created_at)
+	      VALUES ($1, $2, 1, 'USD', 0, 0, $3)`,
+		portfolioID, backdatedAsOf, backdatedAsOf.Add(3*time.Hour))
+
+	// And a purchase registered after it: 50 spent, already worth 55.
+	assetID, entryID := uuid.New(), uuid.New()
+	exec(`INSERT INTO assets (id, ticker, name, asset_type, currency, current_price)
+	      VALUES ($1, $2, 'probe', 'stock', 'USD', 55)`, assetID, uuid.New().String()[:8])
+	track(assetID)
+	exec(`INSERT INTO portfolio_entries
+	        (id, portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date)
+	      VALUES ($1, $2, $3, (SELECT id FROM investment_sources WHERE user_id = $4), 1, 50, 'USD', $5)`,
+		entryID, portfolioID, assetID, userID, backdatedAsOf)
+	exec(`INSERT INTO transactions
+	        (entry_id, type, quantity, price, currency, fees, transaction_date, created_at)
+	      VALUES ($1, 'buy', 1, 50, 'USD', 0, $2, $3)`,
+		entryID, backdatedAsOf, backdatedAsOf.Add(10*time.Hour))
+
+	// What GET /portfolios/summary reads for this portfolio right now.
+	var wantValue, wantGain string
+	if err := pool.QueryRow(ctx,
+		`SELECT total_market_value::text, total_gain_loss::text FROM portfolio_summary WHERE portfolio_id = $1`,
+		portfolioID,
+	).Scan(&wantValue, &wantGain); err != nil {
+		t.Fatalf("leyendo portfolio_summary: %v", err)
+	}
+
+	reads := map[string]func() ([]GrowthPoint, error){
+		"account": func() ([]GrowthPoint, error) {
+			return repo.GetPortfolioGrowthByUserID(ctx, userID, money.USD, false, time.Time{}, backdatedAsOf)
+		},
+		"portfolio": func() ([]GrowthPoint, error) {
+			return repo.GetPortfolioGrowthByPortfolioID(ctx, userID, portfolioID, false, time.Time{}, backdatedAsOf)
+		},
+	}
+
+	for name, read := range reads {
+		t.Run(name, func(t *testing.T) {
+			points, err := read()
+			if err != nil {
+				t.Fatalf("growth series: %v", err)
+			}
+			if len(points) != 57 {
+				t.Fatalf("points = %d, want 57: the 56 closed days and one live point", len(points))
+			}
+
+			last := points[len(points)-1]
+			if !last.Date.Equal(backdatedAsOf) {
+				t.Fatalf("la serie cierra el %s, want %s", last.Date.Format("2006-01-02"), backdatedAsOf.Format("2006-01-02"))
+			}
+			if !growthDecimal(last.TotalValue).Equal(growthDecimal(wantValue)) {
+				t.Errorf("valor de cierre = %s, want %s (portfolio_summary)", last.TotalValue, wantValue)
+			}
+			if !growthDecimal(last.GainLoss).Equal(growthDecimal(wantGain)) {
+				t.Errorf("ganancia de cierre = %s, want %s (portfolio_summary)", last.GainLoss, wantGain)
+			}
+			if flow, _ := growthDecimal(last.NetFlow).Float64(); flow < 49.99 || flow > 50.01 {
+				t.Errorf("flujo de cierre = %s, want 50: la compra que ningún snapshot refleja", last.NetFlow)
+			}
+		})
+	}
+}
+
 func TestGrowthSeriesFlowLandsOnTheDayTheValueMoves(t *testing.T) {
 	pool := growthTestPool(t)
 	repo := NewPostgresRepository(pool)
-	userID := backdatedPortfolio(t, pool)
+	userID, _ := backdatedPortfolio(t, pool)
 
-	points, err := repo.GetPortfolioGrowthByUserID(context.Background(), userID, money.USD, false, time.Time{})
+	points, err := repo.GetPortfolioGrowthByUserID(context.Background(), userID, money.USD, false, time.Time{}, backdatedAsOf)
 	if err != nil {
 		t.Fatalf("GetPortfolioGrowthByUserID: %v", err)
 	}

@@ -203,26 +203,54 @@ func (r *PostgresRepository) GetPortfolioValuesAsOf(ctx context.Context, userID 
 // before the app ever saw it lands on that one day. That is the honest limit of
 // a series that only knows what it was told, when it was told: nobody watched
 // that gain happen, and there is no earlier point to spread it over.
-func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, currency money.Currency, hasSince bool, since time.Time) ([]GrowthPoint, error) {
+//
+// The series closes on asOf, and that point is not a snapshot. The job writes
+// one row a day, so between two runs the stored series trails the account: a
+// purchase registered this morning, or a price that moved since, is already in
+// the summary endpoint and not yet here, and the dashboard printed the two
+// totals one above the other. asOf is read live instead, from the same
+// portfolio_summary view the job copies, replacing any row the job already
+// wrote for that day; every transaction no earlier snapshot reflects lands on
+// it. When the job runs, its row is that same read frozen, and the live point
+// moves on to the next day.
+func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, currency money.Currency, hasSince bool, since, asOf time.Time) ([]GrowthPoint, error) {
 	rows, err := r.db.Query(ctx, `
-		WITH converted AS (
-			SELECT
-				ps.snapshot_date,
-				target.code                               AS currency,
-				ps.total_value     * COALESCE(fx.rate, 1) AS total_value,
-				ps.total_gain_loss * COALESCE(fx.rate, 1) AS total_gain_loss,
-				(fx.rate IS NULL)::int                    AS unconverted
+		WITH series AS (
+			-- The days the snapshot job has already closed...
+			SELECT ps.portfolio_id, ps.snapshot_date, ps.currency, ps.total_value, ps.total_gain_loss
 			FROM portfolio_snapshots ps
 			JOIN portfolios p ON p.id = ps.portfolio_id
+			WHERE p.user_id = $1
+			  AND ps.snapshot_date < $5::date
+			UNION ALL
+			-- ...and asOf, live: the same columns, from the same view, with the
+			-- same COALESCE the job applies before storing them.
+			SELECT
+				p.id,
+				$5::date,
+				p.base_currency,
+				COALESCE(sm.total_market_value, 0),
+				COALESCE(sm.total_gain_loss,    0)
+			FROM portfolios p
+			LEFT JOIN portfolio_summary sm ON sm.portfolio_id = p.id
+			WHERE p.user_id = $1
+		), converted AS (
+			SELECT
+				s.snapshot_date,
+				target.code                              AS currency,
+				s.total_value     * COALESCE(fx.rate, 1) AS total_value,
+				s.total_gain_loss * COALESCE(fx.rate, 1) AS total_gain_loss,
+				(fx.rate IS NULL)::int                   AS unconverted
+			FROM series s
+			JOIN portfolios p ON p.id = s.portfolio_id
 			JOIN users u      ON u.id = p.user_id
 			CROSS JOIN LATERAL (
 				SELECT COALESCE(NULLIF($2::text, ''), u.preferred_currency, 'USD')::char(3) AS code
 			) target
 			CROSS JOIN LATERAL (
-				SELECT fx_rate(p.user_id, ps.currency, target.code) AS rate
+				SELECT fx_rate(p.user_id, s.currency, target.code) AS rate
 			) fx
-			WHERE p.user_id = $1
-			  AND ($3::boolean = FALSE OR ps.snapshot_date >= $4::date)
+			WHERE ($3::boolean = FALSE OR s.snapshot_date >= $4::date)
 		), totals AS (
 			SELECT
 				snapshot_date,
@@ -239,12 +267,19 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, use
 			-- snapshots are never recomputed, so a position registered today
 			-- with a trade date of two months ago moves the series today and
 			-- leaves the older date untouched.
+			--
+			-- One no closed day reflects yet lands on asOf, the live point that
+			-- already carries its money.
 			SELECT
-				(
-					SELECT MIN(ps.snapshot_date)
-					FROM portfolio_snapshots ps
-					WHERE ps.portfolio_id = pe.portfolio_id
-					  AND ps.created_at >= tx.created_at
+				COALESCE(
+					(
+						SELECT MIN(ps.snapshot_date)
+						FROM portfolio_snapshots ps
+						WHERE ps.portfolio_id = pe.portfolio_id
+						  AND ps.snapshot_date < $5::date
+						  AND ps.created_at >= tx.created_at
+					),
+					$5::date
 				) AS snapshot_date,
 				-- Two rates, and the order of them is the point. tx.fx_rate is
 				-- historical: it carries the trade from the currency it was
@@ -279,14 +314,11 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, use
 			) fxt
 			WHERE pf.user_id = $1
 		), net_flows AS (
-			-- A transaction the snapshot job has not caught up with yet lands on
-			-- NULL and waits for the snapshot that will cover it. One that lands
-			-- outside the asked-for window drops off the join below, which is
-			-- what should happen: the opening point of a window has no previous
-			-- point to be measured against.
+			-- A flow that lands outside the asked-for window drops off the join
+			-- below, which is what should happen: the opening point of a window
+			-- has no previous point to be measured against.
 			SELECT snapshot_date, SUM(amount) AS net_flow
 			FROM flows
-			WHERE snapshot_date IS NOT NULL
 			GROUP BY snapshot_date
 		)
 		SELECT
@@ -318,7 +350,7 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, use
 		FROM totals t
 		LEFT JOIN net_flows nf ON nf.snapshot_date = t.snapshot_date
 		ORDER BY t.snapshot_date ASC
-	`, userID, currencyParam(currency), hasSince, since)
+	`, userID, currencyParam(currency), hasSince, since, asOf)
 	if err != nil {
 		return nil, err
 	}
@@ -349,11 +381,14 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, use
 	return result, nil
 }
 
-func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error) {
+func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since, asOf time.Time) ([]GrowthPoint, error) {
 	// One portfolio, one base currency: nothing to convert and nothing that can
 	// fail to, which is why the unconverted count is a literal zero here. The
 	// flows are the exception — a position costs in its own currency and can
 	// differ from the portfolio's base, so those do go through fx_rate.
+	//
+	// It closes on a live asOf point too, for the reason the account-wide query
+	// gives: the portfolio page prints today's holdings above this series.
 	rows, err := r.db.Query(ctx, `
 		WITH points AS (
 			SELECT
@@ -365,16 +400,30 @@ func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context
 			FROM portfolio_snapshots ps
 			JOIN portfolios p ON p.id = ps.portfolio_id
 			WHERE ps.portfolio_id = $1 AND p.user_id = $2
-			  AND ($3::boolean = FALSE OR ps.snapshot_date >= $4::date)
-		), flows AS (
-			-- By when the transaction was recorded, not when it was traded: see
-			-- the account-wide query for why.
+			  AND ps.snapshot_date < $5::date
+			UNION ALL
 			SELECT
-				(
-					SELECT MIN(ps.snapshot_date)
-					FROM portfolio_snapshots ps
-					WHERE ps.portfolio_id = $1
-					  AND ps.created_at >= tx.created_at
+				$5::date,
+				p.base_currency,
+				COALESCE(sm.total_market_value,  0),
+				COALESCE(sm.total_gain_loss,     0),
+				COALESCE(sm.total_gain_loss_pct, 0)
+			FROM portfolios p
+			LEFT JOIN portfolio_summary sm ON sm.portfolio_id = p.id
+			WHERE p.id = $1 AND p.user_id = $2
+		), flows AS (
+			-- By when the transaction was recorded, not when it was traded, and
+			-- on asOf while no closed day reflects it: see the account-wide query.
+			SELECT
+				COALESCE(
+					(
+						SELECT MIN(ps.snapshot_date)
+						FROM portfolio_snapshots ps
+						WHERE ps.portfolio_id = $1
+						  AND ps.snapshot_date < $5::date
+						  AND ps.created_at >= tx.created_at
+					),
+					$5::date
 				) AS snapshot_date,
 				-- Historical rate onto the position's own currency, then the
 				-- current one onto the portfolio's base, with the fee converted
@@ -396,7 +445,6 @@ func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context
 		), net_flows AS (
 			SELECT snapshot_date, SUM(amount) AS net_flow
 			FROM flows
-			WHERE snapshot_date IS NOT NULL
 			GROUP BY snapshot_date
 		)
 		SELECT
@@ -411,8 +459,9 @@ func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context
 			ROUND(COALESCE(nf.net_flow, 0), 8)::text
 		FROM points pt
 		LEFT JOIN net_flows nf ON nf.snapshot_date = pt.snapshot_date
+		WHERE ($3::boolean = FALSE OR pt.snapshot_date >= $4::date)
 		ORDER BY pt.snapshot_date ASC
-	`, portfolioID, userID, hasSince, since)
+	`, portfolioID, userID, hasSince, since, asOf)
 	if err != nil {
 		return nil, err
 	}

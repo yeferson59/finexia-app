@@ -217,10 +217,13 @@ func (s *service) GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, 
 
 // GetPortfolioGrowth builds the account-wide series. An empty currency means
 // "the account's preferred one", the same default the summary endpoints use.
+//
+// The series closes on today read live, not on the last snapshot, so its
+// closing figures are the ones the summary endpoint reports next to it.
 func (s *service) GetPortfolioGrowth(ctx context.Context, userID uuid.UUID, currency money.Currency, period string) ([]GrowthPoint, GrowthSummary, error) {
 	hasSince, since := parsePeriod(period)
 
-	points, err := s.repo.GetPortfolioGrowthByUserID(ctx, userID, currency, hasSince, since)
+	points, err := s.repo.GetPortfolioGrowthByUserID(ctx, userID, currency, hasSince, since, snapshotDay(time.Now()))
 	if err != nil {
 		return nil, GrowthSummary{}, err
 	}
@@ -229,7 +232,7 @@ func (s *service) GetPortfolioGrowth(ctx context.Context, userID uuid.UUID, curr
 
 func (s *service) GetPortfolioGrowthByID(ctx context.Context, userID, portfolioID uuid.UUID, period string) ([]GrowthPoint, GrowthSummary, error) {
 	hasSince, since := parsePeriod(period)
-	points, err := s.repo.GetPortfolioGrowthByPortfolioID(ctx, userID, portfolioID, hasSince, since)
+	points, err := s.repo.GetPortfolioGrowthByPortfolioID(ctx, userID, portfolioID, hasSince, since, snapshotDay(time.Now()))
 	if err != nil {
 		return nil, GrowthSummary{}, err
 	}

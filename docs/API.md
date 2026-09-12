@@ -728,6 +728,20 @@ crecimiento. `gainLoss` y `gainLossPct` son el beneficio del último punto
 —mercado menos capital invertido—, que es el rendimiento. Las dos discrepan a
 propósito y una cartera en pérdidas puede tener `totalGrowthPct` positivo.
 
+#### El último punto de la serie es de hoy, en vivo
+
+Las dos series de crecimiento (`GET /portfolios/growth` y
+`GET /portfolios/:id/growth`) cierran en la fecha de hoy (UTC), y ese punto no
+sale de un snapshot: se lee en el momento de la vista `portfolio_summary`, la
+misma que copia el job diario y que lee `GET /portfolios/summary`. Si el job ya
+escribió la fila de hoy, el punto en vivo la reemplaza. Las transacciones que
+ningún snapshot anterior refleja caen en ese punto como `netFlow`.
+
+Antes la serie terminaba en el último snapshot (el job corre a las 22:00 UTC),
+así que durante el día quedaba por detrás de la cuenta: una compra registrada
+por la mañana o un precio que se movió ya estaban en el resumen y todavía no en
+la serie, y el panel enseñaba dos patrimonios distintos uno encima del otro.
+
 #### Moneda de los holdings
 
 Una posición arrastra hasta tres monedas: la base del portfolio, la de coste

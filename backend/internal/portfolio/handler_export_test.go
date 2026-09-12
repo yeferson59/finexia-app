@@ -177,7 +177,7 @@ func TestHandlerExportRiskMetrics(t *testing.T) {
 	userID := uuid.New()
 	var gotHasSince bool
 	repo := new(fakeRepository{
-		getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, _ money.Currency, hasSince bool, _ time.Time) ([]GrowthPoint, error) {
+		getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, _ money.Currency, hasSince bool, _, _ time.Time) ([]GrowthPoint, error) {
 			gotHasSince = hasSince
 			return riskSeries(31), nil
 		},
@@ -248,7 +248,7 @@ func TestHandlerExportRiskMetrics(t *testing.T) {
 
 func TestHandlerExportRiskMetricsPublishesTheYearlyFiguresTogether(t *testing.T) {
 	repo := new(fakeRepository{
-		getPortfolioGrowthByUserID: func(context.Context, uuid.UUID, money.Currency, bool, time.Time) ([]GrowthPoint, error) {
+		getPortfolioGrowthByUserID: func(context.Context, uuid.UUID, money.Currency, bool, time.Time, time.Time) ([]GrowthPoint, error) {
 			return riskSeries(120), nil
 		},
 	})
@@ -276,7 +276,7 @@ func TestHandlerExportRiskMetricsPublishesTheYearlyFiguresTogether(t *testing.T)
 
 func TestHandlerExportRiskMetricsWithoutHistory(t *testing.T) {
 	repo := new(fakeRepository{
-		getPortfolioGrowthByUserID: func(context.Context, uuid.UUID, money.Currency, bool, time.Time) ([]GrowthPoint, error) {
+		getPortfolioGrowthByUserID: func(context.Context, uuid.UUID, money.Currency, bool, time.Time, time.Time) ([]GrowthPoint, error) {
 			return nil, nil
 		},
 	})

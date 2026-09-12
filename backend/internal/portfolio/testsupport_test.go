@@ -146,8 +146,8 @@ type fakeRepository struct {
 	importEntryTransactions         func(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, rows []ImportTransactionRow) (int, error)
 	getAllPortfolioSummaryRows      func(ctx context.Context) ([]SnapshotRow, error)
 	upsertPortfolioSnapshot         func(ctx context.Context, row SnapshotRow, snapshotDate time.Time) error
-	getPortfolioGrowthByUserID      func(ctx context.Context, userID uuid.UUID, currency money.Currency, hasSince bool, since time.Time) ([]GrowthPoint, error)
-	getPortfolioGrowthByPortfolioID func(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
+	getPortfolioGrowthByUserID      func(ctx context.Context, userID uuid.UUID, currency money.Currency, hasSince bool, since, asOf time.Time) ([]GrowthPoint, error)
+	getPortfolioGrowthByPortfolioID func(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since, asOf time.Time) ([]GrowthPoint, error)
 	getPortfolioValuesAsOf          func(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error)
 	getExchangeRateByPair           func(ctx context.Context, from, to money.Currency) (decimal.Decimal, error)
 	getUserExchangeRateByPair       func(ctx context.Context, userID uuid.UUID, from, to money.Currency) (decimal.Decimal, error)
@@ -279,12 +279,12 @@ func (f *fakeRepository) UpsertPortfolioSnapshot(ctx context.Context, row Snapsh
 	return f.upsertPortfolioSnapshot(ctx, row, snapshotDate)
 }
 
-func (f *fakeRepository) GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, currency money.Currency, hasSince bool, since time.Time) ([]GrowthPoint, error) {
-	return f.getPortfolioGrowthByUserID(ctx, userID, currency, hasSince, since)
+func (f *fakeRepository) GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, currency money.Currency, hasSince bool, since, asOf time.Time) ([]GrowthPoint, error) {
+	return f.getPortfolioGrowthByUserID(ctx, userID, currency, hasSince, since, asOf)
 }
 
-func (f *fakeRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error) {
-	return f.getPortfolioGrowthByPortfolioID(ctx, userID, portfolioID, hasSince, since)
+func (f *fakeRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since, asOf time.Time) ([]GrowthPoint, error) {
+	return f.getPortfolioGrowthByPortfolioID(ctx, userID, portfolioID, hasSince, since, asOf)
 }
 
 func (f *fakeRepository) GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error) {

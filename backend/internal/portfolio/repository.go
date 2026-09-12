@@ -89,11 +89,14 @@ type TransactionStore interface {
 }
 
 // SnapshotStore persists daily portfolio snapshots and reads growth series.
+//
+// A growth series closes on asOf, read live instead of from a snapshot: see
+// GetPortfolioGrowthByUserID in postgres_snapshot.go.
 type SnapshotStore interface {
 	GetAllPortfolioSummaryRows(ctx context.Context) ([]SnapshotRow, error)
 	UpsertPortfolioSnapshot(ctx context.Context, row SnapshotRow, snapshotDate time.Time) error
-	GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, currency money.Currency, hasSince bool, since time.Time) ([]GrowthPoint, error)
-	GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error)
+	GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, currency money.Currency, hasSince bool, since, asOf time.Time) ([]GrowthPoint, error)
+	GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since, asOf time.Time) ([]GrowthPoint, error)
 	GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error)
 }
 

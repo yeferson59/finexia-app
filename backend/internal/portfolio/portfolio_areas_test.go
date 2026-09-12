@@ -153,14 +153,15 @@ func TestGetPortfolioGrowthUsesPeriodFilter(t *testing.T) {
 	var gotHasSince bool
 	var gotSince time.Time
 	var gotCurrency money.Currency
+	var gotAsOf time.Time
 
 	repo := new(fakeRepository{
-		getPortfolioGrowthByUserID: func(_ context.Context, uid uuid.UUID, currency money.Currency, hasSince bool, since time.Time) ([]GrowthPoint, error) {
+		getPortfolioGrowthByUserID: func(_ context.Context, uid uuid.UUID, currency money.Currency, hasSince bool, since, asOf time.Time) ([]GrowthPoint, error) {
 			if uid != userID {
 				t.Errorf("userID = %s, want %s", uid, userID)
 			}
 
-			gotHasSince, gotSince, gotCurrency = hasSince, since, currency
+			gotHasSince, gotSince, gotCurrency, gotAsOf = hasSince, since, currency, asOf
 
 			return []GrowthPoint{
 				{TotalValue: "100.00", Currency: money.COP},
@@ -183,6 +184,11 @@ func TestGetPortfolioGrowthUsesPeriodFilter(t *testing.T) {
 	if gotCurrency != money.COP {
 		t.Errorf("currency = %q, want COP", gotCurrency)
 	}
+	// La serie cierra en el día que el job de snapshots archivaría ahora: una
+	// medianoche UTC de las últimas 24 horas, no el instante de la petición.
+	if age := time.Since(gotAsOf); !gotAsOf.Equal(snapshotDay(gotAsOf)) || age < 0 || age >= 24*time.Hour {
+		t.Errorf("asOf = %v, want today's UTC midnight", gotAsOf)
+	}
 	if len(points) != 2 {
 		t.Errorf("len(points) = %d, want 2", len(points))
 	}
@@ -202,7 +208,7 @@ func TestGetPortfolioGrowthByIDScopesToPortfolio(t *testing.T) {
 	var gotHasSince bool
 
 	repo := new(fakeRepository{
-		getPortfolioGrowthByPortfolioID: func(_ context.Context, uid, pid uuid.UUID, hasSince bool, since time.Time) ([]GrowthPoint, error) {
+		getPortfolioGrowthByPortfolioID: func(_ context.Context, uid, pid uuid.UUID, hasSince bool, _, _ time.Time) ([]GrowthPoint, error) {
 			gotUserID, gotPortfolioID, gotHasSince = uid, pid, hasSince
 			return []GrowthPoint{
 				{TotalValue: "200.00"},
