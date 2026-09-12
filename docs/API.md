@@ -742,6 +742,29 @@ así que durante el día quedaba por detrás de la cuenta: una compra registrada
 por la mañana o un precio que se movió ya estaban en el resumen y todavía no en
 la serie, y el panel enseñaba dos patrimonios distintos uno encima del otro.
 
+#### Posiciones cargadas con historial en `netFlow`
+
+`netFlow` descuenta de la variación del valor lo que entró y salió, para que lo
+que quede sea rentabilidad. Una transacción cuenta de dos maneras según su
+`transaction_date`:
+
+- **Dentro del tramo en el que aparece** (desde el snapshot anterior del
+  portfolio): es dinero movido mientras la serie miraba y cuenta a lo que costó,
+  con comisión (`transaction_cash_flow`).
+- **Anterior a ese tramo**: es historial que se está cargando. La posición entra
+  a lo que valía cuando se registró (`transactions.recorded_market_price`,
+  migración 000036) y sus comisiones o dividendos de entonces no generan flujo
+  (`transaction_holding_flow`).
+
+Antes todo contaba a costo, y la ganancia que una posición ya traía al
+registrarla se convertía en rentabilidad del día en que se escribió: una cuenta
+que ganaba un 15% sobre lo invertido informaba un +42% de «rentabilidad real».
+
+La app no guarda historial de precios, así que ese valor se anota al insertar la
+fila (trigger `trg_transactions_record_market_price`). Las filas anteriores a la
+migración se rellenaron con el precio del día en que se aplicó: exacto para lo
+que aún cae en el punto en vivo, y aproximado para historial más viejo.
+
 #### Moneda de los holdings
 
 Una posición arrastra hasta tres monedas: la base del portfolio, la de coste

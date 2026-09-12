@@ -130,10 +130,13 @@ func backdatedPortfolio(t *testing.T, pool *pgxpool.Pool) (userID, portfolioID u
 		}
 		// fees_currency is left unnamed on purpose: since 000030 the schema fills
 		// it from the row's own currency, and a fixture that spelled it out would
-		// stop exercising that.
+		// stop exercising that. recorded_market_price is named for the opposite
+		// reason: the schema would fill it with the catalog price of today, and
+		// each position here was worth its cost on the day it was recorded.
 		exec(`INSERT INTO transactions
-		        (entry_id, type, quantity, price, currency, fees, transaction_date, created_at)
-		      VALUES ($1, 'buy', 1, $2, 'USD', 0, $3, $4)`,
+		        (entry_id, type, quantity, price, currency, fees, transaction_date, created_at,
+		         recorded_market_price)
+		      VALUES ($1, 'buy', 1, $2, 'USD', 0, $3, $4, $2)`,
 			entryID, position.cost, position.tradeDate, recordedAt)
 	}
 
@@ -309,6 +312,94 @@ func TestGrowthSeriesClosesOnTheLiveSummary(t *testing.T) {
 			}
 			if flow, _ := growthDecimal(last.NetFlow).Float64(); flow < 49.99 || flow > 50.01 {
 				t.Errorf("flujo de cierre = %s, want 50: la compra que ningún snapshot refleja", last.NetFlow)
+			}
+		})
+	}
+}
+
+// A position loaded with history is a holding walking in, not a purchase made
+// while the series watched. Most of what an account brings into the app already
+// had gains, and netting each one at its cost turned all of them into the return
+// of the day it was typed in: +42% of "real" return on an account worth 15% over
+// its cost. Bought at 10 in March, partly sold at 12 in April, paying a dividend
+// in May, every trade with a commission, and priced at 15 when registered, the
+// holding has to flow in at 6 × 15 — exactly what it adds to the value — and
+// leave that day growing at the market's pace.
+func TestGrowthSeriesValuesLoadedHistoryAtWhatItWasWorth(t *testing.T) {
+	pool := growthTestPool(t)
+	repo := NewPostgresRepository(pool)
+	ctx := context.Background()
+	userID, portfolioID := backdatedPortfolio(t, pool)
+	track := dropFixture(t, pool, userID)
+
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, sql, args...); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+
+	assetID, entryID := uuid.New(), uuid.New()
+	exec(`INSERT INTO assets (id, ticker, name, asset_type, currency, current_price)
+	      VALUES ($1, $2, 'probe', 'stock', 'USD', 15)`, assetID, uuid.New().String()[:8])
+	track(assetID)
+	exec(`INSERT INTO portfolio_entries
+	        (id, portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date)
+	      VALUES ($1, $2, $3, (SELECT id FROM investment_sources WHERE user_id = $4), 0, 10, 'USD', $5)`,
+		entryID, portfolioID, assetID, userID, time.Date(2026, time.March, 2, 0, 0, 0, 0, time.UTC))
+
+	// Typed in the morning after the last snapshot, so all three land on the
+	// live point. recorded_market_price is left for the schema to fill from the
+	// catalog, which is what the application's own inserts rely on.
+	recordedAt := backdatedAsOf.Add(-14 * time.Hour)
+	history := []struct {
+		kind            string
+		quantity, price float64
+		tradedOn        time.Time
+	}{
+		{"buy", 10, 10, time.Date(2026, time.March, 2, 0, 0, 0, 0, time.UTC)},
+		{"sell", 4, 12, time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)},
+		{"dividend", 1, 5, time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)},
+	}
+	for _, trade := range history {
+		exec(`INSERT INTO transactions
+		        (entry_id, type, quantity, price, currency, fees, transaction_date, created_at)
+		      VALUES ($1, $2, $3, $4, 'USD', 1, $5, $6)`,
+			entryID, trade.kind, trade.quantity, trade.price, trade.tradedOn, recordedAt)
+	}
+
+	reads := map[string]func() ([]GrowthPoint, error){
+		"account": func() ([]GrowthPoint, error) {
+			return repo.GetPortfolioGrowthByUserID(ctx, userID, money.USD, false, time.Time{}, backdatedAsOf)
+		},
+		"portfolio": func() ([]GrowthPoint, error) {
+			return repo.GetPortfolioGrowthByPortfolioID(ctx, userID, portfolioID, false, time.Time{}, backdatedAsOf)
+		},
+	}
+
+	for name, read := range reads {
+		t.Run(name, func(t *testing.T) {
+			points, err := read()
+			if err != nil {
+				t.Fatalf("growth series: %v", err)
+			}
+
+			last := points[len(points)-1]
+			if flow, _ := growthDecimal(last.NetFlow).Float64(); flow < 89.99 || flow > 90.01 {
+				t.Errorf("flujo de cierre = %s, want 90 (6 × 15): la historia cargada entra a lo que valía, no a su coste", last.NetFlow)
+			}
+
+			// At cost the day would have netted 50 against the 90 that walked in
+			// and reported about +2.6%.
+			metrics := BuildGrowthMetrics(points)
+			closing := metrics.Subperiod[len(metrics.Subperiod)-1]
+			rate, err := closing.Rate.Mul(oneHundred).Float64()
+			if err != nil {
+				t.Fatalf("closing rate: %v", err)
+			}
+			if rate < 0 || rate > 0.5 {
+				t.Errorf("el %s rindió %.2f%%, want ~0.25%%: la ganancia de antes de la app se cuenta como rentabilidad",
+					closing.Date.Format("2006-01-02"), rate)
 			}
 		})
 	}

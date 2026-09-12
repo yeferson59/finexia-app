@@ -203,7 +203,7 @@ type GrowthPoint struct {
 	Currency    string `json:"currency"`
 	// NetFlow is what has to be netted out of the change in TotalValue to leave
 	// a return: a deposit raises the value without anyone having earned it.
-	NetFlow     string `json:"netFlow" jsonschema:"money paid in (positive) or taken out (negative) since the previous point"`
+	NetFlow     string `json:"netFlow" jsonschema:"money paid in (positive) or taken out (negative) since the previous point; positions loaded with older trade dates count at their value when recorded"`
 	Unconverted int64  `json:"portfoliosUnconverted" jsonschema:"portfolios added at face value on this date because no exchange rate reached currency"`
 }
 

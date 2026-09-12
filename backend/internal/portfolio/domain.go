@@ -605,10 +605,12 @@ type GrowthPoint struct {
 	// NetFlow is the money the owner put in (positive) or took out (negative)
 	// between the previous point of the series and this one, in Currency. It is
 	// what has to be netted out of the change in TotalValue to leave a return:
-	// a deposit raises the value without anyone having earned anything. The
-	// sign convention lives in the transaction_cash_flow SQL function, and the
-	// first point of a series carries whatever fell on or before its own date,
-	// which no subperiod uses.
+	// a deposit raises the value without anyone having earned anything. A trade
+	// dated before the stretch it lands in is loaded history rather than money
+	// moved, and counts at what the holding was worth when recorded. The sign
+	// conventions live in the transaction_cash_flow and transaction_holding_flow
+	// SQL functions, and the first point of a series carries whatever fell on or
+	// before its own date, which no subperiod uses.
 	NetFlow string
 }
 

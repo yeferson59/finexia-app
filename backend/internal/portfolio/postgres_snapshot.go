@@ -198,11 +198,12 @@ func (r *PostgresRepository) GetPortfolioValuesAsOf(ctx context.Context, userID 
 // was recorded — the snapshot that first reflects it — and is converted with
 // the same rate as the snapshots it sits next to.
 //
-// The flow of a position loaded with history behind it is its cost, while the
-// value it brings in is what it is worth today, so the gain it accumulated
-// before the app ever saw it lands on that one day. That is the honest limit of
-// a series that only knows what it was told, when it was told: nobody watched
-// that gain happen, and there is no earlier point to spread it over.
+// A position loaded with history behind it — a trade dated before the stretch
+// it lands in — is not money moved while the series watched. It flows in at
+// what the holding was worth when it was recorded (recorded_market_price,
+// 000036), not at its cost: at cost, the gain it made before the app ever saw
+// it became the return of the day it was typed in, and an account that had
+// earned 15% over its cost reported +42%.
 //
 // The series closes on asOf, and that point is not a snapshot. The job writes
 // one row a day, so between two runs the stored series trails the account: a
@@ -270,38 +271,49 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, use
 			--
 			-- One no closed day reflects yet lands on asOf, the live point that
 			-- already carries its money.
+			--
+			-- What it counts for depends on when it was traded. A trade dated
+			-- inside the stretch that ends on its landing point is money the
+			-- owner moved while the series watched, so it counts at what it
+			-- cost, commission included. One dated before that stretch opened is
+			-- history being loaded: the holding walks in at what it was worth
+			-- when it was recorded, and the gain it made before anyone here saw
+			-- it is not the return of the day it happened to be typed in. Its
+			-- fee and the income it paid back then belong to the same unwatched
+			-- past and carry no flow (transaction_holding_flow, 000036).
 			SELECT
-				COALESCE(
-					(
-						SELECT MIN(ps.snapshot_date)
-						FROM portfolio_snapshots ps
-						WHERE ps.portfolio_id = pe.portfolio_id
-						  AND ps.snapshot_date < $5::date
-						  AND ps.created_at >= tx.created_at
-					),
-					$5::date
-				) AS snapshot_date,
-				-- Two rates, and the order of them is the point. tx.fx_rate is
-				-- historical: it carries the trade from the currency it was
-				-- quoted in to the one the account settled it in, at the rate of
-				-- that day. fxt.rate is current: it carries that settled amount
-				-- into whatever currency the series is being read in. Using the
-				-- current rate for both legs — which is what this did before
-				-- fx_rate existed — restates a December purchase at today's
-				-- rate and books the difference as a flow the owner never made.
-				--
-				-- The price and the fee are converted separately and handed in
-				-- already settled, so transaction_cash_flow is left as what its
-				-- own comment says it is: the sign convention, nothing else. It
-				-- cannot be given the raw amounts and one rate, because a
-				-- commission billed to the account never rode the trade's
-				-- conversion and multiplying it by that rate invents a cost.
-				transaction_cash_flow(
-					tx.type,
-					tx.quantity,
-					tx.price * tx.fx_rate,
-					transaction_fees_in_cost(tx.fees, tx.fees_currency, tx.currency, tx.fx_rate)
-				) * COALESCE(fxt.rate, 1) AS amount
+				landed.snapshot_date,
+				CASE
+					WHEN tx.transaction_date < stretch.opened_on THEN
+						-- recorded_market_price is in the portfolio's base
+						-- currency, like the snapshot the holding lands in.
+						transaction_holding_flow(tx.type, tx.quantity, tx.recorded_market_price)
+							* COALESCE(fxb.rate, 1)
+					ELSE
+						-- Two rates, and the order of them is the point. tx.fx_rate
+						-- is historical: it carries the trade from the currency it
+						-- was quoted in to the one the account settled it in, at the
+						-- rate of that day. fxt.rate is current: it carries that
+						-- settled amount into whatever currency the series is being
+						-- read in. Using the current rate for both legs — which is
+						-- what this did before fx_rate existed — restates a December
+						-- purchase at today's rate and books the difference as a
+						-- flow the owner never made.
+						--
+						-- The price and the fee are converted separately and handed
+						-- in already settled, so transaction_cash_flow is left as
+						-- what its own comment says it is: the sign convention,
+						-- nothing else. It cannot be given the raw amounts and one
+						-- rate, because a commission billed to the account never
+						-- rode the trade's conversion and multiplying it by that
+						-- rate invents a cost.
+						transaction_cash_flow(
+							tx.type,
+							tx.quantity,
+							tx.price * tx.fx_rate,
+							transaction_fees_in_cost(tx.fees, tx.fees_currency, tx.currency, tx.fx_rate)
+						) * COALESCE(fxt.rate, 1)
+				END AS amount
 			FROM transactions tx
 			JOIN portfolio_entries pe ON pe.id = tx.entry_id
 			JOIN portfolios pf        ON pf.id = pe.portfolio_id
@@ -312,6 +324,25 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, use
 			CROSS JOIN LATERAL (
 				SELECT fx_rate(pf.user_id, pe.cost_currency, tgt.code) AS rate
 			) fxt
+			CROSS JOIN LATERAL (
+				SELECT fx_rate(pf.user_id, pf.base_currency, tgt.code) AS rate
+			) fxb
+			-- The point the transaction lands on...
+			CROSS JOIN LATERAL (
+				SELECT COALESCE(MIN(ps.snapshot_date), $5::date) AS snapshot_date
+				FROM portfolio_snapshots ps
+				WHERE ps.portfolio_id = pe.portfolio_id
+				  AND ps.snapshot_date < $5::date
+				  AND ps.created_at >= tx.created_at
+			) landed
+			-- ...and the day the stretch ending there opened: the portfolio's
+			-- previous snapshot, or the day before for its first one.
+			CROSS JOIN LATERAL (
+				SELECT COALESCE(MAX(ps.snapshot_date), landed.snapshot_date - 1) AS opened_on
+				FROM portfolio_snapshots ps
+				WHERE ps.portfolio_id = pe.portfolio_id
+				  AND ps.snapshot_date < landed.snapshot_date
+			) stretch
 			WHERE pf.user_id = $1
 		), net_flows AS (
 			-- A flow that lands outside the asked-for window drops off the join
@@ -412,35 +443,47 @@ func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context
 			LEFT JOIN portfolio_summary sm ON sm.portfolio_id = p.id
 			WHERE p.id = $1 AND p.user_id = $2
 		), flows AS (
-			-- By when the transaction was recorded, not when it was traded, and
-			-- on asOf while no closed day reflects it: see the account-wide query.
+			-- By when the transaction was recorded, not when it was traded; on
+			-- asOf while no closed day reflects it; and at what the holding was
+			-- worth when a trade predates the stretch it lands in: see the
+			-- account-wide query for all three.
 			SELECT
-				COALESCE(
-					(
-						SELECT MIN(ps.snapshot_date)
-						FROM portfolio_snapshots ps
-						WHERE ps.portfolio_id = $1
-						  AND ps.snapshot_date < $5::date
-						  AND ps.created_at >= tx.created_at
-					),
-					$5::date
-				) AS snapshot_date,
-				-- Historical rate onto the position's own currency, then the
-				-- current one onto the portfolio's base, with the fee converted
-				-- on its own side: see the account-wide query for why neither
-				-- pair can be collapsed into one.
-				transaction_cash_flow(
-					tx.type,
-					tx.quantity,
-					tx.price * tx.fx_rate,
-					transaction_fees_in_cost(tx.fees, tx.fees_currency, tx.currency, tx.fx_rate)
-				) * COALESCE(fxt.rate, 1) AS amount
+				landed.snapshot_date,
+				CASE
+					WHEN tx.transaction_date < stretch.opened_on THEN
+						-- Already in the portfolio's base currency.
+						transaction_holding_flow(tx.type, tx.quantity, tx.recorded_market_price)
+					ELSE
+						-- Historical rate onto the position's own currency, then the
+						-- current one onto the portfolio's base, with the fee
+						-- converted on its own side: see the account-wide query for
+						-- why neither pair can be collapsed into one.
+						transaction_cash_flow(
+							tx.type,
+							tx.quantity,
+							tx.price * tx.fx_rate,
+							transaction_fees_in_cost(tx.fees, tx.fees_currency, tx.currency, tx.fx_rate)
+						) * COALESCE(fxt.rate, 1)
+				END AS amount
 			FROM transactions tx
 			JOIN portfolio_entries pe ON pe.id = tx.entry_id
 			JOIN portfolios pf        ON pf.id = pe.portfolio_id
 			CROSS JOIN LATERAL (
 				SELECT fx_rate(pf.user_id, pe.cost_currency, pf.base_currency) AS rate
 			) fxt
+			CROSS JOIN LATERAL (
+				SELECT COALESCE(MIN(ps.snapshot_date), $5::date) AS snapshot_date
+				FROM portfolio_snapshots ps
+				WHERE ps.portfolio_id = $1
+				  AND ps.snapshot_date < $5::date
+				  AND ps.created_at >= tx.created_at
+			) landed
+			CROSS JOIN LATERAL (
+				SELECT COALESCE(MAX(ps.snapshot_date), landed.snapshot_date - 1) AS opened_on
+				FROM portfolio_snapshots ps
+				WHERE ps.portfolio_id = $1
+				  AND ps.snapshot_date < landed.snapshot_date
+			) stretch
 			WHERE pe.portfolio_id = $1 AND pf.user_id = $2
 		), net_flows AS (
 			SELECT snapshot_date, SUM(amount) AS net_flow
