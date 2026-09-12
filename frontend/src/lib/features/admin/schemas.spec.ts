@@ -62,7 +62,8 @@ describe('assetCreateSchema', () => {
 			name: ' Apple Inc. ',
 			assetType: 'stock',
 			currency: 'usd',
-			exchange: ' NASDAQ '
+			exchange: ' NASDAQ ',
+			sector: ' technology '
 		});
 
 		expect(parsed).toEqual({
@@ -70,8 +71,45 @@ describe('assetCreateSchema', () => {
 			name: 'Apple Inc.',
 			assetType: 'stock',
 			currency: 'USD',
-			exchange: 'NASDAQ'
+			exchange: 'NASDAQ',
+			sector: 'technology'
 		});
+	});
+
+	/*
+	 * El formulario esconde el desplegable de industria cuando el tipo no la
+	 * admite, así que el envío de una cripto no trae el campo. Ausente tiene que
+	 * leerse como «sin clasificar» y no romper el alta: es el camino normal de
+	 * la mitad del catálogo.
+	 */
+	it('deja la industria vacía cuando el formulario no manda el campo', () => {
+		const parsed = assetCreateSchema.parse({
+			ticker: 'BTC-USD',
+			name: 'Bitcoin',
+			assetType: 'crypto',
+			currency: 'USD'
+		});
+
+		expect(parsed.sector).toBe('');
+	});
+
+	/*
+	 * El sector no se valida contra una lista aquí a propósito: el backend lo
+	 * normaliza («Tecnología», «Financial Services» y `technology` son el mismo
+	 * sector) y rechaza lo que no reconoce. Cerrar el vocabulario en este lado
+	 * dejaría fuera grafías que el servidor sí acepta, y una importación manda
+	 * justamente esas.
+	 */
+	it('deja pasar la grafía libre de la industria', () => {
+		const parsed = assetCreateSchema.parse({
+			ticker: 'JPM',
+			name: 'JPMorgan',
+			assetType: 'stock',
+			currency: 'USD',
+			sector: 'Financial Services'
+		});
+
+		expect(parsed.sector).toBe('Financial Services');
 	});
 
 	it('da el mismo aviso falte el campo que falte', () => {
@@ -127,6 +165,7 @@ describe('assetUpdateSchema', () => {
 		assetType: 'stock',
 		currency: 'usd',
 		exchange: ' NASDAQ ',
+		sector: 'technology',
 		isCurated: 'on',
 		price: ' 190.50 '
 	};
@@ -139,9 +178,21 @@ describe('assetUpdateSchema', () => {
 			assetType: 'stock',
 			currency: 'USD',
 			exchange: 'NASDAQ',
+			sector: 'technology',
 			isCurated: true,
 			price: '190.50'
 		});
+	});
+
+	// Reclasificar un activo a cripto esconde el desplegable, y entonces el
+	// envío no trae `sector`: el backend lo lee como vacío y le quita la
+	// industria, que es lo correcto —una cripto no puede tener una— y no un
+	// descuido del formulario.
+	it('lee la industria ausente como una desclasificación', () => {
+		const { sector, ...withoutSector } = full;
+		void sector;
+
+		expect(assetUpdateSchema.parse(withoutSector).sector).toBe('');
 	});
 
 	// El checkbox no manda nada cuando está desmarcado, así que `null` es la

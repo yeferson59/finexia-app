@@ -119,6 +119,38 @@ describe('cómo está cada bloque', () => {
 		);
 	});
 
+	/*
+	 * Lo que falta por clasificar es trabajo pendiente y por eso entra en el
+	 * resumen. Pero solo cuenta en lo que *puede* llevar industria: una cripto
+	 * sin sector no le falta nada, y meterla en la cuenta daría un aviso que no
+	 * baja a cero por mucho que se trabaje.
+	 */
+	it('cuenta lo que falta por clasificar sin contar lo que no lleva industria', () => {
+		const assets = [
+			{
+				id: '1',
+				assetType: 'stock',
+				sector: 'technology',
+				priceUpdatedAt: ago(1),
+				isCurated: true
+			},
+			{ id: '2', assetType: 'stock', sector: '', priceUpdatedAt: ago(1), isCurated: true },
+			{ id: '3', assetType: 'etf', priceUpdatedAt: ago(1), isCurated: true },
+			{ id: '4', assetType: 'crypto', priceUpdatedAt: ago(1), isCurated: true }
+		] as Asset[];
+
+		expect(describeAssets(assets, NOW)).toBe(
+			'4 activos: 2 están sin industria y el reparto por industria los cuenta aparte.'
+		);
+
+		// Clasificados los dos que faltaban, no queda nada que avisar: la cripto
+		// nunca estuvo en la cuenta.
+		const done = assets.map((a) =>
+			a.assetType === 'crypto' ? a : ({ ...a, sector: 'technology' } as Asset)
+		);
+		expect(describeAssets(done, NOW)).toBe('4 activos, todos con un precio de esta semana.');
+	});
+
 	it('cuenta las tasas por quién las mantiene', () => {
 		const rates = [
 			{ id: '1', source: 'dolarapi' },

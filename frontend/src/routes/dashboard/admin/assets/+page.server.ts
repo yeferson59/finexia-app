@@ -21,7 +21,8 @@ export const actions = {
 			name: fd.get('name') ?? '',
 			assetType: fd.get('assetType') ?? '',
 			currency: fd.get('currency') ?? '',
-			exchange: fd.get('exchange') ?? ''
+			exchange: fd.get('exchange') ?? '',
+			sector: fd.get('sector') ?? ''
 		});
 
 		if (!parsed.success) {
@@ -52,6 +53,7 @@ export const actions = {
 			assetType: fd.get('assetType') ?? '',
 			currency: fd.get('currency') ?? '',
 			exchange: fd.get('exchange') ?? '',
+			sector: fd.get('sector') ?? '',
 			isCurated: fd.get('isCurated'),
 			// El texto tal cual, como en `updatePrice`: convertirlo a número
 			// perdería los decimales de cola que el backend guarda como llegan.

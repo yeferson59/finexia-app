@@ -39,6 +39,45 @@ export const SECTOR_LABELS: Record<string, string> = {
 };
 
 /**
+ * Los sectores que un activo puede llevar, en el orden en que se ofrecen.
+ *
+ * Deja fuera los dos cubos a propósito: `unclassified` y `not_applicable` los
+ * deriva el backend al repartir y no se guardan nunca, así que ofrecerlos en un
+ * desplegable sería ofrecer un valor que la API rechaza con 400. «Sin
+ * clasificar» ya es lo que significa dejar el campo vacío.
+ */
+export const SECTOR_OPTIONS = [
+	'technology',
+	'communication_services',
+	'healthcare',
+	'financials',
+	'consumer_discretionary',
+	'consumer_staples',
+	'industrials',
+	'energy',
+	'materials',
+	'utilities',
+	'real_estate'
+].map((value) => ({ value, label: SECTOR_LABELS[value] }));
+
+/**
+ * Clases de activo que pueden llevar sector, que es la misma línea que traza
+ * `market.AssetType.HasSector` en el backend: hay una empresa detrás de una
+ * acción, un fondo o un bono, y no la hay detrás de una cripto, un saldo en
+ * efectivo, un inmueble o un lingote.
+ *
+ * Se repite aquí para poder **no enseñar** el campo cuando no aplica, en vez de
+ * dejar que el usuario lo rellene y que la API conteste 400. El backend sigue
+ * siendo quien decide; esto solo evita ofrecer lo que va a rechazar.
+ */
+const CLASSIFIABLE_TYPES = new Set(['stock', 'etf', 'bond', 'other']);
+
+/** Si una clase de activo admite sector. */
+export function typeHasSector(assetType: string): boolean {
+	return CLASSIFIABLE_TYPES.has(assetType);
+}
+
+/**
  * Etiqueta legible de un sector. Uno desconocido conserva su nombre crudo en
  * vez de desaparecer del gráfico: la fila representa dinero del usuario y
  * esconderla descuadraría el reparto.

@@ -25,6 +25,11 @@ export const assetSchema = z.object({
 	assetType: z.string(),
 	currency: z.string(),
 	exchange: z.string().optional(),
+	/**
+	 * Industria del activo, vacía cuando nadie lo ha clasificado. Opcional para
+	 * tolerar un backend anterior.
+	 */
+	sector: z.string().optional(),
 	currentPrice: assetPriceSchema.nullable(),
 	priceUpdatedAt: z.string().nullable(),
 	/**

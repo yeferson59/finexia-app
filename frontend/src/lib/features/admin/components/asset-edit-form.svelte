@@ -19,6 +19,7 @@
 	import { untrack } from 'svelte';
 	import Button from '$lib/ui/button.svelte';
 	import Checkbox from '$lib/ui/checkbox.svelte';
+	import { SECTOR_OPTIONS, typeHasSector } from '$lib/shared/format/sector';
 	import { ASSET_TYPES, type Asset } from '../admin';
 
 	interface Props {
@@ -43,6 +44,7 @@
 			assetType: asset.assetType,
 			currency: asset.currency,
 			exchange: asset.exchange ?? '',
+			sector: asset.sector ?? '',
 			// En blanco a propósito: el campo pide un precio *nuevo*, y el que ya
 			// hay se ve al lado. Prellenarlo haría que cualquier edición lo
 			// reescribiera con la misma cifra y le pusiera fecha de hoy, que es
@@ -53,6 +55,18 @@
 	);
 
 	let saving = $state(false);
+
+	/*
+	 * La industria depende del tipo y por eso se mira el borrador y no la prop:
+	 * cambiar un activo de acción a cripto tiene que hacer desaparecer el campo
+	 * en el acto, porque el backend rechaza un sector sobre algo que no lleva
+	 * empresa detrás.
+	 *
+	 * Al ocultarse, el `select` deja de existir y con él su valor, así que el
+	 * envío no lleva `sector` y el backend lo lee como vacío: reclasificar el
+	 * activo le quita la industria, que es lo correcto y no un descuido.
+	 */
+	const classifiable = $derived(typeHasSector(draft.assetType));
 
 	/**
 	 * Cambiar la moneda sin dar un precio nuevo borra el que hay guardado: el
@@ -143,6 +157,22 @@
 			/>
 		</div>
 	</div>
+
+	{#if classifiable}
+		<div class="field">
+			<label for="edit-sector">Industria <span class="optional">(opcional)</span></label>
+			<select id="edit-sector" name="sector" bind:value={draft.sector}>
+				<option value="">Sin clasificar</option>
+				{#each SECTOR_OPTIONS as s (s.value)}
+					<option value={s.value}>{s.label}</option>
+				{/each}
+			</select>
+			<p class="hint">
+				Con esto el panel puede repartir el patrimonio por industria. Volver a «Sin clasificar»
+				borra la clasificación.
+			</p>
+		</div>
+	{/if}
 
 	<div class="field">
 		<label for="edit-price">

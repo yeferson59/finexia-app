@@ -12,6 +12,7 @@
 	 */
 	import { enhance } from '$app/forms';
 	import Button from '$lib/ui/button.svelte';
+	import { SECTOR_OPTIONS, typeHasSector } from '$lib/shared/format/sector';
 	import { ASSET_TYPES } from '../admin';
 
 	interface Props {
@@ -28,6 +29,16 @@
 	let { error = '', onSuccess, onCancel }: Props = $props();
 
 	let creating = $state(false);
+
+	/*
+	 * El tipo se sigue desde aquí porque la industria depende de él: detrás de
+	 * una cripto, un saldo o un inmueble no hay empresa que clasificar, y el
+	 * backend contesta 400 a quien lo intente. Enseñar el campo y que el
+	 * servidor lo rechace sería pedir un dato para luego negarlo; mejor no
+	 * ofrecerlo.
+	 */
+	let assetType = $state('');
+	const classifiable = $derived(typeHasSector(assetType));
 </script>
 
 <form
@@ -77,7 +88,7 @@
 	<div class="pair">
 		<div class="field">
 			<label for="assetType">Tipo</label>
-			<select id="assetType" name="assetType" required>
+			<select id="assetType" name="assetType" bind:value={assetType} required>
 				<option value="" disabled selected>Elige un tipo</option>
 				{#each ASSET_TYPES as t (t.value)}
 					<option value={t.value}>{t.label}</option>
@@ -89,6 +100,22 @@
 			<input id="exchange" type="text" name="exchange" placeholder="NASDAQ" />
 		</div>
 	</div>
+
+	{#if classifiable}
+		<div class="field">
+			<label for="sector">Industria <span class="optional">(opcional)</span></label>
+			<select id="sector" name="sector">
+				<option value="">Sin clasificar</option>
+				{#each SECTOR_OPTIONS as s (s.value)}
+					<option value={s.value}>{s.label}</option>
+				{/each}
+			</select>
+			<p class="hint">
+				Es lo que reparte el panel por industria. Dejarlo sin clasificar no rompe nada: esa parte
+				del patrimonio se cuenta aparte, con su propia etiqueta.
+			</p>
+		</div>
+	{/if}
 
 	{#if error}
 		<p class="feedback error" role="alert">{error}</p>
@@ -103,6 +130,13 @@
 </form>
 
 <style>
+	.hint {
+		margin: 0.35rem 0 0;
+		font-size: 0.78rem;
+		line-height: 1.45;
+		color: var(--text-dim);
+	}
+
 	.actions {
 		display: flex;
 		justify-content: flex-end;

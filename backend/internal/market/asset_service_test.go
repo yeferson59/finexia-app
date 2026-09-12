@@ -217,6 +217,74 @@ func TestHandlerCreateAsset(t *testing.T) {
 		}
 	})
 
+	// The admin form posts the sector as free text — the select sends the
+	// canonical value, a re-import can send anything — so what the handler does
+	// with that string is the contract the form depends on.
+	t.Run("the sector arrives normalised from whatever the form sent", func(t *testing.T) {
+		for _, spelling := range []string{"technology", "Tecnología", "Technology"} {
+			var got Sector
+			repo := new(fakeRepository{
+				upsertAsset: func(_ context.Context, ticker, _ string, _ AssetType, _ string, _ money.Currency, sector Sector) (Asset, error) {
+					got = sector
+
+					return Asset{ID: uuid.New(), Ticker: ticker}, nil
+				},
+			})
+
+			withSector := `{"ticker":"aapl","name":"Apple","assetType":"stock","currency":"usd","sector":"` + spelling + `"}`
+
+			resp := request(t, newAssetApp(t, repo, userID, "admin"), http.MethodPost, "/assets", withSector)
+			if resp.StatusCode != fiber.StatusCreated {
+				t.Fatalf("%q: status = %d, want 201", spelling, resp.StatusCode)
+			}
+			if got != SectorTechnology {
+				t.Errorf("%q reached the service as %q, want technology", spelling, got)
+			}
+		}
+	})
+
+	// A label nobody recognises is refused rather than dropped: the form said
+	// something about this asset, and creating the row without it would report
+	// a success for a field that never landed.
+	t.Run("an unknown sector is a 400 and writes nothing", func(t *testing.T) {
+		repo := new(fakeRepository{
+			upsertAsset: func(context.Context, string, string, AssetType, string, money.Currency, Sector) (Asset, error) {
+				t.Fatal("a row was written despite an unusable sector")
+
+				return Asset{}, nil
+			},
+		})
+
+		bad := `{"ticker":"aapl","name":"Apple","assetType":"stock","currency":"usd","sector":"ganaderia"}`
+
+		resp := request(t, newAssetApp(t, repo, userID, "admin"), http.MethodPost, "/assets", bad)
+		if resp.StatusCode != fiber.StatusBadRequest {
+			t.Fatalf("status = %d, want 400", resp.StatusCode)
+		}
+	})
+
+	// The form hides the select for a type that cannot carry one, so an omitted
+	// sector is the ordinary path for half the catalog and must not fail.
+	t.Run("an omitted sector creates the asset unclassified", func(t *testing.T) {
+		var got Sector
+		var called bool
+		repo := new(fakeRepository{
+			upsertAsset: func(_ context.Context, ticker, _ string, _ AssetType, _ string, _ money.Currency, sector Sector) (Asset, error) {
+				got, called = sector, true
+
+				return Asset{ID: uuid.New(), Ticker: ticker}, nil
+			},
+		})
+
+		resp := request(t, newAssetApp(t, repo, userID, "admin"), http.MethodPost, "/assets", body)
+		if resp.StatusCode != fiber.StatusCreated {
+			t.Fatalf("status = %d, want 201", resp.StatusCode)
+		}
+		if !called || got != SectorNone {
+			t.Errorf("sector = %q (reached=%t), want none", got, called)
+		}
+	})
+
 	t.Run("the quota answers 429", func(t *testing.T) {
 		repo := new(fakeRepository{
 			countContributed: func(context.Context, uuid.UUID, time.Time) (int, error) {

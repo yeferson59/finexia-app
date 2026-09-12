@@ -16,6 +16,7 @@
 	import EmptyState from '$lib/ui/empty-state.svelte';
 	import Pagination from '$lib/ui/pagination.svelte';
 	import { formatAssetType } from '$lib/shared/format/asset-type';
+	import { formatSector, typeHasSector } from '$lib/shared/format/sector';
 	import AdminBlock from './admin-block.svelte';
 	import { formatDateTime, formatPrice, type Asset } from '../admin';
 	import { describeAssets, formatAge, isStale } from '../desk';
@@ -89,7 +90,19 @@
 								<Badge tone="warning">Aportado</Badge>
 							{/if}
 						</td>
-						<td>{formatAssetType(asset.assetType)}</td>
+						<td>
+							{formatAssetType(asset.assetType)}
+							<!-- La industria va debajo del tipo y no en columna propia: la
+							     matiza, y una columna más le daría el mismo peso que al
+							     precio, que es la cifra por la que se entra a esta tabla.
+							     Solo se marca «Sin industria» en lo que puede llevarla: en
+							     una cripto no falta nada. -->
+							{#if asset.sector}
+								<span class="cell-sector">{formatSector(asset.sector)}</span>
+							{:else if typeHasSector(asset.assetType)}
+								<span class="cell-sector missing">Sin industria</span>
+							{/if}
+						</td>
 						<td class="num">{formatPrice(asset.currentPrice, asset.currency)}</td>
 						<td class="cell-age" class:aged={stale} title={formatDateTime(asset.priceUpdatedAt)}>
 							{formatAge(asset.priceUpdatedAt)}

@@ -44,7 +44,13 @@ export const assetCreateSchema = z.object({
 	name: z.string().trim().min(1, REQUIRED_ASSET_FIELDS),
 	assetType: z.string().trim().min(1, REQUIRED_ASSET_FIELDS),
 	currency: z.string().trim().toUpperCase().min(1, REQUIRED_ASSET_FIELDS),
-	exchange: z.string().trim().default('')
+	exchange: z.string().trim().default(''),
+	// Opcional y sin lista cerrada aquí: el backend acepta texto libre y lo
+	// normaliza («Tecnología», «Technology», `technology` son el mismo sector),
+	// así que repetir el vocabulario en este lado solo serviría para rechazar
+	// grafías que el servidor sí entiende. El desplegable manda los valores
+	// canónicos; una importación puede mandar cualquier otra cosa.
+	sector: z.string().trim().default('')
 });
 
 /**
@@ -81,6 +87,7 @@ export const assetUpdateSchema = z.object({
 	assetType: z.string().trim().min(1, REQUIRED_ASSET_FIELDS),
 	currency: z.string().trim().toUpperCase().min(1, REQUIRED_ASSET_FIELDS),
 	exchange: z.string().trim().default(''),
+	sector: z.string().trim().default(''),
 	isCurated: z
 		.union([z.string(), z.boolean(), z.null(), z.undefined()])
 		.transform((v) => v === true || v === 'on' || v === 'true'),

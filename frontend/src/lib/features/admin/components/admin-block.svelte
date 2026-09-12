@@ -140,6 +140,23 @@
 		font-weight: 500;
 	}
 
+	/* Segunda línea de una celda: la industria bajo el tipo de activo. Matiza el
+	   dato de arriba en vez de competir con él, que es lo que haría una columna
+	   propia en una tabla cuya cifra importante es el precio. */
+	.block :global(.cell-sector) {
+		display: block;
+		margin-top: 0.15rem;
+		font-size: 0.75rem;
+		color: var(--text-dim);
+	}
+
+	/* Un pendiente, no un error: se distingue del dato escrito sin gritar como
+	   grita un precio que falta. */
+	.block :global(.cell-sector.missing) {
+		font-style: italic;
+		opacity: 0.75;
+	}
+
 	.block :global(.cell-email) {
 		font-family: var(--font-mono);
 		font-size: 0.8rem;

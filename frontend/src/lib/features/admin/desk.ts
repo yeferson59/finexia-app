@@ -7,6 +7,7 @@
  */
 
 import type { Asset, ExchangeRate, InvitationItem, UserItem, WaitlistItem } from '$lib/api/types';
+import { typeHasSector } from '$lib/shared/format/sector';
 
 // --- Antigüedad -------------------------------------------------------------
 
@@ -162,7 +163,7 @@ export function describeUsers(users: UserItem[], total: number, morePages = fals
 	return morePages ? `${head}. En esta página, ${list}.` : `${head}: ${list}.`;
 }
 
-/** El catálogo compartido: cuánto hay y cuánto se quedó viejo. */
+/** El catálogo compartido: cuánto hay, cuánto se quedó viejo y cuánto falta clasificar. */
 export function describeAssets(assets: Asset[], now: Date = new Date()): string {
 	if (assets.length === 0) return 'El catálogo está vacío.';
 
@@ -185,6 +186,18 @@ export function describeAssets(assets: Asset[], now: Date = new Date()): string 
 			contributed === 1
 				? 'uno lo aportó un usuario y solo lo ve quien lo aportó'
 				: `${contributed} los aportaron usuarios y solo los ven quienes los aportaron`
+		);
+	}
+
+	// Solo cuentan los que *pueden* llevar industria. Una cripto sin sector no
+	// es trabajo pendiente —no hay empresa detrás— y meterla en la cuenta
+	// convertiría un aviso accionable en un número que nunca baja a cero.
+	const unclassified = assets.filter((a) => typeHasSector(a.assetType) && !a.sector).length;
+	if (unclassified > 0) {
+		notes.push(
+			unclassified === 1
+				? 'uno está sin industria y el reparto por industria lo cuenta aparte'
+				: `${unclassified} están sin industria y el reparto por industria los cuenta aparte`
 		);
 	}
 
