@@ -30,6 +30,15 @@ var (
 	errAssetExchangeTooLong = httpx.AsBadRequest(errors.New("el mercado supera el máximo de caracteres"))
 	errAssetTypeInvalid     = httpx.AsBadRequest(errors.New("el tipo de activo debe ser uno de: stock, etf, crypto, bond, cash, real_estate, commodity, other"))
 	errAssetCurrencyInvalid = httpx.AsBadRequest(errors.New("la moneda debe ser un código ISO de 3 letras"))
+	// errAssetSectorInvalid answers a label NormalizeSector could not place.
+	// Spelling is not the issue — that is what the synonym table absorbs — so a
+	// value that reaches here is a sector nobody recognises, and guessing one
+	// would file the user's money under an industry they did not choose.
+	errAssetSectorInvalid = httpx.AsBadRequest(errors.New("el sector no se reconoce: usa uno de los once sectores conocidos o deja el campo vacío"))
+	// errAssetSectorNotApplicable answers a sector on an asset that cannot have
+	// one — a coin, a cash balance, a flat, a bar of gold. Storing it would be
+	// storing a value no screen reads: the breakdown files these by their type.
+	errAssetSectorNotApplicable = httpx.AsBadRequest(errors.New("este tipo de activo no lleva sector: solo acciones, ETFs, bonos y otros"))
 	// errAssetPriceInvalid guards the manual price an edit may carry. Creation
 	// has no counterpart because a new row starts without one: a price only
 	// reaches this table through an update.
@@ -71,6 +80,7 @@ func assetFailureDetail(err error, fallback string) string {
 	for _, domain := range []error{
 		errAssetTickerRequired, errAssetTickerTooLong, errAssetExchangeTooLong,
 		errAssetTypeInvalid, errAssetCurrencyInvalid, errAssetPriceInvalid,
+		errAssetSectorInvalid, errAssetSectorNotApplicable,
 		errAssetDuplicate, ErrAssetQuotaExceeded,
 	} {
 		if errors.Is(err, domain) {

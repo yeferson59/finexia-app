@@ -89,6 +89,7 @@ type Holding struct {
 	Name      string `json:"name"`
 	AssetType string `json:"assetType" jsonschema:"stock, etf, crypto, bond, cash, real_estate, commodity or other"`
 	Exchange  string `json:"exchange,omitempty"`
+	Sector    string `json:"sector,omitempty" jsonschema:"the industry behind the asset. Empty means the catalog has no classification for it, not that it has none — get_sector_allocation tells the two apart."`
 	// Quantity is a sum of units and only means something per asset — never
 	// across rows. MarketValue is what compares, which is why it alone is
 	// converted into DisplayCurrency.
@@ -113,6 +114,23 @@ type AllocationSlice struct {
 	MarketValue string `json:"marketValue"`
 	Currency    string `json:"currency"`
 	Unconverted int64  `json:"positionsUnconverted" jsonschema:"positions in this category added at face value because no exchange rate reached currency"`
+}
+
+// SectorAllocationOutput is the answer of get_sector_allocation.
+type SectorAllocationOutput struct {
+	Allocation []SectorSlice `json:"allocation"`
+}
+
+// SectorSlice is one industry and what the user holds in it. Every slice is in
+// the same currency, which is what makes the shares add up, and every position
+// the user holds lands in exactly one slice — including the two that stand for
+// the absence of a classification.
+type SectorSlice struct {
+	Sector      string `json:"sector" jsonschema:"technology, communication_services, healthcare, financials, consumer_discretionary, consumer_staples, industrials, energy, materials, utilities, real_estate, or one of two buckets: unclassified (the asset could be classified and nobody has) and not_applicable (a coin, a cash balance, a property — nothing to classify)"`
+	MarketValue string `json:"marketValue"`
+	Currency    string `json:"currency"`
+	Assets      int64  `json:"assets" jsonschema:"how many distinct assets are behind this slice"`
+	Unconverted int64  `json:"positionsUnconverted" jsonschema:"positions in this sector added at face value because no exchange rate reached currency"`
 }
 
 // TransactionsOutput is the answer of list_recent_transactions.
@@ -212,6 +230,7 @@ type Asset struct {
 	Name      string `json:"name"`
 	AssetType string `json:"assetType" jsonschema:"stock, etf, crypto, bond, cash, real_estate, commodity or other"`
 	Exchange  string `json:"exchange,omitempty"`
+	Sector    string `json:"sector,omitempty" jsonschema:"the industry behind the asset. Empty means the catalog has no classification for it, not that it has none — get_sector_allocation tells the two apart."`
 	Currency  string `json:"currency" jsonschema:"the currency the asset is quoted in"`
 	// Price is the catalog's shared reference price, not a per-user valuation:
 	// it is what an operator entered or the last sync stored. A holding's own

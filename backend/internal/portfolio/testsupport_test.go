@@ -139,6 +139,7 @@ type fakeRepository struct {
 	getRecentTransactionsByUserID   func(ctx context.Context, userID uuid.UUID, limit int) ([]Transaction, error)
 	getAssetAllocationByUserID      func(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AllocationItem, error)
 	getAssetHoldingsByUserID        func(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AssetHolding, error)
+	getSectorAllocationByUserID     func(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]SectorAllocationItem, error)
 	createTransaction               func(ctx context.Context, userID, entryID uuid.UUID, in TransactionInput) (Transaction, error)
 	updateTransaction               func(ctx context.Context, userID, txnID uuid.UUID, in TransactionInput) (Transaction, error)
 	deleteTransaction               func(ctx context.Context, userID, txnID uuid.UUID) error
@@ -242,6 +243,16 @@ func (f *fakeRepository) GetAssetAllocationByUserID(ctx context.Context, userID 
 
 func (f *fakeRepository) GetAssetHoldingsByUserID(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AssetHolding, error) {
 	return f.getAssetHoldingsByUserID(ctx, userID, targetCurrency)
+}
+
+// Defaults to an empty breakdown so the scenarios that do not exercise it are
+// not made to stub it.
+func (f *fakeRepository) GetSectorAllocationByUserID(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]SectorAllocationItem, error) {
+	if f.getSectorAllocationByUserID == nil {
+		return nil, nil
+	}
+
+	return f.getSectorAllocationByUserID(ctx, userID, targetCurrency)
 }
 
 func (f *fakeRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, in TransactionInput) (Transaction, error) {

@@ -1,8 +1,13 @@
 /*
- * Las tres lecturas del patrimonio: dónde está custodiado (plataforma), cómo lo
- * agrupó el usuario (portafolio) y en qué está invertido (tipo de activo).
+ * Las cuatro lecturas del patrimonio: dónde está custodiado (plataforma), cómo
+ * lo agrupó el usuario (portafolio), en qué está invertido (tipo de activo) y a
+ * qué se dedica el dinero (industria).
  *
- * Son el mismo total leído de tres formas, y por eso viven juntas: comparten el
+ * La última contesta lo que ninguna de las otras puede: ocho tickers repartidos
+ * en tres portafolios pueden ser una sola apuesta a los semiconductores y
+ * parecer diversificados en las tres primeras lecturas.
+ *
+ * Son el mismo total leído de cuatro formas, y por eso viven juntas: comparten el
  * reparto porcentual, el trato de las filas que no se pudieron convertir y la
  * regla de cuándo una cifra de rendimiento se puede enseñar. Antes el panel
  * repetía el mismo total en tres tarjetas distintas sin descomponerlo ni una
@@ -11,21 +16,31 @@
  * Lógica pura y sin Svelte: es aritmética de dinero, que es justo lo que hay
  * que poder probar sin montar un componente.
  */
-import type { AllocationItem, Platform, PortfolioSummary } from '$lib/api/types';
+import type {
+	AllocationItem,
+	Platform,
+	PortfolioSummary,
+	SectorAllocationItem
+} from '$lib/api/types';
 import { partitionByCurrency } from '$lib/shared/currency';
 import { formatAssetType } from '$lib/shared/format/asset-type';
 import { formatPortfolioType } from '$lib/shared/format/portfolio-type';
+import { formatSector, sectorHint } from '$lib/shared/format/sector';
 
-/** Cuál de las tres lecturas se está mirando. */
-export type CutId = 'platform' | 'portfolio' | 'type';
+/** Cuál de las cuatro lecturas se está mirando. */
+export type CutId = 'platform' | 'portfolio' | 'type' | 'sector';
 
 export const CUTS: { id: CutId; label: string }[] = [
 	{ id: 'platform', label: 'Plataforma' },
 	{ id: 'portfolio', label: 'Portafolio' },
-	{ id: 'type', label: 'Tipo de activo' }
+	{ id: 'type', label: 'Tipo de activo' },
+	{ id: 'sector', label: 'Industria' }
 ];
 
-/** Una fila del reparto: una plataforma, un portafolio o una clase de activo. */
+/**
+ * Una fila del reparto: una plataforma, un portafolio, una clase de activo o
+ * una industria.
+ */
 export interface BreakdownRow {
 	/** Id de la entidad: con él, y con el corte, se arma el enlace de la fila. */
 	key: string;
@@ -58,9 +73,9 @@ export interface Breakdown {
 	/** Posiciones que sí se suman, pero sin convertir: el total mezcla monedas. */
 	unconverted: number;
 	/**
-	 * Qué mide la última columna. El reparto por tipo de activo sale de un
-	 * endpoint que no devuelve ganancias, así que allí la columna enseña la
-	 * participación en vez de inventar un rendimiento.
+	 * Qué mide la última columna. Los repartos por tipo de activo y por
+	 * industria salen de endpoints que no devuelven ganancias, así que allí la
+	 * columna enseña la participación en vez de inventar un rendimiento.
 	 */
 	trailing: 'gain' | 'share';
 }
@@ -161,13 +176,50 @@ export function typeBreakdown(allocation: AllocationItem[], currency: string): B
 	return finish(rows, allocation.length - usable.length, unconverted, 'share');
 }
 
+/**
+ * A qué se dedica el dinero.
+ *
+ * El backend ya manda las filas sin clasificar como un cubo propio y aquí se
+ * pintan igual que las demás, a propósito: son dinero del usuario, entran en el
+ * total y por tanto en el reparto. Filtrarlas dejaría un gráfico donde
+ * «Tecnología 40 %» querría decir «el 40 % de lo que resulta que sabemos», que
+ * es una afirmación distinta y el lector no tendría cómo notarlo.
+ *
+ * Lo que sí las distingue es la segunda línea: sin ella, «Sin clasificar» se lee
+ * como un sector más en vez de como lo que es, una tarea pendiente.
+ *
+ * Tampoco llevan enlace estas filas: no hay una página por industria.
+ */
+export function sectorBreakdown(sectors: SectorAllocationItem[], currency: string): Breakdown {
+	// Todas las filas vienen en la misma moneda; si no es la pedida, el reparto
+	// entero se queda fuera en vez de enseñarse bajo el símbolo ajeno.
+	const usable = sectors.filter((item) => (item.currency ?? currency) === currency);
+	const unconverted = usable.reduce((acc, item) => acc + (item.positionsUnconverted ?? 0), 0);
+
+	const rows = usable.map((item) => ({
+		key: item.sector,
+		label: formatSector(item.sector),
+		detail: sectorHint(item.sector) || plural(item.assets, 'activo', 'activos'),
+		value: num(item.marketValue),
+		gainPct: null
+	}));
+
+	return finish(rows, sectors.length - usable.length, unconverted, 'share');
+}
+
 /** El reparto pedido, ya listo para pintar. */
 export function breakdownFor(
 	cut: CutId,
-	data: { platforms: Platform[]; summaries: PortfolioSummary[]; allocation: AllocationItem[] },
+	data: {
+		platforms: Platform[];
+		summaries: PortfolioSummary[];
+		allocation: AllocationItem[];
+		sectors: SectorAllocationItem[];
+	},
 	currency: string
 ): Breakdown {
 	if (cut === 'platform') return platformBreakdown(data.platforms, currency);
 	if (cut === 'portfolio') return portfolioBreakdown(data.summaries, currency);
+	if (cut === 'sector') return sectorBreakdown(data.sectors, currency);
 	return typeBreakdown(data.allocation, currency);
 }

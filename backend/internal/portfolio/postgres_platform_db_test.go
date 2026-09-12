@@ -32,9 +32,7 @@ func platformsByWeight(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 		}
 	}
 
-	t.Cleanup(func() {
-		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
-	})
+	track := dropFixture(t, pool, userID)
 
 	exec(`INSERT INTO users (id, name, email, role_id, preferred_currency)
 	      VALUES ($1, 'platform probe', $2, (SELECT id FROM roles WHERE name = 'customer'), 'USD')`,
@@ -62,6 +60,7 @@ func platformsByWeight(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 		exec(`INSERT INTO assets (id, ticker, name, asset_type, currency, current_price)
 		      VALUES ($1, $2, 'probe', 'stock', 'USD', $3)`,
 			assetID, uuid.New().String()[:8], p.currentPrice)
+		track(assetID)
 		exec(`INSERT INTO portfolio_entries
 		        (portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date)
 		      VALUES ($1, $2, $3, $4, $5, 'USD', now())`,
@@ -154,6 +153,24 @@ func TestSoldOutPositionsDoNotCountAsHeld(t *testing.T) {
 	}
 
 	assetID := uuid.New()
+
+	// This one is planted by the test and not by the fixture, so it needs its
+	// own teardown — and the entry has to go with it, here rather than being
+	// left to dropFixture. t.Cleanup runs last-in-first-out: this was registered
+	// after the fixture's, so it runs before it, while the entry is still there
+	// and the foreign key would still refuse the asset.
+	t.Cleanup(func() {
+		ctx := context.Background()
+		for _, step := range []struct{ what, sql string }{
+			{"entry", `DELETE FROM portfolio_entries WHERE asset_id = $1`},
+			{"asset", `DELETE FROM assets WHERE id = $1`},
+		} {
+			if _, err := pool.Exec(ctx, step.sql, assetID); err != nil {
+				t.Logf("cleanup sold-out %s: %v", step.what, err)
+			}
+		}
+	})
+
 	if _, err := pool.Exec(ctx,
 		`INSERT INTO assets (id, ticker, name, asset_type, currency)
 		 VALUES ($1, $2, 'sold out', 'stock', 'JPY')`,

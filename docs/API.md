@@ -270,6 +270,7 @@ anterior deja de valer en el acto, sin ventana de gracia.
 | POST | `/portfolios/transactions/import/preview` | usuario | Preview del import (multipart `file`, `sheet`, `mapping`, `defaults`) |
 | POST | `/portfolios/transactions/import` | usuario | Import masivo (además `portfolioId`, `sourceId`; `mapping` obligatorio) |
 | GET | `/portfolios/allocation` | usuario | Asignación de activos por categoría (soporta `?currency=`) |
+| GET | `/portfolios/allocation/sectors` | usuario | Asignación por industria (soporta `?currency=`) |
 | GET | `/portfolios/holdings` | usuario | Activos consolidados: una fila por activo sumando todos los portfolios (soporta `?currency=`) |
 | POST | `/portfolios` | usuario | Crea portfolio |
 | POST | `/portfolios/sources` | usuario | Crea plataforma/fuente |
@@ -417,6 +418,59 @@ Ese campo se sigue **aceptando e ignorando**, así que un cliente antiguo que lo
 mande no se rompe; lo que ya no ocurre es que un valor inválido devuelva 400,
 porque no hay nada que validar. La clase de una posición la decide el activo.
 
+#### Reparto por industria
+
+`GET /portfolios/allocation/sectors` reparte las **mismas** posiciones que
+`/portfolios/allocation` por el sector del activo en vez de por su clase. Es la
+lectura que las otras no pueden dar: ocho tickers repartidos en tres portfolios
+pueden ser una sola apuesta a los semiconductores y parecer diversificados por
+tipo de activo.
+
+Mismo `?currency=` que la asignación y por la misma razón, misma cascada de
+precios y mismo `positionsUnconverted`. Lo que añade es `assets`, cuántos
+activos distintos hay detrás de la fila.
+
+El sector sale de `assets.sector`, un campo **del catálogo** —lo escriben la
+edición de admin, la importación de activos y la semilla—, no de ningún
+proveedor: la fila de `assets` es compartida entre usuarios justo porque no
+lleva datos licenciados (§ migración 000021), y un sector traído con la clave
+personal de alguien tendría que vivir en una tabla por usuario como los precios.
+
+##### Los dos huecos, que no son el mismo
+
+`sector` trae, además de los once sectores GICS (`technology`,
+`communication_services`, `healthcare`, `financials`, `consumer_discretionary`,
+`consumer_staples`, `industrials`, `energy`, `materials`, `utilities`,
+`real_estate`), dos cubos que el backend **deriva y nunca guarda**:
+
+- `unclassified` — el activo puede tener sector y nadie se lo ha puesto. Es
+  trabajo pendiente, y su tamaño es el dato: una cartera con el 60 % aquí
+  todavía no tiene respuesta por industria.
+- `not_applicable` — no hay industria que rellenar: una cripto, un saldo en
+  efectivo, un inmueble, un lingote.
+
+Se separan porque piden cosas distintas al lector, y se cuentan **dentro** del
+total: los `percent` son del patrimonio entero y no de la parte clasificada. Un
+reparto que escondiera las filas sin clasificar diría «Tecnología 40 %» cuando
+lo cierto es «el 40 % de lo que resulta que sabemos», y el cliente no tendría
+cómo notar la diferencia.
+
+Solo llevan sector las clases que tienen una empresa detrás —`stock`, `etf`,
+`bond` y `other`—; ponerle uno a una cripto o a un efectivo devuelve 400.
+
+##### Clasificar el catálogo
+
+- `POST /portfolios/assets` y `PATCH /portfolios/assets/:id` aceptan `sector`
+  como texto libre: «Tecnología», «Technology», «Financial Services» y
+  `technology` llegan todos al mismo valor. Uno que no se reconozca devuelve
+  400 en vez de guardarse vacío. En el `PATCH` el campo viaja entero como los
+  demás: mandarlo vacío **borra** la clasificación.
+- La importación de activos acepta una columna `sector` (sinónimos: `industria`,
+  `industry`, `rubro`), opcional. Es la vía para clasificar un catálogo entero:
+  once sectores sobre unos cientos de tickers no es una tarde de formulario.
+- Una contribución de usuario (`POST /portfolios/assets` sin rol admin) **no**
+  lleva sector: la fila es compartida, y el activo entra sin clasificar.
+
 #### Activos consolidados
 
 `GET /portfolios/holdings` contesta «¿cuánto tengo de X?» sin preguntar en qué
@@ -443,6 +497,9 @@ Lo que solo trae esta:
   no en `displayCurrency`: es lo que cotiza, no lo que se convirtió. Llega
   **vacío** cuando `priceSource` es `cost` — cada entry pagó el suyo y ningún
   número representa al activo. Vacío no es cero.
+- `sector`, la industria del activo, **en crudo** y vacía cuando no la tiene.
+  Aquí no se pliega a los cubos de `/allocation/sectors`: esto es una lista de
+  activos y la fila vacía es la que dice cuál ir a clasificar.
 - `priceProvider` y `priceFetchedAt`, quién trajo ese precio y cuándo. Solo
   vienen con `priceSource: "own"`: un precio manual del catálogo y un coste no
   salen de ningún proveedor. `priceSource` dice que el precio es del propio
@@ -1001,6 +1058,7 @@ argumento con el que nombrar a otro:
 | `list_portfolios` | Carteras con coste, valor de mercado y resultado |
 | `get_holdings` | Posiciones consolidadas por activo, sumadas entre carteras |
 | `get_allocation` | Reparto por categoría de activo, todo en una moneda |
+| `get_sector_allocation` | Reparto por industria, todo en una moneda, con los activos sin clasificar en su propio cubo |
 | `list_recent_transactions` | Últimas transacciones (`limit`, máx. 200) |
 | `get_portfolio_growth` | Serie de valor desde los snapshots (`period`: `1M`/`3M`/`6M`/`1Y`) |
 | `list_platforms` | Plataformas con lo que se tiene en cada una |

@@ -29,6 +29,7 @@ type PortfolioReader interface {
 	GetPortfoliosSummaryInCurrency(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]portfolio.SummaryView, error)
 	GetAssetHoldings(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]portfolio.AssetHolding, error)
 	GetAssetAllocation(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]portfolio.AllocationItem, error)
+	GetSectorAllocation(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]portfolio.SectorAllocationItem, error)
 	GetRecentUserTransactions(ctx context.Context, userID uuid.UUID, limit int) ([]portfolio.Transaction, error)
 	GetPortfolioGrowth(ctx context.Context, userID uuid.UUID, currency money.Currency, period string) ([]portfolio.GrowthPoint, portfolio.GrowthSummary, error)
 	GetPlatforms(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]portfolio.PlatformStats, error)

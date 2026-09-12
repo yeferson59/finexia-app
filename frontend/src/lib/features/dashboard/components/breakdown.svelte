@@ -1,7 +1,8 @@
 <script lang="ts">
 	/*
-	 * Dónde está el dinero: el mismo patrimonio leído de tres formas —por
-	 * plataforma, por portafolio y por clase de activo— en un solo sitio.
+	 * Dónde está el dinero: el mismo patrimonio leído de cuatro formas —por
+	 * plataforma, por portafolio, por clase de activo y por industria— en un
+	 * solo sitio.
 	 *
 	 * Sustituye a tres bloques que se repetían entre sí: una tabla de
 	 * portafolios que volvía a sumar el total de arriba y un donut de ocho
@@ -16,12 +17,18 @@
 	import { formatPercent, formatSignedPercent } from '$lib/shared/format/percent';
 	import { FALLBACK_CURRENCY } from '$lib/shared/currency';
 	import { CUTS, breakdownFor, type CutId } from '../breakdown';
-	import type { AllocationItem, Platform, PortfolioSummary } from '$lib/api/types';
+	import type {
+		AllocationItem,
+		Platform,
+		PortfolioSummary,
+		SectorAllocationItem
+	} from '$lib/api/types';
 
 	interface Props {
 		platforms: Platform[];
 		summaries: PortfolioSummary[];
 		allocation: AllocationItem[];
+		sectors?: SectorAllocationItem[];
 		currency?: string;
 	}
 
@@ -29,10 +36,11 @@
 		platforms = [],
 		summaries = [],
 		allocation = [],
+		sectors = [],
 		currency = FALLBACK_CURRENCY
 	}: Props = $props();
 
-	const source = $derived({ platforms, summaries, allocation });
+	const source = $derived({ platforms, summaries, allocation, sectors });
 
 	/*
 	 * `null` mientras el usuario no elija: así la pestaña que se abre es la
@@ -75,7 +83,8 @@
 	const EMPTY: Record<CutId, string> = {
 		platform: 'Todavía no has registrado dónde tienes tus activos.',
 		portfolio: 'Todavía no has creado ningún portafolio.',
-		type: 'Todavía no hay posiciones que repartir.'
+		type: 'Todavía no hay posiciones que repartir.',
+		sector: 'Todavía no hay posiciones que repartir.'
 	};
 </script>
 

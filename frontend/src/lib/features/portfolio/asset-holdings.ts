@@ -13,6 +13,7 @@
  */
 import type { AssetHolding } from '$lib/api/types';
 import { formatAssetType } from '$lib/shared/format/asset-type';
+import { formatSector } from '$lib/shared/format/sector';
 
 export type { AssetHolding };
 
@@ -63,6 +64,17 @@ export interface AssetHoldingRow {
 	assetType: string;
 	/** Etiqueta legible de la clase de activo. */
 	typeLabel: string;
+	/**
+	 * Etiqueta de la industria, o cadena vacía cuando el catálogo no tiene
+	 * clasificado el activo —o cuando su clase no lleva industria: una cripto,
+	 * un saldo, un inmueble—.
+	 *
+	 * Vacía se dibuja como nada, no como «Sin clasificar». En una lista de
+	 * activos la ausencia ya se ve sola, al lado de las filas que sí la traen, y
+	 * repetir la etiqueta en veinte filas convertiría el aviso en ruido. El
+	 * tamaño del agujero se cuenta una sola vez, en el reparto por industria.
+	 */
+	sectorLabel: string;
 	/** Unidades, sumadas entre portafolios. Solo significan algo en su fila. */
 	quantity: number;
 	/** Precio por unidad en `currency`, o `null` si la posición va a coste. */
@@ -112,6 +124,7 @@ export function toAssetHoldingRows(holdings: AssetHolding[]): AssetHoldingRow[] 
 		name: h.name,
 		assetType: h.assetType,
 		typeLabel: formatAssetType(h.assetType),
+		sectorLabel: h.sector ? formatSector(h.sector) : '',
 		quantity: parseFloat(h.quantity) || 0,
 		// Vacío no es cero: es «no hay precio que represente al activo», y un 0
 		// se leería como un activo que no vale nada.

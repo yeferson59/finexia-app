@@ -33,7 +33,9 @@ type Repository interface {
 	// one. Operator-only: the overwrite is what makes it unsafe to expose to
 	// users, since the ticker is the conflict target and any user could reach
 	// somebody else's row through it.
-	UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error)
+	// The sector may be SectorNone, and an upsert that carries none keeps
+	// whatever classification the existing row has.
+	UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency, sector Sector) (Asset, error)
 	// CreateAssetIfAbsent is the user-facing counterpart: it inserts only when
 	// the ticker is new and otherwise returns the existing row untouched, so a
 	// contribution can never rewrite curated data. Either way the asset joins

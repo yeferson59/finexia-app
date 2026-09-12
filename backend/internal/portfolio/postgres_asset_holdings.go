@@ -26,6 +26,12 @@ import (
 // Quantity, the units held regardless of portfolio, and Portfolios, how many of
 // them the asset is spread over.
 //
+// The sector rides along unfolded — the raw catalog value, empty when there is
+// none — and is not bucketed the way GetSectorAllocationByUserID buckets it.
+// This is a list of assets, and a row that reads "AAPL … —" is telling the user
+// which asset to go classify, which is exactly what a "Sin clasificar" label
+// repeated down the column would hide.
+//
 // Entries at quantity zero are left out, matching the allocation: a position
 // sold in full is not something the user holds.
 func (r *PostgresRepository) GetAssetHoldingsByUserID(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AssetHolding, error) {
@@ -40,6 +46,10 @@ func (r *PostgresRepository) GetAssetHoldingsByUserID(ctx context.Context, userI
 			a.asset_type,
 			COALESCE(a.exchange, ''),
 			a.currency,
+			-- Empty rather than NULL for the same reason market scans it that
+			-- way: SectorNone is the empty string, so an unclassified asset
+			-- needs no second representation in Go.
+			COALESCE(a.sector, ''),
 			SUM(pe.quantity::numeric)::text AS quantity,
 			-- The price the asset itself carries, if any. uap and assets are
 			-- both keyed by the asset (uap also by the user, fixed by the WHERE
@@ -86,7 +96,7 @@ func (r *PostgresRepository) GetAssetHoldingsByUserID(ctx context.Context, userI
 		) fx
 		WHERE p.user_id = $1
 		  AND pe.quantity::numeric > 0
-		GROUP BY a.id, a.ticker, a.name, a.asset_type, a.exchange, a.currency, target.code
+		GROUP BY a.id, a.ticker, a.name, a.asset_type, a.exchange, a.currency, a.sector, target.code
 		ORDER BY ROUND(COALESCE(SUM(pe.quantity::numeric * v.price * COALESCE(fx.rate, 1)), 0), 8) DESC, a.ticker
 	`, userID, currencyParam(targetCurrency))
 	if err != nil {
@@ -108,6 +118,7 @@ func (r *PostgresRepository) GetAssetHoldingsByUserID(ctx context.Context, userI
 			&holding.AssetType,
 			&holding.Exchange,
 			&holding.Currency,
+			&holding.Sector,
 			&holding.Quantity,
 			&holding.MarketPrice,
 			&holding.MarketValue,

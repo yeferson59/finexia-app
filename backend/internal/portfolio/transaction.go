@@ -60,6 +60,12 @@ func (s *service) GetAssetHoldings(ctx context.Context, userID uuid.UUID, target
 	return s.repo.GetAssetHoldingsByUserID(ctx, userID, targetCurrency)
 }
 
+// GetSectorAllocation totals the user's holdings per industry, in one currency.
+// Same currency contract as the two above.
+func (s *service) GetSectorAllocation(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]SectorAllocationItem, error) {
+	return s.repo.GetSectorAllocationByUserID(ctx, userID, targetCurrency)
+}
+
 func (s *service) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, in TransactionInput) (Transaction, error) {
 	return s.repo.UpdateTransaction(ctx, userID, txnID, in)
 }

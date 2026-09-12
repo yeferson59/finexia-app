@@ -10,6 +10,7 @@ const row: AssetHoldingRow = {
 	name: 'Apple Inc.',
 	assetType: 'stock',
 	typeLabel: 'Acciones',
+	sectorLabel: 'Tecnología',
 	quantity: 42,
 	marketPrice: 214.35,
 	currency: 'USD',

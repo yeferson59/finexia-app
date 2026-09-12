@@ -52,9 +52,17 @@ func (h *handler) CreateAsset(c fiber.Ctx) error {
 
 	assetType := AssetType(req.AssetType)
 
+	// A sector nobody recognises is rejected here rather than dropped: the body
+	// said something about this asset and storing the row without it would
+	// report success for a field that never landed.
+	sector, ok := NormalizeSector(req.Sector)
+	if !ok {
+		return httpx.FromDomain(c, errAssetSectorInvalid, "Error creating asset", assetFailureDetail(errAssetSectorInvalid, "No se pudo crear el activo"))
+	}
+
 	var asset Asset
 	if role == httpx.RoleAdmin {
-		asset, err = h.service.CreateAsset(c, req.Ticker, req.Name, assetType, req.Exchange, req.Currency)
+		asset, err = h.service.CreateAsset(c, req.Ticker, req.Name, assetType, req.Exchange, req.Currency, sector)
 	} else {
 		asset, err = h.service.ContributeAsset(c, userID, req.Ticker, req.Name, assetType, req.Exchange, req.Currency)
 	}
@@ -85,12 +93,18 @@ func (h *handler) UpdateAsset(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
+	sector, ok := NormalizeSector(req.Sector)
+	if !ok {
+		return httpx.FromDomain(c, errAssetSectorInvalid, "Error updating asset", assetFailureDetail(errAssetSectorInvalid, "No se pudo actualizar el activo"))
+	}
+
 	asset, err := h.service.UpdateAsset(c, assetID, AssetUpdate{
 		Ticker:    req.Ticker,
 		Name:      req.Name,
 		AssetType: AssetType(req.AssetType),
 		Exchange:  req.Exchange,
 		Currency:  req.Currency,
+		Sector:    sector,
 		IsCurated: req.IsCurated,
 		Price:     req.Price,
 	})

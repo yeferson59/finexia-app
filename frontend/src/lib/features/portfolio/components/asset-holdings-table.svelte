@@ -125,7 +125,10 @@
 						</button>
 					</th>
 
-					<td class="col-class type">{row.typeLabel}</td>
+					<td class="col-class type">
+						{row.typeLabel}
+						{#if row.sectorLabel}<span class="sector">{row.sectorLabel}</span>{/if}
+					</td>
 
 					<td class="col-position num mono position">
 						{formatQuantity(row.quantity)} uds
@@ -375,6 +378,17 @@
 
 	.col-class {
 		width: 7rem;
+	}
+
+	/* Segunda línea de la celda y no una columna propia: la industria matiza la
+	   clase —«Acciones, tecnología»— y una quinta columna le daría el mismo peso
+	   visual que al valor, que es la cifra por la que se entra a esta tabla. */
+	.sector {
+		display: block;
+		margin-top: 0.15rem;
+		font-size: 0.75rem;
+		color: var(--text-dim);
+		overflow-wrap: anywhere;
 	}
 
 	.btn-go-portfolios {

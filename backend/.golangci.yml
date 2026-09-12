@@ -35,6 +35,8 @@ linters:
         - dividendos
         - materias
         - producto
+        - materiales
+        - construccion
 
     gocritic:
       disabled-checks: []

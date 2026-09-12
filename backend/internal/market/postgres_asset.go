@@ -17,8 +17,12 @@ import (
 
 // assetColumns is the projection every catalog read shares, aliased to a so the
 // visibility join can be appended to any of them.
+//
+// sector is COALESCEd rather than scanned into a pointer: the column is NULL
+// for everything nobody has classified, and market.SectorNone is the empty
+// string precisely so that state needs no second representation in Go.
 const assetColumns = `a.id, a.ticker, a.name, a.asset_type, COALESCE(a.exchange, ''), a.currency,
-	a.current_price, a.price_updated_at, a.is_curated, a.created_at, a.updated_at`
+	COALESCE(a.sector, ''), a.current_price, a.price_updated_at, a.is_curated, a.created_at, a.updated_at`
 
 // visibleAssets is the FROM clause of a catalog read: the assets table with the
 // viewer's membership attached. $1 is the "see everything" flag (admins), $2
@@ -48,6 +52,7 @@ func scanAssets(rows pgx.Rows) ([]Asset, error) {
 			&asset.AssetType,
 			&asset.Exchange,
 			&asset.Currency,
+			&asset.Sector,
 			&asset.CurrentPrice,
 			&asset.PriceUpdatedAt,
 			&asset.IsCurated,
@@ -79,7 +84,7 @@ func (r *PostgresRepository) GetAssetByID(ctx context.Context, assetID uuid.UUID
 		FROM assets a WHERE a.id = $1
 	`, assetID).Scan(
 		&asset.ID, &asset.Ticker, &asset.Name, &asset.AssetType, &asset.Exchange,
-		&asset.Currency, &asset.CurrentPrice, &asset.PriceUpdatedAt, &asset.IsCurated,
+		&asset.Currency, &asset.Sector, &asset.CurrentPrice, &asset.PriceUpdatedAt, &asset.IsCurated,
 		&asset.CreatedAt, &asset.UpdatedAt,
 	)
 	if err != nil {
@@ -125,6 +130,7 @@ func (r *PostgresRepository) UpdateAssetPrice(ctx context.Context, assetID uuid.
 		&asset.AssetType,
 		&asset.Exchange,
 		&asset.Currency,
+		&asset.Sector,
 		&asset.CurrentPrice,
 		&asset.PriceUpdatedAt,
 		&asset.IsCurated,
@@ -180,6 +186,7 @@ func (r *PostgresRepository) UpdateAsset(ctx context.Context, assetID uuid.UUID,
 		    asset_type = $4::asset_type,
 		    exchange = NULLIF($5, ''),
 		    currency = $6,
+		    sector = NULLIF($9, ''),
 		    is_curated = COALESCE($7::boolean, a.is_curated),
 		    current_price = CASE
 		        WHEN $8::numeric IS NOT NULL THEN $8::numeric
@@ -192,13 +199,14 @@ func (r *PostgresRepository) UpdateAsset(ctx context.Context, assetID uuid.UUID,
 		    updated_at = NOW()
 		WHERE a.id = $1
 		RETURNING `+assetColumns+`
-	`, assetID, upd.Ticker, upd.Name, upd.AssetType, upd.Exchange, upd.Currency, curated, price).Scan(
+	`, assetID, upd.Ticker, upd.Name, upd.AssetType, upd.Exchange, upd.Currency, curated, price, upd.Sector).Scan(
 		&asset.ID,
 		&asset.Ticker,
 		&asset.Name,
 		&asset.AssetType,
 		&asset.Exchange,
 		&asset.Currency,
+		&asset.Sector,
 		&asset.CurrentPrice,
 		&asset.PriceUpdatedAt,
 		&asset.IsCurated,
@@ -240,23 +248,32 @@ func (r *PostgresRepository) SearchAssets(ctx context.Context, view CatalogView,
 	return scanAssets(rows)
 }
 
-func (r *PostgresRepository) UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error) {
+func (r *PostgresRepository) UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency, sector Sector) (Asset, error) {
 	var asset Asset
 
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO assets (ticker, name, asset_type, exchange, currency, is_curated, created_at, updated_at)
-		VALUES ($1, $2, $3::asset_type, NULLIF($4, ''), $5, TRUE, NOW(), NOW())
+		INSERT INTO assets (ticker, name, asset_type, exchange, currency, sector, is_curated, created_at, updated_at)
+		VALUES ($1, $2, $3::asset_type, NULLIF($4, ''), $5, NULLIF($6, ''), TRUE, NOW(), NOW())
 		ON CONFLICT (ticker, COALESCE(exchange, ''))
 		DO UPDATE SET name = EXCLUDED.name, asset_type = EXCLUDED.asset_type, currency = EXCLUDED.currency,
+		              -- An upsert that carries no sector keeps the one the row
+		              -- has. The two writers behind this are the operator's
+		              -- create and the asset spreadsheet, and neither means
+		              -- "unclassify it" by leaving a column out; clearing a
+		              -- sector is what the edit is for, where the whole row
+		              -- travels and a blank field is an instruction.
+		              sector = COALESCE(EXCLUDED.sector, assets.sector),
 		              is_curated = TRUE, updated_at = NOW()
-		RETURNING id, ticker, name, asset_type, COALESCE(exchange, ''), currency, current_price, price_updated_at, is_curated, created_at, updated_at
-	`, ticker, name, assetType, exchange, currency).Scan(
+		RETURNING id, ticker, name, asset_type, COALESCE(exchange, ''), currency, COALESCE(sector, ''),
+		          current_price, price_updated_at, is_curated, created_at, updated_at
+	`, ticker, name, assetType, exchange, currency, sector).Scan(
 		&asset.ID,
 		&asset.Ticker,
 		&asset.Name,
 		&asset.AssetType,
 		&asset.Exchange,
 		&asset.Currency,
+		&asset.Sector,
 		&asset.CurrentPrice,
 		&asset.PriceUpdatedAt,
 		&asset.IsCurated,
@@ -321,7 +338,7 @@ func (r *PostgresRepository) CreateAssetIfAbsent(ctx context.Context, userID uui
 		FROM assets a WHERE a.id = $1
 	`, assetID).Scan(
 			&asset.ID, &asset.Ticker, &asset.Name, &asset.AssetType, &asset.Exchange,
-			&asset.Currency, &asset.CurrentPrice, &asset.PriceUpdatedAt, &asset.IsCurated,
+			&asset.Currency, &asset.Sector, &asset.CurrentPrice, &asset.PriceUpdatedAt, &asset.IsCurated,
 			&asset.CreatedAt, &asset.UpdatedAt,
 		); err != nil {
 			return err

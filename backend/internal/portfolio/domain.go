@@ -405,6 +405,37 @@ type AllocationItem struct {
 	PositionsUnconverted int64            `json:"positionsUnconverted"`
 }
 
+// SectorAllocationItem is the same aggregation as AllocationItem down a
+// different axis: what the money behind the positions does, rather than what
+// the instruments are.
+//
+// The two are separate types and not one generic row because their vocabularies
+// are separate — one speaks market.AssetType, this one market.Sector — and a
+// shared row keyed by a bare string is how the app ended up with two charts
+// disagreeing about the same position once already (see the note on
+// GetAssetAllocationByUserID).
+//
+// Sector is always populated: everything that has no stored classification
+// lands in one of the two derived buckets, market.SectorUnclassified or
+// market.SectorNotApplicable, so the rows always add up to the whole portfolio.
+// A breakdown that dropped the unclassified rows would report shares of a total
+// that is not the user's money, which is the same mistake PositionsUnconverted
+// exists to avoid.
+type SectorAllocationItem struct {
+	Sector      market.Sector  `json:"sector"`
+	MarketValue string         `json:"marketValue"`
+	Currency    money.Currency `json:"currency"`
+	// Assets is how many distinct assets are behind this row. It is what makes
+	// the unclassified bucket actionable — "4 activos sin clasificar" is a job
+	// to do, "12,4 %" alone is not — and on a real sector it is the answer to
+	// whether a fifth of the portfolio is one bet or ten.
+	Assets int64 `json:"assets"`
+	// PositionsUnconverted counts this sector's positions that had no rate to
+	// Currency and are therefore added at face value; same meaning as in
+	// AllocationItem.
+	PositionsUnconverted int64 `json:"positionsUnconverted"`
+}
+
 // AssetHolding is one asset totalled across every portfolio the user owns.
 //
 // It answers a question no other view does: "how much of X do I have?", without
@@ -423,6 +454,11 @@ type AssetHolding struct {
 	Name      string           `json:"name"`
 	AssetType market.AssetType `json:"assetType"`
 	Exchange  string           `json:"exchange"`
+	// Sector is the industry behind the asset, or empty when the catalog has no
+	// classification for it. It rides along here rather than being a second
+	// request because the holdings table is where a user sees an asset is
+	// unclassified and can go do something about it.
+	Sector market.Sector `json:"sector"`
 	// Currency the asset is quoted in, which is what MarketPrice is in. It is
 	// not DisplayCurrency: the price stays in its own currency, the value is
 	// converted.

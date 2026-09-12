@@ -107,6 +107,31 @@ export const allocationItemSchema = z.object({
 });
 
 /**
+ * Reparto por industria (`GET /portfolios/allocation/sectors`).
+ *
+ * Las mismas posiciones que `allocationItemSchema`, agrupadas por el sector del
+ * activo en vez de por su clase. Es la lectura que contesta lo que la otra no
+ * puede: ocho tickers repartidos en tres portafolios pueden ser una sola
+ * apuesta a los semiconductores y parecer diversificados por tipo de activo.
+ *
+ * `sector` trae, además de los once sectores conocidos, dos cubos que el
+ * backend deriva y nunca guarda: `unclassified` —el activo podría estar
+ * clasificado y nadie lo ha hecho— y `not_applicable` —una cripto, un saldo en
+ * efectivo, un inmueble: no hay industria que rellenar—. Todas las posiciones
+ * caen en exactamente un cubo, así que los porcentajes son del patrimonio
+ * entero y no de la parte clasificada.
+ */
+export const sectorAllocationItemSchema = z.object({
+	sector: z.string(),
+	marketValue: z.string(),
+	percent: z.number(),
+	currency: z.string(),
+	/** Cuántos activos distintos hay detrás de la fila. */
+	assets: z.number(),
+	positionsUnconverted: z.number()
+});
+
+/**
  * Un activo con todo lo que el usuario tiene de él, sumado a través de sus
  * portafolios (`GET /portfolios/holdings`).
  *
@@ -125,6 +150,13 @@ export const assetHoldingSchema = z.object({
 	name: z.string(),
 	assetType: z.string(),
 	exchange: z.string(),
+	/**
+	 * Industria del activo, vacía cuando el catálogo no lo tiene clasificado.
+	 * Aquí viene en crudo, sin los cubos de `sectorAllocationItemSchema`: esto
+	 * es una lista de activos, y la fila vacía es la que dice cuál ir a
+	 * clasificar. Opcional para tolerar un backend anterior.
+	 */
+	sector: z.string().optional(),
 	/** Moneda en la que cotiza el activo, que es la de `marketPrice`. */
 	currency: z.string(),
 	quantity: z.string(),

@@ -88,6 +88,15 @@ func (f *fakePortfolios) GetAssetAllocation(_ context.Context, userID uuid.UUID,
 	return []portfolio.AllocationItem{{Category: market.Stock, MarketValue: "1500.00", Currency: money.USD}}, f.err
 }
 
+func (f *fakePortfolios) GetSectorAllocation(_ context.Context, userID uuid.UUID, target money.Currency) ([]portfolio.SectorAllocationItem, error) {
+	f.sawUserID, f.sawCurrency = userID, target
+
+	return []portfolio.SectorAllocationItem{
+		{Sector: market.SectorTechnology, MarketValue: "1500.00", Currency: money.USD, Assets: 2},
+		{Sector: market.SectorUnclassified, MarketValue: "500.00", Currency: money.USD, Assets: 1},
+	}, f.err
+}
+
 func (f *fakePortfolios) GetRecentUserTransactions(_ context.Context, userID uuid.UUID, limit int) ([]portfolio.Transaction, error) {
 	f.sawUserID, f.sawLimit = userID, limit
 
@@ -273,6 +282,7 @@ func TestToolsListIsReadOnly(t *testing.T) {
 
 	want := map[string]bool{
 		"list_portfolios": false, "get_holdings": false, "get_allocation": false,
+		"get_sector_allocation":    false,
 		"list_recent_transactions": false, "get_portfolio_growth": false,
 		"list_platforms": false, "search_assets": false, "list_exchange_rates": false,
 	}

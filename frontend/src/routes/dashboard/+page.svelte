@@ -30,6 +30,7 @@
 	platforms={data.platforms}
 	summaries={data.portfolioSummaries}
 	allocation={data.allocation}
+	sectors={data.sectorAllocation}
 	currency={data.currency}
 />
 

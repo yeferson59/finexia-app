@@ -235,3 +235,108 @@ func TestPostgresUpdateAsset(t *testing.T) {
 		}
 	})
 }
+
+// The sector is the one field the two write paths treat differently, and the
+// difference lives entirely in SQL, so it needs the database to be checked.
+//
+// An upsert that carries no sector keeps the one the row has, because the
+// operator's create and the asset spreadsheet do not mean "unclassify it" by
+// leaving a column out. An edit does replace it with whatever it sends,
+// blank included, because there the whole row travels and an empty field is an
+// instruction.
+func TestPostgresAssetSector(t *testing.T) {
+	pool := assetTestPool(t)
+	repo := NewPostgresRepository(pool)
+	ctx := context.Background()
+
+	t.Run("an upsert writes the sector and a later one without it keeps it", func(t *testing.T) {
+		t.Cleanup(func() {
+			_, _ = pool.Exec(context.Background(), `DELETE FROM assets WHERE ticker = 'PRBSEC1'`)
+		})
+
+		asset, err := repo.UpsertAsset(ctx, "PRBSEC1", "Probe Inc.", Stock, "NASDAQ", money.USD, SectorTechnology)
+		if err != nil {
+			t.Fatalf("UpsertAsset: %v", err)
+		}
+		if asset.Sector != SectorTechnology {
+			t.Fatalf("sector = %q, want technology", asset.Sector)
+		}
+
+		// The same ticker re-imported from a file with no sector column. The
+		// classification an operator already did must survive it.
+		again, err := repo.UpsertAsset(ctx, "PRBSEC1", "Probe Renamed", Stock, "NASDAQ", money.USD, SectorNone)
+		if err != nil {
+			t.Fatalf("UpsertAsset again: %v", err)
+		}
+		if again.Name != "Probe Renamed" {
+			t.Errorf("name = %q, want the upsert to have rewritten it", again.Name)
+		}
+		if again.Sector != SectorTechnology {
+			t.Errorf("sector = %q, want technology kept", again.Sector)
+		}
+	})
+
+	t.Run("an edit replaces the sector, and an empty one clears it", func(t *testing.T) {
+		id := plantAsset(t, pool, "PRBSEC2", "NASDAQ")
+
+		upd := AssetUpdate{
+			Ticker:    "PRBSEC2",
+			Name:      "Probe Inc.",
+			AssetType: Stock,
+			Exchange:  "NASDAQ",
+			Currency:  money.USD,
+			Sector:    SectorFinancials,
+		}
+
+		asset, err := repo.UpdateAsset(ctx, id, upd)
+		if err != nil {
+			t.Fatalf("UpdateAsset: %v", err)
+		}
+		if asset.Sector != SectorFinancials {
+			t.Fatalf("sector = %q, want financials", asset.Sector)
+		}
+
+		upd.Sector = SectorNone
+		cleared, err := repo.UpdateAsset(ctx, id, upd)
+		if err != nil {
+			t.Fatalf("UpdateAsset clearing: %v", err)
+		}
+		if cleared.Sector != SectorNone {
+			t.Errorf("sector = %q, want it cleared", cleared.Sector)
+		}
+
+		// Cleared means NULL in the column, not an empty string: the partial
+		// index and the breakdown's CASE both test for NULL.
+		var stored *string
+		if err := pool.QueryRow(ctx, `SELECT sector FROM assets WHERE id = $1`, id).Scan(&stored); err != nil {
+			t.Fatalf("read back: %v", err)
+		}
+		if stored != nil {
+			t.Errorf("stored sector = %q, want NULL", *stored)
+		}
+	})
+
+	t.Run("a contribution leaves the asset unclassified", func(t *testing.T) {
+		userID := uuid.New()
+
+		t.Cleanup(func() {
+			_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
+			_, _ = pool.Exec(context.Background(), `DELETE FROM assets WHERE ticker = 'PRBSEC3'`)
+		})
+
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO users (id, name, email, role_id, preferred_currency)
+			VALUES ($1, 'sector probe', $2, (SELECT id FROM roles WHERE name = 'customer'), 'USD')
+		`, userID, userID.String()+"@probe.test"); err != nil {
+			t.Fatalf("plant user: %v", err)
+		}
+
+		asset, err := repo.CreateAssetIfAbsent(ctx, userID, "PRBSEC3", "Probe Local", Stock, "BVC", money.COP)
+		if err != nil {
+			t.Fatalf("CreateAssetIfAbsent: %v", err)
+		}
+		if asset.Sector != SectorNone {
+			t.Errorf("sector = %q, want none: a contribution classifies nothing", asset.Sector)
+		}
+	})
+}

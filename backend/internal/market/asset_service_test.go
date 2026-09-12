@@ -30,7 +30,7 @@ func TestContributeAsset(t *testing.T) {
 		var gotCurrency money.Currency
 
 		repo := new(fakeRepository{
-			upsertAsset: func(context.Context, string, string, AssetType, string, money.Currency) (Asset, error) {
+			upsertAsset: func(context.Context, string, string, AssetType, string, money.Currency, Sector) (Asset, error) {
 				t.Fatal("a contribution reached UpsertAsset, which overwrites rows other users hold")
 
 				return Asset{}, nil
@@ -168,7 +168,7 @@ func TestHandlerCreateAsset(t *testing.T) {
 	t.Run("a user contributes rather than curates", func(t *testing.T) {
 		var contributed bool
 		repo := new(fakeRepository{
-			upsertAsset: func(context.Context, string, string, AssetType, string, money.Currency) (Asset, error) {
+			upsertAsset: func(context.Context, string, string, AssetType, string, money.Currency, Sector) (Asset, error) {
 				t.Fatal("a non-admin reached the curating path")
 
 				return Asset{}, nil
@@ -196,7 +196,7 @@ func TestHandlerCreateAsset(t *testing.T) {
 	t.Run("an admin curates", func(t *testing.T) {
 		var curated bool
 		repo := new(fakeRepository{
-			upsertAsset: func(_ context.Context, ticker, _ string, _ AssetType, _ string, _ money.Currency) (Asset, error) {
+			upsertAsset: func(_ context.Context, ticker, _ string, _ AssetType, _ string, _ money.Currency, _ Sector) (Asset, error) {
 				curated = true
 
 				return Asset{ID: uuid.New(), Ticker: ticker, IsCurated: true}, nil

@@ -353,21 +353,67 @@ func NewAllocationResponse(items []AllocationItem) []AllocationItemDTO {
 	return result
 }
 
+// SectorAllocationItemDTO is one industry's share of everything the user holds.
+//
+// Sector carries the two derived buckets as well as the eleven real ones, so a
+// client must map every value it is given rather than assume a known sector;
+// the labels are the client's business, the arithmetic is not.
+type SectorAllocationItemDTO struct {
+	Sector      string  `json:"sector"`
+	MarketValue string  `json:"marketValue"`
+	Percent     float64 `json:"percent"`
+	// Currency is what MarketValue is in — the same for every row, which is
+	// what makes Percent mean anything.
+	Currency             string `json:"currency"`
+	Assets               int64  `json:"assets"`
+	PositionsUnconverted int64  `json:"positionsUnconverted"`
+}
+
+// NewSectorAllocationResponse gives each industry its share of the whole.
+//
+// The share is over every row, the unclassified bucket included, and that is
+// the point: dividing by the classified subtotal would report a portfolio that
+// is 40 % technology when technology is 40 % of the part we happen to know
+// about, and the user would have no way to tell the two apart.
+func NewSectorAllocationResponse(items []SectorAllocationItem) []SectorAllocationItemDTO {
+	amounts := make([]string, len(items))
+	for i, item := range items {
+		amounts[i] = item.MarketValue
+	}
+	shares := percentShares(amounts)
+
+	result := make([]SectorAllocationItemDTO, 0, len(items))
+	for i, item := range items {
+		result = append(result, SectorAllocationItemDTO{
+			Sector:               string(item.Sector),
+			MarketValue:          item.MarketValue,
+			Percent:              shares[i],
+			Currency:             item.Currency.String(),
+			Assets:               item.Assets,
+			PositionsUnconverted: item.PositionsUnconverted,
+		})
+	}
+
+	return result
+}
+
 // AssetHoldingDTO is one asset totalled across every portfolio the user owns.
 // See AssetHolding for what each amount is denominated in; Percent is this
 // asset's share of everything the user holds, computed the same way — and over
 // the same positions — as the allocation's, so the two charts agree.
 type AssetHoldingDTO struct {
-	AssetID     uuid.UUID `json:"assetId"`
-	Ticker      string    `json:"ticker"`
-	Name        string    `json:"name"`
-	AssetType   string    `json:"assetType"`
-	Exchange    string    `json:"exchange"`
-	Currency    string    `json:"currency"`
-	Quantity    string    `json:"quantity"`
-	MarketPrice string    `json:"marketPrice"`
-	MarketValue string    `json:"marketValue"`
-	Percent     float64   `json:"percent"`
+	AssetID   uuid.UUID `json:"assetId"`
+	Ticker    string    `json:"ticker"`
+	Name      string    `json:"name"`
+	AssetType string    `json:"assetType"`
+	Exchange  string    `json:"exchange"`
+	// Sector is the raw catalog value, empty when the asset is unclassified.
+	Sector      string  `json:"sector"`
+	Currency    string  `json:"currency"`
+	Quantity    string  `json:"quantity"`
+	MarketPrice string  `json:"marketPrice"`
+	MarketValue string  `json:"marketValue"`
+	Percent     float64 `json:"percent"`
 	// DisplayCurrency is what MarketValue is in — the same for every row, which
 	// is what makes Percent meaningful.
 	DisplayCurrency      string `json:"displayCurrency"`
@@ -392,6 +438,7 @@ func NewAssetHoldingsResponse(holdings []AssetHolding) []AssetHoldingDTO {
 			Name:                 holding.Name,
 			AssetType:            string(holding.AssetType),
 			Exchange:             holding.Exchange,
+			Sector:               string(holding.Sector),
 			Currency:             holding.Currency.String(),
 			Quantity:             holding.Quantity,
 			MarketPrice:          holding.MarketPrice,

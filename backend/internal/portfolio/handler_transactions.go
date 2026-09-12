@@ -153,6 +153,33 @@ func (h *handler) GetAssetHoldings(c fiber.Ctx) error {
 	return httpx.OK(c, "Asset holdings retrieved", "Asset holdings retrieved successfully", NewAssetHoldingsResponse(holdings))
 }
 
+// GetSectorAllocation answers where the money is invested by industry, rather
+// than by kind of instrument. Same ?currency= contract as the allocation and
+// the holdings, and for the same reason: the rows are summed across portfolios
+// that may be denominated differently.
+func (h *handler) GetSectorAllocation(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	var req CurrencyDTO
+	if err := c.Bind().Query(&req); err != nil {
+		return httpx.BadRequest(c, "Unprocess query currency", "no process currency")
+	}
+
+	if req.Currency != money.XXX && !currency.IsSupported(req.Currency) {
+		return httpx.BadRequest(c, "Unsupported currency", "currency must be one of: "+currency.List())
+	}
+
+	items, err := h.service.GetSectorAllocation(c, userID, req.Currency)
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error retrieving sector allocation", "Could not retrieve sector allocation")
+	}
+
+	return httpx.OK(c, "Sector allocation retrieved", "Sector allocation retrieved successfully", NewSectorAllocationResponse(items))
+}
+
 func (h *handler) GetUserTransactions(c fiber.Ctx) error {
 	userID, _, _, err := httpx.Identity(c)
 	if err != nil {

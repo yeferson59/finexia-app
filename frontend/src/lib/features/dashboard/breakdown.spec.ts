@@ -4,9 +4,15 @@ import {
 	platformBreakdown,
 	plural,
 	portfolioBreakdown,
+	sectorBreakdown,
 	typeBreakdown
 } from './breakdown';
-import type { AllocationItem, Platform, PortfolioSummary } from '$lib/api/types';
+import type {
+	AllocationItem,
+	Platform,
+	PortfolioSummary,
+	SectorAllocationItem
+} from '$lib/api/types';
 
 const platform = (over: Partial<Platform> & { id: string; name: string }): Platform =>
 	({
@@ -38,6 +44,17 @@ const summary = (
 
 const allocation = (category: string, marketValue: string, over: Partial<AllocationItem> = {}) =>
 	({ category, marketValue, percent: 0, currency: 'USD', ...over }) as AllocationItem;
+
+const sector = (sectorId: string, marketValue: string, over: Partial<SectorAllocationItem> = {}) =>
+	({
+		sector: sectorId,
+		marketValue,
+		percent: 0,
+		currency: 'USD',
+		assets: 1,
+		positionsUnconverted: 0,
+		...over
+	}) as SectorAllocationItem;
 
 describe('plural', () => {
 	it('concuerda el sustantivo con la cifra', () => {
@@ -212,17 +229,68 @@ describe('typeBreakdown', () => {
 	});
 });
 
+describe('sectorBreakdown', () => {
+	it('traduce el sector y cuenta los activos que hay detrás', () => {
+		const { rows } = sectorBreakdown([sector('technology', '30', { assets: 3 })], 'USD');
+
+		expect(rows[0].label).toBe('Tecnología');
+		expect(rows[0].detail).toBe('3 activos');
+	});
+
+	/*
+	 * Las filas sin clasificar son dinero del usuario y entran en el total:
+	 * sacarlas dejaría «Tecnología 100 %» queriendo decir «el 100 % de lo que
+	 * resulta que sabemos», que es otra afirmación y no se notaría.
+	 */
+	it('reparte sobre el patrimonio entero, no sobre la parte clasificada', () => {
+		const { rows, total } = sectorBreakdown(
+			[sector('technology', '75'), sector('unclassified', '25')],
+			'USD'
+		);
+
+		expect(total).toBe(100);
+		expect(rows[0].share).toBeCloseTo(0.75);
+		expect(rows[1].share).toBeCloseTo(0.25);
+	});
+
+	// Los dos cubos piden cosas distintas al lector y la segunda línea es lo
+	// único que los separa de un sector cualquiera.
+	it('explica los dos cubos en vez de contarlos como una industria más', () => {
+		const { rows } = sectorBreakdown(
+			[sector('unclassified', '20'), sector('not_applicable', '10')],
+			'USD'
+		);
+
+		expect(rows[0].label).toBe('Sin clasificar');
+		expect(rows[0].detail).toBe('Activos a los que les falta la industria');
+		expect(rows[1].label).toBe('Sin industria');
+		expect(rows[1].detail).toBe('Cripto, efectivo e inmuebles no tienen industria');
+	});
+
+	it('descarta el reparto que viene en otra moneda', () => {
+		const { rows, excluded } = sectorBreakdown(
+			[sector('technology', '60'), sector('energy', '40', { currency: 'COP' })],
+			'USD'
+		);
+
+		expect(rows).toHaveLength(1);
+		expect(excluded).toBe(1);
+	});
+});
+
 describe('breakdownFor', () => {
 	const source = {
 		platforms: [platform({ id: 'p', name: 'Degiro', marketValue: '10' })],
 		summaries: [summary({ id: 's', name: 'Cartera', totalMarketValue: '20' })],
-		allocation: [allocation('stock', '30')]
+		allocation: [allocation('stock', '30')],
+		sectors: [sector('financials', '40')]
 	};
 
 	it('devuelve el corte pedido', () => {
 		expect(breakdownFor('platform', source, 'USD').rows[0].label).toBe('Degiro');
 		expect(breakdownFor('portfolio', source, 'USD').rows[0].label).toBe('Cartera');
 		expect(breakdownFor('type', source, 'USD').rows[0].label).toBe('Acciones');
+		expect(breakdownFor('sector', source, 'USD').rows[0].label).toBe('Finanzas');
 	});
 
 	// Sin total, dividir daría NaN y la barra saldría llena o vacía al azar.
@@ -238,8 +306,9 @@ describe('breakdownFor', () => {
 	});
 
 	it('no se cae sin datos', () => {
-		const empty = { platforms: [], summaries: [], allocation: [] };
+		const empty = { platforms: [], summaries: [], allocation: [], sectors: [] };
 		expect(breakdownFor('platform', empty, 'USD').rows).toEqual([]);
 		expect(breakdownFor('type', empty, 'USD').total).toBe(0);
+		expect(breakdownFor('sector', empty, 'USD').total).toBe(0);
 	});
 });

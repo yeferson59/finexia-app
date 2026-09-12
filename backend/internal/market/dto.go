@@ -13,6 +13,11 @@ type CreateAssetRequestDTO struct {
 	AssetType string         `json:"assetType" validate:"required"`
 	Exchange  string         `json:"exchange"`
 	Currency  money.Currency `json:"currency"  validate:"required"`
+	// Sector is free text on the way in — "Tecnología", "Financial Services",
+	// "technology" all arrive here — and is normalised before it is stored. It
+	// is optional, and only honoured for an admin: see CreateAsset in the
+	// handler for why a contribution cannot classify a shared row.
+	Sector string `json:"sector"`
 }
 
 // UpdateAssetRequestDTO is a catalog row as the operator wants it to read from
@@ -30,8 +35,11 @@ type UpdateAssetRequestDTO struct {
 	AssetType string         `json:"assetType" validate:"required"`
 	Exchange  string         `json:"exchange"`
 	Currency  money.Currency `json:"currency"  validate:"required"`
-	IsCurated *bool          `json:"isCurated"`
-	Price     *money.Money   `json:"price"`
+	// Sector travels whole like the fields above it: an edit that sends it
+	// empty is clearing the classification, not omitting it.
+	Sector    string       `json:"sector"`
+	IsCurated *bool        `json:"isCurated"`
+	Price     *money.Money `json:"price"`
 }
 
 type CreateExchangeRateRequestDTO struct {

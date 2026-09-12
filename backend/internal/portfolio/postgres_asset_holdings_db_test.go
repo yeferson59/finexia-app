@@ -36,8 +36,10 @@ func heldAcrossPortfolios(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 		}
 	}
 
+	track := dropFixture(t, pool, userID)
+
+	// The rate is global rather than the user's, so it does not go with them.
 	t.Cleanup(func() {
-		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
 		_, _ = pool.Exec(context.Background(),
 			`DELETE FROM exchange_rates WHERE from_currency = 'NOK' AND to_currency = 'USD'`)
 	})
@@ -88,6 +90,7 @@ func heldAcrossPortfolios(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 		id := uuid.New()
 		exec(`INSERT INTO assets (id, ticker, name, asset_type, currency, current_price)
 		      VALUES ($1, $2, $3, 'stock', $4, $5)`, id, ticker+uuid.New().String()[:6], ticker, currency, price)
+		track(id)
 
 		return id
 	}

@@ -45,14 +45,18 @@ func (a AssetType) IsValid() bool {
 // the portfolio module references it (entries hold an Asset) but does not own
 // its lifecycle.
 type Asset struct {
-	ID             uuid.UUID      `json:"id"`
-	Ticker         string         `json:"ticker"`
-	Name           string         `json:"name"`
-	AssetType      AssetType      `json:"assetType"`
-	Exchange       string         `json:"exchange"`
-	Currency       money.Currency `json:"currency"`
-	CurrentPrice   *money.Money   `json:"currentPrice"`
-	PriceUpdatedAt *time.Time     `json:"priceUpdatedAt"`
+	ID        uuid.UUID      `json:"id"`
+	Ticker    string         `json:"ticker"`
+	Name      string         `json:"name"`
+	AssetType AssetType      `json:"assetType"`
+	Exchange  string         `json:"exchange"`
+	Currency  money.Currency `json:"currency"`
+	// Sector is the industry behind the asset, or SectorNone when nobody has
+	// classified it — which is most of the catalog, and is reported as such
+	// rather than guessed at. See sector.go.
+	Sector         Sector       `json:"sector"`
+	CurrentPrice   *money.Money `json:"currentPrice"`
+	PriceUpdatedAt *time.Time   `json:"priceUpdatedAt"`
 	// IsCurated marks a row the operator vouches for, which is what makes it
 	// visible to every user. A contributed row is only visible to the users who
 	// contributed it, so the flag doubles as the "everyone" audience.
@@ -74,6 +78,11 @@ type AssetUpdate struct {
 	AssetType AssetType
 	Exchange  string
 	Currency  money.Currency
+	// Sector is replaced like the fields above it and not like the two below:
+	// an empty one clears the classification, which is what an edit that blanks
+	// the field is asking for. There is no "leave it alone" — the whole row
+	// travels, so an unchanged sector arrives as itself.
+	Sector Sector
 	// IsCurated changes who sees the row: curating it publishes it to every
 	// user, un-curating it puts it back to the users who contributed it. Nil
 	// leaves it as it is.

@@ -12,6 +12,7 @@ import type {
 	Platform,
 	PortfolioGrowth,
 	PortfolioSummary,
+	SectorAllocationItem,
 	UserTransaction
 } from '$lib/api/types';
 
@@ -35,6 +36,7 @@ export const load: PageServerLoad = async ({ cookies, fetch, url, locals }) => {
 		transactionsRes,
 		summaryRes,
 		allocationRes,
+		sectorAllocationRes,
 		growthRes,
 		platformsRes,
 		credentialsRes,
@@ -43,6 +45,10 @@ export const load: PageServerLoad = async ({ cookies, fetch, url, locals }) => {
 		transactions.getRecent(event),
 		portfolio.getSummaries(event, currency),
 		portfolio.getAllocation(event, currency),
+		// La cuarta lectura del mismo total: a qué industria se dedica el dinero.
+		// Va aquí y no bajo demanda porque el reparto abre en la pestaña que
+		// tenga algo dentro, y para saberlo hay que tener las cuatro.
+		portfolio.getSectorAllocation(event, currency),
 		portfolio.getAggregateGrowth(event, { currency }),
 		// El panel enseña dónde está custodiado el dinero, no solo cómo lo agrupó
 		// el usuario: son dos lecturas del mismo total y la de plataformas es la
@@ -63,6 +69,11 @@ export const load: PageServerLoad = async ({ cookies, fetch, url, locals }) => {
 	const allocation: AllocationItem[] =
 		allocationRes.ok && allocationRes.success && Array.isArray(allocationRes.data)
 			? allocationRes.data
+			: [];
+
+	const sectorAllocation: SectorAllocationItem[] =
+		sectorAllocationRes.ok && sectorAllocationRes.success && Array.isArray(sectorAllocationRes.data)
+			? sectorAllocationRes.data
 			: [];
 
 	const userPlatforms: Platform[] =
@@ -100,6 +111,7 @@ export const load: PageServerLoad = async ({ cookies, fetch, url, locals }) => {
 		portfolioSummaries,
 		platforms: userPlatforms,
 		allocation,
+		sectorAllocation,
 		portfolioGrowth,
 		currency,
 		displayRate,

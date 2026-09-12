@@ -68,9 +68,7 @@ func backdatedPortfolio(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 		}
 	}
 
-	t.Cleanup(func() {
-		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
-	})
+	track := dropFixture(t, pool, userID)
 
 	exec(`INSERT INTO users (id, name, email, role_id, preferred_currency)
 	      VALUES ($1, 'growth probe', $2, (SELECT id FROM roles WHERE name = 'customer'), 'USD')`,
@@ -99,6 +97,7 @@ func backdatedPortfolio(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 		assetID, entryID := uuid.New(), uuid.New()
 		exec(`INSERT INTO assets (id, ticker, name, asset_type, currency)
 		      VALUES ($1, $2, 'probe', 'stock', 'USD')`, assetID, uuid.New().String()[:8])
+		track(assetID)
 		exec(`INSERT INTO portfolio_entries
 		        (id, portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date)
 		      VALUES ($1, $2, $3, $4, 1, $5, 'USD', $6)`,
@@ -262,9 +261,7 @@ func mixedPortfolio(t *testing.T, pool *pgxpool.Pool) (userID, portfolioID uuid.
 		}
 	}
 
-	t.Cleanup(func() {
-		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
-	})
+	track := dropFixture(t, pool, userID)
 
 	exec(`INSERT INTO users (id, name, email, role_id, preferred_currency)
 	      VALUES ($1, 'allocation probe', $2, (SELECT id FROM roles WHERE name = 'customer'), 'USD')`,
@@ -295,6 +292,7 @@ func mixedPortfolio(t *testing.T, pool *pgxpool.Pool) (userID, portfolioID uuid.
 		exec(`INSERT INTO assets (id, ticker, name, asset_type, currency, current_price)
 		      VALUES ($1, $2, 'probe', $3, 'USD', $4)`,
 			assetID, uuid.New().String()[:8], position.assetType, position.currentPrice)
+		track(assetID)
 
 		if position.ownPrice != nil {
 			// currency and source are NOT NULL since 000018; the fixture had
@@ -393,9 +391,10 @@ func TestSnapshotAllocationOfAnEmptyPortfolioIsAnEmptyObject(t *testing.T) {
 
 	userID := uuid.New()
 	portfolioID := uuid.New()
-	t.Cleanup(func() {
-		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
-	})
+	// No entries and no catalog rows here, so this one's user delete already
+	// worked; it goes through the same helper so the package has one teardown
+	// and not two spellings of it.
+	dropFixture(t, pool, userID)
 
 	mustExec := func(sql string, args ...any) {
 		t.Helper()

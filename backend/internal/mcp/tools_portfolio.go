@@ -81,6 +81,22 @@ func (m *Module) addPortfolioTools(s *mcpsdk.Server, c caller) {
 			return AllocationOutput{Allocation: allocationSlices(items)}, nil
 		})
 
+	readTool(s, "get_sector_allocation", "Get sector allocation",
+		"Total the user's holdings per industry (technology, healthcare, financials…), every slice in one currency so the shares add up. Use this for concentration questions — how much of the money rides on one industry — which get_allocation cannot answer: eight tickers across three portfolios can be one bet on semiconductors and still look diversified by asset type. Assets with no classification are reported in their own slice rather than dropped, so check it before calling a portfolio well spread.",
+		func(ctx context.Context, in CurrencyInput) (SectorAllocationOutput, error) {
+			cur, err := parseCurrency(in.Currency)
+			if err != nil {
+				return SectorAllocationOutput{}, err
+			}
+
+			items, err := m.portfolios.GetSectorAllocation(ctx, c.userID, cur)
+			if err != nil {
+				return SectorAllocationOutput{}, m.logToolError(ctx, "get_sector_allocation", c, err)
+			}
+
+			return SectorAllocationOutput{Allocation: sectorSlices(items)}, nil
+		})
+
 	readTool(s, "list_recent_transactions", "List recent transactions",
 		"List the user's most recent transactions across every portfolio, newest first.",
 		func(ctx context.Context, in TransactionsInput) (TransactionsOutput, error) {
@@ -171,6 +187,7 @@ func holdingRows(holdings []portfolio.AssetHolding) []Holding {
 			MarketPrice:     h.MarketPrice,
 			MarketValue:     h.MarketValue,
 			DisplayCurrency: h.DisplayCurrency.String(),
+			Sector:          string(h.Sector),
 			Portfolios:      h.Portfolios,
 			PriceSource:     string(h.PriceSource),
 		})
@@ -187,6 +204,22 @@ func allocationSlices(items []portfolio.AllocationItem) []AllocationSlice {
 			Category:    string(i.Category),
 			MarketValue: i.MarketValue,
 			Currency:    i.Currency.String(),
+			Unconverted: i.PositionsUnconverted,
+		})
+	}
+
+	return out
+}
+
+func sectorSlices(items []portfolio.SectorAllocationItem) []SectorSlice {
+	out := make([]SectorSlice, 0, len(items))
+
+	for _, i := range items {
+		out = append(out, SectorSlice{
+			Sector:      string(i.Sector),
+			MarketValue: i.MarketValue,
+			Currency:    i.Currency.String(),
+			Assets:      i.Assets,
 			Unconverted: i.PositionsUnconverted,
 		})
 	}

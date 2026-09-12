@@ -19,15 +19,21 @@ type defaultAsset struct {
 	AssetType AssetType
 	Exchange  string
 	Currency  money.Currency
+	Sector    Sector
 }
 
+// The two crypto rows carry SectorNone because a coin has no industry behind
+// it, not because nobody got round to them — see AssetType.HasSector. SPY is
+// the interesting one: a whole-market fund is spread across all eleven sectors,
+// so filing it under any single one would be a lie the breakdown then repeats,
+// and it stays unclassified on purpose.
 var defaultAssets = []defaultAsset{
-	{"AAPL", "Apple Inc.", Stock, "NASDAQ", money.USD},
-	{"MSFT", "Microsoft Corporation", Stock, "NASDAQ", money.USD},
-	{"SPY", "SPDR S&P 500 ETF Trust", ETF, "NYSEARCA", money.USD},
-	{"BTC-USD", "Bitcoin", Crypto, "Coinbase", money.USD},
-	{"ETH-USD", "Ethereum", Crypto, "Coinbase", money.USD},
-	{"BND", "Vanguard Total Bond Market ETF", Bond, "NASDAQ", money.USD},
+	{"AAPL", "Apple Inc.", Stock, "NASDAQ", money.USD, SectorTechnology},
+	{"MSFT", "Microsoft Corporation", Stock, "NASDAQ", money.USD, SectorTechnology},
+	{"SPY", "SPDR S&P 500 ETF Trust", ETF, "NYSEARCA", money.USD, SectorNone},
+	{"BTC-USD", "Bitcoin", Crypto, "Coinbase", money.USD, SectorNone},
+	{"ETH-USD", "Ethereum", Crypto, "Coinbase", money.USD, SectorNone},
+	{"BND", "Vanguard Total Bond Market ETF", Bond, "NASDAQ", money.USD, SectorNone},
 }
 
 // Pacing between two calls made with the same user's key. Alpha Vantage's free
@@ -73,7 +79,7 @@ func (s *service) SeedDefaultAssets(ctx context.Context) []error {
 	var errs []error
 
 	for _, da := range defaultAssets {
-		if _, err := s.CreateAsset(ctx, da.Ticker, da.Name, da.AssetType, da.Exchange, da.Currency); err != nil {
+		if _, err := s.CreateAsset(ctx, da.Ticker, da.Name, da.AssetType, da.Exchange, da.Currency, da.Sector); err != nil {
 			s.log.Error(ctx, "upsert default asset failed", logger.Err(err), logger.Str("ticker", da.Ticker))
 			errs = append(errs, err)
 		}

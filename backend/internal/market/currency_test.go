@@ -12,7 +12,7 @@ import (
 
 func TestNormalizeAssetInputCurrency(t *testing.T) {
 	t.Run("a three-letter non-currency is rejected", func(t *testing.T) {
-		_, err := normalizeAssetInput("AAPL", "Apple", Stock, "NASDAQ", money.Currency(255))
+		_, err := normalizeAssetInput("AAPL", "Apple", Stock, "NASDAQ", money.Currency(255), SectorNone)
 		if !errors.Is(err, errAssetCurrencyInvalid) {
 			t.Errorf("err = %v, want errAssetCurrencyInvalid", err)
 		}
@@ -98,7 +98,7 @@ func TestImportAssetsRejectsNonISOCurrencies(t *testing.T) {
 
 	var stored []string
 	repo := new(fakeRepository{
-		upsertAsset: func(_ context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error) {
+		upsertAsset: func(_ context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency, _ Sector) (Asset, error) {
 			stored = append(stored, ticker+"/"+currency.String())
 			return Asset{Ticker: ticker, Currency: currency}, nil
 		},

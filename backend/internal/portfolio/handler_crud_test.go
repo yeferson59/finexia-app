@@ -611,6 +611,97 @@ func TestHandlerGetAssetAllocation(t *testing.T) {
 	})
 }
 
+func TestHandlerGetSectorAllocation(t *testing.T) {
+	userID := uuid.New()
+
+	newApp := func(t *testing.T, gotCurrency *money.Currency) *fiber.App {
+		t.Helper()
+		repo := new(fakeRepository{
+			getSectorAllocationByUserID: func(_ context.Context, uid uuid.UUID, currency money.Currency) ([]SectorAllocationItem, error) {
+				if uid != userID {
+					t.Errorf("userID = %s, want %s", uid, userID)
+				}
+				*gotCurrency = currency
+
+				return []SectorAllocationItem{
+					{Sector: market.SectorTechnology, MarketValue: "3000", Currency: money.USD, Assets: 2},
+					{Sector: market.SectorUnclassified, MarketValue: "1000", Currency: money.USD, Assets: 1},
+				}, nil
+			},
+		})
+
+		return newTestModule(t, repo, userID, "user")
+	}
+
+	// Same contract as /allocation and /holdings, for the same reason: the rows
+	// are summed across portfolios that may be denominated differently, so the
+	// absence means "the account's own currency" and is resolved in SQL.
+	t.Run("passes no currency through when none is asked for", func(t *testing.T) {
+		var gotCurrency money.Currency
+
+		resp := do(t, newApp(t, &gotCurrency), http.MethodGet, "/portfolios/allocation/sectors")
+		if resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		if gotCurrency != money.XXX {
+			t.Errorf("currency = %q, want the omitted marker", gotCurrency)
+		}
+	})
+
+	t.Run("normalises the requested currency", func(t *testing.T) {
+		var gotCurrency money.Currency
+
+		resp := do(t, newApp(t, &gotCurrency), http.MethodGet, "/portfolios/allocation/sectors?currency=cop")
+		if resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		if gotCurrency != money.COP {
+			t.Errorf("currency = %q, want COP", gotCurrency)
+		}
+	})
+
+	t.Run("rejects an unsupported currency", func(t *testing.T) {
+		app := newTestModule(t, new(fakeRepository{}), userID, "user")
+
+		resp := do(t, app, http.MethodGet, "/portfolios/allocation/sectors?currency=ARS")
+		if resp.StatusCode != fiber.StatusBadRequest {
+			t.Fatalf("status = %d, want 400", resp.StatusCode)
+		}
+	})
+
+	// The response has to be the sector one and not the asset-type one. Both
+	// hang off "/allocation" and Fiber matches in registration order, so a
+	// sub-path registered after its parent is the arrangement that can silently
+	// answer with the wrong body — same vocabulary trap "/holdings" sits in
+	// below, one level deeper.
+	t.Run("answers with sectors and not with the asset-type allocation", func(t *testing.T) {
+		var gotCurrency money.Currency
+
+		resp := do(t, newApp(t, &gotCurrency), http.MethodGet, "/portfolios/allocation/sectors")
+		ok, data := decodeEnvelope(t, resp)
+		if !ok {
+			t.Fatalf("success = false: %s", data)
+		}
+
+		var rows []SectorAllocationItemDTO
+		if err := json.Unmarshal(data, &rows); err != nil {
+			t.Fatalf("decode: %v (%s)", err, data)
+		}
+		if len(rows) != 2 {
+			t.Fatalf("rows = %d, want 2: %s", len(rows), data)
+		}
+
+		// The shares are over the whole portfolio, unclassified included: 3000
+		// of 4000, not of 3000.
+		if rows[0].Sector != string(market.SectorTechnology) || rows[0].Percent != 75 {
+			t.Errorf("first row = %+v, want technology at 75%%", rows[0])
+		}
+		if rows[1].Sector != string(market.SectorUnclassified) || rows[1].Assets != 1 {
+			t.Errorf("second row = %+v, want the unclassified bucket with its asset count", rows[1])
+		}
+	})
+}
+
 func TestHandlerGetAssetHoldings(t *testing.T) {
 	userID := uuid.New()
 

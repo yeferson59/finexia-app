@@ -34,10 +34,7 @@ func fxPosition(t *testing.T, pool *pgxpool.Pool) (userID, entryID uuid.UUID) {
 		}
 	}
 
-	t.Cleanup(func() {
-		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
-		_, _ = pool.Exec(context.Background(), `DELETE FROM assets WHERE id = $1`, assetID)
-	})
+	dropFixture(t, pool, userID)(assetID)
 
 	exec(`INSERT INTO users (id, name, email, role_id, preferred_currency)
 	      VALUES ($1, 'fx probe', $2, (SELECT id FROM roles WHERE name = 'customer'), 'USD')`,

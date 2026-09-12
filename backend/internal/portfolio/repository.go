@@ -78,6 +78,10 @@ type TransactionStore interface {
 	// GetAssetHoldingsByUserID is the same aggregation one level finer: per
 	// asset instead of per category, plus the units held.
 	GetAssetHoldingsByUserID(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AssetHolding, error)
+	// GetSectorAllocationByUserID is the same aggregation down the other axis:
+	// per industry rather than per kind of instrument. Same positions, same
+	// valuation and same currency contract as the two above.
+	GetSectorAllocationByUserID(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]SectorAllocationItem, error)
 	CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, in TransactionInput) (Transaction, error)
 	UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, in TransactionInput) (Transaction, error)
 	DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID) error

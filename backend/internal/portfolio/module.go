@@ -122,6 +122,12 @@ func (m *Module) Routes(router fiber.Router) {
 	portfolios.Post("/transactions/import/preview", m.handler.PreviewTransactionsImport)
 	portfolios.Post("/transactions/import", m.handler.ImportTransactions)
 	portfolios.Get("/allocation", m.handler.GetAssetAllocation)
+	// The same positions grouped by industry instead of by asset type. A
+	// sub-path of /allocation and not a ?by= on it, because the two answer with
+	// different row shapes and different vocabularies — one AssetType, the
+	// other Sector plus two buckets — and a client that asked for the wrong one
+	// would get a body it can label but not read.
+	portfolios.Get("/allocation/sectors", m.handler.GetSectorAllocation)
 	// Consolidated holdings: the same positions as /allocation, one row per
 	// asset instead of one per category. Not "/assets" — that path is the
 	// catalog, registered below.

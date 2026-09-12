@@ -6,6 +6,7 @@
 import { apiRequest, apiRequestSafe, type ApiEvent, type ApiResult } from './client';
 import type {
 	AllocationItem,
+	SectorAllocationItem,
 	AssetHolding,
 	PortfolioDetail,
 	PortfolioGrowth,
@@ -15,6 +16,7 @@ import type {
 } from './types';
 import {
 	allocationItemSchema,
+	sectorAllocationItemSchema,
 	assetHoldingSchema,
 	portfolioDetailSchema,
 	portfolioGrowthSchema,
@@ -53,6 +55,26 @@ export function getAllocation(
 	// en la misma moneda.
 	const query = currency ? `?currency=${encodeURIComponent(currency)}` : '';
 	return apiRequestSafe(event, `/portfolios/allocation${query}`, {}, z.array(allocationItemSchema));
+}
+
+/**
+ * `GET /portfolios/allocation/sectors` — el mismo patrimonio repartido por
+ * industria.
+ *
+ * Mismo contrato de moneda que `getAllocation`: sin `currency` responde en la
+ * preferencia de la cuenta.
+ */
+export function getSectorAllocation(
+	event: ApiEvent,
+	currency?: string
+): Promise<ApiResult<SectorAllocationItem[]>> {
+	const query = currency ? `?currency=${encodeURIComponent(currency)}` : '';
+	return apiRequestSafe(
+		event,
+		`/portfolios/allocation/sectors${query}`,
+		{},
+		z.array(sectorAllocationItemSchema)
+	);
 }
 
 /**

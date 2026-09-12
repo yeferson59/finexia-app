@@ -36,13 +36,13 @@ func (s *service) GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, e
 
 // CreateAsset curates a catalog row. Operator-only, and the seed runs through
 // it too.
-func (s *service) CreateAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error) {
-	input, err := normalizeAssetInput(ticker, name, assetType, exchange, currency)
+func (s *service) CreateAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency, sector Sector) (Asset, error) {
+	input, err := normalizeAssetInput(ticker, name, assetType, exchange, currency, sector)
 	if err != nil {
 		return Asset{}, err
 	}
 
-	return s.repo.UpsertAsset(ctx, input.ticker, input.name, input.assetType, input.exchange, input.currency)
+	return s.repo.UpsertAsset(ctx, input.ticker, input.name, input.assetType, input.exchange, input.currency, input.sector)
 }
 
 // maxContributedAssetsPerDay bounds how many new catalog rows one user can
@@ -62,8 +62,14 @@ const maxContributedAssetsPerDay = 50
 // caller's side both mean "the ticker you asked for is now in your catalog",
 // and distinguishing them would report on whether another user had already
 // contributed that ticker.
+//
+// The sector is not among its arguments, unlike CreateAsset's. A contribution
+// names an instrument the catalog was missing, and the user adding COLCAP knows
+// its ticker and currency; asking them to also file it under an industry would
+// be asking for a guess that every other holder of that row then inherits. The
+// asset arrives unclassified, which the breakdown reports as such.
 func (s *service) ContributeAsset(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error) {
-	input, err := normalizeAssetInput(ticker, name, assetType, exchange, currency)
+	input, err := normalizeAssetInput(ticker, name, assetType, exchange, currency, SectorNone)
 	if err != nil {
 		return Asset{}, err
 	}
@@ -86,13 +92,14 @@ type assetInput struct {
 	assetType AssetType
 	exchange  string
 	currency  money.Currency
+	sector    Sector
 }
 
 // normalizeAssetInput trims, upper-cases and validates what both creation paths
 // receive. It lives in the service rather than the handler because the user
 // path is no longer the only untrusted one: a request body and a spreadsheet
 // row reach the same table, and the column limits have to hold for both.
-func normalizeAssetInput(ticker, name string, assetType AssetType, exchange string, currency money.Currency) (assetInput, error) {
+func normalizeAssetInput(ticker, name string, assetType AssetType, exchange string, currency money.Currency, sector Sector) (assetInput, error) {
 	if !currency.Valid() {
 		return assetInput{}, errAssetCurrencyInvalid
 	}
@@ -103,6 +110,7 @@ func normalizeAssetInput(ticker, name string, assetType AssetType, exchange stri
 		assetType: assetType,
 		exchange:  strings.TrimSpace(exchange),
 		currency:  currency,
+		sector:    sector,
 	}
 
 	switch {
@@ -130,6 +138,19 @@ func normalizeAssetInput(ticker, name string, assetType AssetType, exchange stri
 		return assetInput{}, errAssetTypeInvalid
 	}
 
+	// A sector is optional, so only a value that is neither empty nor known is
+	// an error. Classifying an asset whose type has none — a coin, a cash
+	// balance — is rejected rather than silently stored: the breakdown reads
+	// those from the type, so a sector written there would be a number nothing
+	// displays and the next reader would have to explain.
+	switch {
+	case in.sector == SectorNone:
+	case !in.sector.IsValid():
+		return assetInput{}, errAssetSectorInvalid
+	case !in.assetType.HasSector():
+		return assetInput{}, errAssetSectorNotApplicable
+	}
+
 	return in, nil
 }
 
@@ -148,7 +169,7 @@ func normalizeAssetInput(ticker, name string, assetType AssetType, exchange stri
 // the stale number rather than let the catalog quote a figure in a currency
 // nobody entered it in.
 func (s *service) UpdateAsset(ctx context.Context, assetID uuid.UUID, upd AssetUpdate) (Asset, error) {
-	input, err := normalizeAssetInput(upd.Ticker, upd.Name, upd.AssetType, upd.Exchange, upd.Currency)
+	input, err := normalizeAssetInput(upd.Ticker, upd.Name, upd.AssetType, upd.Exchange, upd.Currency, upd.Sector)
 	if err != nil {
 		return Asset{}, err
 	}
@@ -163,6 +184,7 @@ func (s *service) UpdateAsset(ctx context.Context, assetID uuid.UUID, upd AssetU
 		AssetType: input.assetType,
 		Exchange:  input.exchange,
 		Currency:  input.currency,
+		Sector:    input.sector,
 		IsCurated: upd.IsCurated,
 		Price:     upd.Price,
 	})
