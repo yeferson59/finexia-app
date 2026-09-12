@@ -604,6 +604,54 @@ func TestGrowthSeriesKeepsADeletedPositionOnTheDaysItWasIn(t *testing.T) {
 	}
 }
 
+// A position's cost currency cannot be edited, so fixing the currency an account
+// settled in means deleting the position and loading it again. That has to
+// leave the series where it was: the deleted version goes out and the new one
+// comes in at the same price on the same point, and the day the original came
+// in keeps its flow. Before retired_transactions it cost a gain on one day and a
+// loss on another (MC.PA, 2026-08-14 and 2026-09-04).
+func TestGrowthSeriesIgnoresAReRegisteredPosition(t *testing.T) {
+	pool := growthTestPool(t)
+	repo := NewPostgresRepository(pool)
+	ctx := context.Background()
+	userID, portfolioID, entryID, _, day, asOf := seenPurchase(t, pool, repo)
+
+	var assetID, sourceID uuid.UUID
+	if err := pool.QueryRow(ctx,
+		`SELECT asset_id, source_id FROM portfolio_entries WHERE id = $1`, entryID,
+	).Scan(&assetID, &sourceID); err != nil {
+		t.Fatalf("reading the position: %v", err)
+	}
+
+	if _, err := repo.DeletePortfolioEntry(ctx, userID, entryID); err != nil {
+		t.Fatalf("DeletePortfolioEntry: %v", err)
+	}
+
+	// Loaded again, dated when it was really bought.
+	reloaded := uuid.New()
+	boughtOn := day.AddDate(0, 0, -30)
+	for _, stmt := range []struct {
+		sql  string
+		args []any
+	}{
+		{`INSERT INTO portfolio_entries
+		    (id, portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date)
+		  VALUES ($1, $2, $3, $4, 0, 50, 'USD', $5)`,
+			[]any{reloaded, portfolioID, assetID, sourceID, boughtOn}},
+		{`INSERT INTO transactions (entry_id, type, quantity, price, currency, fees, transaction_date)
+		  VALUES ($1, 'buy', 1, 50, 'USD', 0, $2)`,
+			[]any{reloaded, boughtOn}},
+	} {
+		if _, err := pool.Exec(ctx, stmt.sql, stmt.args...); err != nil {
+			t.Fatalf("%s: %v", stmt.sql, err)
+		}
+	}
+
+	flows := flowsByDay(t, repo, userID, asOf)
+	assertFlow(t, flows, day, 50, "la versión original sigue en el día en que entró")
+	assertFlow(t, flows, asOf, 0, "la que sale y la que entra valen lo mismo")
+}
+
 // A quantity edit is the same problem with the difference: the snapshot held
 // one unit, and the row now says two.
 func TestGrowthSeriesNetsAQuantityEditOnTheDayItWasMade(t *testing.T) {
