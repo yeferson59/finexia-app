@@ -405,6 +405,85 @@ func TestGrowthSeriesValuesLoadedHistoryAtWhatItWasWorth(t *testing.T) {
 	}
 }
 
+// A second run of the snapshot job on the same day refreshes that day's totals,
+// and the time the row carries has to move with them. On 2026-08-14 the job ran
+// at 00:55 and again at 22:00, the row kept 00:55, and the positions recorded in
+// between showed in the 14th's value while their flows went to the 15th: +10%
+// one day and −7% the next, on two days the market barely moved.
+func TestSnapshotRerunKeepsFlowsOnTheDayItsValuesShow(t *testing.T) {
+	pool := growthTestPool(t)
+	repo := NewPostgresRepository(pool)
+	ctx := context.Background()
+	userID, portfolioID := backdatedPortfolio(t, pool)
+	track := dropFixture(t, pool, userID)
+
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, sql, args...); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+
+	// The day after the fixture's last snapshot is closed here, so the series
+	// is read one day later.
+	day := backdatedAsOf
+	asOf := day.AddDate(0, 0, 1)
+
+	upsert := func(readAt time.Time) {
+		t.Helper()
+		row := SnapshotRow{
+			PortfolioID:      portfolioID,
+			BaseCurrency:     money.USD,
+			TotalMarketValue: "1600",
+			TotalGainLoss:    "150",
+			TotalGainLossPct: "10.37",
+			ReadAt:           readAt,
+		}
+		if err := repo.UpsertPortfolioSnapshot(ctx, row, day); err != nil {
+			t.Fatalf("UpsertPortfolioSnapshot: %v", err)
+		}
+	}
+
+	// The catch-up of a restart, a little before one in the morning...
+	upsert(day.Add(55 * time.Minute))
+
+	// ...a purchase recorded an hour later, traded the evening before...
+	assetID, entryID := uuid.New(), uuid.New()
+	exec(`INSERT INTO assets (id, ticker, name, asset_type, currency, current_price)
+	      VALUES ($1, $2, 'probe', 'stock', 'USD', 55)`, assetID, uuid.New().String()[:8])
+	track(assetID)
+	exec(`INSERT INTO portfolio_entries
+	        (id, portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date)
+	      VALUES ($1, $2, $3, (SELECT id FROM investment_sources WHERE user_id = $4), 0, 50, 'USD', $5)`,
+		entryID, portfolioID, assetID, userID, day.AddDate(0, 0, -1))
+	exec(`INSERT INTO transactions
+	        (entry_id, type, quantity, price, currency, fees, transaction_date, created_at)
+	      VALUES ($1, 'buy', 1, 50, 'USD', 0, $2, $3)`,
+		entryID, day.AddDate(0, 0, -1), day.Add(101*time.Minute))
+
+	// ...and the regular run at 22:00, whose totals include it.
+	upsert(day.Add(22 * time.Hour))
+
+	points, err := repo.GetPortfolioGrowthByUserID(ctx, userID, money.USD, false, time.Time{}, asOf)
+	if err != nil {
+		t.Fatalf("GetPortfolioGrowthByUserID: %v", err)
+	}
+
+	flows := map[string]float64{}
+	for _, point := range points {
+		flows[point.Date.Format("2006-01-02")], _ = growthDecimal(point.NetFlow).Float64()
+	}
+
+	// On the day whose value holds it, and at its cost: it was traded inside
+	// the stretch that day closes, not loaded as history.
+	if got := flows[day.Format("2006-01-02")]; got < 49.99 || got > 50.01 {
+		t.Errorf("flujo del %s = %.2f, want 50: la compra ya está en el valor de ese día", day.Format("2006-01-02"), got)
+	}
+	if got := flows[asOf.Format("2006-01-02")]; got != 0 {
+		t.Errorf("flujo del %s = %.2f, want 0: la compra se contó un día tarde", asOf.Format("2006-01-02"), got)
+	}
+}
+
 func TestGrowthSeriesFlowLandsOnTheDayTheValueMoves(t *testing.T) {
 	pool := growthTestPool(t)
 	repo := NewPostgresRepository(pool)

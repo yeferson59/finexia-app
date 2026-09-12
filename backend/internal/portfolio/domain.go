@@ -587,6 +587,10 @@ type SnapshotRow struct {
 	// out of the same statement as TotalMarketValue so the parts add up to it
 	// by construction; see GetAllPortfolioSummaryRows.
 	Allocation string
+	// ReadAt is when the totals above were read. The snapshot stores it as its
+	// created_at, which is what the growth series compares transactions against;
+	// see UpsertPortfolioSnapshot.
+	ReadAt time.Time
 }
 
 type GrowthPoint struct {

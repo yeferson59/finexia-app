@@ -30,7 +30,10 @@ func (r *PostgresRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]
 			COALESCE(ps.total_cost_base,    0)::text,
 			COALESCE(ps.total_gain_loss,    0)::text,
 			COALESCE(ps.total_gain_loss_pct,0)::text,
-			COALESCE(alloc.allocation, '{}'::jsonb)::text
+			COALESCE(alloc.allocation, '{}'::jsonb)::text,
+			-- The instant the totals above were read: a transaction recorded
+			-- after it is not in them, however soon the row gets written.
+			now()
 		FROM portfolios p
 		LEFT JOIN portfolio_summary ps ON ps.portfolio_id = p.id
 		LEFT JOIN LATERAL (
@@ -76,6 +79,7 @@ func (r *PostgresRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]
 			&row.TotalGainLoss,
 			&row.TotalGainLossPct,
 			&row.Allocation,
+			&row.ReadAt,
 		); err != nil {
 			return nil, err
 		}
@@ -97,6 +101,15 @@ func (r *PostgresRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]
 // allocation is refreshed along with the totals. A same-day re-run happens
 // after positions moved, so leaving it would pair the new total with the old
 // composition — the row would contradict itself.
+//
+// created_at is refreshed too, and it is not bookkeeping. The growth series
+// hands each transaction to the first snapshot whose created_at is not older
+// than it, so the column has to say when the stored totals were read. Left at
+// the first write, a second run on the same day — a retry, or the catch-up of a
+// restart — refreshed the totals and kept the old time: on 2026-08-14 the job
+// ran at 00:55 and at 22:00, the positions recorded in between showed in that
+// day's value while their flows went to the next day, and the series drew +10%
+// followed by −7% out of two quiet days.
 func (r *PostgresRepository) UpsertPortfolioSnapshot(
 	ctx context.Context,
 	row SnapshotRow,
@@ -107,16 +120,23 @@ func (r *PostgresRepository) UpsertPortfolioSnapshot(
 		allocation = "{}"
 	}
 
+	// A row built by hand carries no read time and is stamped with the write's.
+	var readAt *time.Time
+	if !row.ReadAt.IsZero() {
+		readAt = &row.ReadAt
+	}
+
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO portfolio_snapshots
-			(portfolio_id, snapshot_date, total_value, currency, allocation, total_gain_loss, total_gain_loss_pct)
-		VALUES ($1, $2::date, $3::numeric, $4, $5::jsonb, $6::numeric, $7::numeric)
+			(portfolio_id, snapshot_date, total_value, currency, allocation, total_gain_loss, total_gain_loss_pct, created_at)
+		VALUES ($1, $2::date, $3::numeric, $4, $5::jsonb, $6::numeric, $7::numeric, COALESCE($8::timestamptz, now()))
 		ON CONFLICT (portfolio_id, snapshot_date)
 		DO UPDATE SET
 			total_value         = EXCLUDED.total_value,
 			allocation          = EXCLUDED.allocation,
 			total_gain_loss     = EXCLUDED.total_gain_loss,
-			total_gain_loss_pct = EXCLUDED.total_gain_loss_pct
+			total_gain_loss_pct = EXCLUDED.total_gain_loss_pct,
+			created_at          = EXCLUDED.created_at
 	`,
 		row.PortfolioID,
 		snapshotDate,
@@ -125,6 +145,7 @@ func (r *PostgresRepository) UpsertPortfolioSnapshot(
 		allocation,
 		row.TotalGainLoss,
 		row.TotalGainLossPct,
+		readAt,
 	)
 
 	return err
