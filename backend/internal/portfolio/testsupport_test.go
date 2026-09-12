@@ -132,6 +132,7 @@ type fakeRepository struct {
 	deletePlatform                  func(ctx context.Context, userID, sourceID uuid.UUID) error
 	createPortfolioEntry            func(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, costCurrency money.Currency, in TransactionInput) (Entry, error)
 	deletePortfolioEntry            func(ctx context.Context, userID, entryID uuid.UUID) (int, error)
+	changeEntrySettlement           func(ctx context.Context, userID, entryID uuid.UUID, costCurrency money.Currency, rates map[uuid.UUID]decimal.Decimal) (int, error)
 	getEntryWithAsset               func(ctx context.Context, entryID uuid.UUID) (Entry, error)
 	getTransactionsByEntryID        func(ctx context.Context, userID, entryID uuid.UUID) ([]Transaction, error)
 	countAssetTransactions          func(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error)
@@ -215,6 +216,10 @@ func (f *fakeRepository) CreatePortfolioEntry(ctx context.Context, userID, portf
 
 func (f *fakeRepository) DeletePortfolioEntry(ctx context.Context, userID, entryID uuid.UUID) (int, error) {
 	return f.deletePortfolioEntry(ctx, userID, entryID)
+}
+
+func (f *fakeRepository) ChangeEntrySettlement(ctx context.Context, userID, entryID uuid.UUID, costCurrency money.Currency, rates map[uuid.UUID]decimal.Decimal) (int, error) {
+	return f.changeEntrySettlement(ctx, userID, entryID, costCurrency, rates)
 }
 
 func (f *fakeRepository) GetEntryWithAsset(ctx context.Context, entryID uuid.UUID) (Entry, error) {

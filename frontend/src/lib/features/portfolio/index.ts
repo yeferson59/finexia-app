@@ -23,6 +23,7 @@ export { default as AssetPositionHeader } from './components/asset-position-head
 export { default as AssetPositionHeadline } from './components/asset-position-headline.svelte';
 export { default as AssetTransactionHistory } from './components/asset-transaction-history.svelte';
 export { default as AssetDeletePosition } from './components/asset-delete-position.svelte';
+export { default as AssetSettlement } from './components/asset-settlement.svelte';
 
 // Vista consolidada de activos (`dashboard/assets`): lo que el usuario tiene
 // de cada activo sumando todos sus portafolios. `asset-holdings-table` es

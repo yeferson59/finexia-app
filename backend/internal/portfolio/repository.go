@@ -70,6 +70,9 @@ type TransactionStore interface {
 	CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, costCurrency money.Currency, in TransactionInput) (Entry, error)
 	GetEntryWithAsset(ctx context.Context, entryID uuid.UUID) (Entry, error)
 	DeletePortfolioEntry(ctx context.Context, userID, entryID uuid.UUID) (int, error)
+	// ChangeEntrySettlement restates a position in another cost currency with the
+	// rate of each of its transactions; see PlanSettlement.
+	ChangeEntrySettlement(ctx context.Context, userID, entryID uuid.UUID, costCurrency money.Currency, rates map[uuid.UUID]decimal.Decimal) (int, error)
 	GetTransactionsByEntryID(ctx context.Context, userID, entryID uuid.UUID) ([]Transaction, error)
 	CountAssetTransactions(ctx context.Context, userID, portfolioID uuid.UUID, ticker string) (int, error)
 	GetAssetTransactionsPaginated(ctx context.Context, userID, portfolioID uuid.UUID, ticker string, limit, offset int) ([]Transaction, error)

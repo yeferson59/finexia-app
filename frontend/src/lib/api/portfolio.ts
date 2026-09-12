@@ -162,6 +162,22 @@ export function deleteEntry(event: ApiEvent, entryId: string): Promise<ApiResult
 	return apiRequest<unknown>(event, `/portfolios/entries/${entryId}`, { method: 'DELETE' });
 }
 
+/**
+ * `PUT /portfolios/entries/:entryId/settlement` — cambia la moneda en la que
+ * liquidó una posición y la tasa de cada transacción, sin borrarla.
+ */
+export function changeEntrySettlement(
+	event: ApiEvent,
+	entryId: string,
+	body: { costCurrency: string; rates: { transactionId: string; fxRate: number }[] }
+): Promise<ApiResult<unknown>> {
+	return apiRequest<unknown>(event, `/portfolios/entries/${entryId}/settlement`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+}
+
 /** `POST /portfolios/entries` — crea una posición (entry) en un portfolio. */
 export function createEntry(
 	event: ApiEvent,

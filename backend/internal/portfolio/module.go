@@ -136,6 +136,7 @@ func (m *Module) Routes(router fiber.Router) {
 	portfolios.Post("/sources", m.handler.CreatePlatform)
 	portfolios.Post("/entries", m.handler.CreatePortfolioEntry)
 	portfolios.Delete("/entries/:entryId", m.handler.DeletePortfolioEntry)
+	portfolios.Put("/entries/:entryId/settlement", m.handler.ChangeEntrySettlement)
 	portfolios.Get("/entries/:entryId/transactions", m.handler.GetTransactions)
 	portfolios.Post("/entries/:entryId/transactions", m.handler.CreateTransaction)
 	portfolios.Put("/transactions/:txnId", m.handler.UpdateTransaction)

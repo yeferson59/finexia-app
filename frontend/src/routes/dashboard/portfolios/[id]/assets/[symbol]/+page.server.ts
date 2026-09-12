@@ -4,6 +4,7 @@ import type { PageServerLoad, Actions } from './$types';
 import type { Holding, Transaction } from '$lib/api/types';
 import {
 	entryDeleteSchema,
+	entrySettlementSchema,
 	transactionCreateSchema,
 	transactionDeleteSchema,
 	transactionUpdateSchema
@@ -234,5 +235,59 @@ export const actions: Actions = {
 			?.deletedTransactions;
 
 		return { success: true, entryDeleted: true, deletedTransactions };
+	},
+
+	// Abre el cambio de moneda de liquidación con la historia entera de la
+	// posición: cada transacción en otra moneda necesita su tasa, y la página
+	// solo tiene cargada una hoja del historial.
+	loadSettlement: async ({ request, fetch, cookies }) => {
+		const formData = await request.formData();
+
+		const { success, data } = await entrySettlementSchema
+			.pick({ entryId: true })
+			.safeParseAsync({ entryId: formData.get('entryId') });
+
+		if (!success) {
+			return { success: false, error: 'No se reconoce la posición.' };
+		}
+
+		const response = await transactions.getEntryTransactions({ cookies, fetch }, data.entryId);
+
+		if (!response.ok || !response.success || !response.data) {
+			return { success: false, error: response.details || response.message || response.action };
+		}
+
+		return { success: true, settlementTransactions: response.data };
+	},
+
+	// Cada tasa llega en un campo `rate:<id de la transacción>`, porque cuántas
+	// hay depende de la moneda elegida en el mismo formulario.
+	changeSettlement: async ({ request, fetch, cookies }) => {
+		const formData = await request.formData();
+
+		const rates = [...formData.entries()]
+			.filter(([key]) => key.startsWith('rate:'))
+			.map(([key, value]) => ({ transactionId: key.slice('rate:'.length), fxRate: value }));
+
+		const { success, error, data } = await entrySettlementSchema.safeParseAsync({
+			entryId: formData.get('entryId'),
+			costCurrency: formData.get('costCurrency'),
+			rates
+		});
+
+		if (!success) {
+			return { success: false, error: error.issues[0]?.message ?? error.message };
+		}
+
+		const response = await portfolio.changeEntrySettlement({ cookies, fetch }, data.entryId, {
+			costCurrency: data.costCurrency,
+			rates: data.rates
+		});
+
+		if (!response.ok || !response.success) {
+			return { success: false, error: response.details || response.message || response.action };
+		}
+
+		return { success: true, settlementChanged: true };
 	}
 };

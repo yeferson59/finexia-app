@@ -58,3 +58,9 @@ var ErrTransactionFXRate = httpx.AsBadRequest(errors.New("invalid transaction ex
 // the trade's currency and the position's, so a fee in a third currency could
 // only be reached by inventing a second one.
 var ErrTransactionFeesCurrency = httpx.AsBadRequest(errors.New("invalid transaction fees currency"))
+
+// ErrSettlementWithoutTransactions refuses to restate a position that has no
+// transactions. Its cost is its transactions' cost at their rates; with none to
+// carry a rate, changing the currency would only relabel a price recorded in
+// another one.
+var ErrSettlementWithoutTransactions = httpx.AsBadRequest(errors.New("position has no transactions to restate"))

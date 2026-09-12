@@ -710,6 +710,33 @@ operaciones—, y es la diferencia entre confirmar lo que pasó y suponerlo. Una
 posición que no exista o que sea de otro usuario devuelve el mismo `404`: la
 pertenencia se impone en el `WHERE`, no con una lectura previa.
 
+#### Cambiar la moneda de liquidación de una posición
+
+`PUT /portfolios/entries/:entryId/settlement` reexpresa una posición en la moneda
+en la que de verdad liquidó la cuenta, sin borrarla:
+
+```json
+{
+  "costCurrency": "USD",
+  "rates": [{ "transactionId": "…", "fxRate": "1.1698" }]
+}
+```
+
+- La moneda de coste se elige al abrir la posición, y antes corregirla obligaba a
+  borrar la posición y volver a cargarla con todo su historial.
+- `rates` lleva la tasa de cada transacción que cotiza en una moneda distinta de
+  `costCurrency`: cuántas unidades de `costCurrency` costaba una de la operación
+  ese día, según la confirmación del bróker. Las que cotizan en `costCurrency`
+  quedan a 1, y un split sin tasa también. Si falta alguna, responde `400`
+  nombrando la fecha de la transacción y no cambia nada.
+- Una comisión cobrada a la cuenta pasa a la nueva moneda de la cuenta; una
+  cobrada en la operación se queda en la moneda de la operación.
+- Solo cambian la moneda y las tasas: el coste medio se recalcula, las cantidades
+  no se tocan y la serie de crecimiento no retira nada.
+
+Responde `{ "costCurrency": "USD", "transactions": 1 }`, y `404` si la posición no
+es de quien la pide.
+
 #### Errores de cliente: el motivo viaja en `details`
 
 Un 4xx generado por `FromDomain` incluye el texto del error de dominio en

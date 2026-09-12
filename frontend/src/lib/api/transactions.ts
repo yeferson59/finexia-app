@@ -10,13 +10,30 @@ import {
 	type ApiEvent,
 	type ApiResult
 } from './client';
-import type { PagedTransactions, UserTransaction } from './types';
-import { pagedTransactionsSchema, userTransactionSchema } from './schemas';
+import type { PagedTransactions, Transaction, UserTransaction } from './types';
+import { pagedTransactionsSchema, transactionSchema, userTransactionSchema } from './schemas';
 import { z } from 'zod';
 
 /** `GET /portfolios/transactions` — transacciones recientes del usuario. */
 export function getRecent(event: ApiEvent): Promise<ApiResult<UserTransaction[]>> {
 	return apiRequestSafe(event, '/portfolios/transactions', {}, z.array(userTransactionSchema));
+}
+
+/**
+ * `GET /portfolios/entries/:entryId/transactions` — todas las transacciones de
+ * una posición, sin paginar. Las pide quien necesita la historia entera: el
+ * cambio de moneda de liquidación no puede dejar ninguna sin su tasa.
+ */
+export function getEntryTransactions(
+	event: ApiEvent,
+	entryId: string
+): Promise<ApiResult<Transaction[]>> {
+	return apiRequestSafe(
+		event,
+		`/portfolios/entries/${entryId}/transactions`,
+		{},
+		z.array(transactionSchema)
+	);
 }
 
 /** `GET /portfolios/:id/assets/:symbol/transactions` — transacciones paginadas de una posición. */

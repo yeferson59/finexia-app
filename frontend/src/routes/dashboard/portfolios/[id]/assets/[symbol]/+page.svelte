@@ -6,6 +6,7 @@
 		AssetPositionHeadline,
 		AssetTransactionHistory,
 		AssetDeletePosition,
+		AssetSettlement,
 		computePosition
 	} from '$lib/features/portfolio';
 	import type { PageProps } from './$types';
@@ -97,6 +98,8 @@
 		{formatCurrency}
 		{formatAmount}
 	/>
+
+	<AssetSettlement {entries} {formatAmount} />
 
 	<AssetDeletePosition
 		portfolioId={params.id}

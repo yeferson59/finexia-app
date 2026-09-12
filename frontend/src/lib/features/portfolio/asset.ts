@@ -285,6 +285,21 @@ export function tradeDateWarnings(check: TradeDateCheck): string[] {
 	return warnings;
 }
 
+/**
+ * Las transacciones que necesitan tasa para liquidar en `costCurrency`: las que
+ * cotizan en otra moneda. Un split no mueve dinero y no la pide.
+ */
+export function transactionsNeedingRate<T extends { currency: string; type: string }>(
+	transactions: T[],
+	costCurrency: string
+): T[] {
+	const target = costCurrency.trim().toUpperCase();
+
+	return transactions.filter(
+		(txn) => txn.type !== 'split' && txn.currency.trim().toUpperCase() !== target
+	);
+}
+
 /** Metadatos de paginación de las transacciones del activo. */
 export interface TxnMeta {
 	total: number;

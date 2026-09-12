@@ -5,6 +5,7 @@ import {
 	formatUnits,
 	priceLabelFor,
 	tradeDateWarnings,
+	transactionsNeedingRate,
 	txnModeFor,
 	unitNoun
 } from './asset';
@@ -164,6 +165,28 @@ describe('formatUnits', () => {
 		expect(formatUnits(1, 'stock')).toBe('1 acción');
 		expect(formatUnits(0.15, 'crypto')).toBe('0,15 unidades');
 		expect(formatUnits(9500, 'cash')).toBe('9.500 unidades');
+	});
+});
+
+describe('transactionsNeedingRate', () => {
+	const history = [
+		{ id: 'buy-eur', type: 'buy', currency: 'EUR' },
+		{ id: 'buy-usd', type: 'buy', currency: 'USD' },
+		{ id: 'split-eur', type: 'split', currency: 'EUR' },
+		{ id: 'dividend-eur', type: 'dividend', currency: 'eur ' }
+	];
+
+	// IBCZ.DE pasada a una cuenta en dólares: todo lo que cotizó en euros pide
+	// su tasa, menos el split, que no movió dinero.
+	it('asks a rate for every transaction quoted in another currency', () => {
+		expect(transactionsNeedingRate(history, 'USD').map((txn) => txn.id)).toEqual([
+			'buy-eur',
+			'dividend-eur'
+		]);
+	});
+
+	it('asks none when everything is quoted in the new currency', () => {
+		expect(transactionsNeedingRate(history, ' eur').map((txn) => txn.id)).toEqual(['buy-usd']);
 	});
 });
 

@@ -114,6 +114,22 @@ export const transactionDeleteSchema = z.object({ txnId: z.uuid() });
 export const entryDeleteSchema = z.object({ entryId: z.uuid() });
 
 /**
+ * Cambio de la moneda en la que liquidó una posición. Cada tasa es la de una
+ * transacción, tal como la dice su confirmación; las que cotizan en la moneda
+ * nueva no la necesitan y el formulario no las manda.
+ */
+export const entrySettlementSchema = z.object({
+	entryId: z.uuid('No se reconoce la posición.'),
+	costCurrency: currencyCode,
+	rates: z.array(
+		z.object({
+			transactionId: z.uuid('No se reconoce la transacción.'),
+			fxRate: z.coerce.number().positive('Cada tasa tiene que ser mayor que cero.')
+		})
+	)
+});
+
+/**
  * Actualización manual del precio de un activo contra un proveedor concreto
  * (`routes/dashboard/assets`).
  *
