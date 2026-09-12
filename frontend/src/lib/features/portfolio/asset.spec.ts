@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import type { Holding } from '$lib/api/types';
-import { computePosition, formatUnits, priceLabelFor, txnModeFor, unitNoun } from './asset';
+import {
+	computePosition,
+	formatUnits,
+	priceLabelFor,
+	tradeDateWarnings,
+	txnModeFor,
+	unitNoun
+} from './asset';
 
 function holding(partial: Partial<Holding>): Holding {
 	return {
@@ -157,5 +164,89 @@ describe('formatUnits', () => {
 		expect(formatUnits(1, 'stock')).toBe('1 acción');
 		expect(formatUnits(0.15, 'crypto')).toBe('0,15 unidades');
 		expect(formatUnits(9500, 'cash')).toBe('9.500 unidades');
+	});
+});
+
+describe('tradeDateWarnings', () => {
+	// PG, comprada el mismo día que se registró y a su precio: nada que decir.
+	const base = {
+		date: '2026-08-13',
+		today: '2026-08-13',
+		ticker: 'PG',
+		assetType: 'stock',
+		price: 145.02,
+		currency: 'USD',
+		marketPrice: 145.27,
+		marketCurrency: 'USD'
+	};
+
+	it('stays quiet for a trade that fits its date', () => {
+		expect(tradeDateWarnings(base)).toEqual([]);
+	});
+
+	// TSM, SPCX y VST entraron fechadas el sábado en que se cargaron.
+	it('flags a weekend date for an exchange-traded asset', () => {
+		const warnings = tradeDateWarnings({ ...base, date: '2026-08-22', today: '2026-08-22' });
+
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain('sábado');
+	});
+
+	it('knows Sunday too, and lets crypto trade on weekends', () => {
+		expect(tradeDateWarnings({ ...base, date: '2026-08-23', today: '2026-08-23' })[0]).toContain(
+			'domingo'
+		);
+		expect(
+			tradeDateWarnings({ ...base, assetType: 'crypto', date: '2026-08-22', today: '2026-08-22' })
+		).toEqual([]);
+	});
+
+	// ADBE: comprada «ayer» a 483,57 cuando valía 252,23.
+	it('flags a recent date whose price is far from the market', () => {
+		const warnings = tradeDateWarnings({
+			...base,
+			ticker: 'ADBE',
+			today: '2026-08-14',
+			price: 483.57,
+			marketPrice: 252.23
+		});
+
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain('ADBE');
+		expect(warnings[0]).toContain('revisa la fecha');
+	});
+
+	it('trusts an old date whatever its price', () => {
+		expect(
+			tradeDateWarnings({
+				...base,
+				ticker: 'ADBE',
+				date: '2024-04-11',
+				today: '2026-08-14',
+				price: 483.57,
+				marketPrice: 252.23
+			})
+		).toEqual([]);
+	});
+
+	it('compares prices only in the same currency and against a known market price', () => {
+		expect(
+			tradeDateWarnings({ ...base, price: 213.24, marketPrice: 433.24, marketCurrency: 'EUR' })
+		).toEqual([]);
+		expect(tradeDateWarnings({ ...base, price: 213.24, marketPrice: null })).toEqual([]);
+	});
+
+	// TSM: fecha de sábado y a la mitad de lo que vale.
+	it('raises both warnings when both signals are there', () => {
+		expect(
+			tradeDateWarnings({
+				...base,
+				ticker: 'TSM',
+				date: '2026-08-22',
+				today: '2026-08-22',
+				price: 213.24,
+				marketPrice: 433.24
+			})
+		).toHaveLength(2);
 	});
 });

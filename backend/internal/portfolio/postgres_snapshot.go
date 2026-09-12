@@ -302,13 +302,22 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, use
 			-- it is not the return of the day it happened to be typed in. Its
 			-- fee and the income it paid back then belong to the same unwatched
 			-- past and carry no flow (transaction_holding_flow, 000036).
+			--
+			-- The transactions are read through growth_flow_events (000038), which
+			-- also carries every version a deletion or a quantity edit retired
+			-- after a snapshot had seen it: once as it came in, and reversed, at
+			-- what the holding was worth when it went, on the point where it
+			-- left. The snapshots between the two still hold its value.
 			SELECT
 				landed.snapshot_date,
 				CASE
-					WHEN tx.transaction_date < stretch.opened_on THEN
-						-- recorded_market_price is in the portfolio's base
-						-- currency, like the snapshot the holding lands in.
-						transaction_holding_flow(tx.type, tx.quantity, tx.recorded_market_price)
+					WHEN ev.reversal THEN
+						-transaction_holding_flow(ev.type, ev.quantity, ev.unit_value)
+							* COALESCE(fxb.rate, 1)
+					WHEN ev.transaction_date < stretch.opened_on THEN
+						-- unit_value is in the portfolio's base currency, like the
+						-- snapshot the holding lands in.
+						transaction_holding_flow(ev.type, ev.quantity, ev.unit_value)
 							* COALESCE(fxb.rate, 1)
 					ELSE
 						-- Two rates, and the order of them is the point. tx.fx_rate
@@ -329,21 +338,20 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, use
 						-- rode the trade's conversion and multiplying it by that
 						-- rate invents a cost.
 						transaction_cash_flow(
-							tx.type,
-							tx.quantity,
-							tx.price * tx.fx_rate,
-							transaction_fees_in_cost(tx.fees, tx.fees_currency, tx.currency, tx.fx_rate)
+							ev.type,
+							ev.quantity,
+							ev.price * ev.fx_rate,
+							transaction_fees_in_cost(ev.fees, ev.fees_currency, ev.currency, ev.fx_rate)
 						) * COALESCE(fxt.rate, 1)
 				END AS amount
-			FROM transactions tx
-			JOIN portfolio_entries pe ON pe.id = tx.entry_id
-			JOIN portfolios pf        ON pf.id = pe.portfolio_id
+			FROM growth_flow_events ev
+			JOIN portfolios pf        ON pf.id = ev.portfolio_id
 			JOIN users us             ON us.id = pf.user_id
 			CROSS JOIN LATERAL (
 				SELECT COALESCE(NULLIF($2::text, ''), us.preferred_currency, 'USD')::char(3) AS code
 			) tgt
 			CROSS JOIN LATERAL (
-				SELECT fx_rate(pf.user_id, pe.cost_currency, tgt.code) AS rate
+				SELECT fx_rate(pf.user_id, ev.cost_currency, tgt.code) AS rate
 			) fxt
 			CROSS JOIN LATERAL (
 				SELECT fx_rate(pf.user_id, pf.base_currency, tgt.code) AS rate
@@ -352,16 +360,16 @@ func (r *PostgresRepository) GetPortfolioGrowthByUserID(ctx context.Context, use
 			CROSS JOIN LATERAL (
 				SELECT COALESCE(MIN(ps.snapshot_date), $5::date) AS snapshot_date
 				FROM portfolio_snapshots ps
-				WHERE ps.portfolio_id = pe.portfolio_id
+				WHERE ps.portfolio_id = ev.portfolio_id
 				  AND ps.snapshot_date < $5::date
-				  AND ps.created_at >= tx.created_at
+				  AND ps.created_at >= ev.recorded_at
 			) landed
 			-- ...and the day the stretch ending there opened: the portfolio's
 			-- previous snapshot, or the day before for its first one.
 			CROSS JOIN LATERAL (
 				SELECT COALESCE(MAX(ps.snapshot_date), landed.snapshot_date - 1) AS opened_on
 				FROM portfolio_snapshots ps
-				WHERE ps.portfolio_id = pe.portfolio_id
+				WHERE ps.portfolio_id = ev.portfolio_id
 				  AND ps.snapshot_date < landed.snapshot_date
 			) stretch
 			WHERE pf.user_id = $1
@@ -467,37 +475,39 @@ func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context
 			-- By when the transaction was recorded, not when it was traded; on
 			-- asOf while no closed day reflects it; and at what the holding was
 			-- worth when a trade predates the stretch it lands in: see the
-			-- account-wide query for all three.
+			-- account-wide query for all three, and for the retired versions read
+			-- alongside the transactions.
 			SELECT
 				landed.snapshot_date,
 				CASE
-					WHEN tx.transaction_date < stretch.opened_on THEN
+					WHEN ev.reversal THEN
+						-transaction_holding_flow(ev.type, ev.quantity, ev.unit_value)
+					WHEN ev.transaction_date < stretch.opened_on THEN
 						-- Already in the portfolio's base currency.
-						transaction_holding_flow(tx.type, tx.quantity, tx.recorded_market_price)
+						transaction_holding_flow(ev.type, ev.quantity, ev.unit_value)
 					ELSE
 						-- Historical rate onto the position's own currency, then the
 						-- current one onto the portfolio's base, with the fee
 						-- converted on its own side: see the account-wide query for
 						-- why neither pair can be collapsed into one.
 						transaction_cash_flow(
-							tx.type,
-							tx.quantity,
-							tx.price * tx.fx_rate,
-							transaction_fees_in_cost(tx.fees, tx.fees_currency, tx.currency, tx.fx_rate)
+							ev.type,
+							ev.quantity,
+							ev.price * ev.fx_rate,
+							transaction_fees_in_cost(ev.fees, ev.fees_currency, ev.currency, ev.fx_rate)
 						) * COALESCE(fxt.rate, 1)
 				END AS amount
-			FROM transactions tx
-			JOIN portfolio_entries pe ON pe.id = tx.entry_id
-			JOIN portfolios pf        ON pf.id = pe.portfolio_id
+			FROM growth_flow_events ev
+			JOIN portfolios pf        ON pf.id = ev.portfolio_id
 			CROSS JOIN LATERAL (
-				SELECT fx_rate(pf.user_id, pe.cost_currency, pf.base_currency) AS rate
+				SELECT fx_rate(pf.user_id, ev.cost_currency, pf.base_currency) AS rate
 			) fxt
 			CROSS JOIN LATERAL (
 				SELECT COALESCE(MIN(ps.snapshot_date), $5::date) AS snapshot_date
 				FROM portfolio_snapshots ps
 				WHERE ps.portfolio_id = $1
 				  AND ps.snapshot_date < $5::date
-				  AND ps.created_at >= tx.created_at
+				  AND ps.created_at >= ev.recorded_at
 			) landed
 			CROSS JOIN LATERAL (
 				SELECT COALESCE(MAX(ps.snapshot_date), landed.snapshot_date - 1) AS opened_on
@@ -505,7 +515,7 @@ func (r *PostgresRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context
 				WHERE ps.portfolio_id = $1
 				  AND ps.snapshot_date < landed.snapshot_date
 			) stretch
-			WHERE pe.portfolio_id = $1 AND pf.user_id = $2
+			WHERE ev.portfolio_id = $1 AND pf.user_id = $2
 		), net_flows AS (
 			SELECT snapshot_date, SUM(amount) AS net_flow
 			FROM flows

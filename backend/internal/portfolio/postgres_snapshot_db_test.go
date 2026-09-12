@@ -484,6 +484,169 @@ func TestSnapshotRerunKeepsFlowsOnTheDayItsValuesShow(t *testing.T) {
 	}
 }
 
+// seenPurchase plants, on top of backdatedPortfolio, a purchase recorded the
+// night after the fixture's last snapshot and held by the next one: one unit
+// bought at 50 and worth 55. It hands back what the tests take back — the
+// position and its transaction — and the two days they read: the day the
+// purchase is in, and the live point after it.
+func seenPurchase(t *testing.T, pool *pgxpool.Pool, repo *PostgresRepository) (userID, portfolioID, entryID, txID uuid.UUID, day, asOf time.Time) {
+	t.Helper()
+	ctx := context.Background()
+
+	userID, portfolioID = backdatedPortfolio(t, pool)
+	track := dropFixture(t, pool, userID)
+
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, sql, args...); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+
+	day = backdatedAsOf
+	asOf = day.AddDate(0, 0, 1)
+
+	assetID := uuid.New()
+	entryID, txID = uuid.New(), uuid.New()
+	exec(`INSERT INTO assets (id, ticker, name, asset_type, currency, current_price)
+	      VALUES ($1, $2, 'probe', 'stock', 'USD', 55)`, assetID, uuid.New().String()[:8])
+	track(assetID)
+	exec(`INSERT INTO portfolio_entries
+	        (id, portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date)
+	      VALUES ($1, $2, $3, (SELECT id FROM investment_sources WHERE user_id = $4), 0, 50, 'USD', $5)`,
+		entryID, portfolioID, assetID, userID, day.AddDate(0, 0, -1))
+	exec(`INSERT INTO transactions
+	        (id, entry_id, type, quantity, price, currency, fees, transaction_date, created_at)
+	      VALUES ($1, $2, 'buy', 1, 50, 'USD', 0, $3, $4)`,
+		txID, entryID, day.AddDate(0, 0, -1), day.Add(time.Hour))
+
+	row := SnapshotRow{
+		PortfolioID:      portfolioID,
+		BaseCurrency:     money.USD,
+		TotalMarketValue: "1600",
+		TotalGainLoss:    "150",
+		TotalGainLossPct: "10.37",
+		ReadAt:           day.Add(22 * time.Hour),
+	}
+	if err := repo.UpsertPortfolioSnapshot(ctx, row, day); err != nil {
+		t.Fatalf("UpsertPortfolioSnapshot: %v", err)
+	}
+
+	return userID, portfolioID, entryID, txID, day, asOf
+}
+
+// flowsByDay reads the account-wide series closing on asOf and indexes its net
+// flows by date.
+func flowsByDay(t *testing.T, repo *PostgresRepository, userID uuid.UUID, asOf time.Time) map[time.Time]float64 {
+	t.Helper()
+
+	points, err := repo.GetPortfolioGrowthByUserID(context.Background(), userID, money.USD, false, time.Time{}, asOf)
+	if err != nil {
+		t.Fatalf("GetPortfolioGrowthByUserID: %v", err)
+	}
+
+	flows := make(map[time.Time]float64, len(points))
+	for _, point := range points {
+		flows[point.Date.UTC()], _ = growthDecimal(point.NetFlow).Float64()
+	}
+
+	return flows
+}
+
+func retiredCount(t *testing.T, pool *pgxpool.Pool, portfolioID uuid.UUID) int {
+	t.Helper()
+
+	var n int
+	if err := pool.QueryRow(context.Background(),
+		`SELECT count(*) FROM retired_transactions WHERE portfolio_id = $1`, portfolioID,
+	).Scan(&n); err != nil {
+		t.Fatalf("counting retired transactions: %v", err)
+	}
+
+	return n
+}
+
+func assertFlow(t *testing.T, flows map[time.Time]float64, day time.Time, want float64, why string) {
+	t.Helper()
+
+	if got := flows[day]; got < want-0.01 || got > want+0.01 {
+		t.Errorf("flujo del %s = %.2f, want %.2f: %s", day.Format("2006-01-02"), got, want, why)
+	}
+}
+
+// A position deleted after a snapshot held it leaves its value behind in that
+// snapshot. Dropping its flow with the row turned the day it came in into a
+// gain nobody made and the day it went into a loss nobody took: +$30.61 on
+// 2026-08-22 and −$29.58 on 2026-09-03 on the account that found it.
+func TestGrowthSeriesKeepsADeletedPositionOnTheDaysItWasIn(t *testing.T) {
+	pool := growthTestPool(t)
+	repo := NewPostgresRepository(pool)
+	ctx := context.Background()
+	userID, portfolioID, entryID, _, day, asOf := seenPurchase(t, pool, repo)
+
+	if _, err := repo.DeletePortfolioEntry(ctx, userID, entryID); err != nil {
+		t.Fatalf("DeletePortfolioEntry: %v", err)
+	}
+
+	// Kept once: the position's trigger keeps it, and the transaction's own
+	// trigger, reached by the cascade, must not keep it again.
+	if n := retiredCount(t, pool, portfolioID); n != 1 {
+		t.Fatalf("retired versions = %d, want 1", n)
+	}
+
+	flows := flowsByDay(t, repo, userID, asOf)
+	assertFlow(t, flows, day, 50, "la compra sigue en el valor de ese día")
+	assertFlow(t, flows, asOf, -55, "la posición sale a lo que valía")
+
+	// A portfolio deleted with its positions goes as it always did.
+	if _, err := pool.Exec(ctx, `DELETE FROM portfolios WHERE id = $1`, portfolioID); err != nil {
+		t.Fatalf("deleting the portfolio: %v", err)
+	}
+}
+
+// A quantity edit is the same problem with the difference: the snapshot held
+// one unit, and the row now says two.
+func TestGrowthSeriesNetsAQuantityEditOnTheDayItWasMade(t *testing.T) {
+	pool := growthTestPool(t)
+	repo := NewPostgresRepository(pool)
+	userID, portfolioID, _, txID, day, asOf := seenPurchase(t, pool, repo)
+
+	if _, err := pool.Exec(context.Background(),
+		`UPDATE transactions SET quantity = 2 WHERE id = $1`, txID); err != nil {
+		t.Fatalf("editing the quantity: %v", err)
+	}
+
+	if n := retiredCount(t, pool, portfolioID); n != 1 {
+		t.Fatalf("retired versions = %d, want 1", n)
+	}
+
+	flows := flowsByDay(t, repo, userID, asOf)
+	assertFlow(t, flows, day, 50, "la versión de una unidad es la que ese día tenía")
+	// One unit out at 55 and two back in at 55.
+	assertFlow(t, flows, asOf, 55, "la diferencia entra el día de la edición")
+}
+
+// Correcting a price, like correcting a date, never changed any snapshot's
+// value, so it is fixed where it happened and nothing is kept.
+func TestGrowthSeriesCorrectsAPriceInPlace(t *testing.T) {
+	pool := growthTestPool(t)
+	repo := NewPostgresRepository(pool)
+	userID, portfolioID, _, txID, day, asOf := seenPurchase(t, pool, repo)
+
+	if _, err := pool.Exec(context.Background(),
+		`UPDATE transactions SET price = 48 WHERE id = $1`, txID); err != nil {
+		t.Fatalf("editing the price: %v", err)
+	}
+
+	if n := retiredCount(t, pool, portfolioID); n != 0 {
+		t.Fatalf("retired versions = %d, want 0", n)
+	}
+
+	flows := flowsByDay(t, repo, userID, asOf)
+	assertFlow(t, flows, day, 48, "el precio corregido vale desde el principio")
+	assertFlow(t, flows, asOf, 0, "no hubo nada que entrara o saliera")
+}
+
 func TestGrowthSeriesFlowLandsOnTheDayTheValueMoves(t *testing.T) {
 	pool := growthTestPool(t)
 	repo := NewPostgresRepository(pool)

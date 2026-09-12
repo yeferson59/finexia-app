@@ -4,6 +4,7 @@
 	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
 	import type { Holding } from '$lib/api/types';
 	import { TRANSACTION_TYPES, priceLabelFor, txnModeFor } from '../asset';
+	import TradeDateWarnings from './trade-date-warnings.svelte';
 
 	let {
 		entries,
@@ -76,6 +77,21 @@
 		(parseFloat(txnForm.quantity) || 0) * (parseFloat(txnForm.price) || 0) * rate
 	);
 
+	// Para avisar si la fecha no parece la de la operación. Solo con precio unitario.
+	const dateCheck = $derived(
+		txnMode === 'trade' && entry
+			? {
+					date: txnForm.transactionDate,
+					ticker: entry.ticker,
+					assetType: entry.assetType,
+					price: parseFloat(txnForm.price) || 0,
+					currency: txnForm.currency,
+					marketPrice: parseFloat(entry.marketPrice) || null,
+					marketCurrency: entry.currency
+				}
+			: null
+	);
+
 	function formatIn(value: number, code: string): string {
 		return new Intl.NumberFormat('es-CO', {
 			style: 'currency',
@@ -136,6 +152,8 @@
 			<DatePicker name="transactionDate" bind:value={txnForm.transactionDate} required />
 		</div>
 	</div>
+
+	<TradeDateWarnings check={dateCheck} />
 
 	<!-- trade: cantidad + precio unitario + comisión -->
 	{#if txnMode === 'trade'}

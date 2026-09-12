@@ -765,6 +765,16 @@ fila (trigger `trg_transactions_record_market_price`). Las filas anteriores a la
 migración se rellenaron con el precio del día en que se aplicó: exacto para lo
 que aún cae en el punto en vivo, y aproximado para historial más viejo.
 
+Borrar una transacción o una posición, o editar la cantidad, el tipo o la
+posición de una compra o venta, **después de que un snapshot ya la vio** no la
+quita de la serie. La versión que sale se guarda en `retired_transactions`
+(migración 000038) y cuenta dos veces: como entró, en el punto donde entró, y al
+revés, a lo que valía la posición al salir, en el punto donde salió. Los
+snapshots entre esos dos puntos siguen teniendo su valor; sin esto, el día de
+entrada se leía como una ganancia y el de salida como una pérdida que nadie
+tuvo. Corregir solo el precio, la fecha, la comisión o un dividendo sigue siendo
+retroactivo, porque no cambia el valor de ningún snapshot.
+
 #### Moneda de los holdings
 
 Una posición arrastra hasta tres monedas: la base del portfolio, la de coste

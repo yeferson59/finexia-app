@@ -10,6 +10,7 @@
 	import DatePicker from '$lib/ui/date-picker.svelte';
 	import { SUPPORTED_CURRENCIES } from '$lib/shared/currency';
 	import type { Asset } from '$lib/api/types';
+	import TradeDateWarnings from './trade-date-warnings.svelte';
 
 	let {
 		asset,
@@ -75,6 +76,28 @@
 	 * ser cierta.
 	 */
 	const sameCurrency = $derived(converted && costCurrency === currency);
+
+	/**
+	 * La compra, para comprobar que su fecha es la suya.
+	 *
+	 * La fecha arranca en hoy, y quien carga una posición vieja copia el precio de
+	 * la confirmación y no la toca: así entraron ADBE, TSM, SPCX y VST, y su
+	 * ganancia previa se contó como rentabilidad del día en que se registraron.
+	 * Se compara contra el precio del catálogo, que es el que el activo trae.
+	 */
+	const dateCheck = $derived(
+		asset
+			? {
+					date: purchaseDate,
+					ticker: asset.ticker,
+					assetType: asset.assetType,
+					price: parseFloat(purchasePrice) || 0,
+					currency,
+					marketPrice: asset.currentPrice ? parseFloat(asset.currentPrice.value) || null : null,
+					marketCurrency: asset.currentPrice?.currency ?? ''
+				}
+			: null
+	);
 </script>
 
 <div class="pair">
@@ -133,6 +156,7 @@
 <div class="field">
 	<span class="field-label">Fecha de compra</span>
 	<DatePicker name="purchaseDate" bind:value={purchaseDate} required />
+	<TradeDateWarnings check={dateCheck} />
 </div>
 
 <div class="field">

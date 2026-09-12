@@ -4,6 +4,10 @@
  * dependencias de Svelte ni de red; los contratos vienen de `$lib/api/types`.
  */
 import type { Holding } from '$lib/api/types';
+import { dayGap } from '$lib/shared/finance/returns';
+import { formatCalendarDate } from '$lib/shared/format/date';
+import { formatCurrency } from '$lib/shared/format/money';
+import { formatSignedPercent } from '$lib/shared/format/percent';
 
 export const TRANSACTION_TYPES = [
 	{ value: 'buy', label: 'Compra' },
@@ -195,6 +199,90 @@ function sumBase(
 	}
 
 	return total;
+}
+
+/**
+ * Clases de activo que solo se negocian con la bolsa abierta. Cripto cotiza
+ * todos los días, y del resto —efectivo, inmuebles, materias primas, «otro»— no
+ * se puede afirmar nada, así que no se avisa.
+ */
+const EXCHANGE_TRADED = new Set(['stock', 'etf', 'bond']);
+
+/** Días hacia atrás en los que una fecha todavía se lee como «la de hoy». */
+const RECENT_DAYS = 7;
+
+/** Distancia al precio de mercado a partir de la cual el precio no parece de esa fecha. */
+const PRICE_GAP = 0.2;
+
+/** Lo que hace falta para juzgar si la fecha de una operación es la suya. */
+export interface TradeDateCheck {
+	/** Fecha de la operación, `YYYY-MM-DD`. */
+	date: string;
+	/** Hoy en el calendario de quien registra, `YYYY-MM-DD`. */
+	today: string;
+	ticker: string;
+	assetType: string;
+	/** Precio unitario escrito, en `currency`. */
+	price: number;
+	currency: string;
+	/** Precio de mercado que conoce la app; `null` si no conoce ninguno. */
+	marketPrice: number | null;
+	marketCurrency: string;
+}
+
+/**
+ * Por qué la fecha de una compra o venta parece no ser la suya.
+ *
+ * Los formularios proponen la fecha de hoy, y quien carga una cartera que ya
+ * tenía copia el precio de una confirmación vieja y se olvida de cambiarla. Nada
+ * lo delataba: ADBE entró comprada «ayer» a 483,57 cuando valía 252,23, y TSM,
+ * SPCX y VST con fecha de un sábado. La serie de crecimiento trata una operación
+ * de esa fecha como dinero nuevo, y la ganancia que la posición ya traía se
+ * contaba como rentabilidad del día en que se registró.
+ *
+ * Son avisos y no errores —una acción que se movió un 25 % esta semana existe—,
+ * así que el formulario los enseña y deja guardar. Dos señales, cada una con su
+ * frase:
+ * - la fecha cae en fin de semana y el activo solo se negocia con la bolsa abierta;
+ * - la fecha es de los últimos siete días y el precio está a más de un 20 % del
+ *   de mercado, comparados en la misma moneda.
+ */
+export function tradeDateWarnings(check: TradeDateCheck): string[] {
+	const warnings: string[] = [];
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(check.date)) return warnings;
+
+	const [year, month, day] = check.date.split('-').map(Number);
+	const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+	if (EXCHANGE_TRADED.has(check.assetType) && (weekday === 0 || weekday === 6)) {
+		const longDate = formatCalendarDate(check.date, {
+			day: 'numeric',
+			month: 'long',
+			year: 'numeric'
+		});
+		warnings.push(
+			`El ${longDate} fue ${weekday === 6 ? 'sábado' : 'domingo'} y la bolsa no abrió. ` +
+				'Si es una compra antigua, pon la fecha de la confirmación del bróker.'
+		);
+	}
+
+	const age = dayGap(check.date, check.today);
+	const currency = check.currency.trim().toUpperCase();
+	const market = check.marketPrice ?? 0;
+	const comparable =
+		currency !== '' && currency === check.marketCurrency.trim().toUpperCase() && market > 0;
+
+	if (age >= 0 && age <= RECENT_DAYS && comparable && check.price > 0) {
+		const gap = check.price / market - 1;
+		if (Math.abs(gap) > PRICE_GAP) {
+			warnings.push(
+				`${check.ticker} vale hoy ${formatCurrency(market, currency)} y escribiste ` +
+					`${formatCurrency(check.price, currency)} (${formatSignedPercent(gap * 100, 0)}). ` +
+					'Con una fecha tan reciente suele ser una compra antigua con la fecha de hoy: revisa la fecha.'
+			);
+		}
+	}
+
+	return warnings;
 }
 
 /** Metadatos de paginación de las transacciones del activo. */

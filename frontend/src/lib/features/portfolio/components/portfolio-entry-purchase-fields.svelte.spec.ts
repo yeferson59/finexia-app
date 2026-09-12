@@ -2,6 +2,7 @@ import { page } from 'vitest/browser';
 import { describe, it, expect } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import PurchaseFields from './portfolio-entry-purchase-fields.svelte';
+import { todayLocalDateString } from '$lib/shared/format/date';
 import type { Asset } from '$lib/api/types';
 
 // Novo Nordisk: cotiza en coronas danesas, una moneda que no está en la lista
@@ -42,6 +43,27 @@ const props = {
 };
 
 describe('portfolio-entry-purchase-fields.svelte', () => {
+	// La compra de Novo de 2024, a su precio de entonces, pero con la fecha de hoy
+	// que propone el formulario: así entraron ADBE, TSM, SPCX y VST.
+	it('avisa cuando la fecha no parece la de la compra', async () => {
+		render(PurchaseFields, {
+			...props,
+			purchaseDate: todayLocalDateString(),
+			currency: 'DKK',
+			costCurrency: 'DKK'
+		});
+
+		await expect.element(page.getByText('revisa la fecha', { exact: false })).toBeInTheDocument();
+	});
+
+	it('no avisa de una compra antigua con su fecha', async () => {
+		render(PurchaseFields, { ...props, currency: 'DKK', costCurrency: 'DKK' });
+
+		await expect
+			.element(page.getByText('revisa la fecha', { exact: false }))
+			.not.toBeInTheDocument();
+	});
+
 	it('ofrece la moneda del activo aunque no esté en la lista de conversión', async () => {
 		render(PurchaseFields, { ...props, currency: 'DKK', costCurrency: 'DKK' });
 
