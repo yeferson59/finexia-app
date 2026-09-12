@@ -151,6 +151,30 @@ describe('cómo está cada bloque', () => {
 		expect(describeAssets(done, NOW)).toBe('4 activos, todos con un precio de esta semana.');
 	});
 
+	// Un fondo de mercado ancho tiene el `sector` vacío porque está repartido
+	// entre varias industrias, no porque le falte clasificar. Contarlo como
+	// pendiente pondría en la lista de tareas algo que ya está hecho.
+	it('no cuenta como pendiente un fondo con desglose por industrias', () => {
+		const assets = [
+			{
+				id: '1',
+				assetType: 'etf',
+				sector: '',
+				sectorWeights: [
+					{ sector: 'technology', weight: 33.1 },
+					{ sector: 'financials', weight: 13.8 }
+				],
+				priceUpdatedAt: ago(1),
+				isCurated: true
+			},
+			{ id: '2', assetType: 'stock', sector: '', priceUpdatedAt: ago(1), isCurated: true }
+		] as Asset[];
+
+		expect(describeAssets(assets, NOW)).toBe(
+			'2 activos: uno está sin industria y el reparto por industria lo cuenta aparte.'
+		);
+	});
+
 	it('cuenta las tasas por quién las mantiene', () => {
 		const rates = [
 			{ id: '1', source: 'dolarapi' },

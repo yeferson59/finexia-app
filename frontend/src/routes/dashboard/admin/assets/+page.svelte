@@ -85,8 +85,9 @@
 			Una fila por activo, con las columnas <code>ticker</code>, <code>name</code>,
 			<code>assetType</code> y <code>currency</code>. <code>exchange</code> y
 			<code>sector</code> son opcionales —<code>sector</code> también se llama
-			<code>industria</code>, y es la vía para clasificar el catálogo entero de una vez—. Se admiten
-			.csv, .xlsx y .xls.
+			<code>industria</code>, y es la vía para clasificar el catálogo entero de una vez—. Para un
+			fondo repartido entre varias industrias, <code>sectorWeights</code> en una sola celda:
+			<code>technology: 33.1; financials: 13.8</code>. Se admiten .csv, .xlsx y .xls.
 		{/snippet}
 	</ImportCard>
 </Modal>

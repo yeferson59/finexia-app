@@ -14,6 +14,7 @@ const novo: Asset = {
 	assetType: 'stock',
 	currency: 'DKK',
 	exchange: 'CPH',
+	sectorWeights: [],
 	currentPrice: { value: '298.25', currency: 'DKK' },
 	priceUpdatedAt: null
 };
@@ -27,6 +28,7 @@ const lvmh: Asset = {
 	assetType: 'stock',
 	currency: 'EUR',
 	exchange: 'PAR',
+	sectorWeights: [],
 	currentPrice: { value: '429.45', currency: 'EUR' },
 	priceUpdatedAt: null
 };

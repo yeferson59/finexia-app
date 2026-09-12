@@ -13,7 +13,11 @@
  */
 import type { AssetHolding } from '$lib/api/types';
 import { formatAssetType } from '$lib/shared/format/asset-type';
-import { formatSector } from '$lib/shared/format/sector';
+import {
+	describeSectorBreakdown,
+	formatSector,
+	formatSectorBreakdown
+} from '$lib/shared/format/sector';
 
 export type { AssetHolding };
 
@@ -73,8 +77,17 @@ export interface AssetHoldingRow {
 	 * activos la ausencia ya se ve sola, al lado de las filas que sí la traen, y
 	 * repetir la etiqueta en veinte filas convertiría el aviso en ruido. El
 	 * tamaño del agujero se cuenta una sola vez, en el reparto por industria.
+	 *
+	 * Un fondo repartido entre varias industrias trae aquí su cuenta —«11
+	 * industrias»— en vez de quedarse en blanco: sin ella se leería igual que un
+	 * activo sin clasificar, que es lo contrario de lo que es.
 	 */
 	sectorLabel: string;
+	/**
+	 * El desglose entero, para el `title` de esa etiqueta. Vacío cuando el
+	 * activo cabe en una industria o cuando no tiene ninguna.
+	 */
+	sectorDetail: string;
 	/** Unidades, sumadas entre portafolios. Solo significan algo en su fila. */
 	quantity: number;
 	/** Precio por unidad en `currency`, o `null` si la posición va a coste. */
@@ -124,7 +137,8 @@ export function toAssetHoldingRows(holdings: AssetHolding[]): AssetHoldingRow[] 
 		name: h.name,
 		assetType: h.assetType,
 		typeLabel: formatAssetType(h.assetType),
-		sectorLabel: h.sector ? formatSector(h.sector) : '',
+		sectorLabel: h.sector ? formatSector(h.sector) : formatSectorBreakdown(h.sectorWeights ?? []),
+		sectorDetail: h.sector ? '' : describeSectorBreakdown(h.sectorWeights ?? []),
 		quantity: parseFloat(h.quantity) || 0,
 		// Vacío no es cero: es «no hay precio que represente al activo», y un 0
 		// se leería como un activo que no vale nada.

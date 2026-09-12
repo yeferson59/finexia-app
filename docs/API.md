@@ -458,6 +458,51 @@ cómo notar la diferencia.
 Solo llevan sector las clases que tienen una empresa detrás —`stock`, `etf`,
 `bond` y `other`—; ponerle uno a una cripto o a un efectivo devuelve 400.
 
+##### El fondo que es muchas industrias a la vez
+
+Un sector único es la respuesta correcta para una acción y para un ETF
+sectorial —Apple es tecnología, XLK es tecnología— y la equivocada para el
+instrumento que la mayoría tiene en cartera. Un VOO es el S&P 500 entero:
+ficharlo bajo `technology` pondría dos tercios de la posición en industrias en
+las que no está, y dejarlo vacío haría que el reparto contara la mayor posición
+de la cartera como «trabajo pendiente» que nadie puede hacer nunca.
+
+Para eso el activo lleva `sectorWeights`, el desglose que publica la ficha del
+fondo:
+
+```json
+{
+  "ticker": "VOO",
+  "sector": "",
+  "sectorWeights": [
+    { "sector": "technology", "weight": 33.1 },
+    { "sector": "financials", "weight": 13.8 }
+  ]
+}
+```
+
+Las dos formas son **excluyentes**: un activo lleva `sector` o `sectorWeights`,
+nunca los dos, y mandar ambos devuelve 400. Los pesos son porcentajes (33.1, no
+0.331) porque es como se transcriben de la ficha.
+
+`GET /portfolios/allocation/sectors` **reparte** la posición entre esas
+industrias en vez de ficharla en una: 600 € de un fondo con
+`technology 30 / financials 20` son 360 € y 240 €. Es el único sitio de la API
+donde una posición se parte en varias filas, y trae dos consecuencias que
+conviene leer:
+
+- Los pesos **no tienen que sumar 100**. La ficha de un fondo real deja unas
+  décimas en caja, y una transcripción a medias deja más. El reparto normaliza
+  sobre el total que encuentra —el 30 del ejemplo es 30/50, no 30/100—, así que
+  un desglose incompleto sigue explicando el 100 % del dinero del fondo y la
+  gráfica sigue cuadrando con el patrimonio. Lo que sí se rechaza con 400 es un
+  total **por encima** de 100: eso no es una transcripción incompleta, es una
+  equivocada.
+- `assets` cuenta por fila, así que un fondo repartido en once industrias es un
+  activo en cada una y la suma de la columna pasa de los activos que hay. Es la
+  lectura honesta de lo que responde («cuántas cosas distintas me meten en esta
+  industria»); la alternativa sería un tercio de activo, que no es accionable.
+
 ##### Clasificar el catálogo
 
 - `POST /portfolios/assets` y `PATCH /portfolios/assets/:id` aceptan `sector`
@@ -465,11 +510,23 @@ Solo llevan sector las clases que tienen una empresa detrás —`stock`, `etf`,
   `technology` llegan todos al mismo valor. Uno que no se reconozca devuelve
   400 en vez de guardarse vacío. En el `PATCH` el campo viaja entero como los
   demás: mandarlo vacío **borra** la clasificación.
+- Los dos aceptan también `sectorWeights`, una lista de `{sector, weight}`. El
+  `sector` de cada línea pasa por el mismo normalizador, y el `weight` admite
+  número (`33.1`) o texto (`"33.1"`). Viaja entero como todo lo demás: un
+  `PATCH` sin `sectorWeights` **borra** el desglose que tuviera. Escribir uno de
+  los dos campos limpia el otro, que es lo que mantiene la exclusividad.
 - La importación de activos acepta una columna `sector` (sinónimos: `industria`,
   `industry`, `rubro`), opcional. Es la vía para clasificar un catálogo entero:
   once sectores sobre unos cientos de tickers no es una tarde de formulario.
+- Y una columna `sectorWeights` (sinónimos: `desglose`, `pesos por sector`,
+  `sector breakdown`) para el desglose, en **una sola celda**:
+  `technology: 33.1; financials: 13.8`. Acepta el pegado de una ficha tal cual:
+  etiquetas en español, coma decimal, signo de porcentaje, `=` en vez de `:` y
+  saltos de línea en vez de `;`. Una celda ilegible salta la fila entera en vez
+  de importar el fondo sin clasificar.
 - Una contribución de usuario (`POST /portfolios/assets` sin rol admin) **no**
-  lleva sector: la fila es compartida, y el activo entra sin clasificar.
+  lleva sector ni desglose: la fila es compartida, y el activo entra sin
+  clasificar.
 
 #### Activos consolidados
 
@@ -500,6 +557,10 @@ Lo que solo trae esta:
 - `sector`, la industria del activo, **en crudo** y vacía cuando no la tiene.
   Aquí no se pliega a los cubos de `/allocation/sectors`: esto es una lista de
   activos y la fila vacía es la que dice cuál ir a clasificar.
+- `sectorWeights`, el desglose del activo que no cabe en una industria, vacío
+  para todo lo demás. Va sin plegar por la misma razón y evita el malentendido
+  que importa: un fondo con `sector` vacío **no** es un activo sin clasificar,
+  y sin esta lista se leería igual que uno.
 - `priceProvider` y `priceFetchedAt`, quién trajo ese precio y cuándo. Solo
   vienen con `priceSource: "own"`: un precio manual del catálogo y un coste no
   salen de ningún proveedor. `priceSource` dice que el precio es del propio
@@ -1058,7 +1119,7 @@ argumento con el que nombrar a otro:
 | `list_portfolios` | Carteras con coste, valor de mercado y resultado |
 | `get_holdings` | Posiciones consolidadas por activo, sumadas entre carteras |
 | `get_allocation` | Reparto por categoría de activo, todo en una moneda |
-| `get_sector_allocation` | Reparto por industria, todo en una moneda, con los activos sin clasificar en su propio cubo |
+| `get_sector_allocation` | Reparto por industria, todo en una moneda, con los activos sin clasificar en su propio cubo y los fondos repartidos entre las suyas |
 | `list_recent_transactions` | Últimas transacciones (`limit`, máx. 200) |
 | `get_portfolio_growth` | Serie de valor desde los snapshots (`period`: `1M`/`3M`/`6M`/`1Y`) |
 | `list_platforms` | Plataformas con lo que se tiene en cada una |

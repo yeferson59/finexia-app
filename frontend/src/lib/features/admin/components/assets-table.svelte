@@ -16,7 +16,12 @@
 	import EmptyState from '$lib/ui/empty-state.svelte';
 	import Pagination from '$lib/ui/pagination.svelte';
 	import { formatAssetType } from '$lib/shared/format/asset-type';
-	import { formatSector, typeHasSector } from '$lib/shared/format/sector';
+	import {
+		describeSectorBreakdown,
+		formatSector,
+		formatSectorBreakdown,
+		typeHasSector
+	} from '$lib/shared/format/sector';
 	import AdminBlock from './admin-block.svelte';
 	import { formatDateTime, formatPrice, type Asset } from '../admin';
 	import { describeAssets, formatAge, isStale } from '../desk';
@@ -99,6 +104,18 @@
 							     una cripto no falta nada. -->
 							{#if asset.sector}
 								<span class="cell-sector">{formatSector(asset.sector)}</span>
+							{:else if (asset.sectorWeights ?? []).length > 0}
+								<!-- Un fondo repartido entre varias industrias. Lleva
+								     `sector` vacío como un activo sin clasificar, así que
+								     sin esta rama se leería como trabajo pendiente en vez
+								     de como lo que es: clasificado, pero en once sitios.
+								     El desglose entero va en el `title`, que es donde cabe. -->
+								<span
+									class="cell-sector"
+									title={describeSectorBreakdown(asset.sectorWeights ?? [])}
+								>
+									{formatSectorBreakdown(asset.sectorWeights ?? [])}
+								</span>
 							{:else if typeHasSector(asset.assetType)}
 								<span class="cell-sector missing">Sin industria</span>
 							{/if}

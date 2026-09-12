@@ -12,8 +12,9 @@
 	 */
 	import { enhance } from '$app/forms';
 	import Button from '$lib/ui/button.svelte';
-	import { SECTOR_OPTIONS, typeHasSector } from '$lib/shared/format/sector';
+	import { typeHasSector } from '$lib/shared/format/sector';
 	import { ASSET_TYPES } from '../admin';
+	import SectorClassification from './sector-classification.svelte';
 
 	interface Props {
 		error?: string;
@@ -39,6 +40,11 @@
 	 */
 	let assetType = $state('');
 	const classifiable = $derived(typeHasSector(assetType));
+
+	// La clasificación vive aquí y no dentro del componente porque los dos
+	// campos se envían juntos y el componente solo los edita.
+	let sector = $state('');
+	let weights = $state<Record<string, number | null>>({});
 </script>
 
 <form
@@ -102,19 +108,7 @@
 	</div>
 
 	{#if classifiable}
-		<div class="field">
-			<label for="sector">Industria <span class="optional">(opcional)</span></label>
-			<select id="sector" name="sector">
-				<option value="">Sin clasificar</option>
-				{#each SECTOR_OPTIONS as s (s.value)}
-					<option value={s.value}>{s.label}</option>
-				{/each}
-			</select>
-			<p class="hint">
-				Es lo que reparte el panel por industria. Dejarlo sin clasificar no rompe nada: esa parte
-				del patrimonio se cuenta aparte, con su propia etiqueta.
-			</p>
-		</div>
+		<SectorClassification bind:sector bind:weights />
 	{/if}
 
 	{#if error}
@@ -130,13 +124,6 @@
 </form>
 
 <style>
-	.hint {
-		margin: 0.35rem 0 0;
-		font-size: 0.78rem;
-		line-height: 1.45;
-		color: var(--text-dim);
-	}
-
 	.actions {
 		display: flex;
 		justify-content: flex-end;

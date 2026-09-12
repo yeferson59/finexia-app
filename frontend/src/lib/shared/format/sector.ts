@@ -19,7 +19,25 @@
  * Sin tabla de colores, a diferencia de `asset-type.ts`: el reparto se pinta con
  * una sola barra ámbar —el largo dice la magnitud y el nombre de la fila, de
  * quién es—, así que una paleta de trece tonos aquí sería código muerto.
+ *
+ * La otra mitad del módulo es el **desglose**: un activo puede estar repartido
+ * entre varias industrias en vez de pertenecer a una (un ETF de mercado ancho),
+ * y entonces trae `sectorWeights` y deja `sector` vacío. Las dos formas son
+ * excluyentes, así que las funciones de abajo son las que deciden cuál enseña
+ * cada pantalla.
  */
+
+import { formatPercent } from './percent';
+
+/**
+ * Una industria y su peso, en porcentaje.
+ *
+ * Se declara aquí en vez de importar `SectorWeight` de `$lib/api/types` porque
+ * `lib/shared` es la capa más baja y no importa de `api`
+ * (docs/FRONTEND_ARCHITECTURE.md). Es estructuralmente el mismo tipo, así que
+ * lo que llega de la API encaja sin conversión.
+ */
+type WeightedSector = { sector: string; weight: number };
 
 /** Sectores que devuelve el backend (`market.Sector`), más sus dos cubos. */
 export const SECTOR_LABELS: Record<string, string> = {
@@ -97,4 +115,45 @@ export function sectorHint(sector: string): string {
 	if (sector === 'not_applicable') return 'Cripto, efectivo e inmuebles no tienen industria';
 
 	return '';
+}
+
+/**
+ * Cuántas industrias hay detrás de un activo, en palabras.
+ *
+ * Es lo que va en la celda de un fondo de mercado ancho. Sin ella, un VOO se
+ * vería igual que un activo sin clasificar —los dos traen `sector` vacío—, que
+ * es justo el malentendido que el desglose existe para deshacer: uno es trabajo
+ * pendiente y el otro es un fondo bien clasificado en once industrias.
+ *
+ * Una sola industria se escribe con su nombre: un desglose de una fila dice lo
+ * mismo que el campo `sector` y no hay por qué contarlo.
+ */
+export function formatSectorBreakdown(weights: WeightedSector[]): string {
+	if (weights.length === 0) return '';
+	if (weights.length === 1) return formatSector(weights[0].sector);
+
+	return `${weights.length} industrias`;
+}
+
+/**
+ * El desglose entero, para el `title` de esa celda y para un panel de detalle:
+ * «Tecnología 33,1 % · Finanzas 13,8 % · …».
+ *
+ * En el orden en que llega, que es el que manda el backend: de mayor a menor
+ * peso, como la ficha del fondo.
+ */
+export function describeSectorBreakdown(weights: WeightedSector[]): string {
+	return weights.map((w) => `${formatSector(w.sector)} ${formatPercent(w.weight)}`).join(' · ');
+}
+
+/**
+ * La suma de los pesos, que **no** tiene por qué ser 100.
+ *
+ * La ficha de un fondo real deja unas décimas en caja y una transcripción a
+ * medias deja más. El backend reparte la posición normalizando sobre este
+ * total, así que enseñarlo es la forma de que quien lo está escribiendo vea si
+ * el 97,3 % es la caja del fondo o una fila que se le olvidó.
+ */
+export function sectorWeightsTotal(weights: WeightedSector[]): number {
+	return weights.reduce((total, w) => total + (Number.isFinite(w.weight) ? w.weight : 0), 0);
 }

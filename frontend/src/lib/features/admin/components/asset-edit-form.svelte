@@ -19,8 +19,9 @@
 	import { untrack } from 'svelte';
 	import Button from '$lib/ui/button.svelte';
 	import Checkbox from '$lib/ui/checkbox.svelte';
-	import { SECTOR_OPTIONS, typeHasSector } from '$lib/shared/format/sector';
+	import { typeHasSector } from '$lib/shared/format/sector';
 	import { ASSET_TYPES, type Asset } from '../admin';
+	import SectorClassification from './sector-classification.svelte';
 
 	interface Props {
 		/** El activo tal como lo devolvió el catálogo; llena el borrador. */
@@ -45,6 +46,12 @@
 			currency: asset.currency,
 			exchange: asset.exchange ?? '',
 			sector: asset.sector ?? '',
+			// Los pesos del desglose, por industria, que es la forma en que los
+			// edita el formulario. Un activo sin desglose empieza con el objeto
+			// vacío y las once casillas en blanco.
+			weights: Object.fromEntries(
+				(asset.sectorWeights ?? []).map((w) => [w.sector, w.weight])
+			) as Record<string, number | null>,
 			// En blanco a propósito: el campo pide un precio *nuevo*, y el que ya
 			// hay se ve al lado. Prellenarlo haría que cualquier edición lo
 			// reescribiera con la misma cifra y le pusiera fecha de hoy, que es
@@ -64,7 +71,8 @@
 	 *
 	 * Al ocultarse, el `select` deja de existir y con él su valor, así que el
 	 * envío no lleva `sector` y el backend lo lee como vacío: reclasificar el
-	 * activo le quita la industria, que es lo correcto y no un descuido.
+	 * activo le quita la industria, que es lo correcto y no un descuido. Lo
+	 * mismo vale para el desglose, que se va con él.
 	 */
 	const classifiable = $derived(typeHasSector(draft.assetType));
 
@@ -159,19 +167,11 @@
 	</div>
 
 	{#if classifiable}
-		<div class="field">
-			<label for="edit-sector">Industria <span class="optional">(opcional)</span></label>
-			<select id="edit-sector" name="sector" bind:value={draft.sector}>
-				<option value="">Sin clasificar</option>
-				{#each SECTOR_OPTIONS as s (s.value)}
-					<option value={s.value}>{s.label}</option>
-				{/each}
-			</select>
-			<p class="hint">
-				Con esto el panel puede repartir el patrimonio por industria. Volver a «Sin clasificar»
-				borra la clasificación.
-			</p>
-		</div>
+		<SectorClassification
+			bind:sector={draft.sector}
+			bind:weights={draft.weights}
+			idPrefix="edit-"
+		/>
 	{/if}
 
 	<div class="field">

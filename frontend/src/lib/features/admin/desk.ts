@@ -192,7 +192,13 @@ export function describeAssets(assets: Asset[], now: Date = new Date()): string 
 	// Solo cuentan los que *pueden* llevar industria. Una cripto sin sector no
 	// es trabajo pendiente —no hay empresa detrás— y meterla en la cuenta
 	// convertiría un aviso accionable en un número que nunca baja a cero.
-	const unclassified = assets.filter((a) => typeHasSector(a.assetType) && !a.sector).length;
+	//
+	// Un fondo con desglose tampoco cuenta, y por la misma razón: está
+	// clasificado, solo que en varias industrias a la vez. Su `sector` vacío es
+	// la consecuencia de eso y no un hueco por llenar.
+	const unclassified = assets.filter(
+		(a) => typeHasSector(a.assetType) && !a.sector && (a.sectorWeights ?? []).length === 0
+	).length;
 	if (unclassified > 0) {
 		notes.push(
 			unclassified === 1

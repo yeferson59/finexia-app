@@ -72,7 +72,10 @@ describe('assetCreateSchema', () => {
 			assetType: 'stock',
 			currency: 'USD',
 			exchange: 'NASDAQ',
-			sector: 'technology'
+			sector: 'technology',
+			// Viaja siempre, aunque el formulario no mande ninguno: en el backend
+			// un envío sin desglose es la instrucción de borrar el que hubiera.
+			sectorWeights: []
 		});
 	});
 
@@ -179,9 +182,68 @@ describe('assetUpdateSchema', () => {
 			currency: 'USD',
 			exchange: 'NASDAQ',
 			sector: 'technology',
+			sectorWeights: [],
 			isCurated: true,
 			price: '190.50'
 		});
+	});
+
+	/*
+	 * El desglose es la otra forma de clasificar, y la que hace falta para un
+	 * fondo de mercado ancho. Las dos son excluyentes: el formulario desactiva
+	 * la que no está en uso, y esto es la red por debajo.
+	 */
+	it('acepta un desglose por industrias en lugar de una industria única', () => {
+		const parsed = assetUpdateSchema.parse({
+			...full,
+			sector: '',
+			sectorWeights: [
+				{ sector: 'technology', weight: '33.1' },
+				{ sector: 'financials', weight: '13.8' }
+			]
+		});
+
+		expect(parsed.sectorWeights).toEqual([
+			{ sector: 'technology', weight: 33.1 },
+			{ sector: 'financials', weight: 13.8 }
+		]);
+	});
+
+	it('rechaza llevar industria única y desglose a la vez', () => {
+		expect(
+			firstError(
+				assetUpdateSchema.safeParse({
+					...full,
+					sector: 'technology',
+					sectorWeights: [{ sector: 'energy', weight: '40' }]
+				})
+			)
+		).toBe('Elige una industria única o un desglose por industrias, no las dos');
+	});
+
+	// Quedarse corto está bien —la ficha de un fondo deja unas décimas en caja y
+	// el reparto normaliza—, pasarse no: eso no es una transcripción incompleta
+	// sino una equivocada.
+	it('acepta un desglose que no llega a 100 y rechaza el que se pasa', () => {
+		const short = assetUpdateSchema.safeParse({
+			...full,
+			sector: '',
+			sectorWeights: [{ sector: 'technology', weight: '97.3' }]
+		});
+		expect(short.success).toBe(true);
+
+		expect(
+			firstError(
+				assetUpdateSchema.safeParse({
+					...full,
+					sector: '',
+					sectorWeights: [
+						{ sector: 'technology', weight: '80' },
+						{ sector: 'energy', weight: '80' }
+					]
+				})
+			)
+		).toBe('Los pesos del desglose suman más de 100 %');
 	});
 
 	// Reclasificar un activo a cripto esconde el desplegable, y entonces el

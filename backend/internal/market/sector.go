@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/yeferson59/gofinance/v2/decimal"
+
 	"github.com/yeferson59/finexia-app/internal/platform/spreadsheet"
 )
 
@@ -245,4 +247,183 @@ func NormalizeSector(raw string) (Sector, bool) {
 	}
 
 	return SectorNone, false
+}
+
+// SectorWeight is one industry's share of a single asset, as a percentage.
+//
+// A percentage and not a fraction because of where the number comes from: a
+// fund fact sheet that reads "Information Technology 33.1%". The value is
+// transcribed, not computed, and asking the operator to divide by a hundred
+// first would be asking for the one arithmetic step that gets typed wrong.
+type SectorWeight struct {
+	Sector Sector          `json:"sector"`
+	Weight decimal.Decimal `json:"weight"`
+}
+
+// SectorBreakdown is what an asset is made of when one sector cannot say it.
+//
+// It exists because the single sector beside it is the right answer for a share
+// and for a sector fund — Apple is technology, XLK is technology — and the
+// wrong answer for the instrument most people actually hold. VOO is the whole
+// S&P 500: filing it under technology would put two thirds of the position in
+// industries it is not in, and leaving it blank would report the largest
+// holding in the portfolio as work somebody has to go and do.
+//
+// The two are exclusive, and the exclusivity is validated rather than modelled:
+// an asset carries either a Sector or a SectorBreakdown, never both, so there
+// is one place to read an asset's classification from and no way for the two to
+// disagree. Empty means the asset has no breakdown, which is the ordinary case.
+//
+// The weights are not required to add up to 100 — see Validate — and the
+// allocation normalises over whatever total it finds. They are ordered by
+// nothing in particular here; the repository reads them back heaviest first,
+// which is the order a fact sheet prints and the order a reader wants.
+type SectorBreakdown []SectorWeight
+
+// IsEmpty reports whether the asset has no breakdown. It reads better than a
+// len() at the call sites that ask "is this classified the plain way or the
+// weighted way", which is most of them.
+func (b SectorBreakdown) IsEmpty() bool { return len(b) == 0 }
+
+// Total adds the weights up. It is what Validate bounds and what a UI shows
+// beside the inputs so the operator can see 97.3 % and decide whether that is
+// the fund's cash sleeve or a row they forgot.
+func (b SectorBreakdown) Total() decimal.Decimal {
+	total := decimal.Zero
+	for _, w := range b {
+		total = total.Add(w.Weight)
+	}
+
+	return total
+}
+
+// hundred is the ceiling every weight and every total is held to. Built from a
+// string so the parser that reads every other decimal in this app is what reads
+// this one too.
+var hundred = func() decimal.Decimal {
+	d, err := decimal.NewFromString("100")
+	if err != nil {
+		panic("market: 100 is not a decimal: " + err.Error())
+	}
+
+	return d
+}()
+
+// Validate checks a breakdown against the four things that make it readable.
+//
+//   - Every sector is one of the eleven. The two derived buckets are rejected
+//     with everything else: "unclassified" is what an asset with no breakdown
+//     already reports, so a row claiming 8 % of it would be claiming a share of
+//     a bucket that means the absence of a share.
+//   - No sector appears twice. A fact sheet lists each once, so a repeat is a
+//     transcription slip, and silently adding the two would hide it.
+//   - Every weight is above 0 and at most 100. A zero-weight row says nothing a
+//     missing row does not, and a negative one says nothing at all.
+//   - The total is at most 100.
+//
+// What it deliberately does not require is a total of exactly 100. Fact sheets
+// do not add to a hundred — a few tenths sit in cash, futures and receivables —
+// and a hand-typed breakdown is further off still. Rejecting those would mean
+// rejecting every real fund's published numbers, so the allocation normalises
+// over the total it finds instead and an incomplete breakdown still accounts
+// for the whole position. A total above 100 is the opposite case: not an
+// incomplete transcription but a wrong one, and normalising it would quietly
+// turn somebody's typo into a chart.
+func (b SectorBreakdown) Validate() error {
+	if b.IsEmpty() {
+		return nil
+	}
+
+	seen := make(map[Sector]struct{}, len(b))
+	for _, w := range b {
+		if !w.Sector.IsValid() {
+			return errAssetSectorInvalid
+		}
+
+		if _, dup := seen[w.Sector]; dup {
+			return errAssetSectorWeightDuplicate
+		}
+		seen[w.Sector] = struct{}{}
+
+		if !w.Weight.IsPos() || w.Weight.GreaterThan(hundred) {
+			return errAssetSectorWeightRange
+		}
+	}
+
+	if b.Total().GreaterThan(hundred) {
+		return errAssetSectorWeightsTotal
+	}
+
+	return nil
+}
+
+// sectorWeightPairs splits the cell a spreadsheet carries a breakdown in, and
+// sectorWeightSplit splits one pair into its two halves.
+//
+// One cell rather than eleven columns, because the sheet an operator builds has
+// one row per asset and eleven mostly-empty columns would make every share in
+// the file carry ten blanks. The spelling is the one somebody types by hand:
+//
+//	technology:33.1; financials:13.8; healthcare:10.2
+//
+// Both separators are generous on purpose. A newline inside a quoted CSV cell
+// is what a paste from a PDF fact sheet produces, "=" is what a spreadsheet
+// user reaches for when ":" looks like a time, and the percent sign comes along
+// with the number whenever the column was copied rather than retyped.
+var (
+	sectorWeightPairs = regexp.MustCompile(`[;|\n\r]+`)
+	sectorWeightSplit = regexp.MustCompile(`\s*[:=]\s*`)
+)
+
+// ParseSectorBreakdown reads a breakdown out of one spreadsheet cell.
+//
+// An empty cell is not an error, exactly like an empty sector column: it is the
+// ordinary row that does not carry one, and it returns an empty breakdown with
+// ok true. Anything else that cannot be read is false, and the importer skips
+// the row rather than storing an asset whose fund the file described and the
+// catalog does not.
+//
+// The sector half goes through NormalizeSector, so "Tecnología: 33,1" works for
+// the same reason the plain sector column accepts it. The number half accepts a
+// decimal comma — the separator most of this app's users type — because a
+// weight between 0 and 100 has no thousands separator for it to be confused
+// with.
+func ParseSectorBreakdown(raw string) (SectorBreakdown, bool) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, true
+	}
+
+	breakdown := make(SectorBreakdown, 0, len(Sectors))
+
+	for _, pair := range sectorWeightPairs.Split(raw, -1) {
+		if strings.TrimSpace(pair) == "" {
+			continue
+		}
+
+		parts := sectorWeightSplit.Split(strings.TrimSpace(pair), 2)
+		if len(parts) != 2 {
+			return nil, false
+		}
+
+		sector, ok := NormalizeSector(parts[0])
+		if !ok || sector == SectorNone {
+			return nil, false
+		}
+
+		number := strings.TrimSuffix(strings.TrimSpace(parts[1]), "%")
+		number = strings.ReplaceAll(strings.TrimSpace(number), ",", ".")
+
+		weight, err := decimal.NewFromString(number)
+		if err != nil {
+			return nil, false
+		}
+
+		breakdown = append(breakdown, SectorWeight{Sector: sector, Weight: weight})
+	}
+
+	if breakdown.IsEmpty() {
+		return nil, false
+	}
+
+	return breakdown, true
 }

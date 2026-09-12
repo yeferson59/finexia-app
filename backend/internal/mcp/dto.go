@@ -90,6 +90,10 @@ type Holding struct {
 	AssetType string `json:"assetType" jsonschema:"stock, etf, crypto, bond, cash, real_estate, commodity or other"`
 	Exchange  string `json:"exchange,omitempty"`
 	Sector    string `json:"sector,omitempty" jsonschema:"the industry behind the asset. Empty means the catalog has no classification for it, not that it has none — get_sector_allocation tells the two apart."`
+	// SectorWeights is what an asset spread over several industries is made of —
+	// a whole-market ETF — and is the reason an empty Sector must not be read as
+	// "unclassified" on its own. Exactly one of the two is ever filled.
+	SectorWeights []SectorWeight `json:"sectorWeights,omitempty" jsonschema:"for an asset made of several industries (a broad ETF), what it is made of. Present instead of sector, never beside it."`
 	// Quantity is a sum of units and only means something per asset — never
 	// across rows. MarketValue is what compares, which is why it alone is
 	// converted into DisplayCurrency.
@@ -100,6 +104,17 @@ type Holding struct {
 	DisplayCurrency string `json:"displayCurrency"`
 	Portfolios      int64  `json:"portfolios" jsonschema:"how many of the user's portfolios hold this asset"`
 	PriceSource     string `json:"priceSource" jsonschema:"own (the user's own market-data key), manual (an operator-entered reference price), or cost (no price available; the position is carried at what it cost and shows no gain)"`
+}
+
+// SectorWeight is one industry's share of one asset, as a percentage.
+//
+// The weights of an asset need not add up to a hundred: they are transcribed
+// from a fund's own published breakdown, which leaves a little in cash.
+// get_sector_allocation normalises over whatever total it finds, so a reader
+// comparing these to its slices should expect the shares, not the raw weights.
+type SectorWeight struct {
+	Sector string `json:"sector" jsonschema:"technology, communication_services, healthcare, financials, consumer_discretionary, consumer_staples, industrials, energy, materials, utilities or real_estate"`
+	Weight string `json:"weight" jsonschema:"percentage of the asset in this industry, e.g. 33.1"`
 }
 
 // AllocationOutput is the answer of get_allocation.

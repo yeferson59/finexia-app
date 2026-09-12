@@ -19,6 +19,7 @@ import type {
 	assetHoldingSchema,
 	assetPriceSchema,
 	assetSchema,
+	sectorWeightSchema,
 	exchangeRateSchema,
 	growthDataPointSchema,
 	growthSummarySchema,
@@ -145,6 +146,14 @@ export type AssetPrice = z.infer<typeof assetPriceSchema>;
 
 /** Asset del catálogo (`GET /portfolios/assets`). */
 export type Asset = z.infer<typeof assetSchema>;
+
+/**
+ * Una industria y su peso dentro de un activo, en porcentaje.
+ *
+ * Es la clasificación del activo que no cabe en una sola industria —un ETF de
+ * mercado ancho—, y es excluyente con `sector`: el catálogo guarda uno u otro.
+ */
+export type SectorWeight = z.infer<typeof sectorWeightSchema>;
 
 /** Resultado de un import masivo (`POST /assets/import`, `POST /exchange-rates/import`). */
 export type ImportResult = z.infer<typeof importResultSchema>;

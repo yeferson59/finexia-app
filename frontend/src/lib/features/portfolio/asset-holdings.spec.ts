@@ -17,6 +17,7 @@ function holding(over: Partial<AssetHolding> = {}): AssetHolding {
 		name: 'Apple Inc.',
 		assetType: 'stock',
 		exchange: 'NASDAQ',
+		sectorWeights: [],
 		currency: 'USD',
 		quantity: '10',
 		marketPrice: '150',
@@ -37,6 +38,33 @@ describe('toAssetHoldingRows', () => {
 
 	it('conserva el nombre crudo de una clase que no conoce', () => {
 		expect(toAssetHoldingRows([holding({ assetType: 'nft' })])[0].typeLabel).toBe('nft');
+	});
+
+	// Un fondo de mercado ancho trae el `sector` vacío y el desglose lleno. Sin
+	// esta rama se vería igual que un activo sin clasificar, que es justo lo
+	// contrario de lo que es.
+	it('resume el desglose de un fondo en lugar de dejar la industria en blanco', () => {
+		const [row] = toAssetHoldingRows([
+			holding({
+				sector: '',
+				sectorWeights: [
+					{ sector: 'technology', weight: 33.1 },
+					{ sector: 'financials', weight: 13.8 }
+				]
+			})
+		]);
+
+		expect(row.sectorLabel).toBe('2 industrias');
+		expect(row.sectorDetail).toBe('Tecnología 33,1% · Finanzas 13,8%');
+	});
+
+	// Y el activo de siempre no cambia: su industria, y ningún detalle que
+	// enseñar por encima.
+	it('deja la industria única como está, sin detalle', () => {
+		const [row] = toAssetHoldingRows([holding({ sector: 'technology' })]);
+
+		expect(row.sectorLabel).toBe('Tecnología');
+		expect(row.sectorDetail).toBe('');
 	});
 
 	// Vacío es «no hay precio que represente al activo»: cada entrada pagó el

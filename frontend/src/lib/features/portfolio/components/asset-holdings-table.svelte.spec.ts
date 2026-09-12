@@ -11,6 +11,7 @@ const row: AssetHoldingRow = {
 	assetType: 'stock',
 	typeLabel: 'Acciones',
 	sectorLabel: 'Tecnología',
+	sectorDetail: '',
 	quantity: 42,
 	marketPrice: 214.35,
 	currency: 'USD',

@@ -7,6 +7,8 @@
 
 import { z } from 'zod';
 
+import { sectorWeightSchema } from './market';
+
 // ---------------------------------------------------------------------------
 // Portfolios
 // ---------------------------------------------------------------------------
@@ -157,6 +159,13 @@ export const assetHoldingSchema = z.object({
 	 * clasificar. Opcional para tolerar un backend anterior.
 	 */
 	sector: z.string().optional(),
+	/**
+	 * El desglose del activo repartido entre varias industrias —un ETF de
+	 * mercado ancho— y vacío para todo lo demás. Es lo que distingue un fondo
+	 * clasificado de un activo sin clasificar: los dos traen `sector` vacío.
+	 * Opcional por la misma razón que `sector`.
+	 */
+	sectorWeights: z.array(sectorWeightSchema).optional(),
 	/** Moneda en la que cotiza el activo, que es la de `marketPrice`. */
 	currency: z.string(),
 	quantity: z.string(),

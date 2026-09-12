@@ -5,8 +5,6 @@ import (
 	"errors"
 	"strings"
 	"testing"
-
-	"github.com/yeferson59/gofinance/v2/money"
 )
 
 func TestImportAssetsFromFile(t *testing.T) {
@@ -18,9 +16,9 @@ func TestImportAssetsFromFile(t *testing.T) {
 
 		var upserted []string
 		repo := new(fakeRepository{
-			upsertAsset: func(_ context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency, _ Sector) (Asset, error) {
-				upserted = append(upserted, ticker)
-				return Asset{Ticker: ticker, Name: name, AssetType: assetType, Exchange: exchange, Currency: currency}, nil
+			upsertAsset: func(_ context.Context, spec AssetSpec) (Asset, error) {
+				upserted = append(upserted, spec.Ticker)
+				return Asset{Ticker: spec.Ticker, Name: spec.Name, AssetType: spec.AssetType, Exchange: spec.Exchange, Currency: spec.Currency}, nil
 			},
 		})
 		svc := newTestServices(repo, newMemStorage())
@@ -59,10 +57,10 @@ func TestImportAssetsFromFile(t *testing.T) {
 
 		got := map[string]Sector{}
 		repo := new(fakeRepository{
-			upsertAsset: func(_ context.Context, ticker, _ string, _ AssetType, _ string, _ money.Currency, sector Sector) (Asset, error) {
-				got[ticker] = sector
+			upsertAsset: func(_ context.Context, spec AssetSpec) (Asset, error) {
+				got[spec.Ticker] = spec.Sector
 
-				return Asset{Ticker: ticker}, nil
+				return Asset{Ticker: spec.Ticker}, nil
 			},
 		})
 		svc := newTestServices(repo, newMemStorage())
@@ -109,10 +107,67 @@ func TestImportAssetsFromFile(t *testing.T) {
 		}
 	})
 
+	// The breakdown is the column this importer earns its keep on: eleven
+	// weights per fund is the most tedious thing in the catalog to type, and a
+	// paste from a fact sheet already has them.
+	t.Run("a fund's breakdown arrives in one cell", func(t *testing.T) {
+		csv := "ticker,name,assetType,currency,sector,sectorWeights\n" +
+			`VOO,Vanguard S&P 500,etf,USD,,"technology: 33.1; financials: 13.8"` + "\n" +
+			"XLK,Technology Select,etf,USD,Technology,\n" +
+			`OVER,Impossible Fund,etf,USD,,"technology: 60; energy: 60"` + "\n" +
+			`BOTH,Confused Fund,etf,USD,Technology,"technology: 50"` + "\n"
+
+		got := map[string]AssetSpec{}
+		repo := new(fakeRepository{
+			upsertAsset: func(_ context.Context, spec AssetSpec) (Asset, error) {
+				got[spec.Ticker] = spec
+
+				return Asset{Ticker: spec.Ticker}, nil
+			},
+		})
+		svc := newTestServices(repo, newMemStorage())
+
+		result, err := svc.ImportAssetsFromFile(context.Background(), []byte(csv), "assets.csv", "")
+		if err != nil {
+			t.Fatalf("ImportAssetsFromFile: %v", err)
+		}
+
+		// The fund and the sector ETF go in; the one that adds to 120 % and the
+		// one classified twice do not.
+		if result.Imported != 2 || result.Skipped != 2 {
+			t.Fatalf("imported/skipped = %d/%d, want 2/2: %+v", result.Imported, result.Skipped, result.Errors)
+		}
+
+		voo := got["VOO"]
+		if len(voo.SectorWeights) != 2 {
+			t.Fatalf("VOO weights = %+v, want two rows", voo.SectorWeights)
+		}
+		if voo.Sector != SectorNone {
+			t.Errorf("VOO sector = %q, want none: a fund with a breakdown carries no single industry", voo.Sector)
+		}
+		if voo.SectorWeights[0].Sector != SectorTechnology || voo.SectorWeights[0].Weight.String() != "33.1" {
+			t.Errorf("VOO first weight = %+v, want technology 33.1", voo.SectorWeights[0])
+		}
+
+		// The sector fund is the other half of the point: one industry is still
+		// the right answer for XLK, and the breakdown column being there does
+		// not make it wrong.
+		if xlk := got["XLK"]; xlk.Sector != SectorTechnology || !xlk.SectorWeights.IsEmpty() {
+			t.Errorf("XLK = %q / %+v, want technology and no breakdown", xlk.Sector, xlk.SectorWeights)
+		}
+
+		if _, written := got["OVER"]; written {
+			t.Error("a breakdown adding to 120 %% was written")
+		}
+		if _, written := got["BOTH"]; written {
+			t.Error("a row carrying a sector and a breakdown was written")
+		}
+	})
+
 	t.Run("repository failures are reported per row without stopping the import", func(t *testing.T) {
 		csv := "ticker,name,assetType,currency\nAAPL,Apple Inc.,stock,USD\n"
 		repo := new(fakeRepository{
-			upsertAsset: func(context.Context, string, string, AssetType, string, money.Currency, Sector) (Asset, error) {
+			upsertAsset: func(context.Context, AssetSpec) (Asset, error) {
 				return Asset{}, errors.New("db write failed")
 			},
 		})

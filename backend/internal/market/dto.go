@@ -18,6 +18,54 @@ type CreateAssetRequestDTO struct {
 	// is optional, and only honoured for an admin: see CreateAsset in the
 	// handler for why a contribution cannot classify a shared row.
 	Sector string `json:"sector"`
+	// SectorWeights is the alternative to the field above, for the asset one
+	// industry cannot describe: a whole-market ETF. Sending both is a 400 — see
+	// errAssetSectorBoth — and sending neither leaves the asset unclassified,
+	// which is the ordinary case.
+	SectorWeights []SectorWeightRequestDTO `json:"sectorWeights"`
+}
+
+// SectorWeightRequestDTO is one line of a breakdown as a client sends it.
+//
+// The sector half is as free as the single sector column beside it, and goes
+// through the same normaliser, so a form built from this app's own vocabulary
+// and a script pasting "Information Technology" both land on the same value.
+//
+// The weight is a percentage — 33.1, not 0.331 — and is a decimal rather than a
+// float64 because it is a number somebody typed off a fact sheet, and the one
+// thing a float64 cannot do is hand it back unchanged. It accepts both the JSON
+// number and the quoted form, so a client that keeps its decimals in strings
+// needs no special case.
+type SectorWeightRequestDTO struct {
+	Sector string          `json:"sector"`
+	Weight decimal.Decimal `json:"weight"`
+}
+
+// normalizeSectorWeights maps a request's breakdown onto the domain's, resolving
+// each label the way the single sector field is resolved.
+//
+// It reports false for a label nobody recognises and for one that is blank: a
+// weight with no industry to attach it to is not an omission the way an empty
+// sector column is, it is a line of the breakdown that says a number and not
+// what the number is about. Arithmetic — the duplicates, the range, the total —
+// belongs to SectorBreakdown.Validate and is not repeated here.
+func normalizeSectorWeights(rows []SectorWeightRequestDTO) (SectorBreakdown, bool) {
+	if len(rows) == 0 {
+		return nil, true
+	}
+
+	breakdown := make(SectorBreakdown, 0, len(rows))
+
+	for _, row := range rows {
+		sector, ok := NormalizeSector(row.Sector)
+		if !ok || sector == SectorNone {
+			return nil, false
+		}
+
+		breakdown = append(breakdown, SectorWeight{Sector: sector, Weight: row.Weight})
+	}
+
+	return breakdown, true
 }
 
 // UpdateAssetRequestDTO is a catalog row as the operator wants it to read from
@@ -37,9 +85,13 @@ type UpdateAssetRequestDTO struct {
 	Currency  money.Currency `json:"currency"  validate:"required"`
 	// Sector travels whole like the fields above it: an edit that sends it
 	// empty is clearing the classification, not omitting it.
-	Sector    string       `json:"sector"`
-	IsCurated *bool        `json:"isCurated"`
-	Price     *money.Money `json:"price"`
+	Sector string `json:"sector"`
+	// SectorWeights travels whole for the same reason: an edit with no weights
+	// removes the breakdown the asset had. It is the field that turns a fund
+	// filed under one industry into the eleven it is actually made of, and back.
+	SectorWeights []SectorWeightRequestDTO `json:"sectorWeights"`
+	IsCurated     *bool                    `json:"isCurated"`
+	Price         *money.Money             `json:"price"`
 }
 
 type CreateExchangeRateRequestDTO struct {

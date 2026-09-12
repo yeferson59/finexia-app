@@ -2,6 +2,7 @@ package portfolio
 
 import (
 	"context"
+	"encoding/json"
 
 	"uuid"
 
@@ -32,6 +33,12 @@ import (
 // which asset to go classify, which is exactly what a "Sin clasificar" label
 // repeated down the column would hide.
 //
+// SectorWeights rides along beside it for the assets one sector cannot describe,
+// and is what keeps a whole-market ETF from reading as that same "go classify
+// me" blank. Unfolded too: the breakdown arrives whole and the list decides how
+// much of it to show, because the answer differs by screen — a table wants
+// "11 industrias", a detail panel wants the eleven.
+//
 // Entries at quantity zero are left out, matching the allocation: a position
 // sold in full is not something the user holds.
 func (r *PostgresRepository) GetAssetHoldingsByUserID(ctx context.Context, userID uuid.UUID, targetCurrency money.Currency) ([]AssetHolding, error) {
@@ -50,6 +57,17 @@ func (r *PostgresRepository) GetAssetHoldingsByUserID(ctx context.Context, userI
 			-- way: SectorNone is the empty string, so an unclassified asset
 			-- needs no second representation in Go.
 			COALESCE(a.sector, ''),
+			-- The breakdown, for the asset that has one instead. A scalar
+			-- subquery rather than a join: this query is grouped by asset, and
+			-- joining a table with eleven rows per fund would multiply the
+			-- quantities it is summing. a.id is in the GROUP BY, so there is one
+			-- answer per group by construction.
+			COALESCE((
+				SELECT json_agg(json_build_object('sector', w.sector, 'weight', w.weight::text)
+				                ORDER BY w.weight DESC, w.sector)
+				FROM asset_sector_weights w
+				WHERE w.asset_id = a.id
+			), '[]')::text AS sector_weights,
 			SUM(pe.quantity::numeric)::text AS quantity,
 			-- The price the asset itself carries, if any. uap and assets are
 			-- both keyed by the asset (uap also by the user, fixed by the WHERE
@@ -110,6 +128,8 @@ func (r *PostgresRepository) GetAssetHoldingsByUserID(ctx context.Context, userI
 		// NULL for every row whose price did not come from the user's own key,
 		// which is most of them on an account with no provider configured.
 		var priceProvider *string
+		// Never NULL: an asset with no breakdown comes back as an empty array.
+		var weights string
 
 		if err := rows.Scan(
 			&holding.AssetID,
@@ -119,6 +139,7 @@ func (r *PostgresRepository) GetAssetHoldingsByUserID(ctx context.Context, userI
 			&holding.Exchange,
 			&holding.Currency,
 			&holding.Sector,
+			&weights,
 			&holding.Quantity,
 			&holding.MarketPrice,
 			&holding.MarketValue,
@@ -129,6 +150,10 @@ func (r *PostgresRepository) GetAssetHoldingsByUserID(ctx context.Context, userI
 			&holding.PriceFetchedAt,
 			&holding.PositionsUnconverted,
 		); err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal([]byte(weights), &holding.SectorWeights); err != nil {
 			return nil, err
 		}
 

@@ -60,9 +60,26 @@ func (h *handler) CreateAsset(c fiber.Ctx) error {
 		return httpx.FromDomain(c, errAssetSectorInvalid, "Error creating asset", assetFailureDetail(errAssetSectorInvalid, "No se pudo crear el activo"))
 	}
 
+	// The breakdown is resolved here for the same reason and answered the same
+	// way: a line naming an industry nobody recognises is a line the operator
+	// meant something by, and storing the fund without it would report a success
+	// the chart then contradicts.
+	weights, ok := normalizeSectorWeights(req.SectorWeights)
+	if !ok {
+		return httpx.FromDomain(c, errAssetSectorInvalid, "Error creating asset", assetFailureDetail(errAssetSectorInvalid, "No se pudo crear el activo"))
+	}
+
 	var asset Asset
 	if role == httpx.RoleAdmin {
-		asset, err = h.service.CreateAsset(c, req.Ticker, req.Name, assetType, req.Exchange, req.Currency, sector)
+		asset, err = h.service.CreateAsset(c, AssetSpec{
+			Ticker:        req.Ticker,
+			Name:          req.Name,
+			AssetType:     assetType,
+			Exchange:      req.Exchange,
+			Currency:      req.Currency,
+			Sector:        sector,
+			SectorWeights: weights,
+		})
 	} else {
 		asset, err = h.service.ContributeAsset(c, userID, req.Ticker, req.Name, assetType, req.Exchange, req.Currency)
 	}
@@ -75,7 +92,7 @@ func (h *handler) CreateAsset(c fiber.Ctx) error {
 }
 
 // UpdateAsset rewrites a catalog row: its ticker, name, type, exchange,
-// currency, who sees it, and the manual price.
+// currency, classification, who sees it, and the manual price.
 //
 // Admin-only, unlike CreateAsset above, and the guard is on the route. The two
 // are not the same request wearing different roles: creating names an
@@ -98,15 +115,21 @@ func (h *handler) UpdateAsset(c fiber.Ctx) error {
 		return httpx.FromDomain(c, errAssetSectorInvalid, "Error updating asset", assetFailureDetail(errAssetSectorInvalid, "No se pudo actualizar el activo"))
 	}
 
+	weights, ok := normalizeSectorWeights(req.SectorWeights)
+	if !ok {
+		return httpx.FromDomain(c, errAssetSectorInvalid, "Error updating asset", assetFailureDetail(errAssetSectorInvalid, "No se pudo actualizar el activo"))
+	}
+
 	asset, err := h.service.UpdateAsset(c, assetID, AssetUpdate{
-		Ticker:    req.Ticker,
-		Name:      req.Name,
-		AssetType: AssetType(req.AssetType),
-		Exchange:  req.Exchange,
-		Currency:  req.Currency,
-		Sector:    sector,
-		IsCurated: req.IsCurated,
-		Price:     req.Price,
+		Ticker:        req.Ticker,
+		Name:          req.Name,
+		AssetType:     AssetType(req.AssetType),
+		Exchange:      req.Exchange,
+		Currency:      req.Currency,
+		Sector:        sector,
+		SectorWeights: weights,
+		IsCurated:     req.IsCurated,
+		Price:         req.Price,
 	})
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error updating asset", assetFailureDetail(err, "No se pudo actualizar el activo"))

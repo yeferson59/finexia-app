@@ -39,6 +39,22 @@ var (
 	// one — a coin, a cash balance, a flat, a bar of gold. Storing it would be
 	// storing a value no screen reads: the breakdown files these by their type.
 	errAssetSectorNotApplicable = httpx.AsBadRequest(errors.New("este tipo de activo no lleva sector: solo acciones, ETFs, bonos y otros"))
+	// The four below guard the sector breakdown — the shape a whole-market ETF
+	// needs and one column cannot hold. They are separate sentinels rather than
+	// one "desglose inválido" because each is a different thing to go and fix,
+	// and the operator reading them is looking at eleven inputs.
+	//
+	// errAssetSectorBoth answers an asset sent with both a single industry and a
+	// breakdown. Either says what the asset is made of, and a row carrying both
+	// would let the two disagree with no rule for which one the chart believes.
+	errAssetSectorBoth            = httpx.AsBadRequest(errors.New("elige una industria única o un desglose por industrias, no las dos"))
+	errAssetSectorWeightDuplicate = httpx.AsBadRequest(errors.New("el desglose repite una industria"))
+	errAssetSectorWeightRange     = httpx.AsBadRequest(errors.New("cada peso del desglose debe ser mayor que 0 y como mucho 100"))
+	// errAssetSectorWeightsTotal answers a breakdown adding up to more than a
+	// hundred. Under it is fine and stays fine — a fact sheet's own weights
+	// leave a little in cash, and the allocation normalises over whatever total
+	// it finds — so only the impossible direction is refused.
+	errAssetSectorWeightsTotal = httpx.AsBadRequest(errors.New("los pesos del desglose suman más de 100 %"))
 	// errAssetPriceInvalid guards the manual price an edit may carry. Creation
 	// has no counterpart because a new row starts without one: a price only
 	// reaches this table through an update.
@@ -80,7 +96,8 @@ func assetFailureDetail(err error, fallback string) string {
 	for _, domain := range []error{
 		errAssetTickerRequired, errAssetTickerTooLong, errAssetExchangeTooLong,
 		errAssetTypeInvalid, errAssetCurrencyInvalid, errAssetPriceInvalid,
-		errAssetSectorInvalid, errAssetSectorNotApplicable,
+		errAssetSectorInvalid, errAssetSectorNotApplicable, errAssetSectorBoth,
+		errAssetSectorWeightDuplicate, errAssetSectorWeightRange, errAssetSectorWeightsTotal,
 		errAssetDuplicate, ErrAssetQuotaExceeded,
 	} {
 		if errors.Is(err, domain) {

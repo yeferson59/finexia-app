@@ -7,6 +7,8 @@ import (
 
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/market"
 )
 
 type CreatePortfolioRequestDTO struct {
@@ -408,12 +410,16 @@ type AssetHoldingDTO struct {
 	AssetType string    `json:"assetType"`
 	Exchange  string    `json:"exchange"`
 	// Sector is the raw catalog value, empty when the asset is unclassified.
-	Sector      string  `json:"sector"`
-	Currency    string  `json:"currency"`
-	Quantity    string  `json:"quantity"`
-	MarketPrice string  `json:"marketPrice"`
-	MarketValue string  `json:"marketValue"`
-	Percent     float64 `json:"percent"`
+	Sector string `json:"sector"`
+	// SectorWeights is what the asset is made of when one industry cannot say
+	// it, and empty for everything else — including the assets nobody has
+	// classified. A client shows one or the other, never both.
+	SectorWeights market.SectorBreakdown `json:"sectorWeights"`
+	Currency      string                 `json:"currency"`
+	Quantity      string                 `json:"quantity"`
+	MarketPrice   string                 `json:"marketPrice"`
+	MarketValue   string                 `json:"marketValue"`
+	Percent       float64                `json:"percent"`
 	// DisplayCurrency is what MarketValue is in — the same for every row, which
 	// is what makes Percent meaningful.
 	DisplayCurrency      string `json:"displayCurrency"`
@@ -439,6 +445,7 @@ func NewAssetHoldingsResponse(holdings []AssetHolding) []AssetHoldingDTO {
 			AssetType:            string(holding.AssetType),
 			Exchange:             holding.Exchange,
 			Sector:               string(holding.Sector),
+			SectorWeights:        holding.SectorWeights,
 			Currency:             holding.Currency.String(),
 			Quantity:             holding.Quantity,
 			MarketPrice:          holding.MarketPrice,

@@ -7,6 +7,7 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/yeferson59/finexia-app/internal/market"
 	"github.com/yeferson59/finexia-app/internal/portfolio"
 )
 
@@ -188,9 +189,30 @@ func holdingRows(holdings []portfolio.AssetHolding) []Holding {
 			MarketValue:     h.MarketValue,
 			DisplayCurrency: h.DisplayCurrency.String(),
 			Sector:          string(h.Sector),
+			SectorWeights:   sectorWeightRows(h.SectorWeights),
 			Portfolios:      h.Portfolios,
 			PriceSource:     string(h.PriceSource),
 		})
+	}
+
+	return out
+}
+
+// sectorWeightRows maps an asset's breakdown into the tool's own shape, as text
+// for the same reason every other amount here is text: the client is a language
+// model, and a JSON number is where a decimal loses its digits.
+//
+// nil for an asset with no breakdown, which is most of them, so the field drops
+// out of the payload entirely rather than repeating an empty array on every row.
+func sectorWeightRows(weights market.SectorBreakdown) []SectorWeight {
+	if weights.IsEmpty() {
+		return nil
+	}
+
+	out := make([]SectorWeight, 0, len(weights))
+
+	for _, w := range weights {
+		out = append(out, SectorWeight{Sector: string(w.Sector), Weight: w.Weight.String()})
 	}
 
 	return out

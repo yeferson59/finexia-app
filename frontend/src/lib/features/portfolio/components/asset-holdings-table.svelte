@@ -127,7 +127,9 @@
 
 					<td class="col-class type">
 						{row.typeLabel}
-						{#if row.sectorLabel}<span class="sector">{row.sectorLabel}</span>{/if}
+						{#if row.sectorLabel}<span class="sector" title={row.sectorDetail}
+								>{row.sectorLabel}</span
+							>{/if}
 					</td>
 
 					<td class="col-position num mono position">

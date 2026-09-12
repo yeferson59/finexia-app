@@ -30,7 +30,7 @@ func TestContributeAsset(t *testing.T) {
 		var gotCurrency money.Currency
 
 		repo := new(fakeRepository{
-			upsertAsset: func(context.Context, string, string, AssetType, string, money.Currency, Sector) (Asset, error) {
+			upsertAsset: func(context.Context, AssetSpec) (Asset, error) {
 				t.Fatal("a contribution reached UpsertAsset, which overwrites rows other users hold")
 
 				return Asset{}, nil
@@ -168,7 +168,7 @@ func TestHandlerCreateAsset(t *testing.T) {
 	t.Run("a user contributes rather than curates", func(t *testing.T) {
 		var contributed bool
 		repo := new(fakeRepository{
-			upsertAsset: func(context.Context, string, string, AssetType, string, money.Currency, Sector) (Asset, error) {
+			upsertAsset: func(context.Context, AssetSpec) (Asset, error) {
 				t.Fatal("a non-admin reached the curating path")
 
 				return Asset{}, nil
@@ -196,10 +196,10 @@ func TestHandlerCreateAsset(t *testing.T) {
 	t.Run("an admin curates", func(t *testing.T) {
 		var curated bool
 		repo := new(fakeRepository{
-			upsertAsset: func(_ context.Context, ticker, _ string, _ AssetType, _ string, _ money.Currency, _ Sector) (Asset, error) {
+			upsertAsset: func(_ context.Context, spec AssetSpec) (Asset, error) {
 				curated = true
 
-				return Asset{ID: uuid.New(), Ticker: ticker, IsCurated: true}, nil
+				return Asset{ID: uuid.New(), Ticker: spec.Ticker, IsCurated: true}, nil
 			},
 			createAssetIfAbsent: func(context.Context, uuid.UUID, string, string, AssetType, string, money.Currency) (Asset, error) {
 				t.Fatal("an admin was routed through the contribution path")
@@ -224,10 +224,10 @@ func TestHandlerCreateAsset(t *testing.T) {
 		for _, spelling := range []string{"technology", "Tecnología", "Technology"} {
 			var got Sector
 			repo := new(fakeRepository{
-				upsertAsset: func(_ context.Context, ticker, _ string, _ AssetType, _ string, _ money.Currency, sector Sector) (Asset, error) {
-					got = sector
+				upsertAsset: func(_ context.Context, spec AssetSpec) (Asset, error) {
+					got = spec.Sector
 
-					return Asset{ID: uuid.New(), Ticker: ticker}, nil
+					return Asset{ID: uuid.New(), Ticker: spec.Ticker}, nil
 				},
 			})
 
@@ -248,7 +248,7 @@ func TestHandlerCreateAsset(t *testing.T) {
 	// a success for a field that never landed.
 	t.Run("an unknown sector is a 400 and writes nothing", func(t *testing.T) {
 		repo := new(fakeRepository{
-			upsertAsset: func(context.Context, string, string, AssetType, string, money.Currency, Sector) (Asset, error) {
+			upsertAsset: func(context.Context, AssetSpec) (Asset, error) {
 				t.Fatal("a row was written despite an unusable sector")
 
 				return Asset{}, nil
@@ -269,10 +269,10 @@ func TestHandlerCreateAsset(t *testing.T) {
 		var got Sector
 		var called bool
 		repo := new(fakeRepository{
-			upsertAsset: func(_ context.Context, ticker, _ string, _ AssetType, _ string, _ money.Currency, sector Sector) (Asset, error) {
-				got, called = sector, true
+			upsertAsset: func(_ context.Context, spec AssetSpec) (Asset, error) {
+				got, called = spec.Sector, true
 
-				return Asset{ID: uuid.New(), Ticker: ticker}, nil
+				return Asset{ID: uuid.New(), Ticker: spec.Ticker}, nil
 			},
 		})
 
@@ -282,6 +282,70 @@ func TestHandlerCreateAsset(t *testing.T) {
 		}
 		if !called || got != SectorNone {
 			t.Errorf("sector = %q (reached=%t), want none", got, called)
+		}
+	})
+
+	// The whole reason the breakdown exists: an ETF that is every industry at
+	// once had two bad answers before it, and both of them ended up on a chart.
+	t.Run("a fund posts its breakdown instead of a sector", func(t *testing.T) {
+		var got AssetSpec
+		repo := new(fakeRepository{
+			upsertAsset: func(_ context.Context, spec AssetSpec) (Asset, error) {
+				got = spec
+
+				return Asset{ID: uuid.New(), Ticker: spec.Ticker}, nil
+			},
+		})
+
+		// The two JSON shapes a client may send a decimal in — quoted and bare
+		// — and a label in the user's own language, since the breakdown goes
+		// through the same normaliser the single sector does.
+		fund := `{"ticker":"voo","name":"Vanguard S&P 500","assetType":"etf","currency":"usd",` +
+			`"sectorWeights":[{"sector":"Tecnología","weight":"33.1"},{"sector":"financials","weight":13.8}]}`
+
+		resp := request(t, newAssetApp(t, repo, userID, "admin"), http.MethodPost, "/assets", fund)
+		if resp.StatusCode != fiber.StatusCreated {
+			t.Fatalf("status = %d, want 201", resp.StatusCode)
+		}
+
+		if len(got.SectorWeights) != 2 {
+			t.Fatalf("weights = %+v, want two rows", got.SectorWeights)
+		}
+		if got.SectorWeights[0].Sector != SectorTechnology || got.SectorWeights[0].Weight.String() != "33.1" {
+			t.Errorf("first weight = %+v, want technology 33.1", got.SectorWeights[0])
+		}
+		if got.SectorWeights[1].Sector != SectorFinancials || got.SectorWeights[1].Weight.String() != "13.8" {
+			t.Errorf("second weight = %+v, want financials 13.8", got.SectorWeights[1])
+		}
+		if got.Sector != SectorNone {
+			t.Errorf("sector = %q, want none beside a breakdown", got.Sector)
+		}
+	})
+
+	// Arithmetic the form should have caught still has to be refused here: the
+	// API is reachable without the form, and a breakdown adding to 160 %% would
+	// hand a chart shares of more money than the user has.
+	t.Run("a breakdown that cannot be true is a 400 and writes nothing", func(t *testing.T) {
+		for _, bad := range []string{
+			`"sectorWeights":[{"sector":"technology","weight":80},{"sector":"energy","weight":80}]`,
+			`"sectorWeights":[{"sector":"technology","weight":50},{"sector":"technology","weight":20}]`,
+			`"sectorWeights":[{"sector":"ganaderia","weight":50}]`,
+			`"sector":"technology","sectorWeights":[{"sector":"energy","weight":50}]`,
+		} {
+			repo := new(fakeRepository{
+				upsertAsset: func(context.Context, AssetSpec) (Asset, error) {
+					t.Fatalf("a row was written despite %s", bad)
+
+					return Asset{}, nil
+				},
+			})
+
+			body := `{"ticker":"voo","name":"Vanguard","assetType":"etf","currency":"usd",` + bad + `}`
+
+			resp := request(t, newAssetApp(t, repo, userID, "admin"), http.MethodPost, "/assets", body)
+			if resp.StatusCode != fiber.StatusBadRequest {
+				t.Errorf("%s: status = %d, want 400", bad, resp.StatusCode)
+			}
 		}
 	})
 

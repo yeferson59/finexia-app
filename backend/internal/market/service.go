@@ -23,10 +23,16 @@ type defaultAsset struct {
 }
 
 // The two crypto rows carry SectorNone because a coin has no industry behind
-// it, not because nobody got round to them — see AssetType.HasSector. SPY is
-// the interesting one: a whole-market fund is spread across all eleven sectors,
-// so filing it under any single one would be a lie the breakdown then repeats,
-// and it stays unclassified on purpose.
+// it, not because nobody got round to them — see AssetType.HasSector.
+//
+// SPY is the interesting one: a whole-market fund is spread across all eleven
+// sectors, so filing it under any single one would be a lie the breakdown then
+// repeats. What it needs is a SectorBreakdown, and the seed deliberately does
+// not ship one. These weights change every quarter and this list is re-applied
+// on every boot, so a breakdown here would overwrite the operator's own numbers
+// with whatever was true the day the constant was typed. It stays unclassified
+// until somebody loads the fund's published weights through the admin edit or
+// the spreadsheet import, which is the one place they can also be kept current.
 var defaultAssets = []defaultAsset{
 	{"AAPL", "Apple Inc.", Stock, "NASDAQ", money.USD, SectorTechnology},
 	{"MSFT", "Microsoft Corporation", Stock, "NASDAQ", money.USD, SectorTechnology},
@@ -79,7 +85,14 @@ func (s *service) SeedDefaultAssets(ctx context.Context) []error {
 	var errs []error
 
 	for _, da := range defaultAssets {
-		if _, err := s.CreateAsset(ctx, da.Ticker, da.Name, da.AssetType, da.Exchange, da.Currency, da.Sector); err != nil {
+		if _, err := s.CreateAsset(ctx, AssetSpec{
+			Ticker:    da.Ticker,
+			Name:      da.Name,
+			AssetType: da.AssetType,
+			Exchange:  da.Exchange,
+			Currency:  da.Currency,
+			Sector:    da.Sector,
+		}); err != nil {
 			s.log.Error(ctx, "upsert default asset failed", logger.Err(err), logger.Str("ticker", da.Ticker))
 			errs = append(errs, err)
 		}

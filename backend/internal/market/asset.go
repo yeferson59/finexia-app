@@ -54,15 +54,53 @@ type Asset struct {
 	// Sector is the industry behind the asset, or SectorNone when nobody has
 	// classified it — which is most of the catalog, and is reported as such
 	// rather than guessed at. See sector.go.
-	Sector         Sector       `json:"sector"`
-	CurrentPrice   *money.Money `json:"currentPrice"`
-	PriceUpdatedAt *time.Time   `json:"priceUpdatedAt"`
+	Sector Sector `json:"sector"`
+	// SectorWeights is the other shape a classification takes: what the asset is
+	// made of, when one industry cannot say it. A whole-market ETF carries the
+	// eleven weights its fact sheet publishes and leaves Sector empty; a share
+	// and a sector fund carry a Sector and leave this empty. Never both — see
+	// SectorBreakdown.
+	//
+	// It rides along on every catalog read rather than behind a second request:
+	// the screens that show an asset's industry are the same ones that would
+	// have to ask, and an ETF whose classification arrived one round trip later
+	// would flash as unclassified in every one of them.
+	SectorWeights  SectorBreakdown `json:"sectorWeights"`
+	CurrentPrice   *money.Money    `json:"currentPrice"`
+	PriceUpdatedAt *time.Time      `json:"priceUpdatedAt"`
 	// IsCurated marks a row the operator vouches for, which is what makes it
 	// visible to every user. A contributed row is only visible to the users who
 	// contributed it, so the flag doubles as the "everyone" audience.
 	IsCurated bool      `json:"isCurated"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// AssetSpec is a catalog row as a create asks for it to be written: the
+// operator's create, the seed and the spreadsheet import all hand one over.
+//
+// A struct rather than seven arguments for the reason AssetUpdate below is one:
+// past a handful, a positional list stops saying which value is which, and this
+// one now ends in two fields that are alternatives to each other. Keeping them
+// named is what makes a call site that sets both visibly wrong.
+//
+// Unlike AssetUpdate, everything here is what it says: there is no field whose
+// absence means "leave it alone", because there is nothing yet to leave alone.
+// The one exception is what an upsert does when the row already exists, which
+// is UpsertAsset's business and documented there.
+type AssetSpec struct {
+	Ticker    string
+	Name      string
+	AssetType AssetType
+	Exchange  string
+	Currency  money.Currency
+	// Sector and SectorWeights are the two ways to classify an asset and are
+	// mutually exclusive: one industry, or the breakdown of the several it is
+	// made of. Sending both is rejected rather than resolved — see
+	// errAssetSectorBoth — because nothing downstream could say which of the two
+	// the chart should believe.
+	Sector        Sector
+	SectorWeights SectorBreakdown
 }
 
 // AssetUpdate is the new state of a catalog row, as an operator edit leaves it.
@@ -83,6 +121,11 @@ type AssetUpdate struct {
 	// the field is asking for. There is no "leave it alone" — the whole row
 	// travels, so an unchanged sector arrives as itself.
 	Sector Sector
+	// SectorWeights travels whole for the same reason and clears the same way:
+	// an edit that sends none removes the breakdown the row had, which is how an
+	// ETF that was split across eleven industries goes back to being filed under
+	// one — or under none. It is exclusive with Sector, exactly as in AssetSpec.
+	SectorWeights SectorBreakdown
 	// IsCurated changes who sees the row: curating it publishes it to every
 	// user, un-curating it puts it back to the users who contributed it. Nil
 	// leaves it as it is.

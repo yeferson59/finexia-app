@@ -2,7 +2,12 @@ import type { Actions, PageServerLoad } from './$types';
 import * as market from '$lib/api/market';
 import { fail } from '@sveltejs/kit';
 import type { Asset } from '$lib/api/types';
-import { assetCreateSchema, assetPriceSchema, assetUpdateSchema } from '$lib/features/admin';
+import {
+	assetCreateSchema,
+	assetPriceSchema,
+	assetUpdateSchema,
+	sectorWeightsFromForm
+} from '$lib/features/admin';
 
 export const load: PageServerLoad = async ({ cookies, fetch }) => {
 	const res = await market.getAssets({ cookies, fetch }, { page: 1, limit: 100 });
@@ -22,7 +27,10 @@ export const actions = {
 			assetType: fd.get('assetType') ?? '',
 			currency: fd.get('currency') ?? '',
 			exchange: fd.get('exchange') ?? '',
-			sector: fd.get('sector') ?? ''
+			sector: fd.get('sector') ?? '',
+			// El formulario manda un campo por industria; la API quiere una
+			// lista. Es la única traducción que hace falta entre los dos.
+			sectorWeights: sectorWeightsFromForm(fd)
 		});
 
 		if (!parsed.success) {
@@ -54,6 +62,7 @@ export const actions = {
 			currency: fd.get('currency') ?? '',
 			exchange: fd.get('exchange') ?? '',
 			sector: fd.get('sector') ?? '',
+			sectorWeights: sectorWeightsFromForm(fd),
 			isCurated: fd.get('isCurated'),
 			// El texto tal cual, como en `updatePrice`: convertirlo a número
 			// perdería los decimales de cola que el backend guarda como llegan.

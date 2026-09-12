@@ -11,6 +11,18 @@ import { z } from 'zod';
 // Assets y tasas de cambio (mercado)
 // ---------------------------------------------------------------------------
 
+/**
+ * Una industria y su peso dentro de un activo, en porcentaje (33.1, no 0.331).
+ *
+ * `weight` llega como número del backend —es un porcentaje con cuatro
+ * decimales, no un importe— y se acepta también como texto para no depender de
+ * cómo lo serialice quien lo mande.
+ */
+export const sectorWeightSchema = z.object({
+	sector: z.string(),
+	weight: z.coerce.number()
+});
+
 /** Precio de un asset. */
 export const assetPriceSchema = z.object({
 	value: z.string(),
@@ -30,6 +42,17 @@ export const assetSchema = z.object({
 	 * tolerar un backend anterior.
 	 */
 	sector: z.string().optional(),
+	/**
+	 * El desglose del activo que no cabe en una sola industria: un ETF de
+	 * mercado ancho. Es **excluyente** con `sector` —el backend no guarda los
+	 * dos—, así que una lista con filas significa que `sector` está vacío por
+	 * ese motivo y no porque falte clasificar.
+	 *
+	 * Opcional, como `sector`, para tolerar un backend anterior: el schema solo
+	 * avisa del contrato en desarrollo, no transforma la respuesta, así que un
+	 * `default` aquí sería una promesa que en ejecución no se cumple.
+	 */
+	sectorWeights: z.array(sectorWeightSchema).optional(),
 	currentPrice: assetPriceSchema.nullable(),
 	priceUpdatedAt: z.string().nullable(),
 	/**

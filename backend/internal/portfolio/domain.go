@@ -421,6 +421,12 @@ type AllocationItem struct {
 // A breakdown that dropped the unclassified rows would report shares of a total
 // that is not the user's money, which is the same mistake PositionsUnconverted
 // exists to avoid.
+//
+// One position can reach several of these rows, which is what separates this
+// aggregation from every other one in the module: an asset carrying a
+// market.SectorBreakdown — a whole-market ETF — is split across its industries
+// in the proportions the catalog holds. The rows still add up to the portfolio;
+// it is the assets that no longer divide neatly between them.
 type SectorAllocationItem struct {
 	Sector      market.Sector  `json:"sector"`
 	MarketValue string         `json:"marketValue"`
@@ -459,6 +465,14 @@ type AssetHolding struct {
 	// request because the holdings table is where a user sees an asset is
 	// unclassified and can go do something about it.
 	Sector market.Sector `json:"sector"`
+	// SectorWeights is the classification of an asset that has more than one
+	// industry — a whole-market ETF — and is empty for everything else. Exactly
+	// one of it and Sector is ever filled: the catalog will not store both.
+	//
+	// Without it the funds in this list would read as the same blank as an asset
+	// nobody has classified, which is the one thing this column exists to point
+	// at.
+	SectorWeights market.SectorBreakdown `json:"sectorWeights"`
 	// Currency the asset is quoted in, which is what MarketPrice is in. It is
 	// not DisplayCurrency: the price stays in its own currency, the value is
 	// converted.

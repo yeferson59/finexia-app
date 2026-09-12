@@ -36,7 +36,7 @@ type fakeRepository struct {
 
 	updateAsset         func(ctx context.Context, assetID uuid.UUID, upd AssetUpdate) (Asset, error)
 	updateAssetPrice    func(ctx context.Context, assetID uuid.UUID, price money.Money) (Asset, error)
-	upsertAsset         func(ctx context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency, sector Sector) (Asset, error)
+	upsertAsset         func(ctx context.Context, spec AssetSpec) (Asset, error)
 	createAssetIfAbsent func(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error)
 	countContributed    func(ctx context.Context, userID uuid.UUID, since time.Time) (int, error)
 	getAssets           func(ctx context.Context, view CatalogView, offset, limit uint) ([]Asset, error)
@@ -70,11 +70,11 @@ func (f *fakeRepository) UpdateAssetPrice(ctx context.Context, assetID uuid.UUID
 	return f.updateAssetPrice(ctx, assetID, price)
 }
 
-func (f *fakeRepository) UpsertAsset(ctx context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency, sector Sector) (Asset, error) {
+func (f *fakeRepository) UpsertAsset(ctx context.Context, spec AssetSpec) (Asset, error) {
 	if f.upsertAsset == nil {
 		return Asset{}, nil
 	}
-	return f.upsertAsset(ctx, ticker, name, assetType, exchange, currency, sector)
+	return f.upsertAsset(ctx, spec)
 }
 
 func (f *fakeRepository) CreateAssetIfAbsent(ctx context.Context, userID uuid.UUID, ticker, name string, assetType AssetType, exchange string, currency money.Currency) (Asset, error) {

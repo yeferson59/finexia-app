@@ -21,7 +21,7 @@ func TestSyncJobRun(t *testing.T) {
 			getAssetByID: func(context.Context, uuid.UUID) (Asset, error) {
 				return Asset{ID: assetID, Ticker: "AAPL", AssetType: Stock, Currency: money.USD}, nil
 			},
-			upsertAsset: func(context.Context, string, string, AssetType, string, money.Currency, Sector) (Asset, error) {
+			upsertAsset: func(context.Context, AssetSpec) (Asset, error) {
 				return Asset{}, nil
 			},
 		})

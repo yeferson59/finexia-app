@@ -10,9 +10,15 @@ import (
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
-func TestNormalizeAssetInputCurrency(t *testing.T) {
+func TestNormalizeAssetSpecCurrency(t *testing.T) {
 	t.Run("a three-letter non-currency is rejected", func(t *testing.T) {
-		_, err := normalizeAssetInput("AAPL", "Apple", Stock, "NASDAQ", money.Currency(255), SectorNone)
+		_, err := normalizeAssetSpec(AssetSpec{
+			Ticker:    "AAPL",
+			Name:      "Apple",
+			AssetType: Stock,
+			Exchange:  "NASDAQ",
+			Currency:  money.Currency(255),
+		})
 		if !errors.Is(err, errAssetCurrencyInvalid) {
 			t.Errorf("err = %v, want errAssetCurrencyInvalid", err)
 		}
@@ -98,9 +104,9 @@ func TestImportAssetsRejectsNonISOCurrencies(t *testing.T) {
 
 	var stored []string
 	repo := new(fakeRepository{
-		upsertAsset: func(_ context.Context, ticker, name string, assetType AssetType, exchange string, currency money.Currency, _ Sector) (Asset, error) {
-			stored = append(stored, ticker+"/"+currency.String())
-			return Asset{Ticker: ticker, Currency: currency}, nil
+		upsertAsset: func(_ context.Context, spec AssetSpec) (Asset, error) {
+			stored = append(stored, spec.Ticker+"/"+spec.Currency.String())
+			return Asset{Ticker: spec.Ticker, Currency: spec.Currency}, nil
 		},
 	})
 	svc := newTestServices(repo, newMemStorage())
