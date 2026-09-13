@@ -141,6 +141,7 @@ Es el menú de navegación. Sus secciones son:
 | **Portafolios** | Crear y gestionar tus portafolios y sus posiciones |
 | **Mis Activos** | Cuánto tienes de cada activo, sumando todos tus portafolios |
 | **Plataformas** | Registrar los brokers/exchanges/bancos donde tienes activos |
+| **Efectivo** | El dinero sin invertir de cada plataforma, por moneda, y sus depósitos, retiros e intereses |
 | **Transacciones** | Historial de operaciones e importación desde Excel/CSV |
 | **Reportes** | Rentabilidad mes a mes, medidas de riesgo, proyección y descargas en Excel |
 | **Notificaciones** | Preferencias de avisos por correo y en la app |
@@ -454,6 +455,28 @@ La ficha avisa cuando toca. Si **ninguna** posición tiene precio de mercado, ex
 **Editar** abre el formulario en una ventana sobre la ficha, con el nombre, la descripción y el tipo.
 
 **Eliminar** pide confirmación y es permanente. Una plataforma que todavía tenga posiciones registradas —**incluidas las que ya vendiste**, porque siguen siendo tu historial— **no se puede eliminar**: Finexia se niega y te lo explica en el propio diálogo en lugar de arrastrar tus posiciones con ella. Elimina primero esas posiciones (apartado 7.2) y vuelve a intentarlo.
+
+### 9.5 El efectivo de tus plataformas
+
+La sección **Efectivo** del menú guarda el dinero que tienes sin invertir: lo que queda en tu cuenta del bróker, en tu cuenta de ahorros o en tu billetera. Cada saldo pertenece a una **plataforma**, a un **portafolio** y a una **moneda**, y suma en el valor de ese portafolio como una posición más.
+
+La página abre con el **total** en la moneda de tu cuenta y, si tienes efectivo en varias monedas, cuánto hay en cada una con su propio importe, que es el que coincide con tu extracto. Debajo están los **saldos** —uno por plataforma, portafolio y moneda— y el historial de **movimientos**.
+
+Para anotar un movimiento pulsa **Registrar movimiento**, o **Movimiento** en la fila de un saldo, que abre el formulario con esa cuenta ya elegida. Lo primero es decir qué pasó:
+
+| Movimiento | Qué hace con el saldo | Qué hace con tu rentabilidad |
+|---|---|---|
+| **Depósito** | Lo sube | Nada: es dinero que pusiste, no una ganancia |
+| **Retiro** | Lo baja | Nada: es dinero que sacaste, no una pérdida. Su comisión sí resta |
+| **Intereses** | Lo sube | La sube: es lo que ganó tu dinero |
+
+Después eliges la plataforma, el portafolio, la moneda, el importe y la fecha, y si quieres una comisión y una nota. El primer depósito en una plataforma y una moneda abre el saldo; los siguientes se suman a él.
+
+> **Anota los intereses netos.** Si el banco retiene impuestos, escribe lo que llegó a la cuenta: los intereses no llevan comisión.
+
+Finexia **no deja un saldo en negativo**. Un retiro mayor que lo que hay, o borrar un depósito cuyo dinero ya salió en un retiro, se rechaza con la explicación en el propio formulario. Cada movimiento se puede **Editar** —tipo, importe, fecha, comisión y nota; la cuenta no cambia— o **Borrar**. Los que se anotaron desde la posición del activo aparecen en la lista, pero aquí solo se pueden borrar.
+
+> **Las compras no descuentan del efectivo.** Si pagas unas acciones con dinero de tu saldo, registra también el retiro por ese importe: así el saldo cuadra con tu cuenta, y tu rentabilidad no cambia, porque el retiro y la compra se compensan.
 
 ---
 
@@ -901,6 +924,8 @@ Si el problema persiste, contacta con el equipo de soporte de Finexia.
 | **Posición** | Tenencia de un activo dentro de un portafolio (cantidad + coste) |
 | **Portafolio** | Conjunto de posiciones agrupadas bajo un objetivo, con moneda y nivel de riesgo propios |
 | **Plataforma** | Broker, exchange o entidad donde custodias tus activos |
+| **Saldo de efectivo** | Dinero sin invertir que guarda una plataforma en una moneda para un portafolio; vale exactamente su importe |
+| **Intereses del efectivo** | Lo que te abona una cuenta sobre su saldo: lo suben y cuentan como rentabilidad, a diferencia de un depósito |
 | **Transacción** | Operación de compra o venta que modifica una posición |
 | **Asignación** | Porcentaje que representa un activo o tipo de activo dentro del total |
 | **ROI** | *Return on Investment*: retorno sobre la inversión, en porcentaje |

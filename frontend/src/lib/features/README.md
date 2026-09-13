@@ -1,7 +1,7 @@
 # `lib/features` — módulos por dominio funcional
 
 Un directorio por dominio (`auth/`, `portfolio/`, `dashboard/`, `transactions/`,
-`platforms/`, `investments/`, `settings/`, `notifications/`, `admin/`,
+`platforms/`, `cash/`, `investments/`, `settings/`, `notifications/`, `admin/`,
 `reports/`, `landing/`, `legal/`). Aquí vive la lógica
 de negocio, los componentes de feature, los schemas Zod y el estado de cada
 dominio. `routes/` **solo orquesta**: loaders/actions delgados que llaman a

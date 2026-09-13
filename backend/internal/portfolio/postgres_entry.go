@@ -233,6 +233,10 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 			return err
 		}
 
+		if err := requireTypeAllowed(ctx, tx, entryID, settled.Type); err != nil {
+			return err
+		}
+
 		// The opening trade carries no commission: this endpoint has never taken
 		// one, so its fee currency is the trade's by the same default every
 		// other zero-fee row gets.

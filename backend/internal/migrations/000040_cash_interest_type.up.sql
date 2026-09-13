@@ -1,0 +1,19 @@
+-- A transaction type for the interest a cash balance keeps.
+--
+-- 'interest' already exists and means something else: income a holding paid
+-- out. It moves no quantity, and transaction_cash_flow (000027) books it as money
+-- leaving the measured pool, because until now the app kept no cash for it to
+-- land in. That is right for a bond coupon and wrong for a savings balance, where
+-- the interest is credited to the same balance it was earned on: the quantity
+-- grows, and nothing entered from outside.
+--
+-- Redefining 'interest' by the asset it is recorded on would have reinterpreted
+-- every interest row already stored against a cash position — their balances
+-- would jump and their past flows would change sign. A separate value leaves
+-- those rows meaning what they meant, and gives the new rule a name the SQL
+-- functions can switch on without joining the asset.
+--
+-- It is its own migration because Postgres will not let a new enum value be used
+-- in the transaction that adds it, and 000041 uses it in the function bodies it
+-- replaces.
+ALTER TYPE transaction_type ADD VALUE IF NOT EXISTS 'cash_interest';

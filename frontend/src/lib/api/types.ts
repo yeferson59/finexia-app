@@ -19,6 +19,8 @@ import type {
 	assetHoldingSchema,
 	assetPriceSchema,
 	assetSchema,
+	cashBalanceSchema,
+	cashMovementSchema,
 	sectorWeightSchema,
 	exchangeRateSchema,
 	growthDataPointSchema,
@@ -36,6 +38,7 @@ import type {
 	oauthConsentSchema,
 	oauthGrantSchema,
 	pageMetaSchema,
+	pagedCashMovementsSchema,
 	pagedTransactionsSchema,
 	platformSchema,
 	portfolioDetailSchema,
@@ -136,6 +139,18 @@ export type PagedTransactions = z.infer<typeof pagedTransactionsSchema>;
 
 /** Plataforma / fuente (`GET /portfolios/sources`). */
 export type Platform = z.infer<typeof platformSchema>;
+
+// ---------------------------------------------------------------------------
+// Efectivo
+// ---------------------------------------------------------------------------
+
+/** Saldo de efectivo de una plataforma, en una moneda y un portafolio. */
+export type CashBalance = z.infer<typeof cashBalanceSchema>;
+
+/** Depósito, retiro o intereses sobre un saldo. */
+export type CashMovement = z.infer<typeof cashMovementSchema>;
+
+export type PagedCashMovements = z.infer<typeof pagedCashMovementsSchema>;
 
 // ---------------------------------------------------------------------------
 // Assets y tasas de cambio (mercado)

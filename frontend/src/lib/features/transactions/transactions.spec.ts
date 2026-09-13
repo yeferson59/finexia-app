@@ -15,7 +15,12 @@ describe('catálogos del import de transacciones', () => {
 		for (const { value, label } of TXN_TYPE_OPTIONS) {
 			expect(TXN_TYPE_LABELS[value]).toBe(label);
 		}
-		expect(Object.keys(TXN_TYPE_LABELS)).toHaveLength(TXN_TYPE_OPTIONS.length);
+		// La única etiqueta de más es la de los intereses del efectivo: el libro
+		// tiene que poder nombrarlos, pero solo se registran desde la pantalla de
+		// efectivo, sobre un saldo, así que el import no los ofrece.
+		expect(Object.keys(TXN_TYPE_LABELS).sort()).toEqual(
+			[...TXN_TYPE_OPTIONS.map((t) => t.value), 'cash_interest'].sort()
+		);
 	});
 
 	it('incluye los tipos que el backend acepta', () => {

@@ -6,9 +6,10 @@ import (
 
 	"uuid"
 
-	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
 // SettledRate is what one transaction becomes when its position is restated in

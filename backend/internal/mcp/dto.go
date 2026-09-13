@@ -158,7 +158,7 @@ type Transaction struct {
 	ID        string `json:"id"`
 	Ticker    string `json:"ticker"`
 	AssetName string `json:"assetName,omitempty"`
-	Type      string `json:"type" jsonschema:"buy, sell, dividend, split, transfer_in, transfer_out, fee or interest"`
+	Type      string `json:"type" jsonschema:"buy, sell, dividend, split, transfer_in, transfer_out, fee, interest (income a holding paid out) or cash_interest (interest credited to a cash balance)"`
 	Quantity  string `json:"quantity"`
 	Price     string `json:"price" jsonschema:"the per-unit price, in currency"`
 	Currency  string `json:"currency" jsonschema:"the currency the trade was quoted in"`

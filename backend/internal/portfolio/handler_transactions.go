@@ -33,7 +33,7 @@ func (h *handler) CreatePortfolioEntry(c fiber.Ctx) error {
 	if req.TransactionType == "" {
 		txnType = Buy
 	} else if !txnType.IsValid() {
-		return httpx.BadRequest(c, "Invalid transaction type", "Type must be one of: buy, sell, dividend, split, transfer_in, transfer_out, fee, interest")
+		return httpx.BadRequest(c, "Invalid transaction type", "Type must be one of: buy, sell, dividend, split, transfer_in, transfer_out, fee, interest, cash_interest")
 	}
 
 	// No category travels with the request any more: the class of a position is
@@ -226,7 +226,7 @@ func (h *handler) upsertTransaction(c fiber.Ctx, rawType string, call func(userI
 
 	txnType := TransactionType(rawType)
 	if !txnType.IsValid() {
-		return httpx.BadRequest(c, "Invalid transaction type", "Type must be one of: buy, sell, dividend, split, transfer_in, transfer_out, fee, interest")
+		return httpx.BadRequest(c, "Invalid transaction type", "Type must be one of: buy, sell, dividend, split, transfer_in, transfer_out, fee, interest, cash_interest")
 	}
 
 	txn, err := call(userID, txnType)

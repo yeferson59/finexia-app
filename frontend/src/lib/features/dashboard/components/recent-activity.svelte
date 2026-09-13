@@ -31,6 +31,7 @@
 		sell: 'Venta',
 		dividend: 'Dividendo',
 		interest: 'Interés',
+		cash_interest: 'Intereses del efectivo',
 		transfer_in: 'Transferencia recibida',
 		transfer_out: 'Transferencia enviada',
 		split: 'División de acciones',
@@ -38,7 +39,7 @@
 	};
 
 	/** Movimientos que meten dinero en la cartera; el resto lo sacan. */
-	const INCOMING = ['dividend', 'interest', 'transfer_in', 'split'];
+	const INCOMING = ['dividend', 'interest', 'cash_interest', 'transfer_in', 'split'];
 
 	function total(tx: Transaction): number {
 		return (parseFloat(tx.quantity) || 0) * (parseFloat(tx.price) || 0);

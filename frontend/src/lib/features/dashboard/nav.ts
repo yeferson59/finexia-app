@@ -24,6 +24,7 @@ export const MAIN_NAV: NavItem[] = [
 		? [{ label: 'Inversiones', icon: 'trending', href: resolve('/dashboard/investments') }]
 		: []),
 	{ label: 'Plataformas', icon: 'layers', href: resolve('/dashboard/platforms') },
+	{ label: 'Efectivo', icon: 'cash', href: resolve('/dashboard/cash') },
 	{ label: 'Transacciones', icon: 'exchange', href: resolve('/dashboard/transactions') },
 	{ label: 'Reportes', icon: 'bars', href: resolve('/dashboard/reports') },
 	{ label: 'Notificaciones', icon: 'bell', href: resolve('/dashboard/notifications') },

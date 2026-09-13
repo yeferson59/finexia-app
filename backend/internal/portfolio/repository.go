@@ -103,6 +103,19 @@ type SnapshotStore interface {
 	GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error)
 }
 
+// CashStore persists cash balances: positions of type cash and the movements
+// on them. It is a separate store because every write checks the balance it
+// would leave while holding a lock on it, which none of the generic transaction
+// writers do.
+type CashStore interface {
+	GetCashBalancesByUserID(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]CashBalance, error)
+	CountCashMovements(ctx context.Context, userID uuid.UUID) (int, error)
+	GetCashMovementsPaginated(ctx context.Context, userID uuid.UUID, limit, offset int) ([]CashMovement, error)
+	CreateCashMovement(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMovementInput) (CashMovement, error)
+	UpdateCashMovement(ctx context.Context, userID, txnID uuid.UUID, in CashMovementInput) (CashMovement, error)
+	DeleteCashMovement(ctx context.Context, userID, txnID uuid.UUID) error
+}
+
 // Repository is the union of the module's stores, satisfied by
 // *PostgresRepository. The Service orchestrates across all of them.
 type Repository interface {
@@ -112,6 +125,7 @@ type Repository interface {
 	TransactionStore
 	SnapshotStore
 	HoldingsStore
+	CashStore
 }
 
 // Ensure the concrete repository keeps satisfying the interface.

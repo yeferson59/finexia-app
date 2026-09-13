@@ -30,9 +30,12 @@ export const CATEGORY_OPTIONS: { value: string; label: string }[] = [
 ];
 
 /** Índice `value → label` de `TXN_TYPE_OPTIONS`, para pintar filas del preview. */
-export const TXN_TYPE_LABELS: Record<string, string> = Object.fromEntries(
-	TXN_TYPE_OPTIONS.map((t) => [t.value, t.label])
-);
+export const TXN_TYPE_LABELS: Record<string, string> = {
+	...Object.fromEntries(TXN_TYPE_OPTIONS.map((t) => [t.value, t.label])),
+	// No es una opción: solo se registra desde la pantalla de efectivo, sobre un
+	// saldo. Aquí solo hace falta saber nombrarlo.
+	cash_interest: 'Intereses del efectivo'
+};
 
 /** Importe de una transacción, en la moneda que se liquidó. */
 export interface TransactionTotal {

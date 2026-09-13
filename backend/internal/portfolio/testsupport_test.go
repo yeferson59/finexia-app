@@ -154,6 +154,12 @@ type fakeRepository struct {
 	getUserExchangeRateByPair       func(ctx context.Context, userID uuid.UUID, from, to money.Currency) (decimal.Decimal, error)
 	getHeldAssetIDs                 func(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
 	getRequiredCurrencyPairs        func(ctx context.Context, userID uuid.UUID) ([]CurrencyPair, error)
+	getCashBalancesByUserID         func(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]CashBalance, error)
+	countCashMovements              func(ctx context.Context, userID uuid.UUID) (int, error)
+	getCashMovementsPaginated       func(ctx context.Context, userID uuid.UUID, limit, offset int) ([]CashMovement, error)
+	createCashMovement              func(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMovementInput) (CashMovement, error)
+	updateCashMovement              func(ctx context.Context, userID, txnID uuid.UUID, in CashMovementInput) (CashMovement, error)
+	deleteCashMovement              func(ctx context.Context, userID, txnID uuid.UUID) error
 
 	// Consumed by fakeUserReader, not part of portfolio.Repository.
 	getUserPreferences func(ctx context.Context, userID uuid.UUID) (user.UserPreferences, error)
@@ -468,4 +474,28 @@ func (f *fakeRepository) GetRequiredCurrencyPairs(ctx context.Context, userID uu
 	}
 
 	return f.getRequiredCurrencyPairs(ctx, userID)
+}
+
+func (f *fakeRepository) GetCashBalancesByUserID(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]CashBalance, error) {
+	return f.getCashBalancesByUserID(ctx, userID, displayCurrency)
+}
+
+func (f *fakeRepository) CountCashMovements(ctx context.Context, userID uuid.UUID) (int, error) {
+	return f.countCashMovements(ctx, userID)
+}
+
+func (f *fakeRepository) GetCashMovementsPaginated(ctx context.Context, userID uuid.UUID, limit, offset int) ([]CashMovement, error) {
+	return f.getCashMovementsPaginated(ctx, userID, limit, offset)
+}
+
+func (f *fakeRepository) CreateCashMovement(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMovementInput) (CashMovement, error) {
+	return f.createCashMovement(ctx, userID, portfolioID, sourceID, in)
+}
+
+func (f *fakeRepository) UpdateCashMovement(ctx context.Context, userID, txnID uuid.UUID, in CashMovementInput) (CashMovement, error) {
+	return f.updateCashMovement(ctx, userID, txnID, in)
+}
+
+func (f *fakeRepository) DeleteCashMovement(ctx context.Context, userID, txnID uuid.UUID) error {
+	return f.deleteCashMovement(ctx, userID, txnID)
 }

@@ -400,6 +400,10 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 			return err
 		}
 
+		if err := requireTypeAllowed(ctx, tx, entryID, settled.Type); err != nil {
+			return err
+		}
+
 		if err := tx.QueryRow(ctx, `
 		INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes)
 		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::numeric, $8::char(3), $9::date, $10)
@@ -447,14 +451,17 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 	var txn Transaction
 
 	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
-		var costCurrency money.Currency
+		var (
+			costCurrency money.Currency
+			entryID      uuid.UUID
+		)
 		if err := tx.QueryRow(ctx, `
-		SELECT pe.cost_currency
+		SELECT pe.cost_currency, pe.id
 		FROM transactions t
 		JOIN portfolio_entries pe ON pe.id = t.entry_id
 		JOIN portfolios p        ON p.id = pe.portfolio_id
 		WHERE t.id = $1 AND p.user_id = $2
-	`, txnID, userID).Scan(&costCurrency); err != nil {
+	`, txnID, userID).Scan(&costCurrency, &entryID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrTransactionNotFound
 			}
@@ -464,6 +471,10 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 
 		settled, err := in.Validate(costCurrency)
 		if err != nil {
+			return err
+		}
+
+		if err := requireTypeAllowed(ctx, tx, entryID, settled.Type); err != nil {
 			return err
 		}
 

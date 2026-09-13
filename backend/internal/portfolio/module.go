@@ -132,6 +132,14 @@ func (m *Module) Routes(router fiber.Router) {
 	// asset instead of one per category. Not "/assets" — that path is the
 	// catalog, registered below.
 	portfolios.Get("/holdings", m.handler.GetAssetHoldings)
+	// Cash balances and their movements. Their own writes rather than the
+	// generic transaction ones, because each checks the balance it would leave;
+	// see CashStore.
+	portfolios.Get("/cash", m.handler.GetCashBalances)
+	portfolios.Get("/cash/movements", paginate.New(), m.handler.GetCashMovements)
+	portfolios.Post("/cash/movements", m.handler.CreateCashMovement)
+	portfolios.Put("/cash/movements/:txnId", m.handler.UpdateCashMovement)
+	portfolios.Delete("/cash/movements/:txnId", m.handler.DeleteCashMovement)
 	portfolios.Post("", m.handler.CreatePortfolio)
 	portfolios.Post("/sources", m.handler.CreatePlatform)
 	portfolios.Post("/entries", m.handler.CreatePortfolioEntry)

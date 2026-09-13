@@ -101,6 +101,12 @@
 	const provenance = $derived.by(() => {
 		if (!row) return '';
 
+		// Un saldo de efectivo vale uno de su moneda por unidad: no hay proveedor
+		// al que preguntar, y «precio escrito a mano» sugeriría que puede estar mal.
+		if (row.assetType === 'cash') {
+			return 'Es efectivo: cada unidad vale una de su moneda, así que no hay precio que consultar.';
+		}
+
 		if (row.priceSource === 'own') {
 			const who = row.priceProvider ? formatMarketProvider(row.priceProvider) : 'una de tus claves';
 			const when = formatTimeAgo(row.priceFetchedAt);

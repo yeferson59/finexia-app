@@ -19,5 +19,6 @@ export * from './pagination';
 export * from './portfolio';
 export * from './transactions';
 export * from './platforms';
+export * from './cash';
 export * from './market';
 export * from './user';

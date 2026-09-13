@@ -272,6 +272,11 @@ anterior deja de valer en el acto, sin ventana de gracia.
 | GET | `/portfolios/allocation` | usuario | Asignación de activos por categoría (soporta `?currency=`) |
 | GET | `/portfolios/allocation/sectors` | usuario | Asignación por industria (soporta `?currency=`) |
 | GET | `/portfolios/holdings` | usuario | Activos consolidados: una fila por activo sumando todos los portfolios (soporta `?currency=`) |
+| GET | `/portfolios/cash` | usuario | Saldos de efectivo por plataforma, portfolio y moneda (soporta `?currency=`) |
+| GET | `/portfolios/cash/movements` | usuario, paginada | Movimientos de efectivo, del más reciente al más antiguo |
+| POST | `/portfolios/cash/movements` | usuario | Registra un depósito, un retiro o unos intereses; abre el saldo si no existía |
+| PUT | `/portfolios/cash/movements/:txnId` | usuario | Reescribe un movimiento sobre el mismo saldo |
+| DELETE | `/portfolios/cash/movements/:txnId` | usuario | Borra un movimiento si el saldo no queda en negativo |
 | POST | `/portfolios` | usuario | Crea portfolio |
 | POST | `/portfolios/sources` | usuario | Crea plataforma/fuente |
 | POST | `/portfolios/entries` | usuario | Crea posición (entry); la categoría sale del activo, no del cuerpo |
@@ -900,6 +905,86 @@ Con `costCurrency` puesta, una fila en otra moneda **sin** tasa se marca
 inválida en el preview con el motivo, en vez de importarse convertida a la tasa
 de hoy. La comisión de una fila importada va en la moneda de esa fila: es lo que
 significa la columna «Moneda» del archivo para los importes que etiqueta.
+
+#### Efectivo
+
+Un saldo de efectivo es una posición: un activo de tipo `cash` que vale **1 de
+su moneda por unidad**, en una plataforma y un portfolio. Por eso suma en el
+resumen, en la asignación (categoría `cash`), en el reparto por industria
+(sector `cash`) y en la serie de crecimiento sin que ninguno de ellos sepa nada
+nuevo. Los saldos que abre la aplicación usan un activo curado por moneda
+—`CASH-USD`, `CASH-COP`…— con precio de catálogo 1, que se crea la primera vez
+que alguien lo necesita. El prefijo existe porque `USD` también es el ticker de
+un ETF.
+
+Cuerpo de `POST /portfolios/cash/movements`:
+
+```json
+{
+  "portfolioId": "…",
+  "sourceId": "…",
+  "currency": "COP",
+  "kind": "deposit",
+  "amount": 1500000,
+  "fees": 0,
+  "date": "2026-09-10T00:00:00Z",
+  "notes": ""
+}
+```
+
+`PUT /portfolios/cash/movements/:txnId` acepta los mismos campos salvo
+`portfolioId`, `sourceId` y `currency`: una edición se queda en el saldo en el
+que está. Moverla de cuenta es borrarla y registrarla de nuevo.
+
+| `kind` | Se guarda como | Saldo | Serie de crecimiento |
+|---|---|---|---|
+| `deposit` | `transfer_in` | sube | aporte: se descuenta, no es rentabilidad |
+| `withdrawal` | `transfer_out` | baja | retiro, por lo cobrado (importe − comisión) |
+| `interest` | `cash_interest` | sube | sin flujo: lo que añade es rentabilidad |
+
+`cash_interest` (migraciones 000040 y 000041) es un tipo de transacción distinto
+de `interest`. Aquel es renta que una posición paga hacia fuera: no mueve la
+cantidad y cuenta como dinero que sale. Este se abona al mismo saldo en que se
+ganó: sube la cantidad y no es dinero que el dueño meta. Redefinir `interest`
+según el activo habría cambiado el significado de las filas ya guardadas, así
+que es un valor aparte. Solo se acepta sobre una posición de tipo `cash`: en
+`POST /portfolios/entries`, `POST /portfolios/entries/:entryId/transactions` y
+`PUT /portfolios/transactions/:txnId` sobre cualquier otra responde **400**.
+Cargado con historia entra con el saldo a su valor, como un `transfer_in`, y
+si se borra después de que un snapshot lo viera se conserva en
+`retired_transactions`, igual que una compra.
+
+Reglas de las escrituras:
+
+- `amount` > 0 y `fees` ≥ 0. Unos intereses se anotan netos (`fees` = 0) y la
+  comisión de un retiro no puede superar el retiro: pasado ese punto, el flujo
+  del retiro se convertiría en un aporte. Las dos responden **400**.
+- `currency` tiene que ser de la lista de *Moneda de la cuenta*: un saldo sin
+  tasa detrás quedaría sumado a valor nominal en todos los totales — **400**.
+- Un retiro, una edición o un borrado que dejaría el saldo por debajo de cero
+  responde **409**. El saldo se bloquea antes de leerse, así que dos retiros
+  simultáneos no pueden gastar el mismo dinero. Sin esta comprobación el
+  trigger del coste medio dejaría el saldo en cero en silencio mientras el
+  retiro seguía contado entero como dinero sacado.
+- El movimiento cae en el saldo de ese portfolio, plataforma y moneda que esté
+  a la par —coste en su propia moneda, precio medio 1—, prefiriendo el que abrió
+  la aplicación y, entre dos, el más antiguo. Una posición de efectivo comprada
+  con otra moneda no se toca: el alta responde **400** y el movimiento se
+  registra desde la posición, con su tasa.
+
+`GET /portfolios/cash` devuelve por saldo `balance` en su propia moneda,
+`value` en `displayCurrency` y `fxConverted`, con el contrato de los holdings:
+`false` es sin tasa y a valor nominal, y no se suma con los demás. A diferencia
+de los holdings **incluye los saldos en cero**: una acción vendida del todo ya
+no es algo que se tenga, pero una cuenta vaciada sigue siendo donde cae el
+próximo depósito. `movements` y `lastMovementDate` distinguen una de otra sin
+estrenar.
+
+`GET /portfolios/cash/movements` marca con `editable: false` lo que el `PUT` no
+puede reescribir como movimiento de efectivo —un `interest` o un `fee` anotados
+sobre el saldo, o una compra de efectivo a otro precio o con tasa— y le pone
+`kind: "other"` cuando no es ninguno de los tres. Todos se pueden borrar:
+quitar una fila no cambia el precio de nada.
 
 ### 2.8 Assets (JWT; *admin* donde se indica)
 

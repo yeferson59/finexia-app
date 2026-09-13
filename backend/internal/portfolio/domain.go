@@ -53,11 +53,16 @@ const (
 	TransferOut TransactionType = "transfer_out"
 	Fee         TransactionType = "fee"
 	Interest    TransactionType = "interest"
+	// CashInterest is interest credited to the cash balance it was earned on:
+	// it grows the balance and is not money the owner put in. Interest is the
+	// other kind, income a holding pays out. Only a cash position takes it; see
+	// cash.go and migrations 000040/000041.
+	CashInterest TransactionType = "cash_interest"
 )
 
 func (t TransactionType) IsValid() bool {
 	switch t {
-	case Buy, Sell, Dividend, Split, TransferIn, TransferOut, Fee, Interest:
+	case Buy, Sell, Dividend, Split, TransferIn, TransferOut, Fee, Interest, CashInterest:
 		return true
 	default:
 		return false
