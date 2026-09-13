@@ -23,9 +23,11 @@
 	let submitting = $state(false);
 	let error = $state('');
 
-	$effect(() => {
-		if (movement) error = '';
-	});
+	/* Cerrar limpia el error: el siguiente movimiento que se abra no lo arrastra. */
+	function close() {
+		error = '';
+		onClose();
+	}
 
 	const amount = $derived(
 		movement
@@ -40,7 +42,7 @@
 	description="El saldo se recalcula sin él."
 	size="sm"
 	tone="danger"
-	{onClose}
+	onClose={close}
 >
 	{#if movement}
 		<form
@@ -55,7 +57,7 @@
 						return;
 					}
 					await update();
-					onClose();
+					close();
 				};
 			}}
 		>
@@ -75,8 +77,7 @@
 			{/if}
 
 			<div class="modal-actions">
-				<Button type="button" variant="ghost" onclick={onClose} disabled={submitting}
-					>Cancelar</Button
+				<Button type="button" variant="ghost" onclick={close} disabled={submitting}>Cancelar</Button
 				>
 				<Button type="submit" variant="danger" loading={submitting}>Borrar</Button>
 			</div>

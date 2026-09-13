@@ -38,6 +38,8 @@ linters:
         - materiales
         - construccion
         - industrias
+        - corporativos
+        - australianos
 
     gocritic:
       disabled-checks: []

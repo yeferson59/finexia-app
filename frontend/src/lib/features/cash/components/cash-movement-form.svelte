@@ -11,7 +11,6 @@
 	 * es la decisión que cambia la rentabilidad: la frase debajo dice cuál de los
 	 * tres cuenta como ganancia.
 	 */
-	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import Button from '$lib/ui/button.svelte';
 	import Modal from '$lib/ui/modal.svelte';
@@ -41,47 +40,69 @@
 
 	let { target, portfolios, platforms, currency, onClose }: Props = $props();
 
-	let kind = $state<CashKind>('deposit');
-	let portfolioId = $state('');
-	let sourceId = $state('');
-	let currencyCode = $state('USD');
-	let amount = $state('');
-	let fees = $state('');
-	let date = $state(todayLocalDateString());
-	let notes = $state('');
+	interface Fields {
+		kind: CashKind;
+		portfolioId: string;
+		sourceId: string;
+		currency: string;
+		amount: string;
+		fees: string;
+		date: string;
+		notes: string;
+	}
+
+	/** Cómo arranca el formulario: vacío, sobre un saldo o con el movimiento que se edita. */
+	function initialFields(current: CashFormTarget | null): Fields {
+		if (current?.mode === 'edit') {
+			const m = current.movement;
+			return {
+				kind: m.kind === 'other' ? 'deposit' : m.kind,
+				portfolioId: m.portfolioId,
+				sourceId: m.sourceId,
+				currency: m.currency,
+				amount: String(parseFloat(m.amount) || ''),
+				fees: parseFloat(m.fees) > 0 ? String(parseFloat(m.fees)) : '',
+				date: m.date.slice(0, 10),
+				notes: m.notes
+			};
+		}
+
+		const b = current?.balance;
+		return {
+			kind: 'deposit',
+			portfolioId:
+				b?.portfolioId ?? (portfolios.find((p) => p.isDefault) ?? portfolios[0])?.id ?? '',
+			sourceId: b?.sourceId ?? platforms[0]?.id ?? '',
+			currency: b?.currency ?? currency,
+			amount: '',
+			fees: '',
+			date: todayLocalDateString(),
+			notes: ''
+		};
+	}
+
+	/*
+	 * Cada campo sale de lo que abre el formulario y se recalcula cuando se abre
+	 * con otro. Son `$derived` reasignables: lo que escribe el usuario los pisa
+	 * hasta la siguiente apertura, sin un `$effect` copiando valores a mano.
+	 */
+	const initial = $derived(initialFields(target));
+	let kind = $derived(initial.kind);
+	let portfolioId = $derived(initial.portfolioId);
+	let sourceId = $derived(initial.sourceId);
+	let currencyCode = $derived(initial.currency);
+	let amount = $derived(initial.amount);
+	let fees = $derived(initial.fees);
+	let date = $derived(initial.date);
+	let notes = $derived(initial.notes);
 	let submitting = $state(false);
 	let error = $state('');
 
-	/* Cada apertura empieza de cero, o desde lo que se está editando. */
-	$effect(() => {
-		const current = target;
-		if (!current) return;
-
-		untrack(() => {
-			error = '';
-
-			if (current.mode === 'edit') {
-				const m = current.movement;
-				kind = m.kind === 'other' ? 'deposit' : m.kind;
-				amount = String(parseFloat(m.amount) || '');
-				fees = parseFloat(m.fees) > 0 ? String(parseFloat(m.fees)) : '';
-				date = m.date.slice(0, 10);
-				notes = m.notes;
-				return;
-			}
-
-			const b = current.balance;
-			kind = 'deposit';
-			portfolioId =
-				b?.portfolioId ?? (portfolios.find((p) => p.isDefault) ?? portfolios[0])?.id ?? '';
-			sourceId = b?.sourceId ?? platforms[0]?.id ?? '';
-			currencyCode = b?.currency ?? currency;
-			amount = '';
-			fees = '';
-			date = todayLocalDateString();
-			notes = '';
-		});
-	});
+	/* Cerrar limpia el error: la siguiente apertura no lo arrastra. */
+	function close() {
+		error = '';
+		onClose();
+	}
 
 	const editing = $derived(target?.mode === 'edit' ? target.movement : null);
 	const hint = $derived(CASH_KIND_OPTIONS.find((o) => o.value === kind)?.hint ?? '');
@@ -94,7 +115,7 @@
 		? cashAccountLabel(editing)
 		: 'Anota el dinero que entra o sale de una cuenta.'}
 	size="md"
-	{onClose}
+	onClose={close}
 >
 	{#if target}
 		<form
@@ -110,7 +131,7 @@
 						return;
 					}
 					await update();
-					onClose();
+					close();
 				};
 			}}
 		>
@@ -215,8 +236,7 @@
 			{/if}
 
 			<div class="modal-actions">
-				<Button type="button" variant="ghost" onclick={onClose} disabled={submitting}
-					>Cancelar</Button
+				<Button type="button" variant="ghost" onclick={close} disabled={submitting}>Cancelar</Button
 				>
 				<Button type="submit" loading={submitting}>
 					{editing ? 'Guardar cambios' : 'Guardar movimiento'}

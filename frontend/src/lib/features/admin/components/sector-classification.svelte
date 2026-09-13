@@ -26,6 +26,7 @@
 	import { untrack } from 'svelte';
 	import { SECTOR_OPTIONS, formatSector, sectorWeightsTotal } from '$lib/shared/format/sector';
 	import { formatPercent } from '$lib/shared/format/percent';
+	import SectorWeightRow from './sector-weight-row.svelte';
 
 	interface Props {
 		/** La industria única, o «» cuando no la tiene. */
@@ -205,34 +206,15 @@
 </fieldset>
 
 {#snippet row(option: SectorOption)}
-	{@const weight = weightOf(option.value)}
-	<div
-		class="row"
-		class:filled={weight !== null}
-		class:active={active === option.value}
-		role="presentation"
-		onpointerenter={() => (hovered = option.value)}
-		onpointerleave={() => (hovered = null)}
-		onfocusin={() => (focused = option.value)}
-		onfocusout={() => (focused = null)}
-	>
-		<label for="{idPrefix}weight-{option.value}">{option.label}</label>
-		<span class="cell">
-			<input
-				id="{idPrefix}weight-{option.value}"
-				type="number"
-				name="weight.{option.value}"
-				bind:value={weights[option.value]}
-				min="0"
-				max="100"
-				step="any"
-				inputmode="decimal"
-				placeholder="—"
-				aria-invalid={weight !== null && weight <= 0}
-			/>
-			<span class="unit" aria-hidden="true">%</span>
-		</span>
-	</div>
+	<SectorWeightRow
+		value={option.value}
+		label={option.label}
+		bind:weight={weights[option.value]}
+		{idPrefix}
+		active={active === option.value}
+		onHover={(value) => (hovered = value)}
+		onFocus={(value) => (focused = value)}
+	/>
 {/snippet}
 
 <style>
@@ -408,82 +390,6 @@
 		column-gap: 1.75rem;
 	}
 
-	.row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.75rem;
-		padding: 0.3rem 0.4rem 0.3rem 0.5rem;
-		border-bottom: 1px solid var(--border);
-		border-radius: 4px 4px 0 0;
-		transition: background 0.15s ease;
-	}
-
-	.row.active {
-		background: var(--surface-2);
-	}
-
-	.row label {
-		min-width: 0;
-		font-size: 0.87rem;
-		color: var(--text-dim);
-		cursor: pointer;
-		overflow-wrap: anywhere;
-	}
-
-	.row.filled label {
-		color: var(--text);
-	}
-
-	.cell {
-		position: relative;
-		flex: none;
-		width: 6.25rem;
-	}
-
-	/* Más compacto que un campo suelto: son trece filas y tienen que caber a la
-	   vista junto a la barra. */
-	.cell input {
-		padding: 0.4rem 1.65rem 0.4rem 0.5rem;
-		border-color: rgba(212, 145, 42, 0.12);
-		font-family: var(--font-mono);
-		font-size: 0.85rem;
-		font-variant-numeric: tabular-nums;
-		text-align: right;
-		appearance: textfield;
-	}
-
-	.cell input::-webkit-inner-spin-button,
-	.cell input::-webkit-outer-spin-button {
-		appearance: none;
-		margin: 0;
-	}
-
-	.row.filled .cell input {
-		border-color: rgba(212, 145, 42, 0.3);
-	}
-
-	/* Por encima de la regla de arriba, que si no le quitaba el borde de foco a
-	   las filas con peso. */
-	.row .cell input:focus {
-		border-color: var(--amber);
-	}
-
-	.row .cell input[aria-invalid='true'] {
-		border-color: var(--red);
-	}
-
-	.unit {
-		position: absolute;
-		top: 50%;
-		right: 0.6rem;
-		transform: translateY(-50%);
-		font-family: var(--font-mono);
-		font-size: 0.8rem;
-		color: var(--text-dim);
-		pointer-events: none;
-	}
-
 	.reserves-hint {
 		margin-top: 0.5rem;
 	}
@@ -496,8 +402,7 @@
 
 	@media (prefers-reduced-motion: reduce) {
 		.mode,
-		.segment,
-		.row {
+		.segment {
 			transition: none;
 		}
 	}

@@ -237,7 +237,7 @@ var cashCurrencyNames = map[money.Currency]string{
 	money.CHF: "francos suizos",
 	money.JPY: "yenes",
 	money.CAD: "dólares canadienses",
-	money.AUD: "dólares australianos", //nolint:misspell // Spanish, not a misspelling of "australians".
+	money.AUD: "dólares australianos",
 	money.CNY: "yuanes",
 	money.MXN: "pesos mexicanos",
 	money.BRL: "reales",
