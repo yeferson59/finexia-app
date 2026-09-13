@@ -2,15 +2,17 @@
  * Etiquetas del `sector` de un activo.
  *
  * El vocabulario es el de `market.Sector` del backend —los once sectores GICS
- * en minúsculas y con guion bajo— más los dos cubos que el reparto por
+ * en minúsculas y con guion bajo, más `fixed_income` y `cash` para la parte de
+ * un fondo que está en bonos o en caja— más los dos cubos que el reparto por
  * industria deriva y el catálogo nunca guarda:
  *
  * - `unclassified`: el activo *puede* tener sector y nadie se lo ha puesto. Es
  *   trabajo pendiente, y su tamaño es justo lo que hay que enseñar: una cartera
  *   con el 60 % sin clasificar todavía no tiene respuesta por industria, y un
  *   gráfico que escondiera esas filas afirmaría que sí.
- * - `not_applicable`: no hay industria que rellenar —una cripto, un saldo en
- *   efectivo, un inmueble—. Nunca la habrá.
+ * - `not_applicable`: no hay industria que rellenar —una cripto, un inmueble,
+ *   un lingote—. Nunca la habrá. Un saldo en efectivo no cae aquí: el backend
+ *   lo suma a `cash`, junto a la caja de los fondos.
  *
  * Que sean dos y no uno es la única razón por la que este módulo existe en vez
  * de imprimir el valor crudo: «Sin clasificar» y «Sin industria» piden cosas
@@ -52,6 +54,8 @@ export const SECTOR_LABELS: Record<string, string> = {
 	materials: 'Materiales',
 	utilities: 'Servicios públicos',
 	real_estate: 'Inmobiliario',
+	fixed_income: 'Renta fija',
+	cash: 'Efectivo',
 	unclassified: 'Sin clasificar',
 	not_applicable: 'Sin industria'
 };
@@ -75,7 +79,9 @@ export const SECTOR_OPTIONS = [
 	'energy',
 	'materials',
 	'utilities',
-	'real_estate'
+	'real_estate',
+	'fixed_income',
+	'cash'
 ].map((value) => ({ value, label: SECTOR_LABELS[value] }));
 
 /**
@@ -112,7 +118,7 @@ export function formatSector(sector: string): string {
  */
 export function sectorHint(sector: string): string {
 	if (sector === 'unclassified') return 'Activos a los que les falta la industria';
-	if (sector === 'not_applicable') return 'Cripto, efectivo e inmuebles no tienen industria';
+	if (sector === 'not_applicable') return 'Cripto, inmuebles y materias primas no tienen industria';
 
 	return '';
 }

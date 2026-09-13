@@ -113,7 +113,7 @@ type Holding struct {
 // get_sector_allocation normalises over whatever total it finds, so a reader
 // comparing these to its slices should expect the shares, not the raw weights.
 type SectorWeight struct {
-	Sector string `json:"sector" jsonschema:"technology, communication_services, healthcare, financials, consumer_discretionary, consumer_staples, industrials, energy, materials, utilities or real_estate"`
+	Sector string `json:"sector" jsonschema:"technology, communication_services, healthcare, financials, consumer_discretionary, consumer_staples, industrials, energy, materials, utilities, real_estate, fixed_income (the fund's bonds) or cash (the fund's cash)"`
 	Weight string `json:"weight" jsonschema:"percentage of the asset in this industry, e.g. 33.1"`
 }
 
@@ -141,7 +141,7 @@ type SectorAllocationOutput struct {
 // the user holds lands in exactly one slice — including the two that stand for
 // the absence of a classification.
 type SectorSlice struct {
-	Sector      string `json:"sector" jsonschema:"technology, communication_services, healthcare, financials, consumer_discretionary, consumer_staples, industrials, energy, materials, utilities, real_estate, or one of two buckets: unclassified (the asset could be classified and nobody has) and not_applicable (a coin, a cash balance, a property — nothing to classify)"`
+	Sector      string `json:"sector" jsonschema:"technology, communication_services, healthcare, financials, consumer_discretionary, consumer_staples, industrials, energy, materials, utilities, real_estate, fixed_income (bonds, held directly or inside a fund), cash (cash balances plus the cash inside funds), or one of two buckets: unclassified (the asset could be classified and nobody has) and not_applicable (a coin, a property, a commodity — nothing to classify)"`
 	MarketValue string `json:"marketValue"`
 	Currency    string `json:"currency"`
 	Assets      int64  `json:"assets" jsonschema:"how many distinct assets are behind this slice"`

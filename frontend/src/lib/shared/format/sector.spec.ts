@@ -3,6 +3,7 @@ import {
 	describeSectorBreakdown,
 	formatSector,
 	formatSectorBreakdown,
+	SECTOR_OPTIONS,
 	sectorWeightsTotal
 } from './sector';
 
@@ -11,10 +12,33 @@ describe('formatSector', () => {
 		expect(formatSector('consumer_discretionary')).toBe('Consumo discrecional');
 	});
 
+	// La parte de un fondo que está en bonos o en caja no es ninguna industria
+	// GICS, y sin estas dos no había dónde escribirla.
+	it('traduce renta fija y efectivo', () => {
+		expect(formatSector('fixed_income')).toBe('Renta fija');
+		expect(formatSector('cash')).toBe('Efectivo');
+	});
+
 	// Una industria que este lado no conoce sigue siendo dinero del usuario: se
 	// enseña en crudo en vez de desaparecer de la fila.
 	it('conserva en crudo una industria que no conoce', () => {
 		expect(formatSector('quantum_widgets')).toBe('quantum_widgets');
+	});
+});
+
+describe('SECTOR_OPTIONS', () => {
+	// Son las casillas del desglose: si faltan, un fondo mixto solo se puede
+	// transcribir por su mitad en acciones.
+	it('ofrece renta fija y efectivo', () => {
+		const values = SECTOR_OPTIONS.map((o) => o.value);
+		expect(values).toContain('fixed_income');
+		expect(values).toContain('cash');
+	});
+
+	it('no ofrece los cubos derivados', () => {
+		const values = SECTOR_OPTIONS.map((o) => o.value);
+		expect(values).not.toContain('unclassified');
+		expect(values).not.toContain('not_applicable');
 	});
 });
 

@@ -25,10 +25,12 @@ import (
 // past.
 //
 // The vocabulary is the eleven GICS sectors, lower-cased and underscored like
-// AssetType. Not because the standard is authoritative here — nothing in this
-// app is licensed from it — but because it is the split every broker statement
-// and every provider already maps onto, so a user filling this in by hand and a
-// provider feed added later land on the same set.
+// AssetType, plus fixed income and cash. The eleven not because the standard
+// is authoritative here — nothing in this app is licensed from it — but because
+// it is the split every broker statement and every provider already maps onto,
+// so a user filling this in by hand and a provider feed added later land on the
+// same set. The two extra ones are what GICS leaves out and a fund fact sheet
+// does not: see SectorFixedIncome.
 type Sector string
 
 const (
@@ -45,6 +47,22 @@ const (
 	SectorCommunication  Sector = "communication_services"
 )
 
+// SectorFixedIncome and SectorCash are the parts of a fund that are not in any
+// industry. GICS classifies companies, so its eleven sectors cover the equity
+// sleeve of a fund and nothing else — and a balanced fund's fact sheet reads
+// "Equity 60 % · Bonds 38 % · Cash 2 %" before it ever gets to technology.
+// Without these two a 60/40 fund could only be transcribed as its equity half,
+// and the allocation, normalising over the total it finds, would then spread
+// the bond money over the industries of the stocks.
+//
+// They are storable like the eleven — a bond fund is fixed income and nothing
+// else, a money-market fund is cash — so they work as a single sector as well
+// as inside a breakdown.
+const (
+	SectorFixedIncome Sector = "fixed_income"
+	SectorCash        Sector = "cash"
+)
+
 // SectorUnclassified and SectorNotApplicable are the two buckets a sector
 // breakdown adds and the catalog never stores. They are the difference between
 // the two kinds of blank a NULL column would otherwise flatten into one:
@@ -53,8 +71,10 @@ const (
 //     It is work to do, and telling the user how much money is sitting in it is
 //     the point — a breakdown that quietly dropped these rows would report
 //     shares of a total that is not the user's money.
-//   - NotApplicable is an asset with no sector to have: a coin, a currency
-//     balance, a flat, a bar of gold. Nothing to fill in, ever.
+//   - NotApplicable is an asset with no sector to have: a coin, a flat, a bar
+//     of gold. Nothing to fill in, ever. A currency balance used to land here
+//     too; the allocation files it under SectorCash now, beside the cash
+//     sleeve of the funds, so one chart does not show cash in two rows.
 //
 // They are Sectors rather than a separate type so one enum covers every row a
 // breakdown can produce, and IsValid rejects both so neither can be written to
@@ -79,6 +99,8 @@ var Sectors = []Sector{
 	SectorMaterials,
 	SectorUtilities,
 	SectorRealEstate,
+	SectorFixedIncome,
+	SectorCash,
 }
 
 // IsValid reports whether the sector is one a catalog row may carry. The empty
@@ -88,7 +110,8 @@ func (s Sector) IsValid() bool {
 	switch s {
 	case SectorTechnology, SectorCommunication, SectorHealthcare, SectorFinancials,
 		SectorConsumerDisc, SectorConsumerStaple, SectorIndustrials, SectorEnergy,
-		SectorMaterials, SectorUtilities, SectorRealEstate:
+		SectorMaterials, SectorUtilities, SectorRealEstate,
+		SectorFixedIncome, SectorCash:
 		return true
 	default:
 		return false
@@ -102,8 +125,8 @@ const SectorNone Sector = ""
 // HasSector reports whether an asset of this type can be classified at all.
 //
 // The line is drawn at "is there an operating business behind this". A share, a
-// fund and a bond all have an issuer that works in an industry — a bond ETF is
-// financials, a corporate bond is whatever its issuer is — while a coin, a cash
+// fund and a bond all have something behind them to classify — a bond ETF is
+// fixed income, a corporate bond is whatever its issuer is — while a coin, a cash
 // balance, a flat and a bar of gold have none, and asking a user to pick one for
 // them would be asking them to invent an answer.
 //
@@ -120,8 +143,8 @@ func (a AssetType) HasSector() bool {
 	}
 }
 
-// sectorSynonyms maps what people and providers actually write to the eleven
-// values above. Same mechanism as categorySynonyms, and for the same reason: a
+// sectorSynonyms maps what people and providers actually write to the values
+// above. Same mechanism as categorySynonyms, and for the same reason: a
 // spreadsheet column is free text, and the alternative to a synonym table is
 // rejecting rows over spelling.
 //
@@ -206,6 +229,25 @@ var sectorSynonyms = map[string]Sector{
 	"real estate": SectorRealEstate, "inmobiliario": SectorRealEstate,
 	"inmobiliaria": SectorRealEstate, "bienes raices": SectorRealEstate,
 	"reit": SectorRealEstate, "reits": SectorRealEstate,
+
+	// Fixed income. The labels a fact sheet puts on a fund's bond sleeve, in
+	// both languages; "bono" and "bonos" are also the asset type, which is fine
+	// here — this table is only consulted for a sector.
+	"fixed income": SectorFixedIncome, "renta fija": SectorFixedIncome,
+	"bonds": SectorFixedIncome, "bond": SectorFixedIncome,
+	"bonos": SectorFixedIncome, "bono": SectorFixedIncome,
+	"government bonds": SectorFixedIncome, "bonos del gobierno": SectorFixedIncome,
+	"corporate bonds": SectorFixedIncome, "bonos corporativos": SectorFixedIncome,
+	"treasuries": SectorFixedIncome, "tesoro": SectorFixedIncome,
+	"debt": SectorFixedIncome, "deuda": SectorFixedIncome,
+
+	// Cash. "Cash & Equivalents" and "Cash & Other" arrive with the ampersand
+	// already dropped by sectorKey.
+	"cash": SectorCash, "efectivo": SectorCash, "caja": SectorCash,
+	"liquidez": SectorCash, "cash equivalents": SectorCash,
+	"cash and equivalents": SectorCash, "cash other": SectorCash,
+	"efectivo y equivalentes": SectorCash, "money market": SectorCash,
+	"mercado monetario": SectorCash, "monetario": SectorCash,
 }
 
 // sectorConjunctions are the characters NormKey leaves alone and a sector label
@@ -311,7 +353,7 @@ var hundred = func() decimal.Decimal {
 
 // Validate checks a breakdown against the four things that make it readable.
 //
-//   - Every sector is one of the eleven. The two derived buckets are rejected
+//   - Every sector is a storable one. The two derived buckets are rejected
 //     with everything else: "unclassified" is what an asset with no breakdown
 //     already reports, so a row claiming 8 % of it would be claiming a share of
 //     a bucket that means the absence of a share.

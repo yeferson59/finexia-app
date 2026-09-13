@@ -4,7 +4,7 @@
 	 * las varias en las que está repartido.
 	 *
 	 * Vive en un componente propio porque el alta y la edición piden lo mismo y
-	 * son once casillas: duplicarlas era duplicar también la regla que las
+	 * son trece casillas: duplicarlas era duplicar también la regla que las
 	 * gobierna, que es la parte que no puede desalinearse.
 	 *
 	 * Las dos formas son **excluyentes** y el formulario lo hace cumplir
@@ -78,6 +78,10 @@
 		Para un ETF de mercado ancho, que está en todas a la vez. Se copian de la ficha del fondo, en
 		porcentaje. <strong>No hace falta que sumen 100</strong>: el reparto normaliza sobre lo que
 		haya, así que un desglose al 97 % sigue explicando el 100 % del dinero del fondo.
+	</p>
+	<p class="hint">
+		Si el fondo tiene bonos o caja, anótalos en <strong>Renta fija</strong> y
+		<strong>Efectivo</strong>: lo que no se escribe se reparte entre las industrias que sí están.
 	</p>
 
 	<div class="weights">

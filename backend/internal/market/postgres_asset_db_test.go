@@ -416,9 +416,10 @@ func TestPostgresAssetSectorWeights(t *testing.T) {
 		if asset.SectorWeights[0].Sector != SectorTechnology || asset.SectorWeights[1].Sector != SectorFinancials {
 			t.Errorf("weights = %+v, want technology before financials", asset.SectorWeights)
 		}
-		// The column is NUMERIC(7,4), so what comes back is what the column
-		// holds — the digits are the ones that were written, padded.
-		if asset.SectorWeights[1].Weight.String() != "20.5000" {
+		// Compared as a number, not as text: the column is NUMERIC(7,4) and
+		// Postgres pads the digits, but how many trailing zeros survive the
+		// decimal's String is formatting, not the value that was stored.
+		if asset.SectorWeights[1].Weight.Cmp(dec(t, "20.5")) != 0 {
 			t.Errorf("financials weight = %s, want 20.5", asset.SectorWeights[1].Weight)
 		}
 

@@ -441,13 +441,20 @@ personal de alguien tendría que vivir en una tabla por usuario como los precios
 `sector` trae, además de los once sectores GICS (`technology`,
 `communication_services`, `healthcare`, `financials`, `consumer_discretionary`,
 `consumer_staples`, `industrials`, `energy`, `materials`, `utilities`,
-`real_estate`), dos cubos que el backend **deriva y nunca guarda**:
+`real_estate`) y de `fixed_income` y `cash`, dos cubos que el backend **deriva
+y nunca guarda**:
 
 - `unclassified` — el activo puede tener sector y nadie se lo ha puesto. Es
   trabajo pendiente, y su tamaño es el dato: una cartera con el 60 % aquí
   todavía no tiene respuesta por industria.
-- `not_applicable` — no hay industria que rellenar: una cripto, un saldo en
-  efectivo, un inmueble, un lingote.
+- `not_applicable` — no hay industria que rellenar: una cripto, un inmueble, un
+  lingote.
+
+`fixed_income` y `cash` son lo que GICS deja fuera y la ficha de un fondo no:
+la parte en bonos y la parte en caja. Se guardan como cualquier otro sector
+—un ETF de bonos es `fixed_income` a secas— o dentro de un desglose. Un activo
+de tipo `cash` sin sector propio se suma a `cash` en el reparto, junto a la
+caja de los fondos, en vez de a `not_applicable`.
 
 Se separan porque piden cosas distintas al lector, y se cuentan **dentro** del
 total: los `percent` son del patrimonio entero y no de la parte clasificada. Un
@@ -497,7 +504,9 @@ conviene leer:
   un desglose incompleto sigue explicando el 100 % del dinero del fondo y la
   gráfica sigue cuadrando con el patrimonio. Lo que sí se rechaza con 400 es un
   total **por encima** de 100: eso no es una transcripción incompleta, es una
-  equivocada.
+  equivocada. Por lo mismo, la parte en bonos o en caja de un fondo mixto hay
+  que escribirla (`fixed_income`, `cash`): si falta, se reparte entre las
+  industrias de las acciones.
 - `assets` cuenta por fila, así que un fondo repartido en once industrias es un
   activo en cada una y la suma de la columna pasa de los activos que hay. Es la
   lectura honesta de lo que responde («cuántas cosas distintas me meten en esta

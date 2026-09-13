@@ -34,7 +34,7 @@ var (
 	// Spelling is not the issue — that is what the synonym table absorbs — so a
 	// value that reaches here is a sector nobody recognises, and guessing one
 	// would file the user's money under an industry they did not choose.
-	errAssetSectorInvalid = httpx.AsBadRequest(errors.New("el sector no se reconoce: usa uno de los once sectores conocidos o deja el campo vacío"))
+	errAssetSectorInvalid = httpx.AsBadRequest(errors.New("el sector no se reconoce: usa uno de los sectores conocidos o deja el campo vacío"))
 	// errAssetSectorNotApplicable answers a sector on an asset that cannot have
 	// one — a coin, a cash balance, a flat, a bar of gold. Storing it would be
 	// storing a value no screen reads: the breakdown files these by their type.

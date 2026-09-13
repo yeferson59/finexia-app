@@ -336,8 +336,9 @@ func TestHoldingsCarryTheBreakdownTheAllocationSplitsOn(t *testing.T) {
 	if len(fund.SectorWeights) != 2 {
 		t.Fatalf("the fund's weights = %+v, want two rows", fund.SectorWeights)
 	}
-	// Heaviest first, which is the order the projection asks Postgres for.
-	if fund.SectorWeights[0].Sector != market.SectorTechnology || fund.SectorWeights[0].Weight.String() != "30.0000" {
+	// Heaviest first, which is the order the projection asks Postgres for. The
+	// weight is compared as a number: trailing zeros are formatting.
+	if fund.SectorWeights[0].Sector != market.SectorTechnology || fund.SectorWeights[0].Weight.Cmp(decimalFromInt(30)) != 0 {
 		t.Errorf("first weight = %+v, want technology 30", fund.SectorWeights[0])
 	}
 	if fund.Sector != market.SectorNone {
@@ -353,5 +354,104 @@ func TestHoldingsCarryTheBreakdownTheAllocationSplitsOn(t *testing.T) {
 	// twelve. This is what a plain JOIN to the weights table would have broken.
 	if amountOf(fund.Quantity).Cmp(decimalFromInt(6)) != 0 {
 		t.Errorf("fund quantity = %q, want 6 — the breakdown multiplied the position", fund.Quantity)
+	}
+}
+
+// A balanced fund is the case the eleven industries could not transcribe: its
+// bonds and its cash are in no industry, and before fixed income and cash
+// existed the only breakdown an operator could type was the equity half — which
+// the normalisation then spread over the whole position.
+//
+// The account also holds a cash balance and a coin, because the cash balance
+// is what moved: it is filed under cash beside the fund's own, while the coin
+// stays the bucket with nothing to classify.
+func TestSectorAllocationGivesAFundsBondsAndCashTheirOwnRows(t *testing.T) {
+	pool := growthTestPool(t)
+	repo := NewPostgresRepository(pool)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	portfolioID := uuid.New()
+
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, sql, args...); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+
+	track := dropFixture(t, pool, userID)
+
+	exec(`INSERT INTO users (id, name, email, role_id, preferred_currency)
+	      VALUES ($1, 'balanced probe', $2, (SELECT id FROM roles WHERE name = 'customer'), 'USD')`,
+		userID, userID.String()+"@probe.test")
+
+	sourceID := uuid.New()
+	exec(`INSERT INTO investment_sources (id, user_id, name, source_type)
+	      VALUES ($1, $2, 'probe', 'broker')`, sourceID, userID)
+
+	exec(`INSERT INTO portfolios (id, user_id, name, type, risk_id, base_currency)
+	      VALUES ($1, $2, 'probe balanced', 'stocks', (SELECT id FROM risks LIMIT 1), 'USD')`,
+		portfolioID, userID)
+
+	asset := func(ticker, assetType string, price float64) uuid.UUID {
+		t.Helper()
+		id := uuid.New()
+		exec(`INSERT INTO assets (id, ticker, name, asset_type, currency, current_price)
+		      VALUES ($1, $2, $3, $4::asset_type, 'USD', $5)`,
+			id, ticker+uuid.New().String()[:6], ticker, assetType, price)
+		track(id)
+
+		return id
+	}
+
+	entry := func(assetID uuid.UUID, quantity, price float64) {
+		t.Helper()
+		exec(`INSERT INTO portfolio_entries
+		        (portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date)
+		      VALUES ($1, $2, $3, $4, $5, 'USD', $6)`,
+			portfolioID, assetID, sourceID, quantity, price, time.Now())
+	}
+
+	// 10 × 100 = 1000, split 30 technology / 60 fixed income / 10 cash.
+	fund := asset("BALANCED", "etf", 100)
+	entry(fund, 10, 95)
+	exec(`INSERT INTO asset_sector_weights (asset_id, sector, weight) VALUES
+	        ($1, $2, 30), ($1, $3, 60), ($1, $4, 10)`,
+		fund, string(market.SectorTechnology), string(market.SectorFixedIncome), string(market.SectorCash))
+
+	// 250 in a cash balance, with no sector of its own.
+	balance := asset("USDCASH", "cash", 1)
+	entry(balance, 250, 1)
+
+	// 2 × 250 = 500 in a coin.
+	coin := asset("COIN", "crypto", 250)
+	entry(coin, 2, 200)
+
+	items, err := repo.GetSectorAllocationByUserID(ctx, userID, money.USD)
+	if err != nil {
+		t.Fatalf("GetSectorAllocationByUserID: %v", err)
+	}
+
+	bySector := make(map[market.Sector]SectorAllocationItem, len(items))
+	for _, item := range items {
+		bySector[item.Sector] = item
+	}
+
+	worth(t, "technology", bySector[market.SectorTechnology].MarketValue, 300)
+	worth(t, "fixed income", bySector[market.SectorFixedIncome].MarketValue, 600)
+
+	// The fund's 100 and the balance's 250 are one answer to "how much is in
+	// cash", from two different assets.
+	cash := bySector[market.SectorCash]
+	worth(t, "cash", cash.MarketValue, 350)
+	if cash.Assets != 2 {
+		t.Errorf("cash assets = %d, want 2 (the fund and the balance)", cash.Assets)
+	}
+
+	worth(t, "not applicable", bySector[market.SectorNotApplicable].MarketValue, 500)
+
+	if len(items) != 4 {
+		t.Errorf("slices = %d, want 4 (technology, fixed_income, cash, not_applicable): %+v", len(items), items)
 	}
 }

@@ -28,9 +28,12 @@ import (
 // The first is that not every asset has a sector, and "has none" comes in two
 // kinds that must not be added together.
 //
-//   - An asset whose type cannot have one — a coin, a cash balance, a flat, a
-//     bar of gold — is market.SectorNotApplicable. Nothing is missing; there is
-//     nothing to fill in.
+//   - An asset whose type cannot have one — a coin, a flat, a bar of gold — is
+//     market.SectorNotApplicable. Nothing is missing; there is nothing to fill
+//     in. A cash balance is the exception: it has no industry either, but it
+//     is exactly what market.SectorCash means, and filing it there puts the
+//     user's cash in the same row as the cash sleeve of their funds instead of
+//     splitting one answer across two.
 //   - An asset whose type can have one and whose catalog row does not is
 //     market.SectorUnclassified. That is work to do, and the size of it is
 //     exactly what the user needs to see: a portfolio that is 60 % unclassified
@@ -140,6 +143,7 @@ func (r *PostgresRepository) GetSectorAllocationByUserID(ctx context.Context, us
 				CASE
 					WHEN a.sector IS NOT NULL AND a.sector <> '' THEN a.sector
 					WHEN a.asset_type IN ('stock', 'etf', 'bond', 'other') THEN $3::text
+					WHEN a.asset_type = 'cash' THEN $5::text
 					ELSE $4::text
 				END,
 				1
@@ -151,7 +155,7 @@ func (r *PostgresRepository) GetSectorAllocationByUserID(ctx context.Context, us
 		  AND pe.quantity::numeric > 0
 		GROUP BY sw.sector, target.code
 		ORDER BY ROUND(COALESCE(SUM(pe.quantity::numeric * v.price * COALESCE(fx.rate, 1) * sw.share), 0), 8) DESC, sw.sector
-	`, userID, currencyParam(targetCurrency), market.SectorUnclassified, market.SectorNotApplicable)
+	`, userID, currencyParam(targetCurrency), market.SectorUnclassified, market.SectorNotApplicable, market.SectorCash)
 	if err != nil {
 		return nil, err
 	}

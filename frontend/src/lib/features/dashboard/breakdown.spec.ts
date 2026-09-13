@@ -264,7 +264,7 @@ describe('sectorBreakdown', () => {
 		expect(rows[0].label).toBe('Sin clasificar');
 		expect(rows[0].detail).toBe('Activos a los que les falta la industria');
 		expect(rows[1].label).toBe('Sin industria');
-		expect(rows[1].detail).toBe('Cripto, efectivo e inmuebles no tienen industria');
+		expect(rows[1].detail).toBe('Cripto, inmuebles y materias primas no tienen industria');
 	});
 
 	it('descarta el reparto que viene en otra moneda', () => {

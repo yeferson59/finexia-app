@@ -42,6 +42,16 @@ func TestNormalizeSector(t *testing.T) {
 		{"consumer_discretionary", SectorConsumerDisc, true},
 		{"communication_services", SectorCommunication, true},
 		{"real_estate", SectorRealEstate, true},
+		{"fixed_income", SectorFixedIncome, true},
+		{"cash", SectorCash, true},
+
+		// What a fund fact sheet calls the parts that are not in any industry.
+		{"Renta fija", SectorFixedIncome, true},
+		{"Bonos", SectorFixedIncome, true},
+		{"Fixed Income", SectorFixedIncome, true},
+		{"Efectivo", SectorCash, true},
+		{"Cash & Equivalents", SectorCash, true},
+		{"Cash & Other", SectorCash, true},
 
 		// Blank is the ordinary case, not an error: most of the catalog is
 		// unclassified and a row that leaves the column out is not malformed.
@@ -182,6 +192,25 @@ func TestSectorBreakdownValidate(t *testing.T) {
 		}
 		if got := voo.Total().String(); got != "99.6" {
 			t.Errorf("total = %s, want 99.6", got)
+		}
+	})
+
+	t.Run("a balanced fund's bonds and cash have rows of their own", func(t *testing.T) {
+		// A 60/40 fund: without fixed income and cash the operator could only
+		// type the equity half, and the allocation would spread the bonds over
+		// those industries.
+		balanced := SectorBreakdown{
+			weight(SectorTechnology, "35"),
+			weight(SectorFinancials, "25"),
+			weight(SectorFixedIncome, "38"),
+			weight(SectorCash, "2"),
+		}
+
+		if err := balanced.Validate(); err != nil {
+			t.Fatalf("a balanced fund's breakdown was rejected: %v", err)
+		}
+		if got := balanced.Total().String(); got != "100" {
+			t.Errorf("total = %s, want 100", got)
 		}
 	})
 
