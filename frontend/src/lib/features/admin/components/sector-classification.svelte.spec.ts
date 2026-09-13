@@ -5,40 +5,52 @@ import SectorClassification from './sector-classification.svelte';
 
 /*
  * Las dos formas de clasificar un activo son excluyentes, y quien lo hace
- * cumplir es este formulario: desactiva la que no está en uso, y un campo
- * desactivado no se envía. Es la única parte de la regla que no está en un
- * schema, así que es la que hay que probar aquí.
+ * cumplir es este formulario: solo pinta los campos del modo elegido, y un
+ * campo que no está no se envía. Es la única parte de la regla que no está en
+ * un schema, así que es la que hay que probar aquí.
  */
 describe('sector-classification.svelte', () => {
-	it('desactiva el desglose cuando hay una industria única', async () => {
+	it('con una industria única no pinta las casillas del reparto', async () => {
 		render(SectorClassification, { sector: 'technology', weights: {} });
 
-		await page.getByText('Desglose por industrias').click();
-
-		await expect.element(page.getByLabelText('Tecnología')).toBeDisabled();
-		await expect
-			.element(page.getByText('vuelve la de arriba a «Sin clasificar»', { exact: false }))
-			.toBeInTheDocument();
+		await expect.element(page.getByRole('combobox')).toBeInTheDocument();
+		await expect.element(page.getByRole('spinbutton').first()).not.toBeInTheDocument();
 	});
 
-	it('desactiva la industria única cuando hay desglose, y suma los pesos', async () => {
+	it('pasar a varias industrias quita el desplegable y avisa de lo que se descarta', async () => {
+		render(SectorClassification, { sector: 'technology', weights: {} });
+
+		await page.getByRole('radio', { name: 'Varias industrias' }).click();
+
+		await expect.element(page.getByRole('combobox')).not.toBeInTheDocument();
+		await expect.element(page.getByLabelText('Tecnología')).toBeInTheDocument();
+		await expect.element(page.getByText('Tecnología deja de ser la industria')).toBeInTheDocument();
+	});
+
+	it('con reparto abre en varias industrias y enseña la suma y lo que falta', async () => {
 		render(SectorClassification, {
 			sector: '',
 			weights: { technology: 33.1, financials: 13.8 }
 		});
 
-		// Por rol y no por etiqueta: el `<label>` lleva dentro el «(opcional)».
-		await expect.element(page.getByRole('combobox')).toBeDisabled();
+		await expect.element(page.getByRole('combobox')).not.toBeInTheDocument();
 		// El total se enseña tal cual: no tiene por qué dar 100, y verlo es lo
 		// que deja decidir si el resto es la caja del fondo o un olvido.
-		await expect.element(page.getByText('Suma: 46,9%')).toBeInTheDocument();
+		await expect.element(page.getByText('46,9%', { exact: true })).toBeInTheDocument();
+		await expect.element(page.getByText('Faltan 53,1%')).toBeInTheDocument();
+	});
+
+	it('volver a una industria avisa de que el reparto se descarta', async () => {
+		render(SectorClassification, { sector: '', weights: { technology: 33.1 } });
+
+		await page.getByRole('radio', { name: 'Una industria' }).click();
+
+		await expect.element(page.getByText('se descarta el reparto')).toBeInTheDocument();
 	});
 
 	it('avisa cuando los pesos se pasan de 100', async () => {
 		render(SectorClassification, { sector: '', weights: { technology: 80, energy: 80 } });
 
-		await expect
-			.element(page.getByText('por encima de 100 %', { exact: false }))
-			.toBeInTheDocument();
+		await expect.element(page.getByText('Sobran 60,0%')).toBeInTheDocument();
 	});
 });

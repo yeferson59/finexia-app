@@ -76,6 +76,27 @@ textarea:focus-visible {
 }
 
 /*
+ * @tailwindcss/forms marca el foco con un anillo azul (`box-shadow`) y un borde
+ * azul, fuera de la paleta, que se sumaban al contorno ámbar de arriba: dos
+ * anillos, uno de cada color. Aquí se apagan en todos los controles y el foco
+ * lo dice solo el ámbar.
+ *
+ * Con `:where()` para que la especificidad sea la de `:focus` y nada más: sin
+ * capa ya le gana a la base del plugin, y así cualquier componente que pinte su
+ * propio foco —`ui/checkbox`, las casillas del reparto por industrias— sigue
+ * mandando sobre esta regla.
+ */
+:where(input, select, textarea):focus {
+	--tw-ring-color: transparent;
+	--tw-ring-offset-color: transparent;
+	box-shadow: none;
+}
+
+:where(input:not([type='checkbox'], [type='radio']), select, textarea):focus {
+	border-color: var(--amber);
+}
+
+/*
  * Las piezas de formulario que comparte todo el panel.
  *
  * Estaban escritas en cada componente que las usaba: `.feedback` cinco veces
