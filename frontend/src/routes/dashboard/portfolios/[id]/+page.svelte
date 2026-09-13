@@ -8,6 +8,7 @@
 		PortfolioHeadline,
 		PortfolioPositions,
 		groupHoldings,
+		splitClosedHoldings,
 		computeTypeBreakdown
 	} from '$lib/features/portfolio';
 	import type { PageProps } from './$types';
@@ -24,7 +25,10 @@
 
 	// Group entries by ticker so the same asset held in multiple platforms
 	// appears as a single row with aggregated quantity and cost basis.
-	const holdings = $derived(groupHoldings(portfolio?.holdings ?? []));
+	// Las vendidas enteras van aparte: siguen siendo del portafolio, pero ni
+	// cuentan como activo ni entran en los totales ni en el reparto por clase.
+	const positions = $derived(splitClosedHoldings(groupHoldings(portfolio?.holdings ?? [])));
+	const holdings = $derived(positions.open);
 
 	const totalValue = $derived(holdings.reduce((sum, h) => sum + h.value, 0));
 	const totalCost = $derived(holdings.reduce((sum, h) => sum + h.costBasis, 0));
@@ -108,6 +112,7 @@
 
 <PortfolioPositions
 	{holdings}
+	closed={positions.closed}
 	{typeBreakdown}
 	topTransaction={data.topTransaction}
 	portfolioId={params.id}

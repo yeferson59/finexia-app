@@ -26,12 +26,20 @@
 
 	let {
 		holdings,
+		closed = [],
 		typeBreakdown,
 		topTransaction,
 		portfolioId,
 		baseCurrency
 	}: {
+		/** Las posiciones abiertas: las que pesan y rinden. */
 		holdings: HoldingView[];
+		/**
+		 * Las vendidas enteras. Se enseñan aparte y plegadas: siguen siendo del
+		 * portafolio y su historial vive en la página del activo, pero una fila a
+		 * cero en la tabla contaba como activo sin tener nada que pesar.
+		 */
+		closed?: HoldingView[];
 		/** Reparto por clase de activo, ya ordenado de mayor a menor. */
 		typeBreakdown: TypeBreakdownSlice[];
 		/** La operación de mayor importe registrada; `null` si no hay ninguna. */
@@ -149,17 +157,54 @@
 			</p>
 		{/if}
 	{:else}
+		<!-- Un portafolio con todo vendido no es uno vacío: invitar a «agregar tu
+		     primer activo» encima de su historial sería decir que nunca tuvo nada. -->
 		<EmptyState
 			bordered
-			title="Este portafolio aún no tiene activos"
-			description="Registra lo que tienes en cada plataforma y aquí verás cuánto pesa y cómo va rindiendo."
+			title={closed.length > 0
+				? 'No hay posiciones abiertas'
+				: 'Este portafolio aún no tiene activos'}
+			description={closed.length > 0
+				? 'Todo lo que había aquí se vendió. Su historial sigue abajo, en cada activo.'
+				: 'Registra lo que tienes en cada plataforma y aquí verás cuánto pesa y cómo va rindiendo.'}
 		>
 			{#snippet action()}
 				<a class="add" href={resolve('/dashboard/portfolios/[id]/add', { id: portfolioId })}>
-					Agregar tu primer activo
+					{closed.length > 0 ? 'Agregar un activo' : 'Agregar tu primer activo'}
 				</a>
 			{/snippet}
 		</EmptyState>
+	{/if}
+
+	{#if closed.length > 0}
+		<details class="closed">
+			<summary>
+				Posiciones cerradas <span class="closed-count">{closed.length}</span>
+			</summary>
+			<p class="closed-hint">
+				Vendidas por completo: ya no suman al valor ni al rendimiento. Sus compras y ventas siguen
+				en la página de cada activo.
+			</p>
+			<ul class="closed-list">
+				{#each closed as holding (holding.symbol)}
+					<li>
+						<span class="who">
+							<a
+								class="symbol"
+								href={resolve('/dashboard/portfolios/[id]/assets/[symbol]', {
+									id: portfolioId,
+									symbol: holding.symbol
+								})}
+							>
+								{holding.symbol}
+							</a>
+							<span class="name">{holding.name}</span>
+						</span>
+						<span class="type">{formatAssetType(holding.assetType)}</span>
+					</li>
+				{/each}
+			</ul>
+		</details>
 	{/if}
 </section>
 
@@ -428,6 +473,56 @@
 		.add {
 			transition: none;
 		}
+	}
+
+	/* Las cerradas van plegadas y en tono apagado: son historia del portafolio,
+	   no cartera, y no deben competir con la tabla de arriba. */
+	.closed {
+		margin-top: 1.75rem;
+		padding-top: 1rem;
+		border-top: 1px solid var(--border);
+	}
+
+	.closed summary {
+		cursor: pointer;
+		font-size: 0.85rem;
+		color: var(--text-muted);
+	}
+
+	.closed-count {
+		margin-left: 0.3rem;
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		font-variant-numeric: tabular-nums;
+		color: var(--text-dim);
+	}
+
+	.closed-hint {
+		max-width: 68ch;
+		margin: 0.6rem 0 0;
+		font-size: 0.8rem;
+		line-height: 1.45;
+		color: var(--text-dim);
+	}
+
+	.closed-list {
+		margin: 0.5rem 0 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.closed-list li {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: baseline;
+		column-gap: 1rem;
+		padding: 0.7rem 0;
+		border-bottom: 1px solid var(--border);
+		font-size: 0.85rem;
+	}
+
+	.closed-list li:last-child {
+		border-bottom: none;
 	}
 
 	/* Debajo de esto la fila se pliega en dos, como en el listado: el activo y

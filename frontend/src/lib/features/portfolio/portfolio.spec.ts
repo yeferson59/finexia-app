@@ -6,6 +6,7 @@ import {
 	portfolioBarScale,
 	portfolioTotals,
 	realReturnPct,
+	splitClosedHoldings,
 	toPortfolioRows,
 	type RawHolding
 } from './portfolio';
@@ -53,6 +54,47 @@ const raw: RawHolding[] = [
 		fxConverted: true
 	}
 ];
+
+describe('splitClosedHoldings', () => {
+	const sold = (ticker: string): RawHolding => ({
+		ticker,
+		name: ticker,
+		assetType: 'stock',
+		quantity: '0.00000000',
+		price: '100',
+		marketPrice: '150',
+		currency: 'USD',
+		costBasisBase: '0',
+		marketValueBase: '0',
+		fxConverted: true
+	});
+
+	// Vendida entera, la posición sigue en el portafolio con su historial, pero
+	// no es cartera: no pesa, no rinde y no cuenta como activo.
+	it('sets sold-out positions apart from the ones still held', () => {
+		const { open, closed } = splitClosedHoldings(groupHoldings([...raw, sold('TSLA')]));
+
+		expect(open.map((h) => h.symbol).sort()).toEqual(['AAPL', 'BTC']);
+		expect(closed.map((h) => h.symbol)).toEqual(['TSLA']);
+	});
+
+	// El corte se hace sobre la fila agrupada: vendida en un bróker y todavía en
+	// cartera en otro, la posición sigue abierta.
+	it('keeps a ticker open while another platform still holds it', () => {
+		const { open, closed } = splitClosedHoldings(groupHoldings([raw[0], sold('AAPL')]));
+
+		expect(open.map((h) => h.symbol)).toEqual(['AAPL']);
+		expect(closed).toEqual([]);
+	});
+
+	it('lists the closed positions alphabetically', () => {
+		const { closed } = splitClosedHoldings(
+			groupHoldings([sold('TSLA'), sold('AMZN'), sold('NFLX')])
+		);
+
+		expect(closed.map((h) => h.symbol)).toEqual(['AMZN', 'NFLX', 'TSLA']);
+	});
+});
 
 describe('groupHoldings', () => {
 	it('aggregates the same ticker across platforms and computes derived metrics', () => {

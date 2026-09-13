@@ -212,6 +212,35 @@ func TestSoldOutPositionsDoNotCountAsHeld(t *testing.T) {
 		t.Errorf("alpha cost/market = %q/%q, want 600/540 unchanged",
 			alpha.TotalValue, alpha.MarketValue)
 	}
+
+	// The portfolio summary makes the same cut (000039). Its list showed
+	// "4 posiciones" for a portfolio whose own page, which sets closed positions
+	// apart, said three — and flagged it as unconverted over an amount of zero.
+	summaries, err := repo.GetPortfoliosSummaryByUserID(ctx, userID)
+	if err != nil {
+		t.Fatalf("GetPortfoliosSummaryByUserID: %v", err)
+	}
+	if len(summaries) != 1 {
+		t.Fatalf("summaries = %d, want 1", len(summaries))
+	}
+
+	summary := summaries[0]
+	if summary.TotalPositions != 3 {
+		t.Errorf("summary positions = %d, want 3: the sold-out one is not held", summary.TotalPositions)
+	}
+	if summary.PositionsPricedManual != 3 || summary.PositionsPricedOwn != 0 || summary.PositionsAtCost != 0 {
+		t.Errorf("summary pricing = %d own / %d manual / %d at cost, want 0/3/0",
+			summary.PositionsPricedOwn, summary.PositionsPricedManual, summary.PositionsAtCost)
+	}
+	if summary.PositionsUnconverted != 0 {
+		t.Errorf("summary unconverted = %d, want 0: nothing is being added at face value",
+			summary.PositionsUnconverted)
+	}
+	if amountOf(summary.TotalCostBase).Cmp(decimalFromInt(1000)) != 0 ||
+		amountOf(summary.TotalMarketValue).Cmp(decimalFromInt(960)) != 0 {
+		t.Errorf("summary cost/market = %q/%q, want 1000/960 unchanged",
+			summary.TotalCostBase, summary.TotalMarketValue)
+	}
 }
 
 // A platform with nothing in it still appears — it exists, the owner created it

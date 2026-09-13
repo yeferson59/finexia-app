@@ -109,4 +109,54 @@ describe('portfolio-positions.svelte', () => {
 			.element(page.getByRole('link', { name: 'Agregar tu primer activo' }))
 			.toHaveAttribute('href', '/dashboard/portfolios/p1/add');
 	});
+
+	describe('closed positions', () => {
+		const sold = (symbol: string, name: string) =>
+			holding({
+				symbol,
+				name,
+				quantity: 0,
+				costBasis: 0,
+				value: 0,
+				gainLoss: 0,
+				gainLossPct: 0,
+				allocation: 0
+			});
+
+		// Vendida entera, la posición sigue siendo del portafolio pero no es
+		// cartera: va plegada debajo de la tabla, con enlace a su historial.
+		it('groups sold-out positions in a collapsed section below the table', async () => {
+			mount([holding()], { closed: [sold('TSLA', 'Tesla, Inc.')] });
+
+			await expect.element(page.getByText('1 activo', { exact: true })).toBeInTheDocument();
+			// Plegada: está en la página pero no a la vista. Se busca por texto
+			// porque `getByRole` ni siquiera ve lo que un `<details>` cerrado oculta.
+			await expect.element(page.getByText('Tesla, Inc.')).not.toBeVisible();
+
+			await page.getByText('Posiciones cerradas').click();
+
+			await expect
+				.element(page.getByRole('link', { name: 'TSLA' }))
+				.toHaveAttribute('href', '/dashboard/portfolios/p1/assets/TSLA');
+			await expect.element(page.getByText('Tesla, Inc.')).toBeVisible();
+		});
+
+		it('shows no closed section when nothing was sold out', async () => {
+			mount([holding()]);
+
+			await expect.element(page.getByText('Posiciones cerradas')).not.toBeInTheDocument();
+		});
+
+		// Con todo vendido el portafolio no está vacío: tiene historial, y la
+		// invitación a «agregar tu primer activo» diría que nunca tuvo nada.
+		it('does not call a portfolio with only closed positions empty', async () => {
+			mount([], { closed: [sold('TSLA', 'Tesla, Inc.')] });
+
+			await expect.element(page.getByText('No hay posiciones abiertas')).toBeInTheDocument();
+			await expect
+				.element(page.getByText('Este portafolio aún no tiene activos'))
+				.not.toBeInTheDocument();
+			await expect.element(page.getByText('Posiciones cerradas')).toBeInTheDocument();
+		});
+	});
 });

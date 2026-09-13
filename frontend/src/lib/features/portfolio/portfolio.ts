@@ -150,6 +150,35 @@ export function groupHoldings(list: RawHolding[]): HoldingView[] {
 	return rows.map((h) => ({ ...h, allocation: total > 0 ? (h.value / total) * 100 : 0 }));
 }
 
+/**
+ * Separa las posiciones abiertas de las cerradas.
+ *
+ * Una posición vendida entera sigue en el portafolio —su historial de compras y
+ * ventas cuelga de ella, y borrarla lo borraría—, pero ya no tiene nada que
+ * pesar ni que rendir: en la tabla era una fila a cero que contaba como activo.
+ * Cerrada es cantidad cero, el mismo corte (`quantity > 0`) con el que el
+ * backend deja fuera las vendidas del reparto por plataforma y por industria.
+ *
+ * Se decide sobre la fila ya agrupada por ticker, así que el mismo activo
+ * vendido en un bróker y todavía en cartera en otro sigue abierto. Las cerradas
+ * van por orden alfabético: no hay peso por el que ordenarlas.
+ */
+export function splitClosedHoldings(holdings: HoldingView[]): {
+	open: HoldingView[];
+	closed: HoldingView[];
+} {
+	const open: HoldingView[] = [];
+	const closed: HoldingView[] = [];
+
+	for (const h of holdings) {
+		(h.quantity > 0 ? open : closed).push(h);
+	}
+
+	closed.sort((a, b) => a.symbol.localeCompare(b.symbol));
+
+	return { open, closed };
+}
+
 export function computeTypeBreakdown(holdings: HoldingView[]): TypeBreakdownSlice[] {
 	const grouped: Record<string, { label: string; value: number; color: string }> = {};
 	for (const h of holdings) {
