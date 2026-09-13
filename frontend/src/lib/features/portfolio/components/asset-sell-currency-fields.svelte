@@ -89,11 +89,9 @@
 	}
 
 	.form-label {
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: rgba(236, 234, 229, 0.6);
-		text-transform: uppercase;
-		letter-spacing: 0.3px;
+		font-size: 0.87rem;
+		font-weight: 500;
+		color: var(--text);
 	}
 
 	.required {

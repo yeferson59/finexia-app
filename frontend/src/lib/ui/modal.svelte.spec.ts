@@ -65,4 +65,31 @@ describe('modal.svelte', () => {
 
 		await expect.element(page.getByText('Se admite .csv, .xlsx y .xls.')).toBeVisible();
 	});
+
+	// La descripción es la mitad de lo que se decide —«la usan todas las
+	// cuentas»—, así que el lector la anuncia junto al título al abrir.
+	it('describe el diálogo con su descripción', async () => {
+		render(ModalHarness, {
+			open: true,
+			title: 'Invitar a alguien',
+			description: 'Le enviaremos un enlace de un solo uso.'
+		});
+
+		await expect
+			.element(page.getByRole('dialog', { name: 'Invitar a alguien' }))
+			.toHaveAccessibleDescription('Le enviaremos un enlace de un solo uso.');
+	});
+
+	it('sin descripción no apunta a un elemento que no existe', async () => {
+		render(ModalHarness, { open: true, title: 'Nuevo activo' });
+
+		expect(dialogEl()?.hasAttribute('aria-describedby')).toBe(false);
+	});
+
+	// El tono es lo que pinta el filete de rojo en las confirmaciones de borrado.
+	it('expone el tono para que el estilo lo distinga', async () => {
+		render(ModalHarness, { open: true, title: 'Eliminar transacción', tone: 'danger' });
+
+		expect(dialogEl()?.dataset.tone).toBe('danger');
+	});
 });

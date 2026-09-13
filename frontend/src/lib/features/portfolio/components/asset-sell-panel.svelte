@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import Button from '$lib/ui/button.svelte';
 	import DatePicker from '$lib/ui/date-picker.svelte';
 	import { todayLocalDateString } from '$lib/shared/format/date';
 	import type { Holding, Transaction } from '$lib/api/types';
@@ -112,22 +113,16 @@
 <div class="sell-panel">
 	<AssetSellPanelHeader {transaction} {formatCurrency} />
 
-	<div class="sell-mode-toggle">
-		<button
-			type="button"
-			class="sell-mode-btn"
-			class:active={sellMode === 'full'}
-			onclick={() => (sellMode = 'full')}
-		>
-			Venta Completa
+	<div class="segmented" role="group" aria-label="Cuánto vender">
+		<button type="button" aria-pressed={sellMode === 'full'} onclick={() => (sellMode = 'full')}>
+			Venta completa
 		</button>
 		<button
 			type="button"
-			class="sell-mode-btn"
-			class:active={sellMode === 'partial'}
+			aria-pressed={sellMode === 'partial'}
 			onclick={() => (sellMode = 'partial')}
 		>
-			Venta Parcial
+			Venta parcial
 		</button>
 	</div>
 
@@ -152,19 +147,17 @@
 		<input type="hidden" name="quantity" value={sellEffectiveQty} />
 
 		{#if sellMode === 'partial'}
-			<div class="sell-basis-toggle">
+			<div class="segmented" role="group" aria-label="Cómo indicar la venta parcial">
 				<button
 					type="button"
-					class="sell-basis-btn"
-					class:active={sellBasis === 'quantity'}
+					aria-pressed={sellBasis === 'quantity'}
 					onclick={() => (sellBasis = 'quantity')}
 				>
 					Por número de acciones
 				</button>
 				<button
 					type="button"
-					class="sell-basis-btn"
-					class:active={sellBasis === 'value'}
+					aria-pressed={sellBasis === 'value'}
 					onclick={() => (sellBasis = 'value')}
 				>
 					Por valor de la venta
@@ -240,49 +233,49 @@
 				bind:fees={sellFees}
 				bind:feesCurrency={sellFeesCurrency}
 			/>
-			<div class="form-group">
-				<label class="form-label" for="sell-date">Fecha <span class="required">*</span></label>
-				<DatePicker name="transactionDate" bind:value={sellDate} required />
-			</div>
 		</div>
 
 		{#if sellExceedsLot}
-			<p class="form-error-msg">
+			<p class="feedback error" role="alert">
 				La cantidad supera el lote disponible ({sellLotMaxQty.toLocaleString('es-CO', {
 					maximumFractionDigits: 8
 				})} unidades).
 			</p>
 		{/if}
 
-		<div class="form-group">
-			<label class="form-label" for="sell-notes">Notas</label>
-			<input
-				id="sell-notes"
-				type="text"
-				class="form-input"
-				name="notes"
-				bind:value={sellNotes}
-				placeholder="Observaciones opcionales..."
-			/>
+		<div class="form-row meta">
+			<div class="form-group">
+				<label class="form-label" for="sell-date">Fecha <span class="required">*</span></label>
+				<DatePicker name="transactionDate" bind:value={sellDate} required />
+			</div>
+			<div class="form-group">
+				<label class="form-label" for="sell-notes">Notas</label>
+				<input
+					id="sell-notes"
+					type="text"
+					class="form-input"
+					name="notes"
+					bind:value={sellNotes}
+					placeholder="Observaciones opcionales..."
+				/>
+			</div>
 		</div>
 
 		{#if formError}
-			<p class="form-error-msg">No se pudo registrar la venta. Verifica los datos.</p>
+			<p class="feedback error" role="alert">No se pudo registrar la venta. Verifica los datos.</p>
 		{/if}
 
-		<div class="form-actions">
-			<button type="button" class="btn-cancel" onclick={onClose}> Cancelar </button>
-			<button
-				type="submit"
-				class="btn-sell-submit"
-				disabled={isSellSubmitting || sellExceedsLot || sellEffectiveQty <= 0}
+		<div class="modal-actions">
+			<Button type="button" variant="ghost" onclick={onClose} disabled={isSellSubmitting}
+				>Cancelar</Button
 			>
-				{isSellSubmitting
-					? 'Guardando…'
-					: sellMode === 'full'
-						? 'Confirmar Venta Total'
-						: 'Registrar Venta Parcial'}
-			</button>
+			<Button
+				type="submit"
+				loading={isSellSubmitting}
+				disabled={sellExceedsLot || sellEffectiveQty <= 0}
+			>
+				{sellMode === 'full' ? 'Confirmar venta total' : 'Registrar venta parcial'}
+			</Button>
 		</div>
 	</form>
 </div>
@@ -295,62 +288,52 @@
 		gap: 1rem;
 	}
 
-	.sell-mode-toggle {
-		display: flex;
-		gap: 0.5rem;
+	/*
+	 * Las dos elecciones del panel —cuánto se vende y cómo se indica— son el
+	 * mismo gesto, así que se ven igual: un interruptor de dos posiciones. Antes
+	 * una iba en rojo y la otra en ámbar, y el rojo decía «borrar» donde solo se
+	 * elegía un modo.
+	 */
+	.segmented {
+		display: inline-flex;
+		align-self: flex-start;
+		flex-wrap: wrap;
+		max-width: 100%;
+		padding: 3px;
+		border: 1px solid var(--border-strong);
+		border-radius: 9px;
+		background: rgba(255, 255, 255, 0.02);
 	}
 
-	.sell-mode-btn {
-		padding: 0.45rem 1rem;
-		border: 1.5px solid rgba(224, 90, 90, 0.3);
+	.segmented button {
+		padding: 0.45rem 0.95rem;
+		border: none;
 		border-radius: 6px;
 		background: transparent;
-		color: rgba(236, 234, 229, 0.6);
+		color: var(--text-muted);
+		font-family: var(--font-body);
 		font-size: 0.85rem;
-		font-weight: 600;
+		font-weight: 500;
 		cursor: pointer;
-		font-family: var(--font-body);
-		transition: all 0.2s ease;
+		transition:
+			color 0.2s ease,
+			background-color 0.2s ease;
 	}
 
-	.sell-mode-btn:hover {
-		border-color: rgba(224, 90, 90, 0.5);
+	.segmented button:hover {
 		color: var(--text);
 	}
 
-	.sell-mode-btn.active {
-		background: rgba(224, 90, 90, 0.15);
-		border-color: var(--red);
-		color: var(--red);
-	}
-
-	.sell-basis-toggle {
-		display: flex;
-		gap: 0.5rem;
-	}
-
-	.sell-basis-btn {
-		padding: 0.35rem 0.85rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
-		border-radius: 6px;
-		background: transparent;
-		color: rgba(236, 234, 229, 0.55);
-		font-size: 0.8rem;
-		font-weight: 600;
-		cursor: pointer;
-		font-family: var(--font-body);
-		transition: all 0.2s ease;
-	}
-
-	.sell-basis-btn:hover {
-		border-color: rgba(212, 145, 42, 0.5);
+	.segmented button[aria-pressed='true'] {
+		background: rgba(212, 145, 42, 0.12);
 		color: var(--text);
+		box-shadow: inset 0 0 0 1px rgba(212, 145, 42, 0.5);
 	}
 
-	.sell-basis-btn.active {
-		background: rgba(212, 145, 42, 0.15);
-		border-color: var(--amber);
-		color: var(--amber);
+	@media (prefers-reduced-motion: reduce) {
+		.segmented button {
+			transition: none;
+		}
 	}
 
 	.sell-computed-hint {
@@ -366,34 +349,9 @@
 	}
 
 	.sell-label-hint {
+		font-size: 0.75rem;
 		font-weight: 400;
 		color: var(--text-dim);
-		text-transform: none;
-		letter-spacing: 0;
-		font-size: 0.75rem;
-	}
-
-	.btn-sell-submit {
-		padding: 0.55rem 1.25rem;
-		border: none;
-		border-radius: 7px;
-		background: var(--red);
-		color: #fff;
-		font-size: 0.88rem;
-		font-weight: 700;
-		cursor: pointer;
-		font-family: var(--font-body);
-		transition: all 0.2s ease;
-	}
-
-	.btn-sell-submit:hover:not(:disabled) {
-		transform: translateY(-1px);
-		box-shadow: 0 6px 16px rgba(224, 90, 90, 0.25);
-	}
-
-	.btn-sell-submit:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
 	}
 
 	.form-row {
@@ -409,11 +367,9 @@
 	}
 
 	.form-label {
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: rgba(236, 234, 229, 0.6);
-		text-transform: uppercase;
-		letter-spacing: 0.3px;
+		font-size: 0.87rem;
+		font-weight: 500;
+		color: var(--text);
 	}
 
 	.required {
@@ -436,37 +392,15 @@
 		border-color: var(--amber);
 	}
 
-	.form-error-msg {
-		margin: 0;
-		padding: 0.6rem 0.9rem;
-		border-radius: 6px;
-		background: rgba(224, 90, 90, 0.1);
-		border: 1px solid rgba(224, 90, 90, 0.3);
-		color: rgba(224, 90, 90, 0.9);
-		font-size: 0.85rem;
+	/* La fecha va en su propia fila: en la de las cifras no cabía y el año se
+	   salía por la derecha del diálogo. */
+	.form-row.meta {
+		grid-template-columns: auto minmax(0, 1fr);
 	}
 
-	.form-actions {
-		display: flex;
-		gap: 0.75rem;
-		justify-content: flex-end;
-	}
-
-	.btn-cancel {
-		padding: 0.55rem 1.1rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.2);
-		border-radius: 7px;
-		background: transparent;
-		color: rgba(236, 234, 229, 0.6);
-		font-size: 0.88rem;
-		font-weight: 600;
-		cursor: pointer;
-		font-family: var(--font-body);
-		transition: all 0.2s ease;
-	}
-
-	.btn-cancel:hover {
-		border-color: rgba(212, 145, 42, 0.4);
-		color: var(--text);
+	@media (max-width: 640px) {
+		.form-row.meta {
+			grid-template-columns: minmax(0, 1fr);
+		}
 	}
 </style>

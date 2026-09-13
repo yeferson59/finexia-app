@@ -213,7 +213,7 @@
 		<p class="feedback error" role="alert">{error}</p>
 	{/if}
 
-	<div class="actions">
+	<div class="modal-actions">
 		{#if onCancel}
 			<Button type="button" variant="ghost" onclick={onCancel}>Cancelar</Button>
 		{/if}
@@ -231,12 +231,5 @@
 		font-size: 0.75rem;
 		line-height: 1.5;
 		color: var(--text-dim);
-	}
-
-	.actions {
-		display: flex;
-		justify-content: flex-end;
-		gap: 0.75rem;
-		margin-top: 0.5rem;
 	}
 </style>

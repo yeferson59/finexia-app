@@ -97,7 +97,7 @@
 				{/each}
 			</select>
 		</div>
-		<div class="form-group">
+		<div class="form-group date-field">
 			<span class="form-label">Fecha <span class="required">*</span></span>
 			<DatePicker name="transactionDate" bind:value={editForm.transactionDate} required />
 		</div>
@@ -238,12 +238,12 @@
 	</div>
 
 	{#if editError}
-		<p class="form-error-msg">
+		<p class="feedback error" role="alert">
 			{editErrorMessage || 'No se pudo actualizar la transacción. Verifica los datos.'}
 		</p>
 	{/if}
 
-	<div class="form-actions">
+	<div class="modal-actions">
 		<Button type="button" variant="ghost" onclick={onClose} disabled={isEditSubmitting}>
 			Cancelar
 		</Button>
@@ -271,11 +271,9 @@
 	}
 
 	.form-label {
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: rgba(236, 234, 229, 0.6);
-		text-transform: uppercase;
-		letter-spacing: 0.3px;
+		font-size: 0.87rem;
+		font-weight: 500;
+		color: var(--text);
 	}
 
 	.required {
@@ -323,20 +321,11 @@
 		border-color: var(--amber);
 		background-color: rgba(212, 145, 42, 0.1);
 	}
-
-	.form-error-msg {
-		margin: 0;
-		padding: 0.6rem 0.9rem;
-		border-radius: 6px;
-		background: rgba(224, 90, 90, 0.1);
-		border: 1px solid rgba(224, 90, 90, 0.3);
-		color: rgba(224, 90, 90, 0.9);
-		font-size: 0.85rem;
-	}
-
-	.form-actions {
-		display: flex;
-		gap: 0.75rem;
-		justify-content: flex-end;
+	/* En el móvil los tres huecos de la fecha no caben al lado de otro campo:
+	   el año se salía por la derecha del diálogo. */
+	@media (max-width: 640px) {
+		.date-field {
+			grid-column: 1 / -1;
+		}
 	}
 </style>

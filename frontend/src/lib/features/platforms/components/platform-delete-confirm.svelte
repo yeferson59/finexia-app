@@ -55,7 +55,7 @@
 		};
 	}}
 >
-	<div class="actions">
+	<div class="modal-actions">
 		<Button type="button" variant="ghost" onclick={onCancel} disabled={isDeleting}>Cancelar</Button>
 		<Button type="submit" variant="danger" loading={isDeleting}>Eliminar</Button>
 	</div>
@@ -82,12 +82,5 @@
 		color: var(--red);
 		font-size: 0.85rem;
 		line-height: 1.5;
-	}
-
-	.actions {
-		display: flex;
-		gap: 0.75rem;
-		justify-content: flex-end;
-		margin-top: 1.5rem;
 	}
 </style>

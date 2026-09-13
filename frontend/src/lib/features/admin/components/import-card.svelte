@@ -56,7 +56,7 @@
 		<p class="feedback error" role="alert">{error}</p>
 	{/if}
 
-	<div class="actions">
+	<div class="modal-actions">
 		{#if onCancel}
 			<Button type="button" variant="ghost" onclick={onCancel}>Cancelar</Button>
 		{/if}
@@ -80,13 +80,6 @@
 {/if}
 
 <style>
-	.actions {
-		display: flex;
-		justify-content: flex-end;
-		gap: 0.75rem;
-		margin-top: 0.5rem;
-	}
-
 	/* El control de archivo nativo se pinta con la tipografía del sistema; solo
 	   el botón necesita alinearse con el resto del formulario. */
 	.field input[type='file'] {

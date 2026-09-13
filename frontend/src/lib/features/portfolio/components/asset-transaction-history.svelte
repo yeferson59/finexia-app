@@ -122,6 +122,7 @@
 	title="Eliminar transacción"
 	onClose={() => (deletingTxn = null)}
 	size="sm"
+	tone="danger"
 >
 	{#if deletingTxn}
 		<AssetTransactionDeleteConfirm

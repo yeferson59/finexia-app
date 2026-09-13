@@ -6,15 +6,17 @@
 		open = false,
 		title = 'Título',
 		description = '',
+		tone = 'default',
 		onClose = () => {}
 	}: {
 		open?: boolean;
 		title?: string;
 		description?: string;
+		tone?: 'default' | 'danger';
 		onClose?: () => void;
 	} = $props();
 </script>
 
-<Modal {open} {title} {description} {onClose}>
+<Modal {open} {title} {description} {tone} {onClose}>
 	<p>contenido del modal</p>
 </Modal>

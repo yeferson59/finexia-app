@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import Button from '$lib/ui/button.svelte';
 	import { untrack } from 'svelte';
 	import { PORTFOLIO_TYPES } from '../portfolio';
 
@@ -105,11 +106,11 @@
 		<label for="edit-default">Portafolio por defecto</label>
 	</div>
 
-	<div class="form-actions">
-		<button type="button" class="btn-cancel" onclick={onCancel}>Cancelar</button>
-		<button type="submit" class="btn-save" disabled={isSubmitting}>
-			{isSubmitting ? 'Guardando…' : 'Guardar cambios'}
-		</button>
+	<div class="modal-actions">
+		<Button type="button" variant="ghost" onclick={onCancel} disabled={isSubmitting}
+			>Cancelar</Button
+		>
+		<Button type="submit" loading={isSubmitting}>Guardar cambios</Button>
 	</div>
 </form>
 
@@ -127,11 +128,9 @@
 	}
 
 	.form-group label {
-		font-size: 0.8rem;
-		font-weight: 600;
-		letter-spacing: 0.4px;
-		text-transform: uppercase;
-		color: rgba(236, 234, 229, 0.55);
+		font-size: 0.87rem;
+		font-weight: 500;
+		color: var(--text);
 	}
 
 	.form-group input,
@@ -185,51 +184,5 @@
 		font-size: 0.9rem;
 		color: var(--text);
 		cursor: pointer;
-	}
-
-	.form-actions {
-		display: flex;
-		gap: 0.75rem;
-		justify-content: flex-end;
-		padding-top: 0.25rem;
-	}
-
-	.btn-cancel {
-		padding: 0.7rem 1.25rem;
-		border: 1px solid rgba(236, 234, 229, 0.2);
-		border-radius: 8px;
-		background: transparent;
-		color: rgba(236, 234, 229, 0.7);
-		font-family: var(--font-body);
-		font-size: 0.9rem;
-		cursor: pointer;
-		transition: all 0.2s ease;
-	}
-
-	.btn-cancel:hover {
-		border-color: var(--text-dim);
-		color: var(--text);
-	}
-
-	.btn-save {
-		padding: 0.7rem 1.5rem;
-		border: none;
-		border-radius: 8px;
-		background: var(--amber);
-		color: #0d0800;
-		font-family: var(--font-body);
-		font-weight: 700;
-		font-size: 0.9rem;
-		cursor: pointer;
-		transition: all 0.2s ease;
-	}
-
-	.btn-save:hover:not(:disabled) {
-		box-shadow: 0 6px 18px rgba(212, 145, 42, 0.3);
-	}
-
-	.btn-save:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
 	}
 </style>

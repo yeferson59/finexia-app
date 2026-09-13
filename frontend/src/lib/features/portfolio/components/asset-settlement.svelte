@@ -332,13 +332,6 @@
 		line-height: 1.5;
 	}
 
-	.modal-actions {
-		display: flex;
-		gap: 0.75rem;
-		justify-content: flex-end;
-		margin-top: 1.25rem;
-	}
-
 	@media (max-width: 520px) {
 		.rate {
 			grid-template-columns: minmax(0, 1fr);

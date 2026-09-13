@@ -114,6 +114,7 @@
 	title="Confirmar eliminación"
 	onClose={() => (showDeleteConfirm = false)}
 	size="sm"
+	tone="danger"
 >
 	<PlatformDeleteConfirm
 		platformName={platform.name}

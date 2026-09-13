@@ -80,7 +80,7 @@
 	{/each}
 </section>
 
-<Modal open={!!confirming} title="Eliminar posición" onClose={close} size="sm">
+<Modal open={!!confirming} title="Eliminar posición" onClose={close} size="sm" tone="danger">
 	{#if confirming}
 		<p class="summary">
 			<strong>{confirming.ticker}</strong>, {formatUnits(
@@ -232,11 +232,5 @@
 		color: var(--red);
 		font-size: 0.85rem;
 		line-height: 1.5;
-	}
-
-	.modal-actions {
-		display: flex;
-		gap: 0.75rem;
-		justify-content: flex-end;
 	}
 </style>

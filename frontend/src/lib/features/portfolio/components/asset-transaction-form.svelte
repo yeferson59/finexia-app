@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import Button from '$lib/ui/button.svelte';
 	import DatePicker from '$lib/ui/date-picker.svelte';
 	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
 	import type { Holding } from '$lib/api/types';
@@ -147,7 +148,7 @@
 				{/each}
 			</select>
 		</div>
-		<div class="form-group">
+		<div class="form-group date-field">
 			<label class="form-label" for="txn-date">Fecha <span class="required">*</span></label>
 			<DatePicker name="transactionDate" bind:value={txnForm.transactionDate} required />
 		</div>
@@ -325,27 +326,26 @@
 	</div>
 
 	{#if formError}
-		<p class="form-error-msg">No se pudo registrar la transacción. Verifica los datos.</p>
+		<p class="feedback error" role="alert">
+			No se pudo registrar la transacción. Verifica los datos.
+		</p>
 	{/if}
 
-	<div class="form-actions">
-		<button type="button" class="btn-cancel" onclick={onCancel}> Cancelar </button>
-		<button type="submit" class="btn-submit" disabled={isSubmitting}>
-			{isSubmitting ? 'Guardando…' : 'Registrar transacción'}
-		</button>
+	<div class="modal-actions">
+		<Button type="button" variant="ghost" onclick={onCancel} disabled={isSubmitting}
+			>Cancelar</Button
+		>
+		<Button type="submit" loading={isSubmitting}>Registrar transacción</Button>
 	</div>
 </form>
 
 <style>
+	/* El marco lo pone el modal: la caja con borde y fondo ámbar que llevaba el
+	   formulario era un marco dentro de otro. */
 	.add-txn-form {
-		margin-bottom: 1.5rem;
-		padding: 1.25rem;
-		border: 1px solid rgba(212, 145, 42, 0.2);
-		border-radius: 10px;
-		background: rgba(212, 145, 42, 0.04);
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 1.1rem;
 	}
 
 	.form-row {
@@ -361,11 +361,9 @@
 	}
 
 	.form-label {
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: rgba(236, 234, 229, 0.6);
-		text-transform: uppercase;
-		letter-spacing: 0.3px;
+		font-size: 0.87rem;
+		font-weight: 500;
+		color: var(--text);
 	}
 
 	.required {
@@ -436,61 +434,11 @@
 		border-color: var(--amber);
 		background-color: rgba(212, 145, 42, 0.1);
 	}
-
-	.form-error-msg {
-		margin: 0;
-		padding: 0.6rem 0.9rem;
-		border-radius: 6px;
-		background: rgba(224, 90, 90, 0.1);
-		border: 1px solid rgba(224, 90, 90, 0.3);
-		color: rgba(224, 90, 90, 0.9);
-		font-size: 0.85rem;
-	}
-
-	.form-actions {
-		display: flex;
-		gap: 0.75rem;
-		justify-content: flex-end;
-	}
-
-	.btn-cancel {
-		padding: 0.55rem 1.1rem;
-		border: 1.5px solid rgba(212, 145, 42, 0.2);
-		border-radius: 7px;
-		background: transparent;
-		color: rgba(236, 234, 229, 0.6);
-		font-size: 0.88rem;
-		font-weight: 600;
-		cursor: pointer;
-		font-family: var(--font-body);
-		transition: all 0.2s ease;
-	}
-
-	.btn-cancel:hover {
-		border-color: rgba(212, 145, 42, 0.4);
-		color: var(--text);
-	}
-
-	.btn-submit {
-		padding: 0.55rem 1.25rem;
-		border: none;
-		border-radius: 7px;
-		background: var(--amber);
-		color: #0d0800;
-		font-size: 0.88rem;
-		font-weight: 700;
-		cursor: pointer;
-		font-family: var(--font-body);
-		transition: all 0.2s ease;
-	}
-
-	.btn-submit:hover:not(:disabled) {
-		transform: translateY(-1px);
-		box-shadow: 0 6px 16px rgba(212, 145, 42, 0.25);
-	}
-
-	.btn-submit:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
+	/* En el móvil los tres huecos de la fecha no caben al lado de otro campo:
+	   el año se salía por la derecha del diálogo. */
+	@media (max-width: 640px) {
+		.date-field {
+			grid-column: 1 / -1;
+		}
 	}
 </style>

@@ -72,7 +72,7 @@
 	}}
 >
 	<input type="hidden" name="txnId" value={transaction.id} />
-	<div class="actions">
+	<div class="modal-actions">
 		<Button type="button" variant="ghost" onclick={onClose} disabled={isDeleting}>Cancelar</Button>
 		<Button type="submit" variant="danger" loading={isDeleting}>Eliminar</Button>
 	</div>
@@ -103,12 +103,5 @@
 		background: rgba(224, 90, 90, 0.08);
 		color: var(--red);
 		font-size: 0.85rem;
-	}
-
-	.actions {
-		display: flex;
-		gap: 0.75rem;
-		justify-content: flex-end;
-		margin-top: 1.5rem;
 	}
 </style>

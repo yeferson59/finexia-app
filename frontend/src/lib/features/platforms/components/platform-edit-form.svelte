@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import Button from '$lib/ui/button.svelte';
 	import { PLATFORM_TYPES, type Platform } from '../platforms';
 
 	let {
@@ -61,16 +62,11 @@
 		</div>
 	</div>
 
-	<div class="form-actions">
-		<button type="button" onclick={onCancel} class="btn btn-secondary"> Cancelar </button>
-		<button type="submit" disabled={isSubmitting} class="btn btn-primary">
-			{#if isSubmitting}
-				<span class="spinner"></span>
-				Guardando...
-			{:else}
-				Guardar Cambios
-			{/if}
-		</button>
+	<div class="modal-actions">
+		<Button type="button" variant="ghost" onclick={onCancel} disabled={isSubmitting}
+			>Cancelar</Button
+		>
+		<Button type="submit" loading={isSubmitting}>Guardar cambios</Button>
 	</div>
 </form>
 
@@ -130,83 +126,9 @@
 		min-height: 90px;
 	}
 
-	.form-actions {
-		display: flex;
-		gap: 1rem;
-		justify-content: flex-end;
-		margin-top: 0.5rem;
-	}
-
-	.btn {
-		padding: 0.75rem 1.5rem;
-		border: none;
-		border-radius: 8px;
-		font-weight: 700;
-		font-family: var(--font-body);
-		font-size: 0.9rem;
-		cursor: pointer;
-		transition: all 0.3s ease;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-		letter-spacing: 0.3px;
-	}
-
-	.btn-primary {
-		background: var(--amber);
-		color: #0d0800;
-	}
-
-	.btn-primary:hover:not(:disabled) {
-		transform: translateY(-2px);
-		box-shadow: 0 10px 25px rgba(212, 145, 42, 0.25);
-	}
-
-	.btn-primary:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
-	}
-
-	.btn-secondary {
-		background: transparent;
-		color: var(--text);
-		border: 1.5px solid rgba(212, 145, 42, 0.25);
-	}
-
-	.btn-secondary:hover {
-		border-color: var(--amber);
-		background: var(--border);
-		color: var(--amber);
-	}
-
-	.spinner {
-		display: inline-block;
-		width: 14px;
-		height: 14px;
-		border: 2px solid rgba(13, 8, 0, 0.3);
-		border-top-color: #0d0800;
-		border-radius: 50%;
-		animation: spin 0.6s linear infinite;
-	}
-
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
 	@media (max-width: 768px) {
 		.form-row {
 			grid-template-columns: 1fr;
-		}
-
-		.form-actions {
-			flex-direction: column-reverse;
-		}
-
-		.btn {
-			width: 100%;
 		}
 	}
 </style>
