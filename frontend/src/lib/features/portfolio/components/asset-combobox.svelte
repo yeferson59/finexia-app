@@ -15,6 +15,22 @@
 	let isCreating = $state(false);
 	let comboboxEl = $state<HTMLDivElement | null>(null);
 	let debounceTimer: ReturnType<typeof setTimeout>;
+	// La búsqueda a la que responden `suggestions`: mientras llega la siguiente,
+	// la lista en pantalla es de lo que se tecleó antes.
+	let resultsFor = $state('');
+
+	const typedTicker = $derived(search.trim().toUpperCase());
+
+	// Crear se ofrece mientras el catálogo no tenga ese ticker exacto, aunque la
+	// búsqueda devuelva otros. Busca por fragmento en ticker y nombre, así que
+	// casi cualquier ticker nuevo se parece a algo, y esperar a una lista vacía
+	// dejaba sin salida a quien registraba GEB con GEBR en el catálogo. Con el
+	// ticker exacto en la lista no: el alta devolvería esa misma fila.
+	const canCreate = $derived(
+		typedTicker.length > 0 &&
+			resultsFor === typedTicker &&
+			!suggestions.some((asset) => asset.ticker.toUpperCase() === typedTicker)
+	);
 
 	function selectAsset(asset: Asset) {
 		selected = asset;
@@ -35,6 +51,7 @@
 		} catch {
 			suggestions = [];
 		} finally {
+			resultsFor = q.trim().toUpperCase();
 			isSearching = false;
 		}
 	}
@@ -110,40 +127,51 @@
 			oncancel={() => (isCreating = false)}
 		/>
 	{:else if showSuggestions && suggestions.length > 0}
-		<ul class="combobox-list" role="listbox">
-			{#each suggestions as asset (asset.id)}
-				<li
-					role="option"
-					aria-selected={asset.id === selected?.id}
-					class="combobox-option"
-					class:selected={asset.id === selected?.id}
-					onmousedown={() => selectAsset(asset)}
-				>
-					<div class="option-left">
-						<span class="option-ticker">{asset.ticker}</span>
-						<span class="option-type">{formatAssetType(asset.assetType)}</span>
-					</div>
-					<div class="option-right">
-						<span class="option-name">{asset.name}</span>
-						{#if asset.exchange || asset.currency}
-							<span class="option-meta">
-								{[asset.exchange, asset.currency].filter(Boolean).join(', ')}
+		<div class="combobox-panel">
+			<ul class="combobox-list" role="listbox">
+				{#each suggestions as asset (asset.id)}
+					<li
+						role="option"
+						aria-selected={asset.id === selected?.id}
+						class="combobox-option"
+						class:selected={asset.id === selected?.id}
+						onmousedown={() => selectAsset(asset)}
+					>
+						<div class="option-left">
+							<span class="option-ticker">{asset.ticker}</span>
+							<span class="option-type">{formatAssetType(asset.assetType)}</span>
+						</div>
+						<div class="option-right">
+							<span class="option-name">{asset.name}</span>
+							{#if asset.exchange || asset.currency}
+								<span class="option-meta">
+									{[asset.exchange, asset.currency].filter(Boolean).join(', ')}
+								</span>
+							{/if}
+						</div>
+						{#if asset.currentPrice}
+							<span class="option-price">
+								{formatCurrency(
+									parseFloat(asset.currentPrice.value),
+									asset.currency && asset.currency !== 'XXX' ? asset.currency : 'USD',
+									4
+								)}
 							</span>
 						{/if}
-					</div>
-					{#if asset.currentPrice}
-						<span class="option-price">
-							{formatCurrency(
-								parseFloat(asset.currentPrice.value),
-								asset.currency && asset.currency !== 'XXX' ? asset.currency : 'USD',
-								4
-							)}
-						</span>
-					{/if}
-				</li>
-			{/each}
-		</ul>
-	{:else if showSuggestions && !isSearching && search.trim().length > 0}
+					</li>
+				{/each}
+			</ul>
+			{#if canCreate}
+				<!-- Lo que hay se parece, pero no es el ticker tecleado. -->
+				<div class="combobox-footer">
+					<span>¿No es ninguno de estos?</span>
+					<button type="button" class="combobox-create" onclick={() => (isCreating = true)}>
+						Crear {typedTicker}
+					</button>
+				</div>
+			{/if}
+		</div>
+	{:else if showSuggestions && !isSearching && typedTicker.length > 0}
 		<!--
 			Crear un activo y añadirlo al portafolio son dos cosas distintas, y aquí
 			se ven las dos: el catálogo no tiene el instrumento, así que primero se
@@ -151,11 +179,11 @@
 		-->
 		<div class="combobox-empty">
 			<span>
-				No hay ningún activo que se llame <strong>{search.trim().toUpperCase()}</strong>. Créalo y
-				sigue con la posición.
+				No hay ningún activo que se llame <strong>{typedTicker}</strong>. Créalo y sigue con la
+				posición.
 			</span>
 			<button type="button" class="combobox-create" onclick={() => (isCreating = true)}>
-				Crear {search.trim().toUpperCase()}
+				Crear {typedTicker}
 			</button>
 		</div>
 	{/if}
@@ -208,21 +236,39 @@
 		color: var(--text);
 	}
 
-	.combobox-list {
+	.combobox-panel {
 		position: absolute;
 		top: calc(100% + 4px);
 		left: 0;
 		right: 0;
 		z-index: 50;
-		list-style: none;
-		margin: 0;
-		padding: 0.35rem 0;
 		background: #101114;
 		border: 1px solid var(--border-strong);
 		border-radius: 10px;
 		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+		overflow: hidden;
+	}
+
+	.combobox-list {
+		list-style: none;
+		margin: 0;
+		padding: 0.35rem 0;
 		max-height: 280px;
 		overflow-y: auto;
+	}
+
+	/* Fuera de la zona que desplaza: con diez parecidos en la lista, crear no
+	   puede quedar al fondo del scroll. */
+	.combobox-footer {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		padding: 0.65rem 1rem;
+		border-top: 1px solid var(--border-strong);
+		font-size: 0.83rem;
+		color: var(--text-muted);
 	}
 
 	.combobox-option {
