@@ -28,7 +28,6 @@ const props = {
 	maxValue: 9002.7,
 	displayCurrency: 'USD',
 	formatValue: (v: number) => `$${v.toFixed(2)}`,
-	onGoToPortfolios: () => {},
 	onOpen: () => {}
 };
 
@@ -95,16 +94,5 @@ describe('asset-holdings-table.svelte', () => {
 
 		await page.getByRole('button', { name: /precio de AAPL/ }).click();
 		expect(onOpen).toHaveBeenCalledWith(row);
-	});
-
-	// Aquí no hay un portafolio al que agregar —la vista los atraviesa todos—,
-	// así que la salida del estado vacío es elegir uno.
-	it('sends a user with nothing to their portfolios', async () => {
-		const onGoToPortfolios = vi.fn();
-		render(AssetHoldingsTable, { ...props, rows: [], onGoToPortfolios });
-
-		await expect.element(page.getByText('Todavía no hay nada que listar')).toBeInTheDocument();
-		await page.getByRole('button', { name: 'Ir a mis portafolios' }).click();
-		expect(onGoToPortfolios).toHaveBeenCalled();
 	});
 });

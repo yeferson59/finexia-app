@@ -9,6 +9,7 @@
 	 * entre la ruta y la tabla, ese acuerdo se rompía en cuanto alguien tocara
 	 * uno de los tres.
 	 */
+	import EmptyState from '$lib/ui/empty-state.svelte';
 	import Pagination from '$lib/ui/pagination.svelte';
 	import AssetHoldingsTable from './asset-holdings-table.svelte';
 	import type { AssetHoldingRow } from '../asset-holdings';
@@ -28,6 +29,10 @@
 		maxValue: number;
 		displayCurrency: string;
 		formatValue: (value: number) => string;
+		/**
+		 * Salida del estado vacío. Aquí no hay un portafolio al que agregar —esta
+		 * vista los atraviesa todos—, así que lleva a elegir uno.
+		 */
 		onGoToPortfolios: () => void;
 		/** Abre el panel de precio de un activo; lo dispara su fila. */
 		onOpen: (row: AssetHoldingRow) => void;
@@ -92,7 +97,30 @@
 		{/if}
 	</header>
 
-	{#if filtered.length === 0 && rows.length > 0}
+	{#if rows.length === 0}
+		<EmptyState
+			bordered
+			title="Todavía no hay nada que listar"
+			description="Cuando registres posiciones en tus portafolios, aquí aparecerá cuánto tienes de cada activo."
+		>
+			{#snippet action()}
+				<button onclick={onGoToPortfolios} class="btn-go-portfolios">
+					<svg
+						width="18"
+						height="18"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						aria-hidden="true"
+					>
+						<path d="M12 5v14M5 12h14" />
+					</svg>
+					Ir a mis portafolios
+				</button>
+			{/snippet}
+		</EmptyState>
+	{:else if filtered.length === 0}
 		<p class="no-match">
 			Ningún activo se llama así.
 			<button type="button" class="clear" onclick={() => (query = '')}>Ver todos</button>
@@ -103,7 +131,6 @@
 			{maxValue}
 			{displayCurrency}
 			{formatValue}
-			{onGoToPortfolios}
 			{onOpen}
 			bind:active
 		/>
@@ -185,6 +212,39 @@
 		text-decoration: underline;
 		text-underline-offset: 3px;
 		cursor: pointer;
+	}
+
+	.btn-go-portfolios {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.8rem 1.4rem;
+		border: none;
+		border-radius: 10px;
+		background: var(--amber);
+		color: #0d0800;
+		font-weight: 600;
+		font-family: var(--font-body);
+		font-size: 0.9rem;
+		cursor: pointer;
+		transition:
+			background 0.2s ease,
+			transform 0.2s ease;
+	}
+
+	.btn-go-portfolios:hover {
+		background: var(--amber-light);
+		transform: translateY(-1px);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.btn-go-portfolios {
+			transition: none;
+		}
+
+		.btn-go-portfolios:hover {
+			transform: none;
+		}
 	}
 
 	.sr-only {

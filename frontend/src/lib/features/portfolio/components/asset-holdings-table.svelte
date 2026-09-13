@@ -17,7 +17,6 @@
 	 * etiqueta ya dice la clase, y ocho matices más al lado de la escala de la
 	 * barra eran ruido sin dato.
 	 */
-	import EmptyState from '$lib/ui/empty-state.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { formatPercent } from '$lib/shared/format/percent';
@@ -28,7 +27,6 @@
 		maxValue,
 		displayCurrency,
 		formatValue,
-		onGoToPortfolios,
 		onOpen,
 		active = $bindable(null)
 	}: {
@@ -42,11 +40,6 @@
 		/** Moneda de la columna «Valor»: la misma en todas las filas. */
 		displayCurrency: string;
 		formatValue: (value: number) => string;
-		/**
-		 * Salida del estado vacío. Aquí no hay un portafolio al que agregar —esta
-		 * vista los atraviesa todos—, así que lleva a elegir uno.
-		 */
-		onGoToPortfolios: () => void;
 		/**
 		 * Abre el activo: de dónde salió su precio y con qué clave volver a
 		 * pedirlo. Es la acción de la fila, y por eso cuelga del nombre del
@@ -86,97 +79,71 @@
 	}
 </script>
 
-{#if rows.length > 0}
-	<table>
-		<caption class="sr-only">
-			Activos que tienes, con su clase, las unidades sumadas entre portafolios, su precio y cuánto
-			pesan sobre el total. Las filas van de mayor a menor valor.
-		</caption>
-		<thead>
-			<tr>
-				<th scope="col">Activo</th>
-				<th scope="col" class="col-class">Clase</th>
-				<th scope="col" class="col-position num">Posición</th>
-				<th scope="col" class="col-value num">Valor en {displayCurrency}</th>
-				<th scope="col" class="col-weight num">Peso</th>
+<table>
+	<caption class="sr-only">
+		Activos que tienes, con su clase, las unidades sumadas entre portafolios, su precio y cuánto
+		pesan sobre el total. Las filas van de mayor a menor valor.
+	</caption>
+	<thead>
+		<tr>
+			<th scope="col">Activo</th>
+			<th scope="col" class="col-class">Clase</th>
+			<th scope="col" class="col-position num">Posición</th>
+			<th scope="col" class="col-value num">Valor en {displayCurrency}</th>
+			<th scope="col" class="col-weight num">Peso</th>
+		</tr>
+	</thead>
+	<tbody>
+		{#each rows as row (row.assetId)}
+			<tr
+				class:on={active === row.ticker}
+				style="--bar: {barWidth(row.value).toFixed(2)}%"
+				onpointerenter={() => point(row.ticker)}
+				onpointerleave={() => point(null)}
+			>
+				<th scope="row" class="asset">
+					<button
+						type="button"
+						class="open"
+						onclick={() => onOpen(row)}
+						aria-label="Ver de dónde sale el precio de {row.ticker} y actualizarlo"
+					>
+						<span class="ticker">{row.ticker}</span>
+						<span class="name">
+							{row.name}{#if row.portfolios > 1}<span class="spread">
+									, en {row.portfolios} portafolios</span
+								>{/if}
+						</span>
+					</button>
+				</th>
+
+				<td class="col-class type">
+					{row.typeLabel}
+					{#if row.sectorLabel}<span class="sector" title={row.sectorDetail}>{row.sectorLabel}</span
+						>{/if}
+				</td>
+
+				<td class="col-position num mono position">
+					{formatQuantity(row.quantity)} uds
+					{#if row.marketPrice === null}
+						<span class="qualifier">a coste, sin precio de mercado</span>
+					{:else}
+						<span class="unit-price">a {fmtPrice(row)}</span>
+					{/if}
+				</td>
+
+				<td class="col-value num mono value">
+					{privacy.money(formatValue(row.value))}
+					{#if !row.fxConverted}
+						<span class="qualifier flagged">sin convertir a {displayCurrency}</span>
+					{/if}
+				</td>
+
+				<td class="col-weight num mono weight">{formatPercent(row.percent)}</td>
 			</tr>
-		</thead>
-		<tbody>
-			{#each rows as row (row.assetId)}
-				<tr
-					class:on={active === row.ticker}
-					style="--bar: {barWidth(row.value).toFixed(2)}%"
-					onpointerenter={() => point(row.ticker)}
-					onpointerleave={() => point(null)}
-				>
-					<th scope="row" class="asset">
-						<button
-							type="button"
-							class="open"
-							onclick={() => onOpen(row)}
-							aria-label="Ver de dónde sale el precio de {row.ticker} y actualizarlo"
-						>
-							<span class="ticker">{row.ticker}</span>
-							<span class="name">
-								{row.name}{#if row.portfolios > 1}<span class="spread">
-										, en {row.portfolios} portafolios</span
-									>{/if}
-							</span>
-						</button>
-					</th>
-
-					<td class="col-class type">
-						{row.typeLabel}
-						{#if row.sectorLabel}<span class="sector" title={row.sectorDetail}
-								>{row.sectorLabel}</span
-							>{/if}
-					</td>
-
-					<td class="col-position num mono position">
-						{formatQuantity(row.quantity)} uds
-						{#if row.marketPrice === null}
-							<span class="qualifier">a coste, sin precio de mercado</span>
-						{:else}
-							<span class="unit-price">a {fmtPrice(row)}</span>
-						{/if}
-					</td>
-
-					<td class="col-value num mono value">
-						{privacy.money(formatValue(row.value))}
-						{#if !row.fxConverted}
-							<span class="qualifier flagged">sin convertir a {displayCurrency}</span>
-						{/if}
-					</td>
-
-					<td class="col-weight num mono weight">{formatPercent(row.percent)}</td>
-				</tr>
-			{/each}
-		</tbody>
-	</table>
-{:else}
-	<EmptyState
-		bordered
-		title="Todavía no hay nada que listar"
-		description="Cuando registres posiciones en tus portafolios, aquí aparecerá cuánto tienes de cada activo."
-	>
-		{#snippet action()}
-			<button onclick={onGoToPortfolios} class="btn-go-portfolios">
-				<svg
-					width="18"
-					height="18"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					aria-hidden="true"
-				>
-					<path d="M12 5v14M5 12h14" />
-				</svg>
-				Ir a mis portafolios
-			</button>
-		{/snippet}
-	</EmptyState>
-{/if}
+		{/each}
+	</tbody>
+</table>
 
 <style>
 	/*
@@ -393,38 +360,10 @@
 		overflow-wrap: anywhere;
 	}
 
-	.btn-go-portfolios {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.6rem;
-		padding: 0.8rem 1.4rem;
-		border: none;
-		border-radius: 10px;
-		background: var(--amber);
-		color: #0d0800;
-		font-weight: 600;
-		font-family: var(--font-body);
-		font-size: 0.9rem;
-		cursor: pointer;
-		transition:
-			background 0.2s ease,
-			transform 0.2s ease;
-	}
-
-	.btn-go-portfolios:hover {
-		background: var(--amber-light);
-		transform: translateY(-1px);
-	}
-
 	@media (prefers-reduced-motion: reduce) {
 		tbody th,
-		tbody td,
-		.btn-go-portfolios {
+		tbody td {
 			transition: none;
-		}
-
-		.btn-go-portfolios:hover {
-			transform: none;
 		}
 	}
 
