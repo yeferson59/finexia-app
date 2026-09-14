@@ -5,9 +5,12 @@ import {
 	cashKindSign,
 	formatCashKind,
 	groupCashAccounts,
+	groupCashMovementsByMonth,
+	groupCashPlatforms,
 	suggestCashPortfolio,
 	summarizeCash,
-	type CashBalance
+	type CashBalance,
+	type CashMovement
 } from './cash';
 
 const balance = (
@@ -145,6 +148,66 @@ describe('groupCashAccounts', () => {
 		]);
 
 		expect(account).toMatchObject({ balance: 900, value: 0, fxConverted: false });
+	});
+});
+
+describe('groupCashPlatforms', () => {
+	it('junta las monedas de una plataforma y ordena por lo que guarda', () => {
+		const platforms = groupCashPlatforms([
+			balance({ balance: '100', currency: 'USD', sourceId: 's2', sourceName: 'Bróker' }),
+			balance({ balance: '4000000', currency: 'COP', value: '1000' }),
+			balance({ balance: '50', currency: 'USD' })
+		]);
+
+		expect(platforms.map((p) => p.sourceName)).toEqual(['Nu', 'Bróker']);
+		expect(platforms[0]).toMatchObject({ value: 1050, partial: false });
+		expect(platforms[0].accounts.map((a) => a.currency)).toEqual(['COP', 'USD']);
+	});
+
+	it('marca la plataforma a la que le falta una cuenta sin tasa', () => {
+		const [platform] = groupCashPlatforms([
+			balance({ balance: '50', currency: 'USD' }),
+			balance({ balance: '900', currency: 'CHF', value: '900', fxConverted: false })
+		]);
+
+		expect(platform).toMatchObject({ value: 50, partial: true });
+	});
+
+	it('una cuenta vacía sin tasa no deja el total a medias', () => {
+		const [platform] = groupCashPlatforms([
+			balance({ balance: '50', currency: 'USD' }),
+			balance({ balance: '0', currency: 'CHF', value: '0', fxConverted: false })
+		]);
+
+		expect(platform.partial).toBe(false);
+	});
+});
+
+describe('groupCashMovementsByMonth', () => {
+	const movement = (id: string, date: string) => ({ id, date }) as CashMovement;
+
+	it('agrupa por mes, con el mes escrito', () => {
+		const months = groupCashMovementsByMonth([
+			movement('a', '2026-09-11T00:00:00Z'),
+			movement('b', '2026-09-01T00:00:00Z'),
+			movement('c', '2026-08-28T00:00:00Z')
+		]);
+
+		expect(months.map((m) => [m.key, m.label, m.movements.map((x) => x.id)])).toEqual([
+			['2026-09', 'Septiembre de 2026', ['a', 'b']],
+			['2026-08', 'Agosto de 2026', ['c']]
+		]);
+	});
+
+	it('no repite un mes aunque sus movimientos no lleguen seguidos', () => {
+		const months = groupCashMovementsByMonth([
+			movement('a', '2026-09-11T00:00:00Z'),
+			movement('b', '2026-08-28T00:00:00Z'),
+			movement('c', '2026-09-02T00:00:00Z')
+		]);
+
+		expect(months.map((m) => m.key)).toEqual(['2026-09', '2026-08']);
+		expect(months[0].movements.map((x) => x.id)).toEqual(['a', 'c']);
 	});
 });
 

@@ -460,9 +460,9 @@ La ficha avisa cuando toca. Si **ninguna** posición tiene precio de mercado, ex
 
 La sección **Efectivo** del menú guarda el dinero que tienes sin invertir: lo que queda en tu cuenta del bróker, en tu cuenta de ahorros o en tu billetera. Cada **cuenta** es una **plataforma** en una **moneda** —tus pesos en el banco, tus dólares en el bróker—, y su dinero suma en el valor de un **portafolio** como una posición más. Si solo tienes un portafolio, Finexia no te lo pregunta: suma en ese.
 
-La página abre con el **total** en la moneda de tu cuenta y, si tienes efectivo en varias monedas, cuánto hay en cada una con su propio importe, que es el que coincide con tu extracto. Debajo están las **cuentas** —una por plataforma y moneda, con el saldo que ves en la plataforma— y el historial de **movimientos**. Si el dinero de una cuenta suma en más de un portafolio, la fila lo dice y lista cuánto corresponde a cada uno.
+La página abre con el **total** en la moneda de tu cuenta y, si tienes efectivo en varias monedas, una barra con lo que pesa cada una y, bajo cada tramo, su propio importe, que es el que coincide con tu extracto. Debajo están las **cuentas**, agrupadas por plataforma —cada plataforma con una línea por moneda y el saldo que ves en ella—, y el historial de **movimientos**, por meses. Si el dinero de una cuenta suma en más de un portafolio, su línea lo dice y lista cuánto corresponde a cada uno.
 
-Para anotar un movimiento pulsa **Registrar movimiento**, o **Movimiento** en la fila de una cuenta, que abre el formulario con esa cuenta ya elegida. Lo primero es decir qué pasó:
+Para anotar un movimiento pulsa **Registrar movimiento**, o **Registrar** junto a una cuenta, que abre el formulario con esa cuenta ya elegida. Lo primero es decir qué pasó:
 
 | Movimiento | Qué hace con el saldo | Qué hace con tu rentabilidad |
 |---|---|---|

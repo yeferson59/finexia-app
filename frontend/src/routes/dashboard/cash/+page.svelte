@@ -6,9 +6,9 @@
 	import EmptyState from '$lib/ui/empty-state.svelte';
 	import CurrencySelect from '$lib/ui/currency-select.svelte';
 	import {
-		CashBalancesTable,
+		CashAccounts,
 		CashMovementForm,
-		CashMovementsTable,
+		CashMovements,
 		CashSummary,
 		summarizeCash,
 		type CashFormTarget
@@ -85,20 +85,31 @@
 {:else}
 	<CashSummary {summary} />
 
-	<Card variant="elevated" padding="none">
-		<CashBalancesTable
-			balances={data.balances}
-			{showPortfolio}
-			onRecord={(balance) => (target = { mode: 'create', balance })}
-		/>
-	</Card>
+	<section class="block" aria-labelledby="cash-accounts-title">
+		<h2 id="cash-accounts-title">Cuentas</h2>
+		<Card variant="elevated" padding="none">
+			<CashAccounts
+				balances={data.balances}
+				{showPortfolio}
+				onRecord={(balance) => (target = { mode: 'create', balance })}
+			/>
+		</Card>
+	</section>
 {/if}
 
 {#if data.movements.length > 0}
-	<section class="movements" aria-labelledby="cash-movements-title">
-		<h2 id="cash-movements-title">Movimientos</h2>
+	<section class="block" aria-labelledby="cash-movements-title">
+		<header class="block-head">
+			<h2 id="cash-movements-title">Movimientos</h2>
+			<!-- La regla que distingue esta pantalla de un simple saldo, junto a la
+			     lista donde se ve: el verde de los intereses es su leyenda. -->
+			<p class="rule">
+				Los depósitos y retiros no cuentan como ganancia ni como pérdida. Los
+				<span class="income">intereses</span> sí: suman a tu rentabilidad.
+			</p>
+		</header>
 		<Card variant="elevated" padding="none">
-			<CashMovementsTable
+			<CashMovements
 				movements={data.movements}
 				total={data.movementsTotal}
 				{showPortfolio}
@@ -126,15 +137,35 @@
 		color: var(--amber);
 	}
 
-	.movements {
-		margin-top: 2.5rem;
+	.block + .block {
+		margin-top: 3rem;
 	}
 
-	.movements h2 {
+	.block h2 {
 		margin: 0 0 0.9rem;
 		font-family: var(--font-display);
-		font-size: 1.25rem;
+		font-size: 1.35rem;
 		font-weight: 500;
 		color: var(--text);
+	}
+
+	.block-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0 2rem;
+	}
+
+	.rule {
+		max-width: 52ch;
+		margin: 0 0 0.9rem;
+		font-size: 0.82rem;
+		line-height: 1.5;
+		color: var(--text-muted);
+	}
+
+	.income {
+		color: var(--green);
 	}
 </style>

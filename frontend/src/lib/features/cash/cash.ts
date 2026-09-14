@@ -5,6 +5,7 @@
  */
 
 import type { CashBalance, CashMovement } from '$lib/api/types';
+import { formatCalendarDate } from '$lib/shared/format/date';
 
 export type { CashBalance, CashMovement };
 
@@ -144,6 +145,89 @@ export function groupCashAccounts(balances: CashBalance[]): CashAccount[] {
 			a.sourceName.localeCompare(b.sourceName) ||
 			a.currency.localeCompare(b.currency)
 	);
+}
+
+/** Una plataforma y lo que guarda en cada moneda. */
+export interface CashPlatform {
+	sourceId: string;
+	sourceName: string;
+	displayCurrency: string;
+	/** La suma en `displayCurrency` de las cuentas que se pudieron convertir. */
+	value: number;
+	/** Si a `value` le falta una cuenta con dinero que no tenía tasa. */
+	partial: boolean;
+	/** De la que más vale a la que menos. */
+	accounts: CashAccount[];
+}
+
+/**
+ * Las cuentas agrupadas por plataforma, de la que más guarda a la que menos.
+ *
+ * Es como las enseña un banco: la entidad y, debajo, cada moneda. Dentro de
+ * cada plataforma las cuentas conservan el orden de `groupCashAccounts`.
+ */
+export function groupCashPlatforms(balances: CashBalance[]): CashPlatform[] {
+	const platforms = new Map<string, CashPlatform>();
+
+	for (const account of groupCashAccounts(balances)) {
+		const platform = platforms.get(account.sourceId) ?? {
+			sourceId: account.sourceId,
+			sourceName: account.sourceName,
+			displayCurrency: account.displayCurrency,
+			value: 0,
+			partial: false,
+			accounts: []
+		};
+
+		platform.value += account.value;
+		if (!account.fxConverted && account.balance !== 0) platform.partial = true;
+		platform.accounts.push(account);
+		platforms.set(account.sourceId, platform);
+	}
+
+	return [...platforms.values()].sort(
+		(a, b) => b.value - a.value || a.sourceName.localeCompare(b.sourceName)
+	);
+}
+
+/** Los movimientos de un mes. */
+export interface CashMonth {
+	/** `2026-09`. */
+	key: string;
+	/** «Septiembre de 2026». */
+	label: string;
+	movements: CashMovement[];
+}
+
+/**
+ * Los movimientos agrupados por mes, en el orden en que aparece cada mes.
+ *
+ * La lista llega de la más reciente a la más antigua, así que los meses salen
+ * en ese orden. El mes es el del día del calendario que guarda el backend, no
+ * el de la hora local: un movimiento del 1 de septiembre no puede caer en
+ * agosto en una zona al oeste de Greenwich.
+ */
+export function groupCashMovementsByMonth(movements: CashMovement[]): CashMonth[] {
+	const months = new Map<string, CashMonth>();
+
+	for (const movement of movements) {
+		const key = movement.date.slice(0, 7);
+		const month = months.get(key);
+
+		if (month) {
+			month.movements.push(movement);
+			continue;
+		}
+
+		const label = formatCalendarDate(`${key}-01`, { month: 'long', year: 'numeric' });
+		months.set(key, {
+			key,
+			label: label.charAt(0).toUpperCase() + label.slice(1),
+			movements: [movement]
+		});
+	}
+
+	return [...months.values()];
 }
 
 /**
