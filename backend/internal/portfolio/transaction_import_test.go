@@ -3,6 +3,7 @@ package portfolio
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -219,6 +220,28 @@ func TestPreviewReportsRowErrors(t *testing.T) {
 	}
 	if preview.Rows[3].Valid || len(preview.Rows[3].Errors) == 0 {
 		t.Errorf("row with non-numeric quantity should be invalid: %+v", preview.Rows[3])
+	}
+}
+
+// A fully mapped file has no missing fields, and the client iterates the list:
+// it must reach the browser as [] rather than null.
+func TestPreviewEncodesNoMissingFieldsAsEmptyArray(t *testing.T) {
+	data := buildXLSX(t, "Sheet1", [][]any{
+		{"Fecha", "Ticker", "Cantidad", "Precio"},
+		{"15/01/2024", "AAPL", "10", "180.5"},
+	})
+
+	svc := newTestServices(new(fakeRepository{}), nil)
+	preview, err := svc.PreviewTransactionImport(data, "archivo.xlsx", "", nil, ImportDefaultsDTO{})
+	if err != nil {
+		t.Fatalf("preview: %v", err)
+	}
+	body, err := json.Marshal(preview)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !bytes.Contains(body, []byte(`"missingFields":[]`)) {
+		t.Errorf("missingFields must encode as [], got %s", body)
 	}
 }
 

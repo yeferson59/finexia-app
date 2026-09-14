@@ -76,8 +76,10 @@ func applyImportDefaults(defaults ImportDefaultsDTO) (ImportDefaultsDTO, error) 
 	return out, nil
 }
 
+// missingRequiredFields never returns nil: the slice goes straight into the
+// preview JSON, where nil encodes as null instead of [] and breaks the client.
 func missingRequiredFields(m *ImportMappingDTO) []string {
-	var missing []string
+	missing := []string{}
 	for _, f := range requiredImportFields {
 		var ptr *int
 		switch f {

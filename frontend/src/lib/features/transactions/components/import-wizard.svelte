@@ -121,7 +121,10 @@
 				if (step === 'upload') file = null;
 				return;
 			}
-			preview = body.data as ImportPreview;
+			const data = body.data as ImportPreview;
+			// Un backend en Go manda `null` y no `[]` por un slice vacío; el resto
+			// del asistente da por hecho que es una lista.
+			preview = { ...data, missingFields: data.missingFields ?? [] };
 			sheet = preview.sheet;
 			if (!withMapping) {
 				mapping = { ...preview.suggestedMapping };
