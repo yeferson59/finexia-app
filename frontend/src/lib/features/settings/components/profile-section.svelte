@@ -80,24 +80,5 @@
 	</form>
 </SettingsSection>
 
-<style>
-	/*
-	 * El desplegable de moneda es el único de toda la página de ajustes, y su
-	 * aspecto era una copia a mano de `ui/input.svelte` —lo decía el comentario
-	 * que había aquí— con medio punto más de letra y otro tamaño de relleno.
-	 * Ahora pide el mismo control que el resto del panel y solo añade lo suyo:
-	 * la flecha, porque un `<select>` sin `appearance: none` pinta la del
-	 * sistema, que en un panel oscuro se ve blanca.
-	 *
-	 * Doble clase para ganarle en especificidad al `background` de
-	 * `.field-control`, que sin ella borraría la flecha.
-	 */
-	.field-control.field-select {
-		padding-right: 2.5rem;
-		cursor: pointer;
-		appearance: none;
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-		background-repeat: no-repeat;
-		background-position: right 0.9rem center;
-	}
-</style>
+<!-- La flecha del desplegable de moneda la pone `select.field-control` en
+     `routes/layout.css`, la misma de todos los desplegables del panel. -->

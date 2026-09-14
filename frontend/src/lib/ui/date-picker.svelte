@@ -112,8 +112,9 @@
 		padding-right: 1.6rem;
 	}
 
+	/* Sin `outline: none`: el anillo lo pinta la regla `:focus-visible` global,
+	   y quitándolo el teclado no veía en cuál de los tres estaba. */
 	.dp-select:focus {
-		outline: none;
 		border-color: var(--amber);
 	}
 

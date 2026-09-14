@@ -174,42 +174,23 @@
 				<p class="hint">{hint}</p>
 			</fieldset>
 
+			<!-- La cuenta: plataforma y moneda van juntas porque juntas dicen dónde
+			     está el dinero. Al editar ya está decidida y la nombra la cabecera. -->
 			{#if !editing}
-				<div class="field">
-					<label for="cash-source">Plataforma</label>
-					<select
-						id="cash-source"
-						name="sourceId"
-						bind:value={() => sourceId, (source) => chooseAccount(source, currencyCode)}
-						required
-					>
-						{#each platforms as platform (platform.id)}
-							<option value={platform.id}>{platform.name}</option>
-						{/each}
-					</select>
-				</div>
-			{/if}
-
-			<div class="pair">
-				<div class="field">
-					<label for="cash-amount">Importe</label>
-					<input
-						id="cash-amount"
-						name="amount"
-						type="number"
-						inputmode="decimal"
-						step="any"
-						min="0"
-						bind:value={amount}
-						required
-					/>
-				</div>
-				{#if editing}
+				<div class="pair">
 					<div class="field">
-						<span class="field-label">Moneda</span>
-						<p class="fixed">{editing.currency}</p>
+						<label for="cash-source">Plataforma</label>
+						<select
+							id="cash-source"
+							name="sourceId"
+							bind:value={() => sourceId, (source) => chooseAccount(source, currencyCode)}
+							required
+						>
+							{#each platforms as platform (platform.id)}
+								<option value={platform.id}>{platform.name}</option>
+							{/each}
+						</select>
 					</div>
-				{:else}
 					<div class="field">
 						<label for="cash-currency">Moneda</label>
 						<select
@@ -223,28 +204,61 @@
 							{/each}
 						</select>
 					</div>
-				{/if}
-			</div>
+				</div>
+			{/if}
 
+			<!--
+				Los dos importes juntos, con la moneda escrita dentro. Al editar no hay
+				selector que la diga, y como texto suelto en media columna no se
+				alineaba con nada. La comisión se descuenta de la misma cuenta, así
+				que lleva la misma moneda.
+
+				Con intereses la comisión desaparece pero el importe no se ensancha:
+				cambiar de tipo no mueve el campo que se está escribiendo.
+			-->
 			<div class="pair">
 				<div class="field">
-					<span class="field-label">Fecha</span>
-					<DatePicker name="date" bind:value={date} required />
-				</div>
-				{#if kind !== 'interest'}
-					<div class="field">
-						<label for="cash-fees">Comisión <span class="optional">(opcional)</span></label>
+					<label for="cash-amount">Importe</label>
+					<div class="with-unit">
 						<input
-							id="cash-fees"
-							name="fees"
+							id="cash-amount"
+							name="amount"
 							type="number"
 							inputmode="decimal"
 							step="any"
 							min="0"
-							bind:value={fees}
+							bind:value={amount}
+							aria-describedby="cash-amount-unit"
+							required
 						/>
+						<span class="unit" id="cash-amount-unit">{currencyCode}</span>
+					</div>
+				</div>
+				{#if kind !== 'interest'}
+					<div class="field">
+						<label for="cash-fees">Comisión <span class="optional">(opcional)</span></label>
+						<div class="with-unit">
+							<input
+								id="cash-fees"
+								name="fees"
+								type="number"
+								inputmode="decimal"
+								step="any"
+								min="0"
+								bind:value={fees}
+								aria-describedby="cash-fees-unit"
+							/>
+							<span class="unit" id="cash-fees-unit">{currencyCode}</span>
+						</div>
 					</div>
 				{/if}
+			</div>
+
+			<!-- Fila propia: día, mes y año no caben en media columna, y el año se
+			     montaba sobre la comisión. -->
+			<div class="field">
+				<span class="field-label">Fecha</span>
+				<DatePicker name="date" bind:value={date} required />
 			</div>
 
 			{#if !editing}
@@ -348,12 +362,34 @@
 		background: rgba(212, 145, 42, 0.08);
 	}
 
-	.fixed {
+	.with-unit {
+		position: relative;
+	}
+
+	/* Sitio a la derecha para la moneda. Sin flechas de número: con `step="any"`
+	   suben de uno en uno, que en un importe no sirve, y tapaban la moneda. */
+	.with-unit input {
+		padding-right: 3.75rem;
+		appearance: textfield;
+		-moz-appearance: textfield;
+	}
+
+	.with-unit input::-webkit-inner-spin-button,
+	.with-unit input::-webkit-outer-spin-button {
+		-webkit-appearance: none;
 		margin: 0;
-		padding: 0.8rem 0;
+	}
+
+	.unit {
+		position: absolute;
+		top: 50%;
+		right: 0.95rem;
+		transform: translateY(-50%);
 		font-family: var(--font-mono);
-		font-size: 0.9rem;
-		color: var(--text-muted);
+		font-size: 0.78rem;
+		letter-spacing: 0.04em;
+		color: var(--text-dim);
+		pointer-events: none;
 	}
 
 	.feedback {
