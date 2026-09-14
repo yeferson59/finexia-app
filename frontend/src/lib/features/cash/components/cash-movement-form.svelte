@@ -2,10 +2,14 @@
 	/**
 	 * Registrar o editar un movimiento de efectivo.
 	 *
-	 * Al registrar se elige sobre qué saldo cae —portafolio, plataforma y
-	 * moneda—; si esa plataforma aún no guardaba esa moneda para ese portafolio,
-	 * el primer depósito abre el saldo. Al editar, el saldo ya está decidido y
-	 * solo se nombra: moverlo de cuenta es borrarlo y registrarlo de nuevo.
+	 * Al registrar se elige la cuenta —plataforma y moneda—, que es donde está el
+	 * dinero; si esa plataforma aún no guardaba esa moneda, el primer depósito
+	 * abre la cuenta. Al editar, la cuenta ya está decidida y solo se nombra:
+	 * moverlo de cuenta es borrarlo y registrarlo de nuevo.
+	 *
+	 * El portafolio es secundario: solo decide dónde cuenta el dinero. Con uno
+	 * solo no se pregunta. Con varios va al final, y elegir la cuenta propone el
+	 * portafolio donde ya suma, para que un depósito no la parta en dos.
 	 *
 	 * El tipo va primero y como opciones a la vista, no en un desplegable, porque
 	 * es la decisión que cambia la rentabilidad: la frase debajo dice cuál de los
@@ -20,6 +24,7 @@
 	import {
 		CASH_KIND_OPTIONS,
 		cashAccountLabel,
+		suggestCashPortfolio,
 		type CashBalance,
 		type CashKind,
 		type CashMovement
@@ -33,12 +38,14 @@
 		target: CashFormTarget | null;
 		portfolios: { id: string; name: string; isDefault: boolean }[];
 		platforms: { id: string; name: string }[];
+		/** Los saldos que ya hay, para proponer el portafolio de una cuenta existente. */
+		balances: CashBalance[];
 		/** Moneda que se propone para un saldo nuevo: la de la cuenta. */
 		currency: string;
 		onClose: () => void;
 	}
 
-	let { target, portfolios, platforms, currency, onClose }: Props = $props();
+	let { target, portfolios, platforms, balances, currency, onClose }: Props = $props();
 
 	interface Fields {
 		kind: CashKind;
@@ -68,12 +75,14 @@
 		}
 
 		const b = current?.balance;
+		const source = b?.sourceId ?? platforms[0]?.id ?? '';
+		const code = b?.currency ?? currency;
+		const fallback = (portfolios.find((p) => p.isDefault) ?? portfolios[0])?.id ?? '';
 		return {
 			kind: 'deposit',
-			portfolioId:
-				b?.portfolioId ?? (portfolios.find((p) => p.isDefault) ?? portfolios[0])?.id ?? '',
-			sourceId: b?.sourceId ?? platforms[0]?.id ?? '',
-			currency: b?.currency ?? currency,
+			portfolioId: b?.portfolioId ?? suggestCashPortfolio(balances, source, code, fallback),
+			sourceId: source,
+			currency: code,
 			amount: '',
 			fees: '',
 			date: todayLocalDateString(),
@@ -104,15 +113,28 @@
 		onClose();
 	}
 
+	/*
+	 * Cambiar la cuenta propone dónde cuenta: si esa plataforma ya guarda esa
+	 * moneda, el portafolio de ese saldo. Si no, se queda el que estaba.
+	 */
+	function chooseAccount(source: string, code: string) {
+		sourceId = source;
+		currencyCode = code;
+		portfolioId = suggestCashPortfolio(balances, source, code, portfolioId);
+	}
+
 	const editing = $derived(target?.mode === 'edit' ? target.movement : null);
 	const hint = $derived(CASH_KIND_OPTIONS.find((o) => o.value === kind)?.hint ?? '');
+
+	/* Con un solo portafolio no hay nada que elegir ni que nombrar. */
+	const choosePortfolio = $derived(portfolios.length > 1);
 </script>
 
 <Modal
 	open={target !== null}
 	title={editing ? 'Editar movimiento' : 'Registrar movimiento'}
 	description={editing
-		? cashAccountLabel(editing)
+		? cashAccountLabel(editing, choosePortfolio)
 		: 'Anota el dinero que entra o sale de una cuenta.'}
 	size="md"
 	onClose={close}
@@ -153,23 +175,18 @@
 			</fieldset>
 
 			{#if !editing}
-				<div class="pair">
-					<div class="field">
-						<label for="cash-source">Plataforma</label>
-						<select id="cash-source" name="sourceId" bind:value={sourceId} required>
-							{#each platforms as platform (platform.id)}
-								<option value={platform.id}>{platform.name}</option>
-							{/each}
-						</select>
-					</div>
-					<div class="field">
-						<label for="cash-portfolio">Portafolio</label>
-						<select id="cash-portfolio" name="portfolioId" bind:value={portfolioId} required>
-							{#each portfolios as portfolio (portfolio.id)}
-								<option value={portfolio.id}>{portfolio.name}</option>
-							{/each}
-						</select>
-					</div>
+				<div class="field">
+					<label for="cash-source">Plataforma</label>
+					<select
+						id="cash-source"
+						name="sourceId"
+						bind:value={() => sourceId, (source) => chooseAccount(source, currencyCode)}
+						required
+					>
+						{#each platforms as platform (platform.id)}
+							<option value={platform.id}>{platform.name}</option>
+						{/each}
+					</select>
 				</div>
 			{/if}
 
@@ -195,7 +212,12 @@
 				{:else}
 					<div class="field">
 						<label for="cash-currency">Moneda</label>
-						<select id="cash-currency" name="currency" bind:value={currencyCode} required>
+						<select
+							id="cash-currency"
+							name="currency"
+							bind:value={() => currencyCode, (code) => chooseAccount(sourceId, code)}
+							required
+						>
 							{#each SUPPORTED_CURRENCIES as code (code)}
 								<option value={code}>{code}</option>
 							{/each}
@@ -224,6 +246,30 @@
 					</div>
 				{/if}
 			</div>
+
+			{#if !editing}
+				{#if choosePortfolio}
+					<div class="field">
+						<label for="cash-portfolio">Portafolio</label>
+						<select
+							id="cash-portfolio"
+							name="portfolioId"
+							bind:value={portfolioId}
+							aria-describedby="cash-portfolio-hint"
+							required
+						>
+							{#each portfolios as portfolio (portfolio.id)}
+								<option value={portfolio.id}>{portfolio.name}</option>
+							{/each}
+						</select>
+						<p class="hint" id="cash-portfolio-hint">
+							En cuál suma este dinero. No cambia dónde está: sigue en la plataforma.
+						</p>
+					</div>
+				{:else}
+					<input type="hidden" name="portfolioId" value={portfolioId} />
+				{/if}
+			{/if}
 
 			<div class="field">
 				<label for="cash-notes">Nota <span class="optional">(opcional)</span></label>

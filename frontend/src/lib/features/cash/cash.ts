@@ -56,9 +56,118 @@ export function cashKindSign(kind: string): 1 | -1 | 0 {
 	return 0;
 }
 
-/** Plataforma y portafolio de un saldo o un movimiento, en una línea. */
-export function cashAccountLabel(row: { sourceName: string; portfolioName: string }): string {
+/**
+ * Plataforma y portafolio de un saldo o un movimiento, en una línea.
+ *
+ * Sin `withPortfolio` solo se nombra la plataforma: con un único portafolio no
+ * hay otro sitio donde el dinero pueda contar, y repetirlo en cada fila no dice
+ * nada.
+ */
+export function cashAccountLabel(
+	row: { sourceName: string; portfolioName: string },
+	withPortfolio = true
+): string {
+	if (!withPortfolio) return row.sourceName || 'Sin plataforma';
 	return row.sourceName ? `${row.sourceName} · ${row.portfolioName}` : row.portfolioName;
+}
+
+/**
+ * Una cuenta: lo que guarda una plataforma en una moneda.
+ *
+ * Es la cifra del extracto del banco o del bróker. Por dentro cada portafolio
+ * lleva su propio saldo en esa cuenta —así suma en su valor y en su
+ * rentabilidad—, pero un único saldo real partido en varias filas sería
+ * irreconocible.
+ */
+export interface CashAccount {
+	/** Plataforma y moneda: lo que identifica la cuenta. */
+	key: string;
+	sourceId: string;
+	sourceName: string;
+	currency: string;
+	displayCurrency: string;
+	/** La suma de sus saldos, en `currency`. */
+	balance: number;
+	/** La suma en `displayCurrency` de los saldos que se pudieron convertir. */
+	value: number;
+	/** Si se pudieron convertir todos. */
+	fxConverted: boolean;
+	lastMovementDate: string | null;
+	/** Un saldo por portafolio, del mayor al menor. */
+	balances: CashBalance[];
+}
+
+/** Los saldos agrupados por cuenta, de la que más vale a la que menos. */
+export function groupCashAccounts(balances: CashBalance[]): CashAccount[] {
+	const accounts = new Map<string, CashAccount>();
+
+	for (const row of balances) {
+		const key = `${row.sourceId}:${row.currency}`;
+		const account = accounts.get(key) ?? {
+			key,
+			sourceId: row.sourceId,
+			sourceName: row.sourceName,
+			currency: row.currency,
+			displayCurrency: row.displayCurrency,
+			balance: 0,
+			value: 0,
+			fxConverted: true,
+			lastMovementDate: null,
+			balances: []
+		};
+
+		account.balance += parseFloat(row.balance) || 0;
+		if (row.fxConverted) account.value += parseFloat(row.value) || 0;
+		else account.fxConverted = false;
+
+		if (
+			row.lastMovementDate &&
+			(!account.lastMovementDate ||
+				Date.parse(row.lastMovementDate) > Date.parse(account.lastMovementDate))
+		) {
+			account.lastMovementDate = row.lastMovementDate;
+		}
+
+		account.balances.push(row);
+		accounts.set(key, account);
+	}
+
+	const list = [...accounts.values()];
+	for (const account of list) {
+		account.balances.sort((a, b) => (parseFloat(b.balance) || 0) - (parseFloat(a.balance) || 0));
+	}
+
+	return list.sort(
+		(a, b) =>
+			b.value - a.value ||
+			b.balance - a.balance ||
+			a.sourceName.localeCompare(b.sourceName) ||
+			a.currency.localeCompare(b.currency)
+	);
+}
+
+/**
+ * El portafolio que se propone para un movimiento en una plataforma y una
+ * moneda.
+ *
+ * Si la cuenta ya existe, el de su saldo mayor: un depósito cae sobre el dinero
+ * que ya estaba, en lugar de abrir otro saldo en otro portafolio y partir la
+ * cuenta en dos. Si no existe, se queda `fallback`, lo que ya estaba elegido.
+ */
+export function suggestCashPortfolio(
+	balances: CashBalance[],
+	sourceId: string,
+	currency: string,
+	fallback: string
+): string {
+	let best: CashBalance | undefined;
+
+	for (const row of balances) {
+		if (row.sourceId !== sourceId || row.currency !== currency) continue;
+		if (!best || (parseFloat(row.balance) || 0) > (parseFloat(best.balance) || 0)) best = row;
+	}
+
+	return best?.portfolioId ?? fallback;
 }
 
 /** Lo que suma el efectivo en una moneda, entre todas sus cuentas. */
@@ -76,8 +185,8 @@ export interface CashSummary {
 	total: number;
 	currency: string;
 	/**
-	 * Saldos con dinero que no tenían tasa a `currency` y quedaron fuera de
-	 * `total`: sumarlos a valor nominal mezclaría monedas.
+	 * Cuentas con dinero que no tenían tasa a `currency` y quedaron fuera de
+	 * `total`: sumarlas a valor nominal mezclaría monedas.
 	 */
 	unconverted: number;
 	/** Cuentas con saldo, de todas las listadas. */
@@ -93,6 +202,9 @@ export interface CashSummary {
  * quedan fuera del total —es la regla del listado de portafolios— pero siguen
  * en el reparto por moneda con su importe propio, que es donde sí significan
  * algo.
+ *
+ * Lo que se cuenta son cuentas, no saldos: una cuenta cuyo dinero suma en dos
+ * portafolios sigue siendo una, que es como aparece en la tabla.
  */
 export function summarizeCash(balances: CashBalance[], fallbackCurrency: string): CashSummary {
 	let total = 0;
@@ -100,25 +212,22 @@ export function summarizeCash(balances: CashBalance[], fallbackCurrency: string)
 	let funded = 0;
 	const groups = new Map<string, CashCurrencyTotal>();
 
-	for (const row of balances) {
-		const balance = parseFloat(row.balance) || 0;
-		const value = parseFloat(row.value) || 0;
+	for (const account of groupCashAccounts(balances)) {
+		if (account.balance !== 0) funded += 1;
 
-		if (balance !== 0) funded += 1;
+		total += account.value;
+		if (!account.fxConverted && account.balance !== 0) unconverted += 1;
 
-		if (row.fxConverted) total += value;
-		else if (balance !== 0) unconverted += 1;
-
-		const group = groups.get(row.currency) ?? {
-			currency: row.currency,
+		const group = groups.get(account.currency) ?? {
+			currency: account.currency,
 			balance: 0,
 			value: 0,
 			accounts: 0
 		};
-		group.balance += balance;
-		group.value += row.fxConverted ? value : 0;
+		group.balance += account.balance;
+		group.value += account.value;
 		group.accounts += 1;
-		groups.set(row.currency, group);
+		groups.set(account.currency, group);
 	}
 
 	const byCurrency = [...groups.values()].sort(

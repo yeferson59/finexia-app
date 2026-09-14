@@ -4,6 +4,8 @@ import {
 	cashErrorMessage,
 	cashKindSign,
 	formatCashKind,
+	groupCashAccounts,
+	suggestCashPortfolio,
 	summarizeCash,
 	type CashBalance
 } from './cash';
@@ -33,7 +35,13 @@ describe('summarizeCash', () => {
 			[
 				balance({ balance: '4000000', currency: 'COP', value: '1000' }),
 				balance({ balance: '250', currency: 'USD' }),
-				balance({ balance: '1000000', currency: 'COP', value: '250', sourceName: 'Bancolombia' })
+				balance({
+					balance: '1000000',
+					currency: 'COP',
+					value: '250',
+					sourceId: 's2',
+					sourceName: 'Bancolombia'
+				})
 			],
 			'USD'
 		);
@@ -44,6 +52,22 @@ describe('summarizeCash', () => {
 		expect(summary.byCurrency).toEqual([
 			{ currency: 'COP', balance: 5000000, value: 1250, accounts: 2 },
 			{ currency: 'USD', balance: 250, value: 250, accounts: 1 }
+		]);
+	});
+
+	it('cuenta cuentas, no saldos: una repartida entre portafolios es una', () => {
+		const summary = summarizeCash(
+			[
+				balance({ balance: '700', currency: 'USD' }),
+				balance({ balance: '300', currency: 'USD', portfolioId: 'p2', portfolioName: 'Retiro' })
+			],
+			'USD'
+		);
+
+		expect(summary.total).toBe(1000);
+		expect(summary.funded).toBe(1);
+		expect(summary.byCurrency).toEqual([
+			{ currency: 'USD', balance: 1000, value: 1000, accounts: 1 }
 		]);
 	});
 
@@ -79,6 +103,69 @@ describe('summarizeCash', () => {
 	});
 });
 
+describe('groupCashAccounts', () => {
+	it('junta en una cuenta los saldos de una plataforma y una moneda', () => {
+		const accounts = groupCashAccounts([
+			balance({
+				balance: '300',
+				currency: 'USD',
+				portfolioId: 'p2',
+				portfolioName: 'Retiro',
+				lastMovementDate: '2026-08-15T00:00:00Z'
+			}),
+			balance({ balance: '700', currency: 'USD' }),
+			balance({ balance: '50', currency: 'USD', sourceId: 's2', sourceName: 'IBKR' })
+		]);
+
+		expect(accounts).toHaveLength(2);
+		expect(accounts[0]).toMatchObject({
+			key: 's1:USD',
+			sourceName: 'Nu',
+			balance: 1000,
+			value: 1000,
+			fxConverted: true,
+			lastMovementDate: '2026-09-01T00:00:00Z'
+		});
+		expect(accounts[0].balances.map((b) => b.portfolioName)).toEqual(['Ahorro', 'Retiro']);
+		expect(accounts[1]).toMatchObject({ key: 's2:USD', balance: 50 });
+	});
+
+	it('separa las monedas de una misma plataforma', () => {
+		const accounts = groupCashAccounts([
+			balance({ balance: '10', currency: 'USD' }),
+			balance({ balance: '40000', currency: 'COP', value: '10' })
+		]);
+
+		expect(accounts.map((a) => a.key).sort()).toEqual(['s1:COP', 's1:USD']);
+	});
+
+	it('no suma al valor lo que no se pudo convertir', () => {
+		const [account] = groupCashAccounts([
+			balance({ balance: '900', currency: 'CHF', value: '900', fxConverted: false })
+		]);
+
+		expect(account).toMatchObject({ balance: 900, value: 0, fxConverted: false });
+	});
+});
+
+describe('suggestCashPortfolio', () => {
+	const balances = [
+		balance({ balance: '300', currency: 'USD', portfolioId: 'p2' }),
+		balance({ balance: '700', currency: 'USD', portfolioId: 'p1' }),
+		balance({ balance: '5', currency: 'COP', portfolioId: 'p3' })
+	];
+
+	it('propone el portafolio del saldo mayor de la cuenta', () => {
+		expect(suggestCashPortfolio(balances, 's1', 'USD', 'p9')).toBe('p1');
+		expect(suggestCashPortfolio(balances, 's1', 'COP', 'p9')).toBe('p3');
+	});
+
+	it('si la cuenta no existe, deja lo que estaba elegido', () => {
+		expect(suggestCashPortfolio(balances, 's2', 'USD', 'p9')).toBe('p9');
+		expect(suggestCashPortfolio(balances, 's1', 'EUR', 'p9')).toBe('p9');
+	});
+});
+
 describe('formatCashKind y cashKindSign', () => {
 	it('nombra y firma los tres movimientos', () => {
 		expect(formatCashKind('deposit')).toBe('Depósito');
@@ -97,6 +184,13 @@ describe('formatCashKind y cashKindSign', () => {
 describe('cashAccountLabel', () => {
 	it('pone la plataforma delante del portafolio', () => {
 		expect(cashAccountLabel({ sourceName: 'Nu', portfolioName: 'Ahorro' })).toBe('Nu · Ahorro');
+	});
+
+	it('sin portafolio nombra solo la plataforma', () => {
+		expect(cashAccountLabel({ sourceName: 'Nu', portfolioName: 'Ahorro' }, false)).toBe('Nu');
+		expect(cashAccountLabel({ sourceName: '', portfolioName: 'Ahorro' }, false)).toBe(
+			'Sin plataforma'
+		);
 	});
 });
 

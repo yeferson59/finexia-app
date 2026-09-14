@@ -22,6 +22,9 @@
 	/* Sin portafolio o sin plataforma no hay saldo sobre el que anotar nada. */
 	const canRecord = $derived(data.portfolios.length > 0 && data.platforms.length > 0);
 
+	/* Con un solo portafolio no hay otro sitio donde el efectivo pueda contar: no se nombra. */
+	const showPortfolio = $derived(data.portfolios.length > 1);
+
 	let target = $state<CashFormTarget | null>(null);
 
 	function record() {
@@ -85,6 +88,7 @@
 	<Card variant="elevated" padding="none">
 		<CashBalancesTable
 			balances={data.balances}
+			{showPortfolio}
 			onRecord={(balance) => (target = { mode: 'create', balance })}
 		/>
 	</Card>
@@ -97,6 +101,7 @@
 			<CashMovementsTable
 				movements={data.movements}
 				total={data.movementsTotal}
+				{showPortfolio}
 				onEdit={(movement) => (target = { mode: 'edit', movement })}
 			/>
 		</Card>
@@ -107,6 +112,7 @@
 	{target}
 	portfolios={data.portfolios}
 	platforms={data.platforms}
+	balances={data.balances}
 	currency={data.currency}
 	onClose={() => (target = null)}
 />

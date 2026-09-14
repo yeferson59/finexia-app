@@ -19,10 +19,12 @@
 		movements: CashMovement[];
 		/** Cuántos hay en total; puede ser más de los que se trajeron. */
 		total: number;
+		/** Si la cuenta nombra también el portafolio. Con uno solo, sobra. */
+		showPortfolio?: boolean;
 		onEdit: (movement: CashMovement) => void;
 	}
 
-	let { movements, total, onEdit }: Props = $props();
+	let { movements, total, showPortfolio = true, onEdit }: Props = $props();
 
 	const PER_PAGE = 15;
 	let page = $state(1);
@@ -64,12 +66,12 @@
 				<td class="col-date date">{date(movement.date)}</td>
 				<th scope="row" class="kind">
 					{formatCashKind(movement.kind)}
-					<span class="detail narrow-only">{cashAccountLabel(movement)}</span>
+					<span class="detail narrow-only">{cashAccountLabel(movement, showPortfolio)}</span>
 					{#if movement.notes}
 						<span class="detail">{movement.notes}</span>
 					{/if}
 				</th>
-				<td class="col-account account">{cashAccountLabel(movement)}</td>
+				<td class="col-account account">{cashAccountLabel(movement, showPortfolio)}</td>
 				<td class="num figure">
 					<span class:income={movement.kind === 'interest'}>{amount(movement)}</span>
 					{#if fees(movement)}
@@ -98,7 +100,7 @@
 	{/if}
 </div>
 
-<CashDeleteConfirm movement={deleting} onClose={() => (deleting = null)} />
+<CashDeleteConfirm movement={deleting} {showPortfolio} onClose={() => (deleting = null)} />
 
 <style>
 	.date {

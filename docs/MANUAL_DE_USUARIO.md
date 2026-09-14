@@ -458,11 +458,11 @@ La ficha avisa cuando toca. Si **ninguna** posición tiene precio de mercado, ex
 
 ### 9.5 El efectivo de tus plataformas
 
-La sección **Efectivo** del menú guarda el dinero que tienes sin invertir: lo que queda en tu cuenta del bróker, en tu cuenta de ahorros o en tu billetera. Cada saldo pertenece a una **plataforma**, a un **portafolio** y a una **moneda**, y suma en el valor de ese portafolio como una posición más.
+La sección **Efectivo** del menú guarda el dinero que tienes sin invertir: lo que queda en tu cuenta del bróker, en tu cuenta de ahorros o en tu billetera. Cada **cuenta** es una **plataforma** en una **moneda** —tus pesos en el banco, tus dólares en el bróker—, y su dinero suma en el valor de un **portafolio** como una posición más. Si solo tienes un portafolio, Finexia no te lo pregunta: suma en ese.
 
-La página abre con el **total** en la moneda de tu cuenta y, si tienes efectivo en varias monedas, cuánto hay en cada una con su propio importe, que es el que coincide con tu extracto. Debajo están los **saldos** —uno por plataforma, portafolio y moneda— y el historial de **movimientos**.
+La página abre con el **total** en la moneda de tu cuenta y, si tienes efectivo en varias monedas, cuánto hay en cada una con su propio importe, que es el que coincide con tu extracto. Debajo están las **cuentas** —una por plataforma y moneda, con el saldo que ves en la plataforma— y el historial de **movimientos**. Si el dinero de una cuenta suma en más de un portafolio, la fila lo dice y lista cuánto corresponde a cada uno.
 
-Para anotar un movimiento pulsa **Registrar movimiento**, o **Movimiento** en la fila de un saldo, que abre el formulario con esa cuenta ya elegida. Lo primero es decir qué pasó:
+Para anotar un movimiento pulsa **Registrar movimiento**, o **Movimiento** en la fila de una cuenta, que abre el formulario con esa cuenta ya elegida. Lo primero es decir qué pasó:
 
 | Movimiento | Qué hace con el saldo | Qué hace con tu rentabilidad |
 |---|---|---|
@@ -470,7 +470,9 @@ Para anotar un movimiento pulsa **Registrar movimiento**, o **Movimiento** en la
 | **Retiro** | Lo baja | Nada: es dinero que sacaste, no una pérdida. Su comisión sí resta |
 | **Intereses** | Lo sube | La sube: es lo que ganó tu dinero |
 
-Después eliges la plataforma, el portafolio, la moneda, el importe y la fecha, y si quieres una comisión y una nota. El primer depósito en una plataforma y una moneda abre el saldo; los siguientes se suman a él.
+Después eliges la plataforma, el importe, la moneda y la fecha, y si quieres una comisión y una nota. El primer depósito en una plataforma y una moneda abre la cuenta; los siguientes se suman a ella.
+
+Si tienes **varios portafolios**, el formulario pregunta al final en cuál suma ese dinero. No cambia dónde está —sigue en la plataforma—, solo en qué portafolio cuenta. Cuando la cuenta ya existe, Finexia propone el portafolio donde ya suma, para que un depósito no la parta en dos.
 
 > **Anota los intereses netos.** Si el banco retiene impuestos, escribe lo que llegó a la cuenta: los intereses no llevan comisión.
 

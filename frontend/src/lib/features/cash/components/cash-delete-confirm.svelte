@@ -15,10 +15,12 @@
 
 	interface Props {
 		movement: CashMovement | null;
+		/** Si la cuenta nombra también el portafolio. */
+		showPortfolio?: boolean;
 		onClose: () => void;
 	}
 
-	let { movement, onClose }: Props = $props();
+	let { movement, showPortfolio = true, onClose }: Props = $props();
 
 	let submitting = $state(false);
 	let error = $state('');
@@ -65,7 +67,8 @@
 
 			<p class="body">
 				{formatCashKind(movement.kind)} de <strong>{amount}</strong> en {cashAccountLabel(
-					movement
+					movement,
+					showPortfolio
 				)}.
 				{#if movement.kind === 'deposit' || movement.kind === 'interest'}
 					Si ese dinero ya salió en un retiro, no se podrá borrar hasta quitar el retiro.

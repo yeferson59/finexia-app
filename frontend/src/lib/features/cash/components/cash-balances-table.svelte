@@ -1,45 +1,66 @@
 <script lang="ts">
 	/**
-	 * Los saldos, uno por plataforma, portafolio y moneda.
+	 * Las cuentas de efectivo: una por plataforma y moneda.
 	 *
-	 * La cuenta se nombra por la plataforma —es donde está el dinero— y el
-	 * portafolio va debajo, porque es dónde cuenta. El botón de cada fila abre
-	 * el formulario con ese saldo ya elegido: casi siempre se anota un movimiento
-	 * sobre una cuenta que ya existe.
+	 * Se agrupa por cuenta porque es la cifra que el usuario reconoce, la de su
+	 * extracto. Que cada portafolio lleve por dentro su propio saldo es cómo el
+	 * dinero suma en su valor, y solo se enseña cuando reparte algo: con un único
+	 * portafolio no se nombra, y una cuenta repartida lista cuánto pone cada uno.
+	 *
+	 * El botón de cada fila abre el formulario con esa cuenta ya elegida —casi
+	 * siempre se anota sobre una que ya existe— y, si está repartida, con el
+	 * portafolio de su saldo mayor, que el formulario deja cambiar.
 	 */
 	import Button from '$lib/ui/button.svelte';
 	import DataTable from '$lib/ui/data-table.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { formatCalendarDate } from '$lib/shared/format/date';
-	import type { CashBalance } from '../cash';
+	import { groupCashAccounts, type CashAccount, type CashBalance } from '../cash';
 
 	interface Props {
 		balances: CashBalance[];
+		/** Si se nombra el portafolio de cada cuenta. Con uno solo, sobra. */
+		showPortfolio: boolean;
 		onRecord: (balance: CashBalance) => void;
 	}
 
-	let { balances, onRecord }: Props = $props();
+	let { balances, showPortfolio, onRecord }: Props = $props();
 
-	const money = (amount: string, currency: string) =>
-		privacy.money(formatCurrency(parseFloat(amount) || 0, currency));
+	const accounts = $derived(groupCashAccounts(balances));
+
+	const money = (amount: number, currency: string) =>
+		privacy.money(formatCurrency(amount, currency));
 
 	const displayCurrency = $derived(balances[0]?.displayCurrency ?? '');
 
 	/* Si todo está en la moneda de la pantalla, la columna repetiría el saldo. */
 	const showValue = $derived(balances.some((b) => b.currency !== b.displayCurrency));
 
-	function lastMovement(balance: CashBalance): string {
-		if (!balance.lastMovementDate) return 'sin movimientos';
-		return `último movimiento el ${formatCalendarDate(balance.lastMovementDate, {
+	function lastMovement(account: CashAccount): string {
+		if (!account.lastMovementDate) return 'sin movimientos';
+		return `último movimiento el ${formatCalendarDate(account.lastMovementDate, {
 			day: 'numeric',
 			month: 'short',
 			year: 'numeric'
 		})}`;
 	}
+
+	function meta(account: CashAccount): string {
+		const last = lastMovement(account);
+
+		if (account.balances.length > 1) {
+			return `Repartida en ${account.balances.length} portafolios · ${last}`;
+		}
+		if (showPortfolio) {
+			return `${account.balances[0].portfolioName} · ${last}`;
+		}
+
+		return last.charAt(0).toUpperCase() + last.slice(1);
+	}
 </script>
 
-<DataTable caption="Saldos de efectivo por plataforma, portafolio y moneda">
+<DataTable caption="Cuentas de efectivo por plataforma y moneda">
 	<thead>
 		<tr>
 			<th scope="col">Cuenta</th>
@@ -52,25 +73,42 @@
 		</tr>
 	</thead>
 	<tbody>
-		{#each balances as balance (balance.entryId)}
-			<tr class="row" class:emptied={(parseFloat(balance.balance) || 0) === 0}>
+		{#each accounts as account (account.key)}
+			<tr class="row" class:emptied={account.balance === 0}>
 				<td class="cell-account">
-					<span class="source">{balance.sourceName || 'Sin plataforma'}</span>
-					<span class="meta">{balance.portfolioName} · {lastMovement(balance)}</span>
+					<span class="source">{account.sourceName || 'Sin plataforma'}</span>
+					<span class="meta">{meta(account)}</span>
+					{#if account.balances.length > 1}
+						<ul class="portions" aria-label="Reparto por portafolio">
+							{#each account.balances as balance (balance.entryId)}
+								<li>
+									<span class="portion-name">{balance.portfolioName}</span>
+									<span class="portion-amount">
+										{money(parseFloat(balance.balance) || 0, balance.currency)}
+									</span>
+								</li>
+							{/each}
+						</ul>
+					{/if}
 				</td>
-				<td class="col-currency"><span class="code">{balance.currency}</span></td>
-				<td class="num figure">{money(balance.balance, balance.currency)}</td>
+				<td class="col-currency"><span class="code">{account.currency}</span></td>
+				<td class="num figure">{money(account.balance, account.currency)}</td>
 				{#if showValue}
 					<td class="num figure col-value muted">
-						{#if balance.fxConverted}
-							{money(balance.value, balance.displayCurrency)}
+						{#if account.fxConverted}
+							{money(account.value, account.displayCurrency)}
 						{:else}
 							<span title="No hay tasa de cambio guardada para convertir este saldo">—</span>
 						{/if}
 					</td>
 				{/if}
 				<td class="col-actions">
-					<Button type="button" variant="secondary" size="sm" onclick={() => onRecord(balance)}>
+					<Button
+						type="button"
+						variant="secondary"
+						size="sm"
+						onclick={() => onRecord(account.balances[0])}
+					>
 						Movimiento
 					</Button>
 				</td>
@@ -103,6 +141,33 @@
 		margin-top: 0.2rem;
 		font-size: 0.8rem;
 		color: var(--text-dim);
+	}
+
+	.portions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem 1.25rem;
+		margin: 0.45rem 0 0;
+		padding: 0;
+		list-style: none;
+		font-size: 0.8rem;
+	}
+
+	.portions li {
+		display: flex;
+		align-items: baseline;
+		gap: 0.45rem;
+	}
+
+	.portion-name {
+		color: var(--text-muted);
+	}
+
+	.portion-amount {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+		color: var(--text);
 	}
 
 	.code {
