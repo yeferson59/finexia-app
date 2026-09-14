@@ -155,6 +155,8 @@ github.com/gofiber/storage/testhelpers/redis v0.1.0 h1:lDUwtanDf3f5YwlDwhbqnqCtj
 github.com/gofiber/storage/testhelpers/redis v0.1.0/go.mod h1:Y1UccxbGVL04+TF5RuyCsksX+76hu6nJIWjPukBBgJ4=
 github.com/gofiber/utils/v2 v2.5.1 h1:Yrt/ljbfsgnDSHymoMvVX5PFrb9kCV/OJnDu6sYuT4A=
 github.com/gofiber/utils/v2 v2.5.1/go.mod h1:5GyHTNQA1I6Qwlw7BWxQsZl8iuFS4yPjLFck+wYR304=
+github.com/gofiber/utils/v2 v2.5.2 h1:bX+iACKsCGm2+dW7jvkYSiWIsBaKqFy5slFSxJSIL/s=
+github.com/gofiber/utils/v2 v2.5.2/go.mod h1:EaVDjy4JJv0m0lg6x4owJ1GG8j1pMO8XriqCgVns1ZQ=
 github.com/gogo/protobuf v1.3.2 h1:Ov1cvc58UF3b5XjBnZv7+opcTcQFZebYjWzi34vdm4Q=
 github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69NZV8Q=
 github.com/golang-jwt/jwt/v5 v5.3.1 h1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63YCY=
@@ -215,6 +217,8 @@ github.com/moby/term v0.5.2 h1:6qk3FJAFDs6i/q3W/pQ97SX192qKfZgGjCQqfCJkgzQ=
 github.com/moby/term v0.5.2/go.mod h1:d3djjFCrjnB+fl8NJux+EJzu0msscUP+f8it8hPkFLc=
 github.com/modelcontextprotocol/go-sdk v1.7.0 h1:yqjY2dsbKAC0LSuWZVBMrHgiG8ukXv6NRo0JiALay44=
 github.com/modelcontextprotocol/go-sdk v1.7.0/go.mod h1:dL7u98E/zjJTGzEq+j30jQ8K2k1mb6LeAH4inEcSGts=
+github.com/modelcontextprotocol/go-sdk v1.8.0 h1:KIvahhYqwtbeniWVPs3TcXEA7b8jEtwfBpOTAI+Urx4=
+github.com/modelcontextprotocol/go-sdk v1.8.0/go.mod h1:dL7u98E/zjJTGzEq+j30jQ8K2k1mb6LeAH4inEcSGts=
 github.com/molecule-man/go-brrr v1.0.1 h1:cEjgx8hgNw6UGdhQ94SPDbPkKuRbkUcxBO3IzbGpA/o=
 github.com/molecule-man/go-brrr v1.0.1/go.mod h1:7ybW6/7gA3oKY45jOfVNjSJDtrr6ea4tzbsTkjmQDC4=
 github.com/molecule-man/go-brrr v1.1.0 h1:rLBGSXA393y+5ttCBLkW34CHESop5tahrOFxVv/XDEU=
@@ -248,6 +252,7 @@ github.com/segmentio/encoding v0.5.4 h1:OW1VRern8Nw6ITAtwSZ7Idrl3MXCFwXHPgqESYfv
 github.com/segmentio/encoding v0.5.4/go.mod h1:HS1ZKa3kSN32ZHVZ7ZLPLXWvOVIiZtyJnO1gPH1sKt0=
 github.com/shamaton/msgpack/v3 v3.2.2 h1:lZITRsXLQkdJ9J2qvh6gjGpWxci/dwuiUf+jm9AudJM=
 github.com/shamaton/msgpack/v3 v3.2.2/go.mod h1:sgBYvEiyz8JR1NC3yGRoPVME9xXovpnh3l/plW1nfRo=
+github.com/shamaton/msgpack/v3 v3.2.3 h1:0r0aZtrXDFOPpwWJTEOpFq+Ih/JmMLm0pqLN5mSilrw=
 github.com/shirou/gopsutil/v4 v4.26.8 h1:YQMTF/1J50B5+Y0vlo1eDRf5DoR7Gk69hY+8wjYkQeo=
 github.com/shirou/gopsutil/v4 v4.26.8/go.mod h1:5O9FjBiXoTDFatIWjZZosqj4pV0DRtLx598xGbBehzM=
 github.com/sirupsen/logrus v1.10.2 h1:G2SED73/qrAu6YwbdxOD6peLkCBI3z7L+ykJFTXJBBo=
