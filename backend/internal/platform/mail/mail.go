@@ -83,6 +83,25 @@ type WeeklySummaryPortfolio struct {
 	WeekChangeColor string
 }
 
+// WeeklySummaryCash is the cash block of the digest: what the account keeps in
+// cash and what that has earned. Every amount is in Currency, the account's
+// preferred one.
+type WeeklySummaryCash struct {
+	Value    string
+	Currency string
+	// Interest is what was credited to the cash balances so far this month,
+	// signed, and InterestColor the colour it is painted in.
+	Interest      string
+	InterestColor string
+	// AverageRatePct is what the balances that earn are earning, weighted by
+	// what each of them holds. Empty when none of them has a rate.
+	AverageRatePct string
+	// Accounts is how many cash balances there are, Idle how many of them earn
+	// nothing — the number the block exists to surface.
+	Accounts int
+	Idle     int
+}
+
 type WeeklySummaryData struct {
 	UserName         string
 	TotalValue       string
@@ -110,6 +129,10 @@ type WeeklySummaryData struct {
 	// last day snapshotted on or before a week ago — not always exactly seven
 	// days back.
 	WeekChangeSince string
+
+	// Cash is the cash block, nil for an account with no cash balance; the
+	// template then leaves it out entirely.
+	Cash *WeeklySummaryCash
 }
 
 func New(apiKey, from string) (*Service, error) {

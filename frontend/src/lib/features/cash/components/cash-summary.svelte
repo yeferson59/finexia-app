@@ -12,8 +12,15 @@
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
 	import type { CashCurrencyTotal, CashSummary } from '../cash';
+	import { formatAnnualRate, type CashYield } from '../rates';
 
-	let { summary }: { summary: CashSummary } = $props();
+	interface Props {
+		summary: CashSummary;
+		/** Lo que rinde el efectivo; `null` si no hay ninguna cuenta con dinero. */
+		yielding: CashYield | null;
+	}
+
+	let { summary, yielding }: Props = $props();
 
 	const money = (amount: number, currency: string) =>
 		privacy.money(formatCurrency(amount, currency));
@@ -58,6 +65,21 @@
 			<!-- La parte de la cifra que es rendimiento, en el verde de los intereses. -->
 			<span class="caption" style:color="var(--green)">
 				+{money(summary.interestThisMonth, summary.currency)} en intereses este mes
+			</span>
+		{/if}
+		<!-- Lo que rinde el dinero que rinde, y cuánto está parado: es el dato que
+		     dice si vale la pena mover algo. -->
+		{#if yielding}
+			<span class="caption">
+				{#if yielding.pct > 0}
+					{formatAnnualRate(yielding.pct.toFixed(2))} de media
+					{#if yielding.idle > 0}
+						· {yielding.idle}
+						{yielding.idle === 1 ? 'cuenta sin tasa' : 'cuentas sin tasa'}
+					{/if}
+				{:else}
+					Ninguna cuenta con saldo tiene tasa
+				{/if}
 			</span>
 		{/if}
 	</p>

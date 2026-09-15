@@ -31,6 +31,10 @@ type fakePortfolioReader struct {
 	// getPortfolioValuesAsOf is optional: left unset, the account reads as
 	// having no history, which is what an unstubbed test wants.
 	getPortfolioValuesAsOf func(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]portfolio.PortfolioValuePoint, error)
+	// The two below are optional too: left unset, the account holds no cash and
+	// the digest carries no cash block.
+	getCashBalances func(ctx context.Context, userID uuid.UUID, display money.Currency) ([]portfolio.CashBalance, error)
+	getCashRates    func(ctx context.Context, userID uuid.UUID) ([]portfolio.CashRate, error)
 }
 
 func (f *fakePortfolioReader) GetPortfoliosSummary(ctx context.Context, userID uuid.UUID) ([]portfolio.SummaryView, error) {
@@ -42,6 +46,22 @@ func (f *fakePortfolioReader) GetPortfolioValuesAsOf(ctx context.Context, userID
 		return nil, nil
 	}
 	return f.getPortfolioValuesAsOf(ctx, userID, asOf)
+}
+
+func (f *fakePortfolioReader) GetCashBalances(ctx context.Context, userID uuid.UUID, display money.Currency) ([]portfolio.CashBalance, error) {
+	if f.getCashBalances == nil {
+		return nil, nil
+	}
+
+	return f.getCashBalances(ctx, userID, display)
+}
+
+func (f *fakePortfolioReader) GetCashRates(ctx context.Context, userID uuid.UUID) ([]portfolio.CashRate, error) {
+	if f.getCashRates == nil {
+		return nil, nil
+	}
+
+	return f.getCashRates(ctx, userID)
 }
 
 // sentWeekly records one SendWeeklySummary call.
@@ -578,5 +598,76 @@ func TestFormatDay(t *testing.T) {
 		if got := formatDay(tc.date); got != tc.want {
 			t.Errorf("formatDay(%v) = %q, want %q", tc.date, got, tc.want)
 		}
+	}
+}
+
+// The cash block totals what the account keeps in cash, what that earned this
+// month, and the rate the earning balances are on — weighted by what each of
+// them holds, with the idle ones counted rather than averaged in.
+func TestCashBlock(t *testing.T) {
+	now := time.Date(2026, time.September, 15, 0, 0, 0, 0, time.UTC)
+	nu, davivienda := uuid.New(), uuid.New()
+
+	balances := []portfolio.CashBalance{
+		{
+			SourceID: nu, Currency: money.COP, DisplayCurrency: money.COP,
+			Value: "30000000", InterestThisMonthValue: "34000",
+		},
+		{
+			SourceID: davivienda, Currency: money.COP, DisplayCurrency: money.COP,
+			Value: "10000000", InterestThisMonthValue: "0",
+		},
+	}
+
+	rates := []portfolio.CashRate{
+		{SourceID: nu, Currency: money.COP, AnnualRatePct: "9", EffectiveFrom: now.AddDate(0, -1, 0), Latest: true},
+	}
+
+	block := cashBlock(balances, rates, now)
+	if block == nil {
+		t.Fatal("no cash block for an account that holds cash")
+	}
+
+	if block.Value != "40000000.00" || block.Currency != "COP" {
+		t.Errorf("value = %s %s, want 40000000.00 COP", block.Value, block.Currency)
+	}
+	if block.Interest != "+34000.00" || block.InterestColor != gainColor {
+		t.Errorf("interest = %s in %s, want +34000.00 in the gain colour", block.Interest, block.InterestColor)
+	}
+	// Only the balance that earns is averaged: 9 %, not 6.75 %.
+	if block.AverageRatePct != "9.00" {
+		t.Errorf("average rate = %s, want 9.00", block.AverageRatePct)
+	}
+	if block.Accounts != 2 || block.Idle != 1 {
+		t.Errorf("accounts = %d with %d idle, want 2 and 1", block.Accounts, block.Idle)
+	}
+}
+
+// An account with no cash gets no block, and one whose balances all sit idle
+// gets a block with no average to report.
+func TestCashBlockWithoutRates(t *testing.T) {
+	now := time.Date(2026, time.September, 15, 0, 0, 0, 0, time.UTC)
+
+	if block := cashBlock(nil, nil, now); block != nil {
+		t.Errorf("block = %+v, want none without cash", block)
+	}
+
+	ended := now.AddDate(0, 0, -1)
+	idle := []portfolio.CashBalance{{
+		SourceID: uuid.New(), Currency: money.USD, DisplayCurrency: money.USD,
+		Value: "500", InterestThisMonthValue: "0",
+	}}
+	// The account's only version stopped yesterday, so nothing earns today.
+	paused := []portfolio.CashRate{{
+		SourceID: idle[0].SourceID, Currency: money.USD, AnnualRatePct: "4",
+		EffectiveFrom: now.AddDate(0, -2, 0), EndedOn: &ended, Latest: true,
+	}}
+
+	block := cashBlock(idle, paused, now)
+	if block == nil {
+		t.Fatal("no cash block for an account that holds cash")
+	}
+	if block.AverageRatePct != "" || block.Idle != 1 {
+		t.Errorf("block = %+v, want no average and one idle balance", block)
 	}
 }

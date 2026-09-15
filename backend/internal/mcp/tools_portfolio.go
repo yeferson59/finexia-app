@@ -2,6 +2,9 @@ package mcp
 
 import (
 	"context"
+	"time"
+
+	"uuid"
 
 	"github.com/yeferson59/gofinance/v2/money"
 
@@ -142,6 +145,94 @@ func (m *Module) addPortfolioTools(s *mcpsdk.Server, c caller) {
 
 			return PlatformsOutput{Platforms: platformRows(platforms)}, nil
 		})
+
+	readTool(s, "get_cash_accounts", "Get cash accounts",
+		"List the user's cash balances — what each platform holds in each currency, per portfolio — with the rate the account earns and what that interest has paid. Use this for questions about idle money and what it yields: how much is in cash, which balances earn nothing, how much interest came in this month. The interest counts as gain, never as money put in, so it shows up in the portfolio's gain and in its return.",
+		func(ctx context.Context, in CurrencyInput) (CashOutput, error) {
+			cur, err := parseCurrency(in.Currency)
+			if err != nil {
+				return CashOutput{}, err
+			}
+
+			balances, err := m.portfolios.GetCashBalances(ctx, c.userID, cur)
+			if err != nil {
+				return CashOutput{}, m.logToolError(ctx, "get_cash_accounts", c, err)
+			}
+
+			rates, err := m.portfolios.GetCashRates(ctx, c.userID)
+			if err != nil {
+				return CashOutput{}, m.logToolError(ctx, "get_cash_accounts", c, err)
+			}
+
+			return CashOutput{Accounts: cashAccountRows(balances, rates, time.Now())}, nil
+		})
+}
+
+// cashAccountKey names an account: a platform and a currency, which is what a
+// rate belongs to.
+type cashAccountKey struct {
+	sourceID uuid.UUID
+	currency money.Currency
+}
+
+// ratesInEffect indexes the version of each account's rate that applies on the
+// given day. Only the newest version of an account can still be running, so a
+// version a later one follows is never in effect.
+func ratesInEffect(rates []portfolio.CashRate, day time.Time) map[cashAccountKey]portfolio.CashRate {
+	inEffect := make(map[cashAccountKey]portfolio.CashRate, len(rates))
+
+	for _, r := range rates {
+		if r.InEffectOn(day) {
+			inEffect[cashAccountKey{sourceID: r.SourceID, currency: r.Currency}] = r
+		}
+	}
+
+	return inEffect
+}
+
+func cashAccountRows(balances []portfolio.CashBalance, rates []portfolio.CashRate, now time.Time) []CashAccount {
+	inEffect := ratesInEffect(rates, now)
+	out := make([]CashAccount, 0, len(balances))
+
+	for _, b := range balances {
+		row := CashAccount{
+			PortfolioID:       b.PortfolioID.String(),
+			PortfolioName:     b.PortfolioName,
+			PlatformID:        b.SourceID.String(),
+			Platform:          b.SourceName,
+			Balance:           b.Balance,
+			Currency:          b.Currency.String(),
+			Value:             b.Value,
+			DisplayCurrency:   b.DisplayCurrency.String(),
+			InterestEarned:    b.InterestEarned,
+			InterestThisMonth: b.InterestThisMonth,
+			PendingInterest:   b.PendingInterest,
+			Movements:         b.Movements,
+		}
+
+		if b.LastAccrualDate != nil {
+			row.LastAccrualDate = timeText(*b.LastAccrualDate)
+		}
+
+		if b.LastMovementDate != nil {
+			row.LastMovementDate = timeText(*b.LastMovementDate)
+		}
+
+		if rate, ok := inEffect[cashAccountKey{sourceID: b.SourceID, currency: b.Currency}]; ok {
+			row.AnnualRatePct = rate.AnnualRatePct
+			row.WithholdingPct = rate.WithholdingPct
+			row.Posting = string(rate.Posting)
+			row.RateFrom = timeText(rate.EffectiveFrom)
+
+			if rate.MaxBalance != nil {
+				row.MaxBalance = *rate.MaxBalance
+			}
+		}
+
+		out = append(out, row)
+	}
+
+	return out
 }
 
 func portfolioSummaries(views []portfolio.SummaryView) []PortfolioSummary {

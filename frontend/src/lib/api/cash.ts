@@ -116,6 +116,22 @@ export function endRate(
 	});
 }
 
+/**
+ * `POST /portfolios/cash/interest/recalculate` — tira los días que la cuenta ya
+ * tenía calculados desde una fecha y los vuelve a calcular sobre lo que guarda
+ * hoy. Es lo que arregla un movimiento anotado con fecha pasada.
+ */
+export function recalculateInterest(
+	event: ApiEvent,
+	body: Record<string, unknown>
+): Promise<ApiResult<unknown>> {
+	return apiRequest<unknown>(event, '/portfolios/cash/interest/recalculate', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+}
+
 /** `DELETE /portfolios/cash/rates/:id` — borra la versión más reciente. */
 export function deleteRate(event: ApiEvent, id: string): Promise<ApiResult<unknown>> {
 	return apiRequest<unknown>(event, `/portfolios/cash/rates/${id}`, { method: 'DELETE' });

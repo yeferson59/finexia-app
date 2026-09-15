@@ -12,7 +12,7 @@ import (
 
 // The persistence surface is split into cohesive, consumer-defined stores
 // (mirroring auth.Stores) so each stays small and fakes only implement what a
-// scenario needs. Repository is their union (28 methods, under the ~30
+// scenario needs. Repository is their union (31 methods, around the ~30
 // criterion), kept as a single alias because the portfolio Service
 // orchestrates across all of them. The asset catalog belongs to the market
 // module; portfolio reads assets via its AssetReader interface instead.
@@ -129,9 +129,17 @@ type CashRateStore interface {
 
 // CashAccrualStore keeps the ledger of the interest cash balances earn: which
 // balances earn, and one day of interest at a time.
+//
+// The last two are for the days a rate posted monthly holds: which balances
+// hold days no month end will ever close, and the credit that pays them.
 type CashAccrualStore interface {
-	GetCashAccrualTargets(ctx context.Context, through time.Time) ([]CashAccrualTarget, error)
+	GetCashAccrualTargets(ctx context.Context, through time.Time, filter CashAccrualFilter) ([]CashAccrualTarget, error)
 	AccrueCashInterestDay(ctx context.Context, entryID, rateID uuid.UUID, day time.Time) (bool, error)
+	GetHeldCashInterest(ctx context.Context, through time.Time, filter CashAccrualFilter) ([]uuid.UUID, error)
+	PostHeldCashInterest(ctx context.Context, entryID uuid.UUID) (bool, error)
+	// ClearCashInterest throws away the days computed from a day, so a
+	// recalculation can compute them again.
+	ClearCashInterest(ctx context.Context, filter CashAccrualFilter, from time.Time) (CashInterestCleared, error)
 }
 
 // Repository is the union of the module's stores, satisfied by

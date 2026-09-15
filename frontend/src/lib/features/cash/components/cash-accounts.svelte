@@ -85,6 +85,10 @@
 						(sum, b) => sum + (parseFloat(b.interestThisMonth) || 0),
 						0
 					)}
+					{@const pending = account.balances.reduce(
+						(sum, b) => sum + (parseFloat(b.pendingInterest) || 0),
+						0
+					)}
 					<li class="account" class:emptied={account.balance === 0}>
 						<span class="code">{account.currency}</span>
 
@@ -117,6 +121,13 @@
 							{#if earned > 0}
 								<p class="line quiet" style:color="var(--green)">
 									+{money(earned, account.currency)} en intereses este mes
+								</p>
+							{/if}
+							<!-- Con abono mensual lo calculado espera al cierre del mes: está
+							     ganado, pero todavía no está en el saldo. -->
+							{#if pending > 0}
+								<p class="line quiet">
+									+{money(pending, account.currency)} calculados, se abonan al cerrar el mes
 								</p>
 							{/if}
 						</div>

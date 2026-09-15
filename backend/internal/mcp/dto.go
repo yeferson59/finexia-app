@@ -269,3 +269,39 @@ type ExchangeRate struct {
 	Date   string `json:"date" jsonschema:"the day the rate is for, RFC 3339"`
 	Source string `json:"source" jsonschema:"who published it: a provider id, or manual for an operator-entered rate"`
 }
+
+// CashOutput is the answer of get_cash_accounts.
+type CashOutput struct {
+	Accounts []CashAccount `json:"accounts"`
+}
+
+// CashAccount is one cash balance — what a platform holds in one currency for
+// one portfolio — with the rate its account earns and what that has paid.
+//
+// The rate belongs to the platform and the currency, so two portfolios holding
+// the same account's money report the same rate on their own share.
+type CashAccount struct {
+	PortfolioID     string `json:"portfolioId"`
+	PortfolioName   string `json:"portfolioName"`
+	PlatformID      string `json:"platformId"`
+	Platform        string `json:"platform"`
+	Balance         string `json:"balance" jsonschema:"what the balance holds, in currency"`
+	Currency        string `json:"currency"`
+	Value           string `json:"value" jsonschema:"the balance in displayCurrency"`
+	DisplayCurrency string `json:"displayCurrency"`
+	// AnnualRatePct is empty when the account has no rate in effect today: the
+	// balance sits there earning nothing, which is worth saying.
+	AnnualRatePct  string `json:"annualRatePct,omitempty" jsonschema:"the effective annual rate the account earns, as a percentage: 9.25 is 9.25 % E.A."`
+	WithholdingPct string `json:"withholdingPct,omitempty" jsonschema:"the share of the interest withheld as tax, as a percentage"`
+	Posting        string `json:"posting,omitempty" jsonschema:"daily, or monthly for interest credited on the last day of the month"`
+	MaxBalance     string `json:"maxBalance,omitempty" jsonschema:"the most the account earns on; the balances of one account share it in proportion to what each holds"`
+	RateFrom       string `json:"rateFrom,omitempty" jsonschema:"the first day the rate in effect applies, RFC 3339"`
+	// What the interest has come to. Interest counts as gain, never as money
+	// put in: see the cash interest ledger.
+	InterestEarned    string `json:"interestEarned" jsonschema:"every interest credited to the balance, by the ledger or by hand, in currency"`
+	InterestThisMonth string `json:"interestThisMonth" jsonschema:"the part of it credited in the current UTC month"`
+	PendingInterest   string `json:"pendingInterest" jsonschema:"interest computed and not credited yet, waiting for the month to close; it is not part of balance"`
+	LastAccrualDate   string `json:"lastAccrualDate,omitempty" jsonschema:"the last day the ledger computed interest for the balance, RFC 3339"`
+	Movements         int64  `json:"movements"`
+	LastMovementDate  string `json:"lastMovementDate,omitempty"`
+}

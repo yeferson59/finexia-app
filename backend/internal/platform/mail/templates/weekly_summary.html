@@ -157,6 +157,33 @@
           </tr>
           {{end}}
 
+          <!-- CASH -->
+          {{with .Cash}}
+          <tr>
+            <td class="wrap-pad" style="padding:0 32px 28px;">
+              <p style="font-family:'JetBrains Mono',Courier New,monospace;font-size:9.5px;font-weight:500;letter-spacing:0.22em;text-transform:uppercase;color:#d4912a;margin:0 0 14px 0;">Tu efectivo{{if .AverageRatePct}} <span style="color:#555250;letter-spacing:0.14em;">· {{.AverageRatePct}}% E.A. promedio</span>{{end}}</p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border:1px solid #1e2023;border-radius:8px;">
+                <tr>
+                  <td style="padding:14px 20px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td valign="middle">
+                          <p style="font-family:'Outfit',Arial,sans-serif;font-size:14px;font-weight:500;color:#eceae5;margin:0 0 2px 0;">{{.Value}} {{.Currency}}</p>
+                          <p style="font-family:'JetBrains Mono',Courier New,monospace;font-size:9.5px;color:#555250;margin:0;text-transform:uppercase;letter-spacing:0.1em;">{{.Accounts}} cuenta{{if ne .Accounts 1}}s{{end}}{{if .Idle}} · {{.Idle}} sin tasa{{end}}</p>
+                        </td>
+                        <td valign="middle" align="right">
+                          <p style="font-family:'Outfit',Arial,sans-serif;font-size:14px;font-weight:500;color:{{.InterestColor}};margin:0 0 2px 0;">{{.Interest}}</p>
+                          <p style="font-family:'JetBrains Mono',Courier New,monospace;font-size:9.5px;color:#555250;margin:0;text-transform:uppercase;letter-spacing:0.1em;">Intereses del mes</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          {{end}}
+
           <!-- CTA -->
           <tr>
             <td class="wrap-pad" style="padding:0 32px 32px;">

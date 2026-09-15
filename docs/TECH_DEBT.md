@@ -5,12 +5,13 @@
 > hacen en los PRs de migración (regla: mover ≠ mejorar). Cada entrada indica
 > dónde se detectó y qué se propone. Priorizar al cerrar la Fase 8.
 
-**Estado (2026-07-26):** 14 de 16 entradas resueltas. Quedan abiertas la **#4**
+**Estado (2026-09-15):** 14 de 17 entradas resueltas. Quedan abiertas la **#4**
 (tests de integración de las implementaciones `postgres.go` contra un Postgres
 real), que necesita Docker/testcontainers y por eso no entra en las tandas
 actuales, y la **#16** (comando de rotación de KEK), que no bloquea nada
-mientras la KEK vieja siga declarada. La #3 tiene un residuo menor: retirar el
-alias deprecado
+mientras la KEK vieja siga declarada, y la **#17** (el costo promedio de las
+acciones mezcla lotes), abierta al implementar la rentabilidad del efectivo. La
+#3 tiene un residuo menor: retirar el alias deprecado
 `GET /portfolios/id` cuando los logs no registren tráfico.
 
 | # | Detectado en | Descripción | Propuesta |
@@ -31,6 +32,7 @@ alias deprecado
 | 14 | Fase 8 (revisión) | **Resuelto (2026-07-22).** `docs/ARCHITECTURE.md` creado; cobertura total medida (39.4% vs 42.6% de línea base, layout distinto); `portfolio.Repository` agrupado en sub-interfaces cohesivas (PortfolioStore/PlatformStore/RateStore/TransactionStore/SnapshotStore) y, tras mover assets a market (#12), su union quedó en **27 métodos** (bajo el criterio ~30). | — |
 | 15 | Cierre (2026-07-25) | **Resuelto (2026-07-25).** Al cerrar #9 y #10 el cableado quedó con dos setters (`SetUsers`, `SetAdminGuard`) porque el grafo de módulos era cíclico. La causa no era de cableado sino de propiedad: `user` guardaba cuatro handlers de `/users/invitations*` que eran *pass-through* puros a `auth.Service` (y exponían `auth.Invitation` en su DTO), y su `UpdatePassword` escribía `accounts.password` —tabla de `auth`— duplicando lo que `ConsumePasswordReset` ya hacía. Ambos volvieron a `auth`, junto con `ChangePassword` y su alerta de seguridad (de la que `auth` ya tenía una copia idéntica). Con eso `user` dejó de importar `auth` y el grafo pasó a ser acíclico. `user` y `marketing` se construyen ahora en dos pasos (`NewService` → `New`), de modo que sus servicios existen antes que `auth` y sus rutas después de los guards: **no queda ningún setter, todo es inyección por constructor**. Los paths HTTP no se movieron. Lo fija `TestServiceFirstModulesStayIndependent` y, para el orden de registro bajo `/users`, `TestAppWiresAndRoutes`. | — |
 | 16 | BYO-key (2026-07-26) | La rotación de KEK está implementada pero no es **ejecutable**: `secretbox.Rewrap` re-envuelve una credencial bajo la KEK activa sin tocar el payload, y `market_credentials.kek_version` dice qué filas siguen en la versión vieja, pero no hay ningún comando ni script que recorra la tabla. Rotar hoy exige escribir el recorrido a mano. `backend/scripts/` está vacío. | Un subcomando del binario (o de `migrator`) que lea las filas con `kek_version <> MARKET_KEK_ACTIVE`, las abra, las vuelva a sellar y las escriba, con log de progreso. No urge: mientras la KEK vieja siga listada en `MARKET_KEK_KEYS`, las filas antiguas se leen sin problema. |
+| 17 | Rentabilidad del efectivo (2026-09-15) | La rama de `recalculate_avg_cost` para los demás activos promedia **todas** las compras de la historia de la posición, sin recorrerlas por fecha. Si se vende todo y se vuelve a comprar, el costo medio mezcla el lote viejo con el nuevo y la ganancia queda mal. La migración 000042 corrigió esto **solo para el efectivo** (`cash_entry_avg_cost` recorre las transacciones en orden y reinicia una posición vaciada), porque era lo que el plan de rentabilidad del efectivo necesitaba; el resto de activos sigue con la fórmula de 000041. Ver `docs/PLAN_RENTABILIDAD_EFECTIVO.md` §13. | Generalizar el recorrido por fecha de `cash_entry_avg_cost` a todos los tipos de activo, en su propia migración y con tests de un ciclo compra → venta total → recompra. Ojo: cambia el costo medio (y con él la ganancia) de posiciones ya existentes, así que necesita aviso en el changelog como lo tuvo 000042. |
 
 ## Frontend
 

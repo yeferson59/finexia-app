@@ -106,3 +106,24 @@ func (h *handler) DeleteCashRate(c fiber.Ctx) error {
 
 	return httpx.OK(c, "Cash rate deleted", "Cash rate deleted successfully", nil)
 }
+
+// RecalculateCashInterest throws away an account's computed days from a date
+// and computes them again on what its balances hold now.
+func (h *handler) RecalculateCashInterest(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	req, err := httpx.Bind[RecalculateCashRequestDTO](c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid request", err.Error())
+	}
+
+	done, err := h.service.RecalculateCashInterest(c, userID, req.Input())
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error recalculating cash interest", "Could not recalculate cash interest")
+	}
+
+	return httpx.OK(c, "Cash interest recalculated", "Cash interest recalculated successfully", done)
+}

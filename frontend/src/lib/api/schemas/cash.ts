@@ -48,6 +48,11 @@ export const cashBalanceSchema = z.object({
 	interestEarned: z.string().default('0'),
 	interestThisMonth: z.string().default('0'),
 	interestThisMonthValue: z.string().default('0'),
+	/**
+	 * Lo calculado y todavía sin abonar, en `currency`: los días que una tasa de
+	 * abono mensual guarda hasta que cierra el mes. No está dentro de `balance`.
+	 */
+	pendingInterest: z.string().default('0'),
 	/** Último día con intereses calculados; `null` si la cuenta nunca rindió. */
 	lastAccrualDate: z.string().nullable().default(null)
 });
@@ -108,7 +113,14 @@ export const cashRateSchema = z.object({
 	annualRatePct: z.string(),
 	/** Parte de los intereses que se retiene, en porcentaje. */
 	withholdingPct: z.string(),
+	/** `daily` abona cada día; `monthly`, el último día de cada mes. */
 	posting: z.enum(['daily', 'monthly']),
+	/**
+	 * Lo máximo sobre lo que rinde la cuenta; `null` si rinde sobre todo. Es de
+	 * la cuenta, así que sus saldos se lo reparten en proporción a lo que guarda
+	 * cada uno.
+	 */
+	maxBalance: z.string().nullable().default(null),
 	/** Primer día de la versión, a medianoche UTC. */
 	effectiveFrom: z.string(),
 	/** Último día que rinde; `null` mientras no tiene fin. */

@@ -14,32 +14,59 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/database"
 )
 
-// cashBalanceAtClose is what a balance held at the close of a day: every row
-// dated on or before it, and every interest the ledger credited for a day
-// before it, whatever day its transaction carries. A catch-up dates those
-// later (see AccrueCashInterestDay), and reading them by that date would leave
-// each caught-up day compounding on less than the balance held.
-const cashBalanceAtClose = `
-	SELECT COALESCE(SUM(CASE
-		WHEN t.type IN ('buy', 'transfer_in', 'cash_interest') THEN t.quantity
-		WHEN t.type IN ('sell', 'transfer_out')                THEN -t.quantity
-		ELSE 0 END), 0)
-	FROM transactions t
-	LEFT JOIN LATERAL (
-		SELECT MIN(ac.accrual_date) AS accrual_date
-		FROM cash_interest_accruals ac
-		WHERE ac.transaction_id = t.id
-	) credited ON TRUE
-	WHERE t.entry_id = $1
-	  AND COALESCE(credited.accrual_date + 1, t.transaction_date) <= $2::date`
+// What a balance held at the close of a day is cash_entry_balance_at_close
+// (000045): every row dated on or before it, every interest the ledger credited
+// for a day before it whatever day its transaction carries, and every day it
+// computed and has not credited yet.
+
+// cashAccountHeld is what every balance of an account — a platform and a
+// currency — held at the close of a day. Only a rate with a cap reads it: the
+// cap belongs to the account, so its balances earn on their share of it.
+const cashAccountHeld = `
+	SELECT COALESCE(SUM(cash_entry_balance_at_close(pe.id, $2::date)), 0)
+	FROM portfolio_entries pe
+	JOIN assets a ON a.id = pe.asset_id
+	WHERE pe.source_id = $1
+	  AND pe.cost_currency = $3::char(3)
+	  AND a.asset_type = 'cash'
+	  AND a.currency = pe.cost_currency
+	  AND cash_entry_at_par(pe.id)`
+
+// cashAccountScope narrows a statement to the balances of one account. Every
+// part of the filter is optional, and an empty one leaves every balance in:
+// that is what the nightly job runs over.
+const cashAccountScope = `
+	AND ($2::uuid IS NULL     OR p.user_id = $2::uuid)
+	AND ($3::uuid IS NULL     OR pe.source_id = $3::uuid)
+	AND ($4::char(3) IS NULL  OR pe.cost_currency = $4::char(3))`
+
+// scopeArgs is the filter as the three optional parameters cashAccountScope
+// reads.
+func scopeArgs(filter CashAccrualFilter) (userID, sourceID *uuid.UUID, cur *string) {
+	if filter.UserID != (uuid.UUID{}) {
+		userID = &filter.UserID
+	}
+
+	if filter.SourceID != (uuid.UUID{}) {
+		sourceID = &filter.SourceID
+	}
+
+	if code := currencyParam(filter.Currency); code != "" {
+		cur = &code
+	}
+
+	return userID, sourceID, cur
+}
 
 // GetCashAccrualTargets lists every cash balance whose account has a rate that
 // started by through, with where its ledger stands and those versions of the
-// rate.
+// rate. The filter narrows it to one account; an empty one takes them all.
 //
 // Only the balances the cash writers keep earn: in their own currency, at one
 // unit per unit. A dollar position bought with pesos is not a savings account.
-func (r *PostgresRepository) GetCashAccrualTargets(ctx context.Context, through time.Time) ([]CashAccrualTarget, error) {
+func (r *PostgresRepository) GetCashAccrualTargets(ctx context.Context, through time.Time, filter CashAccrualFilter) ([]CashAccrualTarget, error) {
+	userID, sourceID, cur := scopeArgs(filter)
+
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			pe.id,
@@ -48,17 +75,20 @@ func (r *PostgresRepository) GetCashAccrualTargets(ctx context.Context, through 
 			r.id,
 			r.annual_rate,
 			r.withholding_rate,
+			r.posting::text,
+			r.max_balance,
 			r.effective_from,
 			r.ended_on
 		FROM portfolio_entries pe
+		JOIN portfolios p       ON p.id = pe.portfolio_id
 		JOIN assets a           ON a.id = pe.asset_id
 		JOIN cash_yield_rates r ON r.source_id = pe.source_id AND r.currency = pe.cost_currency
 		WHERE a.asset_type = 'cash'
 		  AND a.currency = pe.cost_currency
 		  AND r.effective_from <= $1::date
-		  AND cash_entry_at_par(pe.id)
+		  AND cash_entry_at_par(pe.id)`+cashAccountScope+`
 		ORDER BY pe.id, r.effective_from
-	`, cashRateDay(through).Format(time.DateOnly))
+	`, cashRateDay(through).Format(time.DateOnly), userID, sourceID, cur)
 	if err != nil {
 		return nil, err
 	}
@@ -80,6 +110,8 @@ func (r *PostgresRepository) GetCashAccrualTargets(ctx context.Context, through 
 			&version.ID,
 			&version.AnnualRate,
 			&version.WithholdingRate,
+			&version.Posting,
+			&version.MaxBalance,
 			&version.EffectiveFrom,
 			&version.EndedOn,
 		); err != nil {
@@ -117,14 +149,15 @@ func (r *PostgresRepository) AccrueCashInterestDay(ctx context.Context, entryID,
 	err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		var (
 			portfolioID uuid.UUID
+			sourceID    uuid.UUID
 			cur         money.Currency
 		)
 
 		// The lock a withdrawal takes: the basis read below is what the balance
 		// holds while this runs.
 		err := tx.QueryRow(ctx, `
-			SELECT portfolio_id, cost_currency FROM portfolio_entries WHERE id = $1 FOR UPDATE
-		`, entryID).Scan(&portfolioID, &cur)
+			SELECT portfolio_id, source_id, cost_currency FROM portfolio_entries WHERE id = $1 FOR UPDATE
+		`, entryID).Scan(&portfolioID, &sourceID, &cur)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -138,7 +171,7 @@ func (r *PostgresRepository) AccrueCashInterestDay(ctx context.Context, entryID,
 		// the day computed.
 		version := CashRateVersion{ID: rateID}
 		err = tx.QueryRow(ctx, `
-			SELECT r.annual_rate, r.withholding_rate, r.effective_from, r.ended_on
+			SELECT r.annual_rate, r.withholding_rate, r.posting::text, r.max_balance, r.effective_from, r.ended_on
 			FROM cash_yield_rates r
 			JOIN portfolio_entries pe ON pe.source_id = r.source_id AND pe.cost_currency = r.currency
 			WHERE r.id = $1
@@ -151,7 +184,8 @@ func (r *PostgresRepository) AccrueCashInterestDay(ctx context.Context, entryID,
 			      AND later.effective_from <= $3::date
 			  )
 			FOR SHARE OF r
-		`, rateID, entryID, date).Scan(&version.AnnualRate, &version.WithholdingRate, &version.EffectiveFrom, &version.EndedOn)
+		`, rateID, entryID, date).Scan(&version.AnnualRate, &version.WithholdingRate, &version.Posting,
+			&version.MaxBalance, &version.EffectiveFrom, &version.EndedOn)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -174,19 +208,43 @@ func (r *PostgresRepository) AccrueCashInterestDay(ctx context.Context, entryID,
 			return err
 		}
 
-		var basis decimal.Decimal
-		if err := tx.QueryRow(ctx, cashBalanceAtClose, entryID, date).Scan(&basis); err != nil {
+		// What the days the balance holds earned. A rate posted monthly leaves
+		// them waiting in the ledger, and the day that closes the month pays
+		// them all in one credit.
+		held := decimal.Zero
+		if err := tx.QueryRow(ctx, `
+			SELECT COALESCE(SUM(net_amount), 0) FROM cash_interest_accruals
+			WHERE entry_id = $1 AND accrual_date < $2::date AND status = 'pending'
+		`, entryID, date).Scan(&held); err != nil {
 			return err
 		}
 
-		accrual, err := accrueDay(basis, version, carry, cur)
+		atClose := CashDay{Carry: carry, Held: held, Credits: version.creditsOn(cashRateDay(day))}
+		if err := tx.QueryRow(ctx, `
+			SELECT cash_entry_balance_at_close($1, $2::date)
+		`, entryID, date).Scan(&atClose.Basis); err != nil {
+			return err
+		}
+
+		atClose.AccountHeld = atClose.Basis
+		if version.MaxBalance != nil {
+			if err := tx.QueryRow(ctx, cashAccountHeld, sourceID, date, cur).Scan(&atClose.AccountHeld); err != nil {
+				return err
+			}
+		}
+
+		accrual, err := accrueDay(atClose, version, cur)
 		if err != nil {
 			return err
 		}
 
-		status := "carried"
-		if accrual.Credited.IsPos() {
+		status := "pending"
+		switch {
+		case !atClose.Credits:
+		case accrual.Credited.IsPos():
 			status = "posted"
+		default:
+			status = "carried"
 		}
 
 		var accrualID uuid.UUID
@@ -205,8 +263,20 @@ func (r *PostgresRepository) AccrueCashInterestDay(ctx context.Context, entryID,
 			return err
 		}
 
-		if !accrual.Credited.IsPos() {
+		if !atClose.Credits {
 			return nil
+		}
+
+		// The rounded credit came to nothing, so the days it would have paid
+		// stop waiting: their interest is in the carry now, and the next credit
+		// pays it.
+		if !accrual.Credited.IsPos() {
+			_, err := tx.Exec(ctx, `
+				UPDATE cash_interest_accruals SET status = 'carried'
+				WHERE entry_id = $1 AND accrual_date < $2::date AND status = 'pending'
+			`, entryID, date)
+
+			return err
 		}
 
 		var txnID uuid.UUID
@@ -221,9 +291,13 @@ func (r *PostgresRepository) AccrueCashInterestDay(ctx context.Context, entryID,
 			return err
 		}
 
+		// The credit is linked to every day it pays, so what a balance held
+		// reads the same however many days one transaction covers.
 		if _, err := tx.Exec(ctx, `
-			UPDATE cash_interest_accruals SET transaction_id = $2 WHERE id = $1
-		`, accrualID, txnID); err != nil {
+			UPDATE cash_interest_accruals SET transaction_id = $2, status = 'posted'
+			WHERE id = $1
+			   OR (entry_id = $3 AND accrual_date < $4::date AND status = 'pending')
+		`, accrualID, txnID, entryID, date); err != nil {
 			return err
 		}
 
@@ -235,9 +309,285 @@ func (r *PostgresRepository) AccrueCashInterestDay(ctx context.Context, entryID,
 	return credited, err
 }
 
+// GetHeldCashInterest lists the balances holding days no month end will ever
+// close. The filter narrows it to one account, as it does the targets; an empty
+// one takes them all.
+//
+// A rate posted monthly leaves each day waiting until the last day of its
+// month. A balance whose rate is paused, ended or replaced partway through a
+// month never reaches that day, and what it earned would wait in the ledger
+// forever. These are those balances: some day is still held, no later day was
+// computed, and no version of the account's rate covers a day between the last
+// one held and the end of its month.
+func (r *PostgresRepository) GetHeldCashInterest(ctx context.Context, through time.Time, filter CashAccrualFilter) ([]uuid.UUID, error) {
+	userID, sourceID, cur := scopeArgs(filter)
+
+	rows, err := r.db.Query(ctx, `
+		WITH held AS (
+			SELECT ac.entry_id, pe.source_id, pe.cost_currency, MAX(ac.accrual_date) AS last_day
+			FROM cash_interest_accruals ac
+			JOIN portfolio_entries pe ON pe.id = ac.entry_id
+			JOIN portfolios p         ON p.id = pe.portfolio_id
+			WHERE ac.status = 'pending'`+cashAccountScope+`
+			GROUP BY ac.entry_id, pe.source_id, pe.cost_currency
+		)
+		SELECT entry_id FROM held
+		WHERE last_day < $1::date
+		  AND NOT EXISTS (
+		    SELECT 1 FROM cash_yield_rates r
+		    WHERE r.source_id = held.source_id
+		      AND r.currency  = held.cost_currency
+		      AND r.effective_from <= (date_trunc('month', held.last_day) + INTERVAL '1 month - 1 day')::date
+		      AND (r.ended_on IS NULL OR r.ended_on > held.last_day)
+		  )
+		ORDER BY entry_id
+	`, cashRateDay(through).Format(time.DateOnly), userID, sourceID, cur)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	entries := make([]uuid.UUID, 0)
+	for rows.Next() {
+		var entryID uuid.UUID
+		if err := rows.Scan(&entryID); err != nil {
+			return nil, err
+		}
+
+		entries = append(entries, entryID)
+	}
+
+	return entries, rows.Err()
+}
+
+// PostHeldCashInterest credits what a balance holds, on the last day it held.
+// It reports whether anything was credited: what rounds to nothing is carried
+// instead, as it is on any other credit.
+//
+// It takes the same lock and dates the credit the same way AccrueCashInterestDay
+// does, and it is idempotent for the same reason: a balance whose days it
+// resolves holds none afterwards, so a second run finds nothing to credit.
+func (r *PostgresRepository) PostHeldCashInterest(ctx context.Context, entryID uuid.UUID) (bool, error) {
+	credited := false
+
+	err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		var (
+			portfolioID uuid.UUID
+			cur         money.Currency
+		)
+
+		err := tx.QueryRow(ctx, `
+			SELECT portfolio_id, cost_currency FROM portfolio_entries WHERE id = $1 FOR UPDATE
+		`, entryID).Scan(&portfolioID, &cur)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		var (
+			held    decimal.Decimal
+			lastDay *time.Time
+		)
+		if err := tx.QueryRow(ctx, `
+			SELECT COALESCE(SUM(net_amount), 0), MAX(accrual_date)
+			FROM cash_interest_accruals
+			WHERE entry_id = $1 AND status = 'pending'
+		`, entryID).Scan(&held, &lastDay); err != nil {
+			return err
+		}
+
+		// Another run credited them while this one waited for the lock.
+		if lastDay == nil {
+			return nil
+		}
+
+		date := cashRateDay(*lastDay).Format(time.DateOnly)
+
+		// A held day carries what it inherited, so the last one carries what the
+		// last credit left.
+		var carry decimal.Decimal
+		if err := tx.QueryRow(ctx, `
+			SELECT rounding_carry FROM cash_interest_accruals
+			WHERE entry_id = $1 AND accrual_date = $2::date
+		`, entryID, date).Scan(&carry); err != nil {
+			return err
+		}
+
+		amount, left, err := creditHeld(held, carry, cur)
+		if err != nil {
+			return err
+		}
+
+		status, txnID := "carried", (*uuid.UUID)(nil)
+		if amount.IsPos() {
+			var id uuid.UUID
+			if err := tx.QueryRow(ctx, `
+				INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes)
+				SELECT $1::uuid, 'cash_interest', $2::numeric, 1, $3::char(3), 1, 0, $3::char(3),
+				       GREATEST($4::date, COALESCE(MAX(ps.snapshot_date), $4::date)), ''
+				FROM portfolio_snapshots ps
+				WHERE ps.portfolio_id = $5
+				RETURNING id
+			`, entryID, amount.String(), cur, date, portfolioID).Scan(&id); err != nil {
+				return err
+			}
+
+			status, txnID = "posted", &id
+		}
+
+		if _, err := tx.Exec(ctx, `
+			UPDATE cash_interest_accruals SET
+				status         = $2,
+				transaction_id = $3,
+				rounding_carry = CASE WHEN accrual_date = $4::date THEN $5::numeric ELSE rounding_carry END
+			WHERE entry_id = $1 AND status = 'pending'
+		`, entryID, status, txnID, date, left.String()); err != nil {
+			return err
+		}
+
+		credited = amount.IsPos()
+
+		return nil
+	})
+
+	return credited, err
+}
+
+// ClearCashInterest throws away the days an account's ledger computed from a
+// day, and the credits that paid them, so they can be computed again.
+//
+// A day is never revisited on its own: it earned on what the balance held at
+// its close, and a deposit recorded afterwards with a past date changes what
+// that was. Clearing is how the owner asks for the days after it to be redone.
+//
+// The window widens backwards to the first day of any credit that reaches
+// across the day asked for: a month's credit pays every day of its month, and
+// half of one cannot be undone. Deleting a cash_interest leaves the growth
+// series alone — only what moves a quantity is retired (000038) — so what the
+// recalculation writes instead lands as return, exactly as the first run did.
+//
+// A filter that names a platform and an owner is checked against
+// investment_sources first, so someone else's account answers not found rather
+// than reporting that it cleared nothing — the same answer every other write to
+// a rate gives. The check is inside the transaction, like CreateCashRate's, so
+// there is no window between asking and clearing.
+func (r *PostgresRepository) ClearCashInterest(ctx context.Context, filter CashAccrualFilter, from time.Time) (CashInterestCleared, error) {
+	cleared := CashInterestCleared{From: cashRateDay(from)}
+	asked := cleared.From.Format(time.DateOnly)
+	userID, sourceID, cur := scopeArgs(filter)
+
+	err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		// Whether the platform is still active is not asked: one that stopped
+		// taking money can still have its past corrected.
+		if filter.UserID != (uuid.UUID{}) && filter.SourceID != (uuid.UUID{}) {
+			var owned bool
+			if err := tx.QueryRow(ctx, `
+				SELECT EXISTS (SELECT 1 FROM investment_sources WHERE id = $1 AND user_id = $2)
+			`, filter.SourceID, filter.UserID).Scan(&owned); err != nil {
+				return err
+			}
+
+			if !owned {
+				return ErrPlatformNotFound
+			}
+		}
+
+		// Only the balances with a day to throw away, under the lock a credit
+		// takes and in a fixed order, so two runs queue rather than deadlock.
+		rows, err := tx.Query(ctx, `
+			SELECT pe.id
+			FROM portfolio_entries pe
+			JOIN portfolios p ON p.id = pe.portfolio_id
+			JOIN assets a     ON a.id = pe.asset_id
+			WHERE a.asset_type = 'cash'
+			  AND a.currency = pe.cost_currency
+			  AND EXISTS (
+			    SELECT 1 FROM cash_interest_accruals ac
+			    WHERE ac.entry_id = pe.id AND ac.accrual_date >= $1::date
+			  )`+cashAccountScope+`
+			ORDER BY pe.id
+			FOR UPDATE OF pe
+		`, asked, userID, sourceID, cur)
+		if err != nil {
+			return err
+		}
+
+		entries := make([]uuid.UUID, 0)
+		for rows.Next() {
+			var entryID uuid.UUID
+			if err := rows.Scan(&entryID); err != nil {
+				rows.Close()
+
+				return err
+			}
+
+			entries = append(entries, entryID)
+		}
+		rows.Close()
+
+		if err := rows.Err(); err != nil {
+			return err
+		}
+
+		for _, entryID := range entries {
+			var first time.Time
+			if err := tx.QueryRow(ctx, `
+				SELECT LEAST($2::date, COALESCE(MIN(ac.accrual_date), $2::date))
+				FROM cash_interest_accruals ac
+				WHERE ac.entry_id = $1
+				  AND ac.transaction_id IN (
+				    SELECT paid.transaction_id FROM cash_interest_accruals paid
+				    WHERE paid.entry_id = $1
+				      AND paid.accrual_date >= $2::date
+				      AND paid.transaction_id IS NOT NULL
+				  )
+			`, entryID, asked).Scan(&first); err != nil {
+				return err
+			}
+
+			day := first.Format(time.DateOnly)
+
+			if _, err := tx.Exec(ctx, `
+				DELETE FROM transactions WHERE id IN (
+					SELECT DISTINCT ac.transaction_id FROM cash_interest_accruals ac
+					WHERE ac.entry_id = $1 AND ac.accrual_date >= $2::date AND ac.transaction_id IS NOT NULL
+				)
+			`, entryID, day); err != nil {
+				return err
+			}
+
+			tag, err := tx.Exec(ctx, `
+				DELETE FROM cash_interest_accruals WHERE entry_id = $1 AND accrual_date >= $2::date
+			`, entryID, day)
+			if err != nil {
+				return err
+			}
+
+			if days := int(tag.RowsAffected()); days > 0 {
+				cleared.Balances++
+				cleared.Days += days
+
+				if first.Before(cleared.From) {
+					cleared.From = first
+				}
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return CashInterestCleared{}, err
+	}
+
+	return cleared, nil
+}
+
 // addCashInterest fills in what each balance has earned: the interest credited
 // to it — by the ledger or by hand — ever and in the current UTC month, that
-// month's part in the display currency, and the last day the ledger computed.
+// month's part in the display currency, what the ledger computed and has not
+// credited yet, and the last day it computed.
 func (r *PostgresRepository) addCashInterest(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency, balances []CashBalance) error {
 	if len(balances) == 0 {
 		return nil
@@ -251,6 +601,7 @@ func (r *PostgresRepository) addCashInterest(ctx context.Context, userID uuid.UU
 		balances[i].InterestEarned = "0"
 		balances[i].InterestThisMonth = "0"
 		balances[i].InterestThisMonthValue = "0"
+		balances[i].PendingInterest = "0"
 	}
 
 	rows, err := r.db.Query(ctx, `
@@ -263,6 +614,10 @@ func (r *PostgresRepository) addCashInterest(ctx context.Context, userID uuid.UU
 			ROUND(COALESCE(SUM(t.quantity) FILTER (
 				WHERE t.type = 'cash_interest' AND t.transaction_date >= period.starts_on
 			), 0) * COALESCE(fx.rate, 1), 8)::text,
+			ROUND(COALESCE((
+				SELECT SUM(ac.net_amount) FROM cash_interest_accruals ac
+				WHERE ac.entry_id = pe.id AND ac.status = 'pending'
+			), 0), 8)::text,
 			(SELECT MAX(ac.accrual_date) FROM cash_interest_accruals ac WHERE ac.entry_id = pe.id)
 		FROM portfolio_entries pe
 		JOIN portfolios p ON p.id = pe.portfolio_id
@@ -289,12 +644,12 @@ func (r *PostgresRepository) addCashInterest(ctx context.Context, userID uuid.UU
 
 	for rows.Next() {
 		var (
-			id                        uuid.UUID
-			earned, month, monthValue string
-			lastAccrual               *time.Time
+			id                                 uuid.UUID
+			earned, month, monthValue, pending string
+			lastAccrual                        *time.Time
 		)
 
-		if err := rows.Scan(&id, &earned, &month, &monthValue, &lastAccrual); err != nil {
+		if err := rows.Scan(&id, &earned, &month, &monthValue, &pending, &lastAccrual); err != nil {
 			return err
 		}
 
@@ -302,6 +657,7 @@ func (r *PostgresRepository) addCashInterest(ctx context.Context, userID uuid.UU
 			balances[i].InterestEarned = earned
 			balances[i].InterestThisMonth = month
 			balances[i].InterestThisMonthValue = monthValue
+			balances[i].PendingInterest = pending
 			balances[i].LastAccrualDate = lastAccrual
 		}
 	}

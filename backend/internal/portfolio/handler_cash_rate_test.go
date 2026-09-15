@@ -105,13 +105,14 @@ func TestHandlerCreateCashRateRefusesBeforeTheRepository(t *testing.T) {
 	today := todayJSON()
 
 	cases := map[string]string{
-		"no rate":         `{` + source + `"currency":"COP","annualRatePct":0,"effectiveFrom":"` + today + `"}`,
-		"over a hundred":  `{` + source + `"currency":"COP","annualRatePct":101,"effectiveFrom":"` + today + `"}`,
-		"five decimals":   `{` + source + `"currency":"COP","annualRatePct":9.12345,"effectiveFrom":"` + today + `"}`,
-		"monthly posting": `{` + source + `"currency":"COP","annualRatePct":9,"posting":"monthly","effectiveFrom":"` + today + `"}`,
-		"a past start":    `{` + source + `"currency":"COP","annualRatePct":9,"effectiveFrom":"2020-01-01T00:00:00Z"}`,
-		"unsupported":     `{` + source + `"currency":"ARS","annualRatePct":9,"effectiveFrom":"` + today + `"}`,
-		"no platform":     `{"currency":"COP","annualRatePct":9,"effectiveFrom":"` + today + `"}`,
+		"no rate":            `{` + source + `"currency":"COP","annualRatePct":0,"effectiveFrom":"` + today + `"}`,
+		"over a hundred":     `{` + source + `"currency":"COP","annualRatePct":101,"effectiveFrom":"` + today + `"}`,
+		"five decimals":      `{` + source + `"currency":"COP","annualRatePct":9.12345,"effectiveFrom":"` + today + `"}`,
+		"an unknown posting": `{` + source + `"currency":"COP","annualRatePct":9,"posting":"weekly","effectiveFrom":"` + today + `"}`,
+		"a cap of nothing":   `{` + source + `"currency":"COP","annualRatePct":9,"maxBalance":0,"effectiveFrom":"` + today + `"}`,
+		"a past start":       `{` + source + `"currency":"COP","annualRatePct":9,"effectiveFrom":"2020-01-01T00:00:00Z"}`,
+		"unsupported":        `{` + source + `"currency":"ARS","annualRatePct":9,"effectiveFrom":"` + today + `"}`,
+		"no platform":        `{"currency":"COP","annualRatePct":9,"effectiveFrom":"` + today + `"}`,
 	}
 
 	for name, body := range cases {
@@ -226,4 +227,84 @@ func TestHandlerCashRateErrorsMapToStatuses(t *testing.T) {
 			wantDomainDetails(t, resp, tc.err)
 		})
 	}
+}
+
+func TestHandlerRecalculateCashInterest(t *testing.T) {
+	userID, sourceID := uuid.New(), uuid.New()
+	from := time.Now().UTC().AddDate(0, 0, -10).Format(time.DateOnly) + "T00:00:00Z"
+
+	var (
+		gotFilter CashAccrualFilter
+		gotFrom   time.Time
+	)
+
+	repo := new(fakeRepository{
+		clearCashInterest: func(_ context.Context, filter CashAccrualFilter, day time.Time) (CashInterestCleared, error) {
+			gotFilter, gotFrom = filter, day
+
+			return CashInterestCleared{From: day, Balances: 1, Days: 10}, nil
+		},
+		getCashAccrualTargets: func(context.Context, time.Time, CashAccrualFilter) ([]CashAccrualTarget, error) {
+			return nil, nil
+		},
+	})
+	app := newTestModule(t, repo, userID, "user")
+
+	body := `{"sourceId":"` + sourceID.String() + `","currency":"COP","from":"` + from + `"}`
+	resp := doJSON(t, app, http.MethodPost, "/portfolios/cash/interest/recalculate", body)
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, want 200: %s", resp.StatusCode, raw)
+	}
+
+	if gotFilter.UserID != userID || gotFilter.SourceID != sourceID || gotFilter.Currency != money.COP {
+		t.Errorf("filter = %+v, want the owner's account", gotFilter)
+	}
+	if gotFrom.UTC().Format(time.DateOnly)+"T00:00:00Z" != from {
+		t.Errorf("from = %v, want %s", gotFrom, from)
+	}
+}
+
+// Every rule is answered by the service, so the repository — here left nil,
+// which would panic — is never reached.
+func TestHandlerRecalculateCashInterestRefusesBeforeTheRepository(t *testing.T) {
+	source := `"sourceId":"` + uuid.New().String() + `",`
+	tomorrow := time.Now().UTC().AddDate(0, 0, 1).Format(time.DateOnly) + "T00:00:00Z"
+
+	cases := map[string]string{
+		"no platform":   `{"currency":"COP","from":"2026-01-01T00:00:00Z"}`,
+		"unsupported":   `{` + source + `"currency":"ARS","from":"2026-01-01T00:00:00Z"}`,
+		"no day":        `{` + source + `"currency":"COP"}`,
+		"a day to come": `{` + source + `"currency":"COP","from":"` + tomorrow + `"}`,
+	}
+
+	for name, body := range cases {
+		t.Run(name, func(t *testing.T) {
+			app := newTestModule(t, new(fakeRepository{}), uuid.New(), "user")
+
+			resp := doJSON(t, app, http.MethodPost, "/portfolios/cash/interest/recalculate", body)
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Errorf("status = %d, want 400", resp.StatusCode)
+			}
+		})
+	}
+}
+
+// The recalculation answers the same way the rate writes do.
+func TestHandlerRecalculateCashInterestMapsTheDomainError(t *testing.T) {
+	body := `{"sourceId":"` + uuid.New().String() + `","currency":"COP","from":"` +
+		time.Now().UTC().AddDate(0, 0, -5).Format(time.DateOnly) + `T00:00:00Z"}`
+
+	repo := new(fakeRepository{
+		clearCashInterest: func(context.Context, CashAccrualFilter, time.Time) (CashInterestCleared, error) {
+			return CashInterestCleared{}, ErrPlatformNotFound
+		},
+	})
+	app := newTestModule(t, repo, uuid.New(), "user")
+
+	resp := doJSON(t, app, http.MethodPost, "/portfolios/cash/interest/recalculate", body)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", resp.StatusCode)
+	}
+	wantDomainDetails(t, resp, ErrPlatformNotFound)
 }

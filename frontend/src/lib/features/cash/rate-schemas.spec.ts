@@ -77,7 +77,55 @@ describe('cashRateUpdateSchema', () => {
 			withholdingPct: '7'
 		});
 
-		expect(result.data).toEqual({ id: RATE, annualRatePct: 8.5, withholdingPct: 7 });
+		// Omitir el abono y el tope es abono diario y sin tope, que es lo que
+		// dice una versión que no los menciona.
+		expect(result.data).toEqual({
+			id: RATE,
+			annualRatePct: 8.5,
+			withholdingPct: 7,
+			posting: 'daily',
+			maxBalance: null
+		});
+	});
+
+	it('acepta el abono mensual y un tope', () => {
+		const result = cashRateUpdateSchema.safeParse({
+			id: RATE,
+			annualRatePct: '9',
+			withholdingPct: '',
+			posting: 'monthly',
+			maxBalance: '25000000'
+		});
+
+		expect(result.data?.posting).toBe('monthly');
+		expect(result.data?.maxBalance).toBe(25000000);
+	});
+
+	it('rechaza un tope que no es un importe', () => {
+		const cap = (maxBalance: string) =>
+			cashRateUpdateSchema.safeParse({
+				id: RATE,
+				annualRatePct: '9',
+				withholdingPct: '',
+				maxBalance
+			}).success;
+
+		expect(cap('')).toBe(true);
+		expect(cap('0')).toBe(false);
+		expect(cap('-1')).toBe(false);
+		expect(cap('hola')).toBe(false);
+		expect(cap('1.000000001')).toBe(false);
+	});
+
+	it('rechaza un abono que no conoce', () => {
+		expect(
+			cashRateUpdateSchema.safeParse({
+				id: RATE,
+				annualRatePct: '9',
+				withholdingPct: '',
+				posting: 'weekly'
+			}).success
+		).toBe(false);
 	});
 
 	it('pide saber qué versión corregir', () => {
@@ -103,12 +151,32 @@ describe('cashRateDeleteSchema', () => {
 });
 
 describe('toCashRateBody', () => {
-	it('manda los porcentajes con el abono diario, y el día a medianoche UTC', () => {
-		expect(toCashRateBody({ annualRatePct: 9.25, withholdingPct: 0 })).toEqual({
+	it('manda los porcentajes con el abono elegido, y el día a medianoche UTC', () => {
+		expect(
+			toCashRateBody({ annualRatePct: 9.25, withholdingPct: 0, posting: 'daily', maxBalance: null })
+		).toEqual({
 			annualRatePct: 9.25,
 			withholdingPct: 0,
-			posting: 'daily'
+			posting: 'daily',
+			maxBalance: null
 		});
 		expect(toCalendarDateTime('2026-09-15')).toBe('2026-09-15T00:00:00Z');
+	});
+
+	// Una corrección dice la versión entera: un tope que se deja vacío lo quita.
+	it('manda el tope y el abono mensual tal cual', () => {
+		expect(
+			toCashRateBody({
+				annualRatePct: 12,
+				withholdingPct: 7,
+				posting: 'monthly',
+				maxBalance: 25000000
+			})
+		).toEqual({
+			annualRatePct: 12,
+			withholdingPct: 7,
+			posting: 'monthly',
+			maxBalance: 25000000
+		});
 	});
 });

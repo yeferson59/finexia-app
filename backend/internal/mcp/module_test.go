@@ -123,6 +123,30 @@ func (f *fakePortfolios) GetPlatforms(_ context.Context, userID uuid.UUID, displ
 	return []portfolio.PlatformStats{{Name: "IBKR", SourceType: portfolio.Broker, IsActive: true, Investments: 3}}, f.err
 }
 
+// cashSourceID is the platform the fake's cash balance and its rate share, so a
+// tool that matches them by account finds the rate.
+var cashSourceID = uuid.New()
+
+func (f *fakePortfolios) GetCashBalances(_ context.Context, userID uuid.UUID, display money.Currency) ([]portfolio.CashBalance, error) {
+	f.sawUserID, f.sawCurrency = userID, display
+
+	return []portfolio.CashBalance{{
+		PortfolioName: "Long term", SourceID: cashSourceID, SourceName: "Nu",
+		Balance: "10000.00", Currency: money.COP, Value: "10000.00", DisplayCurrency: money.COP,
+		InterestEarned: "71.08", InterestThisMonth: "71.08", PendingInterest: "0", Movements: 2,
+	}}, f.err
+}
+
+func (f *fakePortfolios) GetCashRates(_ context.Context, userID uuid.UUID) ([]portfolio.CashRate, error) {
+	f.sawUserID = userID
+
+	return []portfolio.CashRate{{
+		SourceID: cashSourceID, SourceName: "Nu", Currency: money.COP,
+		AnnualRatePct: "9.25", WithholdingPct: "0", Posting: portfolio.PostingDaily,
+		EffectiveFrom: time.Now().UTC().AddDate(0, 0, -30).Truncate(24 * time.Hour), Latest: true,
+	}}, f.err
+}
+
 // fakeMarket records the CatalogView it was asked for: that view is the whole
 // of the catalog's per-user scoping, so it is what the audience test reads.
 type fakeMarket struct {
@@ -284,7 +308,8 @@ func TestToolsListIsReadOnly(t *testing.T) {
 		"list_portfolios": false, "get_holdings": false, "get_allocation": false,
 		"get_sector_allocation":    false,
 		"list_recent_transactions": false, "get_portfolio_growth": false,
-		"list_platforms": false, "search_assets": false, "list_exchange_rates": false,
+		"list_platforms": false, "get_cash_accounts": false,
+		"search_assets": false, "list_exchange_rates": false,
 	}
 
 	for _, entry := range tools {

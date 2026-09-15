@@ -277,6 +277,7 @@ anterior deja de valer en el acto, sin ventana de gracia.
 | POST | `/portfolios/cash/movements` | usuario | Registra un depósito, un retiro o unos intereses; abre el saldo si no existía |
 | PUT | `/portfolios/cash/movements/:txnId` | usuario | Reescribe un movimiento sobre el mismo saldo |
 | DELETE | `/portfolios/cash/movements/:txnId` | usuario | Borra un movimiento si el saldo no queda en negativo |
+| POST | `/portfolios/cash/interest/recalculate` | usuario | Recalcula los intereses de una cuenta desde una fecha |
 | POST | `/portfolios` | usuario | Crea portfolio |
 | POST | `/portfolios/sources` | usuario | Crea plataforma/fuente |
 | POST | `/portfolios/entries` | usuario | Crea posición (entry); la categoría sale del activo, no del cuerpo |
@@ -1000,8 +1001,8 @@ cuenta —plataforma y moneda, no portafolio— es una tasa efectiva anual en
 porcentaje: `"9.25"` es 9,25 % E.A., la misma cifra que el APY de una cuenta en
 dólares. Se versiona por el día desde el que rige. Cambiar la tasa es anotar una
 versión nueva: la que seguía abierta termina la víspera y los días anteriores
-conservan la suya. Los intereses que rinde se calculan y se abonan solos cada
-día; ver *Intereses* más abajo.
+conservan la suya. Los intereses que rinde se calculan solos cada día y se
+abonan según `posting`; ver *Intereses* más abajo.
 
 | Método y ruta | Qué hace |
 |---|---|
@@ -1010,6 +1011,7 @@ día; ver *Intereses* más abajo.
 | `PUT /portfolios/cash/rates/:rateId` | Corrige `annualRatePct`, `withholdingPct` y `posting` de la versión más reciente; las fechas no cambian |
 | `POST /portfolios/cash/rates/:rateId/end` | La versión más reciente deja de rendir desde `endsOn` (`endedOn` queda en la víspera) |
 | `DELETE /portfolios/cash/rates/:rateId` | Borra la versión más reciente; si la anterior terminaba justo la víspera, vuelve a regir |
+| `POST /portfolios/cash/interest/recalculate` | Recalcula los días de una cuenta desde `from` |
 
 ```json
 {
@@ -1018,17 +1020,25 @@ día; ver *Intereses* más abajo.
   "annualRatePct": 9.25,
   "withholdingPct": 0,
   "posting": "daily",
+  "maxBalance": null,
   "effectiveFrom": "2026-09-15T00:00:00Z"
 }
 ```
 
-Cada versión trae `annualRatePct` y `withholdingPct` como texto, `effectiveFrom`,
-`endedOn` —el último día que rinde, `null` sin fin— y `latest`, que marca la
-única versión de la cuenta que se puede corregir, pausar o borrar.
+Cada versión trae `annualRatePct`, `withholdingPct` y `maxBalance` como texto
+—`maxBalance` es `null` sin tope—, `posting`, `effectiveFrom`, `endedOn` —el
+último día que rinde, `null` sin fin— y `latest`, que marca la única versión de
+la cuenta que se puede corregir, pausar o borrar.
 
 - `annualRatePct` > 0 y ≤ 100, con hasta 4 decimales; `withholdingPct` ≥ 0 y
-  < 100, con hasta 2. `posting` es `daily` o se omite: `monthly` todavía
-  responde **400**.
+  < 100, con hasta 2.
+- `posting` es `daily` (el valor por defecto si se omite) o `monthly`: con
+  `monthly`, los días se calculan igual y se abonan todos juntos el último día
+  del mes.
+- `maxBalance`, si viene, es > 0 y < 10¹², con hasta 8 decimales. Es el tope
+  remunerado de la **cuenta**, así que sus saldos se lo reparten en proporción
+  a lo que guarda cada uno. Omitirlo o mandarlo `null` es no tener tope; el
+  `PUT` dice la versión entera, así que omitirlo en una corrección lo quita.
 - `effectiveFrom` y `endsOn` no pueden ser anteriores a ayer en UTC. Los días
   pasados no se recalculan, y el día de margen es para quien está al oeste de
   Greenwich, que por la noche ya vive el día siguiente en UTC — **400**.
@@ -1056,14 +1066,48 @@ redondea a los decimales de la moneda, y lo que sobra se suma al día siguiente.
 - Solo ganan los saldos que la app lleva uno a uno en su propia moneda; una
   posición de efectivo comprada con otra moneda no.
 
+Con `posting: "monthly"` el día se calcula igual pero espera: queda en el libro
+como *pendiente* y el último día del mes se abona todo junto en un solo
+`cash_interest`, ligado a cada día que paga. Un día pendiente cuenta en el saldo
+sobre el que ganan los siguientes, así que un año abonado por meses rinde lo
+mismo que uno abonado por días. Si la cuenta deja de rendir antes de que cierre
+el mes —la tasa se pausó—, el job abona lo pendiente el último día que ganó, en
+vez de esperar un cierre que no va a llegar.
+
+Con tope, cada saldo gana sobre su parte de él: `saldo × mín(1, tope / lo que
+guarda la cuenta ese día)`.
+
 Con intereses calculados, una versión ya no se corrige ni se borra, no puede
 terminar antes del último día calculado, y una versión nueva tiene que empezar
 después de ese día: las tres responden **409**. `accruedThrough` dice cuál es.
 
 `GET /portfolios/cash` suma por saldo `interestEarned` (todo lo abonado, en su
 moneda), `interestThisMonth` e `interestThisMonthValue` (lo del mes UTC en
-curso, en su moneda y en `displayCurrency`) y `lastAccrualDate`.
+curso, en su moneda y en `displayCurrency`), `pendingInterest` (lo calculado y
+todavía sin abonar, que **no** está dentro de `balance`) y `lastAccrualDate`.
 `GET /portfolios/cash/movements` marca con `automatic: true` los abonos del job.
+
+**Recalcular** (migración 000045). Un día ya calculado no se vuelve a mirar
+solo: ganó sobre lo que el saldo tenía al cierre, y un movimiento anotado
+después con fecha pasada cambia esa cifra.
+`POST /portfolios/cash/interest/recalculate` es cómo se dice.
+
+```json
+{ "sourceId": "…", "currency": "COP", "from": "2026-09-01T00:00:00Z" }
+```
+
+Borra los abonos automáticos de la cuenta desde ese día —borrar un
+`cash_interest` no toca la serie de crecimiento (000038)— y vuelve a calcular
+día por día hasta ayer, sobre lo que los saldos guardan ahora. La ventana se
+ensancha hacia atrás hasta el primer día de un abono que cruce la fecha pedida:
+un abono mensual paga todo su mes, y medio abono no se puede deshacer.
+
+Responde con lo que hizo: `cleared` (`from` real, `balances` y `days`),
+`through`, `recomputed` y `credited`. `from` no puede ser futura (**400**) y la
+moneda tiene que estar soportada (**400**). La plataforma tiene que ser del
+usuario (**404**), como en las demás escrituras de una tasa; que esté inactiva
+no importa, porque su pasado se sigue pudiendo corregir. Una cuenta del usuario
+sin días calculados no es un error: responde con `balances: 0`.
 
 ### 2.8 Assets (JWT; *admin* donde se indica)
 
@@ -1370,6 +1414,7 @@ argumento con el que nombrar a otro:
 | `list_recent_transactions` | Últimas transacciones (`limit`, máx. 200) |
 | `get_portfolio_growth` | Serie de valor desde los snapshots (`period`: `1M`/`3M`/`6M`/`1Y`) |
 | `list_platforms` | Plataformas con lo que se tiene en cada una |
+| `get_cash_accounts` | Saldos de efectivo con la tasa que rinde cada cuenta, lo que ha pagado y lo pendiente de abonar |
 | `search_assets` | Catálogo de activos (`query`, `limit`, máx. 100) |
 | `list_exchange_rates` | Tasas compartidas más recientes |
 

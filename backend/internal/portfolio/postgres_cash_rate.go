@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/platform/database"
@@ -38,7 +39,7 @@ const cashRateColumns = `
 	r.id, r.source_id, s.name, r.currency,
 	trim_scale(r.annual_rate * 100)::text,
 	trim_scale(r.withholding_rate * 100)::text,
-	r.posting::text, r.effective_from, r.ended_on,
+	r.posting::text, trim_scale(r.max_balance)::text, r.effective_from, r.ended_on,
 	` + cashRateLatest + `,
 	` + cashRateAccruedThrough + `,
 	r.created_at, r.updated_at`
@@ -46,6 +47,18 @@ const cashRateColumns = `
 const cashRateFrom = `
 	FROM cash_yield_rates r
 	JOIN investment_sources s ON s.id = r.source_id`
+
+// maxBalanceParam is the cap as a numeric parameter: its digits, or NULL when
+// the rate has none.
+func maxBalanceParam(limit *decimal.Decimal) *string {
+	if limit == nil {
+		return nil
+	}
+
+	digits := limit.String()
+
+	return &digits
+}
 
 func scanCashRate(row pgx.Row) (CashRate, error) {
 	var rate CashRate
@@ -58,6 +71,7 @@ func scanCashRate(row pgx.Row) (CashRate, error) {
 		&rate.AnnualRatePct,
 		&rate.WithholdingPct,
 		&rate.Posting,
+		&rate.MaxBalance,
 		&rate.EffectiveFrom,
 		&rate.EndedOn,
 		&rate.Latest,
@@ -182,11 +196,11 @@ func (r *PostgresRepository) CreateCashRate(ctx context.Context, userID uuid.UUI
 
 		var rateID uuid.UUID
 		if err := tx.QueryRow(ctx, `
-			INSERT INTO cash_yield_rates (source_id, currency, annual_rate, withholding_rate, posting, effective_from)
-			VALUES ($1::uuid, $2::char(3), $3::numeric / 100, $4::numeric / 100, $5::cash_interest_posting, $6::date)
+			INSERT INTO cash_yield_rates (source_id, currency, annual_rate, withholding_rate, posting, max_balance, effective_from)
+			VALUES ($1::uuid, $2::char(3), $3::numeric / 100, $4::numeric / 100, $5::cash_interest_posting, $6::numeric, $7::date)
 			RETURNING id
 		`, in.SourceID, in.Currency, in.AnnualRatePct.String(), in.WithholdingPct.String(), string(in.Posting),
-			start.Format(time.DateOnly)).Scan(&rateID); err != nil {
+			maxBalanceParam(in.MaxBalance), start.Format(time.DateOnly)).Scan(&rateID); err != nil {
 			// The lock makes this unreachable from here; a writer that skipped it
 			// would still get the answer the check above gives.
 			var pgErr *pgconn.PgError
@@ -280,9 +294,11 @@ func (r *PostgresRepository) UpdateCashRate(ctx context.Context, userID, rateID 
 			UPDATE cash_yield_rates SET
 				annual_rate      = $2::numeric / 100,
 				withholding_rate = $3::numeric / 100,
-				posting          = $4::cash_interest_posting
+				posting          = $4::cash_interest_posting,
+				max_balance      = $5::numeric
 			WHERE id = $1
-		`, rateID, in.AnnualRatePct.String(), in.WithholdingPct.String(), string(in.Posting)); err != nil {
+		`, rateID, in.AnnualRatePct.String(), in.WithholdingPct.String(), string(in.Posting),
+			maxBalanceParam(in.MaxBalance)); err != nil {
 			return err
 		}
 

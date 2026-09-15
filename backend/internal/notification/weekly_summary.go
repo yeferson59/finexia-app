@@ -39,6 +39,11 @@ type port interface {
 	// compared against, one per portfolio. Portfolios with no history that far
 	// back are simply absent.
 	GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]portfolio.PortfolioValuePoint, error)
+	// The two below build the cash block: what the account keeps in cash, and
+	// the rate each account earns on it. money.XXX asks for the figures in the
+	// owner's preferred currency, which is the one the digest speaks.
+	GetCashBalances(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]portfolio.CashBalance, error)
+	GetCashRates(ctx context.Context, userID uuid.UUID) ([]portfolio.CashRate, error)
 }
 
 type m interface {
@@ -143,6 +148,8 @@ func (s *Service) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
 			data.WeekChangeSince = formatDay(baseline.date)
 		}
 
+		data.Cash = s.cashBlock(ctx, u.ID, now)
+
 		if err := s.m.SendWeeklySummary(u.Email, data); err != nil {
 			errs = append(errs, fmt.Errorf("user %s: %w", u.ID, err))
 			continue
@@ -151,6 +158,86 @@ func (s *Service) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
 	}
 
 	return sent, errs
+}
+
+// cashBlock reads the account's cash balances and the rates they earn, and
+// builds the digest's cash block. A read that fails, or an account with no cash
+// at all, leaves the block out: the rest of the digest is worth sending.
+func (s *Service) cashBlock(ctx context.Context, userID uuid.UUID, now time.Time) *mail.WeeklySummaryCash {
+	balances, err := s.port.GetCashBalances(ctx, userID, money.XXX)
+	if err != nil {
+		return nil
+	}
+
+	rates, err := s.port.GetCashRates(ctx, userID)
+	if err != nil {
+		return nil
+	}
+
+	return cashBlock(balances, rates, now)
+}
+
+// cashAccount names what a rate belongs to: a platform and a currency.
+type cashAccount struct {
+	sourceID uuid.UUID
+	currency money.Currency
+}
+
+// cashBlock totals the cash and the interest it earned this month, and averages
+// the rate the earning balances are on, weighted by what each of them holds.
+//
+// The average leaves the idle balances out rather than averaging a zero into
+// them: what the money that earns is earning and how much money earns nothing
+// are two different figures, and the block reports both.
+func cashBlock(balances []portfolio.CashBalance, rates []portfolio.CashRate, now time.Time) *mail.WeeklySummaryCash {
+	if len(balances) == 0 {
+		return nil
+	}
+
+	inEffect := make(map[cashAccount]decimal.Decimal, len(rates))
+
+	for _, r := range rates {
+		if r.InEffectOn(now) {
+			inEffect[cashAccount{sourceID: r.SourceID, currency: r.Currency}] = amount(r.AnnualRatePct)
+		}
+	}
+
+	block := mail.WeeklySummaryCash{Accounts: len(balances), Currency: balances[0].DisplayCurrency.String()}
+
+	value, interest := decimal.Zero, decimal.Zero
+	earning, weighted := decimal.Zero, decimal.Zero
+
+	for _, b := range balances {
+		held := amount(b.Value)
+		value = value.Add(held)
+		interest = interest.Add(amount(b.InterestThisMonthValue))
+
+		rate, ok := inEffect[cashAccount{sourceID: b.SourceID, currency: b.Currency}]
+		if !ok {
+			block.Idle++
+
+			continue
+		}
+
+		earning = earning.Add(held)
+		weighted = weighted.Add(held.Mul(rate))
+	}
+
+	block.Value = fixed(value)
+	block.Interest = signed(interest)
+
+	block.InterestColor = gainColor
+	if interest.IsNeg() {
+		block.InterestColor = lossColor
+	}
+
+	if earning.IsPos() {
+		if average, err := weighted.Div(earning); err == nil {
+			block.AverageRatePct = fixed(average)
+		}
+	}
+
+	return &block
 }
 
 // digestPeriod is how far back the digest looks for the value it compares

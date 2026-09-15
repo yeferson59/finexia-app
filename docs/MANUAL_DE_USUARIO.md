@@ -480,6 +480,47 @@ Finexia **no deja un saldo en negativo**. Un retiro mayor que lo que hay, o borr
 
 > **Las compras no descuentan del efectivo.** Si pagas unas acciones con dinero de tu saldo, registra también el retiro por ese importe: así el saldo cuadra con tu cuenta, y tu rentabilidad no cambia, porque el retiro y la compra se compensan.
 
+### 9.6 La rentabilidad de tu efectivo
+
+Si tu cuenta paga intereses —una cuenta de ahorros, una «cajita», una billetera en dólares con APY—, dile a Finexia cuánto paga y los anota sola, día a día. No tendrás que volver a escribirlos.
+
+Debajo de cada cuenta, en la lista de **Efectivo**, hay una línea con su tasa; si todavía no tiene, dice **Agregar tasa**. Al pulsarla se abre la rentabilidad de esa cuenta.
+
+| Campo | Qué escribir |
+|---|---|
+| **Tasa efectiva anual** | La que publica la entidad: `9,25` es 9,25 % E.A. Un APY en dólares es la misma cifra |
+| **Cuándo lo abona** | **Cada día**, o **cada mes** si tu banco te paga los intereses el último día del mes |
+| **Rige desde** | El día en que empieza a contar. Hoy o más adelante |
+
+En **Opciones avanzadas** hay dos cosas que casi nunca hacen falta:
+
+- La **retención**, si la entidad te descuenta impuestos de los intereses. Lo que se abona es lo que llega a la cuenta.
+- El **tope remunerado**, si la entidad solo paga hasta cierto saldo. El tope es de la cuenta entera: si el dinero de esa cuenta suma en varios portafolios, cada uno rinde sobre su parte del tope.
+
+Ahí mismo está el **conversor**: si tu banco publica una tasa **nominal** —«12 % nominal mes vencido»— escríbela, elige cada cuánto capitaliza y pulsa el botón. Finexia pone la efectiva anual equivalente en el campo de arriba, que son 12,68 % y no 12 %.
+
+Mientras escribes, el formulario te enseña **cuánto rendiría tu saldo de hoy** al día, en 30 días y en un año, ya neto de retención y limitado por el tope. Es la cifra que puedes contrastar contra lo que te abonó la entidad el mes pasado.
+
+Cada mañana Finexia calcula el día anterior sobre el saldo que tenías al cierre y lo abona como un movimiento de **Intereses**, marcado como automático. En el extracto los abonos de un mes se agrupan en una sola fila, para que no tapen tus depósitos y retiros. Ese dinero **sube el saldo y cuenta como rentabilidad y como ganancia**, nunca como aporte.
+
+> **Con abono mensual, lo ganado espera.** La cuenta dice «+X calculados, se abonan al cerrar el mes»: ya es tuyo y sigue generando intereses, pero entra en el saldo el último día del mes, de una vez, como hace tu banco.
+
+Cuando la entidad cambia la tasa, vuelve a abrir la ventana y elige qué quieres hacer:
+
+| Opción | Qué hace |
+|---|---|
+| **Cambiar tasa** | Anota una versión nueva desde un día. La anterior termina la víspera y los días pasados conservan la suya |
+| **Corregir** | Reescribe lo que escribiste mal, sin crear otra versión. Solo mientras no haya generado intereses |
+| **Pausar** | Desde ese día la cuenta deja de rendir. **Reanudar** la vuelve a encender |
+| **Borrar** | Quita la versión. Si al anotarla cerró otra, esa vuelve a regir |
+| **Recalcular** | Rehace los intereses desde una fecha |
+
+> **Una tasa que ya generó intereses no se corrige ni se borra.** Esos días se ganaron con ella, así que se quedan como están: para cambiarla, anota una versión nueva desde hoy.
+
+**Recalcular** es para una sola cosa: cuando anotas un depósito o un retiro **con fecha pasada**. Los días que ya estaban calculados rindieron sobre un saldo que ahora sabes que era otro. Elige desde qué día y Finexia borra esos abonos automáticos y los vuelve a calcular sobre lo que la cuenta guarda ahora. Los movimientos que anotaste tú no se tocan.
+
+Tu **resumen semanal** por correo trae también una línea con tu efectivo: cuánto tienes, cuánto rindió en el mes, la tasa media que estás sacando y cuántas cuentas están sin tasa, que suele ser el dinero que más fácil es poner a rendir.
+
 ---
 
 ## 10. Transacciones
@@ -839,6 +880,7 @@ Con la conexión hecha, el asistente puede preguntar por:
 - Tu **asignación** por tipo de activo.
 - La **evolución** de un portafolio a lo largo del tiempo.
 - Tus **transacciones recientes**.
+- Tu **efectivo**: cuánto tienes en cada cuenta, qué tasa rinde, cuánto te ha pagado y qué cuentas están sin tasa.
 - Tus **plataformas**, el **catálogo de activos** y las **tasas de cambio**.
 
 Dos cosas que conviene saber para leer sus respuestas:

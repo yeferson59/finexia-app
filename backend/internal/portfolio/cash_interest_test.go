@@ -43,6 +43,16 @@ func nineAPercent(t *testing.T, withheld string) CashRateVersion {
 	}
 }
 
+// aDay is a day that credits what it earns, on a balance that is its whole
+// account: the shape of every day of a rate posted daily.
+func aDay(t *testing.T, basis, carry string) CashDay {
+	t.Helper()
+
+	held := mustDecimal(t, basis)
+
+	return CashDay{Basis: held, AccountHeld: held, Carry: mustDecimal(t, carry), Credits: true}
+}
+
 func TestAccrueDay(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -65,7 +75,7 @@ func TestAccrueDay(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := accrueDay(mustDecimal(t, tc.basis), nineAPercent(t, tc.withheld), mustDecimal(t, tc.carry), tc.cur)
+			got, err := accrueDay(aDay(t, tc.basis, tc.carry), nineAPercent(t, tc.withheld), tc.cur)
 			if err != nil {
 				t.Fatalf("accrueDay: %v", err)
 			}
@@ -79,6 +89,126 @@ func TestAccrueDay(t *testing.T) {
 	}
 }
 
+// A rate posted monthly computes every day exactly as a daily one does. The day
+// that closes the month credits what every day of it earned, in one amount; the
+// days before it credit nothing and leave the carry alone.
+func TestAccrueDayHoldsWhatItDoesNotCredit(t *testing.T) {
+	version := nineAPercent(t, "0")
+	version.Posting = PostingMonthly
+
+	day := aDay(t, "10000", "0.004")
+	day.Credits = false
+
+	held, err := accrueDay(day, version, money.USD)
+	if err != nil {
+		t.Fatalf("accrueDay: %v", err)
+	}
+
+	aboutAmount(t, "net", held.Net.String(), "2.3613")
+	sameAmount(t, "credited", held.Credited.String(), "0")
+	sameAmount(t, "carry", held.Carry.String(), "0.004")
+
+	// The month closes on a day that earns the same and pays them both.
+	day.Credits = true
+	day.Held = held.Net
+
+	closing, err := accrueDay(day, version, money.USD)
+	if err != nil {
+		t.Fatalf("accrueDay: %v", err)
+	}
+
+	sameAmount(t, "credited", closing.Credited.String(), "4.73")
+	sameAmount(t, "credited + carry", closing.Credited.Add(closing.Carry).String(),
+		closing.Net.Add(day.Held).Add(day.Carry).String())
+}
+
+func TestCreditsOn(t *testing.T) {
+	daily := CashRateVersion{Posting: PostingDaily}
+	monthly := CashRateVersion{Posting: PostingMonthly}
+
+	days := []struct {
+		day   time.Time
+		close bool
+	}{
+		{time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC), false},
+		{time.Date(2026, time.September, 29, 0, 0, 0, 0, time.UTC), false},
+		{time.Date(2026, time.September, 30, 0, 0, 0, 0, time.UTC), true},
+		{time.Date(2026, time.December, 31, 0, 0, 0, 0, time.UTC), true},
+		// 2028 is a leap year, so February closes a day later.
+		{time.Date(2028, time.February, 28, 0, 0, 0, 0, time.UTC), false},
+		{time.Date(2028, time.February, 29, 0, 0, 0, 0, time.UTC), true},
+	}
+
+	for _, d := range days {
+		if !daily.creditsOn(d.day) {
+			t.Errorf("a daily rate does not credit on %s", d.day.Format(time.DateOnly))
+		}
+
+		if got := monthly.creditsOn(d.day); got != d.close {
+			t.Errorf("a monthly rate credits on %s = %v, want %v", d.day.Format(time.DateOnly), got, d.close)
+		}
+	}
+}
+
+// A cap belongs to the account, so the balances of one account earn on their
+// share of it and never on more than it together.
+func TestEarningBasisSharesTheCap(t *testing.T) {
+	limit := mustDecimal(t, "5000")
+	capped := CashRateVersion{MaxBalance: &limit}
+
+	cases := []struct {
+		name        string
+		basis       string
+		accountHeld string
+		want        string
+	}{
+		{"under the cap", "4000", "4000", "4000"},
+		{"exactly the cap", "5000", "5000", "5000"},
+		{"the whole account over it", "8000", "8000", "5000"},
+		{"a quarter of an account over it", "2500", "10000", "1250"},
+		{"the rest of that account", "7500", "10000", "3750"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := capped.earningBasis(mustDecimal(t, tc.basis), mustDecimal(t, tc.accountHeld))
+			if err != nil {
+				t.Fatalf("earningBasis: %v", err)
+			}
+
+			sameAmount(t, "earning basis", got.String(), tc.want)
+		})
+	}
+
+	t.Run("no cap earns on all of it", func(t *testing.T) {
+		got, err := CashRateVersion{}.earningBasis(mustDecimal(t, "8000"), mustDecimal(t, "10000"))
+		if err != nil {
+			t.Fatalf("earningBasis: %v", err)
+		}
+
+		sameAmount(t, "earning basis", got.String(), "8000")
+	})
+}
+
+func TestCreditHeld(t *testing.T) {
+	credited, left, err := creditHeld(mustDecimal(t, "70.8135"), mustDecimal(t, "0.0042"), money.USD)
+	if err != nil {
+		t.Fatalf("creditHeld: %v", err)
+	}
+
+	sameAmount(t, "credited", credited.String(), "70.82")
+	sameAmount(t, "credited + left", credited.Add(left).String(), "70.8177")
+
+	// Less than a cent of interest is carried, not credited.
+	credited, left, err = creditHeld(mustDecimal(t, "0.003"), decimal.Zero, money.USD)
+	if err != nil {
+		t.Fatalf("creditHeld: %v", err)
+	}
+
+	sameAmount(t, "credited", credited.String(), "0")
+	sameAmount(t, "left", left.String(), "0.003")
+}
+
 // A small balance earns less than a cent a day. The carry keeps adding it up
 // until there is a cent to credit, so a year of rounded credits is the year's
 // interest.
@@ -88,7 +218,7 @@ func TestAccrueDayLosesNothingToRoundingOverAYear(t *testing.T) {
 
 	carry, credited, net := decimal.Zero, decimal.Zero, decimal.Zero
 	for range 365 {
-		day, err := accrueDay(basis, version, carry, money.USD)
+		day, err := accrueDay(CashDay{Basis: basis, AccountHeld: basis, Carry: carry, Credits: true}, version, money.USD)
 		if err != nil {
 			t.Fatalf("accrueDay: %v", err)
 		}

@@ -165,8 +165,11 @@ type fakeRepository struct {
 	updateCashRate                  func(ctx context.Context, userID, rateID uuid.UUID, in CashRateInput) (CashRate, error)
 	endCashRate                     func(ctx context.Context, userID, rateID uuid.UUID, endsOn time.Time) (CashRate, error)
 	deleteCashRate                  func(ctx context.Context, userID, rateID uuid.UUID) error
-	getCashAccrualTargets           func(ctx context.Context, through time.Time) ([]CashAccrualTarget, error)
+	getCashAccrualTargets           func(ctx context.Context, through time.Time, filter CashAccrualFilter) ([]CashAccrualTarget, error)
+	clearCashInterest               func(ctx context.Context, filter CashAccrualFilter, from time.Time) (CashInterestCleared, error)
 	accrueCashInterestDay           func(ctx context.Context, entryID, rateID uuid.UUID, day time.Time) (bool, error)
+	getHeldCashInterest             func(ctx context.Context, through time.Time, filter CashAccrualFilter) ([]uuid.UUID, error)
+	postHeldCashInterest            func(ctx context.Context, entryID uuid.UUID) (bool, error)
 
 	// Consumed by fakeUserReader, not part of portfolio.Repository.
 	getUserPreferences func(ctx context.Context, userID uuid.UUID) (user.UserPreferences, error)
@@ -527,10 +530,26 @@ func (f *fakeRepository) DeleteCashRate(ctx context.Context, userID, rateID uuid
 	return f.deleteCashRate(ctx, userID, rateID)
 }
 
-func (f *fakeRepository) GetCashAccrualTargets(ctx context.Context, through time.Time) ([]CashAccrualTarget, error) {
-	return f.getCashAccrualTargets(ctx, through)
+func (f *fakeRepository) GetCashAccrualTargets(ctx context.Context, through time.Time, filter CashAccrualFilter) ([]CashAccrualTarget, error) {
+	return f.getCashAccrualTargets(ctx, through, filter)
+}
+
+func (f *fakeRepository) ClearCashInterest(ctx context.Context, filter CashAccrualFilter, from time.Time) (CashInterestCleared, error) {
+	return f.clearCashInterest(ctx, filter, from)
 }
 
 func (f *fakeRepository) AccrueCashInterestDay(ctx context.Context, entryID, rateID uuid.UUID, day time.Time) (bool, error) {
 	return f.accrueCashInterestDay(ctx, entryID, rateID, day)
+}
+
+func (f *fakeRepository) GetHeldCashInterest(ctx context.Context, through time.Time, filter CashAccrualFilter) ([]uuid.UUID, error) {
+	if f.getHeldCashInterest == nil {
+		return nil, nil
+	}
+
+	return f.getHeldCashInterest(ctx, through, filter)
+}
+
+func (f *fakeRepository) PostHeldCashInterest(ctx context.Context, entryID uuid.UUID) (bool, error) {
+	return f.postHeldCashInterest(ctx, entryID)
 }

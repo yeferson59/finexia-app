@@ -1,8 +1,8 @@
 # Plan — Rentabilidad del efectivo (tasas tipo renta fija)
 
-> **Estado:** propuesta · 14 sep 2026
+> **Estado:** implementado · 15 sep 2026
 > **Alcance:** módulo `portfolio` (backend), feature `cash` (frontend)
-> **Migraciones:** 000042 – 000044 · **Fases:** 4
+> **Migraciones:** 000042 – 000045 · **Fases:** 4
 
 ### Estado de implementación
 
@@ -11,7 +11,7 @@
 | 1. La ganancia del efectivo cuenta | Implementada (000042) |
 | 2. Registrar tasas | Implementada (000043) |
 | 3. Causación automática | Implementada (000044, job `accrue-cash-interest`) |
-| 4. Pulido | Pendiente |
+| 4. Pulido | Implementada (000045) |
 
 Decisiones que cambiaron respecto al plan al implementarlo:
 
@@ -23,12 +23,32 @@ Decisiones que cambiaron respecto al plan al implementarlo:
   versión anterior si terminaba justo la víspera.
 - **Fechas.** Se aceptan desde ayer en UTC, con un día de margen para quien
   está al oeste de Greenwich.
-- **Abono y tope.** Solo existe el abono diario. `max_balance` está en la tabla
-  pero la API no lo expone todavía: el tope queda para la Fase 4.
+- **Abono y tope.** La Fase 4 abrió los dos. `posting: monthly` calcula cada día
+  igual y abona el mes entero el último día, en una sola transacción ligada a
+  cada día que paga; un día pendiente cuenta en el saldo del siguiente, así que
+  un año por meses rinde lo mismo que uno por días. Si la cuenta deja de rendir
+  antes de cerrar el mes, el job abona lo pendiente el último día que ganó.
+  `max_balance` es de la cuenta: sus saldos se reparten el tope en proporción a
+  lo que guarda cada uno.
 - **Primer día que rinde un saldo.** Un saldo gana desde el día en que se abrió
   (`created_at` en UTC), no desde el primer día de la tasa.
 - **Saldo del día en recuperaciones.** Los abonos se cuentan por el día en que
   se ganaron, aunque su transacción quede fechada después (D10).
+- **Nombres.** Los archivos se llaman `cash_rate.*` (la tasa) y `cash_interest.*`
+  / `postgres_cash_accrual.go` (lo que rinde), no `cash_yield.*`. La tabla sí
+  conservó el nombre `cash_yield_rates`. Las tablas de §8, §9, §10 y §12 dicen
+  ya los nombres reales.
+- **Campos que no se hicieron.** Dos del §9 se quedaron fuera porque nada los
+  usa: `annualRatePct` en cada movimiento (el extracto agrupa los abonos y no
+  los desglosa por tasa) y `accruals`/`interestEarned` por versión de la tasa
+  (basta `accruedThrough`, que es lo que decide si una versión se puede
+  corregir). Añadirlos es una consulta más en cada listado; si alguna pantalla
+  los pide, ahí es cuando se pagan.
+- **Plataforma ajena al recalcular.** `POST /portfolios/cash/interest/recalculate`
+  comprueba la propiedad dentro de su misma transacción, como hace
+  `CreateCashRate`, y responde `ErrPlatformNotFound` (404): la misma respuesta
+  que las demás escrituras de una tasa. Que la plataforma esté inactiva no
+  importa — una que dejó de recibir dinero sigue pudiendo corregir su pasado.
 
 ## 1. Qué se quiere
 
@@ -42,7 +62,10 @@ Una plataforma que paga rendimiento sobre el saldo (una cuenta de ahorro, una
    portafolio donde está el efectivo, en todas las cifras: ganancia,
    rentabilidad, plataformas y crecimiento.
 
-## 2. Qué hay hoy
+## 2. Qué había antes
+
+> Este apartado es el planteamiento: describe el estado **anterior** a las
+> migraciones 000042 – 000045. Lo que hay hoy está en la tabla de arriba.
 
 | Pieza | Estado | Dónde |
 |---|---|---|
@@ -92,8 +115,8 @@ dos plataformas.
 
 **D2. Forma canónica: tasa efectiva anual (E.A.), base 365.** Es la convención
 de las cuentas de ahorro en Colombia y equivale al APY de las cuentas en
-dólares. Se guarda como fracción (`0.090000`). Convertir una tasa nominal queda
-para la Fase 4, como ayuda del formulario.
+dólares. Se guarda como fracción (`0.090000`). Convertir una tasa nominal es
+ayuda del formulario (Fase 4): `annualFromNominal` en `lib/features/cash`.
 
 **D3. Las tasas se versionan por fecha de vigencia.** Si la entidad cambia la
 tasa, se crea una versión nueva desde una fecha y la anterior se cierra. Una
@@ -346,19 +369,26 @@ dependencias nuevas entre módulos, así que `arch_test.go` sigue pasando.
 | `portfolio/postgres_cash.go` | Cambiar `pe.price = 1` (líneas 284 y 336) por `cash_entry_at_par(pe.id)` | 1 |
 | `portfolio/cash.go` | Actualizar el comentario del modelo: el interés ya no deja el precio en 1 | 1 |
 | `migrations/000043_*.sql` | Tabla de tasas | 2 |
-| `portfolio/cash_yield.go` | `CashYieldRate`, `CashYieldRateInput.Validate`, `InterestPosting`, errores (`ErrInvalidCashRate` 400, `ErrCashRateInUse` 409, `ErrCashRateNotFound` 404), `dailyRate`, `accrueDay` (función pura) | 2–3 |
-| `portfolio/dto_cash_yield.go` | DTOs de creación y edición; porcentajes como texto (`"9.00"`) | 2 |
-| `portfolio/repository.go` | Interfaz `CashYieldStore`, embebida en el repositorio | 2 |
-| `portfolio/postgres_cash_yield.go` | CRUD de tasas. `Create` cierra la versión vigente en la misma transacción | 2 |
-| `portfolio/service_cash_yield.go` | Casos de uso y `AccrueCashInterest(ctx, through)` | 2–3 |
-| `portfolio/handler_cash_yield.go` | Handlers con el mismo patrón que `handler_cash.go` | 2 |
+| `portfolio/cash_rate.go` | `CashRate`, `CashRateInput.Validate`, `InterestPosting`, errores (`ErrInvalidCashRate` 400, `ErrCashRateInUse`/`ErrCashRateNotLatest`/`ErrCashRateOverlaps` 409, `ErrCashRateNotFound` 404) | 2 |
+| `portfolio/cash_interest.go` | `CashRateVersion`, `PendingDays`, `dailyRate`, `accrueDay` (funciones puras) | 3 |
+| `portfolio/dto_cash_rate.go` | DTOs de creación, edición, pausa y recálculo | 2 |
+| `portfolio/repository.go` | Interfaces `CashRateStore` y `CashAccrualStore`, embebidas en el repositorio | 2–3 |
+| `portfolio/postgres_cash_rate.go` | CRUD de tasas. `Create` cierra la versión vigente en la misma transacción | 2 |
+| `portfolio/service_cash_rate.go` | Casos de uso de las tasas | 2 |
+| `portfolio/service_cash_interest.go` | `AccrueCashInterest(ctx, through)` y `RecalculateCashInterest` | 3–4 |
+| `portfolio/handler_cash_rate.go` | Handlers con el mismo patrón que `handler_cash.go` | 2 |
 | `portfolio/module.go` | Rutas `/cash/rates…` junto a las de `/cash`, antes de `/:id` | 2 |
 | `migrations/000044_*.sql` | Tabla de causaciones | 3 |
 | `portfolio/postgres_cash_accrual.go` | Objetivos por día; causación de un saldo en una transacción con `FOR UPDATE` | 3 |
 | `portfolio/cash_interest_job.go` | `CashInterestJob` (`Name() = "accrue-cash-interest"`) | 3 |
 | `app/app.go` | `sched.Register(portfolio.NewCashInterestJob(…), scheduler.DailyAt{Hour: 5, Minute: 30}, scheduler.WithStore(persistent))` | 3 |
-| `portfolio/cash.go` + `postgres_cash.go` | `CashBalance` suma `rate`, `interestEarned`, `interestThisMonth`, `pendingInterest`; `CashMovement` suma `automatic` | 3 |
-| `docs/API.md` (Efectivo), `docs/MANUAL_DE_USUARIO.md` (9.5) | Documentación | 4 |
+| `portfolio/cash.go` + `postgres_cash_accrual.go` | `CashBalance` suma `interestEarned`, `interestThisMonth`, `interestThisMonthValue`, `lastAccrualDate` (y `pendingInterest` en la Fase 4); `CashMovement` suma `automatic` | 3 |
+| `migrations/000045_*.sql` | Saldo al cierre como función, con lo causado y sin abonar | 4 |
+| `portfolio/cash_interest.go` | `CashDay`, `creditsOn`, `earningBasis`, `creditHeld`, `CashAccrualFilter`, `RecalculateCashInterestInput` | 4 |
+| `portfolio/postgres_cash_accrual.go` | `GetHeldCashInterest`, `PostHeldCashInterest`, `ClearCashInterest` | 4 |
+| `mcp/tools_portfolio.go` | Tool `get_cash_accounts` | 4 |
+| `notification/weekly_summary.go` | Bloque de efectivo del resumen semanal | 4 |
+| `docs/API.md` (Efectivo), `docs/MANUAL_DE_USUARIO.md` (9.5 y 9.6) | Documentación | 4 |
 
 ### Por qué 05:30 UTC
 
@@ -409,13 +439,14 @@ WHERE entry_id = $1 AND transaction_date <= $2;
 
 | Método y ruta | Qué hace |
 |---|---|
-| `GET /portfolios/cash/rates` | Tasas del usuario, vigentes e históricas, con `accruals` e `interestEarned` |
+| `GET /portfolios/cash/rates` | Tasas del usuario, vigentes e históricas, con `latest` y `accruedThrough` |
 | `POST /portfolios/cash/rates` | Crea una tasa o una versión nueva. Si hay una vigente, la cierra el día anterior |
 | `PUT /portfolios/cash/rates/:rateId` | Edita una tasa **sin** causaciones; si ya tiene, responde 409 |
 | `POST /portfolios/cash/rates/:rateId/end` | Pausa la tasa desde `endedOn` |
 | `DELETE /portfolios/cash/rates/:rateId` | Borra una tasa sin causaciones |
-| `GET /portfolios/cash` | Cada saldo trae `rate`, `interestEarned`, `interestThisMonth` y `pendingInterest` |
-| `GET /portfolios/cash/movements` | Cada movimiento trae `automatic` y `annualRatePct` |
+| `GET /portfolios/cash` | Cada saldo trae `interestEarned`, `interestThisMonth`, `interestThisMonthValue`, `pendingInterest` y `lastAccrualDate` |
+| `GET /portfolios/cash/movements` | Cada movimiento trae `automatic` |
+| `POST /portfolios/cash/interest/recalculate` | Rehace los días de una cuenta desde `from` |
 
 ```json
 POST /portfolios/cash/rates
@@ -445,15 +476,16 @@ como `CashMovementInput`):
 
 | Archivo | Cambio |
 |---|---|
-| `lib/api/schemas/cash.ts` | `cashYieldRateSchema`; `cashBalanceSchema` suma `rate` (nullable), `interestEarned`, `interestThisMonth`, `pendingInterest`; `cashMovementSchema` suma `automatic` |
-| `lib/api/cash.ts` | `getRates`, `createRate`, `updateRate`, `endRate`, `deleteRate` |
-| `lib/features/cash/cash.ts` | `formatAnnualRate` ("9 % E.A."), `dailyRateFromEA`, `projectInterest(balance, ea, días)`, `collapseAutomaticInterest(movements)`; `groupCashAccounts` lleva la tasa de la cuenta |
-| `lib/features/cash/schemas.ts` | `cashRateSchema` (zod) con mensajes en español |
+| `lib/api/schemas/cash.ts` | `cashRateSchema`; `cashBalanceSchema` suma `interestEarned`, `interestThisMonth`, `interestThisMonthValue`, `pendingInterest`, `lastAccrualDate`; `cashMovementSchema` suma `automatic` |
+| `lib/api/cash.ts` | `getRates`, `createRate`, `updateRate`, `endRate`, `deleteRate`, `recalculateInterest` |
+| `lib/features/cash/rates.ts` | `formatAnnualRate` ("9,25 % E.A."), `dailyRateFromAnnual`, `annualFromNominal`, `projectInterest`, `cashAccountRate`, `describeCashAccountRate`, `cashYield`, `cashRateErrorMessage` |
+| `lib/features/cash/interest.ts` | `groupAutomaticInterest`, `groupCashLedgerByMonth`: los abonos del libro, agrupados |
+| `lib/features/cash/schemas.ts` | `cashRateCreateSchema`/`UpdateSchema`/`EndSchema`/`DeleteSchema`, `cashRecalculateSchema`, `toCashRateBody` |
 | `components/cash-rate-form.svelte` (nuevo) | Tasa E.A. (%), vigente desde (hoy), abono, y en "Opciones avanzadas" la retención y el tope. Proyección en vivo sobre el saldo actual |
-| `components/cash-accounts.svelte` | Chip "9 % E.A." o enlace "Agregar tasa" en cada cuenta, la línea "Ganado este mes · total" y las acciones "Cambiar tasa" y "Pausar" |
+| `components/cash-accounts.svelte` | Chip "9 % E.A." o enlace "Agregar tasa" en cada cuenta, lo ganado este mes y lo calculado sin abonar |
 | `components/cash-summary.svelte` | "Intereses del mes" y "tasa promedio ponderada" del efectivo |
 | `components/cash-movements.svelte` | Los abonos automáticos se agrupan por cuenta y mes ("Intereses automáticos · 14 abonos · + $ 33.071"), se pueden expandir y llevan la marca "Automático" |
-| `routes/dashboard/cash/+page.server.ts` | Acciones `saveRate`, `endRate`, `deleteRate` |
+| `routes/dashboard/cash/+page.server.ts` | Acciones `createRate`, `updateRate`, `endRate`, `deleteRate`, `recalculateInterest` |
 | Posiciones del portafolio | En las filas de efectivo se oculta el costo promedio (ahora sería 0,99) y la ganancia se rotula "Intereses" |
 
 **Textos del formulario:**
@@ -487,15 +519,33 @@ stub de e2e no sirve `/portfolios/cash`; hay que usar un proxy con `vite dev`.
 4. **Pulido.** Abono mensual, conversor de nominal a E.A., tope remunerado,
    "recalcular desde una fecha", tool de MCP, intereses en el resumen semanal,
    `API.md` y manual.
+   *Cómo quedó:*
+   - Migración 000045: `cash_entry_balance_at_close(entry_id, día)`, que además
+     de las transacciones cuenta lo causado y sin abonar, y el índice parcial de
+     las causaciones pendientes.
+   - `POST /portfolios/cash/interest/recalculate` borra los abonos automáticos de
+     una cuenta desde un día y los vuelve a causar. La ventana se ensancha hacia
+     atrás hasta el primer día de un abono que cruce la fecha: medio abono
+     mensual no se puede deshacer. Borrar un `cash_interest` no toca la serie de
+     crecimiento (000038), así que lo que se vuelve a abonar entra como
+     rendimiento igual que la primera vez.
+   - El conversor de nominal a E.A. vive en el formulario
+     (`annualFromNominal`), junto a la retención y el tope, en «Opciones
+     avanzadas».
+   - Tool de MCP `get_cash_accounts`: los saldos con la tasa vigente de su
+     cuenta, lo ganado y lo pendiente.
+   - El resumen semanal trae un bloque de efectivo: el total, lo ganado en el
+     mes, la tasa media ponderada de los saldos que rinden y cuántos no rinden.
+     La media deja fuera los saldos sin tasa y los cuenta aparte.
 
 ## 12. Pruebas de backend
 
-- **Unitarias (`cash_yield_test.go`):**
+- **Unitarias (`cash_rate_test.go`, `cash_interest_test.go`):**
   - `dailyRate` cumple `(1 + i_d)^365 − 1 = EA` para 0,5 %, 9 % y 13,5 %.
   - `accrueDay` con retención, con tope, con base 0 y con arrastre (que un año
     de abonos redondeados sume lo mismo que el cálculo sin redondeo).
   - `Validate`: un caso por regla.
-- **DB (`postgres_cash_db_test.go`, `postgres_cash_yield_db_test.go`):**
+- **DB (`postgres_cash_db_test.go`, `postgres_cash_gain_db_test.go`, `postgres_cash_rate_db_test.go`, `postgres_cash_accrual_db_test.go`, `postgres_cash_posting_db_test.go`):**
   - La ganancia del resumen y de la plataforma incluye los intereses.
   - Un retiro reduce la ganancia en proporción.
   - Vaciar la cuenta y volver a depositar deja la ganancia en 0.
@@ -509,14 +559,14 @@ stub de e2e no sirve `/portfolios/cash`; hay que usar un proxy con `vite dev`.
   - Un abono automático borrado no se vuelve a crear.
   - Una cuenta repartida con tope reparte el tope en proporción al saldo.
   - Una cuenta sin tasa se comporta exactamente como hoy.
-- **Handlers (`handler_cash_yield_test.go`):** 400 en cada validación, 404 con
+- **Handlers (`handler_cash_rate_test.go`):** 400 en cada validación, 404 con
   una plataforma ajena y 409 al editar una tasa con causaciones.
 
 ## 13. Casos borde y riesgos
 
 | Caso | Qué pasa | Mitigación |
 |---|---|---|
-| Se agrega un depósito con fecha pasada después de causar esos días | Los intereses de esos días no se recalculan | Aceptado en v1. En la Fase 4, "recalcular desde": borra los abonos automáticos desde una fecha (000038 los retira sin afectar la serie) y los vuelve a causar |
+| Se agrega un depósito con fecha pasada después de causar esos días | Los intereses de esos días no se recalculan solos | "Recalcular desde" (Fase 4): borra los abonos automáticos desde una fecha (000038 los retira sin afectar la serie) y los vuelve a causar |
 | El job estuvo caído | Recupera todos los días pendientes | D10: la fecha contable se ajusta al último snapshot |
 | La entidad cambia la tasa | — | Se crea una versión nueva desde hoy |
 | Salto en la línea de ganancia el día de la migración 000042 | Los snapshots viejos guardaron ganancia 0 para el efectivo | Avisarlo en el changelog. La rentabilidad (Dietz) no salta, porque el valor no cambia |
@@ -531,12 +581,22 @@ solo para el efectivo.
 
 ## 14. Criterios de aceptación
 
-- [ ] Registro 9 % E.A. en la cuenta en COP de una plataforma, desde hoy, y veo la tasa y la proyección en la cuenta.
-- [ ] Al día siguiente hay un movimiento "Intereses automáticos" de ≈ $ 2.361 sobre $ 10.000.000 y el saldo subió.
-- [ ] La ganancia del portafolio y la de la plataforma suben en esa cifra; la rentabilidad del reporte también; el aporte neto no.
-- [ ] Correr el job dos veces el mismo día no duplica el abono.
-- [ ] Cambiar la tasa crea una versión nueva; los días anteriores conservan la tasa anterior.
-- [ ] Pausar la tasa detiene los abonos desde esa fecha.
-- [ ] Borrar un abono automático no lo vuelve a crear.
-- [ ] Retirar todo y volver a depositar deja la ganancia en 0.
-- [ ] Una cuenta sin tasa se comporta exactamente como hoy.
+Cada uno con la prueba que lo fija (`internal/portfolio`, contra un Postgres con
+las migraciones aplicadas).
+
+- [x] Registro 9 % E.A. en la cuenta en COP de una plataforma, desde hoy, y veo la tasa y la proyección en la cuenta. — `TestCashRateNewVersionEndsTheOneBefore`; la proyección, `rates.spec.ts`.
+- [x] Al día siguiente hay un movimiento "Intereses automáticos" de ≈ $ 2.361 sobre $ 10.000.000 y el saldo subió. — `TestCashAccrualCreditsADayOfInterest`.
+- [x] La ganancia del portafolio y la de la plataforma suben en esa cifra; la rentabilidad del reporte también; el aporte neto no. — `TestCashInterestIsGainInThePortfolioAndThePlatform`, `TestCashAccrualCaughtUpStillCountsAsReturn`.
+- [x] Correr el job dos veces el mismo día no duplica el abono. — `TestCashAccrualComputesADayOnce`.
+- [x] Cambiar la tasa crea una versión nueva; los días anteriores conservan la tasa anterior. — `TestCashAccrualSkipsTheDaysWithoutARate`, `TestCashRateThatEarnedInterestKeepsItsPast`.
+- [x] Pausar la tasa detiene los abonos desde esa fecha. — `TestCashAccrualSkipsTheDaysWithoutARate`, `TestCashRatePauseAndResume`.
+- [x] Borrar un abono automático no lo vuelve a crear. — `TestCashAccrualDoesNotCreditADeletedInterestAgain`.
+- [x] Retirar todo y volver a depositar deja la ganancia en 0. — `TestCashEmptiedBalanceStartsOver`.
+- [x] Una cuenta sin tasa se comporta exactamente como hoy. — `TestCashWithoutARateIsUntouched`.
+
+De la Fase 4:
+
+- [x] Una tasa de abono mensual calcula cada día y abona el mes en un solo movimiento el último día, y rinde lo mismo que una diaria. — `TestCashAccrualPostsAMonthOnItsLastDay`.
+- [x] Una cuenta que deja de rendir a mitad de mes cobra lo pendiente el último día que ganó. — `TestCashAccrualCreditsWhatAPausedRateHolds`.
+- [x] Con tope, las cuentas de una plataforma se lo reparten en proporción a su saldo, y por debajo del tope nada cambia. — `TestCashAccrualSharesTheCapBetweenBalances`, `TestCashAccrualUnderTheCapEarnsOnEverything`.
+- [x] Recalcular desde una fecha rehace los días sobre el saldo de ahora, y arrastra el mes entero si el abono lo cruzaba. — `TestRecalculateCashInterestRedoesTheDays`, `TestRecalculateCashInterestClearsAWholeMonthlyCredit`.

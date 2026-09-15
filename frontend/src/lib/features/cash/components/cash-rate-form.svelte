@@ -13,9 +13,14 @@
 	 *   escribirla, no para un cambio de la entidad.
 	 * - «Pausar» dice desde qué día la cuenta deja de rendir.
 	 * - «Borrar» quita la versión.
+	 * - «Recalcular» tira los días ya calculados desde una fecha y los vuelve a
+	 *   calcular sobre lo que la cuenta guarda hoy. Es lo que arregla un
+	 *   movimiento anotado con fecha pasada, y solo aparece si hay días que
+	 *   recalcular.
 	 *
 	 * La proyección usa el saldo de hoy y la tasa que se está escribiendo, neta de
-	 * retención, para compararla con lo que abona la entidad.
+	 * retención y limitada por el tope, para compararla con lo que abona la
+	 * entidad.
 	 */
 	import { enhance } from '$app/forms';
 	import Button from '$lib/ui/button.svelte';
@@ -26,9 +31,13 @@
 	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
 	import type { CashAccount } from '../cash';
 	import {
+		annualFromNominal,
+		CASH_RATE_FALLBACK,
+		CASH_RECALCULATE_FALLBACK,
 		cashAccountRate,
 		describeCashAccountRate,
 		formatAnnualRate,
+		NOMINAL_PERIODS,
 		projectInterest,
 		type CashRate
 	} from '../rates';
@@ -47,12 +56,15 @@
 
 	let { target, rates, onClose }: Props = $props();
 
-	type Mode = 'new' | 'edit' | 'end' | 'delete';
+	type Mode = 'new' | 'edit' | 'end' | 'delete' | 'recalc';
+	type Posting = 'daily' | 'monthly';
 
 	interface Fields {
 		mode: Mode;
 		annualRatePct: string;
 		withholdingPct: string;
+		posting: Posting;
+		maxBalance: string;
 		date: string;
 	}
 
@@ -61,7 +73,7 @@
 	const status = $derived(
 		target
 			? cashAccountRate(rates, target.account.sourceId, target.account.currency, today)
-			: { current: null, upcoming: null, latest: null }
+			: { current: null, upcoming: null, latest: null, accruedThrough: null }
 	);
 	const latest = $derived(status.latest);
 
@@ -79,13 +91,16 @@
 
 	/*
 	 * Cómo arranca al abrirse: con los valores de la versión más reciente —cambiar
-	 * la tasa casi siempre conserva la retención— y la fecha de hoy.
+	 * la tasa casi siempre conserva la retención, el tope y la forma de abono— y
+	 * la fecha de hoy.
 	 */
 	function initialFields(current: CashRateTarget | null, version: CashRate | null): Fields {
 		return {
 			mode: 'new',
 			annualRatePct: current ? pctField(version?.annualRatePct) : '',
 			withholdingPct: current ? pctField(version?.withholdingPct) : '',
+			posting: (current && version?.posting === 'monthly' ? 'monthly' : 'daily') as Posting,
+			maxBalance: current && version?.maxBalance ? String(parseFloat(version.maxBalance)) : '',
 			date: today
 		};
 	}
@@ -98,10 +113,22 @@
 	let mode = $derived(initial.mode);
 	let annualRatePct = $derived(initial.annualRatePct);
 	let withholdingPct = $derived(initial.withholdingPct);
+	let posting: Posting = $derived(initial.posting);
+	let maxBalance = $derived(initial.maxBalance);
 	let effectiveFrom = $derived(initial.date);
 	let endsOn = $derived(initial.date);
+	/* Recalcular mira hacia atrás, así que arranca en el primer día del mes. */
+	let recalcFrom = $derived(`${today.slice(0, 7)}-01`);
 	let submitting = $state(false);
 	let error = $state('');
+
+	/*
+	 * El conversor: lo que dice el folleto de la entidad cuando publica una tasa
+	 * nominal. No se envía — solo rellena el campo de la efectiva anual.
+	 */
+	let nominalPct = $state('');
+	let nominalPeriods = $state(12);
+	const converted = $derived(annualFromNominal(parseFloat(nominalPct) || 0, nominalPeriods));
 
 	/* Cerrar limpia el error: la siguiente apertura no lo arrastra. */
 	function close() {
@@ -115,13 +142,17 @@
 	 */
 	const used = $derived(!!latest?.accruedThrough);
 
+	/* Sin días calculados no hay nada que recalcular. */
+	const computed = $derived(status.accruedThrough);
+
 	const modes = $derived<{ value: Mode; label: string }[]>(
 		latest
 			? [
 					{ value: 'new', label: stopped ? 'Reanudar' : 'Cambiar tasa' },
 					...(used ? [] : [{ value: 'edit' as const, label: 'Corregir' }]),
 					...(stopped ? [] : [{ value: 'end' as const, label: 'Pausar' }]),
-					...(used ? [] : [{ value: 'delete' as const, label: 'Borrar' }])
+					...(used ? [] : [{ value: 'delete' as const, label: 'Borrar' }]),
+					...(computed ? [{ value: 'recalc' as const, label: 'Recalcular' }] : [])
 				]
 			: []
 	);
@@ -130,14 +161,16 @@
 		new: '?/createRate',
 		edit: '?/updateRate',
 		end: '?/endRate',
-		delete: '?/deleteRate'
+		delete: '?/deleteRate',
+		recalc: '?/recalculateInterest'
 	};
 
 	const SUBMIT_LABELS: Record<Mode, string> = {
 		new: 'Guardar tasa',
 		edit: 'Guardar corrección',
 		end: 'Pausar rentabilidad',
-		delete: 'Borrar tasa'
+		delete: 'Borrar tasa',
+		recalc: 'Recalcular intereses'
 	};
 
 	const longDate = (iso: string) =>
@@ -161,6 +194,8 @@
 				return 'Desde ese día la cuenta deja de rendir. Los días anteriores conservan su tasa.';
 			case 'delete':
 				return `Borra la tasa de ${formatAnnualRate(latest.annualRatePct)} anotada desde el ${longDate(latest.effectiveFrom)}. Si al empezar cerró otra, esa vuelve a regir.`;
+			case 'recalc':
+				return `Los intereses están calculados hasta el ${longDate(computed ?? today)}. Desde el día que elijas se borran los abonos automáticos y se vuelven a calcular sobre lo que la cuenta guarda ahora. Úsalo si anotaste un depósito o un retiro con fecha pasada.`;
 		}
 	});
 
@@ -168,11 +203,19 @@
 
 	/* Los campos numéricos entregan un número al escribir y una cadena al abrirse. */
 	const rateValue = $derived(parseFloat(String(annualRatePct)) || 0);
+	const capValue = $derived(parseFloat(String(maxBalance)) || 0);
 	const projection = $derived(
 		target
-			? projectInterest(target.account.balance, rateValue, parseFloat(String(withholdingPct)) || 0)
+			? projectInterest(
+					target.account.balance,
+					rateValue,
+					parseFloat(String(withholdingPct)) || 0,
+					capValue > 0 ? capValue : null
+				)
 			: null
 	);
+	/* El tope deja fuera parte del saldo de la cuenta, que es lo que hay que decir. */
+	const capped = $derived(!!target && capValue > 0 && target.account.balance > capValue);
 
 	const money = (amount: number) =>
 		privacy.money(formatCurrency(amount, target?.account.currency ?? 'USD'));
@@ -198,7 +241,9 @@
 				return async ({ result, update }) => {
 					submitting = false;
 					if (result.type === 'failure') {
-						error = (result.data?.error as string) ?? 'No pudimos guardar la tasa.';
+						error =
+							(result.data?.error as string) ??
+							(mode === 'recalc' ? CASH_RECALCULATE_FALLBACK : CASH_RATE_FALLBACK);
 						return;
 					}
 					await update();
@@ -220,7 +265,7 @@
 				</fieldset>
 			{/if}
 
-			{#if mode === 'new'}
+			{#if mode === 'new' || mode === 'recalc'}
 				<input type="hidden" name="sourceId" value={account.sourceId} />
 				<input type="hidden" name="currency" value={account.currency} />
 			{:else if latest}
@@ -250,29 +295,111 @@
 							La que publica la entidad. Un APY en dólares es la misma cifra.
 						</p>
 					</div>
-					<div class="field">
-						<label for="cash-rate-withholding">
-							Retención <span class="optional">(opcional)</span>
-						</label>
-						<div class="with-unit">
-							<input
-								id="cash-rate-withholding"
-								name="withholdingPct"
-								type="number"
-								inputmode="decimal"
-								step="any"
-								min="0"
-								max="99.99"
-								bind:value={withholdingPct}
-								aria-describedby="cash-rate-withholding-unit cash-rate-withholding-hint"
-							/>
-							<span class="unit" id="cash-rate-withholding-unit">%</span>
+					<fieldset class="field posting">
+						<legend class="field-label">Cuándo lo abona</legend>
+						<div class="options" style:--options="2">
+							<label class="option" class:selected={posting === 'daily'}>
+								<input type="radio" name="posting" value="daily" bind:group={posting} />
+								Cada día
+							</label>
+							<label class="option" class:selected={posting === 'monthly'}>
+								<input type="radio" name="posting" value="monthly" bind:group={posting} />
+								Cada mes
+							</label>
 						</div>
-						<p class="hint" id="cash-rate-withholding-hint">
-							Si la entidad te la descuenta, lo que rinde es neto.
+						<p class="hint">
+							{posting === 'monthly'
+								? 'Se calcula igual todos los días y se abona todo junto el último día del mes, como hace la entidad.'
+								: 'La cuenta recibe lo que rindió cada día, a la mañana siguiente.'}
 						</p>
-					</div>
+					</fieldset>
 				</div>
+
+				<details class="advanced">
+					<summary>Opciones avanzadas</summary>
+					<div class="advanced-body">
+						<div class="pair">
+							<div class="field">
+								<label for="cash-rate-withholding">
+									Retención <span class="optional">(opcional)</span>
+								</label>
+								<div class="with-unit">
+									<input
+										id="cash-rate-withholding"
+										name="withholdingPct"
+										type="number"
+										inputmode="decimal"
+										step="any"
+										min="0"
+										max="99.99"
+										bind:value={withholdingPct}
+										aria-describedby="cash-rate-withholding-unit cash-rate-withholding-hint"
+									/>
+									<span class="unit" id="cash-rate-withholding-unit">%</span>
+								</div>
+								<p class="hint" id="cash-rate-withholding-hint">
+									Si la entidad te la descuenta, lo que rinde es neto.
+								</p>
+							</div>
+							<div class="field">
+								<label for="cash-rate-cap">
+									Tope remunerado <span class="optional">(opcional)</span>
+								</label>
+								<div class="with-unit">
+									<input
+										id="cash-rate-cap"
+										name="maxBalance"
+										type="number"
+										inputmode="decimal"
+										step="any"
+										min="0"
+										bind:value={maxBalance}
+										aria-describedby="cash-rate-cap-unit cash-rate-cap-hint"
+									/>
+									<span class="unit" id="cash-rate-cap-unit">{account.currency}</span>
+								</div>
+								<p class="hint" id="cash-rate-cap-hint">
+									Lo máximo sobre lo que paga la entidad. Vacío: rinde todo el saldo.
+								</p>
+							</div>
+						</div>
+
+						<div class="converter">
+							<p class="lead">
+								¿La entidad publica una tasa nominal? Escríbela y la pasamos a efectiva anual.
+							</p>
+							<div class="converter-row">
+								<div class="with-unit">
+									<label class="sr-only" for="cash-rate-nominal">Tasa nominal</label>
+									<input
+										id="cash-rate-nominal"
+										type="number"
+										inputmode="decimal"
+										step="any"
+										min="0"
+										placeholder="12"
+										bind:value={nominalPct}
+									/>
+									<span class="unit">% N.A.</span>
+								</div>
+								<label class="sr-only" for="cash-rate-periods">Capitaliza</label>
+								<select id="cash-rate-periods" bind:value={nominalPeriods}>
+									{#each NOMINAL_PERIODS as period (period.value)}
+										<option value={period.value}>{period.label}</option>
+									{/each}
+								</select>
+								<Button
+									type="button"
+									variant="ghost"
+									disabled={converted <= 0}
+									onclick={() => (annualRatePct = String(Number(converted.toFixed(4))))}
+								>
+									{converted > 0 ? `Usar ${formatAnnualRate(converted.toFixed(4))}` : 'Convertir'}
+								</Button>
+							</div>
+						</div>
+					</div>
+				</details>
 			{/if}
 
 			{#if mode === 'new'}
@@ -285,6 +412,11 @@
 					<span class="field-label">Deja de rendir desde</span>
 					<DatePicker name="endsOn" bind:value={endsOn} required />
 				</div>
+			{:else if mode === 'recalc'}
+				<div class="field">
+					<span class="field-label">Recalcular desde</span>
+					<DatePicker name="from" bind:value={recalcFrom} required />
+				</div>
 			{/if}
 
 			<p class="hint">{hint}</p>
@@ -294,7 +426,13 @@
 					{#if rateValue <= 0}
 						<p class="lead">Escribe la tasa para ver cuánto rendiría la cuenta.</p>
 					{:else if account.balance > 0}
-						<p class="lead">Con el saldo de hoy, {money(account.balance)}, rendiría</p>
+						<p class="lead">
+							{#if capped}
+								Con el tope, {money(capValue)} de los {money(account.balance)} de la cuenta rendirían
+							{:else}
+								Con el saldo de hoy, {money(account.balance)}, rendiría
+							{/if}
+						</p>
 						<dl>
 							<div>
 								<dt>Al día</dt>
@@ -313,8 +451,10 @@
 						<p class="lead">Cuando la cuenta tenga saldo, aquí verás cuánto rinde.</p>
 					{/if}
 					<p class="note">
-						Los intereses se calculan cada día sobre el saldo al cierre y se abonan solos a la
-						mañana siguiente, como movimientos de intereses.
+						Los intereses se calculan cada día sobre el saldo al cierre.
+						{posting === 'monthly'
+							? 'Con abono mensual se guardan hasta el último día del mes y entran todos juntos en un movimiento de intereses.'
+							: 'Se abonan solos a la mañana siguiente, como movimientos de intereses.'}
 					</p>
 				</div>
 			{/if}
@@ -418,6 +558,56 @@
 		pointer-events: none;
 	}
 
+	/* Lo que la entidad rara vez cambia queda plegado: la retención, el tope y el
+	   conversor de una tasa nominal. */
+	.advanced {
+		border: 1px solid var(--border);
+		border-radius: 10px;
+	}
+
+	.advanced summary {
+		padding: 0.7rem 0.95rem;
+		font-size: 0.84rem;
+		color: var(--text-muted);
+		cursor: pointer;
+	}
+
+	.advanced summary:focus-visible {
+		outline: 2px solid var(--amber);
+		outline-offset: 2px;
+	}
+
+	.advanced-body {
+		display: grid;
+		gap: 0.9rem;
+		padding: 0 0.95rem 0.95rem;
+	}
+
+	.posting {
+		margin: 0;
+		padding: 0;
+		border: none;
+	}
+
+	.posting legend {
+		margin-bottom: 0.45rem;
+		padding: 0;
+	}
+
+	.converter {
+		display: grid;
+		gap: 0.55rem;
+		padding-top: 0.2rem;
+		border-top: 1px solid var(--border);
+	}
+
+	.converter-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
 	/* Lo que rendiría, en verde como los intereses de la lista de movimientos. */
 	.projection {
 		display: grid;
@@ -474,7 +664,8 @@
 
 	@media (max-width: 640px) {
 		.pair,
-		dl {
+		dl,
+		.converter-row {
 			grid-template-columns: 1fr;
 		}
 

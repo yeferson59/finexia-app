@@ -8,8 +8,12 @@ import (
 
 	"uuid"
 
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 )
+
+// decimalPtr is a value the optional fields of a rate take by reference.
+func decimalPtr(d decimal.Decimal) *decimal.Decimal { return &d }
 
 // checkCashRateError wants no error for an empty want, and otherwise an
 // ErrInvalidCashRate that says want.
@@ -51,8 +55,13 @@ func TestNewCashRateInputValidate(t *testing.T) {
 		{"negative withholding", func(in *NewCashRateInput) { in.WithholdingPct = mustDecimal(t, "-0.5") }, "at least 0"},
 		{"all of it withheld", func(in *NewCashRateInput) { in.WithholdingPct = mustDecimal(t, "100") }, "less than 100"},
 		{"withholding with three decimals", func(in *NewCashRateInput) { in.WithholdingPct = mustDecimal(t, "7.125") }, "withholdingPct takes at most 2 decimals"},
-		{"monthly posting", func(in *NewCashRateInput) { in.Posting = PostingMonthly }, "not available yet"},
-		{"an unknown posting", func(in *NewCashRateInput) { in.Posting = "weekly" }, "posting must be daily"},
+		{"monthly posting", func(in *NewCashRateInput) { in.Posting = PostingMonthly }, ""},
+		{"a cap", func(in *NewCashRateInput) { in.MaxBalance = decimalPtr(mustDecimal(t, "25000000")) }, ""},
+		{"an unknown posting", func(in *NewCashRateInput) { in.Posting = "weekly" }, "posting must be one of"},
+		{"a cap of nothing", func(in *NewCashRateInput) { in.MaxBalance = decimalPtr(mustDecimal(t, "0")) }, "maxBalance must be greater than 0"},
+		{"a negative cap", func(in *NewCashRateInput) { in.MaxBalance = decimalPtr(mustDecimal(t, "-1")) }, "maxBalance must be greater than 0"},
+		{"a cap too big to store", func(in *NewCashRateInput) { in.MaxBalance = decimalPtr(mustDecimal(t, "1000000000000")) }, "less than 1000000000000"},
+		{"a cap with nine decimals", func(in *NewCashRateInput) { in.MaxBalance = decimalPtr(mustDecimal(t, "1.000000001")) }, "maxBalance takes at most 8 decimals"},
 		{"no platform", func(in *NewCashRateInput) { in.SourceID = uuid.UUID{} }, "sourceId is required"},
 		{"a currency with no rate", func(in *NewCashRateInput) { in.Currency = money.XXX }, "currency must be one of"},
 		{"no first day", func(in *NewCashRateInput) { in.EffectiveFrom = time.Time{} }, "effectiveFrom is required"},

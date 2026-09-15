@@ -287,6 +287,10 @@ type CashBalance struct {
 	InterestEarned         string `json:"interestEarned"`
 	InterestThisMonth      string `json:"interestThisMonth"`
 	InterestThisMonthValue string `json:"interestThisMonthValue"`
+	// PendingInterest is what the ledger computed and has not credited yet: the
+	// days a rate posted monthly holds until its month closes. It is in
+	// Currency, and it is not part of Balance.
+	PendingInterest string `json:"pendingInterest"`
 	// LastAccrualDate is the last day the ledger computed interest for the
 	// balance, nil if it never has.
 	LastAccrualDate *time.Time `json:"lastAccrualDate"`

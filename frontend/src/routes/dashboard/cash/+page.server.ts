@@ -14,6 +14,8 @@ import {
 	cashRateEndSchema,
 	cashRateErrorMessage,
 	cashRateUpdateSchema,
+	cashRecalculateSchema,
+	CASH_RECALCULATE_FALLBACK,
 	toCalendarDateTime,
 	toCashMovementBody,
 	toCashRateBody
@@ -77,7 +79,9 @@ function movementFields(formData: FormData) {
 function rateFields(formData: FormData) {
 	return {
 		annualRatePct: formData.get('annualRatePct'),
-		withholdingPct: formData.get('withholdingPct')
+		withholdingPct: formData.get('withholdingPct'),
+		posting: formData.get('posting') ?? 'daily',
+		maxBalance: formData.get('maxBalance')
 	};
 }
 
@@ -240,6 +244,42 @@ export const actions = {
 		if (!res.ok || !res.success) {
 			return fail(res.status >= 400 ? res.status : 500, {
 				error: cashRateErrorMessage(res.status, res.details)
+			});
+		}
+
+		return { success: true };
+	},
+
+	/*
+	 * Recalcular no es un cambio de tasa: tira los días que la cuenta ya tenía
+	 * calculados desde una fecha y los vuelve a calcular sobre lo que guarda hoy.
+	 * Es la salida cuando se anota un movimiento con fecha pasada.
+	 */
+	recalculateInterest: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed = cashRecalculateSchema.safeParse({
+			sourceId: formData.get('sourceId'),
+			currency: formData.get('currency'),
+			from: formData.get('from')
+		});
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const res = await cash.recalculateInterest(
+			{ cookies, fetch },
+			{
+				sourceId: parsed.data.sourceId,
+				currency: parsed.data.currency,
+				from: toCalendarDateTime(parsed.data.from)
+			}
+		);
+
+		if (!res.ok || !res.success) {
+			return fail(res.status >= 400 ? res.status : 500, {
+				error: cashRateErrorMessage(res.status, res.details, CASH_RECALCULATE_FALLBACK)
 			});
 		}
 

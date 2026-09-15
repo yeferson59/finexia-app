@@ -32,6 +32,7 @@ const balance = (
 	interestEarned: '0',
 	interestThisMonth: '0',
 	interestThisMonthValue: '0',
+	pendingInterest: '0',
 	lastAccrualDate: null,
 	...over
 });

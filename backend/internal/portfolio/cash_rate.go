@@ -56,6 +56,8 @@ const (
 var (
 	maxAnnualRatePct  = decimal.MustFromString("100")
 	maxWithholdingPct = decimal.MustFromString("100")
+	// maxCashRateBalance is what NUMERIC(20, 8) holds, exclusive.
+	maxCashRateBalance = decimal.MustFromString("1000000000000")
 )
 
 const (
@@ -63,6 +65,9 @@ const (
 	// percentage; withholding_rate is a NUMERIC(5, 4) one, which holds two.
 	annualRatePctDecimals  = 4
 	withholdingPctDecimals = 2
+	// max_balance is a NUMERIC(20, 8): twelve digits before the point and
+	// eight after.
+	maxBalanceDecimals = 8
 
 	// cashRateDateGrace is how many days before the server's a rate may start
 	// or end. Days are UTC, as they are for snapshots, and an owner west of
@@ -83,7 +88,10 @@ type CashRate struct {
 	AnnualRatePct  string          `json:"annualRatePct"`
 	WithholdingPct string          `json:"withholdingPct"`
 	Posting        InterestPosting `json:"posting"`
-	EffectiveFrom  time.Time       `json:"effectiveFrom"`
+	// MaxBalance is the most the account earns on, nil when it earns on all of
+	// it. It belongs to the account, so the balances of one account share it.
+	MaxBalance    *string   `json:"maxBalance"`
+	EffectiveFrom time.Time `json:"effectiveFrom"`
 	// EndedOn is the last day the version earns, nil while it has no end.
 	EndedOn *time.Time `json:"endedOn"`
 	// Latest is whether this is the newest version of its account: the only one
@@ -97,12 +105,31 @@ type CashRate struct {
 	UpdatedAt      time.Time  `json:"updatedAt"`
 }
 
+// InEffectOn reports whether this version is the one its account earns at on
+// the given day. Only the newest version of an account can still be running, so
+// a version a later one follows never is, whatever its dates say.
+func (r CashRate) InEffectOn(day time.Time) bool {
+	day = cashRateDay(day)
+
+	switch {
+	case !r.Latest, cashRateDay(r.EffectiveFrom).After(day):
+		return false
+	case r.EndedOn != nil && cashRateDay(*r.EndedOn).Before(day):
+		return false
+	default:
+		return true
+	}
+}
+
 // CashRateInput is what a version of a rate states, and what a correction can
 // rewrite.
 type CashRateInput struct {
 	AnnualRatePct  decimal.Decimal
 	WithholdingPct decimal.Decimal
 	Posting        InterestPosting
+	// MaxBalance is the cap, nil for none. A correction states the version
+	// whole, so leaving it out removes the cap.
+	MaxBalance *decimal.Decimal
 }
 
 // NewCashRateInput is a new version: the values, and the account and day they
@@ -161,13 +188,22 @@ func (in CashRateInput) Validate() error {
 	}
 
 	switch in.Posting {
-	case PostingDaily:
-		return nil
-	case PostingMonthly:
-		return invalidCashRate("monthly posting is not available yet; use daily")
+	case PostingDaily, PostingMonthly:
 	default:
-		return invalidCashRate("posting must be daily")
+		return invalidCashRate("posting must be one of: daily, monthly")
 	}
+
+	if limit := in.MaxBalance; limit != nil {
+		if !limit.IsPos() || !limit.LessThan(maxCashRateBalance) {
+			return invalidCashRate("maxBalance must be greater than 0 and less than %s", maxCashRateBalance)
+		}
+
+		if !limit.Equal(limit.Trunc(maxBalanceDecimals)) {
+			return invalidCashRate("maxBalance takes at most %d decimals", maxBalanceDecimals)
+		}
+	}
+
+	return nil
 }
 
 // ValidateNew is Validate plus what only a new version states: the account, a

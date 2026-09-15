@@ -5,12 +5,15 @@
 	import Card from '$lib/ui/card.svelte';
 	import EmptyState from '$lib/ui/empty-state.svelte';
 	import CurrencySelect from '$lib/ui/currency-select.svelte';
+	import { todayLocalDateString } from '$lib/shared/format/date';
 	import {
 		CashAccounts,
 		CashMovementForm,
 		CashMovements,
 		CashRateForm,
 		CashSummary,
+		cashYield,
+		groupCashAccounts,
 		summarizeCash,
 		type CashFormTarget,
 		type CashRateTarget
@@ -20,6 +23,10 @@
 	const { data }: PageProps = $props();
 
 	const summary = $derived(summarizeCash(data.balances, data.currency));
+	/* La tasa media del efectivo, sobre las mismas cuentas que suma el total. */
+	const yielding = $derived(
+		cashYield(groupCashAccounts(data.balances), data.rates, todayLocalDateString())
+	);
 
 	/* Sin portafolio o sin plataforma no hay saldo sobre el que anotar nada. */
 	const canRecord = $derived(data.portfolios.length > 0 && data.platforms.length > 0);
@@ -88,7 +95,7 @@
 		</EmptyState>
 	</Card>
 {:else}
-	<CashSummary {summary} />
+	<CashSummary {summary} {yielding} />
 
 	<section class="block" aria-labelledby="cash-accounts-title">
 		<h2 id="cash-accounts-title">Cuentas</h2>
