@@ -954,6 +954,15 @@ Cargado con historia entra con el saldo a su valor, como un `transfer_in`, y
 si se borra después de que un snapshot lo viera se conserva en
 `retired_transactions`, igual que una compra.
 
+Los intereses son **ganancia** (migración 000042): entran al coste medio como
+unidades que no costaron nada. 1.000 depositados y 10 de intereses valen 1.010
+con un coste de 1.000, así que la ganancia del portfolio, la de la plataforma y
+la de cada snapshot suben 10. El coste medio se recorre por fecha: un retiro se
+lleva su parte del coste —y con ella su parte de los intereses— y un saldo
+vaciado vuelve a empezar. Solo lo recorren los saldos con intereses; los demás
+conservan la fórmula de siempre. La serie de crecimiento no cambia: ya contaba
+el interés como rentabilidad.
+
 Reglas de las escrituras:
 
 - `amount` > 0 y `fees` ≥ 0. Unos intereses se anotan netos (`fees` = 0) y la
@@ -985,6 +994,76 @@ puede reescribir como movimiento de efectivo —un `interest` o un `fee` anotado
 sobre el saldo, o una compra de efectivo a otro precio o con tasa— y le pone
 `kind: "other"` cuando no es ninguno de los tres. Todos se pueden borrar:
 quitar una fila no cambia el precio de nada.
+
+**Tasas** (`/portfolios/cash/rates`, migración 000043). La tasa que rinde una
+cuenta —plataforma y moneda, no portafolio— es una tasa efectiva anual en
+porcentaje: `"9.25"` es 9,25 % E.A., la misma cifra que el APY de una cuenta en
+dólares. Se versiona por el día desde el que rige. Cambiar la tasa es anotar una
+versión nueva: la que seguía abierta termina la víspera y los días anteriores
+conservan la suya. Los intereses que rinde se calculan y se abonan solos cada
+día; ver *Intereses* más abajo.
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET /portfolios/cash/rates` | Todas las versiones, por plataforma y moneda, de la más nueva a la más vieja |
+| `POST /portfolios/cash/rates` | Anota una tasa, o una versión nueva que cierra la anterior |
+| `PUT /portfolios/cash/rates/:rateId` | Corrige `annualRatePct`, `withholdingPct` y `posting` de la versión más reciente; las fechas no cambian |
+| `POST /portfolios/cash/rates/:rateId/end` | La versión más reciente deja de rendir desde `endsOn` (`endedOn` queda en la víspera) |
+| `DELETE /portfolios/cash/rates/:rateId` | Borra la versión más reciente; si la anterior terminaba justo la víspera, vuelve a regir |
+
+```json
+{
+  "sourceId": "…",
+  "currency": "COP",
+  "annualRatePct": 9.25,
+  "withholdingPct": 0,
+  "posting": "daily",
+  "effectiveFrom": "2026-09-15T00:00:00Z"
+}
+```
+
+Cada versión trae `annualRatePct` y `withholdingPct` como texto, `effectiveFrom`,
+`endedOn` —el último día que rinde, `null` sin fin— y `latest`, que marca la
+única versión de la cuenta que se puede corregir, pausar o borrar.
+
+- `annualRatePct` > 0 y ≤ 100, con hasta 4 decimales; `withholdingPct` ≥ 0 y
+  < 100, con hasta 2. `posting` es `daily` o se omite: `monthly` todavía
+  responde **400**.
+- `effectiveFrom` y `endsOn` no pueden ser anteriores a ayer en UTC. Los días
+  pasados no se recalculan, y el día de margen es para quien está al oeste de
+  Greenwich, que por la noche ya vive el día siguiente en UTC — **400**.
+- La plataforma tiene que ser del usuario (**404**) y estar activa (**400**).
+- Una versión que no empieza después de la más reciente responde **409**, igual
+  que corregir, pausar o borrar una versión que ya no es la más reciente.
+- Pausar desde un día en que la versión todavía no ha empezado responde
+  **400**: eso es borrarla.
+
+**Intereses** (migración 000044). Cada día que una tasa rige, cada saldo de su
+cuenta gana sobre lo que tenía al cierre del día, a la tasa diaria equivalente
+`(1 + E.A.)^(1/365) − 1` y menos la retención. Un job (`accrue-cash-interest`,
+a las 05:30 UTC) calcula el día anterior y lo abona como un `cash_interest`:
+sube el saldo y cuenta como rentabilidad y como ganancia (000042). El abono se
+redondea a los decimales de la moneda, y lo que sobra se suma al día siguiente.
+
+- Cada saldo y cada día se calculan una sola vez. Un abono borrado no se vuelve
+  a abonar: el día queda calculado.
+- Un saldo gana desde el día en que se abrió, no antes: lo que traía ya incluía
+  sus intereses.
+- Si un snapshot ya cerró el día que se calcula —el job estuvo caído—, el abono
+  se fecha el día del último snapshot, para que la serie de crecimiento lo lea
+  como rentabilidad y no como dinero que entró. El día cuenta igual para el
+  saldo sobre el que ganan los siguientes.
+- Solo ganan los saldos que la app lleva uno a uno en su propia moneda; una
+  posición de efectivo comprada con otra moneda no.
+
+Con intereses calculados, una versión ya no se corrige ni se borra, no puede
+terminar antes del último día calculado, y una versión nueva tiene que empezar
+después de ese día: las tres responden **409**. `accruedThrough` dice cuál es.
+
+`GET /portfolios/cash` suma por saldo `interestEarned` (todo lo abonado, en su
+moneda), `interestThisMonth` e `interestThisMonthValue` (lo del mes UTC en
+curso, en su moneda y en `displayCurrency`) y `lastAccrualDate`.
+`GET /portfolios/cash/movements` marca con `automatic: true` los abonos del job.
 
 ### 2.8 Assets (JWT; *admin* donde se indica)
 

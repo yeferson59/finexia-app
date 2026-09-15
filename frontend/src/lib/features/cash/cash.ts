@@ -277,6 +277,11 @@ export interface CashSummary {
 	funded: number;
 	/** Por moneda, de la que más pesa a la que menos. */
 	byCurrency: CashCurrencyTotal[];
+	/**
+	 * Los intereses abonados este mes, en `currency`. Como el total, sin los
+	 * saldos que no tenían tasa de cambio.
+	 */
+	interestThisMonth: number;
 }
 
 /**
@@ -318,12 +323,19 @@ export function summarizeCash(balances: CashBalance[], fallbackCurrency: string)
 		(a, b) => b.value - a.value || b.balance - a.balance || a.currency.localeCompare(b.currency)
 	);
 
+	// Por saldo, no por cuenta: cada saldo trae su parte del mes ya convertida.
+	const interestThisMonth = balances.reduce(
+		(sum, row) => (row.fxConverted ? sum + (parseFloat(row.interestThisMonthValue) || 0) : sum),
+		0
+	);
+
 	return {
 		total,
 		currency: balances[0]?.displayCurrency || fallbackCurrency,
 		unconverted,
 		funded,
-		byCurrency
+		byCurrency,
+		interestThisMonth
 	};
 }
 

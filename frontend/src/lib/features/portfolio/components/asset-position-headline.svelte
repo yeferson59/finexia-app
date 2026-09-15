@@ -48,6 +48,20 @@
 	const mixedCurrencies = $derived(position.costCurrency !== position.currency);
 
 	/*
+	 * Un saldo de efectivo en su propia moneda. Sus intereses entran al coste
+	 * como unidades que no costaron nada, así que su ganancia son intereses y
+	 * su precio medio baja de 1: «Pagaste $0.99 por unidad» es cierto en la
+	 * aritmética y falso para quien depositó dólares.
+	 */
+	const cashAtPar = $derived(position.assetType === 'cash' && !mixedCurrencies);
+
+	/** Cómo entró el capital: a una cuenta se deposita, en un activo se invierte. */
+	const putIn = $derived(cashAtPar ? 'depositaste' : 'invertiste');
+
+	/** De dónde sale la ganancia, cuando es evidente: la de una cuenta son intereses. */
+	const gainSource = $derived(cashAtPar && position.gainLoss > 0 ? ' en intereses' : '');
+
+	/*
 	 * Una ganancia que redondea a cero no es una ganancia: el efectivo de una
 	 * cuenta la tiene siempre, y salía «+$0.00 (0,00%)» escrito en verde, que
 	 * promete algo que la propia cifra desmiente.
@@ -92,12 +106,12 @@
 	{#if position.totalCost <= 0}
 		<p class="delta">Todavía no hay capital invertido que comparar.</p>
 	{:else if flat}
-		<p class="delta">Vale lo mismo que los {base(position.totalCost)} que invertiste.</p>
+		<p class="delta">Vale lo mismo que los {base(position.totalCost)} que {putIn}.</p>
 	{:else}
 		<p class="delta" class:up={position.gainLoss > 0} class:down={position.gainLoss < 0}>
-			{position.gainLoss > 0 ? '+' : '−'}{base(Math.abs(position.gainLoss))} sobre los {base(
+			{position.gainLoss > 0 ? '+' : '−'}{base(Math.abs(position.gainLoss))}{gainSource} sobre los {base(
 				position.totalCost
-			)} que invertiste ({formatPct(position.gainLossPercent)})
+			)} que {putIn} ({formatPct(position.gainLossPercent)})
 		</p>
 	{/if}
 
@@ -112,7 +126,7 @@
 		</div>
 	{/if}
 
-	{#if !sameUnitPrice}
+	{#if !sameUnitPrice && !cashAtPar}
 		<p class="unit-prices">
 			Pagaste {money(position.averageCost, position.costCurrency)}
 			por {unitNoun(position.assetType, 1)}; hoy cotiza a {money(

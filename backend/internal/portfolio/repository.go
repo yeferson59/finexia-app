@@ -116,6 +116,24 @@ type CashStore interface {
 	DeleteCashMovement(ctx context.Context, userID, txnID uuid.UUID) error
 }
 
+// CashRateStore persists the rates cash accounts earn, as versions by the day
+// each takes effect. Every write locks the platform first, so the versions of
+// one account are written one at a time.
+type CashRateStore interface {
+	GetCashRatesByUserID(ctx context.Context, userID uuid.UUID) ([]CashRate, error)
+	CreateCashRate(ctx context.Context, userID uuid.UUID, in NewCashRateInput) (CashRate, error)
+	UpdateCashRate(ctx context.Context, userID, rateID uuid.UUID, in CashRateInput) (CashRate, error)
+	EndCashRate(ctx context.Context, userID, rateID uuid.UUID, endsOn time.Time) (CashRate, error)
+	DeleteCashRate(ctx context.Context, userID, rateID uuid.UUID) error
+}
+
+// CashAccrualStore keeps the ledger of the interest cash balances earn: which
+// balances earn, and one day of interest at a time.
+type CashAccrualStore interface {
+	GetCashAccrualTargets(ctx context.Context, through time.Time) ([]CashAccrualTarget, error)
+	AccrueCashInterestDay(ctx context.Context, entryID, rateID uuid.UUID, day time.Time) (bool, error)
+}
+
 // Repository is the union of the module's stores, satisfied by
 // *PostgresRepository. The Service orchestrates across all of them.
 type Repository interface {
@@ -126,6 +144,8 @@ type Repository interface {
 	SnapshotStore
 	HoldingsStore
 	CashStore
+	CashRateStore
+	CashAccrualStore
 }
 
 // Ensure the concrete repository keeps satisfying the interface.

@@ -160,6 +160,13 @@ type fakeRepository struct {
 	createCashMovement              func(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMovementInput) (CashMovement, error)
 	updateCashMovement              func(ctx context.Context, userID, txnID uuid.UUID, in CashMovementInput) (CashMovement, error)
 	deleteCashMovement              func(ctx context.Context, userID, txnID uuid.UUID) error
+	getCashRatesByUserID            func(ctx context.Context, userID uuid.UUID) ([]CashRate, error)
+	createCashRate                  func(ctx context.Context, userID uuid.UUID, in NewCashRateInput) (CashRate, error)
+	updateCashRate                  func(ctx context.Context, userID, rateID uuid.UUID, in CashRateInput) (CashRate, error)
+	endCashRate                     func(ctx context.Context, userID, rateID uuid.UUID, endsOn time.Time) (CashRate, error)
+	deleteCashRate                  func(ctx context.Context, userID, rateID uuid.UUID) error
+	getCashAccrualTargets           func(ctx context.Context, through time.Time) ([]CashAccrualTarget, error)
+	accrueCashInterestDay           func(ctx context.Context, entryID, rateID uuid.UUID, day time.Time) (bool, error)
 
 	// Consumed by fakeUserReader, not part of portfolio.Repository.
 	getUserPreferences func(ctx context.Context, userID uuid.UUID) (user.UserPreferences, error)
@@ -498,4 +505,32 @@ func (f *fakeRepository) UpdateCashMovement(ctx context.Context, userID, txnID u
 
 func (f *fakeRepository) DeleteCashMovement(ctx context.Context, userID, txnID uuid.UUID) error {
 	return f.deleteCashMovement(ctx, userID, txnID)
+}
+
+func (f *fakeRepository) GetCashRatesByUserID(ctx context.Context, userID uuid.UUID) ([]CashRate, error) {
+	return f.getCashRatesByUserID(ctx, userID)
+}
+
+func (f *fakeRepository) CreateCashRate(ctx context.Context, userID uuid.UUID, in NewCashRateInput) (CashRate, error) {
+	return f.createCashRate(ctx, userID, in)
+}
+
+func (f *fakeRepository) UpdateCashRate(ctx context.Context, userID, rateID uuid.UUID, in CashRateInput) (CashRate, error) {
+	return f.updateCashRate(ctx, userID, rateID, in)
+}
+
+func (f *fakeRepository) EndCashRate(ctx context.Context, userID, rateID uuid.UUID, endsOn time.Time) (CashRate, error) {
+	return f.endCashRate(ctx, userID, rateID, endsOn)
+}
+
+func (f *fakeRepository) DeleteCashRate(ctx context.Context, userID, rateID uuid.UUID) error {
+	return f.deleteCashRate(ctx, userID, rateID)
+}
+
+func (f *fakeRepository) GetCashAccrualTargets(ctx context.Context, through time.Time) ([]CashAccrualTarget, error) {
+	return f.getCashAccrualTargets(ctx, through)
+}
+
+func (f *fakeRepository) AccrueCashInterestDay(ctx context.Context, entryID, rateID uuid.UUID, day time.Time) (bool, error) {
+	return f.accrueCashInterestDay(ctx, entryID, rateID, day)
 }

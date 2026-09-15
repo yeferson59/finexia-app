@@ -9,7 +9,14 @@ import {
 	cashMovementCreateSchema,
 	cashMovementDeleteSchema,
 	cashMovementUpdateSchema,
-	toCashMovementBody
+	cashRateCreateSchema,
+	cashRateDeleteSchema,
+	cashRateEndSchema,
+	cashRateErrorMessage,
+	cashRateUpdateSchema,
+	toCalendarDateTime,
+	toCashMovementBody,
+	toCashRateBody
 } from '$lib/features/cash';
 
 /**
@@ -28,9 +35,10 @@ export const load: PageServerLoad = async ({ cookies, fetch, url, locals }) => {
 		locals.user?.preferredCurrency
 	);
 
-	const [balancesRes, movementsRes, portfoliosRes, platformsRes] = await Promise.all([
+	const [balancesRes, movementsRes, ratesRes, portfoliosRes, platformsRes] = await Promise.all([
 		cash.getBalances(event, currency),
 		cash.getMovements(event, 1, MOVEMENTS_LIMIT),
+		cash.getRates(event),
 		portfolio.getSummaries(event),
 		platforms.getSources(event)
 	]);
@@ -41,6 +49,9 @@ export const load: PageServerLoad = async ({ cookies, fetch, url, locals }) => {
 		balances: balancesRes.success ? (balancesRes.data ?? []) : [],
 		movements: movementsRes.success ? (movementsRes.data?.data ?? []) : [],
 		movementsTotal: movementsRes.success ? (movementsRes.data?.total ?? 0) : 0,
+		// Sin tasas las cuentas se ven igual, solo que sin rentabilidad: no es un
+		// fallo de la página.
+		rates: ratesRes.success ? (ratesRes.data ?? []) : [],
 		portfolios: (portfoliosRes.data ?? []).map((p) => ({
 			id: p.id,
 			name: p.name,
@@ -60,6 +71,13 @@ function movementFields(formData: FormData) {
 		fees: formData.get('fees'),
 		date: formData.get('date'),
 		notes: formData.get('notes')
+	};
+}
+
+function rateFields(formData: FormData) {
+	return {
+		annualRatePct: formData.get('annualRatePct'),
+		withholdingPct: formData.get('withholdingPct')
 	};
 }
 
@@ -139,6 +157,109 @@ export const actions = {
 					res.status === 409
 						? 'No se puede borrar: ese dinero ya salió en un retiro y el saldo quedaría en negativo. Borra o reduce antes el retiro.'
 						: cashErrorMessage(res.status, res.details)
+			});
+		}
+
+		return { success: true };
+	},
+
+	createRate: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed = cashRateCreateSchema.safeParse({
+			...rateFields(formData),
+			sourceId: formData.get('sourceId'),
+			currency: formData.get('currency'),
+			effectiveFrom: formData.get('effectiveFrom')
+		});
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const { sourceId, currency, effectiveFrom, ...values } = parsed.data;
+		const res = await cash.createRate(
+			{ cookies, fetch },
+			{
+				sourceId,
+				currency,
+				effectiveFrom: toCalendarDateTime(effectiveFrom),
+				...toCashRateBody(values)
+			}
+		);
+
+		if (!res.ok || !res.success) {
+			return fail(res.status >= 400 ? res.status : 500, {
+				error: cashRateErrorMessage(res.status, res.details)
+			});
+		}
+
+		return { success: true };
+	},
+
+	updateRate: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed = cashRateUpdateSchema.safeParse({
+			...rateFields(formData),
+			id: formData.get('id')
+		});
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const { id, ...values } = parsed.data;
+		const res = await cash.updateRate({ cookies, fetch }, id, toCashRateBody(values));
+
+		if (!res.ok || !res.success) {
+			return fail(res.status >= 400 ? res.status : 500, {
+				error: cashRateErrorMessage(res.status, res.details)
+			});
+		}
+
+		return { success: true };
+	},
+
+	endRate: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed = cashRateEndSchema.safeParse({
+			id: formData.get('id'),
+			endsOn: formData.get('endsOn')
+		});
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const res = await cash.endRate({ cookies, fetch }, parsed.data.id, {
+			endsOn: toCalendarDateTime(parsed.data.endsOn)
+		});
+
+		if (!res.ok || !res.success) {
+			return fail(res.status >= 400 ? res.status : 500, {
+				error: cashRateErrorMessage(res.status, res.details)
+			});
+		}
+
+		return { success: true };
+	},
+
+	deleteRate: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed = cashRateDeleteSchema.safeParse({ id: formData.get('id') });
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const res = await cash.deleteRate({ cookies, fetch }, parsed.data.id);
+
+		if (!res.ok) {
+			return fail(res.status >= 400 ? res.status : 500, {
+				error: cashRateErrorMessage(res.status, res.details)
 			});
 		}
 

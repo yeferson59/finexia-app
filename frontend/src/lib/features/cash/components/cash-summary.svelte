@@ -54,6 +54,12 @@
 			en efectivo, en {summary.funded}
 			{summary.funded === 1 ? 'cuenta con saldo' : 'cuentas con saldo'}
 		</span>
+		{#if summary.interestThisMonth > 0}
+			<!-- La parte de la cifra que es rendimiento, en el verde de los intereses. -->
+			<span class="caption" style:color="var(--green)">
+				+{money(summary.interestThisMonth, summary.currency)} en intereses este mes
+			</span>
+		{/if}
 	</p>
 
 	{#if showCurrencies}

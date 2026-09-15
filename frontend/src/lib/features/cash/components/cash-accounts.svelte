@@ -15,20 +15,31 @@
 	 * «Registrar» abre el formulario con esa cuenta ya elegida —casi siempre se
 	 * anota sobre una que ya existe— y, si está repartida, con el portafolio de
 	 * su saldo mayor, que el formulario deja cambiar.
+	 *
+	 * La tasa de la cuenta va debajo de su historia, como un botón callado: se
+	 * consulta más de lo que se cambia. En verde mientras rinde; sin tasa invita
+	 * a anotarla.
 	 */
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
-	import { formatCalendarDate } from '$lib/shared/format/date';
+	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
 	import { groupCashPlatforms, type CashAccount, type CashBalance } from '../cash';
+	import { cashAccountRate, describeCashAccountRate, type CashRate } from '../rates';
 
 	interface Props {
 		balances: CashBalance[];
+		/** Todas las versiones de las tasas; cada cuenta toma las suyas. */
+		rates: CashRate[];
 		/** Si se nombra el portafolio de cada cuenta. Con uno solo, sobra. */
 		showPortfolio: boolean;
 		onRecord: (balance: CashBalance) => void;
+		/** Abre la rentabilidad de una cuenta: anotar su tasa o cambiarla. */
+		onRate: (account: CashAccount) => void;
 	}
 
-	let { balances, showPortfolio, onRecord }: Props = $props();
+	let { balances, rates, showPortfolio, onRecord, onRate }: Props = $props();
+
+	const today = todayLocalDateString();
 
 	const platforms = $derived(groupCashPlatforms(balances));
 
@@ -68,6 +79,12 @@
 
 			<ul class="accounts">
 				{#each platform.accounts as account (account.key)}
+					{@const rate = cashAccountRate(rates, account.sourceId, account.currency, today)}
+					{@const rateLine = describeCashAccountRate(rate)}
+					{@const earned = account.balances.reduce(
+						(sum, b) => sum + (parseFloat(b.interestThisMonth) || 0),
+						0
+					)}
 					<li class="account" class:emptied={account.balance === 0}>
 						<span class="code">{account.currency}</span>
 
@@ -88,6 +105,20 @@
 								<p class="line">Suma en {account.balances[0].portfolioName}</p>
 							{/if}
 							<p class="line quiet">{history(account)}</p>
+							<button
+								type="button"
+								class="rate"
+								class:earning={rate.current !== null}
+								onclick={() => onRate(account)}
+							>
+								<span class="sr-only">Rentabilidad de {name}, {account.currency}: </span>
+								{rateLine ?? 'Agregar tasa'}
+							</button>
+							{#if earned > 0}
+								<p class="line quiet" style:color="var(--green)">
+									+{money(earned, account.currency)} en intereses este mes
+								</p>
+							{/if}
 						</div>
 
 						<p class="figures">
@@ -273,6 +304,50 @@
 	.record:hover {
 		border-color: var(--amber);
 		color: var(--amber-light);
+	}
+
+	/*
+	 * La tasa, más callada todavía que «Registrar»: discontinua mientras la
+	 * cuenta no rinde, y en el verde de los intereses mientras rinde.
+	 */
+	.rate {
+		display: inline-flex;
+		align-items: center;
+		margin-top: 0.4rem;
+		padding: 0.15rem 0.65rem;
+		border: 1px dashed var(--border-strong);
+		border-radius: 999px;
+		background: transparent;
+		font: inherit;
+		font-size: 0.76rem;
+		font-variant-numeric: tabular-nums;
+		text-align: left;
+		color: var(--text-muted);
+		cursor: pointer;
+		transition:
+			border-color 0.2s ease,
+			color 0.2s ease;
+	}
+
+	.rate:hover {
+		border-color: var(--amber);
+		color: var(--amber-light);
+	}
+
+	.rate:focus-visible {
+		outline: 2px solid var(--amber);
+		outline-offset: 2px;
+	}
+
+	.rate.earning {
+		border-style: solid;
+		border-color: rgba(34, 201, 126, 0.3);
+		color: var(--green);
+	}
+
+	.rate.earning:hover {
+		border-color: var(--green);
+		color: var(--green);
 	}
 
 	.emptied .code,

@@ -140,6 +140,13 @@ func (m *Module) Routes(router fiber.Router) {
 	portfolios.Post("/cash/movements", m.handler.CreateCashMovement)
 	portfolios.Put("/cash/movements/:txnId", m.handler.UpdateCashMovement)
 	portfolios.Delete("/cash/movements/:txnId", m.handler.DeleteCashMovement)
+	// The rates cash accounts earn, as versions by the day each takes effect;
+	// see CashRateStore.
+	portfolios.Get("/cash/rates", m.handler.GetCashRates)
+	portfolios.Post("/cash/rates", m.handler.CreateCashRate)
+	portfolios.Put("/cash/rates/:rateId", m.handler.UpdateCashRate)
+	portfolios.Post("/cash/rates/:rateId/end", m.handler.EndCashRate)
+	portfolios.Delete("/cash/rates/:rateId", m.handler.DeleteCashRate)
 	portfolios.Post("", m.handler.CreatePortfolio)
 	portfolios.Post("/sources", m.handler.CreatePlatform)
 	portfolios.Post("/entries", m.handler.CreatePortfolioEntry)

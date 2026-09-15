@@ -458,6 +458,12 @@ func (a *App) registerJobs(sched *scheduler.Scheduler, mods *modules, persistent
 	// seconds; the BYO-key sync walks every user at their own pace and can take
 	// hours, so a snapshot taken two minutes in would record yesterday's values.
 	sched.Register(portfolio.NewSnapshotJob(mods.portfolio.Service(), a.deps.Log), scheduler.DailyAt{Hour: 22, Minute: 0}, scheduler.WithStore(persistent))
+
+	// Cash interest runs early in the UTC day, for the day before: once that day
+	// is over in the Americas too, and hours ahead of the snapshot, so the value
+	// the snapshot records already holds the interest. Persistent for the reason
+	// the snapshot is, and a run it misses is caught up by the next one.
+	sched.Register(portfolio.NewCashInterestJob(mods.portfolio.Service(), a.deps.Log), scheduler.DailyAt{Hour: 5, Minute: 30}, scheduler.WithStore(persistent))
 	sched.Register(notification.NewWeeklySummaryScheduler(mods.notification, a.deps.Log), scheduler.WeeklyAt{Day: time.Monday, Hour: 8, Minute: 30}, scheduler.WithStore(persistent))
 	sched.Register(auth.NewCleanupJob(mods.auth.Service(), a.deps.Log), scheduler.Every{Interval: 5 * time.Hour}, scheduler.WithStore(persistent))
 

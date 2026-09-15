@@ -91,3 +91,66 @@ export function toCashMovementBody(data: MovementFields) {
 		notes: data.notes
 	};
 }
+
+/** Si `value` no tiene más decimales de los que caben, sin tropezar con la coma flotante. */
+function hasAtMostDecimals(value: number, decimals: number): boolean {
+	const scaled = value * 10 ** decimals;
+	return Math.abs(scaled - Math.round(scaled)) < 1e-6;
+}
+
+/**
+ * Los valores de una versión de la tasa, en porcentaje como los publica la
+ * entidad: `9.25` es 9,25 % E.A. Los decimales son los que guarda el backend.
+ */
+const rateValues = {
+	annualRatePct: z.coerce
+		.number('Escribe la tasa con números.')
+		.positive('La tasa tiene que ser mayor que cero.')
+		.max(100, 'La tasa no puede pasar de 100 %.')
+		.refine((v) => hasAtMostDecimals(v, 4), 'Escribe la tasa con hasta cuatro decimales.'),
+	// Vacía es que no hay retención.
+	withholdingPct: z.coerce
+		.number('Escribe la retención con números.')
+		.min(0, 'La retención no puede ser negativa.')
+		.lt(100, 'La retención tiene que ser menor que 100 %.')
+		.refine((v) => hasAtMostDecimals(v, 2), 'Escribe la retención con hasta dos decimales.')
+		.default(0)
+};
+
+/** Una tasa, o una versión nueva: la cuenta y el día desde el que rige. */
+export const cashRateCreateSchema = z.object({
+	sourceId: z.uuid('No sabemos a qué cuenta darle la tasa.'),
+	currency: z.enum(SUPPORTED_CURRENCIES, 'No sabemos a qué cuenta darle la tasa.'),
+	effectiveFrom: z.iso.date('Elige desde qué día rige la tasa.'),
+	...rateValues
+});
+
+/** Corrección de la versión más reciente: sus valores, no sus fechas. */
+export const cashRateUpdateSchema = z.object({
+	id: z.uuid('No sabemos qué tasa corregir.'),
+	...rateValues
+});
+
+/** Pausa: el primer día en que la cuenta ya no rinde. */
+export const cashRateEndSchema = z.object({
+	id: z.uuid('No sabemos qué tasa pausar.'),
+	endsOn: z.iso.date('Elige desde qué día deja de rendir.')
+});
+
+export const cashRateDeleteSchema = z.object({
+	id: z.uuid('No sabemos qué tasa borrar.')
+});
+
+/** Los valores como los espera el backend. Por ahora toda tasa se abona a diario. */
+export function toCashRateBody(data: { annualRatePct: number; withholdingPct: number }) {
+	return {
+		annualRatePct: data.annualRatePct,
+		withholdingPct: data.withholdingPct,
+		posting: 'daily'
+	};
+}
+
+/** Un día del selector como lo guarda el backend: medianoche UTC de ese día. */
+export function toCalendarDateTime(date: string): string {
+	return `${date}T00:00:00Z`;
+}

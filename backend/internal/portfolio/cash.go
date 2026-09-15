@@ -27,7 +27,8 @@ import (
 // withdrawal, the interest the balance earned) and the rules that keep that
 // vocabulary from reaching positions it does not describe. The accounting rules
 // behind it live in SQL, next to the ones for every other transaction type:
-// see migrations 000040 and 000041.
+// see migrations 000040 and 000041, and 000042 for what interest adds to the
+// cost of a balance — nothing, which is what makes it gain.
 
 var (
 	// ErrInvalidCashMovement rejects a movement that cannot be recorded as
@@ -279,6 +280,16 @@ type CashBalance struct {
 	// that was emptied or one that was never used.
 	Movements        int64      `json:"movements"`
 	LastMovementDate *time.Time `json:"lastMovementDate"`
+	// InterestEarned is every interest credited to the balance, in Currency, by
+	// the ledger or by hand. InterestThisMonth is the part dated in the current
+	// UTC month, and InterestThisMonthValue that part in DisplayCurrency, under
+	// the FXConverted contract Value has.
+	InterestEarned         string `json:"interestEarned"`
+	InterestThisMonth      string `json:"interestThisMonth"`
+	InterestThisMonthValue string `json:"interestThisMonthValue"`
+	// LastAccrualDate is the last day the ledger computed interest for the
+	// balance, nil if it never has.
+	LastAccrualDate *time.Time `json:"lastAccrualDate"`
 }
 
 // CashMovement is one transaction on a cash position, read as a movement.
@@ -297,7 +308,10 @@ type CashMovement struct {
 	Notes        string         `json:"notes"`
 	// Editable is whether PUT /portfolios/cash/movements/:id can rewrite it: a
 	// known kind, at one unit per unit, in the balance's own currency.
-	Editable      bool      `json:"editable"`
+	Editable bool `json:"editable"`
+	// Automatic is whether the interest ledger credited it (000044) rather than
+	// the owner.
+	Automatic     bool      `json:"automatic"`
 	PortfolioID   uuid.UUID `json:"portfolioId"`
 	PortfolioName string    `json:"portfolioName"`
 	SourceID      uuid.UUID `json:"sourceId"`

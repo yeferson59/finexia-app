@@ -11,17 +11,21 @@
 	 * El importe lleva signo pero no color de ganancia: pintar un depósito de
 	 * verde diría justo lo que esta pantalla explica que no es. Solo los intereses
 	 * van en verde, porque son lo único de aquí que es rendimiento.
+	 *
+	 * Los intereses que abona sola la tasa de una cuenta van en una fila por saldo
+	 * y mes, que se despliega: una cuenta que rinde abona cada día, y treinta
+	 * filas iguales taparían los depósitos y retiros.
 	 */
 	import Pagination from '$lib/ui/pagination.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { formatCalendarDate } from '$lib/shared/format/date';
+	import { cashKindSign, formatCashKind, type CashMovement } from '../cash';
 	import {
-		cashKindSign,
-		formatCashKind,
-		groupCashMovementsByMonth,
-		type CashMovement
-	} from '../cash';
+		groupAutomaticInterest,
+		groupCashLedgerByMonth,
+		type CashInterestGroup
+	} from '../interest';
 	import CashDeleteConfirm from './cash-delete-confirm.svelte';
 
 	interface Props {
@@ -37,19 +41,25 @@
 
 	const PER_PAGE = 15;
 	let page = $state(1);
+
+	/* Se agrupa antes de paginar: un mes de abonos es una fila, no dos páginas. */
+	const rows = $derived(groupAutomaticInterest(movements));
 	const months = $derived(
-		groupCashMovementsByMonth(movements.slice((page - 1) * PER_PAGE, page * PER_PAGE))
+		groupCashLedgerByMonth(rows.slice((page - 1) * PER_PAGE, page * PER_PAGE))
 	);
 
 	let deleting = $state<CashMovement | null>(null);
 
-	function amount(movement: CashMovement): string {
-		const sign = cashKindSign(movement.kind);
-		const value = formatCurrency(Math.abs(parseFloat(movement.amount) || 0), movement.currency);
-		const prefix = sign > 0 ? '+' : sign < 0 ? '−' : '';
+	/* Los grupos de abonos desplegados, por su clave. */
+	let open = $state<Record<string, boolean>>({});
 
-		return privacy.money(`${prefix}${value}`);
+	function signed(sign: number, value: number, currency: string): string {
+		const prefix = sign > 0 ? '+' : sign < 0 ? '−' : '';
+		return privacy.money(`${prefix}${formatCurrency(Math.abs(value), currency)}`);
 	}
+
+	const amount = (movement: CashMovement) =>
+		signed(cashKindSign(movement.kind), parseFloat(movement.amount) || 0, movement.currency);
 
 	function fees(movement: CashMovement): string {
 		const value = parseFloat(movement.fees) || 0;
@@ -66,6 +76,14 @@
 	/* Lo que distingue un «Editar» de los otros catorce para quien no ve la fila. */
 	const described = (movement: CashMovement) =>
 		`${formatCashKind(movement.kind).toLowerCase()} del ${fullDate(movement.date)}`;
+
+	/* Los días que cubre un grupo, dichos para quien no ve la columna del día. */
+	const span = (group: CashInterestGroup) =>
+		group.since === group.date
+			? fullDate(group.date)
+			: `del ${day(group.since)} al ${fullDate(group.date)}`;
+
+	const creditsId = (group: CashInterestGroup) => `cash-credits-${group.key.replaceAll(':', '-')}`;
 </script>
 
 <div class="ledger">
@@ -74,49 +92,121 @@
 			<h3 class="month-title" id="cash-month-{month.key}">{month.label}</h3>
 
 			<ul class="entries">
-				{#each month.movements as movement (movement.id)}
-					<li class="entry">
-						<p class="day">
-							<span class="day-number" aria-hidden="true">{day(movement.date)}</span>
-							<span class="weekday" aria-hidden="true">{weekday(movement.date)}</span>
-							<span class="sr-only">{fullDate(movement.date)}</span>
-						</p>
+				{#each month.rows as row (row.key)}
+					{#if row.type === 'interest'}
+						<li class="entry">
+							<p class="day">
+								<span class="day-number" aria-hidden="true">{day(row.date)}</span>
+								<span class="weekday" aria-hidden="true">desde el {day(row.since)}</span>
+								<span class="sr-only">{span(row)}</span>
+							</p>
 
-						<div class="what">
-							<p class="kind">{formatCashKind(movement.kind)}</p>
-							{#if movement.notes}
-								<p class="note">{movement.notes}</p>
-							{/if}
-						</div>
+							<div class="what">
+								<p class="kind">Intereses de la cuenta</p>
+								<p class="note">{row.movements.length} abonos automáticos</p>
+							</div>
 
-						<p class="where">
-							<span class="source">{movement.sourceName || 'Sin plataforma'}</span>
-							<span class="code">{movement.currency}</span>
-							{#if showPortfolio}
-								<span class="portfolio">{movement.portfolioName}</span>
-							{/if}
-						</p>
+							<p class="where">
+								<span class="source">{row.sourceName || 'Sin plataforma'}</span>
+								<span class="code">{row.currency}</span>
+								{#if showPortfolio}
+									<span class="portfolio">{row.portfolioName}</span>
+								{/if}
+							</p>
 
-						<p class="figures">
-							<span class="amount" class:income={movement.kind === 'interest'}>
-								{amount(movement)}
-							</span>
-							{#if fees(movement)}
-								<span class="fee">comisión {fees(movement)}</span>
-							{/if}
-						</p>
+							<p class="figures">
+								<span class="amount income">{signed(1, row.amount, row.currency)}</span>
+							</p>
 
-						<div class="actions">
-							{#if movement.editable}
-								<button type="button" class="action" onclick={() => onEdit(movement)}>
-									Editar<span class="sr-only"> {described(movement)}</span>
+							<div class="actions">
+								<button
+									type="button"
+									class="action"
+									aria-expanded={open[row.key] === true}
+									aria-controls={creditsId(row)}
+									onclick={() => (open[row.key] = !open[row.key])}
+								>
+									{open[row.key] ? 'Ocultar' : 'Ver abonos'}<span class="sr-only">
+										de intereses {span(row)}</span
+									>
 								</button>
-							{/if}
-							<button type="button" class="action danger" onclick={() => (deleting = movement)}>
-								Borrar<span class="sr-only"> {described(movement)}</span>
-							</button>
-						</div>
-					</li>
+							</div>
+						</li>
+
+						<li class="credits" id={creditsId(row)} hidden={!open[row.key]}>
+							<ul>
+								{#each row.movements as movement (movement.id)}
+									<li class="credit">
+										<span>{fullDate(movement.date)}</span>
+										<span class="amount income">{amount(movement)}</span>
+										<span class="credit-actions">
+											{#if movement.editable}
+												<button type="button" class="action" onclick={() => onEdit(movement)}>
+													Editar<span class="sr-only"> {described(movement)}</span>
+												</button>
+											{/if}
+											<button
+												type="button"
+												class="action danger"
+												onclick={() => (deleting = movement)}
+											>
+												Borrar<span class="sr-only"> {described(movement)}</span>
+											</button>
+										</span>
+									</li>
+								{/each}
+							</ul>
+						</li>
+					{:else}
+						{@const movement = row.movement}
+						<li class="entry">
+							<p class="day">
+								<span class="day-number" aria-hidden="true">{day(movement.date)}</span>
+								<span class="weekday" aria-hidden="true">{weekday(movement.date)}</span>
+								<span class="sr-only">{fullDate(movement.date)}</span>
+							</p>
+
+							<div class="what">
+								<p class="kind">
+									{formatCashKind(movement.kind)}
+									{#if movement.automatic}
+										<span class="tag">automático</span>
+									{/if}
+								</p>
+								{#if movement.notes}
+									<p class="note">{movement.notes}</p>
+								{/if}
+							</div>
+
+							<p class="where">
+								<span class="source">{movement.sourceName || 'Sin plataforma'}</span>
+								<span class="code">{movement.currency}</span>
+								{#if showPortfolio}
+									<span class="portfolio">{movement.portfolioName}</span>
+								{/if}
+							</p>
+
+							<p class="figures">
+								<span class="amount" class:income={movement.kind === 'interest'}>
+									{amount(movement)}
+								</span>
+								{#if fees(movement)}
+									<span class="fee">comisión {fees(movement)}</span>
+								{/if}
+							</p>
+
+							<div class="actions">
+								{#if movement.editable}
+									<button type="button" class="action" onclick={() => onEdit(movement)}>
+										Editar<span class="sr-only"> {described(movement)}</span>
+									</button>
+								{/if}
+								<button type="button" class="action danger" onclick={() => (deleting = movement)}>
+									Borrar<span class="sr-only"> {described(movement)}</span>
+								</button>
+							</div>
+						</li>
+					{/if}
 				{/each}
 			</ul>
 		</section>
@@ -124,7 +214,7 @@
 </div>
 
 <div class="pager">
-	<Pagination bind:page total={movements.length} perPage={PER_PAGE} label="movimientos" />
+	<Pagination bind:page total={rows.length} perPage={PER_PAGE} label="movimientos" />
 	{#if total > movements.length}
 		<p class="hint">Se muestran los {movements.length} movimientos más recientes de {total}.</p>
 	{/if}
@@ -166,7 +256,8 @@
 		padding: 0.85rem 0;
 	}
 
-	.entry + .entry {
+	/* Entre filas, contando las de abonos ocultas: siguen siendo hermanas. */
+	.entries > li + li {
 		border-top: 1px solid var(--border);
 	}
 
@@ -192,6 +283,7 @@
 	.weekday {
 		margin-top: 0.3rem;
 		font-size: 0.72rem;
+		white-space: nowrap;
 		color: var(--text-dim);
 	}
 
@@ -205,6 +297,13 @@
 		font-size: 0.9rem;
 		font-weight: 500;
 		color: var(--text);
+	}
+
+	.tag {
+		margin-left: 0.35rem;
+		font-size: 0.72rem;
+		font-weight: 400;
+		color: var(--text-dim);
 	}
 
 	.note {
@@ -303,6 +402,45 @@
 		color: var(--red);
 	}
 
+	/* Los abonos de un grupo, bajo su fila y con la sangría de la columna del día:
+	   la fecha, el importe en la vertical de los demás y sus acciones. */
+	.credits {
+		margin: 0 1.5rem;
+		padding: 0.35rem 0 0.65rem 3.75rem;
+	}
+
+	.entries > li.credits {
+		border-top-style: dashed;
+	}
+
+	.credits ul {
+		display: grid;
+		gap: 0.1rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.credit {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 9.5rem 8.5rem;
+		align-items: center;
+		column-gap: 1.25rem;
+		font-size: 0.82rem;
+		color: var(--text-muted);
+	}
+
+	.credit .amount {
+		justify-self: end;
+		font-size: 0.85rem;
+	}
+
+	.credit-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.15rem;
+	}
+
 	.pager {
 		padding: 0 1.5rem;
 	}
@@ -332,6 +470,22 @@
 		.actions {
 			justify-content: flex-start;
 			margin: 0 0 0 -0.6rem;
+		}
+
+		.credits {
+			margin: 0 1rem;
+			padding-left: 3rem;
+		}
+
+		.credit {
+			grid-template-columns: minmax(0, 1fr) auto;
+			row-gap: 0.1rem;
+		}
+
+		.credit-actions {
+			grid-column: 1 / -1;
+			justify-content: flex-start;
+			margin-left: -0.6rem;
 		}
 
 		.pager {

@@ -16,6 +16,9 @@ export {
 	default as CashMovementForm,
 	type CashFormTarget
 } from './components/cash-movement-form.svelte';
+export { default as CashRateForm, type CashRateTarget } from './components/cash-rate-form.svelte';
 
 export * from './cash';
+export * from './rates';
+export * from './interest';
 export * from './schemas';

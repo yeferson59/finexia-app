@@ -9,9 +9,11 @@
 		CashAccounts,
 		CashMovementForm,
 		CashMovements,
+		CashRateForm,
 		CashSummary,
 		summarizeCash,
-		type CashFormTarget
+		type CashFormTarget,
+		type CashRateTarget
 	} from '$lib/features/cash';
 	import type { PageProps } from './$types';
 
@@ -26,6 +28,9 @@
 	const showPortfolio = $derived(data.portfolios.length > 1);
 
 	let target = $state<CashFormTarget | null>(null);
+
+	/* La cuenta cuya rentabilidad está abierta. */
+	let rateTarget = $state<CashRateTarget | null>(null);
 
 	function record() {
 		target = { mode: 'create' };
@@ -90,8 +95,10 @@
 		<Card variant="elevated" padding="none">
 			<CashAccounts
 				balances={data.balances}
+				rates={data.rates}
 				{showPortfolio}
 				onRecord={(balance) => (target = { mode: 'create', balance })}
+				onRate={(account) => (rateTarget = { account })}
 			/>
 		</Card>
 	</section>
@@ -127,6 +134,8 @@
 	currency={data.currency}
 	onClose={() => (target = null)}
 />
+
+<CashRateForm target={rateTarget} rates={data.rates} onClose={() => (rateTarget = null)} />
 
 <style>
 	.prereq {

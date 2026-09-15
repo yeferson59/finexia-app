@@ -1,10 +1,11 @@
 /**
  * Efectivo (`/portfolios/cash`): los saldos de cada plataforma por moneda y
- * portafolio, y los depósitos, retiros e intereses que los cambian.
+ * portafolio, los depósitos, retiros e intereses que los cambian, y la tasa que
+ * rinde cada cuenta.
  */
 import { apiRequest, apiRequestSafe, type ApiEvent, type ApiResult } from './client';
-import type { CashBalance, CashMovement, PagedCashMovements } from './types';
-import { cashBalanceSchema, pagedCashMovementsSchema } from './schemas';
+import type { CashBalance, CashMovement, CashRate, PagedCashMovements } from './types';
+import { cashBalanceSchema, cashRateSchema, pagedCashMovementsSchema } from './schemas';
 import { z } from 'zod';
 
 /**
@@ -64,4 +65,58 @@ export function updateMovement(
 /** `DELETE /portfolios/cash/movements/:id` — borra un movimiento. */
 export function deleteMovement(event: ApiEvent, id: string): Promise<ApiResult<unknown>> {
 	return apiRequest<unknown>(event, `/portfolios/cash/movements/${id}`, { method: 'DELETE' });
+}
+
+/**
+ * `GET /portfolios/cash/rates` — todas las versiones de las tasas, por
+ * plataforma y moneda, de la más nueva a la más vieja.
+ */
+export function getRates(event: ApiEvent): Promise<ApiResult<CashRate[]>> {
+	return apiRequestSafe(event, '/portfolios/cash/rates', {}, z.array(cashRateSchema));
+}
+
+/**
+ * `POST /portfolios/cash/rates` — anota una tasa, o una versión nueva que cierra
+ * la anterior la víspera.
+ */
+export function createRate(
+	event: ApiEvent,
+	body: Record<string, unknown>
+): Promise<ApiResult<CashRate>> {
+	return apiRequest<CashRate>(event, '/portfolios/cash/rates', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+}
+
+/** `PUT /portfolios/cash/rates/:id` — corrige los valores de la versión más reciente. */
+export function updateRate(
+	event: ApiEvent,
+	id: string,
+	body: Record<string, unknown>
+): Promise<ApiResult<CashRate>> {
+	return apiRequest<CashRate>(event, `/portfolios/cash/rates/${id}`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+}
+
+/** `POST /portfolios/cash/rates/:id/end` — la cuenta deja de rendir desde `endsOn`. */
+export function endRate(
+	event: ApiEvent,
+	id: string,
+	body: Record<string, unknown>
+): Promise<ApiResult<CashRate>> {
+	return apiRequest<CashRate>(event, `/portfolios/cash/rates/${id}/end`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+}
+
+/** `DELETE /portfolios/cash/rates/:id` — borra la versión más reciente. */
+export function deleteRate(event: ApiEvent, id: string): Promise<ApiResult<unknown>> {
+	return apiRequest<unknown>(event, `/portfolios/cash/rates/${id}`, { method: 'DELETE' });
 }

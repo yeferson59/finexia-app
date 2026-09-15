@@ -153,8 +153,8 @@ func TestCashMovementsLandOnOneBalance(t *testing.T) {
 		t.Errorf("names = %q on %q", b.PortfolioName, b.SourceName)
 	}
 
-	// The balance counts in its portfolio like any position: at its quantity,
-	// and with no gain — the interest cost nothing, and cash has no price to move.
+	// The balance counts in its portfolio like any position, at its quantity. Its
+	// gain is the interest: those units cost nothing (000042).
 	summaries, err := f.repo.GetPortfoliosSummaryByUserID(ctx, f.userID)
 	if err != nil {
 		t.Fatalf("GetPortfoliosSummaryByUserID: %v", err)
@@ -164,7 +164,7 @@ func TestCashMovementsLandOnOneBalance(t *testing.T) {
 	}
 
 	sameAmount(t, "portfolio value", summaries[0].TotalMarketValue, "1255")
-	sameAmount(t, "portfolio gain", summaries[0].TotalGainLoss, "0")
+	aboutAmount(t, "portfolio gain", summaries[0].TotalGainLoss, "4.5")
 	if summaries[0].TotalPositions != 1 {
 		t.Errorf("positions = %d, want 1", summaries[0].TotalPositions)
 	}

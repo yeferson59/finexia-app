@@ -29,6 +29,10 @@ const balance = (
 	fxConverted: true,
 	movements: 1,
 	lastMovementDate: '2026-09-01T00:00:00Z',
+	interestEarned: '0',
+	interestThisMonth: '0',
+	interestThisMonthValue: '0',
+	lastAccrualDate: null,
 	...over
 });
 

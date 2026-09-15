@@ -67,10 +67,36 @@ describe('asset-position-headline.svelte', () => {
 		});
 
 		await expect
-			.element(page.getByText('Vale lo mismo que los $9,500.00 que invertiste.'))
+			.element(page.getByText('Vale lo mismo que los $9,500.00 que depositaste.'))
 			.toBeInTheDocument();
 		// Y con los dos precios iguales, la frase de las unidades solo repetiría
 		// que no ha pasado nada.
+		await expect.element(page.getByText(/Pagaste/)).not.toBeInTheDocument();
+	});
+
+	/*
+	 * Los intereses de una cuenta entran al coste como unidades gratis, así que
+	 * su precio medio baja de 1 y la ganancia es lo que abonó la cuenta.
+	 */
+	it('dice que la ganancia del efectivo son intereses', async () => {
+		render(Headline, {
+			position: position({
+				assetType: 'cash',
+				totalQty: 1010,
+				totalCost: 1000,
+				totalValue: 1010,
+				averageCost: 0.990099,
+				marketPrice: 1,
+				gainLoss: 10,
+				gainLossPercent: 1
+			}),
+			portfolioName: 'Reserva'
+		});
+
+		await expect
+			.element(page.getByText('+$10.00 en intereses sobre los $1,000.00 que depositaste (+1,00%)'))
+			.toBeInTheDocument();
+		// El precio medio de 0,99 no es algo que nadie haya pagado.
 		await expect.element(page.getByText(/Pagaste/)).not.toBeInTheDocument();
 	});
 

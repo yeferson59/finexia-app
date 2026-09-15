@@ -104,7 +104,11 @@ func (r *PostgresRepository) GetCashBalancesByUserID(ctx context.Context, userID
 		balances = append(balances, b)
 	}
 
-	return balances, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return balances, r.addCashInterest(ctx, userID, displayCurrency, balances)
 }
 
 // cashMovementEditable is the SQL test behind CashMovement.Editable, shared by
@@ -126,6 +130,7 @@ const cashMovementColumns = `
 	t.fees::text, t.fees_currency,
 	t.transaction_date, COALESCE(t.notes, ''),
 	` + cashMovementEditable + `,
+	EXISTS (SELECT 1 FROM cash_interest_accruals ac WHERE ac.transaction_id = t.id),
 	pe.portfolio_id, p.name, pe.source_id, COALESCE(s.name, ''), a.ticker, t.created_at`
 
 const cashMovementFrom = `
@@ -149,6 +154,7 @@ func scanCashMovement(row pgx.Row) (CashMovement, error) {
 		&m.Date,
 		&m.Notes,
 		&m.Editable,
+		&m.Automatic,
 		&m.PortfolioID,
 		&m.PortfolioName,
 		&m.SourceID,
@@ -256,11 +262,11 @@ func (r *PostgresRepository) CreateCashMovement(ctx context.Context, userID, por
 				return err
 			}
 
-			// The price is seeded at one and the trigger keeps it there, since
-			// every deposit is priced at one. On a conflict the position already
-			// existed without matching the lookup above — opened by hand in another
-			// cost currency, or at another price — and the check below refuses to
-			// write into it.
+			// The price is seeded at one and the trigger keeps it there until
+			// interest averages in at no cost (000042). On a conflict the position
+			// already existed without matching the lookup above — opened by hand in
+			// another cost currency, or at another price — and the check below
+			// refuses to write into it.
 			if err := tx.QueryRow(ctx, `
 				INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date, notes)
 				VALUES ($1::uuid, $2::uuid, $3::uuid, 0, 1, $4::char(3), $5::date, '')
@@ -281,7 +287,7 @@ func (r *PostgresRepository) CreateCashMovement(ctx context.Context, userID, por
 			atPar        bool
 		)
 		if err := tx.QueryRow(ctx, `
-			SELECT cost_currency, price = 1 FROM portfolio_entries WHERE id = $1
+			SELECT cost_currency, cash_entry_at_par(id) FROM portfolio_entries WHERE id = $1
 		`, entryID).Scan(&costCurrency, &atPar); err != nil {
 			return err
 		}
@@ -333,7 +339,7 @@ func lockCashEntry(ctx context.Context, tx pgx.Tx, portfolioID, sourceID uuid.UU
 		  AND a.asset_type    = 'cash'
 		  AND a.currency      = $3::char(3)
 		  AND pe.cost_currency = $3::char(3)
-		  AND pe.price        = 1
+		  AND cash_entry_at_par(pe.id)
 		ORDER BY (a.ticker = $4) DESC, pe.created_at
 		LIMIT 1
 		FOR UPDATE OF pe
