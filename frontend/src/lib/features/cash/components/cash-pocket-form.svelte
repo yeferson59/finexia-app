@@ -44,8 +44,8 @@
 		target === null
 			? ''
 			: target.mode === 'edit'
-				? `${target.pocket.sourceName || 'Sin plataforma'} · ${target.pocket.currency}`
-				: `${target.sourceName || 'Sin plataforma'} · ${target.currency}`
+				? `Dentro de ${target.pocket.sourceName || 'Sin plataforma'}, en ${target.pocket.currency}.`
+				: `Dentro de ${target.sourceName || 'Sin plataforma'}, en ${target.currency}.`
 	);
 
 	/* Un bolsillo con movimientos no se borra: se perderían. Vaciarlo no basta,
@@ -111,58 +111,85 @@
 				</p>
 			</div>
 
+			<!-- Borrar sale del mismo formulario, con su propia acción: lo único que
+			     lee es el id. Va encima del pie para no quedar debajo de él. -->
+			{#if editing}
+				<div class="danger-zone">
+					{#if canDelete}
+						<p class="danger-note">
+							Todavía no tiene movimientos, así que se puede quitar sin perder nada.
+						</p>
+						<button
+							type="submit"
+							class="danger-link"
+							formaction="?/deletePocket"
+							formnovalidate
+							disabled={submitting}
+						>
+							Borrar bolsillo
+						</button>
+					{:else}
+						<p class="danger-note">
+							Tiene {editing.movements}
+							{editing.movements === 1 ? 'movimiento' : 'movimientos'}, así que no se puede borrar:
+							su historia se iría con él. Bórralos primero si lo anotaste por error.
+						</p>
+					{/if}
+				</div>
+			{/if}
+
 			{#if error}
 				<p class="feedback error">{error}</p>
 			{/if}
 
-			<div class="actions">
+			<div class="modal-actions">
 				<Button type="button" variant="ghost" onclick={close}>Cancelar</Button>
-				<Button type="submit" disabled={submitting}>
-					{editing ? 'Guardar' : 'Crear bolsillo'}
+				<Button type="submit" loading={submitting}>
+					{editing ? 'Guardar nombre' : 'Crear bolsillo'}
 				</Button>
 			</div>
 		</form>
-
-		{#if editing}
-			<form method="POST" action="?/deletePocket" class="danger" use:enhance={handler}>
-				<input type="hidden" name="id" value={editing.id} />
-				{#if canDelete}
-					<p class="danger-note">
-						Todavía no tiene movimientos, así que se puede quitar sin perder nada.
-					</p>
-					<Button type="submit" variant="ghost" disabled={submitting}>Borrar bolsillo</Button>
-				{:else}
-					<p class="danger-note">
-						Tiene {editing.movements}
-						{editing.movements === 1 ? 'movimiento' : 'movimientos'}, así que no se puede borrar: su
-						historia se iría con él. Bórralos primero si lo anotaste por error.
-					</p>
-				{/if}
-			</form>
-		{/if}
 	{/if}
 </Modal>
 
 <style>
-	.actions {
+	.danger-zone {
 		display: flex;
-		justify-content: flex-end;
-		gap: 0.6rem;
-		margin-top: 0.4rem;
-	}
-
-	.danger {
-		margin-top: 1.4rem;
-		padding-top: 1.1rem;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem 1rem;
+		padding-top: 1rem;
 		border-top: 1px solid var(--border);
-		text-align: right;
 	}
 
 	.danger-note {
-		margin: 0 0 0.6rem;
+		flex: 1 1 16rem;
+		margin: 0;
 		font-size: 0.8rem;
 		line-height: 1.5;
-		color: var(--text-muted);
-		text-align: left;
+		color: var(--text-dim);
+	}
+
+	/* Rojo solo en el texto: es la salida que no se deshace, no un botón más. */
+	.danger-link {
+		padding: 0.4rem 0.7rem;
+		border: 1px solid rgba(224, 90, 90, 0.35);
+		border-radius: 7px;
+		background: transparent;
+		font: inherit;
+		font-size: 0.82rem;
+		color: var(--red);
+		cursor: pointer;
+	}
+
+	.danger-link:hover:not(:disabled) {
+		border-color: var(--red);
+		background: rgba(224, 90, 90, 0.08);
+	}
+
+	.danger-link:disabled {
+		cursor: default;
+		opacity: 0.5;
 	}
 </style>

@@ -4,29 +4,33 @@
 	 * al más antiguo.
 	 *
 	 * El mes va de cabecera y cada movimiento solo lleva su día, que es como se
-	 * lee el extracto de un banco y lo que deja sitio a la nota. Como tabla de
-	 * cinco columnas, en una pantalla estrecha la cuenta se partía en cuatro
-	 * líneas y los botones quedaban cortados.
+	 * lee el extracto de un banco y lo que deja sitio a la nota.
 	 *
 	 * El importe lleva signo pero no color de ganancia: pintar un depósito de
 	 * verde diría justo lo que esta pantalla explica que no es. Solo los intereses
 	 * van en verde, porque son lo único de aquí que es rendimiento.
 	 *
 	 * Los intereses que abona sola la tasa de una cuenta van en una fila por saldo
-	 * y mes, que se despliega: una cuenta que rinde abona cada día, y treinta
-	 * filas iguales taparían los depósitos y retiros.
+	 * y mes, que se despliega desde su nombre: una cuenta que rinde abona cada
+	 * día, y treinta filas iguales taparían los depósitos y retiros.
+	 *
+	 * Editar y borrar aparecen al pasar por la fila o al llegar con el teclado:
+	 * dos botones por fila en quince filas eran treinta, compitiendo con los
+	 * importes. En una pantalla táctil, donde no hay «pasar por encima», están
+	 * siempre.
 	 */
 	import Pagination from '$lib/ui/pagination.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { formatCalendarDate } from '$lib/shared/format/date';
-	import { cashKindSign, formatCashKind, type CashMovement } from '../cash';
+	import type { CashMovement } from '../cash';
 	import {
 		groupAutomaticInterest,
 		groupCashLedgerByMonth,
 		type CashInterestGroup
 	} from '../interest';
 	import CashDeleteConfirm from './cash-delete-confirm.svelte';
+	import CashLedgerEntry from './cash-ledger-entry.svelte';
 
 	interface Props {
 		movements: CashMovement[];
@@ -53,29 +57,10 @@
 	/* Los grupos de abonos desplegados, por su clave. */
 	let open = $state<Record<string, boolean>>({});
 
-	function signed(sign: number, value: number, currency: string): string {
-		const prefix = sign > 0 ? '+' : sign < 0 ? '−' : '';
-		return privacy.money(`${prefix}${formatCurrency(Math.abs(value), currency)}`);
-	}
-
-	const amount = (movement: CashMovement) =>
-		signed(cashKindSign(movement.kind), parseFloat(movement.amount) || 0, movement.currency);
-
-	function fees(movement: CashMovement): string {
-		const value = parseFloat(movement.fees) || 0;
-		return value > 0 ? privacy.money(formatCurrency(value, movement.feesCurrency)) : '';
-	}
-
 	const day = (iso: string) => formatCalendarDate(iso, { day: 'numeric' });
-
-	const weekday = (iso: string) => formatCalendarDate(iso, { weekday: 'short' }).replace('.', '');
 
 	const fullDate = (iso: string) =>
 		formatCalendarDate(iso, { day: 'numeric', month: 'long', year: 'numeric' });
-
-	/* Lo que distingue un «Editar» de los otros catorce para quien no ve la fila. */
-	const described = (movement: CashMovement) =>
-		`${formatCashKind(movement.kind).toLowerCase()} del ${fullDate(movement.date)}`;
 
 	/* Los días que cubre un grupo, dichos para quien no ve la columna del día. */
 	const span = (group: CashInterestGroup) =>
@@ -84,17 +69,33 @@
 			: `del ${day(group.since)} al ${fullDate(group.date)}`;
 
 	const creditsId = (group: CashInterestGroup) => `cash-credits-${group.key.replaceAll(':', '-')}`;
+
+	const income = (amount: number, currency: string) =>
+		privacy.money(`+${formatCurrency(amount, currency)}`);
+
+	const count = (n: number) => (n === 1 ? '1 movimiento' : `${n} movimientos`);
 </script>
 
 <div class="ledger">
 	{#each months as month (month.key)}
 		<section class="month" aria-labelledby="cash-month-{month.key}">
-			<h3 class="month-title" id="cash-month-{month.key}">{month.label}</h3>
+			<header class="month-head">
+				<h3 id="cash-month-{month.key}">{month.label}</h3>
+				<p class="month-count">
+					{count(
+						month.rows.reduce(
+							(sum, row) => sum + (row.type === 'interest' ? row.movements.length : 1),
+							0
+						)
+					)}
+				</p>
+			</header>
 
 			<ul class="entries">
 				{#each month.rows as row (row.key)}
 					{#if row.type === 'interest'}
-						<li class="entry">
+						{@const expanded = open[row.key] === true}
+						<li class="entry group" class:expanded>
 							<p class="day">
 								<span class="day-number" aria-hidden="true">{day(row.date)}</span>
 								<span class="weekday" aria-hidden="true">desde el {day(row.since)}</span>
@@ -102,7 +103,16 @@
 							</p>
 
 							<div class="what">
-								<p class="kind">Intereses de la cuenta</p>
+								<button
+									type="button"
+									class="toggle"
+									aria-expanded={expanded}
+									aria-controls={creditsId(row)}
+									onclick={() => (open[row.key] = !expanded)}
+								>
+									<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" /></svg>
+									Intereses de la cuenta
+								</button>
 								<p class="note">{row.movements.length} abonos automáticos</p>
 							</div>
 
@@ -115,97 +125,30 @@
 							</p>
 
 							<p class="figures">
-								<span class="amount income">{signed(1, row.amount, row.currency)}</span>
+								<span class="amount income">{income(row.amount, row.currency)}</span>
 							</p>
-
-							<div class="actions">
-								<button
-									type="button"
-									class="action"
-									aria-expanded={open[row.key] === true}
-									aria-controls={creditsId(row)}
-									onclick={() => (open[row.key] = !open[row.key])}
-								>
-									{open[row.key] ? 'Ocultar' : 'Ver abonos'}<span class="sr-only">
-										de intereses {span(row)}</span
-									>
-								</button>
-							</div>
 						</li>
 
-						<li class="credits" id={creditsId(row)} hidden={!open[row.key]}>
+						<li class="credits" id={creditsId(row)} hidden={!expanded}>
 							<ul>
 								{#each row.movements as movement (movement.id)}
-									<li class="credit">
-										<span>{fullDate(movement.date)}</span>
-										<span class="amount income">{amount(movement)}</span>
-										<span class="credit-actions">
-											{#if movement.editable}
-												<button type="button" class="action" onclick={() => onEdit(movement)}>
-													Editar<span class="sr-only"> {described(movement)}</span>
-												</button>
-											{/if}
-											<button
-												type="button"
-												class="action danger"
-												onclick={() => (deleting = movement)}
-											>
-												Borrar<span class="sr-only"> {described(movement)}</span>
-											</button>
-										</span>
-									</li>
+									<CashLedgerEntry
+										{movement}
+										{showPortfolio}
+										compact
+										onEdit={() => onEdit(movement)}
+										onDelete={() => (deleting = movement)}
+									/>
 								{/each}
 							</ul>
 						</li>
 					{:else}
-						{@const movement = row.movement}
-						<li class="entry">
-							<p class="day">
-								<span class="day-number" aria-hidden="true">{day(movement.date)}</span>
-								<span class="weekday" aria-hidden="true">{weekday(movement.date)}</span>
-								<span class="sr-only">{fullDate(movement.date)}</span>
-							</p>
-
-							<div class="what">
-								<p class="kind">
-									{formatCashKind(movement.kind)}
-									{#if movement.automatic}
-										<span class="tag">automático</span>
-									{/if}
-								</p>
-								{#if movement.notes}
-									<p class="note">{movement.notes}</p>
-								{/if}
-							</div>
-
-							<p class="where">
-								<span class="source">{movement.sourceName || 'Sin plataforma'}</span>
-								<span class="code">{movement.currency}</span>
-								{#if showPortfolio}
-									<span class="portfolio">{movement.portfolioName}</span>
-								{/if}
-							</p>
-
-							<p class="figures">
-								<span class="amount" class:income={movement.kind === 'interest'}>
-									{amount(movement)}
-								</span>
-								{#if fees(movement)}
-									<span class="fee">comisión {fees(movement)}</span>
-								{/if}
-							</p>
-
-							<div class="actions">
-								{#if movement.editable}
-									<button type="button" class="action" onclick={() => onEdit(movement)}>
-										Editar<span class="sr-only"> {described(movement)}</span>
-									</button>
-								{/if}
-								<button type="button" class="action danger" onclick={() => (deleting = movement)}>
-									Borrar<span class="sr-only"> {described(movement)}</span>
-								</button>
-							</div>
-						</li>
+						<CashLedgerEntry
+							movement={row.movement}
+							{showPortfolio}
+							onEdit={() => onEdit(row.movement)}
+							onDelete={() => (deleting = row.movement)}
+						/>
 					{/if}
 				{/each}
 			</ul>
@@ -223,42 +166,56 @@
 <CashDeleteConfirm movement={deleting} {showPortfolio} onClose={() => (deleting = null)} />
 
 <style>
-	.month + .month {
-		border-top: 1px solid var(--border-strong);
+	.ledger {
+		display: grid;
+		gap: 2rem;
 	}
 
-	.month-title {
+	/* El mes, como la cabecera de una hoja del extracto: su nombre y cuántos
+	   movimientos lleva, sobre un filete más marcado que el de las filas. */
+	.month-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 0 0.75rem 0.6rem;
+		border-bottom: 1px solid var(--border-strong);
+	}
+
+	h3 {
 		margin: 0;
-		padding: 1.1rem 1.5rem 0.3rem;
 		font-family: var(--font-display);
-		font-size: 1rem;
-		font-weight: 500;
-		color: var(--text-muted);
+		font-size: 1.1rem;
+		font-weight: 400;
+		color: var(--text);
 	}
 
-	.entries {
+	.month-count {
 		margin: 0;
-		padding: 0 0 0.35rem;
+		font-size: 0.76rem;
+		color: var(--text-dim);
+	}
+
+	.entries,
+	.credits ul {
+		margin: 0;
+		padding: 0;
 		list-style: none;
 	}
 
-	/*
-	 * Día, qué pasó, dónde, cuánto y las acciones. Las dos últimas columnas son
-	 * fijas para que los importes caigan en la misma vertical de mes a mes.
-	 */
+	.entries > :global(li + li) {
+		border-top: 1px solid var(--border);
+	}
+
+	/* La fila de un grupo de abonos: la rejilla y las piezas de
+	   `cash-ledger-entry`, donde está explicada. */
 	.entry {
 		display: grid;
-		grid-template-columns: 2.5rem minmax(0, 1.35fr) minmax(0, 1fr) 9.5rem 8.5rem;
+		grid-template-columns: var(--ledger-columns);
 		grid-template-areas: 'day what where figures actions';
 		align-items: start;
 		column-gap: 1.25rem;
-		margin: 0 1.5rem;
-		padding: 0.85rem 0;
-	}
-
-	/* Entre filas, contando las de abonos ocultas: siguen siendo hermanas. */
-	.entries > li + li {
-		border-top: 1px solid var(--border);
+		padding: 0.85rem 0.75rem;
 	}
 
 	p {
@@ -274,45 +231,65 @@
 
 	.day-number {
 		font-family: var(--font-display);
-		font-size: 1.4rem;
-		font-weight: 400;
+		font-size: 1.45rem;
+		font-weight: 300;
 		font-variant-numeric: lining-nums;
 		color: var(--text);
 	}
 
+	/* «desde el 1» no cabe en la columna del día: baja a dos líneas en vez de
+	   montarse sobre el nombre. */
 	.weekday {
 		margin-top: 0.3rem;
-		font-size: 0.72rem;
-		white-space: nowrap;
+		font-size: 0.7rem;
+		line-height: 1.2;
 		color: var(--text-dim);
 	}
 
 	.what {
 		grid-area: what;
 		min-width: 0;
-		padding-top: 0.1rem;
 	}
 
-	.kind {
+	.toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		margin: -0.2rem 0 0 -0.4rem;
+		padding: 0.2rem 0.4rem;
+		border: none;
+		border-radius: 6px;
+		background: transparent;
+		font: inherit;
 		font-size: 0.9rem;
 		font-weight: 500;
 		color: var(--text);
+		cursor: pointer;
 	}
 
-	.tag {
-		margin-left: 0.35rem;
-		font-size: 0.72rem;
-		font-weight: 400;
-		color: var(--text-dim);
+	.toggle:hover {
+		background: var(--surface-2);
+	}
+
+	.toggle svg {
+		width: 0.8rem;
+		height: 0.8rem;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.75;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		transition: transform 0.2s ease;
+	}
+
+	.expanded .toggle svg {
+		transform: rotate(90deg);
 	}
 
 	.note {
 		margin-top: 0.15rem;
-		max-width: 44ch;
 		font-size: 0.8rem;
-		line-height: 1.45;
 		color: var(--text-dim);
-		overflow-wrap: anywhere;
 	}
 
 	.where {
@@ -322,15 +299,14 @@
 		align-items: baseline;
 		column-gap: 0.5rem;
 		min-width: 0;
-		padding-top: 0.1rem;
 		font-size: 0.84rem;
 		color: var(--text-muted);
 	}
 
 	.code {
-		font-family: var(--font-mono);
-		font-size: 0.72rem;
-		letter-spacing: 0.04em;
+		font-size: 0.68rem;
+		font-weight: 600;
+		letter-spacing: 0.06em;
 		color: var(--text-dim);
 	}
 
@@ -343,11 +319,7 @@
 
 	.figures {
 		grid-area: figures;
-		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		gap: 0.2rem;
-		padding-top: 0.05rem;
+		text-align: right;
 	}
 
 	.amount {
@@ -355,141 +327,61 @@
 		font-size: 0.95rem;
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
-		color: var(--text);
 	}
 
 	.income {
 		color: var(--green);
 	}
 
-	.fee {
-		font-family: var(--font-mono);
-		font-size: 0.74rem;
-		white-space: nowrap;
-		color: var(--text-dim);
-	}
-
-	.actions {
-		grid-area: actions;
-		display: flex;
-		justify-content: flex-end;
-		gap: 0.15rem;
-		margin-top: -0.25rem;
-	}
-
-	/* Texto, no botones con borde: dos por fila y quince filas eran treinta
-	   cajas compitiendo con los importes. */
-	.action {
-		padding: 0.35rem 0.6rem;
-		border: none;
-		border-radius: 6px;
-		background: transparent;
-		font: inherit;
-		font-size: 0.8rem;
-		color: var(--text-dim);
-		cursor: pointer;
-		transition:
-			background 0.2s ease,
-			color 0.2s ease;
-	}
-
-	.action:hover {
-		background: var(--surface-2);
-		color: var(--text);
-	}
-
-	.action.danger:hover {
-		color: var(--red);
-	}
-
-	/* Los abonos de un grupo, bajo su fila y con la sangría de la columna del día:
-	   la fecha, el importe en la vertical de los demás y sus acciones. */
+	/* Los abonos de un grupo, sangrados bajo su fila con un filete a la izquierda
+	   que dice de quién son. */
 	.credits {
-		margin: 0 1.5rem;
-		padding: 0.35rem 0 0.65rem 3.75rem;
-	}
-
-	.entries > li.credits {
-		border-top-style: dashed;
+		padding: 0 0 0.6rem;
 	}
 
 	.credits ul {
-		display: grid;
-		gap: 0.1rem;
-		margin: 0;
-		padding: 0;
-		list-style: none;
-	}
-
-	.credit {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) 9.5rem 8.5rem;
-		align-items: center;
-		column-gap: 1.25rem;
-		font-size: 0.82rem;
-		color: var(--text-muted);
-	}
-
-	.credit .amount {
-		justify-self: end;
-		font-size: 0.85rem;
-	}
-
-	.credit-actions {
-		display: flex;
-		justify-content: flex-end;
-		gap: 0.15rem;
+		margin-left: calc(0.75rem + 3rem + 0.6rem);
+		border-left: 1px solid var(--border-strong);
 	}
 
 	.pager {
-		padding: 0 1.5rem;
+		margin-top: 0.5rem;
 	}
 
 	.pager .hint {
-		padding-bottom: 1rem;
+		padding: 0 0.75rem 1rem;
 	}
 
-	/* En estrecho el día se queda a la izquierda de todo y el resto se apila:
-	   qué pasó con su importe, dónde, y las acciones. */
-	@media (max-width: 720px) {
-		.month-title {
-			padding: 1rem 1rem 0.2rem;
+	.ledger {
+		--ledger-columns: 3rem minmax(0, 1.35fr) minmax(0, 1fr) 10rem 8.5rem;
+	}
+
+	@media (max-width: 760px) {
+		.ledger {
+			--ledger-columns: 2.5rem minmax(0, 1fr) auto;
 		}
 
 		.entry {
-			grid-template-columns: 2.25rem minmax(0, 1fr) auto;
 			grid-template-areas:
 				'day what figures'
-				'day where where'
-				'day actions actions';
+				'day where where';
 			row-gap: 0.35rem;
 			column-gap: 0.75rem;
-			margin: 0 1rem;
+			padding: 0.85rem 0.25rem;
 		}
 
-		.actions {
-			justify-content: flex-start;
-			margin: 0 0 0 -0.6rem;
+		.month-head {
+			padding: 0 0.25rem 0.6rem;
 		}
 
-		.credits {
-			margin: 0 1rem;
-			padding-left: 3rem;
+		.credits ul {
+			margin-left: 1.25rem;
 		}
+	}
 
-		.credit {
-			grid-template-columns: minmax(0, 1fr) auto;
-			row-gap: 0.1rem;
-		}
-
-		.credit-actions {
-			grid-column: 1 / -1;
-			justify-content: flex-start;
-			margin-left: -0.6rem;
-		}
-
-		.pager {
-			padding: 0 1rem;
+	@media (prefers-reduced-motion: reduce) {
+		.toggle svg {
+			transition: none;
 		}
 	}
 </style>

@@ -31,18 +31,20 @@
 	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
 	import type { CashAccount } from '../cash';
 	import {
-		annualFromNominal,
 		CASH_RATE_FALLBACK,
 		CASH_RECALCULATE_FALLBACK,
 		cashAccountRate,
-		describeCashAccountRate,
 		effectiveAnnualRate,
 		formatAnnualRate,
-		NOMINAL_PERIODS,
 		projectInterest,
 		type CashRate,
 		type RateTier
 	} from '../rates';
+	import { cashRateLines } from '../yield';
+	import CashChoice from './cash-choice.svelte';
+	import CashMoneyInput from './cash-money-input.svelte';
+	import CashRateAdvanced, { type TierRow } from './cash-rate-advanced.svelte';
+	import CashRateProjection from './cash-rate-projection.svelte';
 
 	/** La cuenta cuya tasa se gestiona. */
 	export interface CashRateTarget {
@@ -69,15 +71,6 @@
 		tiers: TierRow[];
 		date: string;
 	}
-
-	/** Una fila de tramo como la escribe el usuario. */
-	interface TierRow {
-		fromBalance: string;
-		annualRatePct: string;
-	}
-
-	/** Los que acepta el backend en una versión. */
-	const MAX_TIERS = 10;
 
 	const today = todayLocalDateString();
 
@@ -134,8 +127,9 @@
 	 */
 	const initial = $derived(initialFields(target, latest));
 	let mode = $derived(initial.mode);
-	let annualRatePct = $derived(initial.annualRatePct);
-	let withholdingPct = $derived(initial.withholdingPct);
+	/* Los campos numéricos entregan un número al escribir y una cadena al abrirse. */
+	let annualRatePct: string | number | null = $derived(initial.annualRatePct);
+	let withholdingPct: string | number | null = $derived(initial.withholdingPct);
 	let posting: Posting = $derived(initial.posting);
 	let tiers: TierRow[] = $derived(initial.tiers);
 	let effectiveFrom = $derived(initial.date);
@@ -144,30 +138,6 @@
 	let recalcFrom = $derived(`${today.slice(0, 7)}-01`);
 	let submitting = $state(false);
 	let error = $state('');
-
-	/*
-	 * Las filas se reemplazan enteras en vez de mutarse: un `$derived`
-	 * reasignable avisa cuando se reasigna, no cuando cambia algo por dentro.
-	 */
-	function setTier(index: number, field: keyof TierRow, value: string) {
-		tiers = tiers.map((tier, i) => (i === index ? { ...tier, [field]: value } : tier));
-	}
-
-	function addTier(annualRatePct = '') {
-		tiers = [...tiers, { fromBalance: '', annualRatePct }];
-	}
-
-	function removeTier(index: number) {
-		tiers = tiers.filter((_, i) => i !== index);
-	}
-
-	/*
-	 * El conversor: lo que dice el folleto de la entidad cuando publica una tasa
-	 * nominal. No se envía — solo rellena el campo de la efectiva anual.
-	 */
-	let nominalPct = $state('');
-	let nominalPeriods = $state(12);
-	const converted = $derived(annualFromNominal(parseFloat(nominalPct) || 0, nominalPeriods));
 
 	/* Cerrar limpia el error: la siguiente apertura no lo arrastra. */
 	function close() {
@@ -238,8 +208,6 @@
 		}
 	});
 
-	const summary = $derived(describeCashAccountRate(status));
-
 	/* Los campos numéricos entregan un número al escribir y una cadena al abrirse. */
 	const rateValue = $derived(parseFloat(String(annualRatePct)) || 0);
 	/* Los tramos que se pueden leer, en orden: una fila a medio escribir no cuenta. */
@@ -274,14 +242,21 @@
 
 	const money = (amount: number) =>
 		privacy.money(formatCurrency(amount, target?.account.currency ?? 'USD'));
+
+	/* La tasa de ahora, en la cabecera: la cifra y lo que la matiza. */
+	const current = $derived(cashRateLines(status, money));
+
+	const title = $derived(
+		target
+			? `${target.account.sourceName || 'Sin plataforma'}, ${target.account.pocketName || `cuenta en ${target.account.currency}`}`
+			: ''
+	);
 </script>
 
 <Modal
 	open={target !== null}
-	title="Rentabilidad de la cuenta"
-	description={target
-		? `${target.account.sourceName || 'Sin plataforma'}${target.account.pocketName ? ` · ${target.account.pocketName}` : ''} · ${target.account.currency}${summary ? ` · ${summary}` : ''}`
-		: ''}
+	title="Tasa de la cuenta"
+	description={title}
 	size="md"
 	onClose={close}
 >
@@ -306,18 +281,26 @@
 				};
 			}}
 		>
+			<!-- Lo que rinde hoy, antes de tocar nada: es lo que se viene a mirar
+			     más veces de las que se viene a cambiar. -->
+			<div class="now" class:earning={current?.earning}>
+				<span class="key" aria-hidden="true"></span>
+				<div>
+					<p class="now-rate">{current?.rate ?? 'Sin tasa todavía'}</p>
+					<p class="now-detail">
+						{#if current?.detail}
+							{current.detail}
+						{:else if !current}
+							Anota la que te paga la entidad y Finexia abonará los intereses solo.
+						{:else}
+							Sobre {money(account.balance)} de saldo
+						{/if}
+					</p>
+				</div>
+			</div>
+
 			{#if latest}
-				<fieldset class="modes">
-					<legend class="field-label">Qué quieres hacer</legend>
-					<div class="options" style:--options={modes.length}>
-						{#each modes as option (option.value)}
-							<label class="option" class:selected={mode === option.value}>
-								<input type="radio" name="rateMode" value={option.value} bind:group={mode} />
-								{option.label}
-							</label>
-						{/each}
-					</div>
-				</fieldset>
+				<CashChoice legend="Qué quieres hacer" options={modes} bind:value={mode} />
 			{/if}
 
 			{#if mode === 'new' || mode === 'recalc'}
@@ -333,180 +316,45 @@
 				<div class="pair">
 					<div class="field">
 						<label for="cash-rate-annual">Tasa efectiva anual</label>
-						<div class="with-unit">
-							<input
-								id="cash-rate-annual"
-								name="annualRatePct"
-								type="number"
-								inputmode="decimal"
-								step="any"
-								min="0"
-								max="100"
-								bind:value={annualRatePct}
-								aria-describedby="cash-rate-annual-unit cash-rate-annual-hint"
-								required
-							/>
-							<span class="unit" id="cash-rate-annual-unit">% E.A.</span>
-						</div>
+						<CashMoneyInput
+							id="cash-rate-annual"
+							name="annualRatePct"
+							unit="% E.A."
+							max="100"
+							size="lg"
+							bind:value={annualRatePct}
+							aria-describedby="cash-rate-annual-hint"
+							required
+						/>
 						<p class="hint" id="cash-rate-annual-hint">
 							La que publica la entidad. Un APY en dólares es la misma cifra.
 						</p>
 					</div>
-					<fieldset class="field posting">
-						<legend class="field-label">Cuándo lo abona</legend>
-						<div class="options" style:--options="2">
-							<label class="option" class:selected={posting === 'daily'}>
-								<input type="radio" name="posting" value="daily" bind:group={posting} />
-								Cada día
-							</label>
-							<label class="option" class:selected={posting === 'monthly'}>
-								<input type="radio" name="posting" value="monthly" bind:group={posting} />
-								Cada mes
-							</label>
-						</div>
-						<p class="hint">
+					<div class="field">
+						<CashChoice
+							legend="Cuándo lo abona"
+							name="posting"
+							options={[
+								{ value: 'daily', label: 'Cada día' },
+								{ value: 'monthly', label: 'Cada mes' }
+							]}
+							bind:value={posting}
+							describedby="cash-rate-posting-hint"
+						/>
+						<p class="hint" id="cash-rate-posting-hint">
 							{posting === 'monthly'
-								? 'Se calcula igual todos los días y se abona todo junto el último día del mes, como hace la entidad.'
+								? 'Se abona todo junto el último día del mes, como hace la entidad.'
 								: 'La cuenta recibe lo que rindió cada día, a la mañana siguiente.'}
 						</p>
-					</fieldset>
+					</div>
 				</div>
 
-				<details class="advanced">
-					<summary>Opciones avanzadas</summary>
-					<div class="advanced-body">
-						<div class="pair">
-							<div class="field">
-								<label for="cash-rate-withholding">
-									Retención <span class="optional">(opcional)</span>
-								</label>
-								<div class="with-unit">
-									<input
-										id="cash-rate-withholding"
-										name="withholdingPct"
-										type="number"
-										inputmode="decimal"
-										step="any"
-										min="0"
-										max="99.99"
-										bind:value={withholdingPct}
-										aria-describedby="cash-rate-withholding-unit cash-rate-withholding-hint"
-									/>
-									<span class="unit" id="cash-rate-withholding-unit">%</span>
-								</div>
-								<p class="hint" id="cash-rate-withholding-hint">
-									Si la entidad te la descuenta, lo que rinde es neto.
-								</p>
-							</div>
-						</div>
-
-						<fieldset class="tiers">
-							<legend class="field-label">
-								Tramos <span class="optional">(opcional)</span>
-							</legend>
-							<p class="hint">
-								Si la entidad paga distinto según el saldo. La tasa de arriba rige desde cero y cada
-								tramo desde el saldo que escribas. Un tramo al 0 % es un tope: desde ahí la cuenta
-								no rinde.
-							</p>
-							{#each tiers as tier, i (i)}
-								<div class="tier-row">
-									<div class="with-unit">
-										<label class="sr-only" for="cash-rate-tier-from-{i}">
-											Desde qué saldo rige el tramo {i + 1}
-										</label>
-										<input
-											id="cash-rate-tier-from-{i}"
-											name="tierFromBalance"
-											type="number"
-											inputmode="decimal"
-											step="any"
-											min="0"
-											placeholder="Desde"
-											value={tier.fromBalance}
-											oninput={(event) => setTier(i, 'fromBalance', event.currentTarget.value)}
-										/>
-										<span class="unit">{account.currency}</span>
-									</div>
-									<div class="with-unit">
-										<label class="sr-only" for="cash-rate-tier-rate-{i}">
-											Tasa efectiva anual del tramo {i + 1}
-										</label>
-										<input
-											id="cash-rate-tier-rate-{i}"
-											name="tierAnnualRatePct"
-											type="number"
-											inputmode="decimal"
-											step="any"
-											min="0"
-											max="100"
-											placeholder="Tasa"
-											value={tier.annualRatePct}
-											oninput={(event) => setTier(i, 'annualRatePct', event.currentTarget.value)}
-										/>
-										<span class="unit">% E.A.</span>
-									</div>
-									<Button type="button" variant="ghost" onclick={() => removeTier(i)}>
-										Quitar<span class="sr-only"> el tramo {i + 1}</span>
-									</Button>
-								</div>
-							{/each}
-							<div class="tier-actions">
-								<Button
-									type="button"
-									variant="ghost"
-									disabled={tiers.length >= MAX_TIERS}
-									onclick={() => addTier()}
-								>
-									Agregar tramo
-								</Button>
-								<Button
-									type="button"
-									variant="ghost"
-									disabled={tiers.length >= MAX_TIERS}
-									onclick={() => addTier('0')}
-								>
-									Agregar tope
-								</Button>
-							</div>
-						</fieldset>
-
-						<div class="converter">
-							<p class="lead">
-								¿La entidad publica una tasa nominal? Escríbela y la pasamos a efectiva anual.
-							</p>
-							<div class="converter-row">
-								<div class="with-unit">
-									<label class="sr-only" for="cash-rate-nominal">Tasa nominal</label>
-									<input
-										id="cash-rate-nominal"
-										type="number"
-										inputmode="decimal"
-										step="any"
-										min="0"
-										placeholder="12"
-										bind:value={nominalPct}
-									/>
-									<span class="unit">% N.A.</span>
-								</div>
-								<label class="sr-only" for="cash-rate-periods">Capitaliza</label>
-								<select id="cash-rate-periods" bind:value={nominalPeriods}>
-									{#each NOMINAL_PERIODS as period (period.value)}
-										<option value={period.value}>{period.label}</option>
-									{/each}
-								</select>
-								<Button
-									type="button"
-									variant="ghost"
-									disabled={converted <= 0}
-									onclick={() => (annualRatePct = String(Number(converted.toFixed(4))))}
-								>
-									{converted > 0 ? `Usar ${formatAnnualRate(converted.toFixed(4))}` : 'Convertir'}
-								</Button>
-							</div>
-						</div>
-					</div>
-				</details>
+				<CashRateAdvanced
+					currency={account.currency}
+					bind:withholdingPct
+					bind:tiers
+					onConvert={(pct) => (annualRatePct = pct)}
+				/>
 			{/if}
 
 			{#if mode === 'new'}
@@ -526,45 +374,17 @@
 				</div>
 			{/if}
 
-			<p class="hint">{hint}</p>
+			<p class="consequence" class:warn={mode === 'delete' || mode === 'recalc'}>{hint}</p>
 
 			{#if projection && (mode === 'new' || mode === 'edit')}
-				<div class="projection" aria-live="polite">
-					{#if rateValue <= 0}
-						<p class="lead">Escribe la tasa para ver cuánto rendiría la cuenta.</p>
-					{:else if account.balance > 0}
-						<p class="lead">
-							{#if blended !== null}
-								Con los tramos, el saldo de hoy, {money(account.balance)}, rinde en conjunto un
-								{formatAnnualRate(Number(blended.toFixed(2)))}, y rendiría
-							{:else}
-								Con el saldo de hoy, {money(account.balance)}, rendiría
-							{/if}
-						</p>
-						<dl>
-							<div>
-								<dt>Al día</dt>
-								<dd>≈ {money(projection.day)}</dd>
-							</div>
-							<div>
-								<dt>En 30 días</dt>
-								<dd>≈ {money(projection.month)}</dd>
-							</div>
-							<div>
-								<dt>En un año</dt>
-								<dd>≈ {money(projection.year)}</dd>
-							</div>
-						</dl>
-					{:else}
-						<p class="lead">Cuando la cuenta tenga saldo, aquí verás cuánto rinde.</p>
-					{/if}
-					<p class="note">
-						Los intereses se calculan cada día sobre el saldo al cierre.
-						{posting === 'monthly'
-							? 'Con abono mensual se guardan hasta el último día del mes y entran todos juntos en un movimiento de intereses.'
-							: 'Se abonan solos a la mañana siguiente, como movimientos de intereses.'}
-					</p>
-				</div>
+				<CashRateProjection
+					balance={account.balance}
+					currency={account.currency}
+					rate={rateValue}
+					{projection}
+					{blended}
+					{posting}
+				/>
 			{/if}
 
 			{#if error}
@@ -574,238 +394,78 @@
 			<div class="modal-actions">
 				<Button type="button" variant="ghost" onclick={close} disabled={submitting}>Cancelar</Button
 				>
-				<Button type="submit" loading={submitting}>{SUBMIT_LABELS[mode]}</Button>
+				<Button
+					type="submit"
+					variant={mode === 'delete' ? 'danger' : 'primary'}
+					loading={submitting}
+				>
+					{SUBMIT_LABELS[mode]}
+				</Button>
 			</div>
 		</form>
 	{/if}
 </Modal>
 
 <style>
-	.modes {
-		margin: 0;
-		padding: 0;
-		border: none;
-	}
-
-	.modes legend {
-		margin-bottom: 0.45rem;
-		padding: 0;
-	}
-
-	.options {
-		display: grid;
-		grid-template-columns: repeat(var(--options, 4), minmax(0, 1fr));
-		gap: 0.5rem;
-	}
-
-	.option {
+	/* La tasa de ahora, con la marca de la fila de la cuenta: verde llena
+	   mientras rinde, un aro gris cuando no. */
+	.now {
 		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 0.6rem 0.5rem;
-		border: 1px solid rgba(212, 145, 42, 0.2);
-		border-radius: 8px;
-		font-size: 0.86rem;
-		text-align: center;
-		color: var(--text-muted);
-		cursor: pointer;
-		transition:
-			border-color 0.2s ease,
-			color 0.2s ease;
-	}
-
-	.option:hover {
-		border-color: rgba(212, 145, 42, 0.35);
-	}
-
-	/* El radio queda para el teclado y el lector; lo que se ve es la etiqueta. */
-	.option input {
-		position: absolute;
-		opacity: 0;
-		pointer-events: none;
-	}
-
-	.option:has(input:focus-visible) {
-		outline: 2px solid var(--amber);
-		outline-offset: 2px;
-	}
-
-	.option.selected {
-		border-color: var(--amber);
-		color: var(--text);
-		background: rgba(212, 145, 42, 0.08);
-	}
-
-	.with-unit {
-		position: relative;
-	}
-
-	/* Sitio a la derecha para la unidad, y sin flechas: suben de uno en uno, que
-	   en una tasa no sirve, y la tapaban. */
-	.with-unit input {
-		padding-right: 4.25rem;
-		appearance: textfield;
-		-moz-appearance: textfield;
-	}
-
-	.with-unit input::-webkit-inner-spin-button,
-	.with-unit input::-webkit-outer-spin-button {
-		-webkit-appearance: none;
-		margin: 0;
-	}
-
-	.unit {
-		position: absolute;
-		top: 50%;
-		right: 0.95rem;
-		transform: translateY(-50%);
-		font-family: var(--font-mono);
-		font-size: 0.78rem;
-		letter-spacing: 0.04em;
-		color: var(--text-dim);
-		pointer-events: none;
-	}
-
-	/* Lo que la entidad rara vez cambia queda plegado: la retención, los tramos y el
-	   conversor de una tasa nominal. */
-	.advanced {
-		border: 1px solid var(--border);
-		border-radius: 10px;
-	}
-
-	.advanced summary {
-		padding: 0.7rem 0.95rem;
-		font-size: 0.84rem;
-		color: var(--text-muted);
-		cursor: pointer;
-	}
-
-	.advanced summary:focus-visible {
-		outline: 2px solid var(--amber);
-		outline-offset: 2px;
-	}
-
-	.advanced-body {
-		display: grid;
-		gap: 0.9rem;
-		padding: 0 0.95rem 0.95rem;
-	}
-
-	.posting {
-		margin: 0;
-		padding: 0;
-		border: none;
-	}
-
-	.posting legend {
-		margin-bottom: 0.45rem;
-		padding: 0;
-	}
-
-	.tiers {
-		display: grid;
-		gap: 0.55rem;
-		margin: 0;
-		padding: 0;
-		border: none;
-	}
-
-	.tiers legend {
-		margin-bottom: 0.45rem;
-		padding: 0;
-	}
-
-	.tier-row {
-		display: grid;
-		grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.tier-actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-	}
-
-	.converter {
-		display: grid;
-		gap: 0.55rem;
-		padding-top: 0.2rem;
-		border-top: 1px solid var(--border);
-	}
-
-	.converter-row {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	/* Lo que rendiría, en verde como los intereses de la lista de movimientos. */
-	.projection {
-		display: grid;
-		gap: 0.65rem;
+		align-items: baseline;
+		gap: 0.7rem;
 		padding: 0.9rem 1rem;
 		border: 1px solid var(--border);
 		border-radius: 10px;
-		background: var(--surface);
+		background: rgba(255, 255, 255, 0.02);
 	}
 
-	.lead {
+	.key {
+		flex-shrink: 0;
+		width: 8px;
+		height: 8px;
+		border: 1.5px solid var(--text-dim);
+		border-radius: 50%;
+		transform: translateY(-0.1rem);
+	}
+
+	.earning .key {
+		border-color: var(--green);
+		background: var(--green);
+	}
+
+	.now p {
 		margin: 0;
-		font-size: 0.84rem;
-		color: var(--text-muted);
 	}
 
-	dl {
-		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-		gap: 0.75rem;
-		margin: 0;
-	}
-
-	dl div {
-		display: grid;
-		gap: 0.15rem;
-		min-width: 0;
-	}
-
-	dt {
-		font-size: 0.74rem;
-		color: var(--text-dim);
-	}
-
-	dd {
-		margin: 0;
+	.now-rate {
 		font-family: var(--font-mono);
-		font-size: 0.95rem;
-		font-variant-numeric: tabular-nums;
-		color: var(--green);
-		overflow-wrap: anywhere;
+		font-size: 1.15rem;
+		color: var(--text);
 	}
 
-	.note {
-		margin: 0;
-		font-size: 0.76rem;
+	.now-detail {
+		margin-top: 0.15rem !important;
+		font-size: 0.8rem;
 		line-height: 1.45;
 		color: var(--text-dim);
 	}
 
-	.feedback {
+	/* Lo que le pasa a la historia de la cuenta con la opción elegida: la línea
+	   que hay que leer antes de guardar, con el filete de los avisos. */
+	.consequence {
 		margin: 0;
+		padding-left: 0.75rem;
+		border-left: 2px solid var(--border-strong);
+		font-size: 0.83rem;
+		line-height: 1.55;
+		color: var(--text-muted);
 	}
 
-	@media (max-width: 640px) {
-		.pair,
-		dl,
-		.converter-row,
-		.tier-row {
-			grid-template-columns: 1fr;
-		}
+	.consequence.warn {
+		border-left-color: rgba(212, 145, 42, 0.55);
+	}
 
-		.options {
-			grid-template-columns: repeat(2, minmax(0, 1fr));
-		}
+	.feedback {
+		margin: 0;
 	}
 </style>

@@ -2,7 +2,6 @@
 	import { resolve } from '$app/paths';
 	import PageHeader from '$lib/ui/page-header.svelte';
 	import Button from '$lib/ui/button.svelte';
-	import Card from '$lib/ui/card.svelte';
 	import EmptyState from '$lib/ui/empty-state.svelte';
 	import CurrencySelect from '$lib/ui/currency-select.svelte';
 	import { todayLocalDateString } from '$lib/shared/format/date';
@@ -17,6 +16,7 @@
 		CashSummary,
 		cashAccountRate,
 		cashYield,
+		cashYieldMap,
 		groupCashAccounts,
 		suggestCashPortfolio,
 		summarizeCash,
@@ -25,18 +25,22 @@
 		type CashFormTarget,
 		type CashMoveTarget,
 		type CashPocketTarget,
-		type CashRateTarget
+		type CashRateTarget,
+		type CashYieldBlock
 	} from '$lib/features/cash';
 	import type { CashPocket } from '$lib/api/types';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
 
+	const today = todayLocalDateString();
+
 	const summary = $derived(summarizeCash(data.balances, data.currency));
-	/* La tasa media del efectivo, sobre las mismas cuentas que suma el total. */
-	const yielding = $derived(
-		cashYield(groupCashAccounts(data.balances), data.rates, todayLocalDateString())
-	);
+	/* Cada cajón por su lado: la tasa media y el mapa miden las mismas cuentas
+	   que suma el total. */
+	const accounts = $derived(groupCashAccounts(data.balances));
+	const yielding = $derived(cashYield(accounts, data.rates, today));
+	const yieldMap = $derived(cashYieldMap(accounts, data.rates, today));
 
 	/* Sin portafolio o sin plataforma no hay saldo sobre el que anotar nada. */
 	const canRecord = $derived(data.portfolios.length > 0 && data.platforms.length > 0);
@@ -82,13 +86,8 @@
 			depositTarget = {
 				mode: 'manage',
 				pocket,
-				rate: cashAccountRate(
-					data.rates,
-					pocket.sourceId,
-					pocket.currency,
-					todayLocalDateString(),
-					pocket.id
-				).latest,
+				rate: cashAccountRate(data.rates, pocket.sourceId, pocket.currency, today, pocket.id)
+					.latest,
 				balance: parseFloat(pocket.balance) || 0
 			};
 
@@ -131,6 +130,19 @@
 			portfolioName: data.portfolios.find((p) => p.id === portfolioId)?.name ?? ''
 		};
 	}
+
+	/* Un bloque del mapa abre lo que rinde su cajón: la ficha si es un depósito,
+	   su tasa si no. Un bloque parado lleva así directo a darle una. */
+	function selectBlock(block: CashYieldBlock) {
+		const account = accounts.find((a) => a.key === block.key);
+		if (!account) return;
+
+		if (block.fixed) {
+			openDeposit(account, data.pockets.find((p) => p.id === account.pocketId) ?? null);
+		} else {
+			rateTarget = { account };
+		}
+	}
 </script>
 
 <svelte:head>
@@ -171,36 +183,34 @@
 {#if data.loadFailed}
 	<p class="feedback error">No pudimos cargar tus saldos. Vuelve a intentarlo en un momento.</p>
 {:else if data.balances.length === 0}
-	<Card variant="elevated" padding="md">
-		<EmptyState
-			title="Todavía no hay efectivo registrado"
-			description="Anota lo que tienes en tu banco, tu bróker o tu billetera. Suma a tu patrimonio, y los intereses que te abonen cuentan como rendimiento."
-		>
-			{#snippet action()}
-				{#if canRecord}
-					<Button type="button" onclick={record}>Registrar el primer depósito</Button>
-				{/if}
-			{/snippet}
-		</EmptyState>
-	</Card>
+	<EmptyState
+		bordered
+		title="Todavía no hay efectivo registrado"
+		description="Anota lo que tienes en tu banco, tu bróker o tu billetera. Suma a tu patrimonio, y los intereses que te abonen cuentan como rendimiento."
+	>
+		{#snippet action()}
+			{#if canRecord}
+				<Button type="button" onclick={record}>Registrar el primer depósito</Button>
+			{/if}
+		{/snippet}
+	</EmptyState>
 {:else}
-	<CashSummary {summary} {yielding} />
+	<CashSummary {summary} {yielding} map={yieldMap} onSelect={selectBlock} />
 
 	<section class="block" aria-labelledby="cash-accounts-title">
 		<h2 id="cash-accounts-title">Cuentas</h2>
-		<Card variant="elevated" padding="none">
-			<CashAccounts
-				balances={data.balances}
-				rates={data.rates}
-				pockets={data.pockets}
-				{showPortfolio}
-				onRecord={(balance) => (target = { mode: 'create', balance })}
-				onRate={(account) => (rateTarget = { account })}
-				onPocket={openPocket}
-				onMove={openMove}
-				onDeposit={openDeposit}
-			/>
-		</Card>
+		<CashAccounts
+			balances={data.balances}
+			rates={data.rates}
+			pockets={data.pockets}
+			{showPortfolio}
+			{today}
+			onRecord={(balance) => (target = { mode: 'create', balance })}
+			onRate={(account) => (rateTarget = { account })}
+			onPocket={openPocket}
+			onMove={openMove}
+			onDeposit={openDeposit}
+		/>
 	</section>
 {/if}
 
@@ -215,14 +225,12 @@
 				<span class="income">intereses</span> sí: suman a tu rentabilidad.
 			</p>
 		</header>
-		<Card variant="elevated" padding="none">
-			<CashMovements
-				movements={data.movements}
-				total={data.movementsTotal}
-				{showPortfolio}
-				onEdit={(movement) => (target = { mode: 'edit', movement })}
-			/>
-		</Card>
+		<CashMovements
+			movements={data.movements}
+			total={data.movementsTotal}
+			{showPortfolio}
+			onEdit={(movement) => (target = { mode: 'edit', movement })}
+		/>
 	</section>
 {/if}
 
@@ -254,29 +262,30 @@
 	}
 
 	.block + .block {
-		margin-top: 3rem;
+		margin-top: 3.5rem;
 	}
 
 	.block h2 {
-		margin: 0 0 0.9rem;
+		margin: 0 0 1rem;
 		font-family: var(--font-display);
-		font-size: 1.35rem;
-		font-weight: 500;
+		font-size: 1.5rem;
+		font-weight: 300;
+		letter-spacing: -0.01em;
 		color: var(--text);
 	}
 
 	.block-head {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: 0 2rem;
+		margin-bottom: 1rem;
+	}
+
+	.block-head h2 {
+		margin-bottom: 0.3rem;
 	}
 
 	.rule {
-		max-width: 52ch;
-		margin: 0 0 0.9rem;
-		font-size: 0.82rem;
+		max-width: 62ch;
+		margin: 0;
+		font-size: 0.84rem;
 		line-height: 1.5;
 		color: var(--text-muted);
 	}

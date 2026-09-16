@@ -1,26 +1,30 @@
 <script lang="ts">
 	/**
-	 * Cuánto efectivo hay, y en qué monedas.
+	 * Cuánto efectivo hay, en qué monedas y cuánto está rindiendo.
 	 *
-	 * El total va en la moneda de la pantalla porque es lo único que se puede
-	 * sumar. Debajo, una barra partida por moneda con la cifra de cada una
-	 * escrita bajo su tramo: el ancho dice cuánto pesa en el total y la cifra,
-	 * cuánto hay en su propia moneda, que es la que coincide con el extracto del
-	 * banco. Un saldo en pesos convertido a dólares es una cifra que el usuario
-	 * no reconoce, así que la convertida va en pequeño.
+	 * A la izquierda, las cifras: el total en la moneda de la pantalla —lo único
+	 * que se puede sumar—, lo que abonaron los intereses este mes y el reparto por
+	 * moneda con el importe de cada una en la suya, que es el que coincide con el
+	 * extracto. A la derecha, el mapa de rendimiento, que es lo que esta pantalla
+	 * tiene que decir y ninguna otra dice: dónde trabaja el dinero y dónde está
+	 * parado.
 	 */
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
 	import type { CashCurrencyTotal, CashSummary } from '../cash';
 	import { formatAnnualRate, type CashYield } from '../rates';
+	import type { CashYieldBlock, CashYieldMap } from '../yield';
+	import CashYieldChart from './cash-yield-chart.svelte';
 
 	interface Props {
 		summary: CashSummary;
 		/** Lo que rinde el efectivo; `null` si no hay ninguna cuenta con dinero. */
 		yielding: CashYield | null;
+		map: CashYieldMap;
+		onSelect: (block: CashYieldBlock) => void;
 	}
 
-	let { summary, yielding }: Props = $props();
+	let { summary, yielding, map, onSelect }: Props = $props();
 
 	const money = (amount: number, currency: string) =>
 		privacy.money(formatCurrency(amount, currency));
@@ -32,285 +36,233 @@
 		summary.byCurrency.length > 1 || summary.byCurrency[0]?.currency !== summary.currency
 	);
 
-	/* Sin tasa una moneda no está en el total, así que tampoco pesa en él. */
 	const share = (group: CashCurrencyTotal) => (summary.total > 0 ? group.value / summary.total : 0);
 
+	/* Sin tasa de cambio una moneda no está en el total, así que tampoco pesa en él. */
 	const unrated = (group: CashCurrencyTotal) => !group.value && group.balance !== 0;
 
-	/*
-	 * Cada tramo ocupa lo que pesa, con un mínimo para que su cifra quepa debajo:
-	 * una moneda con el 2 % sigue siendo dinero que el usuario tiene que ver.
-	 */
-	const columns = $derived(
-		summary.byCurrency
-			.map((group) => `minmax(8.5rem, ${Math.max(share(group) * 100, 6).toFixed(2)}fr)`)
-			.join(' ')
-	);
+	/* La frase que encabeza el mapa: la media y, si lo hay, lo que no rinde. */
+	const headline = $derived.by(() => {
+		if (!yielding) return '';
+		if (yielding.pct <= 0)
+			return 'Ninguna cuenta con saldo tiene tasa: todo tu efectivo está parado.';
 
-	/* De la moneda que más pesa a la que menos, el ámbar se va apagando. */
-	function tint(index: number): number {
-		const count = summary.byCurrency.length;
-		return count <= 1 ? 1 : 1 - (index / (count - 1)) * 0.6;
-	}
+		const average = `Rinde ${formatAnnualRate(yielding.pct.toFixed(2))} de media`;
+		if (yielding.idle === 0) return `${average}, y no hay dinero parado.`;
+		return `${average}, con ${yielding.idle} ${yielding.idle === 1 ? 'cuenta parada' : 'cuentas paradas'}.`;
+	});
 </script>
 
 <section class="summary" aria-labelledby="cash-total">
-	<p class="total" id="cash-total">
-		<span class="amount">{money(summary.total, summary.currency)}</span>
-		<span class="caption">
-			en efectivo, en {summary.funded}
-			{summary.funded === 1 ? 'cuenta con saldo' : 'cuentas con saldo'}
-		</span>
-		{#if summary.interestThisMonth > 0}
-			<!-- La parte de la cifra que es rendimiento, en el verde de los intereses. -->
-			<span class="caption" style:color="var(--green)">
-				+{money(summary.interestThisMonth, summary.currency)} en intereses este mes
-			</span>
-		{/if}
-		<!-- Lo que rinde el dinero que rinde, y cuánto está parado: es el dato que
-		     dice si vale la pena mover algo. -->
-		{#if yielding}
+	<div class="figures">
+		<p class="total" id="cash-total">
+			<span class="amount">{money(summary.total, summary.currency)}</span>
 			<span class="caption">
-				{#if yielding.pct > 0}
-					{formatAnnualRate(yielding.pct.toFixed(2))} de media
-					{#if yielding.idle > 0}
-						· {yielding.idle}
-						{yielding.idle === 1 ? 'cuenta sin tasa' : 'cuentas sin tasa'}
-					{/if}
-				{:else}
-					Ninguna cuenta con saldo tiene tasa
-				{/if}
+				en efectivo, entre {summary.funded}
+				{summary.funded === 1 ? 'cuenta con saldo' : 'cuentas con saldo'}
 			</span>
-		{/if}
-	</p>
-
-	{#if showCurrencies}
-		<ul class="currencies" style:--columns={columns} aria-label="Efectivo por moneda">
-			{#each summary.byCurrency as group, index (group.currency)}
-				<li
-					class:unrated={unrated(group)}
-					style:--tint={tint(index)}
-					style:--share={share(group)}
-					style:--index={index}
-				>
-					<span class="bar" aria-hidden="true"></span>
-					<span class="code">{group.currency}</span>
-					<span class="native">{money(group.balance, group.currency)}</span>
-					{#if unrated(group)}
-						<span class="detail">Sin tasa a {summary.currency}, fuera del total</span>
-					{:else}
-						<span class="detail">
-							{percent.format(share(group))} del total
-							{#if group.currency !== summary.currency}
-								<span class="converted">≈ {money(group.value, summary.currency)}</span>
-							{/if}
-						</span>
-					{/if}
-				</li>
-			{/each}
-		</ul>
-	{/if}
-
-	{#if summary.unconverted > 0}
-		<p class="fx-note">
-			{summary.unconverted}
-			{summary.unconverted === 1 ? 'cuenta no tiene' : 'cuentas no tienen'} tasa de cambio a {summary.currency}
-			y {summary.unconverted === 1 ? 'queda' : 'quedan'} fuera del total; {summary.unconverted === 1
-				? 'aparece'
-				: 'aparecen'} abajo en su propia moneda.
 		</p>
+
+		{#if summary.interestThisMonth > 0}
+			<p class="earned">
+				<span class="earned-amount">+{money(summary.interestThisMonth, summary.currency)}</span>
+				en intereses este mes
+			</p>
+		{/if}
+
+		{#if showCurrencies}
+			<dl class="currencies" aria-label="Efectivo por moneda">
+				{#each summary.byCurrency as group (group.currency)}
+					<div class="currency" class:unrated={unrated(group)}>
+						<dt>{group.currency}</dt>
+						<dd class="native">{money(group.balance, group.currency)}</dd>
+						<dd class="weight">
+							{#if unrated(group)}
+								fuera del total
+							{:else}
+								{percent.format(share(group))}
+							{/if}
+						</dd>
+					</div>
+				{/each}
+			</dl>
+		{/if}
+
+		{#if summary.unconverted > 0}
+			<p class="feedback warning fx-note">
+				{summary.unconverted}
+				{summary.unconverted === 1 ? 'cuenta no tiene' : 'cuentas no tienen'} tasa de cambio a {summary.currency}:
+				{summary.unconverted === 1 ? 'queda' : 'quedan'} fuera del total y del mapa, y {summary.unconverted ===
+				1
+					? 'aparece'
+					: 'aparecen'} abajo en su propia moneda.
+			</p>
+		{/if}
+	</div>
+
+	{#if map.blocks.length > 0}
+		<figure class="yield" aria-labelledby="cash-yield-headline" aria-describedby="cash-yield-how">
+			<figcaption>
+				<p class="headline" id="cash-yield-headline">{headline}</p>
+				<p class="how" id="cash-yield-how">
+					Cada bloque es una cuenta: el ancho es cuánto dinero guarda y la altura, a qué tasa rinde.
+				</p>
+			</figcaption>
+			<CashYieldChart {map} average={yielding?.pct ?? 0} {onSelect} />
+		</figure>
 	{/if}
 </section>
 
 <style>
 	.summary {
-		margin-bottom: 2.75rem;
-	}
-
-	.total {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 0.35rem 0.9rem;
-		margin: 0;
-	}
-
-	/* Cifras proporcionales a este tamaño, como el patrimonio del resumen: las
-	   tabulares dejan cada dígito con el ancho de un cero y el número se suelta. */
-	.amount {
-		font-family: var(--font-mono);
-		font-size: clamp(2.25rem, 5.5vw, 3.25rem);
-		font-weight: 500;
-		line-height: 1;
-		letter-spacing: -0.035em;
-		color: var(--text);
-		overflow-wrap: anywhere;
-	}
-
-	.caption {
-		font-size: 0.95rem;
-		font-weight: 300;
-		color: var(--text-muted);
-	}
-
-	/*
-	 * La barra y su leyenda son la misma rejilla: cada moneda es una columna con
-	 * su tramo arriba y sus cifras debajo, así que la cifra no puede separarse
-	 * del tramo que describe.
-	 */
-	.currencies {
 		display: grid;
-		grid-template-columns: var(--columns);
-		column-gap: 3px;
-		margin: 1.75rem 0 0;
-		padding: 0;
-		list-style: none;
+		grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
+		align-items: start;
+		gap: 2.5rem 4rem;
+		margin-bottom: 3.5rem;
 	}
 
-	.currencies li {
+	.figures {
 		display: flex;
 		flex-direction: column;
 		min-width: 0;
 	}
 
-	.bar {
-		height: 12px;
-		margin-bottom: 0.85rem;
-		background: var(--amber);
-		opacity: var(--tint);
+	.total {
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+		margin: 0;
 	}
 
-	.currencies li:first-child .bar {
-		border-radius: 3px 0 0 3px;
-	}
-
-	.currencies li:last-child .bar {
-		border-radius: 0 3px 3px 0;
-	}
-
-	/* Una moneda sin tasa no tiene peso que pintar: su tramo es un hueco con
-	   borde, del ancho mínimo, para que se vea que existe pero no cuenta. */
-	.unrated .bar {
-		background: transparent;
-		border: 1px dashed var(--text-dim);
-		opacity: 1;
-	}
-
-	.code {
+	/* La letra de las cifras del panel, como el patrimonio del resumen, a un
+	   tamaño que deja sitio al mapa en la misma fila. */
+	.amount {
 		font-family: var(--font-mono);
-		font-size: 0.74rem;
-		font-weight: 600;
-		letter-spacing: 0.04em;
+		font-size: clamp(2.1rem, 4.2vw, 2.9rem);
+		font-weight: 500;
+		line-height: 1;
+		letter-spacing: -0.04em;
+		color: var(--text);
+		overflow-wrap: anywhere;
+	}
+
+	.caption {
+		font-size: 0.9rem;
+		font-weight: 300;
 		color: var(--text-muted);
 	}
 
-	.native {
-		margin-top: 0.2rem;
-		padding-right: 0.75rem;
+	.earned {
+		margin: 0.35rem 0 0;
+		font-size: 0.9rem;
+		font-weight: 300;
+		color: var(--text-muted);
+	}
+
+	.earned-amount {
 		font-family: var(--font-mono);
-		font-size: 1.05rem;
+		font-weight: 400;
+		color: var(--green);
+	}
+
+	/*
+	 * El reparto por moneda es una tabla corta: el código, lo que hay en su
+	 * propia moneda y lo que pesa en el total, cada columna en su vertical para
+	 * que las cifras se comparen sin buscarlas.
+	 */
+	.currencies {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr) auto;
+		column-gap: 1rem;
+		margin: 1.75rem 0 0;
+		border-top: 1px solid var(--border);
+	}
+
+	.currency {
+		display: grid;
+		grid-template-columns: subgrid;
+		grid-column: 1 / -1;
+		align-items: baseline;
+		padding: 0.55rem 0;
+		border-bottom: 1px solid var(--border);
+	}
+
+	dt {
+		font-size: 0.74rem;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+		color: var(--text-muted);
+	}
+
+	dd {
+		margin: 0;
+	}
+
+	.native {
+		font-family: var(--font-mono);
+		font-size: 0.92rem;
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 		color: var(--text);
 	}
 
-	.detail {
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
-		margin-top: 0.3rem;
-		padding-right: 0.75rem;
+	.weight {
+		justify-self: end;
+		font-family: var(--font-mono);
 		font-size: 0.78rem;
+		font-variant-numeric: tabular-nums;
 		color: var(--text-dim);
 	}
 
-	.converted {
-		font-family: var(--font-mono);
-		font-size: 0.74rem;
-		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
-	}
-
-	/* El único movimiento de la pantalla: la barra se dibuja una vez al entrar,
-	   tramo a tramo, y lleva la vista al reparto antes que a las cuentas. */
-	@media (prefers-reduced-motion: no-preference) {
-		.bar {
-			transform-origin: left center;
-			animation: draw 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-			animation-delay: calc(var(--index) * 90ms);
-		}
-	}
-
-	@keyframes draw {
-		from {
-			transform: scaleX(0);
-		}
-		to {
-			transform: scaleX(1);
-		}
-	}
-
-	.fx-note {
-		max-width: 62ch;
-		margin: 1.25rem 0 0;
-		padding-left: 0.75rem;
-		border-left: 2px solid rgba(212, 145, 42, 0.45);
-		font-size: 0.8rem;
-		line-height: 1.5;
+	.unrated .native {
 		color: var(--text-muted);
 	}
 
-	/*
-	 * En estrecho las columnas no caben: cada moneda es una fila, con su tramo
-	 * medido contra el ancho entero en vez de repartido.
-	 */
-	@media (max-width: 640px) {
-		.currencies {
+	.unrated .weight {
+		font-family: var(--font-body);
+	}
+
+	.fx-note {
+		margin: 1.1rem 0 0;
+	}
+
+	.yield {
+		min-width: 0;
+		margin: 0;
+	}
+
+	figcaption {
+		margin-bottom: 1.6rem;
+	}
+
+	.headline {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: 1.3rem;
+		font-weight: 300;
+		line-height: 1.3;
+		letter-spacing: -0.01em;
+		color: var(--text);
+		text-wrap: balance;
+	}
+
+	.how {
+		max-width: 60ch;
+		margin: 0.35rem 0 0;
+		font-size: 0.8rem;
+		line-height: 1.5;
+		color: var(--text-dim);
+	}
+
+	@media (max-width: 960px) {
+		.summary {
 			grid-template-columns: minmax(0, 1fr);
-			row-gap: 1.1rem;
+			gap: 2.5rem;
 		}
 
-		.currencies li {
-			display: grid;
-			grid-template-columns: auto minmax(0, 1fr);
-			grid-template-areas:
-				'code native'
-				'bar bar'
-				'detail detail';
-			align-items: baseline;
-			column-gap: 0.6rem;
-		}
-
-		.code {
-			grid-area: code;
-		}
-
-		.native {
-			grid-area: native;
-			margin: 0;
-		}
-
-		.bar {
-			grid-area: bar;
-			width: max(calc(var(--share) * 100%), 6px);
-			height: 8px;
-			margin: 0.45rem 0 0;
-		}
-
-		.unrated .bar {
-			width: 2.5rem;
-		}
-
-		.currencies li:first-child .bar,
-		.currencies li:last-child .bar {
-			border-radius: 2px;
-		}
-
-		.detail {
-			grid-area: detail;
-			flex-direction: row;
-			flex-wrap: wrap;
-			gap: 0 0.6rem;
+		.currencies {
+			max-width: 26rem;
 		}
 	}
 </style>

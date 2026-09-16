@@ -22,6 +22,8 @@
 	import Button from '$lib/ui/button.svelte';
 	import Modal from '$lib/ui/modal.svelte';
 	import DatePicker from '$lib/ui/date-picker.svelte';
+	import { privacy } from '$lib/shared/privacy.svelte';
+	import { formatCurrency } from '$lib/shared/format/money';
 	import { SUPPORTED_CURRENCIES } from '$lib/shared/currency';
 	import { todayLocalDateString } from '$lib/shared/format/date';
 	import {
@@ -33,6 +35,8 @@
 		type CashMovement
 	} from '../cash';
 	import type { CashPocket } from '$lib/api/types';
+	import CashChoice from './cash-choice.svelte';
+	import CashMoneyInput from './cash-money-input.svelte';
 
 	/** Lo que abre el formulario: un alta (quizá sobre un saldo) o una edición. */
 	export type CashFormTarget =
@@ -150,6 +154,34 @@
 
 	/* Con un solo portafolio no hay nada que elegir ni que nombrar. */
 	const choosePortfolio = $derived(portfolios.length > 1);
+
+	/* Lo que dice cada tecla bajo su nombre: hacia dónde va el dinero. */
+	const KIND_DETAILS: Record<CashKind, string> = {
+		deposit: 'Entra en la cuenta',
+		withdrawal: 'Sale de la cuenta',
+		interest: 'Lo que rindió'
+	};
+
+	const kinds = CASH_KIND_OPTIONS.map((o) => ({
+		value: o.value,
+		label: o.label,
+		detail: KIND_DETAILS[o.value]
+	}));
+
+	/*
+	 * Lo que guarda ahora el saldo elegido —plataforma, moneda y cajón—, para
+	 * anotar un retiro sabiendo cuánto hay. `null` si todavía no existe: el
+	 * primer depósito la abre.
+	 */
+	const held = $derived.by(() => {
+		const rows = balances.filter(
+			(b) =>
+				b.sourceId === sourceId && b.currency === currencyCode && (b.pocketId ?? '') === pocketId
+		);
+		return rows.length === 0
+			? null
+			: rows.reduce((sum, b) => sum + (parseFloat(b.balance) || 0), 0);
+	});
 </script>
 
 <Modal
@@ -183,147 +215,130 @@
 				<input type="hidden" name="id" value={editing.id} />
 			{/if}
 
-			<fieldset class="kinds">
-				<legend class="field-label">Qué pasó</legend>
-				<div class="options">
-					{#each CASH_KIND_OPTIONS as option (option.value)}
-						<label class="option" class:selected={kind === option.value}>
-							<input type="radio" name="kind" value={option.value} bind:group={kind} />
-							{option.label}
-						</label>
-					{/each}
-				</div>
-				<p class="hint">{hint}</p>
-			</fieldset>
+			<div class="field">
+				<CashChoice
+					legend="Qué pasó"
+					name="kind"
+					options={kinds}
+					bind:value={kind}
+					describedby="cash-kind-hint"
+				/>
+				<p class="hint" id="cash-kind-hint">{hint}</p>
+			</div>
 
 			<!-- La cuenta: plataforma y moneda van juntas porque juntas dicen dónde
 			     está el dinero. Al editar ya está decidida y la nombra la cabecera. -->
 			{#if !editing}
-				<div class="pair">
-					<div class="field">
-						<label for="cash-source">Plataforma</label>
-						<select
-							id="cash-source"
-							name="sourceId"
-							bind:value={() => sourceId, (source) => chooseAccount(source, currencyCode)}
-							required
-						>
-							{#each platforms as platform (platform.id)}
-								<option value={platform.id}>{platform.name}</option>
-							{/each}
-						</select>
+				<div class="account">
+					<div class="pair">
+						<div class="field">
+							<label for="cash-source">Plataforma</label>
+							<select
+								id="cash-source"
+								name="sourceId"
+								bind:value={() => sourceId, (source) => chooseAccount(source, currencyCode)}
+								required
+							>
+								{#each platforms as platform (platform.id)}
+									<option value={platform.id}>{platform.name}</option>
+								{/each}
+							</select>
+						</div>
+						<div class="field">
+							<label for="cash-currency">Moneda</label>
+							<select
+								id="cash-currency"
+								name="currency"
+								bind:value={() => currencyCode, (code) => chooseAccount(sourceId, code)}
+								required
+							>
+								{#each SUPPORTED_CURRENCIES as code (code)}
+									<option value={code}>{code}</option>
+								{/each}
+							</select>
+						</div>
 					</div>
-					<div class="field">
-						<label for="cash-currency">Moneda</label>
-						<select
-							id="cash-currency"
-							name="currency"
-							bind:value={() => currencyCode, (code) => chooseAccount(sourceId, code)}
-							required
-						>
-							{#each SUPPORTED_CURRENCIES as code (code)}
-								<option value={code}>{code}</option>
-							{/each}
-						</select>
-					</div>
-				</div>
 
-				<!-- Solo cuando la cuenta tiene cajitas. Por defecto la principal, que
-				     es donde cae todo mientras no haya ninguna. -->
-				{#if accountPockets.length > 0}
-					<div class="field">
-						<label for="cash-pocket">Bolsillo</label>
-						<select id="cash-pocket" name="pocketId" bind:value={pocketId}>
-							<option value="">Cuenta principal</option>
-							{#each accountPockets as pocket (pocket.id)}
-								<option value={pocket.id}>{pocket.name}</option>
-							{/each}
-						</select>
-						<p class="hint">
-							El dinero sigue contando en la plataforma; el bolsillo solo dice en qué cajita está y
-							a qué tasa rinde.
-						</p>
-					</div>
-				{/if}
+					<!-- Solo cuando la cuenta tiene cajitas. Por defecto la principal, que
+					     es donde cae todo mientras no haya ninguna. -->
+					{#if accountPockets.length > 0}
+						<div class="field">
+							<label for="cash-pocket">Bolsillo</label>
+							<select id="cash-pocket" name="pocketId" bind:value={pocketId}>
+								<option value="">Cuenta principal</option>
+								{#each accountPockets as pocket (pocket.id)}
+									<option value={pocket.id}>{pocket.name}</option>
+								{/each}
+							</select>
+						</div>
+					{/if}
+
+					<p class="held" aria-live="polite">
+						{#if held === null}
+							Cuenta nueva: este movimiento la abre.
+						{:else}
+							Ahora guarda <strong>{privacy.money(formatCurrency(held, currencyCode))}</strong>
+						{/if}
+					</p>
+				</div>
 			{/if}
 
 			<!--
-				Los dos importes juntos, con la moneda escrita dentro. Al editar no hay
-				selector que la diga, y como texto suelto en media columna no se
-				alineaba con nada. La comisión se descuenta de la misma cuenta, así
-				que lleva la misma moneda.
-
-				Con intereses la comisión desaparece pero el importe no se ensancha:
-				cambiar de tipo no mueve el campo que se está escribiendo.
+				El importe es la cifra que manda: a lo ancho y en la letra de las
+				cifras. La comisión se descuenta de la misma cuenta, así que lleva la
+				misma moneda; con intereses desaparece, porque se anotan netos.
 			-->
-			<div class="pair">
-				<div class="field">
-					<label for="cash-amount">Importe</label>
-					<div class="with-unit">
-						<input
-							id="cash-amount"
-							name="amount"
-							type="number"
-							inputmode="decimal"
-							step="any"
-							min="0"
-							bind:value={amount}
-							aria-describedby="cash-amount-unit"
-							required
-						/>
-						<span class="unit" id="cash-amount-unit">{currencyCode}</span>
-					</div>
-				</div>
-				{#if kind !== 'interest'}
-					<div class="field">
-						<label for="cash-fees">Comisión <span class="optional">(opcional)</span></label>
-						<div class="with-unit">
-							<input
-								id="cash-fees"
-								name="fees"
-								type="number"
-								inputmode="decimal"
-								step="any"
-								min="0"
-								bind:value={fees}
-								aria-describedby="cash-fees-unit"
-							/>
-							<span class="unit" id="cash-fees-unit">{currencyCode}</span>
-						</div>
-					</div>
-				{/if}
+			<div class="field">
+				<label for="cash-amount">Importe</label>
+				<CashMoneyInput
+					id="cash-amount"
+					name="amount"
+					unit={currencyCode}
+					size="lg"
+					bind:value={amount}
+					required
+				/>
 			</div>
 
-			<!-- Fila propia: día, mes y año no caben en media columna, y el año se
-			     montaba sobre la comisión. -->
+			{#if kind !== 'interest' || (!editing && choosePortfolio)}
+				<div class="pair">
+					{#if kind !== 'interest'}
+						<div class="field">
+							<label for="cash-fees">Comisión <span class="optional">(opcional)</span></label>
+							<CashMoneyInput id="cash-fees" name="fees" unit={currencyCode} bind:value={fees} />
+						</div>
+					{/if}
+					{#if !editing && choosePortfolio}
+						<div class="field">
+							<label for="cash-portfolio">Portafolio</label>
+							<select
+								id="cash-portfolio"
+								name="portfolioId"
+								bind:value={portfolioId}
+								aria-describedby="cash-portfolio-hint"
+								required
+							>
+								{#each portfolios as portfolio (portfolio.id)}
+									<option value={portfolio.id}>{portfolio.name}</option>
+								{/each}
+							</select>
+						</div>
+					{/if}
+				</div>
+			{/if}
+			{#if !editing && choosePortfolio}
+				<p class="hint portfolio-hint" id="cash-portfolio-hint">
+					El portafolio dice en cuál suma este dinero. No cambia dónde está: sigue en la plataforma.
+				</p>
+			{:else if !editing}
+				<input type="hidden" name="portfolioId" value={portfolioId} />
+			{/if}
+
+			<!-- Fila propia: día, mes y año no caben en media columna. -->
 			<div class="field">
 				<span class="field-label">Fecha</span>
 				<DatePicker name="date" bind:value={date} required />
 			</div>
-
-			{#if !editing}
-				{#if choosePortfolio}
-					<div class="field">
-						<label for="cash-portfolio">Portafolio</label>
-						<select
-							id="cash-portfolio"
-							name="portfolioId"
-							bind:value={portfolioId}
-							aria-describedby="cash-portfolio-hint"
-							required
-						>
-							{#each portfolios as portfolio (portfolio.id)}
-								<option value={portfolio.id}>{portfolio.name}</option>
-							{/each}
-						</select>
-						<p class="hint" id="cash-portfolio-hint">
-							En cuál suma este dinero. No cambia dónde está: sigue en la plataforma.
-						</p>
-					</div>
-				{:else}
-					<input type="hidden" name="portfolioId" value={portfolioId} />
-				{/if}
-			{/if}
 
 			<div class="field">
 				<label for="cash-notes">Nota <span class="optional">(opcional)</span></label>
@@ -347,98 +362,34 @@
 </Modal>
 
 <style>
-	.kinds {
-		margin: 0;
-		padding: 0;
-		border: none;
-	}
-
-	.kinds legend {
-		margin-bottom: 0.45rem;
-		padding: 0;
-	}
-
-	.options {
+	/* La cuenta elegida, con lo que guarda, como un bloque: plataforma, moneda y
+	   cajón son una sola respuesta a «dónde». */
+	.account {
 		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-		gap: 0.5rem;
-		margin-bottom: 0.55rem;
+		gap: 0.9rem;
+		padding: 1rem;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		background: rgba(255, 255, 255, 0.02);
 	}
 
-	.option {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 0.65rem 0.5rem;
-		border: 1px solid rgba(212, 145, 42, 0.2);
-		border-radius: 8px;
-		font-size: 0.88rem;
-		color: var(--text-muted);
-		cursor: pointer;
-		transition:
-			border-color 0.2s ease,
-			color 0.2s ease;
-	}
-
-	.option:hover {
-		border-color: rgba(212, 145, 42, 0.35);
-	}
-
-	/* El radio queda para el teclado y el lector; lo que se ve es la etiqueta. */
-	.option input {
-		position: absolute;
-		opacity: 0;
-		pointer-events: none;
-	}
-
-	.option:has(input:focus-visible) {
-		outline: 2px solid var(--amber);
-		outline-offset: 2px;
-	}
-
-	.option.selected {
-		border-color: var(--amber);
-		color: var(--text);
-		background: rgba(212, 145, 42, 0.08);
-	}
-
-	.with-unit {
-		position: relative;
-	}
-
-	/* Sitio a la derecha para la moneda. Sin flechas de número: con `step="any"`
-	   suben de uno en uno, que en un importe no sirve, y tapaban la moneda. */
-	.with-unit input {
-		padding-right: 3.75rem;
-		appearance: textfield;
-		-moz-appearance: textfield;
-	}
-
-	.with-unit input::-webkit-inner-spin-button,
-	.with-unit input::-webkit-outer-spin-button {
-		-webkit-appearance: none;
+	.held {
 		margin: 0;
+		font-size: 0.82rem;
+		color: var(--text-muted);
 	}
 
-	.unit {
-		position: absolute;
-		top: 50%;
-		right: 0.95rem;
-		transform: translateY(-50%);
+	.held strong {
 		font-family: var(--font-mono);
-		font-size: 0.78rem;
-		letter-spacing: 0.04em;
-		color: var(--text-dim);
-		pointer-events: none;
+		font-weight: 400;
+		color: var(--text);
+	}
+
+	.portfolio-hint {
+		margin-top: -0.85rem;
 	}
 
 	.feedback {
 		margin: 0;
-	}
-
-	@media (max-width: 640px) {
-		.pair {
-			grid-template-columns: 1fr;
-		}
 	}
 </style>

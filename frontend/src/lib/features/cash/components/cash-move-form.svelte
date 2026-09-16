@@ -22,6 +22,7 @@
 	import { todayLocalDateString } from '$lib/shared/format/date';
 	import type { CashPocket } from '$lib/api/types';
 	import type { CashAccount } from '../cash';
+	import CashMoneyInput from './cash-money-input.svelte';
 
 	/** La cuenta cuyos saldos se mueven, y de qué cajón sale por defecto. */
 	export interface CashMoveTarget {
@@ -78,6 +79,12 @@
 		if (to === id) to = '';
 	}
 
+	/* Darle la vuelta: lo que era el destino pasa a ser el origen. */
+	function swap() {
+		if (to === '') return;
+		[from, to] = [to, from];
+	}
+
 	function close() {
 		error = '';
 		amount = '';
@@ -102,13 +109,15 @@
 
 	const money = (value: number) =>
 		privacy.money(formatCurrency(value, target?.account.currency ?? 'USD'));
+
+	const fromName = $derived(drawers.find((d) => d.id === from)?.name ?? '');
 </script>
 
 <Modal
 	open={target !== null}
 	title="Mover dinero"
 	description={target
-		? `${target.account.sourceName || 'Sin plataforma'} · ${target.account.currency} · ${target.portfolioName}`
+		? `Entre los cajones de ${target.account.sourceName || 'Sin plataforma'} en ${target.account.currency}, dentro de ${target.portfolioName}.`
 		: ''}
 	size="sm"
 	onClose={close}
@@ -135,7 +144,9 @@
 			<input type="hidden" name="sourceId" value={target.account.sourceId} />
 			<input type="hidden" name="currency" value={target.account.currency} />
 
-			<div class="pair">
+			<!-- De dónde sale y a dónde va, uno encima del otro como el trayecto que
+			     son, con la vuelta a mano entre los dos. -->
+			<div class="route">
 				<div class="field">
 					<label for="cash-move-from">De</label>
 					<select id="cash-move-from" name="fromPocketId" bind:value={() => from, chooseOrigin}>
@@ -144,6 +155,17 @@
 						{/each}
 					</select>
 				</div>
+				<button
+					type="button"
+					class="swap"
+					onclick={swap}
+					disabled={to === ''}
+					aria-label="Intercambiar origen y destino"
+				>
+					<svg viewBox="0 0 16 16" aria-hidden="true">
+						<path d="M5.5 2.5v11M3 11l2.5 2.5L8 11M10.5 13.5v-11M8 5l2.5-2.5L13 5" />
+					</svg>
+				</button>
 				<div class="field">
 					<label for="cash-move-to">A</label>
 					<select id="cash-move-to" name="toPocketId" bind:value={to} required>
@@ -157,24 +179,25 @@
 
 			<div class="field">
 				<label for="cash-move-amount">Importe</label>
-				<div class="with-unit">
-					<input
-						id="cash-move-amount"
-						name="amount"
-						type="number"
-						inputmode="decimal"
-						step="any"
-						min="0"
-						bind:value={amount}
-						required
-						aria-describedby="cash-move-amount-hint"
-					/>
-					<span class="unit">{target.account.currency}</span>
+				<CashMoneyInput
+					id="cash-move-amount"
+					name="amount"
+					unit={target.account.currency}
+					size="lg"
+					bind:value={amount}
+					required
+					aria-describedby="cash-move-amount-hint"
+				/>
+				<div class="available">
+					<p class="hint" id="cash-move-amount-hint">
+						En {fromName} hay <strong>{money(available)}</strong>.
+					</p>
+					{#if available > 0}
+						<button type="button" class="all" onclick={() => (amount = String(available))}>
+							Mover todo
+						</button>
+					{/if}
 				</div>
-				<p class="hint" id="cash-move-amount-hint">
-					Ahí hay {money(available)}. El dinero sigue en la misma plataforma, así que tu
-					rentabilidad no se mueve: solo cambia a qué tasa rinde.
-				</p>
 			</div>
 
 			<div class="field">
@@ -194,59 +217,105 @@
 				/>
 			</div>
 
+			<p class="hint rule">
+				El dinero sigue en la misma plataforma, así que tu rentabilidad no se mueve: solo cambia a
+				qué tasa rinde.
+			</p>
+
 			{#if error}
 				<p class="feedback error">{error}</p>
 			{/if}
 
-			<div class="actions">
+			<div class="modal-actions">
 				<Button type="button" variant="ghost" onclick={close}>Cancelar</Button>
-				<Button type="submit" disabled={submitting || to === ''}>Mover</Button>
+				<Button type="submit" loading={submitting} disabled={to === ''}>Mover dinero</Button>
 			</div>
 		</form>
 	{/if}
 </Modal>
 
 <style>
-	.pair {
+	.route {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.9rem;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 0.35rem;
+		padding: 1rem;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		background: rgba(255, 255, 255, 0.02);
 	}
 
-	.with-unit {
-		position: relative;
+	.swap {
+		justify-self: center;
+		display: grid;
+		place-items: center;
+		width: 2.25rem;
+		height: 2.25rem;
+		margin: 0.1rem 0 -0.3rem;
+		padding: 0;
+		border: 1px solid var(--border-strong);
+		border-radius: 50%;
+		background: var(--bg);
+		color: var(--text-muted);
+		cursor: pointer;
+	}
+
+	.swap:hover:not(:disabled) {
+		border-color: var(--amber);
+		color: var(--amber-light);
+	}
+
+	.swap:disabled {
+		cursor: default;
+		opacity: 0.45;
+	}
+
+	.swap svg {
+		width: 0.95rem;
+		height: 0.95rem;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.5;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+
+	.available {
 		display: flex;
-		align-items: center;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.25rem 1rem;
 	}
 
-	.with-unit input {
-		width: 100%;
-		padding-right: 3.4rem;
-	}
-
-	.unit {
-		position: absolute;
-		right: 0.85rem;
-		font-size: 0.78rem;
-		color: var(--text-dim);
-		pointer-events: none;
-	}
-
-	.optional {
-		color: var(--text-dim);
+	.available strong {
+		font-family: var(--font-mono);
 		font-weight: 400;
+		color: var(--text);
 	}
 
-	.actions {
-		display: flex;
-		justify-content: flex-end;
-		gap: 0.6rem;
-		margin-top: 0.4rem;
+	.all {
+		padding: 0.2rem 0.5rem;
+		border: none;
+		border-radius: 6px;
+		background: transparent;
+		font: inherit;
+		font-size: 0.8rem;
+		color: var(--amber);
+		cursor: pointer;
 	}
 
-	@media (max-width: 520px) {
-		.pair {
-			grid-template-columns: 1fr;
-		}
+	.all:hover {
+		background: rgba(212, 145, 42, 0.1);
+		color: var(--amber-light);
+	}
+
+	.rule {
+		font-size: 0.8rem;
+		color: var(--text-dim);
+	}
+
+	.feedback {
+		margin: 0;
 	}
 </style>

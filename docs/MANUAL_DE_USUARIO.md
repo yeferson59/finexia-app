@@ -460,7 +460,7 @@ La ficha avisa cuando toca. Si **ninguna** posición tiene precio de mercado, ex
 
 La sección **Efectivo** del menú guarda el dinero que tienes sin invertir: lo que queda en tu cuenta del bróker, en tu cuenta de ahorros o en tu billetera. Cada **cuenta** es una **plataforma** en una **moneda** —tus pesos en el banco, tus dólares en el bróker—, y su dinero suma en el valor de un **portafolio** como una posición más. Si solo tienes un portafolio, Finexia no te lo pregunta: suma en ese.
 
-La página abre con el **total** en la moneda de tu cuenta y, si tienes efectivo en varias monedas, una barra con lo que pesa cada una y, bajo cada tramo, su propio importe, que es el que coincide con tu extracto. Debajo están las **cuentas**, agrupadas por plataforma —cada plataforma con una línea por moneda y el saldo que ves en ella—, y el historial de **movimientos**, por meses. Si el dinero de una cuenta suma en más de un portafolio, su línea lo dice y lista cuánto corresponde a cada uno.
+La página abre con el **total** en la moneda de tu cuenta, lo que te abonaron los intereses este mes y, si tienes efectivo en varias monedas, una tabla corta con lo que hay en cada una —en su propia moneda, que es la cifra que coincide con tu extracto— y lo que pesa en el total. Al lado está el **mapa de rendimiento** (ver 9.6). Debajo están las **cuentas**, una hoja por plataforma —cada moneda en su fila, con sus bolsillos y depósitos colgando de ella—, y el historial de **movimientos**, por meses. Si el dinero de una cuenta suma en más de un portafolio, su fila lo dice y lista cuánto corresponde a cada uno.
 
 Para anotar un movimiento pulsa **Registrar movimiento**, o **Registrar** junto a una cuenta, que abre el formulario con esa cuenta ya elegida. Lo primero es decir qué pasó:
 
@@ -470,13 +470,13 @@ Para anotar un movimiento pulsa **Registrar movimiento**, o **Registrar** junto 
 | **Retiro** | Lo baja | Nada: es dinero que sacaste, no una pérdida. Su comisión sí resta |
 | **Intereses** | Lo sube | La sube: es lo que ganó tu dinero |
 
-Después eliges la plataforma, el importe, la moneda y la fecha, y si quieres una comisión y una nota. El primer depósito en una plataforma y una moneda abre la cuenta; los siguientes se suman a ella.
+Después eliges la plataforma y la moneda —y el bolsillo, si la cuenta tiene alguno—, el importe y la fecha, y si quieres una comisión y una nota. Bajo la cuenta elegida el formulario te dice **cuánto guarda ahora**, que es lo que necesitas saber antes de anotar un retiro. El primer depósito en una plataforma y una moneda abre la cuenta; los siguientes se suman a ella.
 
 Si tienes **varios portafolios**, el formulario pregunta al final en cuál suma ese dinero. No cambia dónde está —sigue en la plataforma—, solo en qué portafolio cuenta. Cuando la cuenta ya existe, Finexia propone el portafolio donde ya suma, para que un depósito no la parta en dos.
 
 > **Anota los intereses netos.** Si el banco retiene impuestos, escribe lo que llegó a la cuenta: los intereses no llevan comisión.
 
-Finexia **no deja un saldo en negativo**. Un retiro mayor que lo que hay, o borrar un depósito cuyo dinero ya salió en un retiro, se rechaza con la explicación en el propio formulario. Cada movimiento se puede **Editar** —tipo, importe, fecha, comisión y nota; la cuenta no cambia— o **Borrar**. Los que se anotaron desde la posición del activo aparecen en la lista, pero aquí solo se pueden borrar.
+Finexia **no deja un saldo en negativo**. Un retiro mayor que lo que hay, o borrar un depósito cuyo dinero ya salió en un retiro, se rechaza con la explicación en el propio formulario. Cada movimiento se puede **Editar** —tipo, importe, fecha, comisión y nota; la cuenta no cambia— o **Borrar**; con ratón, los dos botones aparecen al pasar por la fila. Los que se anotaron desde la posición del activo aparecen en la lista, pero aquí solo se pueden borrar.
 
 > **Las compras no descuentan del efectivo.** Si pagas unas acciones con dinero de tu saldo, registra también el retiro por ese importe: así el saldo cuadra con tu cuenta, y tu rentabilidad no cambia, porque el retiro y la compra se compensan.
 
@@ -484,7 +484,9 @@ Finexia **no deja un saldo en negativo**. Un retiro mayor que lo que hay, o borr
 
 Si tu cuenta paga intereses —una cuenta de ahorros, una «cajita», una billetera en dólares con APY—, dile a Finexia cuánto paga y los anota sola, día a día. No tendrás que volver a escribirlos.
 
-Debajo de cada cuenta, en la lista de **Efectivo**, hay una línea con su tasa —«12 % E.A. hasta $ 5.000.000 · 8 % después» cuando paga por tramos—; si todavía no tiene, dice **Agregar tasa**. Al pulsarla se abre la rentabilidad de esa cuenta.
+En cada fila de la lista de **Efectivo**, la columna de la tasa dice a cuánto rinde esa cuenta —con un punto verde mientras rinde— y, debajo, lo que la matiza: «hasta $ 5.000.000, 8 % después» cuando paga por tramos, o «abono mensual». Si todavía no tiene, dice **Sin tasa**. El botón **Tasa** de la fila —**Darle tasa** si no tiene— abre la tasa de esa cuenta.
+
+Arriba, el **mapa de rendimiento** enseña todo tu efectivo de un vistazo. Cada bloque es una cuenta: **el ancho es cuánto dinero guarda y la altura, a qué tasa rinde**, así que el área de cada bloque es lo que gana. Van de la tasa más alta a la más baja, con una línea en la tasa media, y el dinero que no rinde nada queda al final como un **suelo gris** sin altura: es el que más fácil es poner a trabajar. Al pasar por un bloque ves su tasa, su saldo y lo que rendiría en un año, y al pulsarlo se abre su tasa —o la ficha, si es un depósito a plazo—.
 
 > **Los bolsillos tienen su propia tasa.** Si tu cuenta paga 8 % y su «cajita» paga 10 %, crea el bolsillo (ver 9.7) y dale su tasa desde su propia línea. Cada uno rinde sobre lo que guarda él.
 
@@ -494,7 +496,7 @@ Debajo de cada cuenta, en la lista de **Efectivo**, hay una línea con su tasa �
 | **Cuándo lo abona** | **Cada día**, o **cada mes** si tu banco te paga los intereses el último día del mes |
 | **Rige desde** | El día en que empieza a contar. Hoy o más adelante |
 
-En **Opciones avanzadas** hay dos cosas que casi nunca hacen falta:
+En **Retención, tramos y tasa nominal**, plegado bajo la tasa, hay dos cosas que casi nunca hacen falta:
 
 - La **retención**, si la entidad te descuenta impuestos de los intereses. Lo que se abona es lo que llega a la cuenta.
 - Los **tramos**, si la entidad paga distinto según cuánto tengas: «12 % hasta $ 5.000.000 y 8 % sobre lo que pase». La tasa de arriba rige desde cero y cada tramo dice **desde qué saldo** empieza otra tasa. Con **Agregar tope** pones un tramo al 0 %, que es decir «solo paga hasta ahí».
@@ -505,9 +507,9 @@ Ahí mismo está el **conversor**: si tu banco publica una tasa **nominal** —�
 
 Mientras escribes, el formulario te enseña **cuánto rendiría tu saldo de hoy** al día, en 30 días y en un año, ya neto de retención y repartido por los tramos. Si los usas, también te dice a cuánto rinde en conjunto tu saldo de hoy: con 12 % hasta $ 5.000.000 y 8 % después, $ 8.000.000 rinden un 10,48 % E.A. Es la cifra que puedes contrastar contra lo que te abonó la entidad el mes pasado.
 
-Cada mañana Finexia calcula el día anterior sobre el saldo que tenías al cierre y lo abona como un movimiento de **Intereses**, marcado como automático. En el extracto los abonos de un mes se agrupan en una sola fila, para que no tapen tus depósitos y retiros. Ese dinero **sube el saldo y cuenta como rentabilidad y como ganancia**, nunca como aporte.
+Cada mañana Finexia calcula el día anterior sobre el saldo que tenías al cierre y lo abona como un movimiento de **Intereses**, marcado como automático. En el extracto los abonos de un mes se agrupan en una sola fila, que se despliega pulsando su nombre, para que no tapen tus depósitos y retiros. Ese dinero **sube el saldo y cuenta como rentabilidad y como ganancia**, nunca como aporte.
 
-> **Con abono mensual, lo ganado espera.** La cuenta dice «+X calculados, se abonan al cerrar el mes»: ya es tuyo y sigue generando intereses, pero entra en el saldo el último día del mes, de una vez, como hace tu banco.
+> **Con abono mensual, lo ganado espera.** La cuenta dice «+X por abonar al cerrar el mes»: ya es tuyo y sigue generando intereses, pero entra en el saldo el último día del mes, de una vez, como hace tu banco.
 
 Cuando la entidad cambia la tasa, vuelve a abrir la ventana y elige qué quieres hacer:
 
@@ -531,14 +533,15 @@ Muchas entidades dejan apartar dinero dentro de la misma cuenta —una «cajita�
 
 **Su dinero sigue siendo de la plataforma.** El total de Nu, sus reportes y su asignación lo siguen sumando: el bolsillo no se lleva el dinero a otro sitio. Lo único que es suyo es **la tasa**.
 
-Debajo de cada cuenta, al pie de sus saldos, hay dos enlaces:
+Al pie de cada cuenta, debajo de sus cajones, están las acciones de la cuenta entera:
 
-| Enlace | Qué hace |
+| Acción | Qué hace |
 |---|---|
 | **Agregar bolsillo** | Crea la cajita. Solo le pones nombre: «Viajes», «Cajita», «Meta» |
-| **Mover dinero** | Traslada dinero entre la cuenta principal y sus bolsillos |
+| **Abrir depósito a plazo** | Abre un depósito a tasa fija (ver 9.8) |
+| **Mover entre cajones** | Traslada dinero entre la cuenta principal y sus bolsillos. Aparece cuando la cuenta ya tiene alguno |
 
-Una vez creado, el bolsillo aparece sangrado bajo su cuenta, con su propia línea de tasa: pulsas ahí y le das la suya, igual que a cualquier cuenta. Para meterle dinero tienes dos caminos: **Mover** lo que ya está en la cuenta principal, o elegir el bolsillo en el selector **Bolsillo** al registrar un movimiento.
+Una vez creado, el bolsillo cuelga de su cuenta por una línea que baja desde el código de la moneda, y la fila de la cuenta pasa a llamarse **Cuenta principal**. Tiene su propio botón **Tasa**: le das la suya igual que a cualquier cuenta. Para meterle dinero tienes dos caminos: **Mover entre cajones** lo que ya está en la cuenta principal —con **Mover todo** si lo quieres entero—, o elegir el bolsillo en el selector **Bolsillo** al registrar un movimiento.
 
 > **Mover no cambia tu rentabilidad.** Las dos patas —lo que sale de un lado y entra en el otro— se anotan a la vez y se compensan. El dinero cambió de cajón, no entró ni salió: lo único que cambia es a qué tasa rinde desde ese día.
 
@@ -550,23 +553,23 @@ Dos cuentas distintas pueden tener cada una su «Viajes». Dos bolsillos de la m
 
 Un CDT, una cajita a plazo, una tasa promocional amarrada noventa días: dinero que se queda quieto un tiempo a una tasa que ya no cambia. En Finexia es un **depósito a tasa fija**, que es un bolsillo especial: conserva la tasa del día en que lo abriste, aunque la entidad cambie la suya después.
 
-Al pie de los saldos de la cuenta, junto a «Agregar bolsillo», está **Abrir depósito**.
+Al pie de la cuenta, junto a «Agregar bolsillo», está **Abrir depósito a plazo**.
 
 | Campo | Qué escribir |
 |---|---|
 | **Nombre** | Como lo llames tú: «CDT 90 días», «Cajita a plazo» |
 | **Importe** | Lo que metiste |
 | **Lo abriste el** | El día en que metiste el dinero. **Puede ser una fecha pasada** |
-| **Plazo** | 30, 60, 90, 180 o 360 días, otra fecha, o **sin plazo** |
+| **Plazo** | 30, 60, 90, 180 o 360 días, **otra fecha** o **sin plazo** |
 | **Tasa** | La efectiva anual que te prometieron |
 | **Retención** | Lo que te descuentan de los intereses, si te descuentan algo |
-| **Abono** | **Cada día**, o **todo al vencer** si tu extracto solo enseña el capital hasta el final |
+| **Cuándo abona** | **Cada día**, o **todo al vencer** si tu extracto solo enseña el capital hasta el final |
 
 > **«Lo abrí hace días» tiene arreglo aquí.** Pon la fecha real y Finexia calcula de una vez lo que ya ganó. Un CDT de $ 10.000.000 al 10 % abierto el 1 de septiembre y registrado el 15 aparece con $ 36.624 de intereses en cuanto lo guardas. Esto **solo vale para un depósito a tasa fija**: en él no se anotan intereses a mano, así que nada se cuenta dos veces. En una cuenta normal, lo que ya te pagaron se anota como un movimiento de **Intereses** (ver 9.5).
 
-Mientras escribes, el formulario te dice **lo que rendirá al vencer**: $ 10.000.000 al 10 % a 90 días con 4 % de retención dan unos $ 228.176 netos.
+Mientras escribes, el formulario dibuja la **línea del plazo** y te dice lo que ya ganó, **lo que rendirá al vencer** y en qué queda: $ 10.000.000 al 10 % a 90 días con 4 % de retención dan unos $ 228.176 netos.
 
-**En un depósito no se anota nada a mano.** Ni depósitos, ni retiros, ni intereses, ni una tasa nueva: es un importe, a una tasa, por un plazo, y cualquiera de esas cosas lo convertiría en otra cosa. Lo que sí puedes hacer está en **Ver depósito**, en su línea.
+**En un depósito no se anota nada a mano.** Ni depósitos, ni retiros, ni intereses, ni una tasa nueva: es un importe, a una tasa, por un plazo, y cualquiera de esas cosas lo convertiría en otra cosa. En su fila, una línea va del día en que lo abriste al del vencimiento, con un punto en hoy y los días que faltan. Lo que sí puedes hacer está en **Ver depósito**, en esa misma fila.
 
 **Al vencer, el dinero vuelve solo.** El día del vencimiento Finexia mueve el saldo —capital e intereses— a la cuenta principal de su portafolio, y el depósito desaparece de la lista de cuentas. Tu rentabilidad no se mueve: el dinero cambió de cajón.
 

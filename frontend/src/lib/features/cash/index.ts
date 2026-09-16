@@ -15,8 +15,16 @@
  * en que se abrió: `cash-deposit-form` lo abre —dinero, plazo y tasa a la vez—
  * y luego lo cancela o lo borra, porque no hay nada más que hacerle.
  *
- * `cash-delete-confirm` es interno de `cash-movements` (import relativo) y no
- * forma parte de la superficie pública.
+ * El resumen dibuja el mapa de rendimiento (`cash-yield-chart`, con los helpers
+ * de `yield.ts`): cada cuenta como un bloque, ancho por lo que guarda y alto por
+ * la tasa a la que rinde.
+ *
+ * Son internos —imports relativos, fuera de la superficie pública—
+ * `cash-delete-confirm` y `cash-ledger-entry` de `cash-movements`;
+ * `cash-drawer` y `cash-term-track` de `cash-accounts`; `cash-yield-chart` de
+ * `cash-summary`; `cash-deposit-open` de `cash-deposit-form`;
+ * `cash-rate-advanced` y `cash-rate-projection` de `cash-rate-form`; y las
+ * piezas de formulario `cash-choice` y `cash-money-input`.
  */
 export { default as CashSummary } from './components/cash-summary.svelte';
 export { default as CashAccounts } from './components/cash-accounts.svelte';
@@ -41,4 +49,5 @@ export * from './pockets';
 export * from './rates';
 export * from './deposits';
 export * from './interest';
+export * from './yield';
 export * from './schemas';

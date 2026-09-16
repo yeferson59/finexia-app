@@ -11,7 +11,8 @@
 	import Modal from '$lib/ui/modal.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
-	import { cashAccountLabel, formatCashKind, type CashMovement } from '../cash';
+	import { formatCalendarDate } from '$lib/shared/format/date';
+	import { cashAccountLabel, cashKindSign, formatCashKind, type CashMovement } from '../cash';
 
 	interface Props {
 		movement: CashMovement | null;
@@ -31,11 +32,14 @@
 		onClose();
 	}
 
-	const amount = $derived(
-		movement
-			? privacy.money(formatCurrency(parseFloat(movement.amount) || 0, movement.currency))
-			: ''
-	);
+	const amount = $derived.by(() => {
+		if (!movement) return '';
+		const sign = cashKindSign(movement.kind);
+		const prefix = sign > 0 ? '+' : sign < 0 ? '−' : '';
+		return privacy.money(
+			`${prefix}${formatCurrency(Math.abs(parseFloat(movement.amount) || 0), movement.currency)}`
+		);
+	});
 </script>
 
 <Modal
@@ -65,15 +69,25 @@
 		>
 			<input type="hidden" name="id" value={movement.id} />
 
-			<p class="body">
-				{formatCashKind(movement.kind)} de <strong>{amount}</strong> en {cashAccountLabel(
-					movement,
-					showPortfolio
-				)}.
-				{#if movement.kind === 'deposit' || movement.kind === 'interest'}
+			<!-- El movimiento como se ve en el extracto, para reconocerlo antes de
+			     borrarlo: qué, cuánto, dónde y cuándo. -->
+			<div class="receipt">
+				<p class="receipt-kind">{formatCashKind(movement.kind)}</p>
+				<p class="receipt-amount" class:income={movement.kind === 'interest'}>{amount}</p>
+				<p class="receipt-meta">
+					{cashAccountLabel(movement, showPortfolio)}, {formatCalendarDate(movement.date, {
+						day: 'numeric',
+						month: 'long',
+						year: 'numeric'
+					})}
+				</p>
+			</div>
+
+			{#if movement.kind === 'deposit' || movement.kind === 'interest'}
+				<p class="body">
 					Si ese dinero ya salió en un retiro, no se podrá borrar hasta quitar el retiro.
-				{/if}
-			</p>
+				</p>
+			{/if}
 
 			{#if error}
 				<p class="feedback error">{error}</p>
@@ -89,16 +103,46 @@
 </Modal>
 
 <style>
-	.body {
+	.receipt {
+		display: grid;
+		gap: 0.2rem;
 		margin: 0 0 1rem;
-		font-size: 0.9rem;
-		line-height: 1.6;
+		padding: 0.9rem 1rem;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		background: rgba(255, 255, 255, 0.02);
+	}
+
+	.receipt p {
+		margin: 0;
+	}
+
+	.receipt-kind {
+		font-size: 0.8rem;
 		color: var(--text-muted);
 	}
 
-	.body strong {
+	.receipt-amount {
+		font-family: var(--font-mono);
+		font-size: 1.35rem;
+		letter-spacing: -0.02em;
 		color: var(--text);
-		font-weight: 500;
+	}
+
+	.receipt-amount.income {
+		color: var(--green);
+	}
+
+	.receipt-meta {
+		font-size: 0.8rem;
+		color: var(--text-dim);
+	}
+
+	.body {
+		margin: 0 0 1rem;
+		font-size: 0.87rem;
+		line-height: 1.55;
+		color: var(--text-muted);
 	}
 
 	.feedback {

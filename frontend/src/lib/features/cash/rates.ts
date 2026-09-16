@@ -228,7 +228,7 @@ export function cashAccountRate(
 }
 
 /** `2026-09-14` → `2026-09-15`, contado en UTC para que no lo mueva la zona. */
-function nextCalendarDay(date: string): string {
+export function nextCalendarDay(date: string): string {
 	const next = new Date(`${calendarDay(date)}T00:00:00Z`);
 	next.setUTCDate(next.getUTCDate() + 1);
 	return next.toISOString().slice(0, 10);

@@ -1,39 +1,28 @@
 <script lang="ts">
 	/**
-	 * Las cuentas de efectivo, agrupadas por plataforma.
+	 * Las cuentas de efectivo, una hoja por plataforma.
 	 *
 	 * Se leen como en la app del banco: la entidad y, debajo, lo que guarda en
-	 * cada moneda. Con una fila por cuenta, el nombre de la plataforma se repetía
-	 * en cada moneda y dos filas «Banco Demo» parecían un duplicado.
+	 * cada moneda, con sus bolsillos y depósitos colgando de la cuenta a la que
+	 * pertenecen. Cada fila es un `cash-drawer`, y todas comparten columnas, así
+	 * que los importes caen en la misma vertical de una plataforma a otra.
 	 *
-	 * El importe grande es el de su propia moneda, el que coincide con el
-	 * extracto; su equivalente en la moneda de la pantalla va debajo. Que cada
-	 * portafolio lleve por dentro su propio saldo solo se enseña cuando reparte
-	 * algo: con un único portafolio no se nombra, y una cuenta repartida lista
-	 * cuánto pone cada uno.
-	 *
-	 * «Registrar» abre el formulario con esa cuenta ya elegida —casi siempre se
-	 * anota sobre una que ya existe— y, si está repartida, con el portafolio de
-	 * su saldo mayor, que el formulario deja cambiar.
-	 *
-	 * La tasa de la cuenta va debajo de su historia, como un botón callado: se
-	 * consulta más de lo que se cambia. En verde mientras rinde; sin tasa invita
-	 * a anotarla.
+	 * Lo que se le hace a una cuenta entera —abrirle un bolsillo, un depósito,
+	 * mover dinero entre sus cajones— va al pie de sus cajones, una sola vez, y
+	 * no repetido en cada fila.
 	 */
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
-	import { todayLocalDateString } from '$lib/shared/format/date';
+	import type { CashPocket } from '$lib/api/types';
 	import type { CashAccount, CashBalance } from '../cash';
 	import {
-		cashAccountHistory,
 		emptyCashPockets,
 		groupCashPlatforms,
 		openCashPockets,
 		pocketAsCashAccount
 	} from '../pockets';
-	import type { CashPocket } from '$lib/api/types';
-	import { cashAccountRate, describeCashAccountRate, type CashRate } from '../rates';
-	import { describeFixedDeposit } from '../deposits';
+	import type { CashRate } from '../rates';
+	import CashDrawer from './cash-drawer.svelte';
 
 	interface Props {
 		balances: CashBalance[];
@@ -43,6 +32,7 @@
 		pockets: CashPocket[];
 		/** Si se nombra el portafolio de cada cuenta. Con uno solo, sobra. */
 		showPortfolio: boolean;
+		today: string;
 		onRecord: (balance: CashBalance) => void;
 		/** Abre la rentabilidad de una cuenta o de un bolsillo. */
 		onRate: (account: CashAccount) => void;
@@ -59,6 +49,7 @@
 		rates,
 		pockets,
 		showPortfolio,
+		today,
 		onRecord,
 		onRate,
 		onPocket,
@@ -66,187 +57,97 @@
 		onDeposit
 	}: Props = $props();
 
-	const today = todayLocalDateString();
-
 	const platforms = $derived(groupCashPlatforms(balances));
 
-	/* El bolsillo de una fila, para pasarlo a los formularios que lo piden. */
 	const pocketOf = (account: CashAccount) => pockets.find((p) => p.id === account.pocketId) ?? null;
 
-	/* Los bolsillos que la cuenta enseña y que todavía no guardan nada. */
-	const empty = (account: CashAccount) => emptyCashPockets(account, pockets);
+	/* Los cajones de una cuenta, en el orden en que cuelgan: los que guardan algo
+	   y luego los que todavía están vacíos. */
+	const drawersOf = (account: CashAccount) => [
+		...openCashPockets(account, pockets),
+		...emptyCashPockets(account, pockets).map((blank) => pocketAsCashAccount(account, blank))
+	];
 
-	/* Un depósito a tasa fija conserva la tasa del día en que se abrió: la línea
-	   lo dice y no lleva botón, porque no hay nada que cambiar. */
-	const isDeposit = (account: CashAccount) => account.pocketKind === 'fixed';
+	/* Cuántos cajones suma la plataforma: sus cuentas y lo que cuelga de ellas. */
+	const drawerCount = (accounts: CashAccount[]) =>
+		accounts.reduce((sum, account) => sum + 1 + drawersOf(account).length, 0);
 
 	const money = (amount: number, currency: string) =>
 		privacy.money(formatCurrency(amount, currency));
 </script>
 
-<!--
-	Cada cajón de una cuenta es la misma fila: la principal y, debajo, sus
-	bolsillos. Un bolsillo cuenta dentro de la plataforma —su dinero suma en
-	ella— y lo que es suyo es la tasa, así que se anida en lugar de listarse
-	aparte.
--->
-{#snippet drawer(account: CashAccount, platformName: string)}
-	{@const rate = cashAccountRate(
-		rates,
-		account.sourceId,
-		account.currency,
-		today,
-		account.pocketId
-	)}
-	{@const pocket = pocketOf(account)}
-	{@const rateLine = describeCashAccountRate(rate, (amount) => money(amount, account.currency))}
-	{@const earned = account.balances.reduce(
-		(sum, b) => sum + (parseFloat(b.interestThisMonth) || 0),
-		0
-	)}
-	{@const pending = account.balances.reduce(
-		(sum, b) => sum + (parseFloat(b.pendingInterest) || 0),
-		0
-	)}
-	{@const where = account.pocketName
-		? `${platformName}, ${account.pocketName}`
-		: `${platformName}, ${account.currency}`}
-	<li
-		class="account"
-		class:emptied={account.balance === 0}
-		class:pocket={account.pocketId !== null}
-	>
-		<span class="code">
-			{#if account.pocketId === null}
-				{account.currency}
-			{:else}
-				<span class="sr-only">Bolsillo</span>
-			{/if}
-		</span>
-
-		<div class="where">
-			{#if account.pocketName}
-				<p class="line name">{account.pocketName}</p>
-			{/if}
-			{#if account.balances.length > 1}
-				<p class="line">Suma en {account.balances.length} portafolios</p>
-				<ul class="portions">
-					{#each account.balances as balance (balance.entryId)}
-						<li>
-							<span class="portion-name">{balance.portfolioName}</span>
-							<span class="portion-amount">
-								{money(parseFloat(balance.balance) || 0, balance.currency)}
-							</span>
-						</li>
-					{/each}
-				</ul>
-			{:else if showPortfolio && account.balances.length === 1}
-				<p class="line">Suma en {account.balances[0].portfolioName}</p>
-			{/if}
-			<p class="line quiet">{cashAccountHistory(account)}</p>
-			{#if isDeposit(account) && pocket}
-				<!-- La tasa de un depósito es la del día en que se abrió: se enseña,
-				     no se toca. Lo que se hace con él está en «Ver depósito». -->
-				<p class="rate fixed">{describeFixedDeposit(pocket, rate.current ?? rate.latest)}</p>
-			{:else}
-				<button
-					type="button"
-					class="rate"
-					class:earning={rate.current !== null}
-					onclick={() => onRate(account)}
-				>
-					<span class="sr-only">Rentabilidad de {where}: </span>
-					{rateLine ?? 'Agregar tasa'}
-				</button>
-			{/if}
-			{#if earned > 0}
-				<p class="line quiet" style:color="var(--green)">
-					+{money(earned, account.currency)} en intereses este mes
-				</p>
-			{/if}
-			<!-- Con abono mensual lo calculado espera al cierre del mes: está
-			     ganado, pero todavía no está en el saldo. -->
-			{#if pending > 0}
-				<p class="line quiet">
-					+{money(pending, account.currency)} calculados, se abonan al cerrar el mes
-				</p>
-			{/if}
-		</div>
-
-		<p class="figures">
-			<span class="native">{money(account.balance, account.currency)}</span>
-			<!-- Vacía no hay nada que convertir: «≈ $0,00» solo añade ruido. -->
-			{#if account.currency !== account.displayCurrency && account.balance !== 0}
-				{#if account.fxConverted}
-					<span class="converted">≈ {money(account.value, account.displayCurrency)}</span>
-				{:else}
-					<span class="converted">sin tasa a {account.displayCurrency}</span>
-				{/if}
-			{/if}
-		</p>
-
-		<div class="row-actions">
-			{#if account.pocketId === null}
-				<button type="button" class="record" onclick={() => onRecord(account.balances[0])}>
-					Registrar<span class="sr-only"> un movimiento en {where}</span>
-				</button>
-			{:else if isDeposit(account)}
-				<button type="button" class="record link" onclick={() => onDeposit(account, pocket)}>
-					Ver depósito<span class="sr-only">: {account.pocketName}</span>
-				</button>
-			{:else}
-				<button type="button" class="record link" onclick={() => onPocket(account, pocket)}>
-					Editar<span class="sr-only"> el bolsillo {account.pocketName}</span>
-				</button>
-			{/if}
-		</div>
-	</li>
-{/snippet}
-
 <div class="platforms">
 	{#each platforms as platform (platform.sourceId)}
 		{@const name = platform.sourceName || 'Sin plataforma'}
+		{@const count = drawerCount(platform.accounts)}
 		<section class="platform" aria-labelledby="cash-platform-{platform.sourceId}">
 			<header class="platform-head">
 				<h3 id="cash-platform-{platform.sourceId}">{name}</h3>
-				<!-- Solo cuando suma varias monedas y todas se pudieron convertir: con
-				     una sola repetiría la fila, y sin tasa sería un total a medias. -->
-				{#if platform.accounts.length > 1 && !platform.partial}
+				<!-- Solo cuando suma más de un cajón y todos se pudieron convertir: con
+				     uno repetiría la fila, y sin tasa sería un total a medias. -->
+				{#if count > 1 && !platform.partial}
 					<p class="platform-total">
 						<span class="figure">{money(platform.value, platform.displayCurrency)}</span>
-						entre sus {platform.accounts.length} cuentas
+						entre {count} cajones
 					</p>
 				{/if}
 			</header>
 
-			<ul class="accounts">
+			<ul class="groups">
 				{#each platform.accounts as account (account.key)}
-					{@render drawer(account, name)}
-					{#each openCashPockets(account, pockets) as held (held.key)}
-						{@render drawer(held, name)}
-					{/each}
-					{#each empty(account) as blank (blank.id)}
-						{@render drawer(pocketAsCashAccount(account, blank), name)}
-					{/each}
-					<li class="drawer-actions">
-						<button type="button" class="link" onclick={() => onPocket(account, null)}>
-							Agregar bolsillo<span class="sr-only"> a {name}, {account.currency}</span>
-						</button>
-						<button type="button" class="link" onclick={() => onDeposit(account, null)}>
-							Abrir depósito<span class="sr-only"> en {name}, {account.currency}</span>
-						</button>
-						{#if openCashPockets(account, pockets).length > 0 || empty(account).length > 0}
-							<button
-								type="button"
-								class="link"
-								disabled={account.balances.length === 0 && account.pockets.length === 0}
-								onclick={() => onMove(account)}
-							>
-								Mover dinero<span class="sr-only">
-									entre los saldos de {name}, {account.currency}</span
-								>
+					{@const drawers = drawersOf(account)}
+					<li class="group">
+						<ul class="drawers">
+							<CashDrawer
+								{account}
+								pocket={null}
+								{rates}
+								platformName={name}
+								{showPortfolio}
+								{today}
+								rail={drawers.length > 0}
+								onRecord={() => onRecord(account.balances[0])}
+								onRate={() => onRate(account)}
+								onPocket={() => onPocket(account, null)}
+								onDeposit={() => onDeposit(account, null)}
+							/>
+							{#each drawers as drawer, index (drawer.key)}
+								{@const pocket = pocketOf(drawer)}
+								<CashDrawer
+									account={drawer}
+									{pocket}
+									{rates}
+									platformName={name}
+									{showPortfolio}
+									{today}
+									nested
+									last={index === drawers.length - 1}
+									onRecord={() => onRecord(drawer.balances[0])}
+									onRate={() => onRate(drawer)}
+									onPocket={() => onPocket(drawer, pocket)}
+									onDeposit={() => onDeposit(drawer, pocket)}
+								/>
+							{/each}
+						</ul>
+
+						<div class="group-actions">
+							<button type="button" class="tool" onclick={() => onPocket(account, null)}>
+								<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+								Agregar bolsillo<span class="sr-only"> a {name}, {account.currency}</span>
 							</button>
-						{/if}
+							<button type="button" class="tool" onclick={() => onDeposit(account, null)}>
+								<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+								Abrir depósito a plazo<span class="sr-only"> en {name}, {account.currency}</span>
+							</button>
+							{#if drawers.length > 0}
+								<button type="button" class="tool" onclick={() => onMove(account)}>
+									<svg viewBox="0 0 16 16" aria-hidden="true">
+										<path d="M3 5.5h9.5M10 3l2.5 2.5L10 8M13 10.5H3.5M6 8l-2.5 2.5L6 13" />
+									</svg>
+									Mover entre cajones<span class="sr-only"> de {name}, {account.currency}</span>
+								</button>
+							{/if}
+						</div>
 					</li>
 				{/each}
 			</ul>
@@ -255,8 +156,17 @@
 </div>
 
 <style>
-	.platform + .platform {
-		border-top: 1px solid var(--border-strong);
+	.platforms {
+		display: grid;
+		gap: 1rem;
+	}
+
+	/* Una hoja por entidad: la superficie de lo que es un objeto suelto en el
+	   panel, sin sombra, con su nombre arriba como el membrete de un extracto. */
+	.platform {
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		background: rgba(255, 255, 255, 0.022);
 	}
 
 	.platform-head {
@@ -265,14 +175,16 @@
 		align-items: baseline;
 		justify-content: space-between;
 		gap: 0.25rem 1.5rem;
-		padding: 1.15rem 1.5rem 0.2rem;
+		padding: 1.1rem 1.5rem 1rem 1.25rem;
+		border-bottom: 1px solid var(--border);
 	}
 
 	h3 {
 		margin: 0;
 		font-family: var(--font-display);
-		font-size: 1.15rem;
-		font-weight: 500;
+		font-size: 1.25rem;
+		font-weight: 400;
+		letter-spacing: -0.01em;
 		color: var(--text);
 	}
 
@@ -283,285 +195,78 @@
 	}
 
 	.platform-total .figure {
+		margin-right: 0.25rem;
 		font-family: var(--font-mono);
+		font-size: 0.88rem;
 		font-variant-numeric: tabular-nums;
 		color: var(--text-muted);
 	}
 
-	.accounts {
+	.groups,
+	.drawers {
 		margin: 0;
-		padding: 0 0 0.35rem;
+		padding: 0;
 		list-style: none;
 	}
 
-	/*
-	 * Cada cuenta es su propia rejilla, pero las dos últimas columnas tienen
-	 * ancho fijo: así los importes, alineados a la derecha, caen en la misma
-	 * vertical en todas las plataformas y se comparan de un vistazo.
-	 */
-	.account {
-		display: grid;
-		grid-template-columns: 3.25rem minmax(0, 1fr) auto 7rem;
-		grid-template-areas: 'code where figures record';
-		align-items: start;
-		column-gap: 1.25rem;
-		margin: 0 1.5rem;
-		padding: 0.9rem 0;
-	}
-
-	.account + .account {
+	.group + .group {
 		border-top: 1px solid var(--border);
 	}
 
-	.code {
-		grid-area: code;
-		padding-top: 0.2rem;
-		font-family: var(--font-mono);
-		font-size: 0.8rem;
-		font-weight: 600;
-		letter-spacing: 0.04em;
-		color: var(--text-muted);
-	}
-
-	.where {
-		grid-area: where;
-		min-width: 0;
-		padding-top: 0.1rem;
-	}
-
-	.line {
-		margin: 0;
-		font-size: 0.84rem;
-		line-height: 1.5;
-		color: var(--text-muted);
-	}
-
-	.quiet {
-		font-size: 0.8rem;
-		color: var(--text-dim);
-	}
-
-	.portions {
+	/* Las acciones de la cuenta entera, al pie de sus cajones y en la columna de
+	   los nombres: se hacen de vez en cuando, así que no llevan borde. */
+	.group-actions {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.2rem 1.25rem;
-		margin: 0.2rem 0 0.35rem;
-		padding: 0;
-		list-style: none;
-		font-size: 0.8rem;
+		gap: 0.25rem 0.5rem;
+		padding: 0 1.5rem 0.85rem calc(1.25rem + 3.5rem + 1.25rem - 0.55rem);
 	}
 
-	.portions li {
-		display: flex;
-		align-items: baseline;
-		gap: 0.45rem;
-	}
-
-	.portion-name {
-		color: var(--text-muted);
-	}
-
-	.portion-amount {
-		font-family: var(--font-mono);
-		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
-		color: var(--text);
-	}
-
-	.figures {
-		grid-area: figures;
-		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		gap: 0.2rem;
-		margin: 0;
-	}
-
-	.native {
-		font-family: var(--font-mono);
-		font-size: 1.05rem;
-		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
-		color: var(--text);
-	}
-
-	.converted {
-		font-family: var(--font-mono);
-		font-size: 0.76rem;
-		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
-		color: var(--text-dim);
-	}
-
-	/* Una acción por cuenta, callada: cinco botones ámbar seguidos competían con
-	   el principal de la página y con las propias cifras. */
-	.row-actions {
-		grid-area: record;
-		justify-self: end;
-		display: flex;
-		gap: 0.4rem;
-	}
-
-	.record {
-		margin-top: -0.1rem;
-		padding: 0.35rem 0.85rem;
-		border: 1px solid var(--border-strong);
-		border-radius: 999px;
+	.tool {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.3rem 0.55rem;
+		border: none;
+		border-radius: 6px;
 		background: transparent;
 		font: inherit;
 		font-size: 0.78rem;
-		color: var(--text-muted);
-		cursor: pointer;
-		transition:
-			border-color 0.2s ease,
-			color 0.2s ease;
-	}
-
-	.record:hover {
-		border-color: var(--amber);
-		color: var(--amber-light);
-	}
-
-	/*
-	 * La tasa, más callada todavía que «Registrar»: discontinua mientras la
-	 * cuenta no rinde, y en el verde de los intereses mientras rinde.
-	 */
-	.rate {
-		display: inline-flex;
-		align-items: center;
-		margin-top: 0.4rem;
-		padding: 0.15rem 0.65rem;
-		border: 1px dashed var(--border-strong);
-		border-radius: 999px;
-		background: transparent;
-		font: inherit;
-		font-size: 0.76rem;
-		font-variant-numeric: tabular-nums;
-		text-align: left;
-		color: var(--text-muted);
-		cursor: pointer;
-		transition:
-			border-color 0.2s ease,
-			color 0.2s ease;
-	}
-
-	.rate:hover {
-		border-color: var(--amber);
-		color: var(--amber-light);
-	}
-
-	.rate:focus-visible {
-		outline: 2px solid var(--amber);
-		outline-offset: 2px;
-	}
-
-	.rate.earning {
-		border-style: solid;
-		border-color: rgba(34, 201, 126, 0.3);
-		color: var(--green);
-	}
-
-	.rate.earning:hover {
-		border-color: var(--green);
-		color: var(--green);
-	}
-
-	/* La de un depósito no es un botón: dice a qué rinde y hasta cuándo, y no
-	   tiene detrás nada que abrir. */
-	.rate.fixed {
-		border-style: solid;
-		border-color: rgba(34, 201, 126, 0.3);
-		color: var(--green);
-		cursor: default;
-	}
-
-	.emptied .code,
-	.emptied .native {
 		color: var(--text-dim);
+		cursor: pointer;
+		transition:
+			background-color 0.15s ease,
+			color 0.15s ease;
 	}
 
-	/*
-	 * Un bolsillo se sangra bajo su cuenta y pierde el código de moneda: es la
-	 * misma cuenta, en la misma moneda, en otra cajita. La línea de arriba lo
-	 * separa menos que a otra cuenta, porque no lo es.
-	 */
-	.account.pocket {
-		margin-left: 3rem;
-		padding: 0.7rem 0;
-	}
-
-	.account.pocket + .account.pocket,
-	.account + .account.pocket {
-		border-top-color: var(--border-subtle, var(--border));
-	}
-
-	.name {
-		font-weight: 500;
+	.tool:hover {
+		background: var(--surface-2);
 		color: var(--text);
 	}
 
-	/* Las dos acciones de la cuenta, al pie de sus cajones y muy calladas: no
-	   compiten con «Registrar», que es lo que se hace todos los días. */
-	.drawer-actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 1rem;
-		margin: 0 1.5rem;
-		padding: 0.25rem 0 0.7rem 3rem;
+	.tool svg {
+		width: 0.8rem;
+		height: 0.8rem;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.5;
+		stroke-linecap: round;
+		stroke-linejoin: round;
 	}
 
-	.link {
-		padding: 0;
-		border: 0;
-		background: transparent;
-		font: inherit;
-		font-size: 0.76rem;
-		color: var(--text-dim);
-		cursor: pointer;
-		transition: color 0.2s ease;
-	}
-
-	.link:hover:not(:disabled) {
-		color: var(--amber-light);
-	}
-
-	.link:disabled {
-		cursor: default;
-		opacity: 0.5;
-	}
-
-	.link:focus-visible {
-		outline: 2px solid var(--amber);
-		outline-offset: 2px;
-		border-radius: 4px;
-	}
-
-	@media (max-width: 640px) {
+	@media (max-width: 980px) {
 		.platform-head {
-			padding: 1rem 1rem 0.1rem;
+			padding: 1rem 1rem 0.9rem;
 		}
 
-		.account {
-			grid-template-columns: 2.75rem minmax(0, 1fr) auto;
-			grid-template-areas:
-				'code figures record'
-				'. where where';
-			row-gap: 0.4rem;
-			column-gap: 0.75rem;
-			margin: 0 1rem;
+		.group-actions {
+			padding: 0 1rem 0.85rem calc(0.75rem + 2.75rem + 0.85rem - 0.55rem);
 		}
+	}
 
-		.account.pocket {
-			margin-left: 1.9rem;
-		}
-
-		.drawer-actions {
-			margin: 0 1rem;
-			padding-left: 1.9rem;
-		}
-
-		.figures {
-			align-items: flex-start;
+	@media (prefers-reduced-motion: reduce) {
+		.tool {
+			transition: none;
 		}
 	}
 </style>
