@@ -305,18 +305,26 @@ func lockLatestCashRate(ctx context.Context, tx pgx.Tx, userID, rateID uuid.UUID
 		return locked, err
 	}
 
-	var latest bool
+	var latest, fixed bool
 	err = tx.QueryRow(ctx, `
-		SELECT r.currency, r.pocket_id, r.effective_from, `+cashRateLatest+`, `+cashRateAccruedThrough+`
+		SELECT r.currency, r.pocket_id, r.effective_from, `+cashRateLatest+`, `+cashRateAccruedThrough+`,
+		       EXISTS (SELECT 1 FROM cash_pockets pk WHERE pk.id = r.pocket_id AND pk.kind = 'fixed')
 		FROM cash_yield_rates r
 		WHERE r.id = $1
 		FOR UPDATE OF r
-	`, rateID).Scan(&locked.currency, &locked.pocketID, &locked.effectiveFrom, &latest, &locked.accruedThrough)
+	`, rateID).Scan(&locked.currency, &locked.pocketID, &locked.effectiveFrom, &latest, &locked.accruedThrough, &fixed)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return locked, ErrCashRateNotFound
 	}
 	if err != nil {
 		return locked, err
+	}
+
+	// The rate of a fixed deposit is the deposit: correcting it, pausing it or
+	// deleting it would change the terms of money already placed. Cancelling the
+	// deposit is what ends it, and deleting the deposit is what removes it.
+	if fixed {
+		return locked, fmt.Errorf("%w: cancel the deposit to end it, or delete it whole", ErrCashPocketFixed)
 	}
 
 	if !latest {
@@ -460,6 +468,13 @@ func requireRatePocket(ctx context.Context, tx pgx.Tx, userID, pocketID, sourceI
 
 	if locked.sourceID != sourceID || locked.currency != cur {
 		return nil, invalidCashRate("that pocket belongs to another account, so it cannot earn this one's rate")
+	}
+
+	// A fixed deposit keeps the rate of the day it was opened, so it never gets
+	// another version (000048). Its one version is written with it, by
+	// OpenFixedDeposit.
+	if locked.kind == PocketFixed {
+		return nil, fmt.Errorf("%w: it keeps the rate of the day it was opened", ErrCashPocketFixed)
 	}
 
 	return &locked.id, nil

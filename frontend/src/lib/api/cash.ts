@@ -188,6 +188,39 @@ export function deletePocket(event: ApiEvent, id: string): Promise<ApiResult<unk
 }
 
 /**
+ * `POST /portfolios/cash/deposits` — abre un depósito a tasa fija: un bolsillo
+ * con su dinero, su tasa y su plazo en una sola escritura. `openedOn` puede
+ * estar en el pasado, y el backend calcula de una vez los días que ya ganó.
+ */
+export function openDeposit(
+	event: ApiEvent,
+	body: Record<string, unknown>
+): Promise<ApiResult<CashPocket>> {
+	return apiRequest<CashPocket>(event, '/portfolios/cash/deposits', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+}
+
+/**
+ * `POST /portfolios/cash/pockets/:id/close` — cancela un depósito antes de su
+ * plazo: la tasa termina la víspera, se abona lo pendiente y el saldo vuelve a
+ * la cuenta principal con la penalidad como comisión del retiro.
+ */
+export function closeDeposit(
+	event: ApiEvent,
+	id: string,
+	body: Record<string, unknown>
+): Promise<ApiResult<CashPocket>> {
+	return apiRequest<CashPocket>(event, `/portfolios/cash/pockets/${id}/close`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+}
+
+/**
  * `POST /portfolios/cash/movements/move` — mueve dinero entre dos saldos de una
  * misma cuenta dentro de un portafolio. Son dos patas en una sola transacción y
  * se compensan, así que la rentabilidad del portafolio no se mueve.

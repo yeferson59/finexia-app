@@ -6,12 +6,12 @@ import {
 	formatCashKind,
 	groupCashAccounts,
 	groupCashMovementsByMonth,
-	groupCashPlatforms,
 	suggestCashPortfolio,
 	summarizeCash,
 	type CashBalance,
 	type CashMovement
 } from './cash';
+import { groupCashPlatforms } from './pockets';
 
 const balance = (
 	over: Partial<CashBalance> & { balance: string; currency: string }

@@ -10,7 +10,7 @@ import { formatCalendarDate } from '$lib/shared/format/date';
 export type { CashRate };
 
 /** Los días con que la E.A. se pasa a diaria, como hacen los bancos. */
-const DAYS_PER_YEAR = 365;
+export const DAYS_PER_YEAR = 365;
 
 /** «9,25% E.A.»: la tasa como la publica la entidad. */
 export function formatAnnualRate(pct: string | number): string {
@@ -183,7 +183,8 @@ export interface CashAccountRate {
 	accruedThrough: string | null;
 }
 
-const calendarDay = (iso: string) => iso.slice(0, 10);
+/** El día del calendario de una fecha ISO, que es como el backend la guarda. */
+export const calendarDay = (iso: string) => iso.slice(0, 10);
 
 /**
  * La tasa de una cuenta —plataforma, moneda y bolsillo— en `today`
@@ -233,7 +234,8 @@ function nextCalendarDay(date: string): string {
 	return next.toISOString().slice(0, 10);
 }
 
-const dayAndMonth = (iso: string) =>
+/** «30 de nov»: una fecha en la forma corta que usan las líneas de la pantalla. */
+export const dayAndMonth = (iso: string) =>
 	formatCalendarDate(calendarDay(iso), { day: 'numeric', month: 'short' });
 
 /**
@@ -262,6 +264,14 @@ function tiersNote(rate: CashRate, money: (amount: number) => string): string {
 	return ` ${parts.join(' · ')}`;
 }
 
+/** Cada cuánto abona la cuenta, cuando no es cada día. */
+function postingNote(posting: CashRate['posting']): string {
+	if (posting === 'monthly') return ' · abono mensual';
+	if (posting === 'at_maturity') return ' · abono al vencer';
+
+	return '';
+}
+
 /**
  * La tasa de una cuenta en una línea: la que rige, sus tramos y lo que cambia
  * después, o desde cuándo no rinde. `null` si nunca tuvo tasa.
@@ -277,7 +287,7 @@ export function describeCashAccountRate(
 		const now =
 			formatAnnualRate(current.annualRatePct) +
 			tiersNote(current, money) +
-			(current.posting === 'monthly' ? ' · abono mensual' : '');
+			postingNote(current.posting);
 		if (upcoming) {
 			return `${now} · ${formatAnnualRate(upcoming.annualRatePct)} desde el ${dayAndMonth(upcoming.effectiveFrom)}`;
 		}

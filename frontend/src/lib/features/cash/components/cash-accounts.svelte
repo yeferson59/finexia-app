@@ -22,10 +22,18 @@
 	 */
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
-	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
-	import { groupCashPlatforms, type CashAccount, type CashBalance } from '../cash';
+	import { todayLocalDateString } from '$lib/shared/format/date';
+	import type { CashAccount, CashBalance } from '../cash';
+	import {
+		cashAccountHistory,
+		emptyCashPockets,
+		groupCashPlatforms,
+		openCashPockets,
+		pocketAsCashAccount
+	} from '../pockets';
 	import type { CashPocket } from '$lib/api/types';
 	import { cashAccountRate, describeCashAccountRate, type CashRate } from '../rates';
+	import { describeFixedDeposit } from '../deposits';
 
 	interface Props {
 		balances: CashBalance[];
@@ -42,10 +50,21 @@
 		onPocket: (account: CashAccount, pocket: CashPocket | null) => void;
 		/** Mueve dinero entre los cajones de una cuenta. */
 		onMove: (account: CashAccount) => void;
+		/** Abre un depósito a tasa fija en la cuenta, o mira el que ya está abierto. */
+		onDeposit: (account: CashAccount, pocket: CashPocket | null) => void;
 	}
 
-	let { balances, rates, pockets, showPortfolio, onRecord, onRate, onPocket, onMove }: Props =
-		$props();
+	let {
+		balances,
+		rates,
+		pockets,
+		showPortfolio,
+		onRecord,
+		onRate,
+		onPocket,
+		onMove,
+		onDeposit
+	}: Props = $props();
 
 	const today = todayLocalDateString();
 
@@ -54,54 +73,15 @@
 	/* El bolsillo de una fila, para pasarlo a los formularios que lo piden. */
 	const pocketOf = (account: CashAccount) => pockets.find((p) => p.id === account.pocketId) ?? null;
 
-	/*
-	 * Los bolsillos de una cuenta que todavía no guardan nada. No llegan con los
-	 * saldos —no hay posición que listar—, y aun así tienen que verse: es donde
-	 * se les da una tasa y desde donde se mueve el primer dinero.
-	 */
-	function emptyPockets(account: CashAccount): CashPocket[] {
-		const held = new Set(account.pockets.map((p) => p.pocketId));
+	/* Los bolsillos que la cuenta enseña y que todavía no guardan nada. */
+	const empty = (account: CashAccount) => emptyCashPockets(account, pockets);
 
-		return pockets.filter(
-			(p) =>
-				p.sourceId === account.sourceId &&
-				p.currency === account.currency &&
-				p.closedOn === null &&
-				!held.has(p.id)
-		);
-	}
-
-	/* Un bolsillo vacío como una cuenta más, para que la fila sea la misma. */
-	const asAccount = (account: CashAccount, pocket: CashPocket): CashAccount => ({
-		...account,
-		key: `${account.sourceId}:${account.currency}:${pocket.id}`,
-		pocketId: pocket.id,
-		pocketName: pocket.name,
-		pocketKind: pocket.kind,
-		balance: 0,
-		value: 0,
-		fxConverted: true,
-		lastMovementDate: null,
-		balances: [],
-		pockets: []
-	});
+	/* Un depósito a tasa fija conserva la tasa del día en que se abrió: la línea
+	   lo dice y no lleva botón, porque no hay nada que cambiar. */
+	const isDeposit = (account: CashAccount) => account.pocketKind === 'fixed';
 
 	const money = (amount: number, currency: string) =>
 		privacy.money(formatCurrency(amount, currency));
-
-	/* Una cuenta vaciada sigue en la lista —es donde cae el próximo depósito— y
-	   dice desde cuándo está así, que es lo que la distingue de una sin estrenar. */
-	function history(account: CashAccount): string {
-		if (!account.lastMovementDate) return 'Sin movimientos todavía';
-
-		const when = formatCalendarDate(account.lastMovementDate, {
-			day: 'numeric',
-			month: 'short',
-			year: 'numeric'
-		});
-
-		return account.balance === 0 ? `Vacía desde el ${when}` : `Último movimiento el ${when}`;
-	}
 </script>
 
 <!--
@@ -118,6 +98,7 @@
 		today,
 		account.pocketId
 	)}
+	{@const pocket = pocketOf(account)}
 	{@const rateLine = describeCashAccountRate(rate, (amount) => money(amount, account.currency))}
 	{@const earned = account.balances.reduce(
 		(sum, b) => sum + (parseFloat(b.interestThisMonth) || 0),
@@ -162,16 +143,22 @@
 			{:else if showPortfolio && account.balances.length === 1}
 				<p class="line">Suma en {account.balances[0].portfolioName}</p>
 			{/if}
-			<p class="line quiet">{history(account)}</p>
-			<button
-				type="button"
-				class="rate"
-				class:earning={rate.current !== null}
-				onclick={() => onRate(account)}
-			>
-				<span class="sr-only">Rentabilidad de {where}: </span>
-				{rateLine ?? 'Agregar tasa'}
-			</button>
+			<p class="line quiet">{cashAccountHistory(account)}</p>
+			{#if isDeposit(account) && pocket}
+				<!-- La tasa de un depósito es la del día en que se abrió: se enseña,
+				     no se toca. Lo que se hace con él está en «Ver depósito». -->
+				<p class="rate fixed">{describeFixedDeposit(pocket, rate.current ?? rate.latest)}</p>
+			{:else}
+				<button
+					type="button"
+					class="rate"
+					class:earning={rate.current !== null}
+					onclick={() => onRate(account)}
+				>
+					<span class="sr-only">Rentabilidad de {where}: </span>
+					{rateLine ?? 'Agregar tasa'}
+				</button>
+			{/if}
 			{#if earned > 0}
 				<p class="line quiet" style:color="var(--green)">
 					+{money(earned, account.currency)} en intereses este mes
@@ -203,12 +190,12 @@
 				<button type="button" class="record" onclick={() => onRecord(account.balances[0])}>
 					Registrar<span class="sr-only"> un movimiento en {where}</span>
 				</button>
+			{:else if isDeposit(account)}
+				<button type="button" class="record link" onclick={() => onDeposit(account, pocket)}>
+					Ver depósito<span class="sr-only">: {account.pocketName}</span>
+				</button>
 			{:else}
-				<button
-					type="button"
-					class="record link"
-					onclick={() => onPocket(account, pocketOf(account))}
-				>
+				<button type="button" class="record link" onclick={() => onPocket(account, pocket)}>
 					Editar<span class="sr-only"> el bolsillo {account.pocketName}</span>
 				</button>
 			{/if}
@@ -235,17 +222,20 @@
 			<ul class="accounts">
 				{#each platform.accounts as account (account.key)}
 					{@render drawer(account, name)}
-					{#each account.pockets as held (held.key)}
+					{#each openCashPockets(account, pockets) as held (held.key)}
 						{@render drawer(held, name)}
 					{/each}
-					{#each emptyPockets(account) as empty (empty.id)}
-						{@render drawer(asAccount(account, empty), name)}
+					{#each empty(account) as blank (blank.id)}
+						{@render drawer(pocketAsCashAccount(account, blank), name)}
 					{/each}
 					<li class="drawer-actions">
 						<button type="button" class="link" onclick={() => onPocket(account, null)}>
 							Agregar bolsillo<span class="sr-only"> a {name}, {account.currency}</span>
 						</button>
-						{#if account.pockets.length > 0 || emptyPockets(account).length > 0}
+						<button type="button" class="link" onclick={() => onDeposit(account, null)}>
+							Abrir depósito<span class="sr-only"> en {name}, {account.currency}</span>
+						</button>
+						{#if openCashPockets(account, pockets).length > 0 || empty(account).length > 0}
 							<button
 								type="button"
 								class="link"
@@ -474,6 +464,15 @@
 	.rate.earning:hover {
 		border-color: var(--green);
 		color: var(--green);
+	}
+
+	/* La de un depósito no es un botón: dice a qué rinde y hasta cuándo, y no
+	   tiene detrás nada que abrir. */
+	.rate.fixed {
+		border-style: solid;
+		border-color: rgba(34, 201, 126, 0.3);
+		color: var(--green);
+		cursor: default;
 	}
 
 	.emptied .code,

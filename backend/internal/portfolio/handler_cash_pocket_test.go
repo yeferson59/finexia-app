@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -209,5 +210,130 @@ func TestHandlerMoveCashIsNotAMovementID(t *testing.T) {
 	resp := doJSON(t, app, http.MethodPut, "/portfolios/cash/movements/move", `{"kind":"deposit","amount":1,"date":"2026-09-10T00:00:00Z"}`)
 	if resp.StatusCode == http.StatusOK {
 		t.Errorf("status = %d, want the literal path not to be read as a movement", resp.StatusCode)
+	}
+}
+
+// The deposit endpoints (000048): what the form sends, what is refused before
+// the repository is reached, and which status each block answers with.
+
+// depositBody is the plan's worked example as the form sends it.
+func depositBody(portfolioID, sourceID uuid.UUID) string {
+	return `{"portfolioId":"` + portfolioID.String() + `","sourceId":"` + sourceID.String() + `",` +
+		`"currency":"COP","name":"CDT 90 días","amount":"10000000",` +
+		`"openedOn":"2026-09-01T00:00:00Z","maturesOn":"2026-11-30T00:00:00Z",` +
+		`"annualRatePct":"10","withholdingPct":"4","posting":"daily","tiers":[]}`
+}
+
+func TestHandlerOpenFixedDeposit(t *testing.T) {
+	userID, portfolioID, sourceID := uuid.New(), uuid.New(), uuid.New()
+	pocketID := uuid.New()
+
+	var got NewFixedDepositInput
+
+	repo := new(fakeRepository{
+		openFixedDeposit: func(_ context.Context, uid uuid.UUID, in NewFixedDepositInput) (CashPocket, error) {
+			if uid != userID {
+				t.Errorf("user = %v, want %v", uid, userID)
+			}
+			got = in
+
+			return CashPocket{ID: pocketID, SourceID: sourceID, Currency: money.COP, Kind: PocketFixed}, nil
+		},
+		// Opening one computes the days it already earned, which reaches the
+		// ledger through these two.
+		getCashAccrualTargets: func(context.Context, time.Time, CashAccrualFilter) ([]CashAccrualTarget, error) {
+			return nil, nil
+		},
+		getHeldCashInterest: func(context.Context, time.Time, CashAccrualFilter) ([]uuid.UUID, error) {
+			return nil, nil
+		},
+	})
+	app := newTestModule(t, repo, userID, "user")
+
+	resp := doJSON(t, app, http.MethodPost, "/portfolios/cash/deposits", depositBody(portfolioID, sourceID))
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, want 200: %s", resp.StatusCode, raw)
+	}
+
+	if got.PortfolioID != portfolioID || got.SourceID != sourceID || got.Currency != money.COP {
+		t.Errorf("account = %v %v %s, want %v %v COP", got.PortfolioID, got.SourceID, got.Currency, portfolioID, sourceID)
+	}
+	if !got.Amount.Equal(mustDecimal(t, "10000000")) || !got.AnnualRatePct.Equal(mustDecimal(t, "10")) {
+		t.Errorf("deposit = %s at %s %%, want 10000000 at 10 %%", got.Amount, got.AnnualRatePct)
+	}
+	if !got.OpenedOn.Equal(sept(1)) || got.MaturesOn == nil || !got.MaturesOn.Equal(time.Date(2026, time.November, 30, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("term = %v .. %v, want 2026-09-01 .. 2026-11-30", got.OpenedOn, got.MaturesOn)
+	}
+	if got.Posting != PostingDaily {
+		t.Errorf("posting = %q, want daily", got.Posting)
+	}
+}
+
+// Every rule the input breaks is answered by the service, so the repository —
+// hooks left nil, which would panic — is never reached.
+func TestHandlerFixedDepositRefusesBeforeTheRepository(t *testing.T) {
+	portfolioID, sourceID, pocketID := uuid.New(), uuid.New(), uuid.New()
+	deposit := depositBody(portfolioID, sourceID)
+
+	cases := map[string]struct {
+		path string
+		body string
+	}{
+		"no portfolio":    {"/portfolios/cash/deposits", strings.Replace(deposit, `"portfolioId":"`+portfolioID.String()+`"`, `"portfolioId":null`, 1)},
+		"nothing in it":   {"/portfolios/cash/deposits", strings.Replace(deposit, `"amount":"10000000"`, `"amount":"0"`, 1)},
+		"no name":         {"/portfolios/cash/deposits", strings.Replace(deposit, `"name":"CDT 90 días"`, `"name":"  "`, 1)},
+		"no opening day":  {"/portfolios/cash/deposits", strings.Replace(deposit, `"openedOn":"2026-09-01T00:00:00Z"`, `"openedOn":null`, 1)},
+		"term before it":  {"/portfolios/cash/deposits", strings.Replace(deposit, `"maturesOn":"2026-11-30T00:00:00Z"`, `"maturesOn":"2026-09-01T00:00:00Z"`, 1)},
+		"no closing day":  {"/portfolios/cash/pockets/" + pocketID.String() + "/close", `{}`},
+		"a penalty below": {"/portfolios/cash/pockets/" + pocketID.String() + "/close", `{"closesOn":"` + time.Now().UTC().Format(time.DateOnly) + `T00:00:00Z","penalty":"-1"}`},
+		"closed tomorrow": {"/portfolios/cash/pockets/" + pocketID.String() + "/close", `{"closesOn":"2999-01-01T00:00:00Z"}`},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			app := newTestModule(t, new(fakeRepository{}), uuid.New(), "user")
+
+			resp := doJSON(t, app, http.MethodPost, tc.path, tc.body)
+			if resp.StatusCode != http.StatusBadRequest {
+				raw, _ := io.ReadAll(resp.Body)
+				t.Errorf("status = %d, want 400: %s", resp.StatusCode, raw)
+			}
+		})
+	}
+}
+
+// A deposit someone else owns is a 404; the writes it does not take, and one
+// already closed, are 409s.
+func TestHandlerFixedDepositErrorsMapToStatuses(t *testing.T) {
+	pocketID := uuid.New()
+	close := `{"closesOn":"` + time.Now().UTC().Format(time.DateOnly) + `T00:00:00Z","penalty":"0"}`
+
+	cases := []struct {
+		name string
+		err  error
+		want int
+	}{
+		{"someone else's deposit", ErrCashPocketNotFound, http.StatusNotFound},
+		{"already closed", ErrCashPocketClosed, http.StatusConflict},
+		{"a flexible pocket", invalidCashPocket("only a fixed deposit is cancelled"), http.StatusBadRequest},
+		{"days already computed past it", cashRateInUse(sept(14), "the deposit can be cancelled from 2026-09-16"), http.StatusConflict},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := new(fakeRepository{
+				endFixedDeposit: func(context.Context, uuid.UUID, uuid.UUID, time.Time) (CashPocket, error) {
+					return CashPocket{}, tc.err
+				},
+			})
+			app := newTestModule(t, repo, uuid.New(), "user")
+
+			resp := doJSON(t, app, http.MethodPost, "/portfolios/cash/pockets/"+pocketID.String()+"/close", close)
+			if resp.StatusCode != tc.want {
+				raw, _ := io.ReadAll(resp.Body)
+				t.Errorf("status = %d, want %d: %s", resp.StatusCode, tc.want, raw)
+			}
+		})
 	}
 }

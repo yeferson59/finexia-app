@@ -124,9 +124,19 @@ type CashStore interface {
 // the platform first, so the pockets of one account are written one at a time.
 type CashPocketStore interface {
 	GetCashPocketsByUserID(ctx context.Context, userID uuid.UUID) ([]CashPocket, error)
+	GetCashPocketByID(ctx context.Context, userID, pocketID uuid.UUID) (CashPocket, error)
 	CreateCashPocket(ctx context.Context, userID uuid.UUID, in NewCashPocketInput) (CashPocket, error)
 	RenameCashPocket(ctx context.Context, userID, pocketID uuid.UUID, in RenameCashPocketInput) (CashPocket, error)
 	DeleteCashPocket(ctx context.Context, userID, pocketID uuid.UUID) error
+	// The three writes of a fixed deposit (000048): opening one whole, stopping
+	// its rate, and moving what it holds back to the main account. Cancelling one
+	// is the last two with the days it still owes computed in between, which is
+	// why they are separate; the maturity sweep is the last one over every
+	// deposit that has come due.
+	OpenFixedDeposit(ctx context.Context, userID uuid.UUID, in NewFixedDepositInput) (CashPocket, error)
+	EndFixedDeposit(ctx context.Context, userID, pocketID uuid.UUID, closesOn time.Time) (CashPocket, error)
+	SettleFixedDeposit(ctx context.Context, userID, pocketID uuid.UUID, on time.Time, penalty decimal.Decimal, notes string) (CashPocket, error)
+	MatureCashPockets(ctx context.Context, on time.Time) (int, error)
 }
 
 // CashRateStore persists the rates cash accounts earn, as versions by the day

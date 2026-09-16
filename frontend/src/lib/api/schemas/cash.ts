@@ -128,8 +128,12 @@ export const cashRateSchema = z.object({
 	annualRatePct: z.string(),
 	/** Parte de los intereses que se retiene, en porcentaje. */
 	withholdingPct: z.string(),
-	/** `daily` abona cada día; `monthly`, el último día de cada mes. */
-	posting: z.enum(['daily', 'monthly']),
+	/**
+	 * `daily` abona cada día; `monthly`, el último día de cada mes;
+	 * `at_maturity` calcula cada día y lo abona todo el último, y solo lo tiene
+	 * un depósito a tasa fija, que es el único con un último día.
+	 */
+	posting: z.enum(['daily', 'monthly', 'at_maturity']),
 	/**
 	 * Los tramos por encima de `annualRatePct`, del más bajo al más alto: la
 	 * parte de la cuenta por encima de `fromBalance` rinde su tasa, hasta el

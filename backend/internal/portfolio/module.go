@@ -149,6 +149,11 @@ func (m *Module) Routes(router fiber.Router) {
 	portfolios.Post("/cash/pockets", m.handler.CreateCashPocket)
 	portfolios.Put("/cash/pockets/:pocketId", m.handler.RenameCashPocket)
 	portfolios.Delete("/cash/pockets/:pocketId", m.handler.DeleteCashPocket)
+	// A fixed deposit is a pocket that keeps the rate of the day it was opened:
+	// opening one records its money, its rate and its term in one write, and
+	// cancelling one ends it early. It comes due on its own, in the nightly job.
+	portfolios.Post("/cash/deposits", m.handler.OpenFixedDeposit)
+	portfolios.Post("/cash/pockets/:pocketId/close", m.handler.CloseFixedDeposit)
 	// The rates cash accounts earn, as versions by the day each takes effect;
 	// see CashRateStore.
 	portfolios.Get("/cash/rates", m.handler.GetCashRates)

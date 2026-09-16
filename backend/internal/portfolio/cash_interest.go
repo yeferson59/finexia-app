@@ -56,12 +56,22 @@ func (v CashRateVersion) coversDay(day time.Time) bool {
 // creditsOn reports whether the interest of a day reaches the balance that
 // day. A rate posted daily credits every day; a monthly one credits on the
 // last day of the month, in one transaction for every day it holds.
+//
+// A rate posted at maturity (000048) holds every day until the last one it
+// earns, and pays them all there. That last day is the version's own end, which
+// is why only a fixed deposit is offered it: its end is written with it and
+// never moves, so the credit always lands. A version with no end credits
+// nothing, and there is none — OpenFixedDeposit and the cancellation both give
+// it one.
 func (v CashRateVersion) creditsOn(day time.Time) bool {
-	if v.Posting != PostingMonthly {
+	switch v.Posting {
+	case PostingMonthly:
+		return day.AddDate(0, 0, 1).Day() == 1
+	case PostingAtMaturity:
+		return v.EndedOn != nil && !day.Before(cashRateDay(*v.EndedOn))
+	default:
 		return true
 	}
-
-	return day.AddDate(0, 0, 1).Day() == 1
 }
 
 // compoundingDays is the base an effective annual rate is compounded on.
@@ -255,7 +265,9 @@ type CashAccrualTarget struct {
 	EntryID uuid.UUID
 	// OpenedOn is the day the balance was opened. It earns from then, not from
 	// its account's first day with a rate: whatever it was opened with was
-	// loaded with the interest it had already earned.
+	// loaded with the interest it had already earned. For a fixed deposit it is
+	// the day the money went in, which can be in the past — see
+	// GetCashAccrualTargets.
 	OpenedOn time.Time
 	// LastAccrued is the last day already computed, nil if none.
 	LastAccrued *time.Time

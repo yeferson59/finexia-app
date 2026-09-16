@@ -6,6 +6,7 @@ import * as platforms from '$lib/api/platforms';
 import { resolveDisplayCurrency } from '$lib/shared/currency';
 import {
 	cashErrorMessage,
+	cashMovementFields,
 	cashMoveSchema,
 	cashMovementCreateSchema,
 	cashMovementDeleteSchema,
@@ -14,11 +15,15 @@ import {
 	cashRateDeleteSchema,
 	cashRateEndSchema,
 	cashRateErrorMessage,
+	cashRateFields,
 	cashRateUpdateSchema,
 	cashPocketCreateSchema,
 	cashPocketDeleteSchema,
 	cashPocketErrorMessage,
 	cashPocketRenameSchema,
+	cashDepositCloseSchema,
+	cashDepositCreateSchema,
+	cashDepositErrorMessage,
 	cashRecalculateSchema,
 	CASH_RECALCULATE_FALLBACK,
 	toCalendarDateTime,
@@ -77,38 +82,12 @@ export const load: PageServerLoad = async ({ cookies, fetch, url, locals }) => {
 	};
 };
 
-function movementFields(formData: FormData) {
-	return {
-		kind: formData.get('kind'),
-		amount: formData.get('amount'),
-		fees: formData.get('fees'),
-		date: formData.get('date'),
-		notes: formData.get('notes')
-	};
-}
-
 /**
- * Los tramos llegan como dos listas paralelas, una entrada por fila. Una fila en
- * blanco no es un tramo, y el resto se ordena por saldo: el orden en que se
- * escribieron no cambia lo que dicen.
+ * El `fail` de una respuesta que no salió: el estado que dio el backend, o un
+ * 500 cuando lo que falló fue el viaje y no hay ninguno.
  */
-function tierFields(formData: FormData) {
-	const from = formData.getAll('tierFromBalance').map(String);
-	const pct = formData.getAll('tierAnnualRatePct').map(String);
-
-	return from
-		.map((fromBalance, i) => ({ fromBalance, annualRatePct: pct[i] ?? '' }))
-		.filter((tier) => tier.fromBalance.trim() !== '' || tier.annualRatePct.trim() !== '')
-		.sort((a, b) => (parseFloat(a.fromBalance) || 0) - (parseFloat(b.fromBalance) || 0));
-}
-
-function rateFields(formData: FormData) {
-	return {
-		annualRatePct: formData.get('annualRatePct'),
-		withholdingPct: formData.get('withholdingPct'),
-		posting: formData.get('posting') ?? 'daily',
-		tiers: tierFields(formData)
-	};
+function failed(res: { status: number }, error: string) {
+	return fail(res.status >= 400 ? res.status : 500, { error });
 }
 
 /*
@@ -121,7 +100,7 @@ export const actions = {
 		const formData = await request.formData();
 
 		const parsed = cashMovementCreateSchema.safeParse({
-			...movementFields(formData),
+			...cashMovementFields(formData),
 			portfolioId: formData.get('portfolioId'),
 			sourceId: formData.get('sourceId'),
 			currency: formData.get('currency'),
@@ -139,9 +118,7 @@ export const actions = {
 		);
 
 		if (!res.ok || !res.success) {
-			return fail(res.status >= 400 ? res.status : 500, {
-				error: cashErrorMessage(res.status, res.details)
-			});
+			return failed(res, cashErrorMessage(res.status, res.details));
 		}
 
 		return { success: true };
@@ -151,7 +128,7 @@ export const actions = {
 		const formData = await request.formData();
 
 		const parsed = cashMovementUpdateSchema.safeParse({
-			...movementFields(formData),
+			...cashMovementFields(formData),
 			id: formData.get('id')
 		});
 
@@ -163,9 +140,7 @@ export const actions = {
 		const res = await cash.updateMovement({ cookies, fetch }, id, toCashMovementBody(movement));
 
 		if (!res.ok || !res.success) {
-			return fail(res.status >= 400 ? res.status : 500, {
-				error: cashErrorMessage(res.status, res.details)
-			});
+			return failed(res, cashErrorMessage(res.status, res.details));
 		}
 
 		return { success: true };
@@ -183,12 +158,12 @@ export const actions = {
 		const res = await cash.deleteMovement({ cookies, fetch }, parsed.data.id);
 
 		if (!res.ok) {
-			return fail(res.status >= 400 ? res.status : 500, {
-				error:
-					res.status === 409
-						? 'No se puede borrar: ese dinero ya salió en un retiro y el saldo quedaría en negativo. Borra o reduce antes el retiro.'
-						: cashErrorMessage(res.status, res.details)
-			});
+			return failed(
+				res,
+				res.status === 409
+					? 'No se puede borrar: ese dinero ya salió en un retiro y el saldo quedaría en negativo. Borra o reduce antes el retiro.'
+					: cashErrorMessage(res.status, res.details)
+			);
 		}
 
 		return { success: true };
@@ -198,7 +173,7 @@ export const actions = {
 		const formData = await request.formData();
 
 		const parsed = cashRateCreateSchema.safeParse({
-			...rateFields(formData),
+			...cashRateFields(formData),
 			sourceId: formData.get('sourceId'),
 			currency: formData.get('currency'),
 			pocketId: formData.get('pocketId'),
@@ -222,9 +197,7 @@ export const actions = {
 		);
 
 		if (!res.ok || !res.success) {
-			return fail(res.status >= 400 ? res.status : 500, {
-				error: cashRateErrorMessage(res.status, res.details)
-			});
+			return failed(res, cashRateErrorMessage(res.status, res.details));
 		}
 
 		return { success: true };
@@ -234,7 +207,7 @@ export const actions = {
 		const formData = await request.formData();
 
 		const parsed = cashRateUpdateSchema.safeParse({
-			...rateFields(formData),
+			...cashRateFields(formData),
 			id: formData.get('id')
 		});
 
@@ -246,9 +219,7 @@ export const actions = {
 		const res = await cash.updateRate({ cookies, fetch }, id, toCashRateBody(values));
 
 		if (!res.ok || !res.success) {
-			return fail(res.status >= 400 ? res.status : 500, {
-				error: cashRateErrorMessage(res.status, res.details)
-			});
+			return failed(res, cashRateErrorMessage(res.status, res.details));
 		}
 
 		return { success: true };
@@ -271,9 +242,7 @@ export const actions = {
 		});
 
 		if (!res.ok || !res.success) {
-			return fail(res.status >= 400 ? res.status : 500, {
-				error: cashRateErrorMessage(res.status, res.details)
-			});
+			return failed(res, cashRateErrorMessage(res.status, res.details));
 		}
 
 		return { success: true };
@@ -309,9 +278,7 @@ export const actions = {
 		);
 
 		if (!res.ok || !res.success) {
-			return fail(res.status >= 400 ? res.status : 500, {
-				error: cashRateErrorMessage(res.status, res.details, CASH_RECALCULATE_FALLBACK)
-			});
+			return failed(res, cashRateErrorMessage(res.status, res.details, CASH_RECALCULATE_FALLBACK));
 		}
 
 		return { success: true };
@@ -337,9 +304,7 @@ export const actions = {
 		const res = await cash.createPocket({ cookies, fetch }, parsed.data);
 
 		if (!res.ok || !res.success) {
-			return fail(res.status >= 400 ? res.status : 500, {
-				error: cashPocketErrorMessage(res.status, res.details)
-			});
+			return failed(res, cashPocketErrorMessage(res.status, res.details));
 		}
 
 		return { success: true };
@@ -362,9 +327,7 @@ export const actions = {
 		});
 
 		if (!res.ok || !res.success) {
-			return fail(res.status >= 400 ? res.status : 500, {
-				error: cashPocketErrorMessage(res.status, res.details)
-			});
+			return failed(res, cashPocketErrorMessage(res.status, res.details));
 		}
 
 		return { success: true };
@@ -382,9 +345,79 @@ export const actions = {
 		const res = await cash.deletePocket({ cookies, fetch }, parsed.data.id);
 
 		if (!res.ok) {
-			return fail(res.status >= 400 ? res.status : 500, {
-				error: cashPocketErrorMessage(res.status, res.details)
-			});
+			return failed(res, cashPocketErrorMessage(res.status, res.details));
+		}
+
+		return { success: true };
+	},
+
+	/*
+	 * Los depósitos a tasa fija: abrirlos y cancelarlos. Borrar uno entero es la
+	 * misma acción que borra un bolsillo, porque un depósito es uno.
+	 *
+	 * Abrirlo dice el dinero, el plazo y la tasa a la vez: son una misma cosa, y
+	 * la tasa no se le da después. La fecha de apertura puede estar en el pasado,
+	 * y el backend calcula de una vez los días que ya ganó.
+	 */
+	openDeposit: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed = cashDepositCreateSchema.safeParse({
+			portfolioId: formData.get('portfolioId'),
+			sourceId: formData.get('sourceId'),
+			currency: formData.get('currency'),
+			name: formData.get('name'),
+			amount: formData.get('amount'),
+			openedOn: formData.get('openedOn'),
+			maturesOn: formData.get('maturesOn'),
+			annualRatePct: formData.get('annualRatePct'),
+			withholdingPct: formData.get('withholdingPct'),
+			posting: formData.get('posting') ?? 'daily'
+		});
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const { openedOn, maturesOn, ...deposit } = parsed.data;
+		const res = await cash.openDeposit(
+			{ cookies, fetch },
+			{
+				...deposit,
+				openedOn: toCalendarDateTime(openedOn),
+				// Sin plazo viaja como null, que es lo que el backend lee como
+				// «hasta que lo canceles».
+				maturesOn: maturesOn ? toCalendarDateTime(maturesOn) : null
+			}
+		);
+
+		if (!res.ok || !res.success) {
+			return failed(res, cashDepositErrorMessage(res.status, res.details));
+		}
+
+		return { success: true };
+	},
+
+	closeDeposit: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed = cashDepositCloseSchema.safeParse({
+			id: formData.get('id'),
+			closesOn: formData.get('closesOn'),
+			penalty: formData.get('penalty')
+		});
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const res = await cash.closeDeposit({ cookies, fetch }, parsed.data.id, {
+			closesOn: toCalendarDateTime(parsed.data.closesOn),
+			penalty: parsed.data.penalty
+		});
+
+		if (!res.ok || !res.success) {
+			return failed(res, cashDepositErrorMessage(res.status, res.details));
 		}
 
 		return { success: true };
@@ -419,12 +452,12 @@ export const actions = {
 		);
 
 		if (!res.ok || !res.success) {
-			return fail(res.status >= 400 ? res.status : 500, {
-				error:
-					res.status === 409
-						? 'No hay tanto dinero en el saldo del que sale. Mira lo que guarda y prueba con menos.'
-						: cashErrorMessage(res.status, res.details)
-			});
+			return failed(
+				res,
+				res.status === 409
+					? 'No hay tanto dinero en el saldo del que sale. Mira lo que guarda y prueba con menos.'
+					: cashErrorMessage(res.status, res.details)
+			);
 		}
 
 		return { success: true };
@@ -442,9 +475,7 @@ export const actions = {
 		const res = await cash.deleteRate({ cookies, fetch }, parsed.data.id);
 
 		if (!res.ok) {
-			return fail(res.status >= 400 ? res.status : 500, {
-				error: cashRateErrorMessage(res.status, res.details)
-			});
+			return failed(res, cashRateErrorMessage(res.status, res.details));
 		}
 
 		return { success: true };

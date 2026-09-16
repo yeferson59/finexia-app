@@ -1041,8 +1041,11 @@ bolsillos se comporta exactamente igual que antes.
 - **Borrar solo un bolsillo que nunca tuvo movimientos** (**409** si los tuvo):
   borrarlo con historia se llevaría esa historia por delante. Vacíalo con «Mover»
   y borra sus movimientos antes.
-- `kind` es `flexible`. `fixed` —un depósito a plazo con su tasa fija— se abre en
-  la fase siguiente; el valor ya existe para que las filas de hoy digan lo que son.
+- `kind` es `flexible` o `fixed`. Un `fixed` es un **depósito a tasa fija**: se
+  abre con `POST /portfolios/cash/deposits`, no con esta ruta, y no admite
+  movimientos ni versiones nuevas de su tasa (**409**). Borrarlo sí se hace con
+  el `DELETE` de arriba, y se lo lleva entero: el depósito, sus intereses, su
+  tasa y el bolsillo.
 
 **Los bolsillos son parte de la clave de una cuenta.** Donde antes se nombraba
 una cuenta con `sourceId` y `currency`, ahora se nombra con `pocketId` también:
@@ -1083,6 +1086,78 @@ no entró ni salió. Responde con las dos filas, `{from, to}`.
   se nombra (**400**).
 - Si el saldo del que sale no da, responde **409**, como un retiro, y no se
   escribe ninguna de las dos patas.
+
+**Depósitos a tasa fija** (`/portfolios/cash/deposits`, migración 000048). Un
+CDT, una cajita a plazo, una tasa promocional amarrada noventa días: un bolsillo
+de tipo `fixed` que **conserva la tasa del día en que se abrió**. Lleva un solo
+depósito —el de apertura—, una sola versión de su tasa, que no admite otra, y un
+vencimiento opcional.
+
+| Método y ruta | Qué hace |
+|---|---|
+| `POST /portfolios/cash/deposits` | Abre uno: el dinero, el plazo y la tasa en una sola escritura |
+| `POST /portfolios/cash/pockets/:pocketId/close` | Lo cancela antes de su plazo: `{closesOn, penalty}` |
+| `DELETE /portfolios/cash/pockets/:pocketId` | Lo borra entero, para algo que se anotó mal |
+
+```json
+{
+  "portfolioId": "…",
+  "sourceId": "3f7c…",
+  "currency": "COP",
+  "name": "CDT 90 días",
+  "amount": "10000000",
+  "openedOn": "2026-09-01T00:00:00Z",
+  "maturesOn": "2026-11-30T00:00:00Z",
+  "annualRatePct": "10",
+  "withholdingPct": "4",
+  "posting": "daily",
+  "tiers": []
+}
+```
+
+Responde con el bolsillo, ya con los días que ya había ganado calculados: un
+depósito abierto el 1 de septiembre y registrado el 15 responde con
+`balance: "10036624.23"`.
+
+- Lleva **portafolio**, a diferencia de un bolsillo flexible: un depósito es un
+  lote de dinero comprado una vez, por uno solo de ellos.
+- **`openedOn` puede estar en el pasado** —hasta cinco años atrás (**400**)— y no
+  puede ser futuro (**400**). En un depósito no se anotan intereses a mano, así
+  que no hay nada que contar dos veces: Finexia calcula de una vez los días
+  desde ese día hasta ayer y los abona como rendimiento. En la cuenta principal
+  y en los bolsillos flexibles sigue valiendo lo contrario: lo que la entidad ya
+  pagó se anota como un movimiento de intereses.
+- `maturesOn` es opcional —sin él, el depósito rinde hasta que se cancele— y
+  tiene que ser posterior a `openedOn` y no anterior a ayer (**400**). La versión
+  de su tasa termina **la víspera del vencimiento**, que es el último día que
+  rinde.
+- `posting` admite además `at_maturity`, que exige un `maturesOn` (**400**): los
+  días se calculan igual y se abonan todos el último. Ver *Intereses*.
+- El resto de los valores de la tasa —`annualRatePct`, `withholdingPct`,
+  `tiers`— se validan como los de cualquier versión.
+- `name` es único por cuenta, como el de cualquier bolsillo (**409**), y la
+  plataforma tiene que ser del usuario (**404**) y estar activa (**400**).
+
+**Al vencer**, el job de intereses mueve el saldo del depósito a la cuenta
+principal del mismo portafolio, con las dos patas fechadas el día del
+vencimiento. Como se compensan, la rentabilidad no se mueve. Corre después de
+causar el día, así que el último día que el depósito rinde ya está abonado
+cuando el dinero sale; si el job estuvo caído, la corrida siguiente lo hace con
+la misma fecha y no lo mueve dos veces.
+
+**Cancelar** (`POST /portfolios/cash/pockets/:pocketId/close`) hace lo mismo
+antes de tiempo: la tasa termina la víspera de `closesOn`, se abona lo que
+llevaba ganado y el saldo vuelve a la cuenta principal.
+
+```json
+{ "closesOn": "2026-10-15T00:00:00Z", "penalty": "50000" }
+```
+
+`penalty` viaja como **comisión del retiro**, así que las dos patas dejan de
+compensarse por esa cifra: lo que la entidad se queda cuenta como **pérdida**,
+no como dinero que el dueño sacó. `closesOn` no puede ser anterior a ayer
+(**400**) ni alcanzar un día ya calculado (**409**), y un depósito ya cerrado
+responde **409**.
 
 **Tasas** (`/portfolios/cash/rates`, migración 000043). La tasa que rinde una
 cuenta —plataforma, moneda y bolsillo, no portafolio— es una tasa efectiva anual en
@@ -1125,7 +1200,9 @@ pausar o borrar.
   < 100, con hasta 2.
 - `posting` es `daily` (el valor por defecto si se omite) o `monthly`: con
   `monthly`, los días se calculan igual y se abonan todos juntos el último día
-  del mes.
+  del mes. Hay un tercero, `at_maturity`, que solo acepta un depósito a tasa
+  fija: es su vencimiento el que dice cuándo cae el abono, y una cuenta sin
+  vencimiento no tendría ninguno (**400**).
 - `tiers` son los **tramos** (migración 000046): `annualRatePct` rige desde 0, y
   cada tramo dice desde qué saldo de la cuenta rige otra tasa, hasta el tramo
   siguiente. Van de menor a mayor `fromBalance`, sin repetir, 10 como máximo;
@@ -1185,6 +1262,16 @@ sobre el que ganan los siguientes, así que un año abonado por meses rinde lo
 mismo que uno abonado por días. Si la cuenta deja de rendir antes de que cierre
 el mes —la tasa se pausó—, el job abona lo pendiente el último día que ganó, en
 vez de esperar un cierre que no va a llegar.
+
+Con `posting: "at_maturity"` (migración 000048) pasa lo mismo, pero el cierre
+que los abona es **el último día que la versión rinde** —la víspera del
+vencimiento— en vez de un fin de mes. Es lo que hace que el saldo cuadre con un
+extracto que solo enseña el capital hasta el final, a cambio de que el valor del
+portafolio salte ese día; por eso el valor por defecto sigue siendo `daily`.
+
+Un **depósito a tasa fija** gana desde el día en que se abrió y no desde el día
+en que se registró, que es la única excepción a la regla de arriba: como en él
+no se anota nada a mano, nada se puede contar dos veces.
 
 Con tope, cada saldo gana sobre su parte de él: `saldo × mín(1, tope / lo que
 guarda la cuenta ese día)`.

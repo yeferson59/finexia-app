@@ -13,8 +13,26 @@ import (
 // AccrueCashInterest computes every day of interest not yet computed, through
 // the given day, on every balance whose account has a rate, and credits what is
 // due. It returns how many credits it wrote. This is what the nightly job runs.
+//
+// Then it settles the fixed deposits that have come due (000048), in that order
+// and never the other way round: a deposit earns through the day before it
+// matures, so its last day has to be credited while its money is still in it.
+// The two legs that move the money are dated on the day it came due and offset
+// each other, so a sweep that runs a day late reads the same as one that did
+// not.
 func (s *service) AccrueCashInterest(ctx context.Context, through time.Time) (int, []error) {
 	credited, _, errs := s.accrueCashInterest(ctx, through, CashAccrualFilter{})
+
+	matured, err := s.repo.MatureCashPockets(ctx, cashRateDay(through).AddDate(0, 0, 1))
+	if err != nil {
+		s.log.Error(ctx, "maturing cash deposits failed", logger.Err(err))
+
+		return credited, append(errs, err)
+	}
+
+	if matured > 0 {
+		s.log.Info(ctx, "cash deposits matured", logger.Int("deposits", matured))
+	}
 
 	return credited, errs
 }

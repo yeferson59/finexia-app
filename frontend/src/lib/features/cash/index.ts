@@ -11,6 +11,10 @@
  * abre y renombra, y `cash-move-form` mueve dinero entre los cajones de una
  * cuenta en una sola transacción.
  *
+ * Un depósito a tasa fija (000048) es un bolsillo que conserva la tasa del día
+ * en que se abrió: `cash-deposit-form` lo abre —dinero, plazo y tasa a la vez—
+ * y luego lo cancela o lo borra, porque no hay nada más que hacerle.
+ *
  * `cash-delete-confirm` es interno de `cash-movements` (import relativo) y no
  * forma parte de la superficie pública.
  */
@@ -27,8 +31,14 @@ export {
 	type CashPocketTarget
 } from './components/cash-pocket-form.svelte';
 export { default as CashMoveForm, type CashMoveTarget } from './components/cash-move-form.svelte';
+export {
+	default as CashDepositForm,
+	type CashDepositTarget
+} from './components/cash-deposit-form.svelte';
 
 export * from './cash';
+export * from './pockets';
 export * from './rates';
+export * from './deposits';
 export * from './interest';
 export * from './schemas';

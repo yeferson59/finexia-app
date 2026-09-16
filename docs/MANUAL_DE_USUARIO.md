@@ -546,6 +546,34 @@ Una vez creado, el bolsillo aparece sangrado bajo su cuenta, con su propia líne
 
 Dos cuentas distintas pueden tener cada una su «Viajes». Dos bolsillos de la misma cuenta, no.
 
+### 9.8 Depósitos a tasa fija: CDT y cajitas a plazo
+
+Un CDT, una cajita a plazo, una tasa promocional amarrada noventa días: dinero que se queda quieto un tiempo a una tasa que ya no cambia. En Finexia es un **depósito a tasa fija**, que es un bolsillo especial: conserva la tasa del día en que lo abriste, aunque la entidad cambie la suya después.
+
+Al pie de los saldos de la cuenta, junto a «Agregar bolsillo», está **Abrir depósito**.
+
+| Campo | Qué escribir |
+|---|---|
+| **Nombre** | Como lo llames tú: «CDT 90 días», «Cajita a plazo» |
+| **Importe** | Lo que metiste |
+| **Lo abriste el** | El día en que metiste el dinero. **Puede ser una fecha pasada** |
+| **Plazo** | 30, 60, 90, 180 o 360 días, otra fecha, o **sin plazo** |
+| **Tasa** | La efectiva anual que te prometieron |
+| **Retención** | Lo que te descuentan de los intereses, si te descuentan algo |
+| **Abono** | **Cada día**, o **todo al vencer** si tu extracto solo enseña el capital hasta el final |
+
+> **«Lo abrí hace días» tiene arreglo aquí.** Pon la fecha real y Finexia calcula de una vez lo que ya ganó. Un CDT de $ 10.000.000 al 10 % abierto el 1 de septiembre y registrado el 15 aparece con $ 36.624 de intereses en cuanto lo guardas. Esto **solo vale para un depósito a tasa fija**: en él no se anotan intereses a mano, así que nada se cuenta dos veces. En una cuenta normal, lo que ya te pagaron se anota como un movimiento de **Intereses** (ver 9.5).
+
+Mientras escribes, el formulario te dice **lo que rendirá al vencer**: $ 10.000.000 al 10 % a 90 días con 4 % de retención dan unos $ 228.176 netos.
+
+**En un depósito no se anota nada a mano.** Ni depósitos, ni retiros, ni intereses, ni una tasa nueva: es un importe, a una tasa, por un plazo, y cualquiera de esas cosas lo convertiría en otra cosa. Lo que sí puedes hacer está en **Ver depósito**, en su línea.
+
+**Al vencer, el dinero vuelve solo.** El día del vencimiento Finexia mueve el saldo —capital e intereses— a la cuenta principal de su portafolio, y el depósito desaparece de la lista de cuentas. Tu rentabilidad no se mueve: el dinero cambió de cajón.
+
+**Cancelarlo antes.** En **Ver depósito**, elige el día y, si la entidad te cobra algo por romperlo, escribe la **penalidad**. La tasa termina la víspera, se te abona lo que llevabas ganado y el resto vuelve a la cuenta principal. Lo que se quedó la entidad **cuenta como pérdida**, no como dinero que sacaste, que es exactamente lo que fue.
+
+**Borrarlo** es otra cosa: quita el depósito entero —el dinero, los intereses y la tasa—, como si nunca hubiera existido. Es para algo que anotaste mal. Si el dinero sí estuvo ahí, cancélalo.
+
 ---
 
 ## 10. Transacciones

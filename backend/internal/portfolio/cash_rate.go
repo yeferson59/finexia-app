@@ -52,6 +52,11 @@ type InterestPosting string
 const (
 	PostingDaily   InterestPosting = "daily"
 	PostingMonthly InterestPosting = "monthly"
+	// PostingAtMaturity computes every day as the other two do and credits them
+	// all on the last day the rate earns (000048). Only a fixed deposit takes
+	// it: it is the version's end that says when the credit lands, and only a
+	// deposit has one it cannot move.
+	PostingAtMaturity InterestPosting = "at_maturity"
 )
 
 var (
@@ -250,6 +255,14 @@ func notBeforeGrace(field string, day, today time.Time) error {
 
 // Validate checks the values of a version, which a correction rewrites.
 func (in CashRateInput) Validate() error {
+	return in.validateValues(false)
+}
+
+// validateValues is Validate with the one rule that depends on where the
+// version lands: at_maturity is only offered where there is a maturity to
+// credit on, which is a fixed deposit (000048). An account's own rate is
+// refused it, because nothing would ever make the credit land.
+func (in CashRateInput) validateValues(atMaturity bool) error {
 	if !in.AnnualRatePct.IsPos() || in.AnnualRatePct.GreaterThan(maxAnnualRatePct) {
 		return invalidCashRate("annualRatePct must be greater than 0 and at most 100")
 	}
@@ -268,7 +281,15 @@ func (in CashRateInput) Validate() error {
 
 	switch in.Posting {
 	case PostingDaily, PostingMonthly:
+	case PostingAtMaturity:
+		if !atMaturity {
+			return invalidCashRate("posting must be one of: daily, monthly")
+		}
 	default:
+		if atMaturity {
+			return invalidCashRate("posting must be one of: daily, monthly, at_maturity")
+		}
+
 		return invalidCashRate("posting must be one of: daily, monthly")
 	}
 

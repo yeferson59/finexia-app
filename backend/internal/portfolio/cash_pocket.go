@@ -47,6 +47,18 @@ var (
 	// ErrInvalidCashMove rejects a transfer between two balances that cannot be
 	// made as stated: to itself, across platforms, across currencies.
 	ErrInvalidCashMove = httpx.AsBadRequest(errors.New("invalid cash move"))
+	// ErrCashPocketFixed refuses a write a fixed deposit does not take: a deposit,
+	// a withdrawal or an interest recorded by hand in it, a new version of its
+	// rate, or pausing the one it has. A deposit is one amount at one rate for
+	// one term, and every one of those would make it something else. It is a
+	// conflict rather than a bad request: the write is fine, the pocket is not
+	// the place for it, and cancelling the deposit is what opens that place.
+	ErrCashPocketFixed = httpx.AsConflict(errors.New("a fixed deposit takes no movements or rate versions of its own"))
+	// ErrCashPocketClosed refuses to cancel a deposit that has already ended,
+	// whether it came due or was cancelled before. It is what makes settling one
+	// idempotent: the job catching up after a day down finds it closed and moves
+	// nothing a second time.
+	ErrCashPocketClosed = httpx.AsConflict(errors.New("the deposit is already closed"))
 )
 
 // CashPocketKind is what a pocket is for.
@@ -56,9 +68,10 @@ const (
 	// PocketFlexible takes deposits and withdrawals like the main account does,
 	// and earns whatever rate its versions say.
 	PocketFlexible CashPocketKind = "flexible"
-	// PocketFixed is a deposit that keeps the rate of the day it was opened,
-	// with a maturity. Opening one comes with the phase after this one; the kind
-	// is read here so a pocket that is one is never written to by hand.
+	// PocketFixed is a deposit that keeps the rate of the day it was opened, with
+	// an optional maturity: a CDT, a term pocket, a promotional rate locked for
+	// ninety days. It holds one deposit and one version of its rate, and takes no
+	// writes by hand — see NewFixedDepositInput and ErrCashPocketFixed.
 	PocketFixed CashPocketKind = "fixed"
 )
 
@@ -67,8 +80,14 @@ func (k CashPocketKind) IsValid() bool {
 	return k == PocketFlexible || k == PocketFixed
 }
 
-// maxCashPocketNameLen mirrors cash_pockets.name VARCHAR(100).
-const maxCashPocketNameLen = 100
+const (
+	// maxCashPocketNameLen mirrors cash_pockets.name VARCHAR(100).
+	maxCashPocketNameLen = 100
+	// maxFixedDepositYears is how far back a deposit can be opened. Recording one
+	// costs a day of computation per day since it opened, and a term nobody
+	// quotes is a mistyped year: 2016 for 2026.
+	maxFixedDepositYears = 5
+)
 
 // CashPocket is one subaccount of a cash account.
 type CashPocket struct {
@@ -237,4 +256,141 @@ func (in CashMoveInput) legs() (out, into CashMovementInput) {
 type CashMove struct {
 	From CashMovement `json:"from"`
 	To   CashMovement `json:"to"`
+}
+
+// A fixed deposit is a pocket of kind fixed (000048). It is opened whole — the
+// money, the rate and the term in one write — and from then on only two things
+// happen to it: the days it earns, and the day it ends.
+//
+// It is the one cash account that can be recorded late. Nothing is written in
+// it by hand, so there is nothing to count twice: a deposit opened two weeks
+// ago and registered today is computed from the day it opened, and the days it
+// already earned are credited at once. The main account and a flexible pocket
+// stay the other way round — what the platform already paid is recorded as an
+// interest movement, because the statement's figure is exact and a computation
+// is an estimate.
+
+// NewFixedDepositInput is a deposit as the owner states it: what went in, where,
+// when, and at what rate.
+//
+// It carries a portfolio because a deposit is one lot of money. An account is
+// shared by every portfolio that keeps money on the platform; a CDT is bought
+// once, by one of them.
+type NewFixedDepositInput struct {
+	PortfolioID uuid.UUID
+	SourceID    uuid.UUID
+	Currency    money.Currency
+	Name        string
+	// Amount is what was deposited, in Currency.
+	Amount decimal.Decimal
+	// OpenedOn is the day the money went in, which is the first day it earns.
+	OpenedOn time.Time
+	// MaturesOn is the day it comes due, nil for a deposit at no term. The rate
+	// runs through the day before, and on the day itself the money goes back to
+	// the main account.
+	MaturesOn *time.Time
+	// CashRateInput is the rate it keeps: the version written with it, which
+	// never gets another.
+	CashRateInput
+}
+
+// CleanName is the name as it is stored, trimmed like any other pocket's.
+func (in NewFixedDepositInput) CleanName() string {
+	return strings.TrimSpace(in.Name)
+}
+
+// Validate checks what the deposit states. today is the server's clock.
+//
+// The account, the portfolio and the money are checked where they can be
+// locked, in the repository.
+func (in NewFixedDepositInput) Validate(today time.Time) error {
+	if in.PortfolioID == (uuid.UUID{}) || in.SourceID == (uuid.UUID{}) {
+		return invalidCashPocket("portfolioId and sourceId are required")
+	}
+
+	if !currency.IsSupported(in.Currency) {
+		return invalidCashPocket("currency must be one of: %s", currency.List())
+	}
+
+	if err := validateCashPocketName(in.Name); err != nil {
+		return err
+	}
+
+	if !in.Amount.IsPos() || !in.Amount.LessThan(maxCashRateBalance) {
+		return invalidCashPocket("amount must be greater than 0 and less than %s", maxCashRateBalance)
+	}
+
+	day := cashRateDay(today)
+
+	switch {
+	case in.OpenedOn.IsZero():
+		return invalidCashPocket("openedOn is required")
+	case cashRateDay(in.OpenedOn).After(day):
+		return invalidCashPocket("openedOn cannot be in the future")
+	case cashRateDay(in.OpenedOn).Before(day.AddDate(-maxFixedDepositYears, 0, 0)):
+		return invalidCashPocket("openedOn cannot be more than %d years ago", maxFixedDepositYears)
+	}
+
+	if in.MaturesOn != nil {
+		matures := cashRateDay(*in.MaturesOn)
+
+		// Its term has to have some of itself left. One that came due already is
+		// a deposit that has been paid, and what that leaves is a deposit and an
+		// interest in the main account, recorded as the movements they were.
+		switch {
+		case !matures.After(cashRateDay(in.OpenedOn)):
+			return invalidCashPocket("maturesOn must be after openedOn")
+		case matures.Before(day.AddDate(0, 0, -cashRateDateGrace)):
+			return invalidCashPocket("maturesOn cannot be before %s: a deposit that already came due is recorded as the movements it paid", day.AddDate(0, 0, -cashRateDateGrace).Format(time.DateOnly))
+		}
+	}
+
+	// Crediting at maturity needs a maturity to credit on.
+	if in.Posting == PostingAtMaturity && in.MaturesOn == nil {
+		return invalidCashPocket("posting at_maturity needs a maturesOn to credit on")
+	}
+
+	return in.validateValues(true)
+}
+
+// CloseFixedDepositInput cancels a deposit before its term, or ends one that
+// has none.
+//
+// The rate stops the day before, what it has earned and not credited is paid,
+// and the balance goes back to the main account of its portfolio. What the
+// platform charges for breaking the term rides on that withdrawal as its fee,
+// so it counts as a loss and not as money the owner took out.
+type CloseFixedDepositInput struct {
+	// ClosesOn is the day the money moves, and the first day the deposit no
+	// longer earns.
+	ClosesOn time.Time
+	// Penalty is what the platform keeps for cancelling early, in the deposit's
+	// currency. Zero when there is none.
+	Penalty decimal.Decimal
+}
+
+// Validate checks what the cancellation states. today is the server's clock.
+func (in CloseFixedDepositInput) Validate(today time.Time) error {
+	if in.ClosesOn.IsZero() {
+		return invalidCashPocket("closesOn is required")
+	}
+
+	// Past days are not recomputed, so a deposit cannot stop earning in one.
+	earliest := cashRateDay(today).AddDate(0, 0, -cashRateDateGrace)
+	if cashRateDay(in.ClosesOn).Before(earliest) {
+		return invalidCashPocket("closesOn cannot be before %s: past days are not recomputed", earliest.Format(time.DateOnly))
+	}
+
+	// And it cannot stop in a day that has not happened: the money moves when
+	// the cancellation is recorded, and the days up to then are computed with
+	// it — days the deposit has not lived yet.
+	if cashRateDay(in.ClosesOn).After(cashRateDay(today)) {
+		return invalidCashPocket("closesOn cannot be in the future")
+	}
+
+	if in.Penalty.IsNeg() {
+		return invalidCashPocket("penalty cannot be negative")
+	}
+
+	return nil
 }

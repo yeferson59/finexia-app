@@ -107,13 +107,19 @@ func cashRateSteps(ctx context.Context, tx pgx.Tx, rateID uuid.UUID) ([]CashRate
 //
 // Only the balances the cash writers keep earn: in their own currency, at one
 // unit per unit. A dollar position bought with pesos is not a savings account.
+//
+// A balance earns from the day it was opened in Finexia, because whatever it was
+// opened with already carried the interest it had earned before that. A fixed
+// deposit (000048) is the exception: it earns from the day the money went in,
+// which is what its pocket says and which can be weeks back, because nothing is
+// ever recorded in it by hand and so nothing can be counted twice.
 func (r *PostgresRepository) GetCashAccrualTargets(ctx context.Context, through time.Time, filter CashAccrualFilter) ([]CashAccrualTarget, error) {
 	userID, sourceID, cur, scoped, pocketID := scopeArgs(filter)
 
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			pe.id,
-			(pe.created_at AT TIME ZONE 'UTC')::date,
+			CASE WHEN pk.kind = 'fixed' THEN pk.opened_on ELSE (pe.created_at AT TIME ZONE 'UTC')::date END,
 			(SELECT MAX(ac.accrual_date) FROM cash_interest_accruals ac WHERE ac.entry_id = pe.id),
 			r.id,
 			r.annual_rate,
@@ -122,8 +128,9 @@ func (r *PostgresRepository) GetCashAccrualTargets(ctx context.Context, through 
 			r.effective_from,
 			r.ended_on
 		FROM portfolio_entries pe
-		JOIN portfolios p       ON p.id = pe.portfolio_id
-		JOIN assets a           ON a.id = pe.asset_id
+		JOIN portfolios p         ON p.id = pe.portfolio_id
+		JOIN assets a             ON a.id = pe.asset_id
+		LEFT JOIN cash_pockets pk ON pk.id = pe.pocket_id
 		JOIN cash_yield_rates r ON r.source_id = pe.source_id
 		                       AND r.currency  = pe.cost_currency
 		                       AND r.pocket_id IS NOT DISTINCT FROM pe.pocket_id

@@ -102,6 +102,46 @@ export function toCashMovementBody(data: MovementFields) {
 	};
 }
 
+/**
+ * Lo que el formulario de un movimiento manda, tal cual, para dárselo a su
+ * schema. Vive junto al schema porque es su otra mitad: los nombres de los
+ * campos y las reglas que los juzgan cambian a la vez.
+ */
+export function cashMovementFields(formData: FormData) {
+	return {
+		kind: formData.get('kind'),
+		amount: formData.get('amount'),
+		fees: formData.get('fees'),
+		date: formData.get('date'),
+		notes: formData.get('notes')
+	};
+}
+
+/**
+ * Los tramos llegan como dos listas paralelas, una entrada por fila. Una fila en
+ * blanco no es un tramo, y el resto se ordena por saldo: el orden en que se
+ * escribieron no cambia lo que dicen.
+ */
+function cashRateTierFields(formData: FormData) {
+	const from = formData.getAll('tierFromBalance').map(String);
+	const pct = formData.getAll('tierAnnualRatePct').map(String);
+
+	return from
+		.map((fromBalance, i) => ({ fromBalance, annualRatePct: pct[i] ?? '' }))
+		.filter((tier) => tier.fromBalance.trim() !== '' || tier.annualRatePct.trim() !== '')
+		.sort((a, b) => (parseFloat(a.fromBalance) || 0) - (parseFloat(b.fromBalance) || 0));
+}
+
+/** Los valores de una versión de la tasa como los manda su formulario. */
+export function cashRateFields(formData: FormData) {
+	return {
+		annualRatePct: formData.get('annualRatePct'),
+		withholdingPct: formData.get('withholdingPct'),
+		posting: formData.get('posting') ?? 'daily',
+		tiers: cashRateTierFields(formData)
+	};
+}
+
 /** Si `value` no tiene más decimales de los que caben, sin tropezar con la coma flotante. */
 function hasAtMostDecimals(value: number, decimals: number): boolean {
 	const scaled = value * 10 ** decimals;
@@ -219,25 +259,24 @@ export const cashRecalculateSchema = z.object({
 	from: z.iso.date('Elige desde qué día recalcular.')
 });
 
+/** El nombre de un cajón de la cuenta, como lo guarda el backend: recortado. */
+const cashPocketName = z
+	.string('Ponle un nombre al bolsillo.')
+	.transform((v) => v.trim())
+	.refine((v) => v.length > 0, 'Ponle un nombre al bolsillo.')
+	.refine((v) => v.length <= 100, 'El nombre no puede pasar de 100 caracteres.');
+
 /** Abrir un bolsillo flexible en una cuenta. */
 export const cashPocketCreateSchema = z.object({
 	sourceId: z.uuid('Elige la plataforma.'),
 	currency: z.enum(SUPPORTED_CURRENCIES, 'Elige la moneda.'),
-	name: z
-		.string('Ponle un nombre al bolsillo.')
-		.transform((v) => v.trim())
-		.refine((v) => v.length > 0, 'Ponle un nombre al bolsillo.')
-		.refine((v) => v.length <= 100, 'El nombre no puede pasar de 100 caracteres.')
+	name: cashPocketName
 });
 
 /** Lo único que cambia de un bolsillo es el nombre. */
 export const cashPocketRenameSchema = z.object({
 	id: z.uuid('No sabemos qué bolsillo renombrar.'),
-	name: z
-		.string('Ponle un nombre al bolsillo.')
-		.transform((v) => v.trim())
-		.refine((v) => v.length > 0, 'Ponle un nombre al bolsillo.')
-		.refine((v) => v.length <= 100, 'El nombre no puede pasar de 100 caracteres.')
+	name: cashPocketName
 });
 
 export const cashPocketDeleteSchema = z.object({
@@ -270,6 +309,107 @@ export const cashMoveSchema = z
 		path: ['toPocketId'],
 		error: 'Elige un destino distinto del origen.'
 	});
+
+/**
+ * Un depósito a tasa fija: el dinero, el día en que se abrió, el plazo y la
+ * tasa, todo en una sola escritura, porque son una misma cosa. La tasa no se le
+ * da después al bolsillo: es lo que el bolsillo es.
+ *
+ * `openedOn` puede estar en el pasado —«lo abrí hace dos semanas»— y el backend
+ * calcula de una vez los días que ya ganó. `maturesOn` vacío es un depósito sin
+ * plazo.
+ */
+export const cashDepositCreateSchema = z
+	.object({
+		portfolioId: z.uuid('Elige el portafolio.'),
+		sourceId: z.uuid('Elige la plataforma.'),
+		currency: z.enum(SUPPORTED_CURRENCIES, 'Elige la moneda.'),
+		name: cashPocketName,
+		amount: z.coerce
+			.number('Escribe el importe con números.')
+			.positive('El importe tiene que ser mayor que cero.')
+			.lt(1e12, 'El importe es demasiado grande.'),
+		openedOn: z.iso.date('Elige el día en que abriste el depósito.'),
+		maturesOn: z
+			.union([z.iso.date('Elige la fecha de vencimiento.'), z.literal('')])
+			.nullish()
+			.transform((v) => v || undefined),
+		annualRatePct: rateValues.annualRatePct,
+		withholdingPct: rateValues.withholdingPct,
+		posting: z
+			.enum(['daily', 'monthly', 'at_maturity'], 'Elige cada cuánto se abonan los intereses.')
+			.default('daily')
+	})
+	.refine((v) => !v.maturesOn || v.maturesOn > v.openedOn, {
+		path: ['maturesOn'],
+		error: 'El vencimiento tiene que ser posterior al día en que lo abriste.'
+	})
+	// Abonar al vencer necesita un vencimiento en el que abonar.
+	.refine((v) => v.posting !== 'at_maturity' || !!v.maturesOn, {
+		path: ['maturesOn'],
+		error: 'Para abonar al vencimiento hay que ponerle un plazo.'
+	});
+
+/**
+ * Cancelar un depósito antes de su plazo: el día en que el dinero vuelve a la
+ * cuenta principal, y lo que cobra la entidad por romperlo.
+ */
+export const cashDepositCloseSchema = z.object({
+	id: z.uuid('No sabemos qué depósito cancelar.'),
+	// Hoy o ayer: un día futuro calcularía días que el depósito no ha vivido, y
+	// uno pasado querría recalcular días que ya están cerrados.
+	closesOn: z.iso.date('Elige el día en que lo cancelas.'),
+	penalty: z.coerce
+		.number('Escribe la penalidad con números.')
+		.nonnegative('La penalidad no puede ser negativa.')
+		.default(0)
+});
+
+/** Lo que se dice cuando un depósito no se puede abrir ni cancelar. */
+export function cashDepositErrorMessage(status: number, details = ''): string {
+	if (details.includes('takes no movements or rate versions')) {
+		return 'Un depósito a tasa fija no admite movimientos ni cambios de tasa. Cancélalo si quieres sacar el dinero antes.';
+	}
+	if (details.includes('already closed')) {
+		return 'Ese depósito ya está cerrado. Recarga la página.';
+	}
+	if (details.includes('already earned interest')) {
+		const from = details.match(/cancelled from (\d{4}-\d{2}-\d{2})/)?.[1];
+		return from
+			? `Ya hay intereses calculados más allá de ese día. Cancélalo el ${from} o después.`
+			: 'Ya hay intereses calculados más allá de ese día. Elige un día posterior.';
+	}
+	if (details.includes('closesOn cannot be in the future')) {
+		return 'No puedes cancelarlo en un día que aún no ha pasado. Elige hoy.';
+	}
+	if (details.includes('closesOn cannot be before')) {
+		return 'Elige hoy o ayer: los días pasados no se recalculan.';
+	}
+	if (details.includes('openedOn cannot be in the future')) {
+		return 'La fecha de apertura no puede ser futura: pon el día en que metiste el dinero.';
+	}
+	if (details.includes('more than 5 years ago')) {
+		return 'La fecha de apertura no puede ser de hace más de cinco años.';
+	}
+	if (details.includes('maturesOn must be after openedOn')) {
+		return 'El vencimiento tiene que ser posterior al día en que lo abriste.';
+	}
+	if (details.includes('maturesOn cannot be before')) {
+		return 'Ese depósito ya venció. Anótalo como un depósito y unos intereses en la cuenta, que es lo que te pagaron.';
+	}
+	if (details.includes('needs a maturesOn')) {
+		return 'Para abonar al vencimiento hay que ponerle un plazo.';
+	}
+	if (details.includes('platform is inactive')) {
+		return 'Esa plataforma está inactiva. Actívala para abrir un depósito en ella.';
+	}
+	if (details.includes('already has a pocket with that name')) {
+		return 'Esa cuenta ya tiene un bolsillo con ese nombre. Ponle otro.';
+	}
+	if (status === 404) return 'No encontramos esa cuenta. Recarga la página.';
+
+	return details || 'No pudimos guardar el depósito. Vuelve a intentarlo en un momento.';
+}
 
 /** Lo que se dice cuando un bolsillo no se puede guardar ni borrar. */
 export function cashPocketErrorMessage(status: number, details?: string): string {

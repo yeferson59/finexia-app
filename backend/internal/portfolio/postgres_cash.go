@@ -252,6 +252,12 @@ func requireCashAccount(ctx context.Context, tx pgx.Tx, userID, portfolioID, sou
 // A pocket carries its own platform and currency, so one that disagrees with
 // what the request said is refused rather than quietly preferred: the caller
 // believes it is writing somewhere else.
+//
+// A fixed deposit is refused outright (000048). It holds one deposit at one
+// rate for one term, and a movement by hand would make it something else; the
+// writes that do move its money — opening it, settling it — hold the pocket
+// already and go straight to writeCashMovement, which is why this guard sits in
+// front of that rather than inside it.
 func requireWritablePocket(ctx context.Context, tx pgx.Tx, userID, pocketID, sourceID uuid.UUID, cur money.Currency) (*uuid.UUID, error) {
 	if pocketID == (uuid.UUID{}) {
 		return nil, nil
@@ -264,6 +270,10 @@ func requireWritablePocket(ctx context.Context, tx pgx.Tx, userID, pocketID, sou
 
 	if locked.sourceID != sourceID || locked.currency != cur {
 		return nil, invalidCash("that pocket belongs to another account, so it cannot hold a movement of this one")
+	}
+
+	if locked.kind == PocketFixed {
+		return nil, fmt.Errorf("%w: cancel it to get the money back", ErrCashPocketFixed)
 	}
 
 	return &locked.id, nil
@@ -566,22 +576,31 @@ type lockedCashMovement struct {
 	balance      decimal.Decimal
 	costCurrency money.Currency
 	editable     bool
+	// fixed is whether it sits in a fixed deposit. Its rows are the deposit that
+	// opened it and the interest it earned, and neither is the owner's to
+	// rewrite: what the deposit says is settled by cancelling it.
+	fixed bool
 }
 
 func lockCashMovement(ctx context.Context, tx pgx.Tx, userID, txnID uuid.UUID) (lockedCashMovement, error) {
 	var m lockedCashMovement
 
 	err := tx.QueryRow(ctx, `
-		SELECT t.type, t.quantity, pe.quantity, pe.cost_currency, `+cashMovementEditable+`
+		SELECT t.type, t.quantity, pe.quantity, pe.cost_currency, `+cashMovementEditable+`,
+		       EXISTS (SELECT 1 FROM cash_pockets pk WHERE pk.id = pe.pocket_id AND pk.kind = 'fixed')
 		FROM transactions t
 		JOIN portfolio_entries pe ON pe.id = t.entry_id
 		JOIN portfolios p         ON p.id = pe.portfolio_id
 		JOIN assets a             ON a.id = pe.asset_id
 		WHERE t.id = $1 AND p.user_id = $2 AND a.asset_type = 'cash'
 		FOR UPDATE OF pe
-	`, txnID, userID).Scan(&m.txnType, &m.quantity, &m.balance, &m.costCurrency, &m.editable)
+	`, txnID, userID).Scan(&m.txnType, &m.quantity, &m.balance, &m.costCurrency, &m.editable, &m.fixed)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return m, ErrCashMovementNotFound
+	}
+
+	if err == nil && m.fixed {
+		return m, fmt.Errorf("%w: cancel it or delete it whole", ErrCashPocketFixed)
 	}
 
 	return m, err
@@ -686,6 +705,30 @@ func requireTypeAllowed(ctx context.Context, tx pgx.Tx, entryID uuid.UUID, t Tra
 
 	if !t.AllowedOn(assetType) {
 		return ErrCashInterestOutsideCash
+	}
+
+	return nil
+}
+
+// requireWritableEntry refuses a position that belongs to a fixed deposit
+// (000048). The generic transaction writers call it, next to requireTypeAllowed
+// and for the same reason: the positions screen reaches every position there
+// is, and a deposit recorded there would stop being one deposit at one rate.
+func requireWritableEntry(ctx context.Context, tx pgx.Tx, entryID uuid.UUID) error {
+	var fixed bool
+
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM portfolio_entries pe
+			JOIN cash_pockets pk ON pk.id = pe.pocket_id
+			WHERE pe.id = $1 AND pk.kind = 'fixed'
+		)
+	`, entryID).Scan(&fixed); err != nil {
+		return err
+	}
+
+	if fixed {
+		return fmt.Errorf("%w: cancel it or delete it whole", ErrCashPocketFixed)
 	}
 
 	return nil

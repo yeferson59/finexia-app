@@ -160,9 +160,14 @@ type fakeRepository struct {
 	createCashMovement              func(ctx context.Context, userID, portfolioID, sourceID, pocketID uuid.UUID, in CashMovementInput) (CashMovement, error)
 	moveCash                        func(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMoveInput) (CashMove, error)
 	getCashPocketsByUserID          func(ctx context.Context, userID uuid.UUID) ([]CashPocket, error)
+	getCashPocketByID               func(ctx context.Context, userID, pocketID uuid.UUID) (CashPocket, error)
 	createCashPocket                func(ctx context.Context, userID uuid.UUID, in NewCashPocketInput) (CashPocket, error)
 	renameCashPocket                func(ctx context.Context, userID, pocketID uuid.UUID, in RenameCashPocketInput) (CashPocket, error)
 	deleteCashPocket                func(ctx context.Context, userID, pocketID uuid.UUID) error
+	openFixedDeposit                func(ctx context.Context, userID uuid.UUID, in NewFixedDepositInput) (CashPocket, error)
+	endFixedDeposit                 func(ctx context.Context, userID, pocketID uuid.UUID, closesOn time.Time) (CashPocket, error)
+	settleFixedDeposit              func(ctx context.Context, userID, pocketID uuid.UUID, on time.Time, penalty decimal.Decimal, notes string) (CashPocket, error)
+	matureCashPockets               func(ctx context.Context, on time.Time) (int, error)
 	updateCashMovement              func(ctx context.Context, userID, txnID uuid.UUID, in CashMovementInput) (CashMovement, error)
 	deleteCashMovement              func(ctx context.Context, userID, txnID uuid.UUID) error
 	getCashRatesByUserID            func(ctx context.Context, userID uuid.UUID) ([]CashRate, error)
@@ -525,6 +530,39 @@ func (f *fakeRepository) RenameCashPocket(ctx context.Context, userID, pocketID 
 
 func (f *fakeRepository) DeleteCashPocket(ctx context.Context, userID, pocketID uuid.UUID) error {
 	return f.deleteCashPocket(ctx, userID, pocketID)
+}
+
+// GetCashPocketByID answers with the pocket the write returned when no hook is
+// set: the writes re-read what they moved, and a test that only cares what was
+// written should not have to say so twice.
+func (f *fakeRepository) GetCashPocketByID(ctx context.Context, userID, pocketID uuid.UUID) (CashPocket, error) {
+	if f.getCashPocketByID == nil {
+		return CashPocket{ID: pocketID}, nil
+	}
+
+	return f.getCashPocketByID(ctx, userID, pocketID)
+}
+
+func (f *fakeRepository) OpenFixedDeposit(ctx context.Context, userID uuid.UUID, in NewFixedDepositInput) (CashPocket, error) {
+	return f.openFixedDeposit(ctx, userID, in)
+}
+
+func (f *fakeRepository) EndFixedDeposit(ctx context.Context, userID, pocketID uuid.UUID, closesOn time.Time) (CashPocket, error) {
+	return f.endFixedDeposit(ctx, userID, pocketID, closesOn)
+}
+
+func (f *fakeRepository) SettleFixedDeposit(ctx context.Context, userID, pocketID uuid.UUID, on time.Time, penalty decimal.Decimal, notes string) (CashPocket, error) {
+	return f.settleFixedDeposit(ctx, userID, pocketID, on, penalty, notes)
+}
+
+// MatureCashPockets settles nothing when no hook is set. The nightly accrual
+// runs it on every call, and a test about interest is not about deposits.
+func (f *fakeRepository) MatureCashPockets(ctx context.Context, on time.Time) (int, error) {
+	if f.matureCashPockets == nil {
+		return 0, nil
+	}
+
+	return f.matureCashPockets(ctx, on)
 }
 
 func (f *fakeRepository) UpdateCashMovement(ctx context.Context, userID, txnID uuid.UUID, in CashMovementInput) (CashMovement, error) {

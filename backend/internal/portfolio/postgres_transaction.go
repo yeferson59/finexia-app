@@ -404,6 +404,10 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 			return err
 		}
 
+		if err := requireWritableEntry(ctx, tx, entryID); err != nil {
+			return err
+		}
+
 		if err := tx.QueryRow(ctx, `
 		INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes)
 		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::numeric, $8::char(3), $9::date, $10)
@@ -478,6 +482,10 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 			return err
 		}
 
+		if err := requireWritableEntry(ctx, tx, entryID); err != nil {
+			return err
+		}
+
 		if err := tx.QueryRow(ctx, `
 		UPDATE transactions SET
 			type             = $1::transaction_type,
@@ -541,24 +549,41 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 // transaction id belonging to somebody else is indistinguishable from one that
 // does not exist — both delete no rows and answer 404.
 func (r *PostgresRepository) DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID) error {
-	tag, err := r.db.Exec(ctx, `
-		DELETE FROM transactions
-		WHERE id = $1
-		  AND entry_id IN (
-			SELECT pe.id FROM portfolio_entries pe
-			JOIN portfolios p ON p.id = pe.portfolio_id
-			WHERE p.user_id = $2
-		  )
-	`, txnID, userID)
-	if err != nil {
-		return err
-	}
+	return database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		// A row of a fixed deposit is refused before the delete rather than left
+		// out of it, so it answers "that is a deposit" and not "there is no such
+		// transaction". The read and the delete share a transaction so the
+		// position cannot become one in between.
+		var entryID uuid.UUID
+		if err := tx.QueryRow(ctx, `
+			SELECT t.entry_id
+			FROM transactions t
+			JOIN portfolio_entries pe ON pe.id = t.entry_id
+			JOIN portfolios p         ON p.id = pe.portfolio_id
+			WHERE t.id = $1 AND p.user_id = $2
+		`, txnID, userID).Scan(&entryID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrTransactionNotFound
+			}
 
-	if tag.RowsAffected() == 0 {
-		return ErrTransactionNotFound
-	}
+			return err
+		}
 
-	return nil
+		if err := requireWritableEntry(ctx, tx, entryID); err != nil {
+			return err
+		}
+
+		tag, err := tx.Exec(ctx, `DELETE FROM transactions WHERE id = $1`, txnID)
+		if err != nil {
+			return err
+		}
+
+		if tag.RowsAffected() == 0 {
+			return ErrTransactionNotFound
+		}
+
+		return nil
+	})
 }
 
 // ImportEntryTransactions persists a batch of validated spreadsheet rows in a

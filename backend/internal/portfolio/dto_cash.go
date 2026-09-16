@@ -112,3 +112,49 @@ type RenameCashPocketRequestDTO struct {
 func (d RenameCashPocketRequestDTO) Input() RenameCashPocketInput {
 	return RenameCashPocketInput(d)
 }
+
+// OpenFixedDepositRequestDTO opens a deposit that keeps the rate of the day it
+// was opened (000048). It states the deposit and its rate in one body, because
+// they are one thing: the rate is not given to the pocket afterwards, it is
+// what the pocket is.
+//
+// openedOn may be in the past — "I opened it two weeks ago" — and maturesOn may
+// be omitted for a deposit at no term.
+type OpenFixedDepositRequestDTO struct {
+	PortfolioID uuid.UUID       `json:"portfolioId"`
+	SourceID    uuid.UUID       `json:"sourceId"`
+	Currency    money.Currency  `json:"currency"`
+	Name        string          `json:"name"`
+	Amount      decimal.Decimal `json:"amount"`
+	OpenedOn    time.Time       `json:"openedOn"`
+	MaturesOn   *time.Time      `json:"maturesOn"`
+
+	AnnualRatePct  decimal.Decimal   `json:"annualRatePct"`
+	WithholdingPct decimal.Decimal   `json:"withholdingPct"`
+	Posting        string            `json:"posting"`
+	Tiers          []CashRateTierDTO `json:"tiers"`
+}
+
+func (d OpenFixedDepositRequestDTO) Input() NewFixedDepositInput {
+	return NewFixedDepositInput{
+		PortfolioID:   d.PortfolioID,
+		SourceID:      d.SourceID,
+		Currency:      d.Currency,
+		Name:          d.Name,
+		Amount:        d.Amount,
+		OpenedOn:      d.OpenedOn,
+		MaturesOn:     d.MaturesOn,
+		CashRateInput: cashRateValues(d.AnnualRatePct, d.WithholdingPct, d.Posting, d.Tiers, nil),
+	}
+}
+
+// CloseFixedDepositRequestDTO cancels a deposit before its term: the day the
+// money moves, and what the platform keeps for breaking it.
+type CloseFixedDepositRequestDTO struct {
+	ClosesOn time.Time       `json:"closesOn"`
+	Penalty  decimal.Decimal `json:"penalty"`
+}
+
+func (d CloseFixedDepositRequestDTO) Input() CloseFixedDepositInput {
+	return CloseFixedDepositInput(d)
+}

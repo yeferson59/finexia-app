@@ -8,17 +8,20 @@
 	import { todayLocalDateString } from '$lib/shared/format/date';
 	import {
 		CashAccounts,
+		CashDepositForm,
 		CashMoveForm,
 		CashMovementForm,
 		CashMovements,
 		CashPocketForm,
 		CashRateForm,
 		CashSummary,
+		cashAccountRate,
 		cashYield,
 		groupCashAccounts,
 		suggestCashPortfolio,
 		summarizeCash,
 		type CashAccount,
+		type CashDepositTarget,
 		type CashFormTarget,
 		type CashMoveTarget,
 		type CashPocketTarget,
@@ -50,6 +53,9 @@
 	let pocketTarget = $state<CashPocketTarget | null>(null);
 	let moveTarget = $state<CashMoveTarget | null>(null);
 
+	/* El depósito a tasa fija que se abre, o el que se está mirando. */
+	let depositTarget = $state<CashDepositTarget | null>(null);
+
 	function record() {
 		target = { mode: 'create' };
 	}
@@ -63,6 +69,47 @@
 					sourceName: account.sourceName,
 					currency: account.currency
 				};
+	}
+
+	/*
+	 * Un depósito es un lote de dinero comprado una vez, así que es de un solo
+	 * portafolio: se propone aquel en que la cuenta ya guarda más, como al mover.
+	 * Uno ya abierto no se edita —su tasa es la del día en que se abrió—, así que
+	 * lo que se abre es la ficha desde la que se cancela o se borra.
+	 */
+	function openDeposit(account: CashAccount, pocket: CashPocket | null) {
+		if (pocket) {
+			depositTarget = {
+				mode: 'manage',
+				pocket,
+				rate: cashAccountRate(
+					data.rates,
+					pocket.sourceId,
+					pocket.currency,
+					todayLocalDateString(),
+					pocket.id
+				).latest,
+				balance: parseFloat(pocket.balance) || 0
+			};
+
+			return;
+		}
+
+		const portfolioId = suggestCashPortfolio(
+			data.balances,
+			account.sourceId,
+			account.currency,
+			data.portfolios[0]?.id ?? ''
+		);
+
+		depositTarget = {
+			mode: 'create',
+			sourceId: account.sourceId,
+			sourceName: account.sourceName,
+			currency: account.currency,
+			portfolioId,
+			portfolioName: data.portfolios.find((p) => p.id === portfolioId)?.name ?? ''
+		};
 	}
 
 	/*
@@ -151,6 +198,7 @@
 				onRate={(account) => (rateTarget = { account })}
 				onPocket={openPocket}
 				onMove={openMove}
+				onDeposit={openDeposit}
 			/>
 		</Card>
 	</section>
@@ -193,6 +241,8 @@
 <CashPocketForm target={pocketTarget} onClose={() => (pocketTarget = null)} />
 
 <CashMoveForm target={moveTarget} pockets={data.pockets} onClose={() => (moveTarget = null)} />
+
+<CashDepositForm target={depositTarget} onClose={() => (depositTarget = null)} />
 
 <style>
 	.prereq {

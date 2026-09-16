@@ -1,6 +1,6 @@
 # Plan — Varias tasas en una plataforma
 
-> **Estado:** Fases 1 y 2 implementadas (000046, 000047) · Fase 3 propuesta · 15 sep 2026
+> **Estado:** Implementado (000046 – 000048) · 16 sep 2026
 > **Alcance:** módulo `portfolio` (backend), feature `cash` (frontend)
 > **Migraciones:** 000046 – 000048 · **Fases:** 3
 > **Parte de:** [`PLAN_RENTABILIDAD_EFECTIVO.md`](./PLAN_RENTABILIDAD_EFECTIVO.md).
@@ -233,7 +233,9 @@ CREATE INDEX IF NOT EXISTS idx_cash_pockets_maturing
 ```
 
 Un valor que añade `ADD VALUE` no se puede usar en la misma transacción, así que
-esta migración solo lo añade.
+esta migración solo lo añade. El down solo quita el índice: sacar un valor de un
+enum obliga a reconstruir el tipo y a reescribir como otra cosa una tasa que ya
+se abonaba al vencer, y un valor sin usar no estorba.
 
 ## 7. Backend, archivo por archivo
 
@@ -328,6 +330,12 @@ POST /portfolios/cash/deposits
    14 días ganados, y al vencer su saldo pasa a la principal sin mover la
    rentabilidad.
 
+**Lo que se movió de sitio al implementar la Fase 3.** `CloseCashPocket` acabó
+siendo dos escrituras y no una —`EndFixedDeposit` y `SettleFixedDeposit`— porque
+entre las dos hay que causar los días que el depósito todavía debía: a la tasa
+que acaba de terminar, y con el dinero aún dentro. El job hace lo mismo al
+vencer, con `MatureCashPockets` como segunda mitad.
+
 Las fases van en ese orden porque cada una se apoya en la anterior: los
 bolsillos solo cambian la clave de lo que la Fase 1 ya calcula, y los depósitos
 son un tipo de bolsillo.
@@ -398,7 +406,7 @@ Fase 2:
 
 Fase 3:
 
-- [ ] Abro hoy (15 sep) un depósito de $10.000.000 al 10 % E.A. con fecha 1 sep a 90 días, y al guardarlo tiene 36.624,23 de intereses.
-- [ ] No puedo depositar, retirar, anotar intereses ni cambiar la tasa del depósito.
-- [ ] El 30 nov el saldo del depósito pasa a la cuenta principal y la rentabilidad no se mueve.
-- [ ] Cancelarlo antes con una penalidad la cuenta como pérdida.
+- [x] Abro hoy (15 sep) un depósito de $10.000.000 al 10 % E.A. con fecha 1 sep a 90 días, y al guardarlo tiene 36.624,23 de intereses.
+- [x] No puedo depositar, retirar, anotar intereses ni cambiar la tasa del depósito.
+- [x] El 30 nov el saldo del depósito pasa a la cuenta principal y la rentabilidad no se mueve.
+- [x] Cancelarlo antes con una penalidad la cuenta como pérdida.

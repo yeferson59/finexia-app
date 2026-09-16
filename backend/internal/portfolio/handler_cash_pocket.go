@@ -102,3 +102,50 @@ func (h *handler) MoveCash(c fiber.Ctx) error {
 
 	return httpx.OK(c, "Cash moved", "Cash moved successfully", move)
 }
+
+// OpenFixedDeposit records a deposit that keeps the rate of the day it was
+// opened, and answers with the days it has already earned computed.
+func (h *handler) OpenFixedDeposit(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	req, err := httpx.Bind[OpenFixedDepositRequestDTO](c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid request", err.Error())
+	}
+
+	pocket, err := h.service.OpenFixedDeposit(c, userID, req.Input())
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error opening fixed deposit", "Could not open fixed deposit")
+	}
+
+	return httpx.OK(c, "Fixed deposit opened", "Fixed deposit opened successfully", pocket)
+}
+
+// CloseFixedDeposit cancels a deposit before its term and moves what it holds
+// back to the main account.
+func (h *handler) CloseFixedDeposit(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	pocketID, err := httpx.ParamUUID(c, "pocketId")
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid pocket ID", err.Error())
+	}
+
+	req, err := httpx.Bind[CloseFixedDepositRequestDTO](c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid request", err.Error())
+	}
+
+	pocket, err := h.service.CloseFixedDeposit(c, userID, pocketID, req.Input())
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error cancelling fixed deposit", "Could not cancel fixed deposit")
+	}
+
+	return httpx.OK(c, "Fixed deposit cancelled", "Fixed deposit cancelled successfully", pocket)
+}
