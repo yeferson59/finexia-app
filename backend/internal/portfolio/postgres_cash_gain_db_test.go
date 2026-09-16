@@ -178,7 +178,7 @@ func TestCashMovementsLeaveAPositionAtAnotherPriceAlone(t *testing.T) {
 	           VALUES ($1, (SELECT id FROM assets WHERE ticker = 'CASH-USD' AND exchange IS NULL), $2, 0, 0.9, 'USD', '2026-09-01')`,
 		f.portfolioID, broker)
 
-	_, err := f.repo.CreateCashMovement(ctx, f.userID, f.portfolioID, broker, CashMovementInput{
+	_, err := f.repo.CreateCashMovement(ctx, f.userID, f.portfolioID, broker, uuid.UUID{}, CashMovementInput{
 		Kind: CashKindDeposit, Amount: mustDecimal(t, "10"), Currency: money.USD, Date: cashDay,
 	})
 	if !errors.Is(err, ErrInvalidCashMovement) {

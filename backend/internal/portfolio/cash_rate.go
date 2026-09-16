@@ -17,7 +17,8 @@ import (
 // The rate a cash account earns: what the owner states, and the rules that keep
 // it usable for computing interest. The model — one rate per platform and
 // currency, stored as an effective annual rate, versioned by the date it takes
-// effect — is described in migration 000043.
+// effect — is described in migration 000043, and the tiers a version can pay
+// in steps in 000046.
 //
 // Only the latest version of an account can change, and only for the days its
 // interest has not been computed yet (000044). The versions before it, and the
@@ -58,6 +59,9 @@ var (
 	maxWithholdingPct = decimal.MustFromString("100")
 	// maxCashRateBalance is what NUMERIC(20, 8) holds, exclusive.
 	maxCashRateBalance = decimal.MustFromString("1000000000000")
+	// The owner states rates as percentages, and the ledger reads fractions.
+	pctToFraction = decimal.MustFromString("0.01")
+	fractionToPct = decimal.MustFromString("100")
 )
 
 const (
@@ -65,9 +69,12 @@ const (
 	// percentage; withholding_rate is a NUMERIC(5, 4) one, which holds two.
 	annualRatePctDecimals  = 4
 	withholdingPctDecimals = 2
-	// max_balance is a NUMERIC(20, 8): twelve digits before the point and
-	// eight after.
-	maxBalanceDecimals = 8
+	// A tier's from_balance is a NUMERIC(20, 8): twelve digits before the point
+	// and eight after.
+	tierBalanceDecimals = 8
+	// maxCashRateTiers is how many steps a version takes above the rate it pays
+	// from zero. Platforms quote two or three.
+	maxCashRateTiers = 10
 
 	// cashRateDateGrace is how many days before the server's a rate may start
 	// or end. Days are UTC, as they are for snapshots, and an owner west of
@@ -82,16 +89,24 @@ type CashRate struct {
 	SourceID   uuid.UUID      `json:"sourceId"`
 	SourceName string         `json:"sourceName"`
 	Currency   money.Currency `json:"currency"`
+	// PocketID is the pocket of the account the rate belongs to, nil for the
+	// main account (000047). A platform can pay one rate on its account and
+	// another on its pocket, and each earns on its own balances.
+	PocketID   *uuid.UUID `json:"pocketId"`
+	PocketName string     `json:"pocketName"`
 	// AnnualRatePct is the effective annual rate as a percentage: "9.25" is
 	// 9.25 % E.A. WithholdingPct is the share of the interest withheld as tax,
 	// also as a percentage.
 	AnnualRatePct  string          `json:"annualRatePct"`
 	WithholdingPct string          `json:"withholdingPct"`
 	Posting        InterestPosting `json:"posting"`
-	// MaxBalance is the most the account earns on, nil when it earns on all of
-	// it. It belongs to the account, so the balances of one account share it.
-	MaxBalance    *string   `json:"maxBalance"`
-	EffectiveFrom time.Time `json:"effectiveFrom"`
+	// Tiers are the steps above AnnualRatePct, lowest first: the part of the
+	// account above a step's FromBalance earns its rate, up to the next step. A
+	// step at 0 is a cap. They belong to the account, so the balances of one
+	// account share them. Empty, never nil, when the account earns AnnualRatePct
+	// on all of it.
+	Tiers         []CashRateTier `json:"tiers"`
+	EffectiveFrom time.Time      `json:"effectiveFrom"`
 	// EndedOn is the last day the version earns, nil while it has no end.
 	EndedOn *time.Time `json:"endedOn"`
 	// Latest is whether this is the newest version of its account: the only one
@@ -121,22 +136,86 @@ func (r CashRate) InEffectOn(day time.Time) bool {
 	}
 }
 
+// CashRateTier is a step of a rate, both figures as text like the rate's own:
+// what the account holds from which it applies, and the effective annual rate
+// on the part of the account in it, as a percentage.
+type CashRateTier struct {
+	FromBalance   string `json:"fromBalance"`
+	AnnualRatePct string `json:"annualRatePct"`
+}
+
+// EffectiveAnnualPct is the rate an account earns on everything it holds when
+// it holds held, in its currency, as a percentage. Without tiers it is the
+// version's own rate. With them it is what the steps come to together,
+// compounded the way the ledger compounds a day: the rate a day is kept at.
+func (r CashRate) EffectiveAnnualPct(held decimal.Decimal) (decimal.Decimal, error) {
+	version, err := r.ledgerVersion()
+	if err != nil {
+		return decimal.Zero, err
+	}
+
+	rate, err := version.effectiveRate(held)
+	if err != nil {
+		return decimal.Zero, err
+	}
+
+	return rate.Mul(fractionToPct), nil
+}
+
+// ledgerVersion is the version as the ledger computes with it: the rates as
+// fractions.
+func (r CashRate) ledgerVersion() (CashRateVersion, error) {
+	annual, err := decimal.NewFromString(r.AnnualRatePct)
+	if err != nil {
+		return CashRateVersion{}, err
+	}
+
+	version := CashRateVersion{ID: r.ID, AnnualRate: annual.Mul(pctToFraction), Posting: r.Posting}
+
+	for _, tier := range r.Tiers {
+		from, err := decimal.NewFromString(tier.FromBalance)
+		if err != nil {
+			return CashRateVersion{}, err
+		}
+
+		rate, err := decimal.NewFromString(tier.AnnualRatePct)
+		if err != nil {
+			return CashRateVersion{}, err
+		}
+
+		version.Tiers = append(version.Tiers, CashRateStep{From: from, AnnualRate: rate.Mul(pctToFraction)})
+	}
+
+	return version, nil
+}
+
 // CashRateInput is what a version of a rate states, and what a correction can
 // rewrite.
 type CashRateInput struct {
 	AnnualRatePct  decimal.Decimal
 	WithholdingPct decimal.Decimal
 	Posting        InterestPosting
-	// MaxBalance is the cap, nil for none. A correction states the version
-	// whole, so leaving it out removes the cap.
-	MaxBalance *decimal.Decimal
+	// Tiers are the steps above AnnualRatePct, lowest first. A correction states
+	// the version whole, so leaving them out removes them.
+	Tiers []CashRateTierInput
+}
+
+// CashRateTierInput is a step as the owner states it: from what the account
+// holds, the effective annual rate on the part above it, as a percentage.
+type CashRateTierInput struct {
+	FromBalance   decimal.Decimal
+	AnnualRatePct decimal.Decimal
 }
 
 // NewCashRateInput is a new version: the values, and the account and day they
 // apply from.
 type NewCashRateInput struct {
-	SourceID      uuid.UUID
-	Currency      money.Currency
+	SourceID uuid.UUID
+	Currency money.Currency
+	// PocketID is which drawer of the account earns it, the zero UUID being the
+	// main one. Versions of one pocket close each other; the main account's and
+	// a pocket's never meet.
+	PocketID      uuid.UUID
 	EffectiveFrom time.Time
 	CashRateInput
 }
@@ -193,13 +272,30 @@ func (in CashRateInput) Validate() error {
 		return invalidCashRate("posting must be one of: daily, monthly")
 	}
 
-	if limit := in.MaxBalance; limit != nil {
-		if !limit.IsPos() || !limit.LessThan(maxCashRateBalance) {
-			return invalidCashRate("maxBalance must be greater than 0 and less than %s", maxCashRateBalance)
+	if len(in.Tiers) > maxCashRateTiers {
+		return invalidCashRate("tiers take at most %d steps", maxCashRateTiers)
+	}
+
+	for i, tier := range in.Tiers {
+		if !tier.FromBalance.IsPos() || !tier.FromBalance.LessThan(maxCashRateBalance) {
+			return invalidCashRate("tier fromBalance must be greater than 0 and less than %s", maxCashRateBalance)
 		}
 
-		if !limit.Equal(limit.Trunc(maxBalanceDecimals)) {
-			return invalidCashRate("maxBalance takes at most %d decimals", maxBalanceDecimals)
+		if !tier.FromBalance.Equal(tier.FromBalance.Trunc(tierBalanceDecimals)) {
+			return invalidCashRate("tier fromBalance takes at most %d decimals", tierBalanceDecimals)
+		}
+
+		// In order, so the ledger reads each step's end as the next one's start.
+		if i > 0 && !tier.FromBalance.GreaterThan(in.Tiers[i-1].FromBalance) {
+			return invalidCashRate("tiers must go up: each fromBalance above the one before")
+		}
+
+		if tier.AnnualRatePct.IsNeg() || tier.AnnualRatePct.GreaterThan(maxAnnualRatePct) {
+			return invalidCashRate("tier annualRatePct must be at least 0 and at most 100")
+		}
+
+		if !tier.AnnualRatePct.Equal(tier.AnnualRatePct.Trunc(annualRatePctDecimals)) {
+			return invalidCashRate("tier annualRatePct takes at most %d decimals", annualRatePctDecimals)
 		}
 	}
 

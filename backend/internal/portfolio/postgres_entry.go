@@ -29,11 +29,15 @@ func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfo
 		         WHEN a.current_price IS NOT NULL THEN 'manual'
 		         ELSE 'cost'
 		       END,
-		       a.created_at, a.updated_at
+		       a.created_at, a.updated_at,
+		       -- The pocket of the cash account, so two balances of one platform
+		       -- read as the two drawers they are (000047).
+		       COALESCE(pk.name, '')
 		FROM portfolio_entries pe
 		JOIN portfolios p ON p.id = pe.portfolio_id
 		JOIN assets a ON a.id = pe.asset_id
 		LEFT JOIN user_asset_prices uap ON uap.asset_id = a.id AND uap.user_id = p.user_id
+		LEFT JOIN cash_pockets pk ON pk.id = pe.pocket_id
 		WHERE pe.portfolio_id = $1
 		ORDER BY pe.created_at DESC
 	`, portfolioID)
@@ -69,6 +73,7 @@ func (r *PostgresRepository) GetEntriesByPortfolioID(ctx context.Context, portfo
 			&entry.PriceSource,
 			&entry.Asset.CreatedAt,
 			&entry.Asset.UpdatedAt,
+			&entry.PocketName,
 		); err != nil {
 			return nil, err
 		}
@@ -217,7 +222,7 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 		if err := tx.QueryRow(ctx, `
 		INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date, notes)
 		VALUES ($1::uuid, $2::uuid, $3::uuid, 0, $4::numeric, $5::char(3), $6::date, $7)
-		ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, ''))
+		ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, '')) WHERE pocket_id IS NULL
 		DO UPDATE SET updated_at = NOW()
 		RETURNING id, cost_currency
 	`, portfolioID, assetID, sourceID, costPrice.String(), costCurrency, in.TransactionDate, in.Notes).Scan(&entryID, &entryCostCurrency); err != nil {

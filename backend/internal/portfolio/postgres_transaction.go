@@ -632,7 +632,7 @@ func (r *PostgresRepository) ImportEntryTransactions(ctx context.Context, userID
 			if err := tx.QueryRow(ctx, `
 			INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date, notes)
 			VALUES ($1::uuid, $2::uuid, $3::uuid, 0, $4::numeric, $5::char(3), $6::date, $7)
-			ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, ''))
+			ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, '')) WHERE pocket_id IS NULL
 			DO UPDATE SET updated_at = NOW()
 			RETURNING id, cost_currency
 		`, portfolioID, assetID, sourceID, row.Price.MulDecimal(row.FXRate).String(), row.CostCurrency, row.Date, row.Notes).Scan(&entryID, &entryCostCurrency); err != nil {

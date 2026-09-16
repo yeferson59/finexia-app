@@ -98,6 +98,38 @@ func TestHandlerCreateCashRate(t *testing.T) {
 	}
 }
 
+// Tiers travel as a list of steps, and a cap sent the way it was before tiers
+// arrives as the step at zero it now is, after them.
+func TestHandlerCreateCashRateReadsTiers(t *testing.T) {
+	var got NewCashRateInput
+
+	repo := new(fakeRepository{
+		createCashRate: func(_ context.Context, _ uuid.UUID, in NewCashRateInput) (CashRate, error) {
+			got = in
+			return CashRate{ID: uuid.New(), Currency: in.Currency, AnnualRatePct: "12", Posting: PostingDaily, Latest: true, Tiers: []CashRateTier{}}, nil
+		},
+	})
+	app := newTestModule(t, repo, uuid.New(), "user")
+
+	body := `{"sourceId":"` + uuid.New().String() + `","currency":"COP","annualRatePct":12,` +
+		`"tiers":[{"fromBalance":5000000,"annualRatePct":8}],"maxBalance":20000000,"effectiveFrom":"` + todayJSON() + `"}`
+	resp := doJSON(t, app, http.MethodPost, "/portfolios/cash/rates", body)
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, want 200: %s", resp.StatusCode, raw)
+	}
+
+	if len(got.Tiers) != 2 {
+		t.Fatalf("tiers = %+v, want the step and the cap", got.Tiers)
+	}
+	if !got.Tiers[0].FromBalance.Equal(mustDecimal(t, "5000000")) || !got.Tiers[0].AnnualRatePct.Equal(mustDecimal(t, "8")) {
+		t.Errorf("first step = %+v, want 8 %% from 5 000 000", got.Tiers[0])
+	}
+	if !got.Tiers[1].FromBalance.Equal(mustDecimal(t, "20000000")) || !got.Tiers[1].AnnualRatePct.IsZero() {
+		t.Errorf("second step = %+v, want the cap at 0 %% from 20 000 000", got.Tiers[1])
+	}
+}
+
 // Every rule the input breaks is answered by the service, so the repository —
 // here a hook left nil, which would panic — is never reached.
 func TestHandlerCreateCashRateRefusesBeforeTheRepository(t *testing.T) {
@@ -110,6 +142,7 @@ func TestHandlerCreateCashRateRefusesBeforeTheRepository(t *testing.T) {
 		"five decimals":      `{` + source + `"currency":"COP","annualRatePct":9.12345,"effectiveFrom":"` + today + `"}`,
 		"an unknown posting": `{` + source + `"currency":"COP","annualRatePct":9,"posting":"weekly","effectiveFrom":"` + today + `"}`,
 		"a cap of nothing":   `{` + source + `"currency":"COP","annualRatePct":9,"maxBalance":0,"effectiveFrom":"` + today + `"}`,
+		"steps out of order": `{` + source + `"currency":"COP","annualRatePct":9,"tiers":[{"fromBalance":20000000,"annualRatePct":8},{"fromBalance":5000000,"annualRatePct":0}],"effectiveFrom":"` + today + `"}`,
 		"a past start":       `{` + source + `"currency":"COP","annualRatePct":9,"effectiveFrom":"2020-01-01T00:00:00Z"}`,
 		"unsupported":        `{` + source + `"currency":"ARS","annualRatePct":9,"effectiveFrom":"` + today + `"}`,
 		"no platform":        `{"currency":"COP","annualRatePct":9,"effectiveFrom":"` + today + `"}`,

@@ -208,6 +208,11 @@ type Entry struct {
 	CostBasisBase   money.Money      `json:"costBasisBase,omitzero"`
 	MarketValueBase money.Money      `json:"marketValueBase,omitzero"`
 	FXConverted     bool             `json:"fxConverted,omitempty"`
+	// PocketName is the pocket of the cash account the position sits in, empty
+	// for the main account and for everything that is not cash (000047). It is
+	// what tells two rows of one platform apart in a list of positions, where
+	// the platform's name is the same on both.
+	PocketName string `json:"pocketName,omitempty"`
 }
 
 type Transaction struct {

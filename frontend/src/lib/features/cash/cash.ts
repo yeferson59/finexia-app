@@ -81,11 +81,19 @@ export function cashAccountLabel(
  * irreconocible.
  */
 export interface CashAccount {
-	/** Plataforma y moneda: lo que identifica la cuenta. */
+	/** Plataforma, moneda y bolsillo: lo que identifica la cuenta. */
 	key: string;
 	sourceId: string;
 	sourceName: string;
 	currency: string;
+	/**
+	 * El bolsillo, `null` en la cuenta principal. Un bolsillo es una subcuenta
+	 * de la plataforma —su dinero suma en ella—, pero rinde su propia tasa, así
+	 * que se agrupa y se mira aparte.
+	 */
+	pocketId: string | null;
+	pocketName: string;
+	pocketKind: string;
 	displayCurrency: string;
 	/** La suma de sus saldos, en `currency`. */
 	balance: number;
@@ -96,6 +104,11 @@ export interface CashAccount {
 	lastMovementDate: string | null;
 	/** Un saldo por portafolio, del mayor al menor. */
 	balances: CashBalance[];
+	/**
+	 * Los bolsillos de esta cuenta, en una cuenta principal; vacío en un
+	 * bolsillo, que no tiene bolsillos propios.
+	 */
+	pockets: CashAccount[];
 }
 
 /** Los saldos agrupados por cuenta, de la que más vale a la que menos. */
@@ -103,18 +116,26 @@ export function groupCashAccounts(balances: CashBalance[]): CashAccount[] {
 	const accounts = new Map<string, CashAccount>();
 
 	for (const row of balances) {
-		const key = `${row.sourceId}:${row.currency}`;
+		// La cuenta principal conserva la clave que siempre tuvo; un bolsillo
+		// añade la suya. Así nada de lo que ya la usaba cambia.
+		const key = row.pocketId
+			? `${row.sourceId}:${row.currency}:${row.pocketId}`
+			: `${row.sourceId}:${row.currency}`;
 		const account = accounts.get(key) ?? {
 			key,
 			sourceId: row.sourceId,
 			sourceName: row.sourceName,
 			currency: row.currency,
+			pocketId: row.pocketId,
+			pocketName: row.pocketName,
+			pocketKind: row.pocketKind,
 			displayCurrency: row.displayCurrency,
 			balance: 0,
 			value: 0,
 			fxConverted: true,
 			lastMovementDate: null,
-			balances: []
+			balances: [],
+			pockets: []
 		};
 
 		account.balance += parseFloat(row.balance) || 0;
@@ -143,7 +164,8 @@ export function groupCashAccounts(balances: CashBalance[]): CashAccount[] {
 			b.value - a.value ||
 			b.balance - a.balance ||
 			a.sourceName.localeCompare(b.sourceName) ||
-			a.currency.localeCompare(b.currency)
+			a.currency.localeCompare(b.currency) ||
+			a.pocketName.localeCompare(b.pocketName)
 	);
 }
 
@@ -161,6 +183,54 @@ export interface CashPlatform {
 }
 
 /**
+ * Las cuentas principales con sus bolsillos debajo, como lo enseña el banco: la
+ * cuenta y, debajo, sus cajitas.
+ *
+ * Un bolsillo cuenta dentro de su plataforma —su dinero suma en ella— y lo que
+ * es suyo es la tasa. Por eso se anida en lugar de listarse aparte.
+ *
+ * Una cuenta principal vacía se inventa cuando solo hay bolsillos: el dinero
+ * entró directo en la cajita, y sin ella la cajita no tendría dónde colgarse.
+ */
+export function nestCashPockets(accounts: CashAccount[]): CashAccount[] {
+	const main = new Map<string, CashAccount>();
+
+	for (const account of accounts) {
+		if (account.pocketId === null) main.set(`${account.sourceId}:${account.currency}`, account);
+	}
+
+	for (const account of accounts) {
+		if (account.pocketId === null) continue;
+
+		const key = `${account.sourceId}:${account.currency}`;
+		let parent = main.get(key);
+
+		if (!parent) {
+			parent = {
+				...account,
+				key,
+				pocketId: null,
+				pocketName: '',
+				pocketKind: '',
+				balance: 0,
+				value: 0,
+				fxConverted: true,
+				lastMovementDate: null,
+				balances: [],
+				pockets: []
+			};
+			main.set(key, parent);
+		}
+
+		parent.pockets.push(account);
+	}
+
+	return accounts
+		.filter((a) => a.pocketId === null)
+		.concat([...main.values()].filter((a) => !accounts.includes(a)));
+}
+
+/**
  * Las cuentas agrupadas por plataforma, de la que más guarda a la que menos.
  *
  * Es como las enseña un banco: la entidad y, debajo, cada moneda. Dentro de
@@ -169,7 +239,7 @@ export interface CashPlatform {
 export function groupCashPlatforms(balances: CashBalance[]): CashPlatform[] {
 	const platforms = new Map<string, CashPlatform>();
 
-	for (const account of groupCashAccounts(balances)) {
+	for (const account of nestCashPockets(groupCashAccounts(balances))) {
 		const platform = platforms.get(account.sourceId) ?? {
 			sourceId: account.sourceId,
 			sourceName: account.sourceName,
@@ -179,8 +249,12 @@ export function groupCashPlatforms(balances: CashBalance[]): CashPlatform[] {
 			accounts: []
 		};
 
-		platform.value += account.value;
-		if (!account.fxConverted && account.balance !== 0) platform.partial = true;
+		// Un bolsillo es dinero de la plataforma, así que suma en ella aunque se
+		// enseñe anidado bajo su cuenta.
+		platform.value += account.value + account.pockets.reduce((sum, p) => sum + p.value, 0);
+		for (const drawer of [account, ...account.pockets]) {
+			if (!drawer.fxConverted && drawer.balance !== 0) platform.partial = true;
+		}
 		platform.accounts.push(account);
 		platforms.set(account.sourceId, platform);
 	}

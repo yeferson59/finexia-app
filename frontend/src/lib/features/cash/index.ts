@@ -6,6 +6,11 @@
  * formulario para registrarlos o editarlos. `cash.ts` aporta los helpers puros
  * y reexporta los contratos `CashBalance` y `CashMovement` de `$lib/api/types`.
  *
+ * Los bolsillos (000047) son subcuentas de una cuenta: su dinero sigue contando
+ * en la plataforma y lo propio de cada uno es su tasa. `cash-pocket-form` los
+ * abre y renombra, y `cash-move-form` mueve dinero entre los cajones de una
+ * cuenta en una sola transacción.
+ *
  * `cash-delete-confirm` es interno de `cash-movements` (import relativo) y no
  * forma parte de la superficie pública.
  */
@@ -17,6 +22,11 @@ export {
 	type CashFormTarget
 } from './components/cash-movement-form.svelte';
 export { default as CashRateForm, type CashRateTarget } from './components/cash-rate-form.svelte';
+export {
+	default as CashPocketForm,
+	type CashPocketTarget
+} from './components/cash-pocket-form.svelte';
+export { default as CashMoveForm, type CashMoveTarget } from './components/cash-move-form.svelte';
 
 export * from './cash';
 export * from './rates';

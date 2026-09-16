@@ -51,13 +51,23 @@ function checkFees(v: { kind: string; amount: number; fees: number }, ctx: z.Ref
 	}
 }
 
+/**
+ * Un bolsillo del formulario: vacío es la cuenta principal, que es donde cae
+ * todo mientras la cuenta no tenga cajitas.
+ */
+const pocketField = z
+	.union([z.uuid('Elige el bolsillo.'), z.literal('')])
+	.nullish()
+	.transform((v) => v || undefined);
+
 /** Alta de un movimiento: también dice sobre qué saldo cae. */
 export const cashMovementCreateSchema = z
 	.object({
 		...movementFields,
 		portfolioId: z.uuid('Elige el portafolio.'),
 		sourceId: z.uuid('Elige la plataforma.'),
-		currency: z.enum(SUPPORTED_CURRENCIES, 'Elige la moneda.')
+		currency: z.enum(SUPPORTED_CURRENCIES, 'Elige la moneda.'),
+		pocketId: pocketField
 	})
 	.superRefine(checkFees);
 
@@ -120,27 +130,44 @@ const rateValues = {
 		.enum(['daily', 'monthly'], 'Elige cada cuánto se abonan los intereses.')
 		.default('daily'),
 	/**
-	 * Lo máximo sobre lo que rinde la cuenta. Vacío es que rinde sobre todo, y
-	 * llega como cadena vacía desde el formulario, así que se lee aparte de
-	 * `z.coerce.number`, que la convertiría en cero.
+	 * Los tramos por encima de la tasa, del más bajo al más alto: desde qué saldo
+	 * de la cuenta rige cada uno y a qué tasa. Un tramo al 0 % es un tope. Sin
+	 * tramos, la cuenta rinde la tasa sobre todo el saldo.
 	 */
-	maxBalance: z
-		.union([z.string(), z.number(), z.null()])
-		.optional()
-		.transform((v) => (v === '' || v === null || v === undefined ? null : Number(v)))
-		.refine((v) => v === null || Number.isFinite(v), 'Escribe el tope con números.')
-		.refine((v) => v === null || v > 0, 'El tope tiene que ser mayor que cero.')
-		.refine((v) => v === null || v < 1e12, 'El tope es demasiado grande.')
-		.refine(
-			(v) => v === null || hasAtMostDecimals(v, 8),
-			'Escribe el tope con hasta ocho decimales.'
+	tiers: z
+		.array(
+			z.object({
+				fromBalance: z.coerce
+					.number('Escribe el saldo de cada tramo con números.')
+					.positive('El saldo desde el que rige un tramo tiene que ser mayor que cero.')
+					.lt(1e12, 'El saldo de un tramo es demasiado grande.')
+					.refine(
+						(v) => hasAtMostDecimals(v, 8),
+						'Escribe el saldo de cada tramo con hasta ocho decimales.'
+					),
+				annualRatePct: z.coerce
+					.number('Escribe la tasa de cada tramo con números.')
+					.min(0, 'La tasa de un tramo no puede ser negativa.')
+					.max(100, 'La tasa de un tramo no puede pasar de 100 %.')
+					.refine(
+						(v) => hasAtMostDecimals(v, 4),
+						'Escribe la tasa de cada tramo con hasta cuatro decimales.'
+					)
+			})
 		)
+		.max(10, 'Una tasa tiene como mucho 10 tramos.')
+		.refine(
+			(tiers) => tiers.every((t, i) => i === 0 || t.fromBalance > tiers[i - 1].fromBalance),
+			'Cada tramo tiene que empezar en un saldo mayor que el anterior.'
+		)
+		.default([])
 };
 
 /** Una tasa, o una versión nueva: la cuenta y el día desde el que rige. */
 export const cashRateCreateSchema = z.object({
 	sourceId: z.uuid('No sabemos a qué cuenta darle la tasa.'),
 	currency: z.enum(SUPPORTED_CURRENCIES, 'No sabemos a qué cuenta darle la tasa.'),
+	pocketId: pocketField,
 	effectiveFrom: z.iso.date('Elige desde qué día rige la tasa.'),
 	...rateValues
 });
@@ -164,20 +191,20 @@ export const cashRateDeleteSchema = z.object({
 /**
  * Los valores como los espera el backend.
  *
- * Una corrección dice la versión entera, así que un tope que se deja vacío lo
- * quita: viaja como `null`, no se omite.
+ * Una corrección dice la versión entera, así que los tramos viajan siempre, y
+ * una lista vacía los quita.
  */
 export function toCashRateBody(data: {
 	annualRatePct: number;
 	withholdingPct: number;
 	posting: 'daily' | 'monthly';
-	maxBalance: number | null;
+	tiers: { fromBalance: number; annualRatePct: number }[];
 }) {
 	return {
 		annualRatePct: data.annualRatePct,
 		withholdingPct: data.withholdingPct,
 		posting: data.posting,
-		maxBalance: data.maxBalance
+		tiers: data.tiers
 	};
 }
 
@@ -188,8 +215,74 @@ export function toCashRateBody(data: {
 export const cashRecalculateSchema = z.object({
 	sourceId: z.uuid('No sabemos de qué cuenta recalcular los intereses.'),
 	currency: z.enum(SUPPORTED_CURRENCIES, 'No sabemos de qué cuenta recalcular los intereses.'),
+	pocketId: pocketField,
 	from: z.iso.date('Elige desde qué día recalcular.')
 });
+
+/** Abrir un bolsillo flexible en una cuenta. */
+export const cashPocketCreateSchema = z.object({
+	sourceId: z.uuid('Elige la plataforma.'),
+	currency: z.enum(SUPPORTED_CURRENCIES, 'Elige la moneda.'),
+	name: z
+		.string('Ponle un nombre al bolsillo.')
+		.transform((v) => v.trim())
+		.refine((v) => v.length > 0, 'Ponle un nombre al bolsillo.')
+		.refine((v) => v.length <= 100, 'El nombre no puede pasar de 100 caracteres.')
+});
+
+/** Lo único que cambia de un bolsillo es el nombre. */
+export const cashPocketRenameSchema = z.object({
+	id: z.uuid('No sabemos qué bolsillo renombrar.'),
+	name: z
+		.string('Ponle un nombre al bolsillo.')
+		.transform((v) => v.trim())
+		.refine((v) => v.length > 0, 'Ponle un nombre al bolsillo.')
+		.refine((v) => v.length <= 100, 'El nombre no puede pasar de 100 caracteres.')
+});
+
+export const cashPocketDeleteSchema = z.object({
+	id: z.uuid('No sabemos qué bolsillo borrar.')
+});
+
+/**
+ * Mover dinero entre dos saldos de una misma cuenta, dentro de un portafolio.
+ * Origen y destino vacíos son la cuenta principal, y no pueden ser el mismo:
+ * mover el dinero a donde ya está no hace nada.
+ */
+export const cashMoveSchema = z
+	.object({
+		portfolioId: z.uuid('Elige el portafolio.'),
+		sourceId: z.uuid('Elige la plataforma.'),
+		currency: z.enum(SUPPORTED_CURRENCIES, 'Elige la moneda.'),
+		fromPocketId: pocketField,
+		toPocketId: pocketField,
+		amount: z.coerce
+			.number('Escribe el importe con números.')
+			.positive('El importe tiene que ser mayor que cero.'),
+		date: z.iso.date('Elige la fecha del movimiento.'),
+		notes: z
+			.string()
+			.max(500, 'La nota no puede pasar de 500 caracteres.')
+			.nullish()
+			.transform((v) => (v ?? '').trim())
+	})
+	.refine((v) => (v.fromPocketId ?? '') !== (v.toPocketId ?? ''), {
+		path: ['toPocketId'],
+		error: 'Elige un destino distinto del origen.'
+	});
+
+/** Lo que se dice cuando un bolsillo no se puede guardar ni borrar. */
+export function cashPocketErrorMessage(status: number, details?: string): string {
+	if (status === 404) return 'Ese bolsillo ya no existe. Recarga la página.';
+	if (status === 409 && (details ?? '').includes('name')) {
+		return 'Esa cuenta ya tiene un bolsillo con ese nombre. Ponle otro.';
+	}
+	if (status === 409) {
+		return 'Ese bolsillo todavía tiene movimientos. Mueve el dinero a la cuenta principal y borra sus movimientos antes de quitarlo.';
+	}
+
+	return details || 'No pudimos guardar el bolsillo. Vuelve a intentarlo en un momento.';
+}
 
 /** Un día del selector como lo guarda el backend: medianoche UTC de ese día. */
 export function toCalendarDateTime(date: string): string {

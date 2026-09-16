@@ -34,6 +34,9 @@ const balance = (
 	interestThisMonthValue: '0',
 	pendingInterest: '0',
 	lastAccrualDate: null,
+	pocketId: null,
+	pocketName: '',
+	pocketKind: '',
 	...over
 });
 

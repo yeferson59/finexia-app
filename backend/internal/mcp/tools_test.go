@@ -100,7 +100,7 @@ func TestCashAccountRows(t *testing.T) {
 	rates := []portfolio.CashRate{
 		{
 			SourceID: nu, Currency: money.COP, AnnualRatePct: "9.25", WithholdingPct: "0",
-			Posting: portfolio.PostingMonthly, MaxBalance: &limit,
+			Posting: portfolio.PostingMonthly, Tiers: []portfolio.CashRateTier{{FromBalance: limit, AnnualRatePct: "0"}},
 			EffectiveFrom: today.AddDate(0, -1, 0), Latest: true,
 		},
 		// Superseded: a version a later one follows is never in effect.
@@ -119,7 +119,7 @@ func TestCashAccountRows(t *testing.T) {
 		t.Fatalf("rows = %+v, want one per balance", rows)
 	}
 
-	if rows[0].AnnualRatePct != "9.25" || rows[0].Posting != "monthly" || rows[0].MaxBalance != limit {
+	if rows[0].AnnualRatePct != "9.25" || rows[0].Posting != "monthly" || len(rows[0].Tiers) != 1 || rows[0].Tiers[0].FromBalance != limit {
 		t.Errorf("the account with a rate = %+v", rows[0])
 	}
 	if rows[1].AnnualRatePct != "" {

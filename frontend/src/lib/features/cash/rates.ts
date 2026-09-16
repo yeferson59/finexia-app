@@ -18,12 +18,79 @@ export function formatAnnualRate(pct: string | number): string {
 	return `${value.toLocaleString('es-CO', { maximumFractionDigits: 4 })}% E.A.`;
 }
 
+/** «8%»: un tramo, sin repetir el «E.A.» que ya dijo la tasa principal. */
+function formatRatePct(pct: number): string {
+	return `${pct.toLocaleString('es-CO', { maximumFractionDigits: 4 })}%`;
+}
+
 /**
  * La tasa diaria equivalente a una efectiva anual, como fracción:
  * `(1 + EA)^(1/365) − 1`. Un 9 % E.A. da 0,000236131.
  */
 export function dailyRateFromAnnual(annualPct: number): number {
 	return Math.pow(1 + annualPct / 100, 1 / DAYS_PER_YEAR) - 1;
+}
+
+/** Un tramo de la tasa: desde qué saldo de la cuenta rige, y a qué tasa E.A. */
+export interface RateTier {
+	fromBalance: number;
+	annualRatePct: number;
+}
+
+/** Los tramos de una versión como números, del más bajo al más alto. */
+export function rateTiers(rate: Pick<CashRate, 'tiers'>): RateTier[] {
+	return rate.tiers
+		.map((t) => ({
+			fromBalance: parseFloat(t.fromBalance) || 0,
+			annualRatePct: parseFloat(t.annualRatePct) || 0
+		}))
+		.sort((a, b) => a.fromBalance - b.fromBalance);
+}
+
+/**
+ * Lo que rinde en un día una cuenta que guarda `balance`, antes de retención:
+ * la tasa diaria de cada tramo sobre la parte del saldo que cae en él. La tasa
+ * principal rige desde cero, y sin tramos es la única. Es la misma cuenta que
+ * hace el backend.
+ */
+export function dailyInterest(balance: number, annualPct: number, tiers: RateTier[] = []): number {
+	let earned = 0;
+	let from = 0;
+	let pct = annualPct;
+
+	for (let i = 0; from < balance; i++) {
+		const next = tiers[i];
+		const to = next && next.fromBalance < balance ? next.fromBalance : balance;
+
+		// Un tramo al 0 % es un tope: lo que cae en él no rinde.
+		if (pct > 0) earned += (to - from) * dailyRateFromAnnual(pct);
+
+		if (!next) break;
+		from = next.fromBalance;
+		pct = next.annualRatePct;
+	}
+
+	return earned;
+}
+
+/**
+ * La tasa E.A. a la que rinde todo el saldo de una cuenta con tramos: su día
+ * capitalizado un año, `(1 + día / saldo)^365 − 1`, en porcentaje. Sin tramos o
+ * sin saldo es la tasa principal.
+ *
+ * Doce por ciento hasta cinco millones y ocho sobre el resto dan, con ocho
+ * millones, un 10,48 % E.A.
+ */
+export function effectiveAnnualRate(
+	balance: number,
+	annualPct: number,
+	tiers: RateTier[] = []
+): number {
+	if (tiers.length === 0 || !(balance > 0)) return annualPct;
+
+	return (
+		(Math.pow(1 + dailyInterest(balance, annualPct, tiers) / balance, DAYS_PER_YEAR) - 1) * 100
+	);
 }
 
 /**
@@ -67,25 +134,37 @@ export interface InterestProjection {
  * Es una proyección sobre el saldo de hoy: no cuenta los depósitos ni los
  * retiros que vengan. Sin saldo o sin tasa rinde cero.
  *
- * Con tope, solo rinde la parte del saldo que cabe en él. El tope es de la
- * cuenta entera, así que la proyección de una cuenta repartida en varios
- * portafolios se calcula sobre la suma, como hace el backend.
+ * Con tramos, cada día rinde por tramos sobre el saldo de ese día, como en el
+ * backend: lo ganado puede caer en el tramo siguiente, y por encima de un tope
+ * ya no capitaliza. Los tramos son de la cuenta entera, así que la proyección
+ * de una cuenta repartida en varios portafolios se calcula sobre la suma.
  */
 export function projectInterest(
 	balance: number,
 	annualPct: number,
 	withholdingPct = 0,
-	maxBalance: number | null = null
+	tiers: RateTier[] = []
 ): InterestProjection {
-	const earning = maxBalance !== null && maxBalance > 0 ? Math.min(balance, maxBalance) : balance;
-
-	if (!(earning > 0) || !(annualPct > 0)) return { day: 0, month: 0, year: 0 };
+	if (!(balance > 0) || !(annualPct > 0)) return { day: 0, month: 0, year: 0 };
 
 	const kept = 1 - Math.min(Math.max(withholdingPct, 0), 100) / 100;
-	const daily = dailyRateFromAnnual(annualPct) * kept;
-	const earned = (days: number) => earning * (Math.pow(1 + daily, days) - 1);
 
-	return { day: earned(1), month: earned(30), year: earned(DAYS_PER_YEAR) };
+	// Sin tramos, la fórmula cerrada da lo mismo sin recorrer el año.
+	if (tiers.length === 0) {
+		const daily = dailyRateFromAnnual(annualPct) * kept;
+		const earned = (days: number) => balance * (Math.pow(1 + daily, days) - 1);
+
+		return { day: earned(1), month: earned(30), year: earned(DAYS_PER_YEAR) };
+	}
+
+	const earned: Record<number, number> = {};
+	let held = balance;
+	for (let day = 1; day <= DAYS_PER_YEAR; day++) {
+		held += dailyInterest(held, annualPct, tiers) * kept;
+		earned[day] = held - balance;
+	}
+
+	return { day: earned[1], month: earned[30], year: earned[DAYS_PER_YEAR] };
 }
 
 /** Las versiones de la tasa de una cuenta, leídas en un día. */
@@ -107,7 +186,9 @@ export interface CashAccountRate {
 const calendarDay = (iso: string) => iso.slice(0, 10);
 
 /**
- * La tasa de una cuenta —plataforma y moneda— en `today` (`2026-09-14`).
+ * La tasa de una cuenta —plataforma, moneda y bolsillo— en `today`
+ * (`2026-09-14`). `pocketId` en `null` es la cuenta principal, que es lo que
+ * había antes de que hubiera bolsillos.
  *
  * Las fechas se comparan como días del calendario, que es como las guarda el
  * backend: una tasa desde el 15 no puede empezar el 14 en una zona al oeste de
@@ -117,9 +198,12 @@ export function cashAccountRate(
 	rates: CashRate[],
 	sourceId: string,
 	currency: string,
-	today: string
+	today: string,
+	pocketId: string | null = null
 ): CashAccountRate {
-	const versions = rates.filter((r) => r.sourceId === sourceId && r.currency === currency);
+	const versions = rates.filter(
+		(r) => r.sourceId === sourceId && r.currency === currency && (r.pocketId ?? null) === pocketId
+	);
 
 	const current =
 		versions.find(
@@ -153,17 +237,46 @@ const dayAndMonth = (iso: string) =>
 	formatCalendarDate(calendarDay(iso), { day: 'numeric', month: 'short' });
 
 /**
- * La tasa de una cuenta en una línea: la que rige y lo que cambia después, o
- * desde cuándo no rinde. `null` si nunca tuvo tasa.
+ * Cómo paga una versión por encima de su tasa: «hasta $ 5.000.000 · 8 %
+ * después». La tasa principal rige desde cero, así que cada tramo cierra el
+ * que viene antes —«hasta» ese saldo— y el último dice qué se gana de ahí en
+ * adelante. Un tramo al 0 % no se nombra: no rinde, y decir «hasta» ya lo
+ * cuenta.
+ *
+ * Los importes pasan por `money`, que con el modo oculto los enmascara, porque
+ * la línea de la cuenta se ve con él puesto.
  */
-export function describeCashAccountRate({
-	current,
-	upcoming,
-	latest
-}: CashAccountRate): string | null {
+function tiersNote(rate: CashRate, money: (amount: number) => string): string {
+	const tiers = rateTiers(rate);
+	if (tiers.length === 0) return '';
+
+	const parts = tiers.map(
+		(tier, i) =>
+			(i === 0 ? '' : `${formatRatePct(tiers[i - 1].annualRatePct)} `) +
+			`hasta ${money(tier.fromBalance)}`
+	);
+
+	const last = tiers[tiers.length - 1];
+	if (last.annualRatePct > 0) parts.push(`${formatRatePct(last.annualRatePct)} después`);
+
+	return ` ${parts.join(' · ')}`;
+}
+
+/**
+ * La tasa de una cuenta en una línea: la que rige, sus tramos y lo que cambia
+ * después, o desde cuándo no rinde. `null` si nunca tuvo tasa.
+ *
+ * `money` da formato al saldo desde el que rige un tramo; por defecto no se
+ * nombra ninguno, para quien solo quiera la tasa.
+ */
+export function describeCashAccountRate(
+	{ current, upcoming, latest }: CashAccountRate,
+	money: (amount: number) => string = (amount) => String(amount)
+): string | null {
 	if (current) {
 		const now =
 			formatAnnualRate(current.annualRatePct) +
+			tiersNote(current, money) +
 			(current.posting === 'monthly' ? ' · abono mensual' : '');
 		if (upcoming) {
 			return `${now} · ${formatAnnualRate(upcoming.annualRatePct)} desde el ${dayAndMonth(upcoming.effectiveFrom)}`;
@@ -197,12 +310,19 @@ export interface CashYield {
  * que rinde el dinero que rinde y cuánto dinero está parado son dos preguntas
  * distintas, y esto responde las dos por separado. Se pondera por el valor en
  * la moneda de la pantalla, que es lo único que se puede sumar entre monedas;
- * una cuenta sin tasa de cambio no pesa, como en el total.
+ * una cuenta sin tasa de cambio no pesa, como en el total. Una cuenta con
+ * tramos cuenta con la tasa a la que rinde todo su saldo.
  *
  * `null` si no hay ninguna cuenta con dinero.
  */
 export function cashYield(
-	accounts: { sourceId: string; currency: string; balance: number; value: number }[],
+	accounts: {
+		sourceId: string;
+		currency: string;
+		balance: number;
+		value: number;
+		pocketId?: string | null;
+	}[],
 	rates: CashRate[],
 	today: string
 ): CashYield | null {
@@ -215,14 +335,26 @@ export function cashYield(
 		if (account.balance === 0) continue;
 		funded += 1;
 
-		const current = cashAccountRate(rates, account.sourceId, account.currency, today).current;
+		const current = cashAccountRate(
+			rates,
+			account.sourceId,
+			account.currency,
+			today,
+			account.pocketId ?? null
+		).current;
 		if (!current) {
 			idle += 1;
 			continue;
 		}
 
 		earning += account.value;
-		weighted += account.value * (parseFloat(current.annualRatePct) || 0);
+		weighted +=
+			account.value *
+			effectiveAnnualRate(
+				account.balance,
+				parseFloat(current.annualRatePct) || 0,
+				rateTiers(current)
+			);
 	}
 
 	if (funded === 0) return null;
@@ -270,17 +402,30 @@ export function cashRateErrorMessage(
 	if (details.includes('cannot be before')) {
 		return 'Elige hoy o una fecha posterior: los días pasados no se recalculan.';
 	}
+	// Antes que los de la tasa principal: sus mensajes contienen los de ella.
+	if (details.includes('tiers take at most')) {
+		return 'Una tasa tiene como mucho 10 tramos.';
+	}
+	if (details.includes('tiers must go up')) {
+		return 'Cada tramo tiene que empezar en un saldo mayor que el anterior.';
+	}
+	if (details.includes('tier fromBalance takes at most')) {
+		return 'Escribe el saldo de cada tramo con hasta ocho decimales.';
+	}
+	if (details.includes('tier fromBalance must be greater than 0')) {
+		return 'El saldo desde el que rige un tramo tiene que ser mayor que cero.';
+	}
+	if (details.includes('tier annualRatePct takes at most')) {
+		return 'Escribe la tasa de cada tramo con hasta cuatro decimales.';
+	}
+	if (details.includes('tier annualRatePct must be')) {
+		return 'La tasa de un tramo va de 0 % a 100 %.';
+	}
 	if (details.includes('annualRatePct takes at most')) {
 		return 'Escribe la tasa con hasta cuatro decimales.';
 	}
 	if (details.includes('withholdingPct takes at most')) {
 		return 'Escribe la retención con hasta dos decimales.';
-	}
-	if (details.includes('maxBalance takes at most')) {
-		return 'Escribe el tope con hasta ocho decimales.';
-	}
-	if (details.includes('maxBalance must be greater than 0')) {
-		return 'El tope tiene que ser mayor que cero. Déjalo vacío si la cuenta rinde sobre todo el saldo.';
 	}
 	if (details.includes('from cannot be in the future')) {
 		return 'Elige hoy o un día pasado: no hay intereses que recalcular más adelante.';

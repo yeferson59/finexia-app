@@ -150,17 +150,106 @@ func TestCreditsOn(t *testing.T) {
 	}
 }
 
-// A cap belongs to the account, so the balances of one account earn on their
-// share of it and never on more than it together.
-func TestEarningBasisSharesTheCap(t *testing.T) {
-	limit := mustDecimal(t, "5000")
-	capped := CashRateVersion{MaxBalance: &limit}
+// twelveThenEight pays 12 % up to from and 8 % on what is above it.
+func twelveThenEight(t *testing.T, from string) CashRateVersion {
+	t.Helper()
+
+	return CashRateVersion{
+		ID:              uuid.New(),
+		AnnualRate:      mustDecimal(t, "0.12"),
+		WithholdingRate: decimal.Zero,
+		Tiers:           []CashRateStep{{From: mustDecimal(t, from), AnnualRate: mustDecimal(t, "0.08")}},
+	}
+}
+
+// near fails unless got is within tolerance of want.
+func near(t *testing.T, label string, got decimal.Decimal, want, tolerance string) {
+	t.Helper()
+
+	if got.Sub(mustDecimal(t, want)).Abs().GreaterThan(mustDecimal(t, tolerance)) {
+		t.Errorf("%s = %s, want %s ± %s", label, got, want, tolerance)
+	}
+}
+
+// A version pays in steps of what its account holds: its own rate from zero,
+// and each tier's from its own point up.
+func TestAccountGrossPaysInSteps(t *testing.T) {
+	tiered := twelveThenEight(t, "5000000")
+
+	cases := []struct {
+		name string
+		held string
+		want string
+	}{
+		// 5 000 000 × ((1.12)^(1/365) − 1) + 3 000 000 × ((1.08)^(1/365) − 1).
+		{"across two steps", "8000000", "2185.311973"},
+		{"inside the first", "4000000", "1242.151023"},
+		{"exactly where the second starts", "5000000", "1552.688778"},
+		{"nothing held", "0", "0"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := tiered.accountGross(mustDecimal(t, tc.held))
+			if err != nil {
+				t.Fatalf("accountGross: %v", err)
+			}
+
+			near(t, "gross", got, tc.want, "0.000001")
+		})
+	}
+}
+
+// Three steps, so a middle one is bounded on both sides: 12 % up to 5 000 000,
+// 8 % up to 10 000 000, 5 % above that. On 12 000 000 the middle step earns on
+// the 5 000 000 between its neighbours, and the last on the 2 000 000 over it.
+func TestAccountGrossPaysInThreeSteps(t *testing.T) {
+	version := CashRateVersion{
+		AnnualRate: mustDecimal(t, "0.12"),
+		Tiers: []CashRateStep{
+			{From: mustDecimal(t, "5000000"), AnnualRate: mustDecimal(t, "0.08")},
+			{From: mustDecimal(t, "10000000"), AnnualRate: mustDecimal(t, "0.05")},
+		},
+	}
+
+	got, err := version.accountGross(mustDecimal(t, "12000000"))
+	if err != nil {
+		t.Fatalf("accountGross: %v", err)
+	}
+
+	// 5 000 000 × i(12 %) + 5 000 000 × i(8 %) + 2 000 000 × i(5 %).
+	near(t, "gross", got, "2874.422004", "0.000001")
+
+	// A step above what the account holds earns nothing: on 7 000 000 only the
+	// first two steps pay, and the third never starts.
+	inTwo, err := version.accountGross(mustDecimal(t, "7000000"))
+	if err != nil {
+		t.Fatalf("accountGross: %v", err)
+	}
+
+	near(t, "gross inside the middle step", inTwo, "1974.437575", "0.000001")
+}
+
+// A cap is a step at zero. The account earns on the cap and no more, and its
+// balances share that in proportion to what each holds: what the cap column
+// computed before 000046, on the same figures.
+func TestDayGrossSharesACap(t *testing.T) {
+	nine := mustDecimal(t, "0.09")
+	capped := CashRateVersion{
+		AnnualRate: nine,
+		Tiers:      []CashRateStep{{From: mustDecimal(t, "5000"), AnnualRate: decimal.Zero}},
+	}
+
+	daily, err := dailyRate(nine)
+	if err != nil {
+		t.Fatalf("dailyRate: %v", err)
+	}
 
 	cases := []struct {
 		name        string
 		basis       string
 		accountHeld string
-		want        string
+		earnsOn     string
 	}{
 		{"under the cap", "4000", "4000", "4000"},
 		{"exactly the cap", "5000", "5000", "5000"},
@@ -171,23 +260,113 @@ func TestEarningBasisSharesTheCap(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := capped.earningBasis(mustDecimal(t, tc.basis), mustDecimal(t, tc.accountHeld))
+			got, err := capped.dayGross(mustDecimal(t, tc.basis), mustDecimal(t, tc.accountHeld))
 			if err != nil {
-				t.Fatalf("earningBasis: %v", err)
+				t.Fatalf("dayGross: %v", err)
 			}
 
-			sameAmount(t, "earning basis", got.String(), tc.want)
+			aboutRate(t, "gross", got, mustDecimal(t, tc.earnsOn).Mul(daily))
 		})
 	}
 
-	t.Run("no cap earns on all of it", func(t *testing.T) {
-		got, err := CashRateVersion{}.earningBasis(mustDecimal(t, "8000"), mustDecimal(t, "10000"))
+	t.Run("no tiers earns on all of it", func(t *testing.T) {
+		got, err := CashRateVersion{AnnualRate: nine}.dayGross(mustDecimal(t, "8000"), mustDecimal(t, "10000"))
 		if err != nil {
-			t.Fatalf("earningBasis: %v", err)
+			t.Fatalf("dayGross: %v", err)
 		}
 
-		sameAmount(t, "earning basis", got.String(), "8000")
+		aboutRate(t, "gross", got, mustDecimal(t, "8000").Mul(daily))
 	})
+}
+
+// Tiers belong to the account: two balances of it take the account's day in
+// proportion to what each holds, not each a day of its own on its own figure.
+func TestDayGrossSharesTiersAcrossTheAccount(t *testing.T) {
+	tiered := twelveThenEight(t, "5000000")
+	held := mustDecimal(t, "8000000")
+
+	whole, err := tiered.accountGross(held)
+	if err != nil {
+		t.Fatalf("accountGross: %v", err)
+	}
+
+	larger, err := tiered.dayGross(mustDecimal(t, "6000000"), held)
+	if err != nil {
+		t.Fatalf("dayGross: %v", err)
+	}
+
+	smaller, err := tiered.dayGross(mustDecimal(t, "2000000"), held)
+	if err != nil {
+		t.Fatalf("dayGross: %v", err)
+	}
+
+	near(t, "the two shares", larger.Add(smaller), whole.String(), "0.000000001")
+	near(t, "the smaller share", smaller, "546.327993", "0.000001")
+
+	// On its own the smaller balance would sit wholly in the first step.
+	alone, err := tiered.dayGross(mustDecimal(t, "2000000"), mustDecimal(t, "2000000"))
+	if err != nil {
+		t.Fatalf("dayGross: %v", err)
+	}
+	if !alone.GreaterThan(smaller) {
+		t.Errorf("alone = %s, want more than its share of the account, %s", alone, smaller)
+	}
+}
+
+func TestEffectiveRate(t *testing.T) {
+	tiered := twelveThenEight(t, "5000000")
+
+	blended, err := tiered.effectiveRate(mustDecimal(t, "8000000"))
+	if err != nil {
+		t.Fatalf("effectiveRate: %v", err)
+	}
+	near(t, "across two steps", blended, "0.104829742", "0.000000001")
+
+	inside, err := tiered.effectiveRate(mustDecimal(t, "4000000"))
+	if err != nil {
+		t.Fatalf("effectiveRate: %v", err)
+	}
+	near(t, "inside the first step", inside, "0.12", "0.000000001")
+
+	// With nothing held, or without tiers, it is the version's own rate as it is.
+	for label, version := range map[string]CashRateVersion{
+		"nothing held": tiered,
+		"no tiers":     {AnnualRate: mustDecimal(t, "0.12")},
+	} {
+		got, err := version.effectiveRate(decimal.Zero)
+		if err != nil {
+			t.Fatalf("effectiveRate: %v", err)
+		}
+		if !got.Equal(mustDecimal(t, "0.12")) {
+			t.Errorf("%s = %s, want 0.12", label, got)
+		}
+	}
+}
+
+// A day on a tiered account credits the balance's share of the account's day,
+// keeps what the balance held as its basis, and keeps the rate the steps came
+// to as the day's rate.
+func TestAccrueDayOnTiers(t *testing.T) {
+	day := CashDay{Basis: mustDecimal(t, "6000"), AccountHeld: mustDecimal(t, "8000"), Carry: decimal.Zero, Credits: true}
+
+	got, err := accrueDay(day, twelveThenEight(t, "5000"), money.USD)
+	if err != nil {
+		t.Fatalf("accrueDay: %v", err)
+	}
+
+	// Three quarters of 2.185311973.
+	sameAmount(t, "basis", got.Basis.String(), "6000")
+	near(t, "gross", got.Gross, "1.638983980", "0.000000001")
+	sameAmount(t, "credited", got.Credited.String(), "1.64")
+	near(t, "the day's rate", got.AnnualRate, "0.104829742", "0.000000001")
+
+	// A reading of the account below the balance is taken as the balance alone.
+	day.AccountHeld = decimal.Zero
+	alone, err := accrueDay(day, twelveThenEight(t, "5000"), money.USD)
+	if err != nil {
+		t.Fatalf("accrueDay: %v", err)
+	}
+	near(t, "gross on the balance alone", alone.Gross, "1.763563177", "0.000000001")
 }
 
 func TestCreditHeld(t *testing.T) {

@@ -11,6 +11,9 @@
 	 * solo no se pregunta. Con varios va al final, y elegir la cuenta propone el
 	 * portafolio donde ya suma, para que un depósito no la parta en dos.
 	 *
+	 * El bolsillo solo se pregunta cuando la cuenta tiene alguno, y por defecto
+	 * es la principal: una cuenta sin cajitas se comporta como siempre.
+	 *
 	 * El tipo va primero y como opciones a la vista, no en un desplegable, porque
 	 * es la decisión que cambia la rentabilidad: la frase debajo dice cuál de los
 	 * tres cuenta como ganancia.
@@ -29,6 +32,7 @@
 		type CashKind,
 		type CashMovement
 	} from '../cash';
+	import type { CashPocket } from '$lib/api/types';
 
 	/** Lo que abre el formulario: un alta (quizá sobre un saldo) o una edición. */
 	export type CashFormTarget =
@@ -40,18 +44,22 @@
 		platforms: { id: string; name: string }[];
 		/** Los saldos que ya hay, para proponer el portafolio de una cuenta existente. */
 		balances: CashBalance[];
+		/** Los bolsillos del usuario; la cuenta elegida toma los suyos. */
+		pockets: CashPocket[];
 		/** Moneda que se propone para un saldo nuevo: la de la cuenta. */
 		currency: string;
 		onClose: () => void;
 	}
 
-	let { target, portfolios, platforms, balances, currency, onClose }: Props = $props();
+	let { target, portfolios, platforms, balances, pockets, currency, onClose }: Props = $props();
 
 	interface Fields {
 		kind: CashKind;
 		portfolioId: string;
 		sourceId: string;
 		currency: string;
+		/** Vacío es la cuenta principal. */
+		pocketId: string;
 		amount: string;
 		fees: string;
 		date: string;
@@ -67,6 +75,9 @@
 				portfolioId: m.portfolioId,
 				sourceId: m.sourceId,
 				currency: m.currency,
+				// Una edición se queda en el saldo en que ya está: cambiar de bolsillo
+				// es mover, y mover son dos movimientos.
+				pocketId: '',
 				amount: String(parseFloat(m.amount) || ''),
 				fees: parseFloat(m.fees) > 0 ? String(parseFloat(m.fees)) : '',
 				date: m.date.slice(0, 10),
@@ -83,6 +94,7 @@
 			portfolioId: b?.portfolioId ?? suggestCashPortfolio(balances, source, code, fallback),
 			sourceId: source,
 			currency: code,
+			pocketId: b?.pocketId ?? '',
 			amount: '',
 			fees: '',
 			date: todayLocalDateString(),
@@ -100,6 +112,7 @@
 	let portfolioId = $derived(initial.portfolioId);
 	let sourceId = $derived(initial.sourceId);
 	let currencyCode = $derived(initial.currency);
+	let pocketId = $derived(initial.pocketId);
 	let amount = $derived(initial.amount);
 	let fees = $derived(initial.fees);
 	let date = $derived(initial.date);
@@ -121,7 +134,16 @@
 		sourceId = source;
 		currencyCode = code;
 		portfolioId = suggestCashPortfolio(balances, source, code, portfolioId);
+		// Otra cuenta, otros bolsillos: el que estaba elegido ya no es de esta.
+		pocketId = '';
 	}
+
+	/* Los bolsillos abiertos de la cuenta elegida. Sin ninguno no se pregunta. */
+	const accountPockets = $derived(
+		pockets.filter(
+			(p) => p.sourceId === sourceId && p.currency === currencyCode && p.closedOn === null
+		)
+	);
 
 	const editing = $derived(target?.mode === 'edit' ? target.movement : null);
 	const hint = $derived(CASH_KIND_OPTIONS.find((o) => o.value === kind)?.hint ?? '');
@@ -205,6 +227,24 @@
 						</select>
 					</div>
 				</div>
+
+				<!-- Solo cuando la cuenta tiene cajitas. Por defecto la principal, que
+				     es donde cae todo mientras no haya ninguna. -->
+				{#if accountPockets.length > 0}
+					<div class="field">
+						<label for="cash-pocket">Bolsillo</label>
+						<select id="cash-pocket" name="pocketId" bind:value={pocketId}>
+							<option value="">Cuenta principal</option>
+							{#each accountPockets as pocket (pocket.id)}
+								<option value={pocket.id}>{pocket.name}</option>
+							{/each}
+						</select>
+						<p class="hint">
+							El dinero sigue contando en la plataforma; el bolsillo solo dice en qué cajita está y
+							a qué tasa rinde.
+						</p>
+					</div>
+				{/if}
 			{/if}
 
 			<!--

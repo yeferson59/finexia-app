@@ -19,7 +19,7 @@
 	 *   recalcular.
 	 *
 	 * La proyección usa el saldo de hoy y la tasa que se está escribiendo, neta de
-	 * retención y limitada por el tope, para compararla con lo que abona la
+	 * retención y por tramos, para compararla con lo que abona la
 	 * entidad.
 	 */
 	import { enhance } from '$app/forms';
@@ -36,10 +36,12 @@
 		CASH_RECALCULATE_FALLBACK,
 		cashAccountRate,
 		describeCashAccountRate,
+		effectiveAnnualRate,
 		formatAnnualRate,
 		NOMINAL_PERIODS,
 		projectInterest,
-		type CashRate
+		type CashRate,
+		type RateTier
 	} from '../rates';
 
 	/** La cuenta cuya tasa se gestiona. */
@@ -64,15 +66,30 @@
 		annualRatePct: string;
 		withholdingPct: string;
 		posting: Posting;
-		maxBalance: string;
+		tiers: TierRow[];
 		date: string;
 	}
+
+	/** Una fila de tramo como la escribe el usuario. */
+	interface TierRow {
+		fromBalance: string;
+		annualRatePct: string;
+	}
+
+	/** Los que acepta el backend en una versión. */
+	const MAX_TIERS = 10;
 
 	const today = todayLocalDateString();
 
 	const status = $derived(
 		target
-			? cashAccountRate(rates, target.account.sourceId, target.account.currency, today)
+			? cashAccountRate(
+					rates,
+					target.account.sourceId,
+					target.account.currency,
+					today,
+					target.account.pocketId
+				)
 			: { current: null, upcoming: null, latest: null, accruedThrough: null }
 	);
 	const latest = $derived(status.latest);
@@ -91,7 +108,7 @@
 
 	/*
 	 * Cómo arranca al abrirse: con los valores de la versión más reciente —cambiar
-	 * la tasa casi siempre conserva la retención, el tope y la forma de abono— y
+	 * la tasa casi siempre conserva la retención, los tramos y la forma de abono— y
 	 * la fecha de hoy.
 	 */
 	function initialFields(current: CashRateTarget | null, version: CashRate | null): Fields {
@@ -100,7 +117,13 @@
 			annualRatePct: current ? pctField(version?.annualRatePct) : '',
 			withholdingPct: current ? pctField(version?.withholdingPct) : '',
 			posting: (current && version?.posting === 'monthly' ? 'monthly' : 'daily') as Posting,
-			maxBalance: current && version?.maxBalance ? String(parseFloat(version.maxBalance)) : '',
+			tiers:
+				current && version
+					? version.tiers.map((tier) => ({
+							fromBalance: String(parseFloat(tier.fromBalance)),
+							annualRatePct: String(parseFloat(tier.annualRatePct))
+						}))
+					: [],
 			date: today
 		};
 	}
@@ -114,13 +137,29 @@
 	let annualRatePct = $derived(initial.annualRatePct);
 	let withholdingPct = $derived(initial.withholdingPct);
 	let posting: Posting = $derived(initial.posting);
-	let maxBalance = $derived(initial.maxBalance);
+	let tiers: TierRow[] = $derived(initial.tiers);
 	let effectiveFrom = $derived(initial.date);
 	let endsOn = $derived(initial.date);
 	/* Recalcular mira hacia atrás, así que arranca en el primer día del mes. */
 	let recalcFrom = $derived(`${today.slice(0, 7)}-01`);
 	let submitting = $state(false);
 	let error = $state('');
+
+	/*
+	 * Las filas se reemplazan enteras en vez de mutarse: un `$derived`
+	 * reasignable avisa cuando se reasigna, no cuando cambia algo por dentro.
+	 */
+	function setTier(index: number, field: keyof TierRow, value: string) {
+		tiers = tiers.map((tier, i) => (i === index ? { ...tier, [field]: value } : tier));
+	}
+
+	function addTier(annualRatePct = '') {
+		tiers = [...tiers, { fromBalance: '', annualRatePct }];
+	}
+
+	function removeTier(index: number) {
+		tiers = tiers.filter((_, i) => i !== index);
+	}
 
 	/*
 	 * El conversor: lo que dice el folleto de la entidad cuando publica una tasa
@@ -203,19 +242,35 @@
 
 	/* Los campos numéricos entregan un número al escribir y una cadena al abrirse. */
 	const rateValue = $derived(parseFloat(String(annualRatePct)) || 0);
-	const capValue = $derived(parseFloat(String(maxBalance)) || 0);
+	/* Los tramos que se pueden leer, en orden: una fila a medio escribir no cuenta. */
+	const tierValues = $derived<RateTier[]>(
+		tiers
+			.map((tier) => ({
+				fromBalance: parseFloat(String(tier.fromBalance)),
+				annualRatePct: parseFloat(String(tier.annualRatePct)) || 0
+			}))
+			.filter((tier) => tier.fromBalance > 0)
+			.sort((a, b) => a.fromBalance - b.fromBalance)
+	);
 	const projection = $derived(
 		target
 			? projectInterest(
 					target.account.balance,
 					rateValue,
 					parseFloat(String(withholdingPct)) || 0,
-					capValue > 0 ? capValue : null
+					tierValues
 				)
 			: null
 	);
-	/* El tope deja fuera parte del saldo de la cuenta, que es lo que hay que decir. */
-	const capped = $derived(!!target && capValue > 0 && target.account.balance > capValue);
+	/*
+	 * Con el saldo por encima del primer tramo, la cuenta ya no rinde la tasa de
+	 * arriba sobre todo, y eso es lo que hay que decir: a cuánto rinde en conjunto.
+	 */
+	const blended = $derived(
+		target && tierValues.length > 0 && target.account.balance > tierValues[0].fromBalance
+			? effectiveAnnualRate(target.account.balance, rateValue, tierValues)
+			: null
+	);
 
 	const money = (amount: number) =>
 		privacy.money(formatCurrency(amount, target?.account.currency ?? 'USD'));
@@ -225,7 +280,7 @@
 	open={target !== null}
 	title="Rentabilidad de la cuenta"
 	description={target
-		? `${target.account.sourceName || 'Sin plataforma'} · ${target.account.currency}${summary ? ` · ${summary}` : ''}`
+		? `${target.account.sourceName || 'Sin plataforma'}${target.account.pocketName ? ` · ${target.account.pocketName}` : ''} · ${target.account.currency}${summary ? ` · ${summary}` : ''}`
 		: ''}
 	size="md"
 	onClose={close}
@@ -268,6 +323,8 @@
 			{#if mode === 'new' || mode === 'recalc'}
 				<input type="hidden" name="sourceId" value={account.sourceId} />
 				<input type="hidden" name="currency" value={account.currency} />
+				<!-- Vacío es la cuenta principal: un bolsillo rinde su propia tasa. -->
+				<input type="hidden" name="pocketId" value={account.pocketId ?? ''} />
 			{:else if latest}
 				<input type="hidden" name="id" value={latest.id} />
 			{/if}
@@ -341,28 +398,78 @@
 									Si la entidad te la descuenta, lo que rinde es neto.
 								</p>
 							</div>
-							<div class="field">
-								<label for="cash-rate-cap">
-									Tope remunerado <span class="optional">(opcional)</span>
-								</label>
-								<div class="with-unit">
-									<input
-										id="cash-rate-cap"
-										name="maxBalance"
-										type="number"
-										inputmode="decimal"
-										step="any"
-										min="0"
-										bind:value={maxBalance}
-										aria-describedby="cash-rate-cap-unit cash-rate-cap-hint"
-									/>
-									<span class="unit" id="cash-rate-cap-unit">{account.currency}</span>
-								</div>
-								<p class="hint" id="cash-rate-cap-hint">
-									Lo máximo sobre lo que paga la entidad. Vacío: rinde todo el saldo.
-								</p>
-							</div>
 						</div>
+
+						<fieldset class="tiers">
+							<legend class="field-label">
+								Tramos <span class="optional">(opcional)</span>
+							</legend>
+							<p class="hint">
+								Si la entidad paga distinto según el saldo. La tasa de arriba rige desde cero y cada
+								tramo desde el saldo que escribas. Un tramo al 0 % es un tope: desde ahí la cuenta
+								no rinde.
+							</p>
+							{#each tiers as tier, i (i)}
+								<div class="tier-row">
+									<div class="with-unit">
+										<label class="sr-only" for="cash-rate-tier-from-{i}">
+											Desde qué saldo rige el tramo {i + 1}
+										</label>
+										<input
+											id="cash-rate-tier-from-{i}"
+											name="tierFromBalance"
+											type="number"
+											inputmode="decimal"
+											step="any"
+											min="0"
+											placeholder="Desde"
+											value={tier.fromBalance}
+											oninput={(event) => setTier(i, 'fromBalance', event.currentTarget.value)}
+										/>
+										<span class="unit">{account.currency}</span>
+									</div>
+									<div class="with-unit">
+										<label class="sr-only" for="cash-rate-tier-rate-{i}">
+											Tasa efectiva anual del tramo {i + 1}
+										</label>
+										<input
+											id="cash-rate-tier-rate-{i}"
+											name="tierAnnualRatePct"
+											type="number"
+											inputmode="decimal"
+											step="any"
+											min="0"
+											max="100"
+											placeholder="Tasa"
+											value={tier.annualRatePct}
+											oninput={(event) => setTier(i, 'annualRatePct', event.currentTarget.value)}
+										/>
+										<span class="unit">% E.A.</span>
+									</div>
+									<Button type="button" variant="ghost" onclick={() => removeTier(i)}>
+										Quitar<span class="sr-only"> el tramo {i + 1}</span>
+									</Button>
+								</div>
+							{/each}
+							<div class="tier-actions">
+								<Button
+									type="button"
+									variant="ghost"
+									disabled={tiers.length >= MAX_TIERS}
+									onclick={() => addTier()}
+								>
+									Agregar tramo
+								</Button>
+								<Button
+									type="button"
+									variant="ghost"
+									disabled={tiers.length >= MAX_TIERS}
+									onclick={() => addTier('0')}
+								>
+									Agregar tope
+								</Button>
+							</div>
+						</fieldset>
 
 						<div class="converter">
 							<p class="lead">
@@ -427,8 +534,9 @@
 						<p class="lead">Escribe la tasa para ver cuánto rendiría la cuenta.</p>
 					{:else if account.balance > 0}
 						<p class="lead">
-							{#if capped}
-								Con el tope, {money(capValue)} de los {money(account.balance)} de la cuenta rendirían
+							{#if blended !== null}
+								Con los tramos, el saldo de hoy, {money(account.balance)}, rinde en conjunto un
+								{formatAnnualRate(Number(blended.toFixed(2)))}, y rendiría
 							{:else}
 								Con el saldo de hoy, {money(account.balance)}, rendiría
 							{/if}
@@ -558,7 +666,7 @@
 		pointer-events: none;
 	}
 
-	/* Lo que la entidad rara vez cambia queda plegado: la retención, el tope y el
+	/* Lo que la entidad rara vez cambia queda plegado: la retención, los tramos y el
 	   conversor de una tasa nominal. */
 	.advanced {
 		border: 1px solid var(--border);
@@ -592,6 +700,32 @@
 	.posting legend {
 		margin-bottom: 0.45rem;
 		padding: 0;
+	}
+
+	.tiers {
+		display: grid;
+		gap: 0.55rem;
+		margin: 0;
+		padding: 0;
+		border: none;
+	}
+
+	.tiers legend {
+		margin-bottom: 0.45rem;
+		padding: 0;
+	}
+
+	.tier-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.tier-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
 	}
 
 	.converter {
@@ -665,7 +799,8 @@
 	@media (max-width: 640px) {
 		.pair,
 		dl,
-		.converter-row {
+		.converter-row,
+		.tier-row {
 			grid-template-columns: 1fr;
 		}
 

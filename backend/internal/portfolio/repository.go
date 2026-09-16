@@ -111,9 +111,22 @@ type CashStore interface {
 	GetCashBalancesByUserID(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]CashBalance, error)
 	CountCashMovements(ctx context.Context, userID uuid.UUID) (int, error)
 	GetCashMovementsPaginated(ctx context.Context, userID uuid.UUID, limit, offset int) ([]CashMovement, error)
-	CreateCashMovement(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMovementInput) (CashMovement, error)
+	CreateCashMovement(ctx context.Context, userID, portfolioID, sourceID, pocketID uuid.UUID, in CashMovementInput) (CashMovement, error)
 	UpdateCashMovement(ctx context.Context, userID, txnID uuid.UUID, in CashMovementInput) (CashMovement, error)
 	DeleteCashMovement(ctx context.Context, userID, txnID uuid.UUID) error
+	// MoveCash records the two legs of a move between balances of one account
+	// in one transaction, so the money is never in both places or in neither.
+	MoveCash(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMoveInput) (CashMove, error)
+}
+
+// CashPocketStore persists the pockets of a cash account: the subaccounts its
+// money can sit in, each earning a rate of its own (000047). Every write locks
+// the platform first, so the pockets of one account are written one at a time.
+type CashPocketStore interface {
+	GetCashPocketsByUserID(ctx context.Context, userID uuid.UUID) ([]CashPocket, error)
+	CreateCashPocket(ctx context.Context, userID uuid.UUID, in NewCashPocketInput) (CashPocket, error)
+	RenameCashPocket(ctx context.Context, userID, pocketID uuid.UUID, in RenameCashPocketInput) (CashPocket, error)
+	DeleteCashPocket(ctx context.Context, userID, pocketID uuid.UUID) error
 }
 
 // CashRateStore persists the rates cash accounts earn, as versions by the day
@@ -152,6 +165,7 @@ type Repository interface {
 	SnapshotStore
 	HoldingsStore
 	CashStore
+	CashPocketStore
 	CashRateStore
 	CashAccrualStore
 }

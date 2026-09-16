@@ -110,7 +110,9 @@ func (s *service) RecalculateCashInterest(ctx context.Context, userID uuid.UUID,
 		return CashRecalculation{}, err
 	}
 
-	filter := CashAccrualFilter{UserID: userID, SourceID: in.SourceID, Currency: in.Currency}
+	// One pocket at a time: a pocket earns its own rate on its own balances, so
+	// redoing one leaves the rest of the platform as it was.
+	filter := CashAccrualFilter{UserID: userID, SourceID: in.SourceID, Currency: in.Currency}.OnPocket(in.PocketID)
 
 	cleared, err := s.repo.ClearCashInterest(ctx, filter, in.From)
 	if err != nil {

@@ -7,9 +7,12 @@ import {
 	cashRateErrorMessage,
 	cashYield,
 	dailyRateFromAnnual,
+	dailyInterest,
 	describeCashAccountRate,
+	effectiveAnnualRate,
 	formatAnnualRate,
 	projectInterest,
+	rateTiers,
 	type CashRate
 } from './rates';
 
@@ -20,9 +23,11 @@ const rate = (
 	sourceId: 's1',
 	sourceName: 'Nu',
 	currency: 'COP',
+	pocketId: null,
+	pocketName: '',
 	withholdingPct: '0',
 	posting: 'daily',
-	maxBalance: null,
+	tiers: [],
 	endedOn: null,
 	latest: false,
 	createdAt: '2026-09-01T00:00:00Z',
@@ -69,19 +74,71 @@ describe('projectInterest', () => {
 		expect(projectInterest(1000, 0)).toEqual({ day: 0, month: 0, year: 0 });
 	});
 
-	// Con tope solo rinde la parte del saldo que cabe en él.
+	// Un tope es un tramo al 0 %: por encima de él no rinde, y lo ganado tampoco
+	// capitaliza, así que 30 días son 30 veces uno.
 	it('solo proyecta hasta el tope', () => {
-		expect(projectInterest(10_000_000, 9, 0, 5_000_000).day).toBeCloseTo(1180.66, 2);
-		// Por debajo del tope, rinde todo.
-		expect(projectInterest(4_000_000, 9, 0, 5_000_000).day).toBeCloseTo(
-			projectInterest(4_000_000, 9).day,
-			10
+		const cap = [{ fromBalance: 5_000_000, annualRatePct: 0 }];
+
+		expect(projectInterest(10_000_000, 9, 0, cap).day).toBeCloseTo(1180.66, 2);
+		expect(projectInterest(10_000_000, 9, 0, cap).month).toBeCloseTo(35419.67, 1);
+		// Por debajo del tope, rinde todo, igual que sin él.
+		expect(projectInterest(4_000_000, 9, 0, cap).month).toBeCloseTo(
+			projectInterest(4_000_000, 9).month,
+			4
 		);
-		// Un tope de cero es «sin tope», que es como llega un campo vacío.
-		expect(projectInterest(1_000_000, 9, 0, 0).day).toBeCloseTo(
-			projectInterest(1_000_000, 9).day,
-			10
-		);
+	});
+
+	it('proyecta por tramos sobre el saldo de cada día', () => {
+		const tiers = [{ fromBalance: 5_000_000, annualRatePct: 8 }];
+
+		expect(projectInterest(8_000_000, 12, 0, tiers).day).toBeCloseTo(2185.31, 2);
+		expect(projectInterest(8_000_000, 12, 0, tiers).month).toBeCloseTo(65760.21, 1);
+	});
+});
+
+describe('dailyInterest', () => {
+	const tiers = [{ fromBalance: 5_000_000, annualRatePct: 8 }];
+
+	// El ejemplo del plan: 12 % hasta cinco millones y 8 % sobre el resto.
+	it('rinde cada tramo sobre la parte del saldo que cae en él', () => {
+		expect(dailyInterest(8_000_000, 12, tiers)).toBeCloseTo(2185.312, 3);
+		expect(dailyInterest(4_000_000, 12, tiers)).toBeCloseTo(1242.151, 3);
+		expect(dailyInterest(5_000_000, 12, tiers)).toBeCloseTo(1552.689, 3);
+	});
+
+	it('sin tramos es la tasa diaria sobre todo el saldo', () => {
+		expect(dailyInterest(10_000_000, 9)).toBeCloseTo(2361.31, 2);
+	});
+});
+
+describe('effectiveAnnualRate', () => {
+	const tiers = [{ fromBalance: 5_000_000, annualRatePct: 8 }];
+
+	it('dice a cuánto rinde todo el saldo con los tramos', () => {
+		expect(effectiveAnnualRate(8_000_000, 12, tiers)).toBeCloseTo(10.483, 3);
+	});
+
+	it('dentro del primer tramo, o sin tramos, es la tasa principal', () => {
+		expect(effectiveAnnualRate(4_000_000, 12, tiers)).toBeCloseTo(12, 8);
+		expect(effectiveAnnualRate(8_000_000, 12)).toBe(12);
+	});
+});
+
+describe('rateTiers', () => {
+	it('lee los tramos como números, del más bajo al más alto', () => {
+		const tiered = rate({
+			annualRatePct: '12',
+			effectiveFrom: '2026-09-01T00:00:00Z',
+			tiers: [
+				{ fromBalance: '20000000', annualRatePct: '0' },
+				{ fromBalance: '5000000', annualRatePct: '8' }
+			]
+		});
+
+		expect(rateTiers(tiered)).toEqual([
+			{ fromBalance: 5_000_000, annualRatePct: 8 },
+			{ fromBalance: 20_000_000, annualRatePct: 0 }
+		]);
 	});
 });
 
@@ -238,6 +295,43 @@ describe('describeCashAccountRate', () => {
 			describeCashAccountRate({ current: each, upcoming: null, latest: each, accruedThrough: null })
 		).toBe('9,25% E.A. · abono mensual');
 	});
+
+	// «12 % E.A. hasta $ 5.000.000 · 8 % después»: cada tramo cierra el que viene
+	// antes, y el último dice qué se gana de ahí en adelante.
+	it('dice los tramos con el saldo desde el que rigen', () => {
+		const money = (amount: number) => `$ ${amount.toLocaleString('es-CO')}`;
+		const line = (tiers: { fromBalance: string; annualRatePct: string }[]) => {
+			const version = { ...current, tiers };
+			return describeCashAccountRate(
+				{ current: version, upcoming: null, latest: version, accruedThrough: null },
+				money
+			);
+		};
+
+		expect(line([{ fromBalance: '5000000', annualRatePct: '8' }])).toBe(
+			'9,25% E.A. hasta $ 5.000.000 · 8% después'
+		);
+
+		expect(
+			line([
+				{ fromBalance: '5000000', annualRatePct: '8' },
+				{ fromBalance: '10000000', annualRatePct: '5' }
+			])
+		).toBe('9,25% E.A. hasta $ 5.000.000 · 8% hasta $ 10.000.000 · 5% después');
+	});
+
+	// Un tope no se nombra: por encima no rinde, y «hasta» ya lo dice.
+	it('un tramo al 0 % se dice como el saldo hasta el que paga', () => {
+		const money = (amount: number) => `$ ${amount.toLocaleString('es-CO')}`;
+		const capped = { ...current, tiers: [{ fromBalance: '25000000', annualRatePct: '0' }] };
+
+		expect(
+			describeCashAccountRate(
+				{ current: capped, upcoming: null, latest: capped, accruedThrough: null },
+				money
+			)
+		).toBe('9,25% E.A. hasta $ 25.000.000');
+	});
 });
 
 describe('cashRateErrorMessage', () => {
@@ -259,6 +353,22 @@ describe('cashRateErrorMessage', () => {
 		).toMatch(/hoy o una fecha posterior/);
 		expect(cashRateErrorMessage(404, 'cash rate not found')).toMatch(/ya no existe/);
 		expect(cashRateErrorMessage(500)).toBe(CASH_RATE_FALLBACK);
+	});
+
+	// Los de un tramo contienen los de la tasa principal, así que se miran antes.
+	it('distingue los rechazos de un tramo de los de la tasa', () => {
+		expect(
+			cashRateErrorMessage(400, 'invalid cash rate: tier annualRatePct takes at most 4 decimals')
+		).toMatch(/cada tramo/);
+		expect(
+			cashRateErrorMessage(
+				400,
+				'invalid cash rate: tiers must go up: each fromBalance above the one before'
+			)
+		).toMatch(/mayor que el anterior/);
+		expect(
+			cashRateErrorMessage(400, 'invalid cash rate: annualRatePct takes at most 4 decimals')
+		).toBe('Escribe la tasa con hasta cuatro decimales.');
 	});
 
 	// Los motivos son los mismos —la cuenta es la misma— pero lo que se
@@ -302,6 +412,21 @@ describe('cashYield', () => {
 				TODAY
 			)
 		).toEqual({ pct: 7.75, idle: 0 });
+	});
+
+	// Una cuenta con tramos pesa con la tasa a la que rinde todo su saldo.
+	it('pondera una cuenta con tramos por lo que rinde en conjunto', () => {
+		const tiered = rate({
+			annualRatePct: '12',
+			effectiveFrom: '2026-09-01T00:00:00Z',
+			latest: true,
+			tiers: [{ fromBalance: '5000000', annualRatePct: '8' }]
+		});
+
+		expect(cashYield([account({ balance: 8_000_000 })], [tiered], TODAY)?.pct).toBeCloseTo(
+			10.483,
+			3
+		);
 	});
 
 	// Una cuenta parada se cuenta aparte, no se promedia con un cero.

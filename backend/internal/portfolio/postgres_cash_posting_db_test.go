@@ -15,7 +15,7 @@ import (
 // database contract as postgres_cash_db_test.go.
 
 // rateWith records a USD rate on the fixture's platform, with the posting and
-// the cap the case is about.
+// the tiers the case is about. A cap is a tier at 0 % (000046).
 func (f cashFixture) rateWith(t *testing.T, pct string, from time.Time, edit func(*CashRateInput)) CashRate {
 	t.Helper()
 
@@ -192,7 +192,7 @@ func TestCashAccrualSharesTheCapBetweenBalances(t *testing.T) {
 
 	first := f.mustMove(t, CashKindDeposit, "7500", cashDay)
 
-	second, err := f.repo.CreateCashMovement(ctx, f.userID, other, f.sourceID, CashMovementInput{
+	second, err := f.repo.CreateCashMovement(ctx, f.userID, other, f.sourceID, uuid.UUID{}, CashMovementInput{
 		Kind: CashKindDeposit, Amount: mustDecimal(t, "2500"), Currency: money.USD, Date: cashDay,
 	})
 	if err != nil {
@@ -200,18 +200,20 @@ func TestCashAccrualSharesTheCapBetweenBalances(t *testing.T) {
 	}
 
 	rate := f.rateWith(t, "9", cashDay, func(in *CashRateInput) {
-		in.MaxBalance = decimalPtr(mustDecimal(t, "5000"))
+		in.Tiers = tierSteps(t, "5000", "0")
 	})
 
 	f.accrue(t, first.EntryID, rate.ID, cashDay)
 	f.accrue(t, second.EntryID, rate.ID, cashDay)
 
-	// The account holds 10 000 against a cap of 5 000, so each balance earns on
-	// half of what it holds: 3 750 and 1 250, never on more than the cap.
+	// The account holds 10 000 against a cap of 5 000, so each balance earns
+	// what half of it would, 3 750 and 1 250, never more than the cap. The
+	// ledger keeps what each held, and the rate that came to: 4.4033 %.
 	firstRow, _ := f.accrualOn(t, first.EntryID, cashDay)
 	secondRow, _ := f.accrualOn(t, second.EntryID, cashDay)
-	sameAmount(t, "the larger basis", firstRow.basis, "3750")
-	sameAmount(t, "the smaller basis", secondRow.basis, "1250")
+	sameAmount(t, "the larger basis", firstRow.basis, "7500")
+	sameAmount(t, "the smaller basis", secondRow.basis, "2500")
+	sameAmount(t, "the rate of the day", f.accrualRate(t, first.EntryID, cashDay), "0.044033")
 
 	// 3 750 × 0.000236131 = 0.8855, 1 250 × 0.000236131 = 0.2952.
 	sameAmount(t, "the larger balance", f.balanceOf(t, first.EntryID).Balance, "7500.89")
@@ -224,7 +226,7 @@ func TestCashAccrualUnderTheCapEarnsOnEverything(t *testing.T) {
 
 	deposit := f.mustMove(t, CashKindDeposit, "10000", cashDay)
 	rate := f.rateWith(t, "9", cashDay, func(in *CashRateInput) {
-		in.MaxBalance = decimalPtr(mustDecimal(t, "25000"))
+		in.Tiers = tierSteps(t, "25000", "0")
 	})
 
 	f.accrue(t, deposit.EntryID, rate.ID, cashDay)
@@ -494,18 +496,20 @@ func TestCashAccrualCapsAMonthlyRate(t *testing.T) {
 	deposit := f.mustMove(t, CashKindDeposit, "10000", cashDay)
 	rate := f.rateWith(t, "9", cashDay, func(in *CashRateInput) {
 		monthly(in)
-		in.MaxBalance = decimalPtr(mustDecimal(t, "4000"))
+		in.Tiers = tierSteps(t, "4000", "0")
 	})
 
 	f.accrueThrough(t, deposit.EntryID, rate.ID, cashDay.AddDate(0, 0, 2))
 
+	// Every day earns on the cap alone. The ledger keeps what the balance held:
+	// the deposit on the first day, and on the second the day before as well,
+	// which leaves the account over the cap either way.
 	first, _ := f.accrualOn(t, deposit.EntryID, cashDay)
-	sameAmount(t, "the first basis", first.basis, "4000")
+	sameAmount(t, "the first basis", first.basis, "10000")
 
-	// The second day earns on the cap too, not on the cap plus what it held:
-	// the account is over the cap either way.
 	second, _ := f.accrualOn(t, deposit.EntryID, cashDay.AddDate(0, 0, 1))
-	sameAmount(t, "the second basis", second.basis, "4000")
+	sameAmount(t, "the second basis", second.basis, mustDecimal(t, "10000").Add(mustDecimal(t, first.net)).String())
+	sameAmount(t, "the second day", second.net, first.net)
 
 	if n := f.countInterest(t, deposit.EntryID); n != 0 {
 		t.Errorf("credits = %d, want none before the month closes", n)

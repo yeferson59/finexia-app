@@ -77,44 +77,68 @@ describe('cashRateUpdateSchema', () => {
 			withholdingPct: '7'
 		});
 
-		// Omitir el abono y el tope es abono diario y sin tope, que es lo que
+		// Omitir el abono y los tramos es abono diario y sin tramos, que es lo que
 		// dice una versión que no los menciona.
 		expect(result.data).toEqual({
 			id: RATE,
 			annualRatePct: 8.5,
 			withholdingPct: 7,
 			posting: 'daily',
-			maxBalance: null
+			tiers: []
 		});
 	});
 
-	it('acepta el abono mensual y un tope', () => {
+	it('acepta el abono mensual y tramos, con un tope entre ellos', () => {
 		const result = cashRateUpdateSchema.safeParse({
 			id: RATE,
 			annualRatePct: '9',
 			withholdingPct: '',
 			posting: 'monthly',
-			maxBalance: '25000000'
+			tiers: [
+				{ fromBalance: '5000000', annualRatePct: '8' },
+				{ fromBalance: '25000000', annualRatePct: '0' }
+			]
 		});
 
 		expect(result.data?.posting).toBe('monthly');
-		expect(result.data?.maxBalance).toBe(25000000);
+		expect(result.data?.tiers).toEqual([
+			{ fromBalance: 5000000, annualRatePct: 8 },
+			{ fromBalance: 25000000, annualRatePct: 0 }
+		]);
 	});
 
-	it('rechaza un tope que no es un importe', () => {
-		const cap = (maxBalance: string) =>
-			cashRateUpdateSchema.safeParse({
-				id: RATE,
-				annualRatePct: '9',
-				withholdingPct: '',
-				maxBalance
-			}).success;
+	it('rechaza un tramo que no se puede guardar', () => {
+		const valid = (tiers: { fromBalance: string; annualRatePct: string }[]) =>
+			cashRateUpdateSchema.safeParse({ id: RATE, annualRatePct: '9', withholdingPct: '', tiers })
+				.success;
 
-		expect(cap('')).toBe(true);
-		expect(cap('0')).toBe(false);
-		expect(cap('-1')).toBe(false);
-		expect(cap('hola')).toBe(false);
-		expect(cap('1.000000001')).toBe(false);
+		expect(valid([])).toBe(true);
+		expect(valid([{ fromBalance: '0', annualRatePct: '8' }])).toBe(false);
+		expect(valid([{ fromBalance: '-1', annualRatePct: '8' }])).toBe(false);
+		expect(valid([{ fromBalance: 'hola', annualRatePct: '8' }])).toBe(false);
+		expect(valid([{ fromBalance: '1.000000001', annualRatePct: '8' }])).toBe(false);
+		expect(valid([{ fromBalance: '5000', annualRatePct: '-1' }])).toBe(false);
+		expect(valid([{ fromBalance: '5000', annualRatePct: '8.00001' }])).toBe(false);
+	});
+
+	it('pide los tramos de menor a mayor saldo, sin repetir', () => {
+		const message = (...from: string[]) =>
+			firstMessage(
+				cashRateUpdateSchema.safeParse({
+					id: RATE,
+					annualRatePct: '9',
+					withholdingPct: '',
+					tiers: from.map((fromBalance) => ({ fromBalance, annualRatePct: '8' }))
+				})
+			);
+
+		expect(message('5000', '20000')).toBeUndefined();
+		expect(message('20000', '5000')).toBe(
+			'Cada tramo tiene que empezar en un saldo mayor que el anterior.'
+		);
+		expect(message('5000', '5000')).toBe(
+			'Cada tramo tiene que empezar en un saldo mayor que el anterior.'
+		);
 	});
 
 	it('rechaza un abono que no conoce', () => {
@@ -153,30 +177,27 @@ describe('cashRateDeleteSchema', () => {
 describe('toCashRateBody', () => {
 	it('manda los porcentajes con el abono elegido, y el día a medianoche UTC', () => {
 		expect(
-			toCashRateBody({ annualRatePct: 9.25, withholdingPct: 0, posting: 'daily', maxBalance: null })
+			toCashRateBody({ annualRatePct: 9.25, withholdingPct: 0, posting: 'daily', tiers: [] })
 		).toEqual({
 			annualRatePct: 9.25,
 			withholdingPct: 0,
 			posting: 'daily',
-			maxBalance: null
+			tiers: []
 		});
 		expect(toCalendarDateTime('2026-09-15')).toBe('2026-09-15T00:00:00Z');
 	});
 
-	// Una corrección dice la versión entera: un tope que se deja vacío lo quita.
-	it('manda el tope y el abono mensual tal cual', () => {
+	// Una corrección dice la versión entera: los tramos viajan siempre.
+	it('manda los tramos y el abono mensual tal cual', () => {
+		const tiers = [{ fromBalance: 5000000, annualRatePct: 8 }];
+
 		expect(
-			toCashRateBody({
-				annualRatePct: 12,
-				withholdingPct: 7,
-				posting: 'monthly',
-				maxBalance: 25000000
-			})
+			toCashRateBody({ annualRatePct: 12, withholdingPct: 7, posting: 'monthly', tiers })
 		).toEqual({
 			annualRatePct: 12,
 			withholdingPct: 7,
 			posting: 'monthly',
-			maxBalance: 25000000
+			tiers
 		});
 	});
 });

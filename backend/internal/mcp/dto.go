@@ -281,21 +281,25 @@ type CashOutput struct {
 // The rate belongs to the platform and the currency, so two portfolios holding
 // the same account's money report the same rate on their own share.
 type CashAccount struct {
-	PortfolioID     string `json:"portfolioId"`
-	PortfolioName   string `json:"portfolioName"`
-	PlatformID      string `json:"platformId"`
-	Platform        string `json:"platform"`
+	PortfolioID   string `json:"portfolioId"`
+	PortfolioName string `json:"portfolioName"`
+	PlatformID    string `json:"platformId"`
+	Platform      string `json:"platform"`
+	// Pocket is the drawer of the account the balance sits in, empty for the
+	// main account. A pocket's money counts in its platform's total and earns a
+	// rate of its own (000047).
+	Pocket          string `json:"pocket,omitempty" jsonschema:"the pocket of the account the balance sits in, empty for the main account; its money counts in the platform's total and it earns its own rate"`
 	Balance         string `json:"balance" jsonschema:"what the balance holds, in currency"`
 	Currency        string `json:"currency"`
 	Value           string `json:"value" jsonschema:"the balance in displayCurrency"`
 	DisplayCurrency string `json:"displayCurrency"`
 	// AnnualRatePct is empty when the account has no rate in effect today: the
 	// balance sits there earning nothing, which is worth saying.
-	AnnualRatePct  string `json:"annualRatePct,omitempty" jsonschema:"the effective annual rate the account earns, as a percentage: 9.25 is 9.25 % E.A."`
-	WithholdingPct string `json:"withholdingPct,omitempty" jsonschema:"the share of the interest withheld as tax, as a percentage"`
-	Posting        string `json:"posting,omitempty" jsonschema:"daily, or monthly for interest credited on the last day of the month"`
-	MaxBalance     string `json:"maxBalance,omitempty" jsonschema:"the most the account earns on; the balances of one account share it in proportion to what each holds"`
-	RateFrom       string `json:"rateFrom,omitempty" jsonschema:"the first day the rate in effect applies, RFC 3339"`
+	AnnualRatePct  string            `json:"annualRatePct,omitempty" jsonschema:"the effective annual rate the account earns, as a percentage: 9.25 is 9.25 % E.A."`
+	WithholdingPct string            `json:"withholdingPct,omitempty" jsonschema:"the share of the interest withheld as tax, as a percentage"`
+	Posting        string            `json:"posting,omitempty" jsonschema:"daily, or monthly for interest credited on the last day of the month"`
+	Tiers          []CashAccountTier `json:"tiers,omitempty" jsonschema:"steps above annualRatePct, lowest first: the part of the account above a step's fromBalance earns its rate, up to the next step, and a step at 0 is a cap. They belong to the account, so its balances share them in proportion to what each holds"`
+	RateFrom       string            `json:"rateFrom,omitempty" jsonschema:"the first day the rate in effect applies, RFC 3339"`
 	// What the interest has come to. Interest counts as gain, never as money
 	// put in: see the cash interest ledger.
 	InterestEarned    string `json:"interestEarned" jsonschema:"every interest credited to the balance, by the ledger or by hand, in currency"`
@@ -304,4 +308,10 @@ type CashAccount struct {
 	LastAccrualDate   string `json:"lastAccrualDate,omitempty" jsonschema:"the last day the ledger computed interest for the balance, RFC 3339"`
 	Movements         int64  `json:"movements"`
 	LastMovementDate  string `json:"lastMovementDate,omitempty"`
+}
+
+// CashAccountTier is a step of an account's rate.
+type CashAccountTier struct {
+	FromBalance   string `json:"fromBalance" jsonschema:"what the account holds from which the step applies, in currency"`
+	AnnualRatePct string `json:"annualRatePct" jsonschema:"the effective annual rate on the part of the account in the step, as a percentage"`
 }

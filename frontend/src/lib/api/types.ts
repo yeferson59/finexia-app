@@ -21,6 +21,8 @@ import type {
 	assetSchema,
 	cashBalanceSchema,
 	cashMovementSchema,
+	cashMoveSchema,
+	cashPocketSchema,
 	cashRateSchema,
 	sectorWeightSchema,
 	exchangeRateSchema,
@@ -155,6 +157,12 @@ export type PagedCashMovements = z.infer<typeof pagedCashMovementsSchema>;
 
 /** Una versión de la tasa que rinde una cuenta de efectivo. */
 export type CashRate = z.infer<typeof cashRateSchema>;
+
+/** Un bolsillo de una cuenta: una subcuenta con su propia tasa. */
+export type CashPocket = z.infer<typeof cashPocketSchema>;
+
+/** Las dos patas de un movimiento de dinero entre bolsillos de una cuenta. */
+export type CashMove = z.infer<typeof cashMoveSchema>;
 
 // ---------------------------------------------------------------------------
 // Assets y tasas de cambio (mercado)

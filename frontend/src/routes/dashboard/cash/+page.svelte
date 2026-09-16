@@ -8,16 +8,23 @@
 	import { todayLocalDateString } from '$lib/shared/format/date';
 	import {
 		CashAccounts,
+		CashMoveForm,
 		CashMovementForm,
 		CashMovements,
+		CashPocketForm,
 		CashRateForm,
 		CashSummary,
 		cashYield,
 		groupCashAccounts,
+		suggestCashPortfolio,
 		summarizeCash,
+		type CashAccount,
 		type CashFormTarget,
+		type CashMoveTarget,
+		type CashPocketTarget,
 		type CashRateTarget
 	} from '$lib/features/cash';
+	import type { CashPocket } from '$lib/api/types';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
@@ -39,8 +46,43 @@
 	/* La cuenta cuya rentabilidad está abierta. */
 	let rateTarget = $state<CashRateTarget | null>(null);
 
+	/* El bolsillo que se está abriendo o editando, y el traslado en curso. */
+	let pocketTarget = $state<CashPocketTarget | null>(null);
+	let moveTarget = $state<CashMoveTarget | null>(null);
+
 	function record() {
 		target = { mode: 'create' };
+	}
+
+	function openPocket(account: CashAccount, pocket: CashPocket | null) {
+		pocketTarget = pocket
+			? { mode: 'edit', pocket }
+			: {
+					mode: 'create',
+					sourceId: account.sourceId,
+					sourceName: account.sourceName,
+					currency: account.currency
+				};
+	}
+
+	/*
+	 * Mover es dentro de un portafolio: el dinero cambia de cajón, no de sitio
+	 * donde cuenta. Se propone aquel en que la cuenta ya guarda más, que es el
+	 * que casi siempre se quiere.
+	 */
+	function openMove(account: CashAccount) {
+		const portfolioId = suggestCashPortfolio(
+			data.balances,
+			account.sourceId,
+			account.currency,
+			data.portfolios[0]?.id ?? ''
+		);
+
+		moveTarget = {
+			account,
+			portfolioId,
+			portfolioName: data.portfolios.find((p) => p.id === portfolioId)?.name ?? ''
+		};
 	}
 </script>
 
@@ -103,9 +145,12 @@
 			<CashAccounts
 				balances={data.balances}
 				rates={data.rates}
+				pockets={data.pockets}
 				{showPortfolio}
 				onRecord={(balance) => (target = { mode: 'create', balance })}
 				onRate={(account) => (rateTarget = { account })}
+				onPocket={openPocket}
+				onMove={openMove}
 			/>
 		</Card>
 	</section>
@@ -138,11 +183,16 @@
 	portfolios={data.portfolios}
 	platforms={data.platforms}
 	balances={data.balances}
+	pockets={data.pockets}
 	currency={data.currency}
 	onClose={() => (target = null)}
 />
 
 <CashRateForm target={rateTarget} rates={data.rates} onClose={() => (rateTarget = null)} />
+
+<CashPocketForm target={pocketTarget} onClose={() => (pocketTarget = null)} />
+
+<CashMoveForm target={moveTarget} pockets={data.pockets} onClose={() => (moveTarget = null)} />
 
 <style>
 	.prereq {

@@ -177,10 +177,23 @@ func (s *Service) cashBlock(ctx context.Context, userID uuid.UUID, now time.Time
 	return cashBlock(balances, rates, now)
 }
 
-// cashAccount names what a rate belongs to: a platform and a currency.
+// cashAccount names what a rate belongs to: a platform, a currency and a pocket
+// of it (000047). The main account is the empty pocket, so a platform without
+// pockets keys exactly as it always did.
 type cashAccount struct {
 	sourceID uuid.UUID
 	currency money.Currency
+	pocketID uuid.UUID
+}
+
+// pocketKey is a pocket as the key holds it: the zero UUID for the main
+// account.
+func pocketKey(pocketID *uuid.UUID) uuid.UUID {
+	if pocketID == nil {
+		return uuid.UUID{}
+	}
+
+	return *pocketID
 }
 
 // cashBlock totals the cash and the interest it earned this month, and averages
@@ -194,12 +207,39 @@ func cashBlock(balances []portfolio.CashBalance, rates []portfolio.CashRate, now
 		return nil
 	}
 
+	// What each account holds together, in its own currency. A rate with tiers
+	// pays in steps of that figure, so what a balance earns depends on the rest
+	// of its account.
+	accountHeld := make(map[cashAccount]decimal.Decimal, len(balances))
+
+	for _, b := range balances {
+		key := cashAccount{sourceID: b.SourceID, currency: b.Currency, pocketID: pocketKey(b.PocketID)}
+
+		sum, ok := accountHeld[key]
+		if !ok {
+			sum = decimal.Zero
+		}
+
+		accountHeld[key] = sum.Add(amount(b.Balance))
+	}
+
 	inEffect := make(map[cashAccount]decimal.Decimal, len(rates))
 
 	for _, r := range rates {
-		if r.InEffectOn(now) {
-			inEffect[cashAccount{sourceID: r.SourceID, currency: r.Currency}] = amount(r.AnnualRatePct)
+		key := cashAccount{sourceID: r.SourceID, currency: r.Currency, pocketID: pocketKey(r.PocketID)}
+
+		held, ok := accountHeld[key]
+		if !ok || !r.InEffectOn(now) {
+			continue
 		}
+
+		// A rate whose figures do not read is still the rate it quotes.
+		pct, err := r.EffectiveAnnualPct(held)
+		if err != nil {
+			pct = amount(r.AnnualRatePct)
+		}
+
+		inEffect[key] = pct
 	}
 
 	block := mail.WeeklySummaryCash{Accounts: len(balances), Currency: balances[0].DisplayCurrency.String()}
@@ -212,7 +252,7 @@ func cashBlock(balances []portfolio.CashBalance, rates []portfolio.CashRate, now
 		value = value.Add(held)
 		interest = interest.Add(amount(b.InterestThisMonthValue))
 
-		rate, ok := inEffect[cashAccount{sourceID: b.SourceID, currency: b.Currency}]
+		rate, ok := inEffect[cashAccount{sourceID: b.SourceID, currency: b.Currency, pocketID: pocketKey(b.PocketID)}]
 		if !ok {
 			block.Idle++
 

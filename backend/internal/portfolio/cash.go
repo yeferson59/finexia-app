@@ -265,6 +265,11 @@ type CashBalance struct {
 	AssetID       uuid.UUID `json:"assetId"`
 	Ticker        string    `json:"ticker"`
 	Name          string    `json:"name"`
+	// PocketID is the pocket of the account the balance sits in, nil for the
+	// main account (000047). PocketName and PocketKind are empty with it.
+	PocketID   *uuid.UUID     `json:"pocketId"`
+	PocketName string         `json:"pocketName"`
+	PocketKind CashPocketKind `json:"pocketKind"`
 	// Balance is what the position holds, in Currency. For every balance these
 	// screens open that is its quantity; one recorded by hand at another price
 	// is valued the way the rest of the app values it.

@@ -157,7 +157,12 @@ type fakeRepository struct {
 	getCashBalancesByUserID         func(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]CashBalance, error)
 	countCashMovements              func(ctx context.Context, userID uuid.UUID) (int, error)
 	getCashMovementsPaginated       func(ctx context.Context, userID uuid.UUID, limit, offset int) ([]CashMovement, error)
-	createCashMovement              func(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMovementInput) (CashMovement, error)
+	createCashMovement              func(ctx context.Context, userID, portfolioID, sourceID, pocketID uuid.UUID, in CashMovementInput) (CashMovement, error)
+	moveCash                        func(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMoveInput) (CashMove, error)
+	getCashPocketsByUserID          func(ctx context.Context, userID uuid.UUID) ([]CashPocket, error)
+	createCashPocket                func(ctx context.Context, userID uuid.UUID, in NewCashPocketInput) (CashPocket, error)
+	renameCashPocket                func(ctx context.Context, userID, pocketID uuid.UUID, in RenameCashPocketInput) (CashPocket, error)
+	deleteCashPocket                func(ctx context.Context, userID, pocketID uuid.UUID) error
 	updateCashMovement              func(ctx context.Context, userID, txnID uuid.UUID, in CashMovementInput) (CashMovement, error)
 	deleteCashMovement              func(ctx context.Context, userID, txnID uuid.UUID) error
 	getCashRatesByUserID            func(ctx context.Context, userID uuid.UUID) ([]CashRate, error)
@@ -498,8 +503,28 @@ func (f *fakeRepository) GetCashMovementsPaginated(ctx context.Context, userID u
 	return f.getCashMovementsPaginated(ctx, userID, limit, offset)
 }
 
-func (f *fakeRepository) CreateCashMovement(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMovementInput) (CashMovement, error) {
-	return f.createCashMovement(ctx, userID, portfolioID, sourceID, in)
+func (f *fakeRepository) CreateCashMovement(ctx context.Context, userID, portfolioID, sourceID, pocketID uuid.UUID, in CashMovementInput) (CashMovement, error) {
+	return f.createCashMovement(ctx, userID, portfolioID, sourceID, pocketID, in)
+}
+
+func (f *fakeRepository) MoveCash(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMoveInput) (CashMove, error) {
+	return f.moveCash(ctx, userID, portfolioID, sourceID, in)
+}
+
+func (f *fakeRepository) GetCashPocketsByUserID(ctx context.Context, userID uuid.UUID) ([]CashPocket, error) {
+	return f.getCashPocketsByUserID(ctx, userID)
+}
+
+func (f *fakeRepository) CreateCashPocket(ctx context.Context, userID uuid.UUID, in NewCashPocketInput) (CashPocket, error) {
+	return f.createCashPocket(ctx, userID, in)
+}
+
+func (f *fakeRepository) RenameCashPocket(ctx context.Context, userID, pocketID uuid.UUID, in RenameCashPocketInput) (CashPocket, error) {
+	return f.renameCashPocket(ctx, userID, pocketID, in)
+}
+
+func (f *fakeRepository) DeleteCashPocket(ctx context.Context, userID, pocketID uuid.UUID) error {
+	return f.deleteCashPocket(ctx, userID, pocketID)
 }
 
 func (f *fakeRepository) UpdateCashMovement(ctx context.Context, userID, txnID uuid.UUID, in CashMovementInput) (CashMovement, error) {

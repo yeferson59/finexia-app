@@ -41,6 +41,14 @@ export const cashBalanceSchema = z.object({
 	movements: z.number(),
 	lastMovementDate: z.string().nullable(),
 	/**
+	 * El bolsillo de la cuenta en que está el saldo; `null` es la cuenta
+	 * principal, que es donde estaba todo antes de que hubiera bolsillos. Con
+	 * `null`, `pocketName` y `pocketKind` van vacíos.
+	 */
+	pocketId: z.string().nullable().default(null),
+	pocketName: z.string().default(''),
+	pocketKind: z.string().default(''),
+	/**
 	 * Los intereses abonados al saldo, en `currency`: todos, y los fechados en el
 	 * mes en curso (UTC). `interestThisMonthValue` es esa parte en
 	 * `displayCurrency`, con el mismo contrato de `fxConverted` que `value`.
@@ -109,6 +117,13 @@ export const cashRateSchema = z.object({
 	sourceId: z.string(),
 	sourceName: z.string(),
 	currency: z.string(),
+	/**
+	 * El bolsillo que rinde esta tasa; `null` es la cuenta principal. Una
+	 * plataforma puede pagar una tasa en la cuenta y otra en su bolsillo, y cada
+	 * una rinde sobre sus propios saldos.
+	 */
+	pocketId: z.string().nullable().default(null),
+	pocketName: z.string().default(''),
 	/** Tasa efectiva anual en porcentaje: `"9.25"` es 9,25 % E.A. */
 	annualRatePct: z.string(),
 	/** Parte de los intereses que se retiene, en porcentaje. */
@@ -116,11 +131,13 @@ export const cashRateSchema = z.object({
 	/** `daily` abona cada día; `monthly`, el último día de cada mes. */
 	posting: z.enum(['daily', 'monthly']),
 	/**
-	 * Lo máximo sobre lo que rinde la cuenta; `null` si rinde sobre todo. Es de
-	 * la cuenta, así que sus saldos se lo reparten en proporción a lo que guarda
-	 * cada uno.
+	 * Los tramos por encima de `annualRatePct`, del más bajo al más alto: la
+	 * parte de la cuenta por encima de `fromBalance` rinde su tasa, hasta el
+	 * siguiente. Un tramo al 0 % es un tope. Son de la cuenta, así que sus saldos
+	 * se los reparten en proporción a lo que guarda cada uno. Vacío si la cuenta
+	 * rinde `annualRatePct` sobre todo el saldo.
 	 */
-	maxBalance: z.string().nullable().default(null),
+	tiers: z.array(z.object({ fromBalance: z.string(), annualRatePct: z.string() })).default([]),
 	/** Primer día de la versión, a medianoche UTC. */
 	effectiveFrom: z.string(),
 	/** Último día que rinde; `null` mientras no tiene fin. */
@@ -134,4 +151,41 @@ export const cashRateSchema = z.object({
 	accruedThrough: z.string().nullable().default(null),
 	createdAt: z.string(),
 	updatedAt: z.string()
+});
+
+/**
+ * Un bolsillo de una cuenta (`GET /portfolios/cash/pockets`): la «cajita»
+ * dentro de la cuenta de ahorros, el subsaldo dentro del bróker.
+ *
+ * Pertenece a una plataforma y una moneda, y su dinero cuenta dentro de esa
+ * plataforma: ninguna cifra por plataforma cambia porque el dinero esté en un
+ * bolsillo. Lo propio del bolsillo es su tasa.
+ */
+export const cashPocketSchema = z.object({
+	id: z.string(),
+	sourceId: z.string(),
+	sourceName: z.string(),
+	currency: z.string(),
+	name: z.string(),
+	/** `flexible` admite depósitos y retiros; `fixed` es un depósito a plazo. */
+	kind: z.enum(['flexible', 'fixed']),
+	/** El día en que empezó a guardar dinero. */
+	openedOn: z.string(),
+	/** Cuándo vence un depósito a tasa fija; `null` en uno flexible. */
+	maturesOn: z.string().nullable().default(null),
+	/** El día en que se cerró; `null` mientras sigue abierto. */
+	closedOn: z.string().nullable().default(null),
+	/** Lo que guardan sus saldos juntos, en `currency`, y en cuántos portafolios. */
+	balance: z.string().default('0'),
+	balances: z.number().default(0),
+	/** Cuántos movimientos se anotaron en él: con alguno ya no se puede borrar. */
+	movements: z.number().default(0),
+	createdAt: z.string(),
+	updatedAt: z.string()
+});
+
+/** Las dos patas de un movimiento entre bolsillos (`POST /movements/move`). */
+export const cashMoveSchema = z.object({
+	from: cashMovementSchema,
+	to: cashMovementSchema
 });

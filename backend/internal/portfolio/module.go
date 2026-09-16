@@ -138,8 +138,17 @@ func (m *Module) Routes(router fiber.Router) {
 	portfolios.Get("/cash", m.handler.GetCashBalances)
 	portfolios.Get("/cash/movements", paginate.New(), m.handler.GetCashMovements)
 	portfolios.Post("/cash/movements", m.handler.CreateCashMovement)
+	// Moving money between two balances of one account. Before "/:txnId", so the
+	// literal path is not read as a movement called "move".
+	portfolios.Post("/cash/movements/move", m.handler.MoveCash)
 	portfolios.Put("/cash/movements/:txnId", m.handler.UpdateCashMovement)
 	portfolios.Delete("/cash/movements/:txnId", m.handler.DeleteCashMovement)
+	// The pockets an account's money can sit in, each earning its own rate;
+	// see CashPocketStore.
+	portfolios.Get("/cash/pockets", m.handler.GetCashPockets)
+	portfolios.Post("/cash/pockets", m.handler.CreateCashPocket)
+	portfolios.Put("/cash/pockets/:pocketId", m.handler.RenameCashPocket)
+	portfolios.Delete("/cash/pockets/:pocketId", m.handler.DeleteCashPocket)
 	// The rates cash accounts earn, as versions by the day each takes effect;
 	// see CashRateStore.
 	portfolios.Get("/cash/rates", m.handler.GetCashRates)

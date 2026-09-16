@@ -46,7 +46,10 @@ func (s *service) GetCashMovements(ctx context.Context, userID uuid.UUID, page, 
 // CreateCashMovement records a deposit, a withdrawal or the interest a balance
 // earned. No activity alert is sent: those announce trades, and moving money
 // into an account is not one.
-func (s *service) CreateCashMovement(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMovementInput) (CashMovement, error) {
+//
+// pocketID is which drawer of the account it goes in; the zero UUID is the main
+// account, which is where everything went before pockets existed.
+func (s *service) CreateCashMovement(ctx context.Context, userID, portfolioID, sourceID, pocketID uuid.UUID, in CashMovementInput) (CashMovement, error) {
 	if portfolioID == (uuid.UUID{}) || sourceID == (uuid.UUID{}) {
 		return CashMovement{}, invalidCash("portfolioId and sourceId are required")
 	}
@@ -55,7 +58,22 @@ func (s *service) CreateCashMovement(ctx context.Context, userID, portfolioID, s
 		return CashMovement{}, err
 	}
 
-	return s.repo.CreateCashMovement(ctx, userID, portfolioID, sourceID, in)
+	return s.repo.CreateCashMovement(ctx, userID, portfolioID, sourceID, pocketID, in)
+}
+
+// MoveCash moves money between two balances of one account inside a portfolio.
+// It is the one write that touches two balances, and it is not two movements:
+// the legs offset each other, so the portfolio's return does not move.
+func (s *service) MoveCash(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMoveInput) (CashMove, error) {
+	if portfolioID == (uuid.UUID{}) || sourceID == (uuid.UUID{}) {
+		return CashMove{}, invalidCashMove("portfolioId and sourceId are required")
+	}
+
+	if err := in.Validate(); err != nil {
+		return CashMove{}, err
+	}
+
+	return s.repo.MoveCash(ctx, userID, portfolioID, sourceID, in)
 }
 
 // UpdateCashMovement rewrites a movement on the balance it is already on.

@@ -3,6 +3,14 @@
 > **Estado:** implementado · 15 sep 2026
 > **Alcance:** módulo `portfolio` (backend), feature `cash` (frontend)
 > **Migraciones:** 000042 – 000045 · **Fases:** 4
+> **Continuado por:** [`PLAN_TASAS_MULTIPLES_EFECTIVO.md`](./PLAN_TASAS_MULTIPLES_EFECTIVO.md),
+> que sustituye su **D1** («dos productos, dos plataformas») y amplía su **D6**
+> (lo ganado antes de registrar la tasa). Lo que aquí se llama **tope** ya es un
+> tramo al 0 % desde la migración 000046: la columna `max_balance` no existe y
+> `maxBalance` ya no se devuelve, aunque la API lo siga leyendo.
+> Desde 000047 una cuenta se identifica por plataforma, moneda **y bolsillo**:
+> donde aquí se lee «plataforma y moneda», la clave lleva también el bolsillo, y
+> la cuenta principal es el bolsillo que no está (`pocket_id NULL`).
 
 ### Estado de implementación
 
@@ -29,7 +37,9 @@ Decisiones que cambiaron respecto al plan al implementarlo:
   un año por meses rinde lo mismo que uno por días. Si la cuenta deja de rendir
   antes de cerrar el mes, el job abona lo pendiente el último día que ganó.
   `max_balance` es de la cuenta: sus saldos se reparten el tope en proporción a
-  lo que guarda cada uno.
+  lo que guarda cada uno. Desde 000046 el tope es un tramo al 0 % de
+  `cash_yield_rate_tiers` y la columna ya no está; lo que rinde una cuenta con
+  tope no cambió.
 - **Primer día que rinde un saldo.** Un saldo gana desde el día en que se abrió
   (`created_at` en UTC), no desde el primer día de la tasa.
 - **Saldo del día en recuperaciones.** Los abonos se cuentan por el día en que
@@ -112,6 +122,10 @@ entidad y lo que aparece en el extracto. Si la cuenta está repartida entre
 varios portafolios, cada saldo gana la misma tasa sobre lo suyo. Si una entidad
 tiene dos productos con tasas distintas (cuenta y bolsillo), se registran como
 dos plataformas.
+*Sustituida por la migración 000047:* un producto con tasa propia es un
+**bolsillo** de la cuenta, no otra plataforma, y la clave pasa a ser plataforma +
+moneda + bolsillo. Su dinero sigue contando en la plataforma, que era lo que
+«dos plataformas» rompía. Ver `PLAN_TASAS_MULTIPLES_EFECTIVO.md`, D1–D3.
 
 **D2. Forma canónica: tasa efectiva anual (E.A.), base 365.** Es la convención
 de las cuentas de ahorro en Colombia y equivale al APY de las cuentas en

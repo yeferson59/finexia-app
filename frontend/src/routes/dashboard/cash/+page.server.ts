@@ -6,6 +6,7 @@ import * as platforms from '$lib/api/platforms';
 import { resolveDisplayCurrency } from '$lib/shared/currency';
 import {
 	cashErrorMessage,
+	cashMoveSchema,
 	cashMovementCreateSchema,
 	cashMovementDeleteSchema,
 	cashMovementUpdateSchema,
@@ -14,6 +15,10 @@ import {
 	cashRateEndSchema,
 	cashRateErrorMessage,
 	cashRateUpdateSchema,
+	cashPocketCreateSchema,
+	cashPocketDeleteSchema,
+	cashPocketErrorMessage,
+	cashPocketRenameSchema,
 	cashRecalculateSchema,
 	CASH_RECALCULATE_FALLBACK,
 	toCalendarDateTime,
@@ -37,13 +42,15 @@ export const load: PageServerLoad = async ({ cookies, fetch, url, locals }) => {
 		locals.user?.preferredCurrency
 	);
 
-	const [balancesRes, movementsRes, ratesRes, portfoliosRes, platformsRes] = await Promise.all([
-		cash.getBalances(event, currency),
-		cash.getMovements(event, 1, MOVEMENTS_LIMIT),
-		cash.getRates(event),
-		portfolio.getSummaries(event),
-		platforms.getSources(event)
-	]);
+	const [balancesRes, movementsRes, ratesRes, pocketsRes, portfoliosRes, platformsRes] =
+		await Promise.all([
+			cash.getBalances(event, currency),
+			cash.getMovements(event, 1, MOVEMENTS_LIMIT),
+			cash.getRates(event),
+			cash.getPockets(event),
+			portfolio.getSummaries(event),
+			platforms.getSources(event)
+		]);
 
 	return {
 		currency,
@@ -54,6 +61,10 @@ export const load: PageServerLoad = async ({ cookies, fetch, url, locals }) => {
 		// Sin tasas las cuentas se ven igual, solo que sin rentabilidad: no es un
 		// fallo de la página.
 		rates: ratesRes.success ? (ratesRes.data ?? []) : [],
+		// Los bolsillos vacíos no tienen saldo, así que no llegan con los saldos:
+		// esta es la lista que permite enseñarlos y darles tasa antes de meterles
+		// dinero.
+		pockets: pocketsRes.success ? (pocketsRes.data ?? []) : [],
 		portfolios: (portfoliosRes.data ?? []).map((p) => ({
 			id: p.id,
 			name: p.name,
@@ -76,12 +87,27 @@ function movementFields(formData: FormData) {
 	};
 }
 
+/**
+ * Los tramos llegan como dos listas paralelas, una entrada por fila. Una fila en
+ * blanco no es un tramo, y el resto se ordena por saldo: el orden en que se
+ * escribieron no cambia lo que dicen.
+ */
+function tierFields(formData: FormData) {
+	const from = formData.getAll('tierFromBalance').map(String);
+	const pct = formData.getAll('tierAnnualRatePct').map(String);
+
+	return from
+		.map((fromBalance, i) => ({ fromBalance, annualRatePct: pct[i] ?? '' }))
+		.filter((tier) => tier.fromBalance.trim() !== '' || tier.annualRatePct.trim() !== '')
+		.sort((a, b) => (parseFloat(a.fromBalance) || 0) - (parseFloat(b.fromBalance) || 0));
+}
+
 function rateFields(formData: FormData) {
 	return {
 		annualRatePct: formData.get('annualRatePct'),
 		withholdingPct: formData.get('withholdingPct'),
 		posting: formData.get('posting') ?? 'daily',
-		maxBalance: formData.get('maxBalance')
+		tiers: tierFields(formData)
 	};
 }
 
@@ -98,17 +124,18 @@ export const actions = {
 			...movementFields(formData),
 			portfolioId: formData.get('portfolioId'),
 			sourceId: formData.get('sourceId'),
-			currency: formData.get('currency')
+			currency: formData.get('currency'),
+			pocketId: formData.get('pocketId')
 		});
 
 		if (!parsed.success) {
 			return fail(400, { error: parsed.error.issues[0].message });
 		}
 
-		const { portfolioId, sourceId, currency, ...movement } = parsed.data;
+		const { portfolioId, sourceId, currency, pocketId, ...movement } = parsed.data;
 		const res = await cash.createMovement(
 			{ cookies, fetch },
-			{ portfolioId, sourceId, currency, ...toCashMovementBody(movement) }
+			{ portfolioId, sourceId, currency, pocketId, ...toCashMovementBody(movement) }
 		);
 
 		if (!res.ok || !res.success) {
@@ -174,6 +201,7 @@ export const actions = {
 			...rateFields(formData),
 			sourceId: formData.get('sourceId'),
 			currency: formData.get('currency'),
+			pocketId: formData.get('pocketId'),
 			effectiveFrom: formData.get('effectiveFrom')
 		});
 
@@ -181,12 +209,13 @@ export const actions = {
 			return fail(400, { error: parsed.error.issues[0].message });
 		}
 
-		const { sourceId, currency, effectiveFrom, ...values } = parsed.data;
+		const { sourceId, currency, pocketId, effectiveFrom, ...values } = parsed.data;
 		const res = await cash.createRate(
 			{ cookies, fetch },
 			{
 				sourceId,
 				currency,
+				pocketId,
 				effectiveFrom: toCalendarDateTime(effectiveFrom),
 				...toCashRateBody(values)
 			}
@@ -261,6 +290,7 @@ export const actions = {
 		const parsed = cashRecalculateSchema.safeParse({
 			sourceId: formData.get('sourceId'),
 			currency: formData.get('currency'),
+			pocketId: formData.get('pocketId'),
 			from: formData.get('from')
 		});
 
@@ -273,6 +303,7 @@ export const actions = {
 			{
 				sourceId: parsed.data.sourceId,
 				currency: parsed.data.currency,
+				pocketId: parsed.data.pocketId,
 				from: toCalendarDateTime(parsed.data.from)
 			}
 		);
@@ -280,6 +311,119 @@ export const actions = {
 		if (!res.ok || !res.success) {
 			return fail(res.status >= 400 ? res.status : 500, {
 				error: cashRateErrorMessage(res.status, res.details, CASH_RECALCULATE_FALLBACK)
+			});
+		}
+
+		return { success: true };
+	},
+
+	/*
+	 * Los bolsillos: abrir, renombrar y borrar. Un bolsillo es una subcuenta de
+	 * la cuenta —su dinero sigue contando en la plataforma— con su propia tasa.
+	 */
+	createPocket: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed = cashPocketCreateSchema.safeParse({
+			sourceId: formData.get('sourceId'),
+			currency: formData.get('currency'),
+			name: formData.get('name')
+		});
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const res = await cash.createPocket({ cookies, fetch }, parsed.data);
+
+		if (!res.ok || !res.success) {
+			return fail(res.status >= 400 ? res.status : 500, {
+				error: cashPocketErrorMessage(res.status, res.details)
+			});
+		}
+
+		return { success: true };
+	},
+
+	renamePocket: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed = cashPocketRenameSchema.safeParse({
+			id: formData.get('id'),
+			name: formData.get('name')
+		});
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const res = await cash.renamePocket({ cookies, fetch }, parsed.data.id, {
+			name: parsed.data.name
+		});
+
+		if (!res.ok || !res.success) {
+			return fail(res.status >= 400 ? res.status : 500, {
+				error: cashPocketErrorMessage(res.status, res.details)
+			});
+		}
+
+		return { success: true };
+	},
+
+	deletePocket: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed = cashPocketDeleteSchema.safeParse({ id: formData.get('id') });
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const res = await cash.deletePocket({ cookies, fetch }, parsed.data.id);
+
+		if (!res.ok) {
+			return fail(res.status >= 400 ? res.status : 500, {
+				error: cashPocketErrorMessage(res.status, res.details)
+			});
+		}
+
+		return { success: true };
+	},
+
+	/*
+	 * Mover no es un retiro y un depósito anotados a mano: las dos patas van en
+	 * una sola transacción y se compensan, así que la rentabilidad no se mueve.
+	 */
+	move: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed = cashMoveSchema.safeParse({
+			portfolioId: formData.get('portfolioId'),
+			sourceId: formData.get('sourceId'),
+			currency: formData.get('currency'),
+			fromPocketId: formData.get('fromPocketId'),
+			toPocketId: formData.get('toPocketId'),
+			amount: formData.get('amount'),
+			date: formData.get('date'),
+			notes: formData.get('notes')
+		});
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const { date, ...move } = parsed.data;
+		const res = await cash.moveCash(
+			{ cookies, fetch },
+			{ ...move, date: toCalendarDateTime(date) }
+		);
+
+		if (!res.ok || !res.success) {
+			return fail(res.status >= 400 ? res.status : 500, {
+				error:
+					res.status === 409
+						? 'No hay tanto dinero en el saldo del que sale. Mira lo que guarda y prueba con menos.'
+						: cashErrorMessage(res.status, res.details)
 			});
 		}
 

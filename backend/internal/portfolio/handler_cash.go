@@ -83,7 +83,7 @@ func (h *handler) CreateCashMovement(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid request", err.Error())
 	}
 
-	movement, err := h.service.CreateCashMovement(c, userID, req.PortfolioID, req.SourceID, req.Input())
+	movement, err := h.service.CreateCashMovement(c, userID, req.PortfolioID, req.SourceID, req.PocketID, req.Input())
 	if err != nil {
 		return httpx.FromDomain(c, err, "Error recording cash movement", "Could not record cash movement")
 	}

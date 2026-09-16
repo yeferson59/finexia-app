@@ -33,11 +33,18 @@ type CashRateVersion struct {
 	// monthly one computes every day just as a daily one does and holds the
 	// days until the month closes; see creditsOn.
 	Posting InterestPosting
-	// MaxBalance is the most the account earns on, nil when it earns on all of
-	// it. It belongs to the account, so its balances share it.
-	MaxBalance    *decimal.Decimal
+	// Tiers are the steps above AnnualRate, lowest first. They belong to the
+	// account, so its balances share them; see dayGross.
+	Tiers         []CashRateStep
 	EffectiveFrom time.Time
 	EndedOn       *time.Time
+}
+
+// CashRateStep is a tier as the ledger reads it: from what the account holds,
+// the annual rate on the part above it, as a fraction. A rate of zero is a cap.
+type CashRateStep struct {
+	From       decimal.Decimal
+	AnnualRate decimal.Decimal
 }
 
 // coversDay reports whether day falls between the version's first and last
@@ -57,24 +64,97 @@ func (v CashRateVersion) creditsOn(day time.Time) bool {
 	return day.AddDate(0, 0, 1).Day() == 1
 }
 
-// earningBasis is the part of a balance that earns on a day. Without a cap that
-// is all of it. With one, the cap belongs to the account rather than to any of
-// its balances, so when they hold more than it together, each earns on its
-// share of the cap, in proportion to what it holds.
+// compoundingDays is the base an effective annual rate is compounded on.
+var compoundingDays = decimal.MustFromString("365")
+
+// accountGross is what an account that held held at the close of a day earns
+// that day, before withholding: each step's daily rate on the part of held that
+// falls in it. The first step is the version's own rate, from zero; without
+// tiers it is the only one.
+func (v CashRateVersion) accountGross(held decimal.Decimal) (decimal.Decimal, error) {
+	gross := decimal.Zero
+	from, annual := decimal.Zero, v.AnnualRate
+
+	for i := 0; from.LessThan(held); i++ {
+		to := held
+		if i < len(v.Tiers) && v.Tiers[i].From.LessThan(held) {
+			to = v.Tiers[i].From
+		}
+
+		// A step at zero is a cap: what falls in it earns nothing, and there is
+		// no daily rate to convert.
+		if annual.IsPos() {
+			daily, err := dailyRate(annual)
+			if err != nil {
+				return decimal.Zero, err
+			}
+
+			gross = gross.Add(to.Sub(from).Mul(daily))
+		}
+
+		if i == len(v.Tiers) {
+			break
+		}
+
+		from, annual = v.Tiers[i].From, v.Tiers[i].AnnualRate
+	}
+
+	return gross, nil
+}
+
+// dayGross is what a balance earns in a day, before withholding.
+//
+// Without tiers it is its basis at the daily rate. With them, the steps belong
+// to the account rather than to any of its balances: the day is computed on
+// what they held together, and each balance takes its share, in proportion to
+// what it holds. A cap is a step at zero, so over it every balance earns on its
+// share of the cap.
 //
 // accountHeld is what every balance of the account held that day, this one
 // included; a balance that is the whole account passes its own basis.
-func (v CashRateVersion) earningBasis(basis, accountHeld decimal.Decimal) (decimal.Decimal, error) {
-	if v.MaxBalance == nil || !accountHeld.GreaterThan(*v.MaxBalance) {
-		return basis, nil
+func (v CashRateVersion) dayGross(basis, accountHeld decimal.Decimal) (decimal.Decimal, error) {
+	if len(v.Tiers) == 0 || !basis.IsPos() {
+		return v.accountGross(basis)
 	}
 
-	share, err := v.MaxBalance.Div(accountHeld)
+	gross, err := v.accountGross(accountHeld)
 	if err != nil {
 		return decimal.Zero, err
 	}
 
-	return basis.Mul(share), nil
+	share, err := basis.Div(accountHeld)
+	if err != nil {
+		return decimal.Zero, err
+	}
+
+	return gross.Mul(share), nil
+}
+
+// effectiveRate is the annual rate an account that holds held earns on all of
+// it: its day compounded over a year, (1 + gross/held)^365 − 1. It is the rate
+// the ledger keeps for a day. Without tiers, or with nothing held to earn on,
+// it is the version's own rate.
+func (v CashRateVersion) effectiveRate(held decimal.Decimal) (decimal.Decimal, error) {
+	if len(v.Tiers) == 0 || !held.IsPos() {
+		return v.AnnualRate, nil
+	}
+
+	gross, err := v.accountGross(held)
+	if err != nil {
+		return decimal.Zero, err
+	}
+
+	daily, err := gross.Div(held)
+	if err != nil {
+		return decimal.Zero, err
+	}
+
+	compounded, err := daily.Add(decimal.One).Pow(compoundingDays)
+	if err != nil {
+		return decimal.Zero, err
+	}
+
+	return compounded.Sub(decimal.One), nil
 }
 
 // ErrInvalidCashRecalculation rejects a recalculation that cannot be run as
@@ -82,12 +162,33 @@ func (v CashRateVersion) earningBasis(basis, accountHeld decimal.Decimal) (decim
 var ErrInvalidCashRecalculation = httpx.AsBadRequest(errors.New("invalid cash interest recalculation"))
 
 // CashAccrualFilter narrows a run to the balances of one account: one platform,
-// in one currency, for one owner. The zero value is every balance there is,
-// which is what the nightly job computes.
+// in one currency, for one owner, and since 000047 in one pocket of it. The
+// zero value is every balance there is, which is what the nightly job computes.
 type CashAccrualFilter struct {
 	UserID   uuid.UUID
 	SourceID uuid.UUID
 	Currency money.Currency
+	// Pocket is which drawer of the account. Nil is every one of them and the
+	// main account with them — "the whole platform" — and a pocket named
+	// explicitly is only itself. The main account is named by pointing at the
+	// zero UUID, which is why this is a pointer and not a plain one: "every
+	// pocket" and "the one with no pocket" are different runs, and the zero
+	// value cannot mean both.
+	Pocket *uuid.UUID
+}
+
+// mainCashAccount is the pocket filter that means the balances in no pocket:
+// what an account was before pockets existed.
+func mainCashAccount() *uuid.UUID {
+	return &uuid.UUID{}
+}
+
+// OnPocket is the filter narrowed to one pocket of its account, or to the main
+// account when pocketID is the zero UUID.
+func (f CashAccrualFilter) OnPocket(pocketID uuid.UUID) CashAccrualFilter {
+	f.Pocket = &pocketID
+
+	return f
 }
 
 // RecalculateCashInterestInput asks for an account's interest to be computed
@@ -99,6 +200,10 @@ type CashAccrualFilter struct {
 type RecalculateCashInterestInput struct {
 	SourceID uuid.UUID
 	Currency money.Currency
+	// PocketID is which drawer of the account to redo, the zero UUID being the
+	// main one. A pocket earns its own rate on its own balances, so redoing one
+	// leaves the others as they were.
+	PocketID uuid.UUID
 	From     time.Time
 }
 
@@ -215,7 +320,7 @@ func dailyRate(annual decimal.Decimal) (decimal.Decimal, error) {
 type CashDay struct {
 	// Basis is what the balance held, and AccountHeld what every balance of its
 	// account held together — the two are equal when the account has only this
-	// balance. AccountHeld is only read by a rate with a cap.
+	// balance. AccountHeld is only read by a rate with tiers.
 	Basis       decimal.Decimal
 	AccountHeld decimal.Decimal
 	// Carry is what the rounding of the last credit left.
@@ -230,9 +335,11 @@ type CashDay struct {
 
 // CashAccrual is one day of interest, computed.
 type CashAccrual struct {
-	// Basis is what the day earned on: what the balance held, or its share of
-	// the cap when the account holds more than one.
+	// Basis is what the balance held at the close, or zero when that was less.
+	// AnnualRate is the rate the day was earned at: the version's own, or what
+	// its tiers came to on what the account held.
 	Basis       decimal.Decimal
+	AnnualRate  decimal.Decimal
 	Gross       decimal.Decimal
 	Withholding decimal.Decimal
 	Net         decimal.Decimal
@@ -255,12 +362,19 @@ func accrueDay(day CashDay, version CashRateVersion, cur money.Currency) (CashAc
 		basis = decimal.Zero
 	}
 
-	basis, err := version.earningBasis(basis, day.AccountHeld)
+	// The account holds at least this balance: a reading that says less is
+	// taken as the balance alone.
+	held := day.AccountHeld
+	if held.LessThan(basis) {
+		held = basis
+	}
+
+	gross, err := version.dayGross(basis, held)
 	if err != nil {
 		return CashAccrual{}, err
 	}
 
-	daily, err := dailyRate(version.AnnualRate)
+	annual, err := version.effectiveRate(held)
 	if err != nil {
 		return CashAccrual{}, err
 	}
@@ -270,12 +384,12 @@ func accrueDay(day CashDay, version CashRateVersion, cur money.Currency) (CashAc
 		return CashAccrual{}, err
 	}
 
-	gross := basis.Mul(daily)
 	withholding := gross.Mul(version.WithholdingRate)
 	net := gross.Sub(withholding)
 
 	accrual := CashAccrual{
 		Basis:       basis,
+		AnnualRate:  annual,
 		Gross:       gross,
 		Withholding: withholding,
 		Net:         net,

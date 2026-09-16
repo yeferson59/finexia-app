@@ -484,7 +484,9 @@ Finexia **no deja un saldo en negativo**. Un retiro mayor que lo que hay, o borr
 
 Si tu cuenta paga intereses —una cuenta de ahorros, una «cajita», una billetera en dólares con APY—, dile a Finexia cuánto paga y los anota sola, día a día. No tendrás que volver a escribirlos.
 
-Debajo de cada cuenta, en la lista de **Efectivo**, hay una línea con su tasa; si todavía no tiene, dice **Agregar tasa**. Al pulsarla se abre la rentabilidad de esa cuenta.
+Debajo de cada cuenta, en la lista de **Efectivo**, hay una línea con su tasa —«12 % E.A. hasta $ 5.000.000 · 8 % después» cuando paga por tramos—; si todavía no tiene, dice **Agregar tasa**. Al pulsarla se abre la rentabilidad de esa cuenta.
+
+> **Los bolsillos tienen su propia tasa.** Si tu cuenta paga 8 % y su «cajita» paga 10 %, crea el bolsillo (ver 9.7) y dale su tasa desde su propia línea. Cada uno rinde sobre lo que guarda él.
 
 | Campo | Qué escribir |
 |---|---|
@@ -495,11 +497,13 @@ Debajo de cada cuenta, en la lista de **Efectivo**, hay una línea con su tasa; 
 En **Opciones avanzadas** hay dos cosas que casi nunca hacen falta:
 
 - La **retención**, si la entidad te descuenta impuestos de los intereses. Lo que se abona es lo que llega a la cuenta.
-- El **tope remunerado**, si la entidad solo paga hasta cierto saldo. El tope es de la cuenta entera: si el dinero de esa cuenta suma en varios portafolios, cada uno rinde sobre su parte del tope.
+- Los **tramos**, si la entidad paga distinto según cuánto tengas: «12 % hasta $ 5.000.000 y 8 % sobre lo que pase». La tasa de arriba rige desde cero y cada tramo dice **desde qué saldo** empieza otra tasa. Con **Agregar tope** pones un tramo al 0 %, que es decir «solo paga hasta ahí».
+
+> **Los tramos son de la cuenta, no de cada portafolio.** Si el dinero de esa cuenta suma en varios portafolios, el interés del día se calcula sobre el total y cada portafolio se lleva su parte, en proporción a lo que guarda. Con $ 6.000.000 en uno y $ 2.000.000 en otro, al primero le toca el 75 % de lo que rindió la cuenta.
 
 Ahí mismo está el **conversor**: si tu banco publica una tasa **nominal** —«12 % nominal mes vencido»— escríbela, elige cada cuánto capitaliza y pulsa el botón. Finexia pone la efectiva anual equivalente en el campo de arriba, que son 12,68 % y no 12 %.
 
-Mientras escribes, el formulario te enseña **cuánto rendiría tu saldo de hoy** al día, en 30 días y en un año, ya neto de retención y limitado por el tope. Es la cifra que puedes contrastar contra lo que te abonó la entidad el mes pasado.
+Mientras escribes, el formulario te enseña **cuánto rendiría tu saldo de hoy** al día, en 30 días y en un año, ya neto de retención y repartido por los tramos. Si los usas, también te dice a cuánto rinde en conjunto tu saldo de hoy: con 12 % hasta $ 5.000.000 y 8 % después, $ 8.000.000 rinden un 10,48 % E.A. Es la cifra que puedes contrastar contra lo que te abonó la entidad el mes pasado.
 
 Cada mañana Finexia calcula el día anterior sobre el saldo que tenías al cierre y lo abona como un movimiento de **Intereses**, marcado como automático. En el extracto los abonos de un mes se agrupan en una sola fila, para que no tapen tus depósitos y retiros. Ese dinero **sube el saldo y cuenta como rentabilidad y como ganancia**, nunca como aporte.
 
@@ -520,6 +524,27 @@ Cuando la entidad cambia la tasa, vuelve a abrir la ventana y elige qué quieres
 **Recalcular** es para una sola cosa: cuando anotas un depósito o un retiro **con fecha pasada**. Los días que ya estaban calculados rindieron sobre un saldo que ahora sabes que era otro. Elige desde qué día y Finexia borra esos abonos automáticos y los vuelve a calcular sobre lo que la cuenta guarda ahora. Los movimientos que anotaste tú no se tocan.
 
 Tu **resumen semanal** por correo trae también una línea con tu efectivo: cuánto tienes, cuánto rindió en el mes, la tasa media que estás sacando y cuántas cuentas están sin tasa, que suele ser el dinero que más fácil es poner a rendir.
+
+### 9.7 Bolsillos: las cajitas de una cuenta
+
+Muchas entidades dejan apartar dinero dentro de la misma cuenta —una «cajita», un «bolsillo», una «meta»— y le pagan una tasa distinta. En Finexia eso es un **bolsillo**: una subcuenta de la cuenta, no otra plataforma.
+
+**Su dinero sigue siendo de la plataforma.** El total de Nu, sus reportes y su asignación lo siguen sumando: el bolsillo no se lleva el dinero a otro sitio. Lo único que es suyo es **la tasa**.
+
+Debajo de cada cuenta, al pie de sus saldos, hay dos enlaces:
+
+| Enlace | Qué hace |
+|---|---|
+| **Agregar bolsillo** | Crea la cajita. Solo le pones nombre: «Viajes», «Cajita», «Meta» |
+| **Mover dinero** | Traslada dinero entre la cuenta principal y sus bolsillos |
+
+Una vez creado, el bolsillo aparece sangrado bajo su cuenta, con su propia línea de tasa: pulsas ahí y le das la suya, igual que a cualquier cuenta. Para meterle dinero tienes dos caminos: **Mover** lo que ya está en la cuenta principal, o elegir el bolsillo en el selector **Bolsillo** al registrar un movimiento.
+
+> **Mover no cambia tu rentabilidad.** Las dos patas —lo que sale de un lado y entra en el otro— se anotan a la vez y se compensan. El dinero cambió de cajón, no entró ni salió: lo único que cambia es a qué tasa rinde desde ese día.
+
+**Renombrar y borrar.** Pulsa **Editar** en la línea del bolsillo. El nombre es lo único que se cambia: lo que guarda se mueve con movimientos, y cuándo rinde se mueve con su tasa. Solo se puede **borrar** un bolsillo que nunca tuvo movimientos; con historia, borrarlo se la llevaría por delante, así que primero mueve el dinero de vuelta y borra sus movimientos.
+
+Dos cuentas distintas pueden tener cada una su «Viajes». Dos bolsillos de la misma cuenta, no.
 
 ---
 

@@ -4,8 +4,20 @@
  * rinde cada cuenta.
  */
 import { apiRequest, apiRequestSafe, type ApiEvent, type ApiResult } from './client';
-import type { CashBalance, CashMovement, CashRate, PagedCashMovements } from './types';
-import { cashBalanceSchema, cashRateSchema, pagedCashMovementsSchema } from './schemas';
+import type {
+	CashBalance,
+	CashMove,
+	CashMovement,
+	CashPocket,
+	CashRate,
+	PagedCashMovements
+} from './types';
+import {
+	cashBalanceSchema,
+	cashPocketSchema,
+	cashRateSchema,
+	pagedCashMovementsSchema
+} from './schemas';
 import { z } from 'zod';
 
 /**
@@ -135,4 +147,58 @@ export function recalculateInterest(
 /** `DELETE /portfolios/cash/rates/:id` — borra la versión más reciente. */
 export function deleteRate(event: ApiEvent, id: string): Promise<ApiResult<unknown>> {
 	return apiRequest<unknown>(event, `/portfolios/cash/rates/${id}`, { method: 'DELETE' });
+}
+
+/**
+ * `GET /portfolios/cash/pockets` — los bolsillos del usuario, abiertos y
+ * cerrados, por plataforma y moneda.
+ */
+export function getPockets(event: ApiEvent): Promise<ApiResult<CashPocket[]>> {
+	return apiRequestSafe(event, '/portfolios/cash/pockets', {}, z.array(cashPocketSchema));
+}
+
+/** `POST /portfolios/cash/pockets` — abre un bolsillo flexible en una cuenta. */
+export function createPocket(
+	event: ApiEvent,
+	body: Record<string, unknown>
+): Promise<ApiResult<CashPocket>> {
+	return apiRequest<CashPocket>(event, '/portfolios/cash/pockets', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+}
+
+/** `PUT /portfolios/cash/pockets/:id` — lo único que se cambia es el nombre. */
+export function renamePocket(
+	event: ApiEvent,
+	id: string,
+	body: Record<string, unknown>
+): Promise<ApiResult<CashPocket>> {
+	return apiRequest<CashPocket>(event, `/portfolios/cash/pockets/${id}`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+}
+
+/** `DELETE /portfolios/cash/pockets/:id` — borra un bolsillo sin movimientos. */
+export function deletePocket(event: ApiEvent, id: string): Promise<ApiResult<unknown>> {
+	return apiRequest<unknown>(event, `/portfolios/cash/pockets/${id}`, { method: 'DELETE' });
+}
+
+/**
+ * `POST /portfolios/cash/movements/move` — mueve dinero entre dos saldos de una
+ * misma cuenta dentro de un portafolio. Son dos patas en una sola transacción y
+ * se compensan, así que la rentabilidad del portafolio no se mueve.
+ */
+export function moveCash(
+	event: ApiEvent,
+	body: Record<string, unknown>
+): Promise<ApiResult<CashMove>> {
+	return apiRequest<CashMove>(event, '/portfolios/cash/movements/move', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
 }

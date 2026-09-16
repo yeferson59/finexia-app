@@ -119,14 +119,17 @@ func TestHandlerGetCashMovementsPaginates(t *testing.T) {
 // string a JavaScript Date serialises to.
 func TestHandlerCreateCashMovement(t *testing.T) {
 	userID, portfolioID, sourceID := uuid.New(), uuid.New(), uuid.New()
-	var got CashMovementInput
+	var (
+		got       CashMovementInput
+		gotPocket uuid.UUID
+	)
 
 	repo := new(fakeRepository{
-		createCashMovement: func(_ context.Context, uid, pid, sid uuid.UUID, in CashMovementInput) (CashMovement, error) {
+		createCashMovement: func(_ context.Context, uid, pid, sid, pocketID uuid.UUID, in CashMovementInput) (CashMovement, error) {
 			if uid != userID || pid != portfolioID || sid != sourceID {
 				t.Errorf("ids = %v %v %v, want %v %v %v", uid, pid, sid, userID, portfolioID, sourceID)
 			}
-			got = in
+			got, gotPocket = in, pocketID
 			return CashMovement{ID: uuid.New(), Type: TransferIn, Kind: CashKindDeposit, Amount: "150000.5", Currency: money.COP}, nil
 		},
 	})
@@ -138,6 +141,12 @@ func TestHandlerCreateCashMovement(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status = %d, want 200: %s", resp.StatusCode, raw)
+	}
+
+	// No pocketId is the main account, which is where every movement went
+	// before pockets existed.
+	if gotPocket != (uuid.UUID{}) {
+		t.Errorf("pocket = %v, want the main account", gotPocket)
 	}
 
 	if got.Kind != CashKindDeposit || got.Currency != money.COP || got.Notes != "nómina" {

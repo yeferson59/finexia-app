@@ -72,7 +72,7 @@ func (f cashFixture) move(t *testing.T, kind CashMovementKind, amount, fees stri
 		in.Fees = mustDecimal(t, fees)
 	}
 
-	return f.repo.CreateCashMovement(context.Background(), f.userID, f.portfolioID, f.sourceID, in)
+	return f.repo.CreateCashMovement(context.Background(), f.userID, f.portfolioID, f.sourceID, uuid.UUID{}, in)
 }
 
 func (f cashFixture) mustMove(t *testing.T, kind CashMovementKind, amount string, date time.Time) CashMovement {
@@ -351,7 +351,7 @@ func TestCashMovementsLeaveAPositionInAnotherCurrencyAlone(t *testing.T) {
 	           VALUES ($1, (SELECT id FROM assets WHERE ticker = 'CASH-USD' AND exchange IS NULL), $2, 0, 4000, 'COP', '2026-09-01')`,
 		f.portfolioID, broker)
 
-	_, err := f.repo.CreateCashMovement(ctx, f.userID, f.portfolioID, broker, CashMovementInput{
+	_, err := f.repo.CreateCashMovement(ctx, f.userID, f.portfolioID, broker, uuid.UUID{}, CashMovementInput{
 		Kind: CashKindDeposit, Amount: mustDecimal(t, "10"), Currency: money.USD, Date: cashDay,
 	})
 	if !errors.Is(err, ErrInvalidCashMovement) {

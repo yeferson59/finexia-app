@@ -996,8 +996,96 @@ sobre el saldo, o una compra de efectivo a otro precio o con tasa— y le pone
 `kind: "other"` cuando no es ninguno de los tres. Todos se pueden borrar:
 quitar una fila no cambia el precio de nada.
 
+**Bolsillos** (`/portfolios/cash/pockets`, migración 000047). Un **bolsillo** es
+una subcuenta de una cuenta: la «cajita» del banco, el subsaldo del bróker.
+Pertenece a una plataforma y una moneda, y su dinero **cuenta dentro de esa
+plataforma**: ninguna cifra por plataforma —detalle, reportes, asignación, MCP—
+cambia porque el dinero esté en un bolsillo. Lo propio del bolsillo es su tasa.
+
+La **cuenta principal es el bolsillo que no está**: `pocketId` en `null`. Todo lo
+que existía antes de 000047 ya es la cuenta principal, así que una plataforma sin
+bolsillos se comporta exactamente igual que antes.
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET /portfolios/cash/pockets` | Todos los bolsillos del usuario, abiertos y cerrados |
+| `POST /portfolios/cash/pockets` | Abre uno flexible: `{sourceId, currency, name}` |
+| `PUT /portfolios/cash/pockets/:pocketId` | Lo renombra; es lo único que se cambia |
+| `DELETE /portfolios/cash/pockets/:pocketId` | Lo borra, si nunca tuvo movimientos |
+| `POST /portfolios/cash/movements/move` | Mueve dinero entre dos saldos de una cuenta |
+
+```json
+{
+  "id": "…",
+  "sourceId": "…",
+  "sourceName": "Nu",
+  "currency": "COP",
+  "name": "Viajes",
+  "kind": "flexible",
+  "openedOn": "2026-09-15T00:00:00Z",
+  "maturesOn": null,
+  "closedOn": null,
+  "balance": "2000000",
+  "balances": 1,
+  "movements": 3
+}
+```
+
+- `name` es único por cuenta —plataforma y moneda—, no por usuario: dos entidades
+  pueden tener cada una su «Viajes» (**409**). Se guarda recortado, hasta 100
+  caracteres, y no puede quedar vacío (**400**).
+- La plataforma tiene que ser del usuario (**404**) y estar activa (**400**),
+  igual que para darle una tasa.
+- `balance` y `balances` son lo que guardan sus saldos y en cuántos portafolios;
+  `movements`, cuántos se anotaron en él.
+- **Borrar solo un bolsillo que nunca tuvo movimientos** (**409** si los tuvo):
+  borrarlo con historia se llevaría esa historia por delante. Vacíalo con «Mover»
+  y borra sus movimientos antes.
+- `kind` es `flexible`. `fixed` —un depósito a plazo con su tasa fija— se abre en
+  la fase siguiente; el valor ya existe para que las filas de hoy digan lo que son.
+
+**Los bolsillos son parte de la clave de una cuenta.** Donde antes se nombraba
+una cuenta con `sourceId` y `currency`, ahora se nombra con `pocketId` también:
+
+- `POST /portfolios/cash/movements` acepta `pocketId`; omitirlo o mandarlo `null`
+  es la cuenta principal. Un bolsillo de otra cuenta responde **400**.
+- `POST /portfolios/cash/rates` acepta `pocketId`: la cuenta paga 8 % y su
+  bolsillo 10 %, y cada uno rinde sobre sus propios saldos. Las versiones de un
+  bolsillo se cierran entre ellas y nunca tocan las de la cuenta principal.
+- `POST /portfolios/cash/interest/recalculate` acepta `pocketId`: se recalcula
+  ese cajón y los demás quedan como estaban.
+- `GET /portfolios/cash` trae `pocketId`, `pocketName` y `pocketKind` en cada
+  saldo, y el listado de posiciones trae `pocketName` en las filas de efectivo.
+
+**Mover** (`POST /portfolios/cash/movements/move`) traslada dinero entre dos
+saldos de una misma cuenta dentro de un portafolio:
+
+```json
+{
+  "portfolioId": "…",
+  "sourceId": "…",
+  "currency": "COP",
+  "fromPocketId": null,
+  "toPocketId": "3f7c…",
+  "amount": "2000000",
+  "date": "2026-09-15T00:00:00Z",
+  "notes": "para el viaje"
+}
+```
+
+Son **dos patas en una sola transacción** —un retiro de un lado y un depósito del
+otro—, así que el dinero nunca está en los dos sitios ni en ninguno. Como se
+compensan exactamente —mismo importe, mismo día, sin comisión—, el flujo neto del
+portafolio no se mueve y **su rentabilidad tampoco**: el dinero cambió de cajón,
+no entró ni salió. Responde con las dos filas, `{from, to}`.
+
+- Origen y destino tienen que ser distintos (**400**), y los dos de la cuenta que
+  se nombra (**400**).
+- Si el saldo del que sale no da, responde **409**, como un retiro, y no se
+  escribe ninguna de las dos patas.
+
 **Tasas** (`/portfolios/cash/rates`, migración 000043). La tasa que rinde una
-cuenta —plataforma y moneda, no portafolio— es una tasa efectiva anual en
+cuenta —plataforma, moneda y bolsillo, no portafolio— es una tasa efectiva anual en
 porcentaje: `"9.25"` es 9,25 % E.A., la misma cifra que el APY de una cuenta en
 dólares. Se versiona por el día desde el que rige. Cambiar la tasa es anotar una
 versión nueva: la que seguía abierta termina la víspera y los días anteriores
@@ -1008,7 +1096,7 @@ abonan según `posting`; ver *Intereses* más abajo.
 |---|---|
 | `GET /portfolios/cash/rates` | Todas las versiones, por plataforma y moneda, de la más nueva a la más vieja |
 | `POST /portfolios/cash/rates` | Anota una tasa, o una versión nueva que cierra la anterior |
-| `PUT /portfolios/cash/rates/:rateId` | Corrige `annualRatePct`, `withholdingPct` y `posting` de la versión más reciente; las fechas no cambian |
+| `PUT /portfolios/cash/rates/:rateId` | Corrige `annualRatePct`, `withholdingPct`, `posting` y `tiers` de la versión más reciente; las fechas no cambian |
 | `POST /portfolios/cash/rates/:rateId/end` | La versión más reciente deja de rendir desde `endsOn` (`endedOn` queda en la víspera) |
 | `DELETE /portfolios/cash/rates/:rateId` | Borra la versión más reciente; si la anterior terminaba justo la víspera, vuelve a regir |
 | `POST /portfolios/cash/interest/recalculate` | Recalcula los días de una cuenta desde `from` |
@@ -1020,25 +1108,37 @@ abonan según `posting`; ver *Intereses* más abajo.
   "annualRatePct": 9.25,
   "withholdingPct": 0,
   "posting": "daily",
-  "maxBalance": null,
+  "tiers": [{ "fromBalance": "5000000", "annualRatePct": "8" }],
+  "pocketId": null,
   "effectiveFrom": "2026-09-15T00:00:00Z"
 }
 ```
 
-Cada versión trae `annualRatePct`, `withholdingPct` y `maxBalance` como texto
-—`maxBalance` es `null` sin tope—, `posting`, `effectiveFrom`, `endedOn` —el
-último día que rinde, `null` sin fin— y `latest`, que marca la única versión de
-la cuenta que se puede corregir, pausar o borrar.
+Cada versión trae `annualRatePct` y `withholdingPct` como texto, `posting`,
+`tiers` —siempre un arreglo, vacío si la cuenta rinde lo mismo sobre todo el
+saldo—, `pocketId` y `pocketName` —el bolsillo que la rinde, `null` en la cuenta
+principal—, `effectiveFrom`, `endedOn` —el último día que rinde, `null` sin fin—
+y `latest`, que marca la única versión **de ese bolsillo** que se puede corregir,
+pausar o borrar.
 
 - `annualRatePct` > 0 y ≤ 100, con hasta 4 decimales; `withholdingPct` ≥ 0 y
   < 100, con hasta 2.
 - `posting` es `daily` (el valor por defecto si se omite) o `monthly`: con
   `monthly`, los días se calculan igual y se abonan todos juntos el último día
   del mes.
-- `maxBalance`, si viene, es > 0 y < 10¹², con hasta 8 decimales. Es el tope
-  remunerado de la **cuenta**, así que sus saldos se lo reparten en proporción
-  a lo que guarda cada uno. Omitirlo o mandarlo `null` es no tener tope; el
-  `PUT` dice la versión entera, así que omitirlo en una corrección lo quita.
+- `tiers` son los **tramos** (migración 000046): `annualRatePct` rige desde 0, y
+  cada tramo dice desde qué saldo de la cuenta rige otra tasa, hasta el tramo
+  siguiente. Van de menor a mayor `fromBalance`, sin repetir, 10 como máximo;
+  `fromBalance` > 0 y < 10¹², con hasta 8 decimales, y el `annualRatePct` del
+  tramo ≥ 0 y ≤ 100, con hasta 4 decimales. Los tramos son de la **cuenta**: el
+  día se calcula sobre lo que guardan todos sus saldos y cada uno se lleva su
+  parte en proporción a lo que guarda. Omitirlos es rendir la misma tasa sobre
+  todo; el `PUT` dice la versión entera, así que omitirlos en una corrección los
+  quita.
+- **Un tope es un tramo al 0 %**: `[{"fromBalance": "25000000", "annualRatePct": "0"}]`
+  es «solo paga hasta 25 millones». `maxBalance`, como se mandaba el tope antes
+  de 000046, se sigue leyendo y se guarda como ese tramo, pero ya no se
+  devuelve.
 - `effectiveFrom` y `endsOn` no pueden ser anteriores a ayer en UTC. Los días
   pasados no se recalculan, y el día de margen es para quien está al oeste de
   Greenwich, que por la noche ya vive el día siguiente en UTC — **400**.
@@ -1054,6 +1154,18 @@ cuenta gana sobre lo que tenía al cierre del día, a la tasa diaria equivalente
 a las 05:30 UTC) calcula el día anterior y lo abona como un `cash_interest`:
 sube el saldo y cuenta como rentabilidad y como ganancia (000042). El abono se
 redondea a los decimales de la moneda, y lo que sobra se suma al día siguiente.
+
+Con **tramos**, el día es de la cuenta entera —plataforma, moneda y bolsillo—:
+se calcula sobre lo que guardan todos sus saldos juntos, cada tramo sobre la
+parte que cae en él, y cada saldo se lleva su parte en proporción a lo que
+guarda. El dinero de un bolsillo no empuja a la cuenta principal a un tramo más
+alto, ni al revés: cada cajón cuenta el suyo. 12 % hasta 5 000 000 y 8 % de
+ahí en adelante, sobre una cuenta con 8 000 000, rinde
+`5 000 000 × ((1,12)^(1/365) − 1) + 3 000 000 × ((1,08)^(1/365) − 1)` = 2 185,31
+al día; si ese dinero está en dos portafolios con 6 000 000 y 2 000 000, les
+tocan 1 638,98 y 546,33. El libro guarda como tasa del día lo que los tramos
+dieron juntos, `(1 + bruto / saldo de la cuenta)^365 − 1`, que ahí son
+10,4830 % E.A.
 
 - Cada saldo y cada día se calculan una sola vez. Un abono borrado no se vuelve
   a abonar: el día queda calculado.

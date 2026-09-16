@@ -19,15 +19,20 @@ import (
 // for a day before it whatever day its transaction carries, and every day it
 // computed and has not credited yet.
 
-// cashAccountHeld is what every balance of an account — a platform and a
-// currency — held at the close of a day. Only a rate with a cap reads it: the
-// cap belongs to the account, so its balances earn on their share of it.
+// cashAccountHeld is what every balance of an account — a platform, a currency
+// and a pocket of it — held at the close of a day. Only a rate with tiers reads
+// it: the tiers belong to the account, so its balances earn their share of what
+// it earns.
+//
+// The pocket is part of the key. An account at 8 % and its pocket at 10 % each
+// count what their own balances hold, so neither pushes the other up a tier.
 const cashAccountHeld = `
 	SELECT COALESCE(SUM(cash_entry_balance_at_close(pe.id, $2::date)), 0)
 	FROM portfolio_entries pe
 	JOIN assets a ON a.id = pe.asset_id
 	WHERE pe.source_id = $1
 	  AND pe.cost_currency = $3::char(3)
+	  AND pe.pocket_id IS NOT DISTINCT FROM $4::uuid
 	  AND a.asset_type = 'cash'
 	  AND a.currency = pe.cost_currency
 	  AND cash_entry_at_par(pe.id)`
@@ -35,14 +40,18 @@ const cashAccountHeld = `
 // cashAccountScope narrows a statement to the balances of one account. Every
 // part of the filter is optional, and an empty one leaves every balance in:
 // that is what the nightly job runs over.
+//
+// The pocket takes two parameters rather than one, because "no pocket" is an
+// answer and not an omission: $5 says whether a pocket was named at all, and
+// $6 which one, NULL being the main account.
 const cashAccountScope = `
 	AND ($2::uuid IS NULL     OR p.user_id = $2::uuid)
 	AND ($3::uuid IS NULL     OR pe.source_id = $3::uuid)
-	AND ($4::char(3) IS NULL  OR pe.cost_currency = $4::char(3))`
+	AND ($4::char(3) IS NULL  OR pe.cost_currency = $4::char(3))
+	AND (NOT $5::boolean      OR pe.pocket_id IS NOT DISTINCT FROM $6::uuid)`
 
-// scopeArgs is the filter as the three optional parameters cashAccountScope
-// reads.
-func scopeArgs(filter CashAccrualFilter) (userID, sourceID *uuid.UUID, cur *string) {
+// scopeArgs is the filter as the five parameters cashAccountScope reads.
+func scopeArgs(filter CashAccrualFilter) (userID, sourceID *uuid.UUID, cur *string, scoped bool, pocketID *uuid.UUID) {
 	if filter.UserID != (uuid.UUID{}) {
 		userID = &filter.UserID
 	}
@@ -55,7 +64,41 @@ func scopeArgs(filter CashAccrualFilter) (userID, sourceID *uuid.UUID, cur *stri
 		cur = &code
 	}
 
-	return userID, sourceID, cur
+	if filter.Pocket != nil {
+		scoped = true
+
+		if *filter.Pocket != (uuid.UUID{}) {
+			pocketID = filter.Pocket
+		}
+	}
+
+	return userID, sourceID, cur, scoped, pocketID
+}
+
+// cashRateSteps reads a version's tiers, lowest first, as the ledger computes
+// with them.
+func cashRateSteps(ctx context.Context, tx pgx.Tx, rateID uuid.UUID) ([]CashRateStep, error) {
+	rows, err := tx.Query(ctx, `
+		SELECT from_balance, annual_rate FROM cash_yield_rate_tiers
+		WHERE rate_id = $1
+		ORDER BY from_balance
+	`, rateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	steps := make([]CashRateStep, 0)
+	for rows.Next() {
+		var step CashRateStep
+		if err := rows.Scan(&step.From, &step.AnnualRate); err != nil {
+			return nil, err
+		}
+
+		steps = append(steps, step)
+	}
+
+	return steps, rows.Err()
 }
 
 // GetCashAccrualTargets lists every cash balance whose account has a rate that
@@ -65,7 +108,7 @@ func scopeArgs(filter CashAccrualFilter) (userID, sourceID *uuid.UUID, cur *stri
 // Only the balances the cash writers keep earn: in their own currency, at one
 // unit per unit. A dollar position bought with pesos is not a savings account.
 func (r *PostgresRepository) GetCashAccrualTargets(ctx context.Context, through time.Time, filter CashAccrualFilter) ([]CashAccrualTarget, error) {
-	userID, sourceID, cur := scopeArgs(filter)
+	userID, sourceID, cur, scoped, pocketID := scopeArgs(filter)
 
 	rows, err := r.db.Query(ctx, `
 		SELECT
@@ -76,19 +119,20 @@ func (r *PostgresRepository) GetCashAccrualTargets(ctx context.Context, through 
 			r.annual_rate,
 			r.withholding_rate,
 			r.posting::text,
-			r.max_balance,
 			r.effective_from,
 			r.ended_on
 		FROM portfolio_entries pe
 		JOIN portfolios p       ON p.id = pe.portfolio_id
 		JOIN assets a           ON a.id = pe.asset_id
-		JOIN cash_yield_rates r ON r.source_id = pe.source_id AND r.currency = pe.cost_currency
+		JOIN cash_yield_rates r ON r.source_id = pe.source_id
+		                       AND r.currency  = pe.cost_currency
+		                       AND r.pocket_id IS NOT DISTINCT FROM pe.pocket_id
 		WHERE a.asset_type = 'cash'
 		  AND a.currency = pe.cost_currency
 		  AND r.effective_from <= $1::date
 		  AND cash_entry_at_par(pe.id)`+cashAccountScope+`
 		ORDER BY pe.id, r.effective_from
-	`, cashRateDay(through).Format(time.DateOnly), userID, sourceID, cur)
+	`, cashRateDay(through).Format(time.DateOnly), userID, sourceID, cur, scoped, pocketID)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +155,6 @@ func (r *PostgresRepository) GetCashAccrualTargets(ctx context.Context, through 
 			&version.AnnualRate,
 			&version.WithholdingRate,
 			&version.Posting,
-			&version.MaxBalance,
 			&version.EffectiveFrom,
 			&version.EndedOn,
 		); err != nil {
@@ -151,13 +194,17 @@ func (r *PostgresRepository) AccrueCashInterestDay(ctx context.Context, entryID,
 			portfolioID uuid.UUID
 			sourceID    uuid.UUID
 			cur         money.Currency
+			// The drawer the balance sits in, NULL for the main account. It is
+			// part of the account's key, so the version of the rate and the sum
+			// the tiers read are both looked up with it.
+			pocketID *uuid.UUID
 		)
 
 		// The lock a withdrawal takes: the basis read below is what the balance
 		// holds while this runs.
 		err := tx.QueryRow(ctx, `
-			SELECT portfolio_id, source_id, cost_currency FROM portfolio_entries WHERE id = $1 FOR UPDATE
-		`, entryID).Scan(&portfolioID, &sourceID, &cur)
+			SELECT portfolio_id, source_id, cost_currency, pocket_id FROM portfolio_entries WHERE id = $1 FOR UPDATE
+		`, entryID).Scan(&portfolioID, &sourceID, &cur, &pocketID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -171,21 +218,24 @@ func (r *PostgresRepository) AccrueCashInterestDay(ctx context.Context, entryID,
 		// the day computed.
 		version := CashRateVersion{ID: rateID}
 		err = tx.QueryRow(ctx, `
-			SELECT r.annual_rate, r.withholding_rate, r.posting::text, r.max_balance, r.effective_from, r.ended_on
+			SELECT r.annual_rate, r.withholding_rate, r.posting::text, r.effective_from, r.ended_on
 			FROM cash_yield_rates r
-			JOIN portfolio_entries pe ON pe.source_id = r.source_id AND pe.cost_currency = r.currency
+			JOIN portfolio_entries pe ON pe.source_id = r.source_id
+			                         AND pe.cost_currency = r.currency
+			                         AND pe.pocket_id IS NOT DISTINCT FROM r.pocket_id
 			WHERE r.id = $1
 			  AND pe.id = $2
 			  AND NOT EXISTS (
 			    SELECT 1 FROM cash_yield_rates later
 			    WHERE later.source_id = r.source_id
 			      AND later.currency  = r.currency
+			      AND later.pocket_id IS NOT DISTINCT FROM r.pocket_id
 			      AND later.effective_from > r.effective_from
 			      AND later.effective_from <= $3::date
 			  )
 			FOR SHARE OF r
 		`, rateID, entryID, date).Scan(&version.AnnualRate, &version.WithholdingRate, &version.Posting,
-			&version.MaxBalance, &version.EffectiveFrom, &version.EndedOn)
+			&version.EffectiveFrom, &version.EndedOn)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -195,6 +245,10 @@ func (r *PostgresRepository) AccrueCashInterestDay(ctx context.Context, entryID,
 
 		if !version.coversDay(cashRateDay(day)) {
 			return nil
+		}
+
+		if version.Tiers, err = cashRateSteps(ctx, tx, rateID); err != nil {
+			return err
 		}
 
 		carry := decimal.Zero
@@ -227,8 +281,8 @@ func (r *PostgresRepository) AccrueCashInterestDay(ctx context.Context, entryID,
 		}
 
 		atClose.AccountHeld = atClose.Basis
-		if version.MaxBalance != nil {
-			if err := tx.QueryRow(ctx, cashAccountHeld, sourceID, date, cur).Scan(&atClose.AccountHeld); err != nil {
+		if len(version.Tiers) > 0 {
+			if err := tx.QueryRow(ctx, cashAccountHeld, sourceID, date, cur, pocketID).Scan(&atClose.AccountHeld); err != nil {
 				return err
 			}
 		}
@@ -254,7 +308,7 @@ func (r *PostgresRepository) AccrueCashInterestDay(ctx context.Context, entryID,
 			VALUES ($1, $2, $3::date, $4::numeric, $5::numeric, $6::numeric, $7::numeric, $8::numeric, $9::numeric, $10)
 			ON CONFLICT (entry_id, accrual_date) DO NOTHING
 			RETURNING id
-		`, entryID, rateID, date, version.AnnualRate.String(), accrual.Basis.String(), accrual.Gross.String(),
+		`, entryID, rateID, date, accrual.AnnualRate.String(), accrual.Basis.String(), accrual.Gross.String(),
 			accrual.Withholding.String(), accrual.Net.String(), accrual.Carry.String(), status).Scan(&accrualID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
@@ -320,16 +374,16 @@ func (r *PostgresRepository) AccrueCashInterestDay(ctx context.Context, entryID,
 // computed, and no version of the account's rate covers a day between the last
 // one held and the end of its month.
 func (r *PostgresRepository) GetHeldCashInterest(ctx context.Context, through time.Time, filter CashAccrualFilter) ([]uuid.UUID, error) {
-	userID, sourceID, cur := scopeArgs(filter)
+	userID, sourceID, cur, scoped, pocketID := scopeArgs(filter)
 
 	rows, err := r.db.Query(ctx, `
 		WITH held AS (
-			SELECT ac.entry_id, pe.source_id, pe.cost_currency, MAX(ac.accrual_date) AS last_day
+			SELECT ac.entry_id, pe.source_id, pe.cost_currency, pe.pocket_id, MAX(ac.accrual_date) AS last_day
 			FROM cash_interest_accruals ac
 			JOIN portfolio_entries pe ON pe.id = ac.entry_id
 			JOIN portfolios p         ON p.id = pe.portfolio_id
 			WHERE ac.status = 'pending'`+cashAccountScope+`
-			GROUP BY ac.entry_id, pe.source_id, pe.cost_currency
+			GROUP BY ac.entry_id, pe.source_id, pe.cost_currency, pe.pocket_id
 		)
 		SELECT entry_id FROM held
 		WHERE last_day < $1::date
@@ -337,11 +391,12 @@ func (r *PostgresRepository) GetHeldCashInterest(ctx context.Context, through ti
 		    SELECT 1 FROM cash_yield_rates r
 		    WHERE r.source_id = held.source_id
 		      AND r.currency  = held.cost_currency
+		      AND r.pocket_id IS NOT DISTINCT FROM held.pocket_id
 		      AND r.effective_from <= (date_trunc('month', held.last_day) + INTERVAL '1 month - 1 day')::date
 		      AND (r.ended_on IS NULL OR r.ended_on > held.last_day)
 		  )
 		ORDER BY entry_id
-	`, cashRateDay(through).Format(time.DateOnly), userID, sourceID, cur)
+	`, cashRateDay(through).Format(time.DateOnly), userID, sourceID, cur, scoped, pocketID)
 	if err != nil {
 		return nil, err
 	}
@@ -476,7 +531,7 @@ func (r *PostgresRepository) PostHeldCashInterest(ctx context.Context, entryID u
 func (r *PostgresRepository) ClearCashInterest(ctx context.Context, filter CashAccrualFilter, from time.Time) (CashInterestCleared, error) {
 	cleared := CashInterestCleared{From: cashRateDay(from)}
 	asked := cleared.From.Format(time.DateOnly)
-	userID, sourceID, cur := scopeArgs(filter)
+	userID, sourceID, cur, scoped, pocketID := scopeArgs(filter)
 
 	err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		// Whether the platform is still active is not asked: one that stopped
@@ -509,7 +564,7 @@ func (r *PostgresRepository) ClearCashInterest(ctx context.Context, filter CashA
 			  )`+cashAccountScope+`
 			ORDER BY pe.id
 			FOR UPDATE OF pe
-		`, asked, userID, sourceID, cur)
+		`, asked, userID, sourceID, cur, scoped, pocketID)
 		if err != nil {
 			return err
 		}

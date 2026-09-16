@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"uuid"
 
@@ -46,12 +47,16 @@ func (r *PostgresRepository) GetCashBalancesByUserID(ctx context.Context, userID
 			target.code,
 			fx.rate IS NOT NULL,
 			(SELECT COUNT(*) FROM transactions t WHERE t.entry_id = pe.id),
-			(SELECT MAX(t.transaction_date) FROM transactions t WHERE t.entry_id = pe.id)
+			(SELECT MAX(t.transaction_date) FROM transactions t WHERE t.entry_id = pe.id),
+			pe.pocket_id,
+			COALESCE(pk.name, ''),
+			COALESCE(pk.kind::text, '')
 		FROM portfolio_entries pe
 		JOIN portfolios p ON p.id = pe.portfolio_id
 		JOIN users u      ON u.id = p.user_id
 		JOIN assets a     ON a.id = pe.asset_id
 		LEFT JOIN investment_sources s  ON s.id = pe.source_id
+		LEFT JOIN cash_pockets pk       ON pk.id = pe.pocket_id
 		LEFT JOIN user_asset_prices uap ON uap.asset_id = a.id AND uap.user_id = p.user_id
 		CROSS JOIN LATERAL (
 			SELECT COALESCE(NULLIF($2::text, ''), u.preferred_currency, 'USD')::char(3) AS code
@@ -70,7 +75,7 @@ func (r *PostgresRepository) GetCashBalancesByUserID(ctx context.Context, userID
 		) fx
 		WHERE p.user_id = $1
 		  AND a.asset_type = 'cash'
-		ORDER BY ROUND(pe.quantity::numeric * v.price * COALESCE(fx.rate, 1), 8) DESC, p.name, s.name, a.ticker
+		ORDER BY ROUND(pe.quantity::numeric * v.price * COALESCE(fx.rate, 1), 8) DESC, p.name, s.name, a.ticker, pk.name
 	`, userID, currencyParam(displayCurrency))
 	if err != nil {
 		return nil, err
@@ -97,6 +102,9 @@ func (r *PostgresRepository) GetCashBalancesByUserID(ctx context.Context, userID
 			&b.FXConverted,
 			&b.Movements,
 			&b.LastMovementDate,
+			&b.PocketID,
+			&b.PocketName,
+			&b.PocketKind,
 		); err != nil {
 			return nil, err
 		}
@@ -217,8 +225,56 @@ func getCashMovement(ctx context.Context, tx pgx.Tx, userID, txnID uuid.UUID) (C
 	return m, err
 }
 
+// requireCashAccount refuses a portfolio or a platform that is not the user's.
+// The two are one answer: a request that names either wrongly is asking about
+// an account it cannot see.
+func requireCashAccount(ctx context.Context, tx pgx.Tx, userID, portfolioID, sourceID uuid.UUID) error {
+	var owned bool
+
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM portfolios WHERE id = $1 AND user_id = $3)
+		   AND EXISTS (SELECT 1 FROM investment_sources WHERE id = $2 AND user_id = $3)
+	`, portfolioID, sourceID, userID).Scan(&owned); err != nil {
+		return err
+	}
+
+	if !owned {
+		return ErrPortfolioOrSourceNotFound
+	}
+
+	return nil
+}
+
+// requireWritablePocket turns the pocket a cash write names into the value
+// portfolio_entries.pocket_id takes: nil for the main account, or the pocket
+// itself once it is known to be the owner's and part of the account stated.
+//
+// A pocket carries its own platform and currency, so one that disagrees with
+// what the request said is refused rather than quietly preferred: the caller
+// believes it is writing somewhere else.
+func requireWritablePocket(ctx context.Context, tx pgx.Tx, userID, pocketID, sourceID uuid.UUID, cur money.Currency) (*uuid.UUID, error) {
+	if pocketID == (uuid.UUID{}) {
+		return nil, nil
+	}
+
+	locked, err := lockCashPocket(ctx, tx, userID, pocketID)
+	if err != nil {
+		return nil, err
+	}
+
+	if locked.sourceID != sourceID || locked.currency != cur {
+		return nil, invalidCash("that pocket belongs to another account, so it cannot hold a movement of this one")
+	}
+
+	return &locked.id, nil
+}
+
 // CreateCashMovement records a movement on the balance a platform holds in one
 // currency for one portfolio, opening that balance if there is none.
+//
+// pocketID names the drawer of the account it goes in: the zero UUID is the
+// main account, which is every balance there was before pockets existed
+// (000047).
 //
 // The balance it lands on is the one the owner would point at: a cash position
 // of that platform and portfolio, in that currency, kept at one unit per unit.
@@ -229,89 +285,20 @@ func getCashMovement(ctx context.Context, tx pgx.Tx, userID, txnID uuid.UUID) (C
 //
 // The position is locked before its balance is read, so two withdrawals racing
 // each other cannot both see the money that only one of them can take.
-func (r *PostgresRepository) CreateCashMovement(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMovementInput) (CashMovement, error) {
+func (r *PostgresRepository) CreateCashMovement(ctx context.Context, userID, portfolioID, sourceID, pocketID uuid.UUID, in CashMovementInput) (CashMovement, error) {
 	var movement CashMovement
 
 	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
-		var owned bool
-		if err := tx.QueryRow(ctx, `
-			SELECT EXISTS (SELECT 1 FROM portfolios WHERE id = $1 AND user_id = $3)
-			   AND EXISTS (SELECT 1 FROM investment_sources WHERE id = $2 AND user_id = $3)
-		`, portfolioID, sourceID, userID).Scan(&owned); err != nil {
+		if err := requireCashAccount(ctx, tx, userID, portfolioID, sourceID); err != nil {
 			return err
 		}
 
-		if !owned {
-			return ErrPortfolioOrSourceNotFound
-		}
-
-		txnIn := in.transactionInput(in.Currency)
-
-		entryID, balance, found, err := lockCashEntry(ctx, tx, portfolioID, sourceID, in.Currency)
+		pocket, err := requireWritablePocket(ctx, tx, userID, pocketID, sourceID, in.Currency)
 		if err != nil {
 			return err
 		}
 
-		if balance.Add(balanceEffect(txnIn.Type, txnIn.Quantity)).IsNeg() {
-			return fmt.Errorf("%w: the balance holds %s %s", ErrInsufficientCash, balance.String(), in.Currency)
-		}
-
-		if !found {
-			assetID, err := ensureCashAsset(ctx, tx, in.Currency)
-			if err != nil {
-				return err
-			}
-
-			// The price is seeded at one and the trigger keeps it there until
-			// interest averages in at no cost (000042). On a conflict the position
-			// already existed without matching the lookup above — opened by hand in
-			// another cost currency, or at another price — and the check below
-			// refuses to write into it.
-			if err := tx.QueryRow(ctx, `
-				INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date, notes)
-				VALUES ($1::uuid, $2::uuid, $3::uuid, 0, 1, $4::char(3), $5::date, '')
-				ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, ''))
-				DO UPDATE SET updated_at = NOW()
-				RETURNING id
-			`, portfolioID, assetID, sourceID, in.Currency, in.Date).Scan(&entryID); err != nil {
-				return err
-			}
-		}
-
-		// TransactionInput.Validate would not catch this. It refuses a missing
-		// rate between two currencies, not a rate of one, so a dollar deposit
-		// into a position that costs in pesos would pass it and be averaged in as
-		// one peso a dollar.
-		var (
-			costCurrency money.Currency
-			atPar        bool
-		)
-		if err := tx.QueryRow(ctx, `
-			SELECT cost_currency, cash_entry_at_par(id) FROM portfolio_entries WHERE id = $1
-		`, entryID).Scan(&costCurrency, &atPar); err != nil {
-			return err
-		}
-
-		if costCurrency != in.Currency || !atPar {
-			return invalidCash("this platform already holds %s as a position that costs in %s at another price; record movements on it from the position", cashTicker(in.Currency), costCurrency)
-		}
-
-		settled, err := txnIn.Validate(costCurrency)
-		if err != nil {
-			return err
-		}
-
-		var txnID uuid.UUID
-		if err := tx.QueryRow(ctx, `
-			INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes)
-			VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::numeric, $8::char(3), $9::date, $10)
-			RETURNING id
-		`, entryID, settled.Type, settled.Quantity.String(), settled.Price.String(), settled.Currency,
-			settled.FXRate.String(), settled.Fees.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes).Scan(&txnID); err != nil {
-			return err
-		}
-
-		movement, err = getCashMovement(ctx, tx, userID, txnID)
+		movement, err = writeCashMovement(ctx, tx, userID, portfolioID, sourceID, pocket, in)
 
 		return err
 	}); err != nil {
@@ -321,10 +308,134 @@ func (r *PostgresRepository) CreateCashMovement(ctx context.Context, userID, por
 	return movement, nil
 }
 
-// lockCashEntry finds and locks the balance CreateCashMovement writes to, and
-// reads what it holds. found is false when there is none yet, which is a
-// balance of zero.
-func lockCashEntry(ctx context.Context, tx pgx.Tx, portfolioID, sourceID uuid.UUID, cur money.Currency) (uuid.UUID, decimal.Decimal, bool, error) {
+// writeCashMovement is CreateCashMovement once the account and the pocket are
+// known to be the owner's: find or open the balance, refuse the movement that
+// would overdraw it, and record it. MoveCash calls it twice.
+func writeCashMovement(ctx context.Context, tx pgx.Tx, userID, portfolioID, sourceID uuid.UUID, pocket *uuid.UUID, in CashMovementInput) (CashMovement, error) {
+	txnIn := in.transactionInput(in.Currency)
+
+	entryID, balance, found, err := lockCashEntry(ctx, tx, portfolioID, sourceID, pocket, in.Currency)
+	if err != nil {
+		return CashMovement{}, err
+	}
+
+	if balance.Add(balanceEffect(txnIn.Type, txnIn.Quantity)).IsNeg() {
+		return CashMovement{}, fmt.Errorf("%w: the balance holds %s %s", ErrInsufficientCash, balance.String(), in.Currency)
+	}
+
+	if !found {
+		assetID, err := ensureCashAsset(ctx, tx, in.Currency)
+		if err != nil {
+			return CashMovement{}, err
+		}
+
+		if entryID, err = openCashEntry(ctx, tx, portfolioID, assetID, sourceID, pocket, in.Currency, in.Date); err != nil {
+			return CashMovement{}, err
+		}
+	}
+
+	// TransactionInput.Validate would not catch this. It refuses a missing
+	// rate between two currencies, not a rate of one, so a dollar deposit
+	// into a position that costs in pesos would pass it and be averaged in as
+	// one peso a dollar.
+	var (
+		costCurrency money.Currency
+		atPar        bool
+	)
+	if err := tx.QueryRow(ctx, `
+		SELECT cost_currency, cash_entry_at_par(id) FROM portfolio_entries WHERE id = $1
+	`, entryID).Scan(&costCurrency, &atPar); err != nil {
+		return CashMovement{}, err
+	}
+
+	if costCurrency != in.Currency || !atPar {
+		return CashMovement{}, invalidCash("this platform already holds %s as a position that costs in %s at another price; record movements on it from the position", cashTicker(in.Currency), costCurrency)
+	}
+
+	settled, err := txnIn.Validate(costCurrency)
+	if err != nil {
+		return CashMovement{}, err
+	}
+
+	var txnID uuid.UUID
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes)
+		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::numeric, $8::char(3), $9::date, $10)
+		RETURNING id
+	`, entryID, settled.Type, settled.Quantity.String(), settled.Price.String(), settled.Currency,
+		settled.FXRate.String(), settled.Fees.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes).Scan(&txnID); err != nil {
+		return CashMovement{}, err
+	}
+
+	return getCashMovement(ctx, tx, userID, txnID)
+}
+
+// MoveCash moves money between two balances of one account inside one
+// portfolio: the main account and a pocket, or two pockets.
+//
+// It is one transaction with two legs, a withdrawal on one side and a deposit
+// on the other, so the money is never in both places or in neither. Because the
+// two flows offset each other exactly — same amount, same day, no fee — the
+// portfolio's net flow does not move, and neither does its return: the money
+// changed drawer, it did not arrive or leave.
+//
+// Both balances are locked before either is written, in the order of their
+// position, so a move each way at the same time queues instead of deadlocking.
+func (r *PostgresRepository) MoveCash(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMoveInput) (CashMove, error) {
+	var move CashMove
+
+	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		if err := requireCashAccount(ctx, tx, userID, portfolioID, sourceID); err != nil {
+			return err
+		}
+
+		from, err := requireWritablePocket(ctx, tx, userID, in.From, sourceID, in.Currency)
+		if err != nil {
+			return err
+		}
+
+		to, err := requireWritablePocket(ctx, tx, userID, in.To, sourceID, in.Currency)
+		if err != nil {
+			return err
+		}
+
+		if _, err := tx.Exec(ctx, `
+			SELECT pe.id
+			FROM portfolio_entries pe
+			WHERE pe.portfolio_id = $1
+			  AND pe.source_id    = $2
+			  AND (pe.pocket_id IS NOT DISTINCT FROM $3::uuid OR pe.pocket_id IS NOT DISTINCT FROM $4::uuid)
+			ORDER BY pe.id
+			FOR UPDATE OF pe
+		`, portfolioID, sourceID, from, to); err != nil {
+			return err
+		}
+
+		out, into := in.legs()
+
+		if move.From, err = writeCashMovement(ctx, tx, userID, portfolioID, sourceID, from, out); err != nil {
+			return err
+		}
+
+		move.To, err = writeCashMovement(ctx, tx, userID, portfolioID, sourceID, to, into)
+
+		return err
+	}); err != nil {
+		return CashMove{}, err
+	}
+
+	return move, nil
+}
+
+// lockCashEntry finds and locks the balance a cash write lands on, and reads
+// what it holds. found is false when there is none yet, which is a balance of
+// zero.
+//
+// pocketID is which drawer of the account: nil is the main one, the balance
+// that has no pocket. A pocket has exactly one balance per portfolio — its
+// asset and its platform follow from the pocket — so the search for the right
+// one among several only ever applies to the main account.
+func lockCashEntry(ctx context.Context, tx pgx.Tx, portfolioID, sourceID uuid.UUID, pocketID *uuid.UUID, cur money.Currency) (uuid.UUID, decimal.Decimal, bool, error) {
 	var (
 		entryID  uuid.UUID
 		quantity decimal.Decimal
@@ -336,6 +447,7 @@ func lockCashEntry(ctx context.Context, tx pgx.Tx, portfolioID, sourceID uuid.UU
 		JOIN assets a ON a.id = pe.asset_id
 		WHERE pe.portfolio_id = $1
 		  AND pe.source_id    = $2
+		  AND pe.pocket_id IS NOT DISTINCT FROM $5::uuid
 		  AND a.asset_type    = 'cash'
 		  AND a.currency      = $3::char(3)
 		  AND pe.cost_currency = $3::char(3)
@@ -343,7 +455,7 @@ func lockCashEntry(ctx context.Context, tx pgx.Tx, portfolioID, sourceID uuid.UU
 		ORDER BY (a.ticker = $4) DESC, pe.created_at
 		LIMIT 1
 		FOR UPDATE OF pe
-	`, portfolioID, sourceID, cur, cashTicker(cur)).Scan(&entryID, &quantity)
+	`, portfolioID, sourceID, cur, cashTicker(cur), pocketID).Scan(&entryID, &quantity)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.UUID{}, decimal.Zero, false, nil
 	}
@@ -353,6 +465,32 @@ func lockCashEntry(ctx context.Context, tx pgx.Tx, portfolioID, sourceID uuid.UU
 	}
 
 	return entryID, quantity, true, nil
+}
+
+// openCashEntry opens the balance a movement needs and returns its position.
+//
+// The price is seeded at one and the trigger keeps it there until interest
+// averages in at no cost (000042). The two statements differ only in the key
+// they resolve a conflict on, and each has to name the predicate of its partial
+// index (000047) or Postgres will not use it. On a conflict the position
+// already existed: for the main account, opened by hand in another cost
+// currency or at another price, which the caller then refuses to write into.
+func openCashEntry(ctx context.Context, tx pgx.Tx, portfolioID, assetID, sourceID uuid.UUID, pocketID *uuid.UUID, cur money.Currency, date time.Time) (uuid.UUID, error) {
+	conflict := `ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, '')) WHERE pocket_id IS NULL`
+	if pocketID != nil {
+		conflict = `ON CONFLICT (portfolio_id, pocket_id) WHERE pocket_id IS NOT NULL`
+	}
+
+	var entryID uuid.UUID
+	err := tx.QueryRow(ctx, `
+		INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, pocket_id, quantity, price, cost_currency, entry_date, notes)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, $6::uuid, 0, 1, $4::char(3), $5::date, '')
+		`+conflict+`
+		DO UPDATE SET updated_at = NOW()
+		RETURNING id
+	`, portfolioID, assetID, sourceID, cur, date, pocketID).Scan(&entryID)
+
+	return entryID, err
 }
 
 // ensureCashAsset returns the catalog row of the balance kept in cur, creating

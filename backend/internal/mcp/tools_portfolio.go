@@ -168,11 +168,23 @@ func (m *Module) addPortfolioTools(s *mcpsdk.Server, c caller) {
 		})
 }
 
-// cashAccountKey names an account: a platform and a currency, which is what a
-// rate belongs to.
+// cashAccountKey names an account: a platform, a currency and a pocket of it,
+// which is what a rate belongs to (000047). The main account is the empty
+// pocket, so a platform without pockets keys exactly as it always did.
 type cashAccountKey struct {
 	sourceID uuid.UUID
 	currency money.Currency
+	pocketID uuid.UUID
+}
+
+// pocketKey is a pocket as the key holds it: the zero UUID for the main
+// account.
+func pocketKey(pocketID *uuid.UUID) uuid.UUID {
+	if pocketID == nil {
+		return uuid.UUID{}
+	}
+
+	return *pocketID
 }
 
 // ratesInEffect indexes the version of each account's rate that applies on the
@@ -183,7 +195,7 @@ func ratesInEffect(rates []portfolio.CashRate, day time.Time) map[cashAccountKey
 
 	for _, r := range rates {
 		if r.InEffectOn(day) {
-			inEffect[cashAccountKey{sourceID: r.SourceID, currency: r.Currency}] = r
+			inEffect[cashAccountKey{sourceID: r.SourceID, currency: r.Currency, pocketID: pocketKey(r.PocketID)}] = r
 		}
 	}
 
@@ -200,6 +212,7 @@ func cashAccountRows(balances []portfolio.CashBalance, rates []portfolio.CashRat
 			PortfolioName:     b.PortfolioName,
 			PlatformID:        b.SourceID.String(),
 			Platform:          b.SourceName,
+			Pocket:            b.PocketName,
 			Balance:           b.Balance,
 			Currency:          b.Currency.String(),
 			Value:             b.Value,
@@ -218,14 +231,14 @@ func cashAccountRows(balances []portfolio.CashBalance, rates []portfolio.CashRat
 			row.LastMovementDate = timeText(*b.LastMovementDate)
 		}
 
-		if rate, ok := inEffect[cashAccountKey{sourceID: b.SourceID, currency: b.Currency}]; ok {
+		if rate, ok := inEffect[cashAccountKey{sourceID: b.SourceID, currency: b.Currency, pocketID: pocketKey(b.PocketID)}]; ok {
 			row.AnnualRatePct = rate.AnnualRatePct
 			row.WithholdingPct = rate.WithholdingPct
 			row.Posting = string(rate.Posting)
 			row.RateFrom = timeText(rate.EffectiveFrom)
 
-			if rate.MaxBalance != nil {
-				row.MaxBalance = *rate.MaxBalance
+			for _, tier := range rate.Tiers {
+				row.Tiers = append(row.Tiers, CashAccountTier{FromBalance: tier.FromBalance, AnnualRatePct: tier.AnnualRatePct})
 			}
 		}
 

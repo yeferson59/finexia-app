@@ -671,3 +671,31 @@ func TestCashBlockWithoutRates(t *testing.T) {
 		t.Errorf("block = %+v, want no average and one idle balance", block)
 	}
 }
+
+// A rate with tiers averages in at what its account earns on all it holds, not
+// at the rate it pays from zero, whichever portfolio holds each part.
+func TestCashBlockWeighsATieredRateAtWhatItComesTo(t *testing.T) {
+	now := time.Date(2026, time.September, 15, 0, 0, 0, 0, time.UTC)
+	nu := uuid.New()
+
+	balances := []portfolio.CashBalance{
+		{SourceID: nu, Currency: money.COP, DisplayCurrency: money.COP, Balance: "6000000", Value: "6000000", InterestThisMonthValue: "0"},
+		{SourceID: nu, Currency: money.COP, DisplayCurrency: money.COP, Balance: "2000000", Value: "2000000", InterestThisMonthValue: "0"},
+	}
+
+	rates := []portfolio.CashRate{{
+		SourceID: nu, Currency: money.COP, AnnualRatePct: "12", EffectiveFrom: now.AddDate(0, -1, 0), Latest: true,
+		Tiers: []portfolio.CashRateTier{{FromBalance: "5000000", AnnualRatePct: "8"}},
+	}}
+
+	block := cashBlock(balances, rates, now)
+	if block == nil {
+		t.Fatal("no cash block for an account that holds cash")
+	}
+
+	// 12 % on the first five million and 8 % on the other three come to 10.48 %
+	// on all eight.
+	if block.AverageRatePct != "10.48" {
+		t.Errorf("average rate = %s, want 10.48", block.AverageRatePct)
+	}
+}

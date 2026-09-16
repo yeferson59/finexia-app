@@ -2,6 +2,7 @@ package portfolio
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/platform/database"
@@ -21,11 +21,14 @@ import (
 // the session's time zone, which is not guaranteed to be UTC.
 
 // cashRateLatest is the SQL test behind CashRate.Latest: no version of the same
-// account starts later.
+// account starts later. The pocket is part of the account (000047), so a rate
+// given to a pocket does not make the main account's rate stop being the latest
+// of its own.
 const cashRateLatest = `NOT EXISTS (
 	SELECT 1 FROM cash_yield_rates later
 	WHERE later.source_id = r.source_id
 	  AND later.currency  = r.currency
+	  AND later.pocket_id IS NOT DISTINCT FROM r.pocket_id
 	  AND later.effective_from > r.effective_from
 )`
 
@@ -37,48 +40,85 @@ const cashRateAccruedThrough = `(
 // The percentages come back trimmed: "9.25", not "9.250000".
 const cashRateColumns = `
 	r.id, r.source_id, s.name, r.currency,
+	r.pocket_id, COALESCE(pk.name, ''),
 	trim_scale(r.annual_rate * 100)::text,
 	trim_scale(r.withholding_rate * 100)::text,
-	r.posting::text, trim_scale(r.max_balance)::text, r.effective_from, r.ended_on,
+	r.posting::text,
+	COALESCE((
+		SELECT json_agg(json_build_object(
+			'fromBalance',   trim_scale(t.from_balance)::text,
+			'annualRatePct', trim_scale(t.annual_rate * 100)::text
+		) ORDER BY t.from_balance)
+		FROM cash_yield_rate_tiers t
+		WHERE t.rate_id = r.id
+	), '[]')::text,
+	r.effective_from, r.ended_on,
 	` + cashRateLatest + `,
 	` + cashRateAccruedThrough + `,
 	r.created_at, r.updated_at`
 
 const cashRateFrom = `
 	FROM cash_yield_rates r
-	JOIN investment_sources s ON s.id = r.source_id`
+	JOIN investment_sources s      ON s.id = r.source_id
+	LEFT JOIN cash_pockets pk      ON pk.id = r.pocket_id`
 
-// maxBalanceParam is the cap as a numeric parameter: its digits, or NULL when
-// the rate has none.
-func maxBalanceParam(limit *decimal.Decimal) *string {
-	if limit == nil {
+// writeCashRateTiers states a version's tiers whole: the ones it had go, and the
+// ones given take their place. The caller holds the lock every write to a rate
+// takes.
+func writeCashRateTiers(ctx context.Context, tx pgx.Tx, rateID uuid.UUID, tiers []CashRateTierInput) error {
+	if _, err := tx.Exec(ctx, `DELETE FROM cash_yield_rate_tiers WHERE rate_id = $1`, rateID); err != nil {
+		return err
+	}
+
+	if len(tiers) == 0 {
 		return nil
 	}
 
-	digits := limit.String()
+	from := make([]string, len(tiers))
+	pct := make([]string, len(tiers))
+	for i, tier := range tiers {
+		from[i] = tier.FromBalance.String()
+		pct[i] = tier.AnnualRatePct.String()
+	}
 
-	return &digits
+	_, err := tx.Exec(ctx, `
+		INSERT INTO cash_yield_rate_tiers (rate_id, from_balance, annual_rate)
+		SELECT $1::uuid, step.from_balance::numeric, step.pct::numeric / 100
+		FROM unnest($2::text[], $3::text[]) AS step(from_balance, pct)
+	`, rateID, from, pct)
+
+	return err
 }
 
 func scanCashRate(row pgx.Row) (CashRate, error) {
-	var rate CashRate
+	var (
+		rate CashRate
+		// Never NULL: a version without tiers comes back as an empty array.
+		tiers string
+	)
 
-	err := row.Scan(
+	if err := row.Scan(
 		&rate.ID,
 		&rate.SourceID,
 		&rate.SourceName,
 		&rate.Currency,
+		&rate.PocketID,
+		&rate.PocketName,
 		&rate.AnnualRatePct,
 		&rate.WithholdingPct,
 		&rate.Posting,
-		&rate.MaxBalance,
+		&tiers,
 		&rate.EffectiveFrom,
 		&rate.EndedOn,
 		&rate.Latest,
 		&rate.AccruedThrough,
 		&rate.CreatedAt,
 		&rate.UpdatedAt,
-	)
+	); err != nil {
+		return rate, err
+	}
+
+	err := json.Unmarshal([]byte(tiers), &rate.Tiers)
 
 	return rate, err
 }
@@ -88,7 +128,7 @@ func scanCashRate(row pgx.Row) (CashRate, error) {
 func (r *PostgresRepository) GetCashRatesByUserID(ctx context.Context, userID uuid.UUID) ([]CashRate, error) {
 	rows, err := r.db.Query(ctx, `SELECT `+cashRateColumns+cashRateFrom+`
 		WHERE s.user_id = $1
-		ORDER BY s.name, r.currency, r.effective_from DESC
+		ORDER BY s.name, r.currency, pk.name NULLS FIRST, r.effective_from DESC
 	`, userID)
 	if err != nil {
 		return nil, err
@@ -151,6 +191,11 @@ func (r *PostgresRepository) CreateCashRate(ctx context.Context, userID uuid.UUI
 			return invalidCashRate("the platform is inactive; activate it before giving it a rate")
 		}
 
+		pocket, err := requireRatePocket(ctx, tx, userID, in.PocketID, in.SourceID, in.Currency)
+		if err != nil {
+			return err
+		}
+
 		var (
 			latestID   uuid.UUID
 			latestFrom time.Time
@@ -159,10 +204,10 @@ func (r *PostgresRepository) CreateCashRate(ctx context.Context, userID uuid.UUI
 		err = tx.QueryRow(ctx, `
 			SELECT id, effective_from, ended_on
 			FROM cash_yield_rates
-			WHERE source_id = $1 AND currency = $2::char(3)
+			WHERE source_id = $1 AND currency = $2::char(3) AND pocket_id IS NOT DISTINCT FROM $3::uuid
 			ORDER BY effective_from DESC
 			LIMIT 1
-		`, in.SourceID, in.Currency).Scan(&latestID, &latestFrom, &latestEnd)
+		`, in.SourceID, in.Currency, pocket).Scan(&latestID, &latestFrom, &latestEnd)
 
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -176,8 +221,8 @@ func (r *PostgresRepository) CreateCashRate(ctx context.Context, userID uuid.UUI
 				SELECT MAX(ac.accrual_date)
 				FROM cash_interest_accruals ac
 				JOIN cash_yield_rates v ON v.id = ac.rate_id
-				WHERE v.source_id = $1 AND v.currency = $2::char(3)
-			`, in.SourceID, in.Currency).Scan(&accruedThrough); err != nil {
+				WHERE v.source_id = $1 AND v.currency = $2::char(3) AND v.pocket_id IS NOT DISTINCT FROM $3::uuid
+			`, in.SourceID, in.Currency, pocket).Scan(&accruedThrough); err != nil {
 				return err
 			}
 
@@ -196,11 +241,11 @@ func (r *PostgresRepository) CreateCashRate(ctx context.Context, userID uuid.UUI
 
 		var rateID uuid.UUID
 		if err := tx.QueryRow(ctx, `
-			INSERT INTO cash_yield_rates (source_id, currency, annual_rate, withholding_rate, posting, max_balance, effective_from)
-			VALUES ($1::uuid, $2::char(3), $3::numeric / 100, $4::numeric / 100, $5::cash_interest_posting, $6::numeric, $7::date)
+			INSERT INTO cash_yield_rates (source_id, currency, pocket_id, annual_rate, withholding_rate, posting, effective_from)
+			VALUES ($1::uuid, $2::char(3), $7::uuid, $3::numeric / 100, $4::numeric / 100, $5::cash_interest_posting, $6::date)
 			RETURNING id
 		`, in.SourceID, in.Currency, in.AnnualRatePct.String(), in.WithholdingPct.String(), string(in.Posting),
-			maxBalanceParam(in.MaxBalance), start.Format(time.DateOnly)).Scan(&rateID); err != nil {
+			start.Format(time.DateOnly), pocket).Scan(&rateID); err != nil {
 			// The lock makes this unreachable from here; a writer that skipped it
 			// would still get the answer the check above gives.
 			var pgErr *pgconn.PgError
@@ -208,6 +253,10 @@ func (r *PostgresRepository) CreateCashRate(ctx context.Context, userID uuid.UUI
 				return ErrCashRateOverlaps
 			}
 
+			return err
+		}
+
+		if err := writeCashRateTiers(ctx, tx, rateID, in.Tiers); err != nil {
 			return err
 		}
 
@@ -223,8 +272,11 @@ func (r *PostgresRepository) CreateCashRate(ctx context.Context, userID uuid.UUI
 
 // lockedCashRate is what a write to an existing version has to know first.
 type lockedCashRate struct {
-	sourceID       uuid.UUID
-	currency       money.Currency
+	sourceID uuid.UUID
+	currency money.Currency
+	// pocketID is the drawer of the account the version belongs to, nil for the
+	// main account: part of the key every other version is compared against.
+	pocketID       *uuid.UUID
 	effectiveFrom  time.Time
 	accruedThrough *time.Time
 }
@@ -255,11 +307,11 @@ func lockLatestCashRate(ctx context.Context, tx pgx.Tx, userID, rateID uuid.UUID
 
 	var latest bool
 	err = tx.QueryRow(ctx, `
-		SELECT r.currency, r.effective_from, `+cashRateLatest+`, `+cashRateAccruedThrough+`
+		SELECT r.currency, r.pocket_id, r.effective_from, `+cashRateLatest+`, `+cashRateAccruedThrough+`
 		FROM cash_yield_rates r
 		WHERE r.id = $1
 		FOR UPDATE OF r
-	`, rateID).Scan(&locked.currency, &locked.effectiveFrom, &latest, &locked.accruedThrough)
+	`, rateID).Scan(&locked.currency, &locked.pocketID, &locked.effectiveFrom, &latest, &locked.accruedThrough)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return locked, ErrCashRateNotFound
 	}
@@ -294,11 +346,13 @@ func (r *PostgresRepository) UpdateCashRate(ctx context.Context, userID, rateID 
 			UPDATE cash_yield_rates SET
 				annual_rate      = $2::numeric / 100,
 				withholding_rate = $3::numeric / 100,
-				posting          = $4::cash_interest_posting,
-				max_balance      = $5::numeric
+				posting          = $4::cash_interest_posting
 			WHERE id = $1
-		`, rateID, in.AnnualRatePct.String(), in.WithholdingPct.String(), string(in.Posting),
-			maxBalanceParam(in.MaxBalance)); err != nil {
+		`, rateID, in.AnnualRatePct.String(), in.WithholdingPct.String(), string(in.Posting)); err != nil {
+			return err
+		}
+
+		if err := writeCashRateTiers(ctx, tx, rateID, in.Tiers); err != nil {
 			return err
 		}
 
@@ -376,13 +430,37 @@ func (r *PostgresRepository) DeleteCashRate(ctx context.Context, userID, rateID 
 			UPDATE cash_yield_rates SET ended_on = NULL
 			WHERE source_id = $1
 			  AND currency  = $2::char(3)
+			  AND pocket_id IS NOT DISTINCT FROM $4::uuid
 			  AND ended_on  = $3::date - 1
 			  AND effective_from = (
 			    SELECT MAX(effective_from) FROM cash_yield_rates
-			    WHERE source_id = $1 AND currency = $2::char(3)
+			    WHERE source_id = $1 AND currency = $2::char(3) AND pocket_id IS NOT DISTINCT FROM $4::uuid
 			  )
-		`, locked.sourceID, locked.currency, locked.effectiveFrom.Format(time.DateOnly))
+		`, locked.sourceID, locked.currency, locked.effectiveFrom.Format(time.DateOnly), locked.pocketID)
 
 		return err
 	})
+}
+
+// requireRatePocket turns the pocket a rate names into the value
+// cash_yield_rates.pocket_id takes: nil for the main account, or the pocket
+// itself once it is known to be the owner's and part of the account stated.
+//
+// It is requireWritablePocket's answer for a rate: the pocket is locked with
+// the platform, so a version and a rename cannot cross.
+func requireRatePocket(ctx context.Context, tx pgx.Tx, userID, pocketID, sourceID uuid.UUID, cur money.Currency) (*uuid.UUID, error) {
+	if pocketID == (uuid.UUID{}) {
+		return nil, nil
+	}
+
+	locked, err := lockCashPocket(ctx, tx, userID, pocketID)
+	if err != nil {
+		return nil, err
+	}
+
+	if locked.sourceID != sourceID || locked.currency != cur {
+		return nil, invalidCashRate("that pocket belongs to another account, so it cannot earn this one's rate")
+	}
+
+	return &locked.id, nil
 }
