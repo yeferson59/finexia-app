@@ -1,32 +1,51 @@
 <script lang="ts">
-	import CountdownInline from './countdown-inline.svelte';
+	/*
+	 * El alta en la lista de espera. Lo usan el hero y el cierre.
+	 *
+	 * El botón decía «Acceso anticipado» mientras la barra decía «Unirme a la
+	 * lista»: dos nombres para la misma acción. Ahora es uno solo, y lo que
+	 * contesta al enviarlo usa el mismo verbo.
+	 */
+	import { onMount } from 'svelte';
+	import { LAUNCH_DATE, daysUntil, launchCountdownText } from '../landing';
 
 	interface Props {
 		/** Ancla del formulario. Solo lo lleva el del hero, al que apunta el menú. */
 		anchor?: string;
-		/** El del CTA final va centrado dentro de su panel. */
-		centered?: boolean;
-		/** El aviso de spam sobra donde ya se ha leído una vez. */
-		note?: boolean;
-		/** Texto que precede a la cuenta atrás. */
-		countdownLabel?: string;
+		/** Sobre el verde del cierre, los colores se invierten. */
+		tone?: 'paper' | 'forest';
 	}
 
-	let { anchor, centered = false, note = true, countdownLabel = 'Faltan' }: Props = $props();
+	let { anchor, tone = 'paper' }: Props = $props();
 
-	let waitlistEmail = $state('');
-	let waitlistError = $state(false);
-	let waitlistErrorMessage = $state('');
-	let waitlistSuccess = $state(false);
+	const inputId = $props.id();
+
+	let email = $state('');
+	let errorMessage = $state('');
+	let success = $state(false);
 	let submitting = $state(false);
 
-	async function submitWaitlist(event: SubmitEvent) {
+	/*
+	 * La página se prerenderiza: la cifra del HTML es la del día del build. Hasta
+	 * que hidrata se enseña la frase sin días, que nunca es falsa.
+	 */
+	let days = $state(0);
+
+	onMount(() => {
+		days = daysUntil(new Date(LAUNCH_DATE).getTime(), Date.now());
+	});
+
+	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		const formEl = event.currentTarget as HTMLFormElement;
-		waitlistError = false;
-		waitlistErrorMessage = '';
-		submitting = true;
+		errorMessage = '';
 
+		if (!email.trim()) {
+			errorMessage = 'Escribe tu correo para unirte a la lista.';
+			return;
+		}
+
+		submitting = true;
 		try {
 			const res = await fetch('/api/waitlist', {
 				method: 'POST',
@@ -34,203 +53,169 @@
 				body: new FormData(formEl)
 			});
 			const data = await res.json();
-
 			if (data.success) {
-				waitlistSuccess = true;
+				success = true;
 			} else {
-				waitlistError = true;
-				waitlistErrorMessage = data.error ?? 'Ocurrió un error. Inténtalo de nuevo.';
+				errorMessage = data.error ?? 'No pudimos guardar tu correo. Inténtalo de nuevo.';
 			}
 		} catch {
-			waitlistError = true;
-			waitlistErrorMessage = 'Ocurrió un error. Inténtalo de nuevo.';
+			errorMessage = 'No pudimos guardar tu correo. Revisa tu conexión e inténtalo de nuevo.';
 		} finally {
 			submitting = false;
 		}
 	}
 </script>
 
-<div class="waitlist reveal" class:centered id={anchor}>
-	{#if waitlistSuccess}
-		<div class="wl-success">
-			<span class="check-ico" aria-hidden="true">
-				<svg
-					width="12"
-					height="12"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="3.2"
-					stroke-linecap="round"
-					stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg
-				>
-			</span>
-			<span>¡Listo! Te avisaremos en cuanto Finexia esté disponible.</span>
-		</div>
+<div class="waitlist" class:forest={tone === 'forest'} id={anchor}>
+	{#if success}
+		<p class="done" role="status">
+			Te has unido a la lista. Te escribimos el 1 de octubre, cuando abramos.
+		</p>
 	{:else}
 		<form
-			class="wl-form"
-			class:error={waitlistError}
+			class="form"
+			class:invalid={errorMessage}
 			method="POST"
 			action="/api/waitlist"
-			onsubmit={submitWaitlist}
+			onsubmit={submit}
 			novalidate
 		>
+			<label class="lp-sr-only" for={inputId}>Correo electrónico</label>
 			<input
+				id={inputId}
 				type="email"
-				bind:value={waitlistEmail}
-				placeholder="tu@email.com"
-				autocomplete="email"
 				name="email"
+				bind:value={email}
+				placeholder="tu@correo.com"
+				autocomplete="email"
 				required
-				aria-label="Correo electrónico"
+				aria-invalid={errorMessage ? 'true' : undefined}
+				aria-describedby={errorMessage ? `${inputId}-error` : `${inputId}-note`}
 			/>
-			<button type="submit" class="btn-amber" disabled={submitting}>
-				{submitting ? 'Enviando...' : 'Acceso anticipado'}
+			<button type="submit" class="lp-btn" disabled={submitting}>
+				{submitting ? 'Uniéndote…' : 'Unirme a la lista'}
 			</button>
 		</form>
-		{#if waitlistError && waitlistErrorMessage}
-			<p class="wl-error" role="alert">{waitlistErrorMessage}</p>
+
+		{#if errorMessage}
+			<p class="error" id="{inputId}-error" role="alert">{errorMessage}</p>
 		{/if}
-		<div class="wl-meta">
-			{#if note}
-				<div class="wl-note">
-					<svg
-						width="13"
-						height="13"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						><rect x="3" y="11" width="18" height="11" rx="2" /><path
-							d="M7 11V7a5 5 0 0 1 10 0v4"
-						/></svg
-					>
-					Sin spam. Solo te escribimos el día del lanzamiento.
-				</div>
-			{/if}
-			<CountdownInline label={countdownLabel} />
-		</div>
+
+		<p class="note" id="{inputId}-note">
+			{launchCountdownText(days)} Solo te escribiremos ese día.
+		</p>
 	{/if}
 </div>
 
 <style>
 	.waitlist {
 		width: 100%;
-		max-width: 480px;
+		max-width: 520px;
 	}
 
-	.waitlist.centered {
-		margin: 0 auto;
-	}
-
-	.wl-form {
+	.form {
 		display: flex;
-		gap: 8px;
-		background: var(--surface-2);
-		border: 1px solid var(--border-strong);
-		border-radius: 8px;
-		padding: 6px;
-		transition:
-			border-color 0.2s,
-			box-shadow 0.2s;
+		gap: 6px;
+		padding: 5px;
+		border: 1px solid var(--lp-ink);
+		border-radius: 10px;
+		background: #fff;
 	}
 
-	.wl-form:focus-within {
-		border-color: rgba(212, 145, 42, 0.5);
-		box-shadow: 0 0 0 3px rgba(212, 145, 42, 0.07);
+	.form.invalid {
+		border-color: #b3261e;
 	}
 
-	.wl-form.error {
-		border-color: var(--red);
+	/* El foco lo marca el borde de la caja entera, no el del campo suelto. */
+	.form:focus-within {
+		outline: 2px solid var(--lp-ink);
+		outline-offset: 2px;
 	}
 
-	.wl-form input {
+	.form input {
 		flex: 1;
-		background: transparent;
-		border: none;
-		outline: none;
-		color: var(--text);
-		font-family: var(--font-body);
-		font-size: 15px;
-		padding: 0 14px;
 		min-width: 0;
+		padding: 0 14px;
+		border: none;
+		background: transparent;
+		color: var(--lp-ink);
+		font-family: var(--lp-font);
+		font-size: 16px;
 	}
 
-	.wl-form input::placeholder {
-		color: var(--text-dim);
+	.form input:focus,
+	.form input:focus-visible {
+		outline: none;
+		box-shadow: none;
 	}
 
-	/*
-	 * Aviso y cuenta atrás comparten fila: la información secundaria del
-	 * formulario ocupa una línea en vez de dos bloques apilados.
-	 */
-	.wl-meta {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 16px;
-		margin-top: 12px;
+	.form input::placeholder {
+		color: #6b7a75;
 	}
 
-	.waitlist.centered .wl-meta {
-		justify-content: center;
-		margin-top: 14px;
+	.note,
+	.error,
+	.done {
+		margin: 12px 0 0;
+		font-size: var(--lp-fs-sm);
+		line-height: 1.5;
 	}
 
-	.wl-note {
-		font-size: 12px;
-		color: var(--text-dim);
-		display: flex;
-		align-items: center;
-		gap: 7px;
+	.note {
+		color: var(--lp-ink-2);
 	}
 
-	.wl-error {
-		margin-top: 10px;
-		font-size: 12.5px;
-		color: var(--red);
+	.error {
+		color: #b3261e;
 	}
 
-	.wl-success {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		padding: 16px 20px;
-		border-radius: 8px;
-		background: rgba(34, 201, 126, 0.06);
-		border: 1px solid rgba(34, 201, 126, 0.22);
-		font-size: 15px;
-		font-weight: 300;
+	.done {
+		margin: 0;
+		padding: 14px 0 14px 16px;
+		border-left: 3px solid var(--lp-cripto);
+		font-size: var(--lp-fs-lead);
+		color: var(--lp-ink);
 	}
 
-	.check-ico {
-		flex-shrink: 0;
-		width: 24px;
-		height: 24px;
-		border-radius: 50%;
-		display: grid;
-		place-items: center;
-		background: var(--green);
-		color: #06140c;
+	/* Sobre el bosque: la caja pasa a papel y el botón, a ámbar. */
+	.forest .form {
+		border-color: transparent;
+		background: var(--lp-forest-ink);
 	}
 
-	@media (max-width: 640px) {
-		.wl-form {
+	.forest .form:focus-within {
+		outline-color: var(--lp-forest-ink);
+	}
+
+	.forest .lp-btn {
+		background: var(--lp-jubilacion);
+		color: var(--lp-ink);
+	}
+
+	.forest .lp-btn:hover {
+		background: #e3a03a;
+	}
+
+	.forest .note {
+		color: var(--lp-forest-ink-2);
+	}
+
+	.forest .error {
+		color: #ffb4a9;
+	}
+
+	.forest .done {
+		border-left-color: var(--lp-jubilacion);
+		color: var(--lp-forest-ink);
+	}
+
+	@media (max-width: 520px) {
+		.form {
 			flex-direction: column;
+			padding: 6px;
 		}
-		.wl-form input {
-			height: 44px;
-		}
-		.wl-meta {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 8px;
-		}
-		.waitlist.centered .wl-meta {
-			align-items: center;
+		.form input {
+			min-height: 48px;
 		}
 	}
 </style>

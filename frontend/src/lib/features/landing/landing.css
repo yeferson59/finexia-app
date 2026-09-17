@@ -1,163 +1,181 @@
 /*
- * Shared utility classes for the marketing landing page. Imported once from
- * the route so the classes are global and every landing/components/*.svelte
- * section component can use them without redeclaring them in its scoped <style>.
+ * Hoja compartida de la superficie pública: la landing y las páginas legales.
+ *
+ * Todo cuelga de `.lp`, el contenedor que ponen `routes/+page.svelte` y
+ * `routes/(legal)/+layout.svelte`. Antes las utilidades eran globales y con
+ * nombres genéricos —`.wrap`, `.block`, `.band`, `.eyebrow`— que el panel
+ * también usa: al navegar desde la portada, esas reglas se quedaban en el
+ * documento y se sumaban a las del panel.
+ *
+ * La portada no usa los tokens del panel (`--bg`, `--text`…): va en papel y
+ * tinta, y el panel se enseña dentro del recorrido tal cual es, oscuro. Por eso
+ * los tokens de aquí llevan su propio prefijo y no redefinen los de `:root`:
+ * la maqueta del recorrido, que vive dentro de `.lp`, sigue leyendo los suyos.
  */
 
-.wrap {
-	max-width: 1200px;
+.lp {
+	/* Papel y tinta. El papel es frío, con un punto verde, no crema. */
+	--lp-paper: #eef0ec;
+	--lp-paper-2: #e4e8e2;
+	--lp-ink: #10231e;
+	--lp-ink-2: #4a5c56;
+	--lp-rule: #c9d1ca;
+
+	/* El verde profundo de la sección de seguridad y del pie. */
+	--lp-forest: #0f3a32;
+	--lp-forest-ink: #e9eee9;
+	--lp-forest-ink-2: #a9bdb5;
+	--lp-forest-rule: rgba(233, 238, 233, 0.16);
+
+	/*
+	 * Un color por portafolio en el mapa del hero. Validados como paleta
+	 * categórica sobre `--lp-paper-2` (todas las parejas, protanopia y
+	 * deuteranopia): el ámbar es el de la marca. Queda por debajo de 3:1 contra
+	 * el papel, así que ningún dato depende solo de él: cada grupo lleva su
+	 * nombre y su importe escritos al lado.
+	 */
+	--lp-jubilacion: #d4912a;
+	--lp-cripto: #00846f;
+	--lp-reserva: #4d5fc4;
+
+	--lp-font: 'Archivo', system-ui, sans-serif;
+
+	/* Escala tipográfica: la clásica de 12-14-16-18-21-24-36-48-60-72. */
+	--lp-fs-sm: 14px;
+	--lp-fs-body: 16px;
+	--lp-fs-lead: 18px;
+	--lp-fs-h3: 21px;
+
+	min-height: 100vh;
+	background: var(--lp-paper);
+	color: var(--lp-ink);
+	font-family: var(--lp-font);
+	font-size: var(--lp-fs-body);
+	line-height: 1.55;
+	overflow-x: clip;
+}
+
+.lp ::selection {
+	background: rgba(212, 145, 42, 0.35);
+	color: var(--lp-ink);
+}
+
+/* El contorno ámbar del panel no llega a 3:1 sobre el papel: aquí el foco va
+   en tinta. Dentro del bosque, en papel. */
+.lp :focus-visible {
+	outline: 2px solid var(--lp-ink);
+	outline-offset: 3px;
+}
+
+.lp .lp-forest :focus-visible {
+	outline-color: var(--lp-forest-ink);
+}
+
+.lp-wrap {
+	max-width: 1240px;
 	margin: 0 auto;
-	padding: 0 36px;
+	padding-inline: 40px;
+}
+
+.lp-section {
+	padding-block: 112px;
+}
+
+.lp-forest {
+	background: var(--lp-forest);
+	color: var(--lp-forest-ink);
 }
 
 /*
- * Vertical rhythm for each landing section. Defined once here (global) instead of
- * per-component so the responsive scale lives in a single place.
- *
- * Solo el eje vertical: en atajo, `padding: 88px 0` pisaba el `padding: 0 36px`
- * de `.wrap` (misma especificidad, regla posterior) y dejaba todas las secciones
- * pegadas al borde de la pantalla en móvil.
+ * Titulares de sección. La anchura de Archivo hace el trabajo que antes hacía
+ * el antetítulo en versalitas: el titular ya se distingue del texto por su
+ * forma, sin una etiqueta encima que lo anuncie.
  */
-.block {
-	padding-block: 88px;
+.lp-h2 {
+	margin: 0;
+	font-size: clamp(32px, 4.4vw, 56px);
+	font-stretch: 116%;
+	font-weight: 620;
+	line-height: 1;
+	letter-spacing: -0.025em;
+	text-wrap: balance;
 }
 
-@media (max-width: 768px) {
-	.wrap {
-		padding: 0 24px;
+.lp-lead {
+	margin: 0;
+	max-width: 52ch;
+	font-size: var(--lp-fs-lead);
+	line-height: 1.55;
+	color: var(--lp-ink-2);
+	text-wrap: pretty;
+}
+
+.lp-forest .lp-lead {
+	color: var(--lp-forest-ink-2);
+}
+
+/* La acción principal: tinta sobre papel. Nombre y verbo iguales en toda la
+   página —«Unirme a la lista»—. */
+.lp-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	min-height: 48px;
+	padding: 0 22px;
+	border: none;
+	border-radius: 6px;
+	background: var(--lp-ink);
+	color: var(--lp-paper);
+	font-family: var(--lp-font);
+	font-size: 15px;
+	font-stretch: 108%;
+	font-weight: 600;
+	white-space: nowrap;
+	cursor: pointer;
+	transition: background 0.18s ease;
+}
+
+.lp-btn:hover {
+	background: #1f3d35;
+}
+
+.lp-btn:disabled {
+	cursor: progress;
+	opacity: 0.7;
+}
+
+.lp-sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+@media (max-width: 900px) {
+	.lp-section {
+		padding-block: 88px;
 	}
-	.block {
+}
+
+@media (max-width: 640px) {
+	.lp-wrap {
+		padding-inline: 20px;
+	}
+	.lp-section {
 		padding-block: 64px;
 	}
 }
 
-@media (max-width: 480px) {
-	.wrap {
-		padding: 0 18px;
+@media (max-width: 380px) {
+	.lp-wrap {
+		padding-inline: 16px;
 	}
-	.block {
-		padding-block: 52px;
-	}
-}
-
-/*
- * Bandas de sección.
- *
- * Antes cada corte entre secciones era un `.divider` suelto en la ruta y todas
- * compartían el mismo fondo, así que siete bloques seguidos respiraban igual.
- * Alternando banda y fondo base la página cambia de ritmo sin añadir color.
- */
-.band {
-	background: rgba(255, 255, 255, 0.014);
-	border-top: 1px solid var(--border);
-	border-bottom: 1px solid var(--border);
-}
-
-/* Section heading block */
-.sec-head {
-	max-width: 640px;
-	margin: 0 auto 56px;
-	text-align: center;
-}
-.eyebrow {
-	font-family: var(--font-mono);
-	font-size: 11px;
-	font-weight: 500;
-	letter-spacing: 0.2em;
-	text-transform: uppercase;
-	color: var(--amber);
-}
-.sec-title {
-	font-family: var(--font-display);
-	font-weight: 300;
-	font-size: clamp(28px, 4vw, 46px);
-	line-height: 1.1;
-	letter-spacing: -0.02em;
-	margin-top: 14px;
-	text-wrap: balance;
-}
-.sec-desc {
-	margin-top: 16px;
-	font-size: 16px;
-	color: var(--text-muted);
-	font-weight: 300;
-}
-
-/*
- * Variantes de cabecera. `.sec-head` (centrada) sigue siendo la de por defecto;
- * estas dos existen para que dos secciones consecutivas nunca abran igual.
- */
-
-/* Titular a la izquierda y argumento a la derecha, apoyados en un filete. */
-.sec-split {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) 420px;
-	gap: 64px;
-	align-items: end;
-	margin-bottom: 40px;
-	padding-bottom: 28px;
-	border-bottom: 1px solid var(--border);
-}
-.sec-split .sec-desc {
-	margin-top: 0;
-}
-
-/* Cabecera fija en un raíl lateral con el contenido a la derecha. */
-.sec-rail {
-	display: grid;
-	grid-template-columns: 320px minmax(0, 1fr);
-	gap: 64px;
-	align-items: start;
-}
-
-/* Titular algo menor para las cabeceras de raíl, que tienen menos ancho. */
-.sec-title-sm {
-	font-size: clamp(26px, 3.4vw, 42px);
-}
-
-@media (max-width: 900px) {
-	.sec-split {
-		grid-template-columns: minmax(0, 1fr);
-		gap: 20px;
-		align-items: start;
-	}
-	.sec-rail {
-		grid-template-columns: minmax(0, 1fr);
-		gap: 36px;
-	}
-}
-
-/* Amber button — hero waitlist + final CTA */
-.btn-amber {
-	flex-shrink: 0;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	padding: 12px 22px;
-	border-radius: 6px;
-	border: none;
-	cursor: pointer;
-	font-family: var(--font-body);
-	font-size: 14px;
-	font-weight: 600;
-	color: #0d0800;
-	background: var(--amber);
-	transition:
-		background 0.2s,
-		transform 0.15s;
-}
-.btn-amber:hover {
-	background: var(--amber-light);
-	transform: translateY(-1px);
-}
-.btn-amber:active {
-	transform: none;
-}
-.btn-amber-lg {
-	display: inline-flex;
-	padding: 15px 30px;
-	font-size: 15.5px;
-	border-radius: 8px;
 }
 
 /*

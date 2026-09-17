@@ -12,38 +12,33 @@
 
 	/*
 	 * La primera abierta de entrada: se ve el patrón de pregunta y respuesta sin
-	 * tener que adivinar que la fila es pulsable.
+	 * tener que adivinar que la fila se puede pulsar.
 	 */
-	let openFaqIndex = $state<number | null>(0);
+	let openIndex = $state<number | null>(0);
 
-	function toggleFaq(index: number) {
-		openFaqIndex = openFaqIndex === index ? null : index;
+	function toggle(index: number) {
+		openIndex = openIndex === index ? null : index;
 	}
 </script>
 
-<section class="wrap block" id="faq">
-	<!-- De columna centrada de 720px a raíl más lista: la cabecera deja de
-	     empujar las preguntas media pantalla hacia abajo. -->
-	<div class="sec-rail">
-		<div class="faq-head reveal">
-			<div class="eyebrow">Preguntas frecuentes</div>
-			<h2 class="sec-title sec-title-sm">Lo que necesitas saber</h2>
-			<div class="faq-count">{faqs.length} preguntas</div>
-		</div>
+<section class="lp-section" id="faq" aria-labelledby="faq-title">
+	<div class="lp-wrap grid">
+		<h2 class="lp-h2" id="faq-title">Preguntas frecuentes</h2>
 
-		<div class="faq">
+		<div class="list">
 			{#each faqs as faq, i (faq.q)}
-				<div class="faq-item reveal" class:open={openFaqIndex === i}>
+				<div class="item" class:open={openIndex === i}>
 					<h3>
 						<button
 							id="faq-q-{i}"
-							class="faq-q"
+							class="q"
 							type="button"
-							aria-expanded={openFaqIndex === i}
+							aria-expanded={openIndex === i}
 							aria-controls="faq-a-{i}"
-							onclick={() => toggleFaq(i)}
+							onclick={() => toggle(i)}
 						>
-							{faq.q}<span class="plus" aria-hidden="true"></span>
+							<span>{faq.q}</span>
+							<span class="sign" aria-hidden="true"></span>
 						</button>
 					</h3>
 					<!--
@@ -51,8 +46,8 @@
 						un max-height fijo: así el alto lo decide el texto y una respuesta
 						larga no queda recortada en pantallas estrechas.
 					-->
-					<div id="faq-a-{i}" class="faq-a" role="region" aria-labelledby="faq-q-{i}">
-						<div class="faq-a-inner"><p>{faq.a}</p></div>
+					<div id="faq-a-{i}" class="a" role="region" aria-labelledby="faq-q-{i}">
+						<div class="a-inner"><p>{faq.a}</p></div>
 					</div>
 				</div>
 			{/each}
@@ -61,121 +56,132 @@
 </section>
 
 <style>
-	.faq-count {
-		display: inline-flex;
-		align-items: center;
-		margin-top: 24px;
-		padding: 6px 12px;
-		border: 1px solid var(--border);
-		border-radius: 999px;
-		background: var(--surface);
-		font-family: var(--font-mono);
-		font-size: 10.5px;
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
-		color: var(--text-dim);
+	.grid {
+		display: grid;
+		grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+		gap: 32px 96px;
+		align-items: start;
 	}
 
-	.faq-item {
-		border-bottom: 1px solid var(--border);
+	.grid .lp-h2 {
+		max-width: 10ch;
 	}
-	.faq-item:last-child {
-		border-bottom: none;
+
+	.list {
+		border-top: 2px solid var(--lp-ink);
 	}
-	.faq-item h3 {
+
+	.item {
+		border-bottom: 1px solid var(--lp-rule);
+	}
+
+	.item h3 {
 		margin: 0;
-		font-weight: inherit;
 		font-size: inherit;
+		font-weight: inherit;
 	}
-	.faq-q {
-		width: 100%;
-		background: none;
-		border: none;
-		cursor: pointer;
+
+	.q {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 20px;
+		gap: 24px;
+		width: 100%;
 		padding: 22px 0;
+		border: none;
+		background: none;
+		color: var(--lp-ink);
+		font-family: var(--lp-font);
+		font-size: 19px;
+		font-stretch: 104%;
+		font-weight: 560;
+		line-height: 1.3;
 		text-align: left;
-		font-family: var(--font-display);
-		font-weight: 300;
-		font-size: 18px;
-		color: var(--text);
-		transition: color 0.2s;
+		cursor: pointer;
 	}
-	.faq-q:hover {
-		color: var(--amber-light);
+
+	.q:hover span:first-child {
+		text-decoration: underline;
+		text-decoration-thickness: 1px;
+		text-underline-offset: 4px;
 	}
-	.faq-item.open .faq-q {
-		color: var(--amber-light);
-	}
-	.plus {
-		flex-shrink: 0;
-		width: 22px;
-		height: 22px;
+
+	/* Un más que pierde el trazo vertical al abrirse: menos. */
+	.sign {
 		position: relative;
-		transition: transform 0.3s ease;
+		flex-shrink: 0;
+		width: 16px;
+		height: 16px;
 	}
-	.plus::before,
-	.plus::after {
+
+	.sign::before,
+	.sign::after {
 		content: '';
 		position: absolute;
-		background: var(--amber);
-		border-radius: 1px;
 		top: 50%;
 		left: 50%;
+		background: var(--lp-ink);
 		transform: translate(-50%, -50%);
 	}
-	.plus::before {
-		width: 12px;
-		height: 1.5px;
+
+	.sign::before {
+		width: 16px;
+		height: 2px;
 	}
-	.plus::after {
-		width: 1.5px;
-		height: 12px;
-		transition: opacity 0.3s ease;
+
+	.sign::after {
+		width: 2px;
+		height: 16px;
+		transition: transform 0.25s ease;
 	}
-	.faq-item.open .plus {
-		transform: rotate(90deg);
+
+	.item.open .sign::after {
+		transform: translate(-50%, -50%) scaleY(0);
 	}
-	.faq-item.open .plus::after {
-		opacity: 0;
-	}
-	.faq-a {
+
+	.a {
 		display: grid;
 		grid-template-rows: 0fr;
-		transition: grid-template-rows 0.35s ease;
+		transition: grid-template-rows 0.3s ease;
 	}
-	.faq-item.open .faq-a {
+
+	.item.open .a {
 		grid-template-rows: 1fr;
 	}
-	.faq-a-inner {
+
+	.a-inner {
 		overflow: hidden;
 	}
-	.faq-a p {
-		max-width: 68ch;
-		font-size: 15px;
-		color: var(--text-muted);
-		line-height: 1.68;
-		font-weight: 300;
+
+	.a p {
+		max-width: 62ch;
+		margin: 0;
 		padding: 0 40px 24px 0;
+		color: var(--lp-ink-2);
 		text-wrap: pretty;
 	}
 
+	@media (max-width: 900px) {
+		.grid {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.grid .lp-h2 {
+			max-width: none;
+		}
+	}
+
 	@media (max-width: 640px) {
-		.faq-q {
+		.q {
 			font-size: 17px;
 		}
-		.faq-a p {
+		.a p {
 			padding-right: 0;
 		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.faq-a,
-		.plus,
-		.plus::after {
+		.a,
+		.sign::after {
 			transition: none;
 		}
 	}

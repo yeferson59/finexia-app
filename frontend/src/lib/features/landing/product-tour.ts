@@ -78,7 +78,7 @@ export const TOUR_VIEWS: TourView[] = [
 		points: [
 			'Reparto por plataforma, portafolio o tipo',
 			'Valor de mercado frente a capital invertido',
-			'1M · 3M · 6M · 1Y · Todo',
+			'De un mes a todo el historial',
 			'Once monedas de visualización',
 			'Ocultar los importes'
 		]

@@ -1,16 +1,15 @@
 <script lang="ts">
 	/*
-	 * "Dentro de Finexia": recorrido por las cuatro vistas del dashboard.
+	 * "El producto": recorrido por cuatro vistas del panel.
 	 *
 	 * Las maquetas replican la interfaz real (misma tipografía, mismos tokens,
-	 * misma jerarquía) con cifras de ejemplo, para que quien llega a la landing
-	 * vea el producto que va a usar y no una ilustración genérica. La ventana es
-	 * decorativa (`aria-hidden`); cada pestaña lleva debajo un pie de texto que
-	 * describe la vista, así que la información también existe sin verla.
+	 * misma jerarquía) con las cifras del ejemplo, para que quien llega a la
+	 * portada vea el producto que va a usar y no una ilustración. La ventana es
+	 * decorativa (`aria-hidden`); cada pestaña lleva debajo un texto que describe
+	 * la vista, así que la información también existe sin verla.
 	 *
-	 * La cabecera va a la izquierda y las pestañas a la derecha sobre el mismo
-	 * filete: la sección abre con un eje horizontal en vez de con el tercer
-	 * bloque centrado seguido.
+	 * Sobre el papel de la portada, la ventana es lo único oscuro de la sección:
+	 * se lee como lo que es, una pantalla del panel.
 	 */
 	import ProductTourWindow from './product-tour-window.svelte';
 	import { TOUR_VIEWS, type TourView } from '../product-tour';
@@ -30,20 +29,16 @@
 	}
 </script>
 
-<section class="band" id="producto">
-	<div class="wrap block">
-		<div class="tour-head reveal">
-			<div class="tour-head-text">
-				<div class="eyebrow">El producto</div>
-				<h2 class="sec-title">Esto es lo que verás al entrar</h2>
-			</div>
+<section class="lp-section" id="producto" aria-labelledby="producto-title">
+	<div class="lp-wrap">
+		<div class="head">
+			<h2 class="lp-h2" id="producto-title">Esto es lo que verás al entrar</h2>
 
-			<div class="tour-tabs" role="tablist" aria-label="Vistas del panel de Finexia">
+			<div class="tabs" role="tablist" aria-label="Vistas del panel de Finexia">
 				{#each TOUR_VIEWS as v, i (v.id)}
 					<button
 						id="tour-tab-{v.id}"
-						class="tour-tab"
-						class:active={active === v.id}
+						class="tab"
 						role="tab"
 						type="button"
 						aria-selected={active === v.id}
@@ -60,19 +55,19 @@
 
 		<div
 			id="tour-panel-{view.id}"
-			class="tour-panel reveal"
+			class="panel"
 			role="tabpanel"
 			aria-labelledby="tour-tab-{view.id}"
 			tabindex="-1"
 		>
 			<ProductTourWindow {view} />
 
-			<div class="tour-caption">
+			<div class="caption">
 				<div>
 					<h3>{view.title}</h3>
 					<p>{view.description}</p>
 				</div>
-				<ul class="tour-points">
+				<ul class="points">
 					{#each view.points as point (point)}
 						<li>{point}</li>
 					{/each}
@@ -83,137 +78,111 @@
 </section>
 
 <style>
-	.tour-head {
+	.head {
 		display: flex;
 		align-items: flex-end;
 		justify-content: space-between;
-		gap: 48px;
-		padding-bottom: 26px;
-		margin-bottom: 32px;
-		border-bottom: 1px solid var(--border);
+		gap: 24px 48px;
+		flex-wrap: wrap;
+		margin-bottom: 40px;
 	}
 
-	.tour-head-text {
-		max-width: 620px;
+	.head .lp-h2 {
+		max-width: 16ch;
 	}
 
-	.tour-tabs {
+	.tabs {
 		display: flex;
 		gap: 4px;
-		flex-shrink: 0;
 		max-width: 100%;
-		padding: 4px;
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		background: var(--surface);
 		overflow-x: auto;
 		scrollbar-width: none;
 	}
 
-	.tour-tabs::-webkit-scrollbar {
+	.tabs::-webkit-scrollbar {
 		display: none;
 	}
 
-	.tour-tab {
+	.tab {
 		flex-shrink: 0;
-		padding: 9px 18px;
-		border: none;
-		border-radius: 7px;
+		min-height: 44px;
+		padding: 0 16px;
+		border: 1px solid var(--lp-rule);
+		border-radius: 999px;
 		background: transparent;
-		color: var(--text-muted);
-		font-family: var(--font-body);
-		font-size: 13.5px;
+		color: var(--lp-ink);
+		font-family: var(--lp-font);
+		font-size: 15px;
 		font-weight: 500;
 		cursor: pointer;
-		transition:
-			background 0.2s,
-			color 0.2s;
+		transition: border-color 0.15s ease;
 	}
 
-	.tour-tab:hover {
-		color: var(--text);
-		background: rgba(255, 255, 255, 0.04);
+	.tab:hover {
+		border-color: var(--lp-ink);
 	}
 
-	.tour-tab.active {
-		background: rgba(212, 145, 42, 0.12);
-		color: var(--amber-light);
+	.tab[aria-selected='true'] {
+		border-color: var(--lp-ink);
+		background: var(--lp-ink);
+		color: var(--lp-paper);
 	}
 
-	.tour-panel:focus {
+	.panel:focus {
 		outline: none;
 	}
 
-	/* El pie deja de ser una pila centrada: descripción a la izquierda,
-	   capacidades alineadas a la derecha. */
-	.tour-caption {
+	.caption {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) 380px;
-		gap: 56px;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
+		gap: 24px 64px;
 		align-items: start;
-		margin-top: 30px;
+		margin-top: 36px;
 	}
 
-	.tour-caption h3 {
-		font-family: var(--font-display);
-		font-weight: 500;
-		font-size: 21px;
-		letter-spacing: -0.01em;
+	.caption h3 {
+		margin: 0;
+		font-size: 24px;
+		font-stretch: 110%;
+		font-weight: 620;
+		letter-spacing: -0.015em;
+		line-height: 1.15;
 	}
 
-	.tour-caption p {
-		margin-top: 10px;
-		max-width: 62ch;
-		font-size: 14.5px;
-		font-weight: 300;
-		line-height: 1.65;
-		color: var(--text-muted);
+	.caption p {
+		margin: 12px 0 0;
+		max-width: 60ch;
+		color: var(--lp-ink-2);
 		text-wrap: pretty;
 	}
 
-	.tour-points {
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: flex-end;
-		gap: 8px;
+	.points {
 		margin: 0;
-		list-style: none;
 		padding: 0;
+		list-style: none;
+		border-top: 1px solid var(--lp-rule);
 	}
 
-	.tour-points li {
-		padding: 5px 12px;
-		border: 1px solid var(--border);
-		border-radius: 999px;
-		background: var(--surface);
-		font-family: var(--font-mono);
-		font-size: 11px;
-		letter-spacing: 0.02em;
-		color: var(--text-muted);
+	.points li {
+		padding: 10px 0;
+		border-bottom: 1px solid var(--lp-rule);
+		font-size: 15px;
 	}
 
-	@media (max-width: 1040px) {
-		.tour-head {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 26px;
-		}
-		.tour-tabs {
-			width: 100%;
-		}
-		.tour-caption {
+	@media (max-width: 900px) {
+		.caption {
 			grid-template-columns: minmax(0, 1fr);
-			gap: 22px;
-		}
-		.tour-points {
-			justify-content: flex-start;
 		}
 	}
 
 	@media (max-width: 640px) {
-		.tour-tab {
-			padding: 9px 14px;
-			font-size: 13px;
+		.head {
+			margin-bottom: 28px;
+		}
+		/* Cuatro pestañas no caben en una fila: pasan a dos en vez de esconder la
+		   última tras un desplazamiento que no se ve. */
+		.tabs {
+			flex-wrap: wrap;
 		}
 	}
 </style>

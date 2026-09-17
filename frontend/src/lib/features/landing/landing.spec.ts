@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-	countdownBetween,
-	chartPoints,
-	chartY,
-	METRICS_MARKET_VALUE,
-	METRICS_INVESTED
-} from './landing';
+import { countdownBetween, daysUntil, launchCountdownText } from './landing';
 
 const at = (iso: string) => new Date(iso).getTime();
 
@@ -38,50 +32,23 @@ describe('countdownBetween', () => {
 	});
 });
 
-describe('chartY', () => {
-	const scale = { min: 100, max: 200 };
-	const box = { left: 0, right: 100, top: 0, bottom: 200 };
-
-	it('lleva el mínimo al borde inferior y el máximo al superior', () => {
-		expect(chartY(100, scale, box)).toBe(200);
-		expect(chartY(200, scale, box)).toBe(0);
+describe('daysUntil', () => {
+	it('cuenta solo los días completos', () => {
+		expect(daysUntil(at('2026-10-01T09:00:00Z'), at('2026-09-16T20:50:00Z'))).toBe(14);
 	});
 
-	it('interpola los valores intermedios', () => {
-		expect(chartY(150, scale, box)).toBe(100);
-	});
-
-	it('no divide por cero cuando la escala es plana', () => {
-		expect(chartY(150, { min: 150, max: 150 }, box)).toBe(200);
+	it('no baja de cero pasada la fecha', () => {
+		expect(daysUntil(at('2026-10-01T09:00:00Z'), at('2026-10-02T09:00:00Z'))).toBe(0);
 	});
 });
 
-describe('chartPoints', () => {
-	const scale = { min: 0, max: 10 };
-	const box = { left: 10, right: 110, top: 0, bottom: 100 };
-
-	it('reparte los valores a lo ancho del área de trazado', () => {
-		expect(chartPoints([0, 5, 10], scale, box)).toBe('10,100 60,50 110,0');
+describe('launchCountdownText', () => {
+	it('usa el plural y el singular', () => {
+		expect(launchCountdownText(14)).toBe('Abrimos el 1 de octubre. Faltan 14 días.');
+		expect(launchCountdownText(1)).toBe('Abrimos el 1 de octubre. Falta 1 día.');
 	});
 
-	it('deja un único valor en el borde izquierdo, sin dividir por cero', () => {
-		expect(chartPoints([5], scale, box)).toBe('10,50');
-	});
-});
-
-describe('series de la sección de métricas', () => {
-	it('el valor de mercado nunca cae por debajo del capital invertido', () => {
-		METRICS_MARKET_VALUE.forEach((value, i) => {
-			expect(value).toBeGreaterThan(METRICS_INVESTED[i]);
-		});
-	});
-
-	it('cierra en los $248.500 y $221.100 que anuncia la landing', () => {
-		const value = METRICS_MARKET_VALUE.at(-1)!;
-		const invested = METRICS_INVESTED.at(-1)!;
-		expect(value).toBe(248.5);
-		expect(invested).toBe(221.1);
-		// Los $27.400 de ganancia son el 12,4% del capital invertido.
-		expect(((value - invested) / invested) * 100).toBeCloseTo(12.4, 1);
+	it('deja solo la fecha cuando ya no falta nada', () => {
+		expect(launchCountdownText(0)).toBe('Abrimos el 1 de octubre.');
 	});
 });

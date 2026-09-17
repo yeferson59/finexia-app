@@ -1,9 +1,9 @@
 <script lang="ts">
 	/*
-	 * Antes era una sola fila flex con la marca, seis enlaces de sección, tres
-	 * legales y el copyright: al partirse quedaban en cualquier orden y sin
-	 * jerarquía. En columnas cada bloque se lee por lo que es, y "Iniciar
-	 * sesión" tiene un sitio fijo también al final de la página.
+	 * El pie, en columnas: cada bloque se lee por lo que es, e "Iniciar sesión"
+	 * tiene un sitio fijo también al final de la página. Va en el verde del
+	 * cierre, que en la portada queda justo encima; en las páginas legales es el
+	 * único bloque verde, y cierra igual.
 	 */
 	import { resolve } from '$app/paths';
 	import Brand from './brand.svelte';
@@ -12,135 +12,99 @@
 	const home = resolve('/');
 </script>
 
-<footer>
-	<div class="wrap">
-		<div class="foot-cols">
-			<div class="foot-brand">
-				<Brand iconSize={26} nameSize={18} />
+<footer class="lp-forest">
+	<div class="lp-wrap">
+		<div class="cols">
+			<div class="brand-col">
+				<Brand iconSize={26} nameSize={20} />
 				<p>Tu patrimonio en un solo mapa. Registro manual, sin conectar cuentas.</p>
 			</div>
 
-			<nav class="foot-col" aria-label="Producto">
-				<div class="foot-label">Producto</div>
+			<nav class="col" aria-label="Producto">
+				<h2>Producto</h2>
 				<a href="{home}#producto">El producto</a>
-				<a href="{home}#beneficios">Beneficios</a>
 				<a href="{home}#como-funciona">Cómo funciona</a>
 				<a href="{home}#seguridad">Seguridad</a>
+				<a href="{home}#faq">Preguntas</a>
 			</nav>
 
-			<nav class="foot-col" aria-label="Legal">
-				<div class="foot-label">Legal</div>
-				<a href={resolve('/privacidad')}>Política de Privacidad</a>
-				<a href={resolve('/terminos')}>Términos y Condiciones</a>
+			<nav class="col" aria-label="Legal">
+				<h2>Legal</h2>
+				<a href={resolve('/privacidad')}>Política de privacidad</a>
+				<a href={resolve('/terminos')}>Términos y condiciones</a>
 				<a href={resolve('/cookies')}>Cookies</a>
 			</nav>
 
-			<nav class="foot-col" aria-label="Cuenta">
-				<div class="foot-label">Cuenta</div>
+			<nav class="col" aria-label="Cuenta">
+				<h2>Cuenta</h2>
 				<a href={resolve('/auth')}>Iniciar sesión</a>
-				<a href="{home}#waitlist">Lista de espera</a>
-				<a href="{home}#faq">Preguntas</a>
+				<a href="{home}#waitlist">Unirme a la lista</a>
 			</nav>
 		</div>
 
-		<div class="foot-bottom">
-			<div class="foot-copy">© {currentYear} Finexia. Todos los derechos reservados.</div>
-			<div class="foot-launch">Lanzamiento · 1 oct 2026</div>
-		</div>
+		<p class="copy">© {currentYear} Finexia. Todos los derechos reservados.</p>
 	</div>
 </footer>
 
 <style>
 	footer {
-		border-top: 1px solid var(--border);
-		margin-top: 40px;
 		padding-top: 56px;
 	}
 
-	.foot-cols {
+	.cols {
 		display: grid;
-		grid-template-columns: 1.6fr 1fr 1fr 1fr;
-		gap: 48px;
-		align-items: start;
+		grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr));
+		gap: 40px;
+		padding-top: 40px;
+		border-top: 1px solid var(--lp-forest-rule);
 	}
 
-	.foot-brand p {
-		margin-top: 16px;
+	.brand-col p {
 		max-width: 34ch;
-		font-size: 13.5px;
-		font-weight: 300;
-		line-height: 1.65;
-		color: var(--text-dim);
-		text-wrap: pretty;
+		margin: 16px 0 0;
+		font-size: var(--lp-fs-sm);
+		color: var(--lp-forest-ink-2);
 	}
 
-	.foot-col {
+	.col {
 		display: flex;
 		flex-direction: column;
-		gap: 12px;
+		align-items: flex-start;
+		gap: 10px;
 	}
 
-	.foot-label {
-		padding-bottom: 2px;
-		font-family: var(--font-mono);
-		font-size: 9.5px;
-		font-weight: 500;
-		letter-spacing: 0.18em;
-		text-transform: uppercase;
-		color: var(--text-dim);
+	.col h2 {
+		margin: 0 0 4px;
+		font-size: var(--lp-fs-sm);
+		font-weight: 600;
+		color: var(--lp-forest-ink);
 	}
 
-	.foot-col a {
-		font-size: 13.5px;
-		color: var(--text-muted);
-		transition: color 0.2s;
+	.col a {
+		font-size: var(--lp-fs-sm);
+		color: var(--lp-forest-ink-2);
 	}
 
-	.foot-col a:hover {
-		color: var(--text);
+	.col a:hover {
+		color: var(--lp-forest-ink);
+		text-decoration: underline;
+		text-underline-offset: 3px;
 	}
 
-	.foot-bottom {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 24px;
-		margin-top: 48px;
-		padding: 22px 0 40px;
-		border-top: 1px solid var(--border);
-	}
-
-	.foot-copy {
+	.copy {
+		margin: 56px 0 0;
+		padding-block: 20px 32px;
+		border-top: 1px solid var(--lp-forest-rule);
 		font-size: 13px;
-		color: var(--text-dim);
-	}
-
-	.foot-launch {
-		font-family: var(--font-mono);
-		font-size: 10.5px;
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
-		color: var(--text-dim);
+		color: var(--lp-forest-ink-2);
 	}
 
 	@media (max-width: 860px) {
-		.foot-cols {
+		.cols {
 			grid-template-columns: repeat(2, minmax(0, 1fr));
-			gap: 40px 32px;
 		}
-		.foot-brand {
+		.brand-col {
 			grid-column: 1 / -1;
-		}
-	}
-
-	@media (max-width: 480px) {
-		footer {
-			padding-top: 44px;
-		}
-		.foot-bottom {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 12px;
 		}
 	}
 </style>

@@ -1,10 +1,9 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import Brand from './brand.svelte';
 
-	let headerEl: HTMLElement;
 	let menuOpen = $state(false);
+	let scrolled = $state(false);
 
 	const login = resolve('/auth');
 
@@ -12,52 +11,40 @@
 	// así `svelte/no-navigation-without-resolve` reconoce el enlace de fragmento.
 	const links = [
 		{ id: 'producto', label: 'El producto' },
-		{ id: 'beneficios', label: 'Beneficios' },
 		{ id: 'como-funciona', label: 'Cómo funciona' },
 		{ id: 'seguridad', label: 'Seguridad' },
 		{ id: 'faq', label: 'Preguntas' }
 	];
-
-	onMount(() => {
-		let ticking = false;
-		const onScroll = () => {
-			if (!ticking) {
-				ticking = true;
-				requestAnimationFrame(() => {
-					headerEl.classList.toggle('scrolled', window.scrollY > 10);
-					ticking = false;
-				});
-			}
-		};
-		window.addEventListener('scroll', onScroll, { passive: true });
-		return () =>
-			window.removeEventListener('scroll', onScroll, { passive: true } as EventListenerOptions);
-	});
 </script>
 
 <svelte:window
+	onscroll={() => (scrolled = window.scrollY > 8)}
 	onkeydown={(event) => {
 		if (event.key === 'Escape') menuOpen = false;
 	}}
 />
 
-<header bind:this={headerEl}>
-	<div class="wrap nav">
-		<a href="#contenido" class="skip">Saltar al contenido</a>
-		<Brand />
-		<nav class="nav-links" aria-label="Secciones de la página">
+<header class:scrolled>
+	<a href="#contenido" class="skip">Saltar al contenido</a>
+	<div class="lp-wrap bar">
+		<a href={resolve('/')} class="home" aria-label="Finexia, inicio">
+			<Brand />
+		</a>
+
+		<nav class="links" aria-label="Secciones de la página">
 			{#each links as link (link.id)}
 				<a href="#{link.id}">{link.label}</a>
 			{/each}
 		</nav>
-		<div class="nav-right">
+
+		<div class="actions">
 			<!--
-				Dos acciones con pesos distintos: entrar es un botón fantasma porque
-				solo lo usa quien ya tiene cuenta; la lista de espera, que es a lo que
-				viene la mayoría, se lleva el botón con borde.
+				Dos acciones con pesos distintos: entrar es un enlace porque solo lo
+				usa quien ya tiene cuenta; la lista de espera, que es a lo que viene la
+				mayoría, se lleva el borde.
 			-->
-			<a href={login} class="nav-login">Iniciar sesión</a>
-			<a href="#waitlist" class="nav-cta">Unirme a la lista</a>
+			<a href={login} class="login">Iniciar sesión</a>
+			<a href="#waitlist" class="join">Unirme a la lista</a>
 			<button
 				class="burger"
 				type="button"
@@ -66,237 +53,222 @@
 				aria-controls="landing-menu"
 				onclick={() => (menuOpen = !menuOpen)}
 			>
-				<span class="bar" class:x={menuOpen}></span>
-				<span class="bar mid" class:hide={menuOpen}></span>
-				<span class="bar" class:y={menuOpen}></span>
+				<span class="line" class:x={menuOpen}></span>
+				<span class="line" class:y={menuOpen}></span>
 			</button>
 		</div>
 	</div>
 
 	<nav id="landing-menu" class="menu" class:open={menuOpen} aria-label="Menú de navegación">
-		{#each links as link (link.id)}
-			<a href="#{link.id}" onclick={() => (menuOpen = false)} tabindex={menuOpen ? 0 : -1}>
-				{link.label}
+		<div class="lp-wrap menu-inner">
+			{#each links as link (link.id)}
+				<a href="#{link.id}" onclick={() => (menuOpen = false)} tabindex={menuOpen ? 0 : -1}>
+					{link.label}
+				</a>
+			{/each}
+			<!-- En móvil la barra solo guarda «Iniciar sesión»: la lista de espera
+			     baja aquí para que siga estando a un toque. -->
+			<a
+				href="#waitlist"
+				class="menu-join"
+				onclick={() => (menuOpen = false)}
+				tabindex={menuOpen ? 0 : -1}
+			>
+				Unirme a la lista
 			</a>
-		{/each}
-		<!-- En móvil el botón con borde de la barra es "Iniciar sesión", así que la
-		     lista de espera baja aquí para que siga estando a un toque. -->
-		<a
-			href="#waitlist"
-			class="menu-cta"
-			onclick={() => (menuOpen = false)}
-			tabindex={menuOpen ? 0 : -1}
-		>
-			Unirme a la lista
-		</a>
+		</div>
 	</nav>
 </header>
 
 <style>
-	header:global(.scrolled) {
-		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
-	}
 	header {
 		position: sticky;
 		top: 0;
 		z-index: 50;
-		backdrop-filter: blur(16px);
-		-webkit-backdrop-filter: blur(16px);
-		background: rgba(8, 9, 10, 0.82);
-		border-bottom: 1px solid var(--border);
-	}
-	.nav {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 16px;
-		height: 66px;
+		background: var(--lp-paper);
+		border-bottom: 1px solid transparent;
+		transition: border-color 0.2s ease;
 	}
 
-	/* Visible solo cuando recibe foco con el tabulador. */
+	header.scrolled {
+		border-bottom-color: var(--lp-rule);
+	}
+
 	.skip {
 		position: absolute;
 		left: -9999px;
 		top: 12px;
+		z-index: 60;
 		padding: 10px 16px;
 		border-radius: 6px;
-		background: var(--amber);
-		color: #0d0800;
-		font-size: 13.5px;
+		background: var(--lp-ink);
+		color: var(--lp-paper);
+		font-size: var(--lp-fs-sm);
 		font-weight: 600;
-		z-index: 60;
 	}
+
 	.skip:focus {
-		left: 24px;
+		left: 16px;
 	}
 
-	.nav-links {
+	.bar {
 		display: flex;
 		align-items: center;
+		gap: 40px;
+		height: 72px;
+	}
+
+	.home {
+		display: inline-flex;
+		color: var(--lp-ink);
+	}
+
+	.links {
+		display: flex;
 		gap: 28px;
-	}
-	.nav-links a {
-		font-size: 14px;
-		color: var(--text-muted);
-		font-weight: 400;
-		white-space: nowrap;
-		transition: color 0.2s;
-	}
-	.nav-links a:hover {
-		color: var(--text);
+		margin-right: auto;
 	}
 
-	.nav-right {
+	.links a,
+	.login {
+		font-size: 15px;
+		color: var(--lp-ink-2);
+		white-space: nowrap;
+		transition: color 0.15s ease;
+	}
+
+	.links a:hover,
+	.login:hover {
+		color: var(--lp-ink);
+	}
+
+	.actions {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 20px;
 	}
 
-	.nav-login {
+	.join {
 		display: inline-flex;
 		align-items: center;
-		padding: 9px 14px;
+		min-height: 40px;
+		padding: 0 16px;
+		border: 1px solid var(--lp-ink);
 		border-radius: 6px;
-		border: 1px solid transparent;
-		font-size: 13.5px;
-		font-weight: 500;
-		color: var(--text-muted);
+		font-size: 15px;
+		font-weight: 600;
+		color: var(--lp-ink);
 		white-space: nowrap;
 		transition:
-			color 0.2s,
-			background 0.2s;
-	}
-	.nav-login:hover {
-		color: var(--text);
-		background: var(--surface-2);
+			background 0.15s ease,
+			color 0.15s ease;
 	}
 
-	.nav-cta {
-		display: inline-flex;
-		align-items: center;
-		padding: 9px 18px;
-		border-radius: 6px;
-		border: 1px solid var(--border-strong);
-		font-size: 13.5px;
-		font-weight: 500;
-		color: var(--text);
-		white-space: nowrap;
-		transition:
-			border-color 0.2s,
-			background 0.2s;
-	}
-	.nav-cta:hover {
-		border-color: var(--amber);
-		background: rgba(212, 145, 42, 0.06);
+	.join:hover {
+		background: var(--lp-ink);
+		color: var(--lp-paper);
 	}
 
 	.burger {
 		display: none;
 		flex-direction: column;
 		justify-content: center;
-		gap: 4px;
-		/* 44×44: objetivo táctil mínimo recomendado. */
+		gap: 6px;
 		width: 44px;
 		height: 44px;
 		padding: 0;
-		border: 1px solid var(--border-strong);
-		border-radius: 6px;
+		border: none;
 		background: transparent;
 		cursor: pointer;
 	}
-	.bar {
+
+	.line {
 		display: block;
-		width: 15px;
-		height: 1.5px;
+		width: 22px;
+		height: 2px;
 		margin: 0 auto;
-		border-radius: 1px;
-		background: var(--text);
-		transition:
-			transform 0.22s ease,
-			opacity 0.18s ease;
+		background: var(--lp-ink);
+		transition: transform 0.22s ease;
 	}
-	.bar.x {
-		transform: translateY(5.5px) rotate(45deg);
+
+	.line.x {
+		transform: translateY(4px) rotate(45deg);
 	}
-	.bar.y {
-		transform: translateY(-5.5px) rotate(-45deg);
-	}
-	.bar.hide {
-		opacity: 0;
+
+	.line.y {
+		transform: translateY(-4px) rotate(-45deg);
 	}
 
 	.menu {
 		display: none;
-		flex-direction: column;
-		border-top: 1px solid var(--border);
 		overflow: hidden;
 		max-height: 0;
 		transition: max-height 0.28s ease;
 	}
+
 	.menu.open {
 		max-height: 420px;
+		border-bottom: 1px solid var(--lp-rule);
 	}
+
+	.menu-inner {
+		display: flex;
+		flex-direction: column;
+		padding-bottom: 12px;
+	}
+
 	.menu a {
-		padding: 14px 24px;
-		border-bottom: 1px solid var(--border);
-		font-size: 15px;
-		color: var(--text-muted);
-	}
-	.menu a:last-child {
-		border-bottom: none;
-	}
-	.menu a:hover {
-		color: var(--text);
-		background: var(--surface);
-	}
-	.menu .menu-cta {
-		color: var(--amber-light);
-		font-weight: 500;
+		padding: 14px 0;
+		border-top: 1px solid var(--lp-rule);
+		font-size: var(--lp-fs-lead);
+		font-stretch: 108%;
+		font-weight: 560;
+		color: var(--lp-ink);
 	}
 
-	@media (max-width: 1000px) {
-		.nav-links {
-			gap: 20px;
-		}
-		.nav-links a {
-			font-size: 13.5px;
-		}
+	.menu .menu-join {
+		text-decoration: underline;
+		text-underline-offset: 4px;
 	}
 
-	@media (max-width: 900px) {
-		.nav-links {
+	@media (max-width: 960px) {
+		.links {
 			display: none;
+		}
+		.actions {
+			margin-left: auto;
+			gap: 8px;
+		}
+		.join {
+			display: none;
+		}
+		.login {
+			display: inline-flex;
+			align-items: center;
+			min-height: 40px;
+			padding: 0 14px;
+			border: 1px solid var(--lp-ink);
+			border-radius: 6px;
+			font-weight: 600;
+			color: var(--lp-ink);
 		}
 		.burger {
 			display: flex;
 		}
 		.menu {
-			display: flex;
-		}
-		/* Con el hero justo debajo, el formulario de la lista ya está a la vista:
-		   la barra reserva su único botón para lo que no se ve en ningún otro
-		   sitio, entrar a la cuenta. */
-		.nav-cta {
-			display: none;
-		}
-		.nav-login {
-			border-color: var(--border-strong);
-			color: var(--text);
+			display: block;
 		}
 	}
 
-	@media (max-width: 480px) {
-		.nav {
-			height: 58px;
-		}
-		.nav-login {
-			padding: 9px 13px;
-			font-size: 13px;
+	@media (max-width: 640px) {
+		.bar {
+			height: 60px;
 		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.bar,
+		header,
+		.line,
 		.menu {
 			transition: none;
 		}

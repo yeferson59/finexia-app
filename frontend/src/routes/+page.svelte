@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import {
 		SITE_URL,
 		SITE_NAME,
@@ -11,14 +10,11 @@
 	} from '$lib/seo';
 	import '$lib/features/landing/landing.css';
 	import {
-		Ticker,
 		Header,
 		Hero,
 		ProductTour,
-		Benefits,
 		HowItWorks,
 		Trust,
-		Metrics,
 		Faq,
 		FinalCta,
 		Footer
@@ -60,26 +56,6 @@
 			a: 'Es algo que estamos contemplando para más adelante. Por ahora todo el registro es manual para que tú mantengas el control, pero tenemos en mente ofrecer en el futuro una zona centralizada y automatizada que conecte con plataformas. Lo evaluaremos próximamente según las condiciones técnicas y de seguridad que permitan hacerlo bien.'
 		}
 	];
-
-	onMount(() => {
-		const revealIo = new IntersectionObserver(
-			(entries) => {
-				entries.forEach((entry) => {
-					if (entry.isIntersecting) {
-						entry.target.classList.add('in');
-						revealIo.unobserve(entry.target);
-					}
-				});
-			},
-			{ threshold: 0.12 }
-		);
-		document.querySelectorAll('.reveal').forEach((el, i) => {
-			(el as HTMLElement).style.transitionDelay = Math.min(i * 60, 240) + 'ms';
-			revealIo.observe(el);
-		});
-
-		return () => revealIo.disconnect();
-	});
 
 	// Structured data — single @graph keeps Organization, WebSite and FAQPage
 	// in one script and lets Google relate them via @id references.
@@ -142,34 +118,17 @@
 	{@html `<script type="application/ld+json">${jsonLd}</scr` + 'ipt>'}
 </svelte:head>
 
-<Ticker />
-<Header />
+<div class="lp">
+	<Header />
 
-<!--
-	Las secciones ya no van separadas por un divisor suelto: las que llevan
-	`.band` se pintan sobre un fondo levemente elevado con filete arriba y abajo,
-	y se alternan con las que van sobre el fondo base. El corte lo marca el
-	cambio de fondo, y de paso la página deja de respirar igual siete veces.
--->
-<main id="contenido">
-	<Hero />
-	<ProductTour />
-	<Benefits />
-	<HowItWorks />
-	<Trust />
-	<Metrics />
-	<Faq {faqs} />
-	<FinalCta />
-</main>
+	<main id="contenido">
+		<Hero />
+		<ProductTour />
+		<HowItWorks />
+		<Trust />
+		<Faq {faqs} />
+		<FinalCta />
+	</main>
 
-<Footer />
-
-<style>
-	:global(html) {
-		scroll-behavior: smooth;
-	}
-	:global(body) {
-		line-height: 1.55;
-		overflow-x: hidden;
-	}
-</style>
+	<Footer />
+</div>

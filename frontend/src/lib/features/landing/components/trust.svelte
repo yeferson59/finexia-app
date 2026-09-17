@@ -1,167 +1,118 @@
 <script lang="ts">
 	/*
-	 * Garantías de seguridad. Cada una corresponde a algo que la aplicación hace
-	 * hoy —2FA, cierre de sesiones, modo oculto, exportación en XLSX—, no a una
-	 * promesa a futuro: la landing no debe prometer lo que el dashboard no tiene.
+	 * Seguridad. Cada garantía corresponde a algo que la aplicación hace hoy
+	 * —2FA, cierre de sesiones, ocultar importes, exportación en XLSX—, no a una
+	 * promesa a futuro: la portada no debe prometer lo que el panel no tiene.
 	 *
-	 * La cabecera va a dos columnas (titular y argumento sobre un filete), la
-	 * tercera forma distinta de abrir sección de la página.
+	 * La primera, no pedir credenciales, es la que sostiene a las demás, así que
+	 * deja de ser una tarjeta más de seis y pasa a ser el titular de la sección.
 	 */
 	const guarantees = [
 		{
-			icon: 'lock',
-			title: 'Nunca pedimos credenciales',
-			body: 'Finexia no se conecta a tu broker, exchange ni banco. No hay contraseñas de terceros que guardar, así que no hay nada que se nos pueda escapar.'
-		},
-		{
-			icon: 'shield',
 			title: 'Verificación en dos pasos',
 			body: 'Activa el segundo factor con tu app de autenticación y guarda los códigos de recuperación por si pierdes el teléfono.'
 		},
 		{
-			icon: 'devices',
 			title: 'Tus sesiones, bajo control',
-			body: 'Consulta desde qué dispositivos hay sesión abierta y ciérralas una a una o todas de golpe cuando quieras.'
+			body: 'Consulta desde qué dispositivos hay una sesión abierta y ciérralas una a una o todas a la vez.'
 		},
 		{
-			icon: 'eye',
-			/* El nombre que lleva el botón del panel. «Modo oculto» es como se llama
-			   por dentro, y nadie lo lee en ninguna pantalla. */
+			/* El nombre que lleva el botón del panel. */
 			title: 'Ocultar los importes',
-			body: 'Un clic y todos los importes quedan enmascarados. Puedes abrir tu panel en un café o en una reunión sin enseñar tus cifras.'
+			body: 'Un clic y todas las cifras quedan tapadas. Puedes abrir el panel en un café o en una reunión sin enseñarlas.'
 		},
 		{
-			icon: 'download',
 			title: 'Tus datos salen contigo',
-			body: 'Descarga tu resumen, tus movimientos y tu informe de riesgo en XLSX cuando te apetezca. Sin trámites ni permisos.'
+			body: 'Descarga tu resumen, tus movimientos y tu informe de riesgo en XLSX cuando quieras, sin pedir permiso.'
 		},
 		{
-			icon: 'pencil',
 			title: 'Tú eres la única fuente',
 			body: 'Todo lo que aparece en el panel lo has escrito tú. Nada se añade, se estima ni se comparte por detrás.'
 		}
 	];
 </script>
 
-<section class="wrap block" id="seguridad">
-	<div class="sec-split reveal">
-		<div>
-			<div class="eyebrow">Seguridad y control</div>
-			<h2 class="sec-title">Menos accesos,<br />menos superficie de riesgo</h2>
+<section class="lp-section lp-forest" id="seguridad" aria-labelledby="seguridad-title">
+	<div class="lp-wrap grid">
+		<div class="head">
+			<h2 class="lp-h2" id="seguridad-title">No te pedimos la contraseña de ninguna cuenta.</h2>
+			<p class="lp-lead">
+				Finexia no se conecta a tu broker, exchange ni banco. No guardamos claves de terceros, así
+				que no hay ninguna que se pueda filtrar. Sobre eso está construido lo demás.
+			</p>
 		</div>
-		<p class="sec-desc">
-			La forma más segura de tratar las llaves de tus cuentas es no pedirlas nunca. Sobre esa base
-			está construido el resto.
-		</p>
-	</div>
 
-	<div class="trust-grid">
-		{#each guarantees as item (item.title)}
-			<div class="titem reveal">
-				<span class="ticon" aria-hidden="true">
-					<svg
-						width="17"
-						height="17"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="1.7"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						{#if item.icon === 'lock'}
-							<rect x="3" y="11" width="18" height="11" rx="2" />
-							<path d="M7 11V7a5 5 0 0 1 10 0v4" />
-						{:else if item.icon === 'shield'}
-							<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-							<path d="m9 12 2 2 4-4" />
-						{:else if item.icon === 'devices'}
-							<rect x="2" y="4" width="14" height="10" rx="2" />
-							<path d="M6 18h6" />
-							<rect x="18" y="10" width="4" height="10" rx="1" />
-						{:else if item.icon === 'eye'}
-							<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" />
-							<circle cx="12" cy="12" r="3" />
-							<path d="m3 3 18 18" />
-						{:else if item.icon === 'download'}
-							<path d="M12 3v12" />
-							<path d="m7 11 5 5 5-5" />
-							<path d="M4 19h16" />
-						{:else}
-							<path d="M12 20h9" />
-							<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
-						{/if}
-					</svg>
-				</span>
-				<h3>{item.title}</h3>
-				<p>{item.body}</p>
-			</div>
-		{/each}
+		<dl class="list">
+			{#each guarantees as item (item.title)}
+				<div class="item">
+					<dt>{item.title}</dt>
+					<dd>{item.body}</dd>
+				</div>
+			{/each}
+		</dl>
 	</div>
 </section>
 
 <style>
-	.trust-grid {
+	.grid {
 		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-		gap: 1px;
-		background: var(--border);
-		border: 1px solid var(--border);
-		border-radius: 12px;
-		overflow: hidden;
+		grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+		gap: 48px 96px;
+		align-items: start;
 	}
 
-	.titem {
-		padding: 30px 26px;
-		background: var(--bg);
-		transition: background 0.2s;
+	.head {
+		position: sticky;
+		top: 112px;
 	}
 
-	.titem:hover {
-		background: rgba(255, 255, 255, 0.022);
+	.head .lp-h2 {
+		font-size: clamp(34px, 4.6vw, 60px);
 	}
 
-	.ticon {
+	.head .lp-lead {
+		margin-top: 28px;
+	}
+
+	.list {
+		margin: 0;
+		border-top: 1px solid var(--lp-forest-rule);
+	}
+
+	.item {
 		display: grid;
-		place-items: center;
-		width: 34px;
-		height: 34px;
-		border-radius: 9px;
-		border: 1px solid rgba(212, 145, 42, 0.22);
-		background: rgba(212, 145, 42, 0.08);
-		color: var(--amber-light);
-		margin-bottom: 18px;
+		grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+		gap: 8px 32px;
+		padding: 24px 0;
+		border-bottom: 1px solid var(--lp-forest-rule);
 	}
 
-	.titem h3 {
-		font-family: var(--font-display);
-		font-weight: 500;
-		font-size: 17px;
-		letter-spacing: -0.01em;
-		margin-bottom: 9px;
+	dt {
+		font-size: var(--lp-fs-lead);
+		font-stretch: 108%;
+		font-weight: 600;
+		line-height: 1.3;
 	}
 
-	.titem p {
-		font-size: 13.5px;
-		color: var(--text-muted);
-		line-height: 1.65;
-		font-weight: 300;
+	dd {
+		margin: 0;
+		color: var(--lp-forest-ink-2);
 		text-wrap: pretty;
 	}
 
-	@media (max-width: 900px) {
-		.trust-grid {
-			grid-template-columns: repeat(2, minmax(0, 1fr));
+	@media (max-width: 1000px) {
+		.grid {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.head {
+			position: static;
 		}
 	}
 
-	@media (max-width: 600px) {
-		.trust-grid {
+	@media (max-width: 640px) {
+		.item {
 			grid-template-columns: minmax(0, 1fr);
-		}
-
-		.titem {
-			padding: 24px 20px;
+			padding: 20px 0;
 		}
 	}
 </style>

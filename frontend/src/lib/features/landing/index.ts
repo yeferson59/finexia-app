@@ -5,16 +5,14 @@
  * legal (`routes/(legal)/+layout.svelte`, que reutiliza `Brand` y `Footer`).
  *
  * La hoja de estilos compartida se importa por su ruta como side-effect:
- * `import '$lib/features/landing/landing.css'`.
+ * `import '$lib/features/landing/landing.css'`, y todo lo que declara cuelga de
+ * un contenedor con la clase `lp`.
  */
-export { default as Ticker } from './components/ticker.svelte';
 export { default as Header } from './components/header.svelte';
 export { default as Hero } from './components/hero.svelte';
 export { default as ProductTour } from './components/product-tour.svelte';
-export { default as Benefits } from './components/benefits.svelte';
 export { default as HowItWorks } from './components/how-it-works.svelte';
 export { default as Trust } from './components/trust.svelte';
-export { default as Metrics } from './components/metrics.svelte';
 export { default as Faq } from './components/faq.svelte';
 export { default as FinalCta } from './components/final-cta.svelte';
 export { default as Footer } from './components/footer.svelte';

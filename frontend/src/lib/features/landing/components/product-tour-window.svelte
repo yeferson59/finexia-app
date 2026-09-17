@@ -110,13 +110,20 @@
 </div>
 
 <style>
+	/*
+	 * La portada va en papel y el panel es oscuro: la ventana pone su propio
+	 * fondo, letra y color —los del panel— en vez de heredar los de la página,
+	 * para que la maqueta siga siendo la pantalla que retrata.
+	 */
 	.win {
-		border: 1px solid var(--border-strong);
-		border-radius: 14px;
+		border: 1px solid #1d2422;
+		border-radius: 12px;
 		overflow: hidden;
-		background: rgba(255, 255, 255, 0.02);
-		box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
-		backdrop-filter: blur(10px);
+		background: var(--bg);
+		color: var(--text);
+		font-family: var(--font-body);
+		line-height: 1.5;
+		box-shadow: 0 40px 70px -40px rgba(16, 35, 30, 0.55);
 	}
 
 	.win-bar {

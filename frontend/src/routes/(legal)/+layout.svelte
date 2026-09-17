@@ -6,45 +6,48 @@
 	let { children } = $props();
 </script>
 
-<header class="legal-header">
-	<div class="wrap nav">
-		<a href={resolve('/')} class="brand-link" aria-label="Volver al inicio">
-			<Brand />
-		</a>
-		<nav class="legal-nav">
-			<a href={resolve('/privacidad')}>Privacidad</a>
-			<a href={resolve('/terminos')}>Términos</a>
-			<a href={resolve('/cookies')}>Cookies</a>
-		</nav>
-	</div>
-</header>
+<div class="lp">
+	<header class="legal-header">
+		<div class="lp-wrap nav">
+			<a href={resolve('/')} class="brand-link" aria-label="Volver al inicio">
+				<Brand />
+			</a>
+			<nav class="legal-nav" aria-label="Páginas legales">
+				<a href={resolve('/privacidad')}>Privacidad</a>
+				<a href={resolve('/terminos')}>Términos</a>
+				<a href={resolve('/cookies')}>Cookies</a>
+			</nav>
+		</div>
+	</header>
 
-<main class="legal-main">
-	<div class="wrap legal-prose">
-		{@render children()}
-	</div>
-</main>
+	<main class="legal-main">
+		<div class="lp-wrap">
+			<div class="legal-prose">
+				{@render children()}
+			</div>
+		</div>
+	</main>
 
-<Footer />
+	<Footer />
+</div>
 
 <style>
 	.legal-header {
 		position: sticky;
 		top: 0;
 		z-index: 50;
-		backdrop-filter: blur(16px);
-		-webkit-backdrop-filter: blur(16px);
-		background: rgba(8, 9, 10, 0.82);
-		border-bottom: 1px solid var(--border);
+		background: var(--lp-paper);
+		border-bottom: 1px solid var(--lp-rule);
 	}
 	.nav {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		height: 66px;
+		height: 72px;
 	}
 	.brand-link {
 		display: inline-flex;
+		color: var(--lp-ink);
 	}
 	.legal-nav {
 		display: flex;
@@ -52,63 +55,60 @@
 		gap: 28px;
 	}
 	.legal-nav a {
-		font-size: 14px;
-		color: var(--text-muted);
-		transition: color 0.2s;
+		font-size: 15px;
+		color: var(--lp-ink-2);
+		transition: color 0.15s;
 	}
 	.legal-nav a:hover {
-		color: var(--text);
+		color: var(--lp-ink);
 	}
 
 	.legal-main {
 		min-height: 60vh;
-		padding: 56px 0 40px;
+		padding: 64px 0 96px;
 	}
 	.legal-prose {
-		max-width: 760px;
+		max-width: 720px;
 	}
 
 	/* Prose styling scoped to legal content rendered via {@render children()}. */
 	.legal-prose :global(h1) {
-		font-family: var(--font-display);
-		font-weight: 400;
-		font-size: clamp(30px, 5vw, 46px);
-		line-height: 1.1;
-		letter-spacing: -0.02em;
-		margin-bottom: 10px;
+		font-size: clamp(36px, 5.4vw, 60px);
+		font-stretch: 116%;
+		font-weight: 620;
+		line-height: 1;
+		letter-spacing: -0.025em;
+		margin: 0 0 16px;
 	}
 	.legal-prose :global(.legal-updated) {
-		font-family: var(--font-mono);
-		font-size: 12px;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: var(--text-dim);
-		margin-bottom: 36px;
+		font-size: 14px;
+		color: var(--lp-ink-2);
+		margin: 0 0 36px;
 	}
 	.legal-prose :global(.legal-intro) {
-		font-size: 17px;
-		color: var(--text-muted);
-		font-weight: 300;
-		line-height: 1.7;
-		margin-bottom: 40px;
+		font-size: 18px;
+		color: var(--lp-ink);
+		line-height: 1.6;
+		margin: 0 0 40px;
 	}
 	.legal-prose :global(h2) {
-		font-family: var(--font-display);
-		font-weight: 500;
-		font-size: clamp(20px, 3vw, 26px);
+		font-size: 24px;
+		font-stretch: 110%;
+		font-weight: 620;
 		letter-spacing: -0.01em;
-		margin: 40px 0 14px;
+		line-height: 1.2;
+		margin: 48px 0 14px;
 	}
 	.legal-prose :global(h3) {
 		font-weight: 600;
-		font-size: 16px;
-		margin: 24px 0 8px;
-		color: var(--text);
+		font-size: 17px;
+		margin: 28px 0 8px;
+		color: var(--lp-ink);
 	}
 	.legal-prose :global(p) {
-		font-size: 15.5px;
-		line-height: 1.75;
-		color: var(--text-muted);
+		font-size: 16px;
+		line-height: 1.7;
+		color: var(--lp-ink-2);
 		margin: 0 0 16px;
 	}
 	.legal-prose :global(ul) {
@@ -117,29 +117,28 @@
 		list-style: disc;
 	}
 	.legal-prose :global(li) {
-		font-size: 15.5px;
+		font-size: 16px;
 		line-height: 1.7;
-		color: var(--text-muted);
+		color: var(--lp-ink-2);
 		margin-bottom: 8px;
 	}
 	.legal-prose :global(a) {
-		color: var(--amber-light);
+		color: var(--lp-ink);
 		text-decoration: underline;
-		text-underline-offset: 2px;
+		text-underline-offset: 3px;
 	}
 	.legal-prose :global(a:hover) {
-		color: var(--amber);
+		text-decoration-thickness: 2px;
 	}
 	.legal-prose :global(strong) {
-		color: var(--text);
+		color: var(--lp-ink);
 		font-weight: 600;
 	}
 	.legal-prose :global(.legal-contact) {
-		margin-top: 40px;
-		padding: 24px 26px;
-		border: 1px solid var(--border-strong);
+		margin-top: 48px;
+		padding: 24px 28px;
 		border-radius: 12px;
-		background: var(--surface);
+		background: var(--lp-paper-2);
 	}
 	.legal-prose :global(.legal-contact p) {
 		margin-bottom: 6px;
@@ -158,7 +157,7 @@
 			font-size: 13px;
 		}
 		.legal-main {
-			padding: 36px 0 28px;
+			padding: 40px 0 64px;
 		}
 	}
 </style>
