@@ -26,6 +26,7 @@ export const TOUR_NAV = [
 	{ label: 'Portafolios', icon: 'briefcase' },
 	{ label: 'Mis activos', icon: 'pie' },
 	{ label: 'Plataformas', icon: 'layers' },
+	{ label: 'Efectivo', icon: 'cash' },
 	{ label: 'Transacciones', icon: 'exchange' },
 	{ label: 'Reportes', icon: 'bars' },
 	{ label: 'Notificaciones', icon: 'bell' },

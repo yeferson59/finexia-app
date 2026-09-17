@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import Button from '$lib/ui/button.svelte';
-	import Input from '$lib/ui/input.svelte';
+	import PublicShell from '$lib/ui/public-shell.svelte';
+	import AuthField from './auth-field.svelte';
 
 	type VerifyData =
 		{ valid: false; reason: string } | { valid: true; token: string; reason?: string };
@@ -20,10 +20,7 @@
 	let submitting = $state(false);
 	let confirmForm: HTMLFormElement | undefined = $state();
 
-	function fieldError(field: string): string | undefined {
-		if (!form || !('errors' in form) || !form.errors) return undefined;
-		return (form.errors as Record<string, string>)[field];
-	}
+	const serverError = $derived(form?.errors?.server);
 
 	$effect(() => {
 		// The link requires no extra input from the user, so confirm it
@@ -34,165 +31,88 @@
 	});
 </script>
 
-<main class="wrap">
-	<div class="card">
-		<div class="brand">
-			<span class="brand-mark">◆</span>
-			<span class="brand-name">FINEXIA</span>
-		</div>
-
-		{#if data.valid}
-			<form
-				method="POST"
-				action="?/confirm"
-				bind:this={confirmForm}
-				use:enhance={() => {
-					submitting = true;
-					return async ({ update }) => {
-						submitting = false;
-						await update({ reset: false });
-					};
-				}}
-			>
-				<input type="hidden" name="token" value={data.token} />
-			</form>
-
-			{#if fieldError('server')}
-				<p class="eyebrow">Verificación de correo</p>
-				<h1 class="title">No se pudo verificar</h1>
-				<p class="subtitle">{fieldError('server')}</p>
-				<a class="back-link" href={authHref}>Volver a iniciar sesión</a>
-			{:else}
-				<p class="eyebrow">Verificación de correo</p>
-				<h1 class="title">Verificando tu correo…</h1>
-				<p class="subtitle">Un momento, estamos confirmando tu cuenta.</p>
-			{/if}
+<PublicShell>
+	{#snippet heading()}
+		{#if data.valid && serverError}
+			<h1 class="shell-title">No pudimos verificar tu correo</h1>
+		{:else if data.valid}
+			<h1 class="shell-title">Verificando tu correo</h1>
 		{:else if form?.resent}
-			<p class="eyebrow">Enlace enviado</p>
-			<h1 class="title">Revisa tu correo</h1>
-			<p class="subtitle">
-				Si <strong>{email}</strong> tiene una cuenta sin verificar, te enviamos un nuevo enlace de verificación.
-				El enlace caduca pronto, así que úsalo cuanto antes.
-			</p>
-			<a class="back-link" href={authHref}>Volver a iniciar sesión</a>
+			<h1 class="shell-title">Revisa tu correo</h1>
 		{:else}
-			<p class="eyebrow">Enlace no válido</p>
-			<h1 class="title">{data.reason}</h1>
-			<p class="subtitle">Ingresa tu email y te enviaremos un nuevo enlace de verificación.</p>
-
-			<form
-				method="POST"
-				action="?/resend"
-				use:enhance={() => {
-					submitting = true;
-					return async ({ update }) => {
-						submitting = false;
-						await update({ reset: false });
-					};
-				}}
-			>
-				<div class="fields">
-					<Input
-						label="Email"
-						name="email"
-						type="email"
-						placeholder="tu@email.com"
-						bind:value={email}
-						required
-						error={fieldError('email')}
-					/>
-				</div>
-
-				<Button type="submit" loading={submitting} class="submit">Reenviar enlace</Button>
-			</form>
-
-			<a class="back-link" href={authHref}>Volver a iniciar sesión</a>
+			<h1 class="shell-title">Verifica tu correo</h1>
 		{/if}
-	</div>
-</main>
+	{/snippet}
+
+	{#if data.valid}
+		<form
+			method="POST"
+			action="?/confirm"
+			bind:this={confirmForm}
+			use:enhance={() => {
+				submitting = true;
+				return async ({ update }) => {
+					submitting = false;
+					await update({ reset: false });
+				};
+			}}
+		>
+			<input type="hidden" name="token" value={data.token} />
+		</form>
+
+		{#if serverError}
+			<p class="lp-alert error" role="alert">{serverError}</p>
+			<p class="shell-after">
+				<a class="lp-link" href={resolve('/auth/verify-email')}>Pedir un enlace nuevo</a>
+			</p>
+		{:else}
+			<p class="shell-copy" role="status">
+				Un momento: estamos confirmando tu cuenta. Al terminar te llevamos a iniciar sesión.
+			</p>
+		{/if}
+	{:else if form?.resent}
+		<p class="shell-copy" role="status">
+			Si <strong>{email}</strong> tiene una cuenta sin verificar, te enviamos un enlace nuevo. Caduca
+			pronto, así que úsalo cuanto antes.
+		</p>
+		<p class="shell-after"><a class="lp-link" href={authHref}>Volver a iniciar sesión</a></p>
+	{:else}
+		<p class="shell-copy">{data.reason}</p>
+
+		<form
+			method="POST"
+			action="?/resend"
+			class="lp-fields resend"
+			use:enhance={() => {
+				submitting = true;
+				return async ({ update }) => {
+					submitting = false;
+					await update({ reset: false });
+				};
+			}}
+		>
+			<AuthField
+				label="Correo de tu cuenta"
+				id="verify-email"
+				name="email"
+				type="email"
+				autocomplete="email"
+				placeholder="tu@correo.com"
+				bind:value={email}
+				error={form?.errors?.email}
+			/>
+
+			<button type="submit" class="lp-btn block" disabled={submitting}>
+				{submitting ? 'Enviando…' : 'Enviar enlace'}
+			</button>
+		</form>
+
+		<p class="shell-after"><a class="lp-link" href={authHref}>Volver a iniciar sesión</a></p>
+	{/if}
+</PublicShell>
 
 <style>
-	.wrap {
-		min-height: 100vh;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 1.5rem;
-		background: var(--bg, #08090a);
-	}
-
-	.card {
-		width: 100%;
-		max-width: 26rem;
-		background: var(--surface, #0e1011);
-		border: 1px solid var(--border, #1e2023);
-		border-radius: 1rem;
-		padding: 2.25rem 2rem;
-	}
-
-	.brand {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-bottom: 1.75rem;
-	}
-
-	.brand-mark {
-		color: var(--amber, #d4912a);
-		font-size: 1rem;
-	}
-
-	.brand-name {
-		font-weight: 600;
-		letter-spacing: 0.12em;
-		font-size: 0.95rem;
-		color: var(--text, #eceae5);
-	}
-
-	.eyebrow {
-		font-family: var(--font-mono, monospace);
-		font-size: 0.68rem;
-		font-weight: 500;
-		letter-spacing: 0.2em;
-		text-transform: uppercase;
-		color: var(--amber, #d4912a);
-		margin: 0 0 0.5rem 0;
-	}
-
-	.title {
-		font-size: 1.5rem;
-		font-weight: 600;
-		color: var(--text, #eceae5);
-		margin: 0 0 0.5rem 0;
-	}
-
-	.subtitle {
-		font-size: 0.9rem;
-		color: var(--text-dim, #8a8780);
-		line-height: 1.6;
-		margin: 0 0 1.75rem 0;
-	}
-
-	.fields {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-		margin-bottom: 1.25rem;
-	}
-
-	:global(.submit) {
-		width: 100%;
-	}
-
-	.back-link {
-		display: inline-block;
-		margin-top: 1.5rem;
-		font-size: 0.85rem;
-		color: var(--amber, #d4912a);
-		text-decoration: none;
-	}
-
-	.back-link:hover {
-		text-decoration: underline;
+	.resend {
+		margin-top: 28px;
 	}
 </style>

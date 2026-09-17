@@ -33,7 +33,11 @@ export const actions = {
 		const parsed = await verifyEmailConfirmSchema.safeParseAsync({ token: formData.get('token') });
 
 		if (!parsed.success) {
-			return fail(400, { errors: { server: 'Falta el token de verificación.' } });
+			return fail(400, {
+				errors: {
+					server: 'El enlace está incompleto. Ábrelo de nuevo desde el correo o pide uno nuevo.'
+				}
+			});
 		}
 
 		const res = await auth.confirmEmailVerification(fetch, parsed.data.token);
@@ -53,7 +57,7 @@ export const actions = {
 		const parsed = await resendVerificationSchema.safeParseAsync({ email: formData.get('email') });
 
 		if (!parsed.success) {
-			return fail(400, { errors: { email: 'Ingresa un email válido' } });
+			return fail(400, { errors: { email: 'Escribe un correo válido.' } });
 		}
 
 		// The backend response never reveals whether the email exists or is

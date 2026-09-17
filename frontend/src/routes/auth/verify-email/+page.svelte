@@ -6,7 +6,7 @@
 </script>
 
 <svelte:head>
-	<title>Verificar correo — FINEXIA</title>
+	<title>Verificar correo — Finexia</title>
 	<meta name="robots" content="noindex" />
 </svelte:head>
 

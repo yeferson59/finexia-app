@@ -188,11 +188,13 @@
 	}
 
 	.forest .lp-btn {
+		border-color: var(--lp-jubilacion);
 		background: var(--lp-jubilacion);
 		color: var(--lp-ink);
 	}
 
 	.forest .lp-btn:hover {
+		border-color: #e3a03a;
 		background: #e3a03a;
 	}
 

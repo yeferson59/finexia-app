@@ -1,89 +1,11 @@
 /*
- * Hoja compartida de la superficie pública: la landing y las páginas legales.
- *
- * Todo cuelga de `.lp`, el contenedor que ponen `routes/+page.svelte` y
- * `routes/(legal)/+layout.svelte`. Antes las utilidades eran globales y con
- * nombres genéricos —`.wrap`, `.block`, `.band`, `.eyebrow`— que el panel
- * también usa: al navegar desde la portada, esas reglas se quedaban en el
- * documento y se sumaban a las del panel.
- *
- * La portada no usa los tokens del panel (`--bg`, `--text`…): va en papel y
- * tinta, y el panel se enseña dentro del recorrido tal cual es, oscuro. Por eso
- * los tokens de aquí llevan su propio prefijo y no redefinen los de `:root`:
- * la maqueta del recorrido, que vive dentro de `.lp`, sigue leyendo los suyos.
+ * Piezas que solo usa la portada. Los tokens de papel y tinta, el contenedor
+ * `.lp` y las piezas compartidas con las páginas legales y el acceso viven en
+ * `$lib/ui/public.css`, que la ruta importa antes que esta hoja.
  */
-
-.lp {
-	/* Papel y tinta. El papel es frío, con un punto verde, no crema. */
-	--lp-paper: #eef0ec;
-	--lp-paper-2: #e4e8e2;
-	--lp-ink: #10231e;
-	--lp-ink-2: #4a5c56;
-	--lp-rule: #c9d1ca;
-
-	/* El verde profundo de la sección de seguridad y del pie. */
-	--lp-forest: #0f3a32;
-	--lp-forest-ink: #e9eee9;
-	--lp-forest-ink-2: #a9bdb5;
-	--lp-forest-rule: rgba(233, 238, 233, 0.16);
-
-	/*
-	 * Un color por portafolio en el mapa del hero. Validados como paleta
-	 * categórica sobre `--lp-paper-2` (todas las parejas, protanopia y
-	 * deuteranopia): el ámbar es el de la marca. Queda por debajo de 3:1 contra
-	 * el papel, así que ningún dato depende solo de él: cada grupo lleva su
-	 * nombre y su importe escritos al lado.
-	 */
-	--lp-jubilacion: #d4912a;
-	--lp-cripto: #00846f;
-	--lp-reserva: #4d5fc4;
-
-	--lp-font: 'Archivo', system-ui, sans-serif;
-
-	/* Escala tipográfica: la clásica de 12-14-16-18-21-24-36-48-60-72. */
-	--lp-fs-sm: 14px;
-	--lp-fs-body: 16px;
-	--lp-fs-lead: 18px;
-	--lp-fs-h3: 21px;
-
-	min-height: 100vh;
-	background: var(--lp-paper);
-	color: var(--lp-ink);
-	font-family: var(--lp-font);
-	font-size: var(--lp-fs-body);
-	line-height: 1.55;
-	overflow-x: clip;
-}
-
-.lp ::selection {
-	background: rgba(212, 145, 42, 0.35);
-	color: var(--lp-ink);
-}
-
-/* El contorno ámbar del panel no llega a 3:1 sobre el papel: aquí el foco va
-   en tinta. Dentro del bosque, en papel. */
-.lp :focus-visible {
-	outline: 2px solid var(--lp-ink);
-	outline-offset: 3px;
-}
-
-.lp .lp-forest :focus-visible {
-	outline-color: var(--lp-forest-ink);
-}
-
-.lp-wrap {
-	max-width: 1240px;
-	margin: 0 auto;
-	padding-inline: 40px;
-}
 
 .lp-section {
 	padding-block: 112px;
-}
-
-.lp-forest {
-	background: var(--lp-forest);
-	color: var(--lp-forest-ink);
 }
 
 /*
@@ -114,49 +36,6 @@
 	color: var(--lp-forest-ink-2);
 }
 
-/* La acción principal: tinta sobre papel. Nombre y verbo iguales en toda la
-   página —«Unirme a la lista»—. */
-.lp-btn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	flex-shrink: 0;
-	min-height: 48px;
-	padding: 0 22px;
-	border: none;
-	border-radius: 6px;
-	background: var(--lp-ink);
-	color: var(--lp-paper);
-	font-family: var(--lp-font);
-	font-size: 15px;
-	font-stretch: 108%;
-	font-weight: 600;
-	white-space: nowrap;
-	cursor: pointer;
-	transition: background 0.18s ease;
-}
-
-.lp-btn:hover {
-	background: #1f3d35;
-}
-
-.lp-btn:disabled {
-	cursor: progress;
-	opacity: 0.7;
-}
-
-.lp-sr-only {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	margin: -1px;
-	padding: 0;
-	overflow: hidden;
-	clip: rect(0 0 0 0);
-	white-space: nowrap;
-	border: 0;
-}
-
 @media (max-width: 900px) {
 	.lp-section {
 		padding-block: 88px;
@@ -164,17 +43,8 @@
 }
 
 @media (max-width: 640px) {
-	.lp-wrap {
-		padding-inline: 20px;
-	}
 	.lp-section {
 		padding-block: 64px;
-	}
-}
-
-@media (max-width: 380px) {
-	.lp-wrap {
-		padding-inline: 16px;
 	}
 }
 

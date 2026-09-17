@@ -9,9 +9,10 @@ describe('register-form.svelte', () => {
 	it('renders the name, email and password fields', async () => {
 		render(RegisterForm, { form: null, onSwitchToLogin: noop });
 
-		await expect.element(page.getByPlaceholder('Juan Pérez')).toBeInTheDocument();
-		await expect.element(page.getByPlaceholder('Crea una contraseña segura')).toBeInTheDocument();
-		await expect.element(page.getByPlaceholder('Repite tu contraseña')).toBeInTheDocument();
+		await expect.element(page.getByLabelText('Nombre')).toBeInTheDocument();
+		await expect.element(page.getByLabelText('Correo electrónico')).toBeInTheDocument();
+		await expect.element(page.getByLabelText('Contraseña', { exact: true })).toBeInTheDocument();
+		await expect.element(page.getByLabelText('Repite la contraseña')).toBeInTheDocument();
 	});
 
 	it('shows a terms error from the register action result', async () => {

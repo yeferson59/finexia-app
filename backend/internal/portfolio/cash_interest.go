@@ -187,12 +187,6 @@ type CashAccrualFilter struct {
 	Pocket *uuid.UUID
 }
 
-// mainCashAccount is the pocket filter that means the balances in no pocket:
-// what an account was before pockets existed.
-func mainCashAccount() *uuid.UUID {
-	return &uuid.UUID{}
-}
-
 // OnPocket is the filter narrowed to one pocket of its account, or to the main
 // account when pocketID is the zero UUID.
 func (f CashAccrualFilter) OnPocket(pocketID uuid.UUID) CashAccrualFilter {

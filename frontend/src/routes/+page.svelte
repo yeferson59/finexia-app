@@ -8,6 +8,7 @@
 		LOCALE,
 		absoluteUrl
 	} from '$lib/seo';
+	import '$lib/ui/public.css';
 	import '$lib/features/landing/landing.css';
 	import {
 		Header,
@@ -95,6 +96,7 @@
 	<title>{DEFAULT_TITLE}</title>
 	<meta name="description" content={DEFAULT_DESCRIPTION} />
 	<link rel="canonical" href={canonical} />
+	<meta name="theme-color" content="#eef0ec" />
 
 	<!-- Open Graph -->
 	<meta property="og:type" content="website" />

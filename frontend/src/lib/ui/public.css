@@ -1,0 +1,324 @@
+/*
+ * La superficie pública en papel y tinta: portada, páginas legales, acceso
+ * (`/auth/**`) y la pantalla de autorización OAuth.
+ *
+ * Vivía en `features/landing/landing.css`, pero en cuanto el acceso la
+ * necesitó dejó de ser de una sola feature, y una feature no importa de otra:
+ * lo compartido baja a `ui`. Aquí están los tokens y las piezas que usan todas
+ * esas pantallas; lo que es solo de la portada sigue en `landing.css`.
+ *
+ * Todo cuelga de `.lp`, el contenedor de cada una. Las utilidades no son
+ * globales a propósito: el panel usa nombres como `.wrap` o `.block`, y al
+ * navegar desde una pantalla pública estas reglas se quedan en el documento.
+ *
+ * Los tokens llevan su propio prefijo y no redefinen los de `:root` (`--bg`,
+ * `--text`…): la maqueta del panel que enseña la portada vive dentro de `.lp`
+ * y tiene que seguir leyendo los suyos, que son los del panel oscuro.
+ */
+
+.lp {
+	/* Papel y tinta. El papel es frío, con un punto verde, no crema. */
+	--lp-paper: #eef0ec;
+	--lp-paper-2: #e4e8e2;
+	--lp-ink: #10231e;
+	--lp-ink-2: #4a5c56;
+	/* El texto que existe pero cede el paso: 3,6:1 sobre el papel, para
+	   titulares y rótulos grandes, nunca para texto corrido. */
+	--lp-ink-3: #74837d;
+	--lp-rule: #c9d1ca;
+	--lp-error: #b3261e;
+
+	/* El verde profundo de las bandas oscuras. */
+	--lp-forest: #0f3a32;
+	--lp-forest-ink: #e9eee9;
+	--lp-forest-ink-2: #a9bdb5;
+	--lp-forest-rule: rgba(233, 238, 233, 0.16);
+
+	/*
+	 * Un color por portafolio en el mapa de la portada. Validados como paleta
+	 * categórica sobre `--lp-paper-2` (todas las parejas, protanopia y
+	 * deuteranopia): el ámbar es el de la marca. Queda por debajo de 3:1 contra
+	 * el papel, así que ningún dato depende solo de él.
+	 */
+	--lp-jubilacion: #d4912a;
+	--lp-cripto: #00846f;
+	--lp-reserva: #4d5fc4;
+
+	--lp-font: 'Archivo', system-ui, sans-serif;
+
+	/* Escala tipográfica: la clásica de 12-14-16-18-21-24-36-48-60-72. */
+	--lp-fs-sm: 14px;
+	--lp-fs-body: 16px;
+	--lp-fs-lead: 18px;
+	--lp-fs-h3: 21px;
+
+	min-height: 100vh;
+	background: var(--lp-paper);
+	color: var(--lp-ink);
+	font-family: var(--lp-font);
+	font-size: var(--lp-fs-body);
+	line-height: 1.55;
+	overflow-x: clip;
+}
+
+.lp ::selection {
+	background: rgba(212, 145, 42, 0.35);
+	color: var(--lp-ink);
+}
+
+/* El contorno ámbar del panel no llega a 3:1 sobre el papel: aquí el foco va
+   en tinta. Dentro del bosque, en papel. */
+.lp :focus-visible {
+	outline: 2px solid var(--lp-ink);
+	outline-offset: 3px;
+}
+
+.lp .lp-forest :focus-visible {
+	outline-color: var(--lp-forest-ink);
+}
+
+.lp-wrap {
+	max-width: 1240px;
+	margin: 0 auto;
+	padding-inline: 40px;
+}
+
+.lp-forest {
+	background: var(--lp-forest);
+	color: var(--lp-forest-ink);
+}
+
+/* ── Acciones ─────────────────────────────────────────────────────────── */
+
+/* La acción principal: tinta sobre papel. */
+.lp-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	min-height: 48px;
+	padding: 0 22px;
+	border: 1px solid var(--lp-ink);
+	border-radius: 6px;
+	background: var(--lp-ink);
+	color: var(--lp-paper);
+	font-family: var(--lp-font);
+	font-size: 15px;
+	font-stretch: 108%;
+	font-weight: 600;
+	line-height: 1.2;
+	text-align: center;
+	white-space: nowrap;
+	cursor: pointer;
+	transition:
+		background 0.18s ease,
+		color 0.18s ease;
+}
+
+.lp-btn:hover {
+	background: #1f3d35;
+}
+
+.lp-btn:disabled {
+	cursor: progress;
+	opacity: 0.7;
+}
+
+/* La que acompaña a la principal sin competir con ella: mismo tamaño, sin
+   relleno. Cancelar, volver. */
+.lp-btn.quiet {
+	background: transparent;
+	color: var(--lp-ink);
+}
+
+.lp-btn.quiet:hover {
+	background: var(--lp-paper-2);
+}
+
+.lp-btn.block {
+	width: 100%;
+}
+
+/* Los enlaces dentro de un texto van subrayados: en tinta, el color no basta
+   para distinguirlos. */
+.lp-link {
+	color: var(--lp-ink);
+	text-decoration: underline;
+	text-decoration-thickness: 1px;
+	text-underline-offset: 3px;
+	font-weight: 500;
+}
+
+.lp-link:hover {
+	text-decoration-thickness: 2px;
+}
+
+button.lp-link {
+	padding: 0;
+	border: none;
+	background: none;
+	font-family: inherit;
+	font-size: inherit;
+	cursor: pointer;
+}
+
+/* ── Formularios ──────────────────────────────────────────────────────── */
+
+.lp-fields {
+	display: flex;
+	flex-direction: column;
+	gap: 22px;
+}
+
+.lp-field {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 0;
+}
+
+/* La etiqueta y, si la hay, una acción suya a la derecha («¿Olvidaste tu
+   contraseña?» va con su campo, no suelta debajo del formulario). */
+.lp-label-row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.lp-label {
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--lp-ink);
+}
+
+.lp-label-row .lp-link {
+	font-size: var(--lp-fs-sm);
+	font-weight: 400;
+}
+
+/*
+ * El campo es blanco sobre el papel: se lee como un sitio donde escribir, y el
+ * borde en `--lp-ink-3` pasa el 3:1 que pide un control. Lleva clase propia en
+ * vez de `.field-control` porque esa es la del panel oscuro.
+ */
+.lp .lp-input {
+	width: 100%;
+	min-height: 50px;
+	padding: 0 14px;
+	border: 1px solid var(--lp-ink-3);
+	border-radius: 8px;
+	background: #fff;
+	color: var(--lp-ink);
+	font-family: var(--lp-font);
+	font-size: 16px;
+	box-shadow: none;
+	transition: border-color 0.15s ease;
+}
+
+.lp .lp-input::placeholder {
+	color: #7d8a85;
+}
+
+.lp .lp-input:hover {
+	border-color: var(--lp-ink);
+}
+
+.lp .lp-input:focus {
+	border-color: var(--lp-ink);
+	outline: 2px solid var(--lp-ink);
+	outline-offset: 1px;
+	box-shadow: none;
+}
+
+.lp .lp-input[aria-invalid='true'] {
+	border-color: var(--lp-error);
+}
+
+.lp .lp-input[aria-invalid='true']:focus {
+	outline-color: var(--lp-error);
+}
+
+.lp-field-error {
+	margin: 0;
+	font-size: var(--lp-fs-sm);
+	line-height: 1.45;
+	color: var(--lp-error);
+}
+
+.lp-hint {
+	margin: 0;
+	font-size: var(--lp-fs-sm);
+	line-height: 1.5;
+	color: var(--lp-ink-2);
+}
+
+.lp .lp-check {
+	width: 20px;
+	height: 20px;
+	margin: 2px 0 0;
+	flex-shrink: 0;
+	border: 1px solid var(--lp-ink-3);
+	border-radius: 4px;
+	background-color: #fff;
+	color: var(--lp-ink);
+	accent-color: var(--lp-ink);
+	cursor: pointer;
+}
+
+.lp .lp-check:focus {
+	box-shadow: none;
+}
+
+/*
+ * Avisos: prosa con un filete del color de lo que dicen, no cajas de alerta.
+ * Es el mismo idioma que el panel (`.feedback`), pasado al papel.
+ */
+.lp-alert {
+	margin: 0;
+	padding: 2px 0 2px 14px;
+	border-left: 3px solid var(--lp-ink);
+	font-size: 15px;
+	line-height: 1.5;
+	color: var(--lp-ink);
+}
+
+.lp-alert.error {
+	border-color: var(--lp-error);
+	color: var(--lp-error);
+}
+
+.lp-alert.success {
+	border-color: var(--lp-cripto);
+}
+
+.lp-sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+@media (max-width: 640px) {
+	.lp-wrap {
+		padding-inline: 20px;
+	}
+}
+
+@media (max-width: 380px) {
+	.lp-wrap {
+		padding-inline: 16px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.lp-btn,
+	.lp .lp-input {
+		transition: none;
+	}
+}

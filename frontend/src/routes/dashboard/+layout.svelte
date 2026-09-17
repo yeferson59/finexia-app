@@ -7,6 +7,12 @@
 	let sidebarOpen = $state(false);
 </script>
 
+<!-- El color de la barra del navegador móvil lo pone cada superficie: el panel
+     es oscuro y las pantallas públicas van en papel (`ui/public-shell`). -->
+<svelte:head>
+	<meta name="theme-color" content="#08090a" />
+</svelte:head>
+
 <div class="shell">
 	<Sidebar {sidebarOpen} user={data.user} />
 	<DashboardHeader bind:sidebarOpen {data} />

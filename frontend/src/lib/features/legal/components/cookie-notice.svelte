@@ -30,15 +30,26 @@
 {#if visible}
 	<div class="cookie-notice" role="region" aria-label="Aviso de cookies">
 		<p>
-			Usamos cookies estrictamente necesarias para el funcionamiento del servicio. Consulta nuestro
-			<a href={resolve('/cookies')}>Aviso de Cookies</a> y la
-			<a href={resolve('/privacidad')}>Política de Privacidad</a>.
+			Solo usamos las cookies necesarias para que el servicio funcione. Más detalles en el
+			<a href={resolve('/cookies')}>aviso de cookies</a> y la
+			<a href={resolve('/privacidad')}>política de privacidad</a>.
 		</p>
 		<button type="button" onclick={dismiss}>Entendido</button>
 	</div>
 {/if}
 
 <style>
+	/*
+	 * Sale en la primera visita, que casi siempre es la portada o el acceso, en
+	 * papel; pero vive en el layout raíz y también puede aparecer sobre el panel
+	 * oscuro. En tinta sobre papel claro se lee como aviso, y sobre el panel
+	 * sigue destacando por el filete. Por eso los colores van escritos aquí y no
+	 * con los tokens de ninguna de las dos superficies: fuera de `.lp` no existen
+	 * los del papel.
+	 *
+	 * La altura es la del aviso anterior a propósito: está fijo al pie y, más
+	 * alto, tapaba los botones de los formularios del panel hasta cerrarlo.
+	 */
 	.cookie-notice {
 		position: fixed;
 		z-index: 200;
@@ -50,59 +61,58 @@
 		display: flex;
 		align-items: center;
 		gap: 18px;
-		padding: 14px 18px;
-		border-radius: 12px;
-		background: rgba(16, 17, 19, 0.96);
-		border: 1px solid var(--border-strong);
-		box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
-		backdrop-filter: blur(12px);
-		-webkit-backdrop-filter: blur(12px);
+		padding: 12px 12px 12px 18px;
+		border: 1px solid rgba(238, 240, 236, 0.18);
+		border-radius: 10px;
+		background: #10231e;
+		box-shadow: 0 20px 40px -24px rgba(16, 35, 30, 0.6);
+		font-family: 'Archivo', system-ui, sans-serif;
 	}
 	.cookie-notice p {
 		flex: 1;
 		margin: 0;
 		font-size: 13px;
 		line-height: 1.5;
-		color: var(--text-muted);
+		color: #c9d4cf;
 	}
 	.cookie-notice a {
-		color: var(--amber-light);
+		color: #eef0ec;
 		text-decoration: underline;
-		text-underline-offset: 2px;
+		text-underline-offset: 3px;
 	}
 	.cookie-notice a:hover {
-		color: var(--amber);
+		text-decoration-thickness: 2px;
+	}
+	.cookie-notice a:focus-visible,
+	.cookie-notice button:focus-visible {
+		outline: 2px solid #eef0ec;
+		outline-offset: 2px;
 	}
 	.cookie-notice button {
 		flex-shrink: 0;
-		padding: 9px 18px;
-		border-radius: 8px;
-		border: 1px solid var(--border-strong);
-		background: var(--amber);
-		color: #0d0800;
-		font-family: var(--font-body);
-		font-size: 13px;
+		min-height: 36px;
+		padding: 0 16px;
+		border: none;
+		border-radius: 6px;
+		background: #eef0ec;
+		color: #10231e;
+		font-family: inherit;
+		font-size: 14px;
 		font-weight: 600;
 		cursor: pointer;
-		transition:
-			background 0.2s,
-			transform 0.1s;
 	}
 	.cookie-notice button:hover {
-		background: var(--amber-light);
-	}
-	.cookie-notice button:active {
-		transform: translateY(1px);
+		background: #ffffff;
 	}
 	@media (max-width: 560px) {
 		.cookie-notice {
 			flex-direction: column;
 			align-items: stretch;
-			text-align: center;
 			gap: 12px;
+			padding: 14px;
 		}
 		.cookie-notice button {
-			width: 100%;
+			min-height: 44px;
 		}
 	}
 </style>

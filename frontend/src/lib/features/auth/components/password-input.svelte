@@ -1,108 +1,96 @@
 <script lang="ts">
-	import Input from '$lib/ui/input.svelte';
+	import type { Snippet } from 'svelte';
 	import type { HTMLInputAttributes } from 'svelte/elements';
+	import AuthField from './auth-field.svelte';
 
 	interface Props {
 		label: string;
-		id?: string;
+		id: string;
 		name: string;
 		placeholder?: string;
 		value?: string;
 		error?: string;
+		hint?: string;
 		autocomplete?: HTMLInputAttributes['autocomplete'];
-		required?: boolean;
+		/** Una acción del campo, a la derecha de la etiqueta. */
+		action?: Snippet;
 	}
 
 	let {
 		label,
 		id,
 		name,
-		placeholder = '',
+		placeholder,
 		value = $bindable(''),
 		error,
+		hint,
 		autocomplete,
-		required = true
+		action
 	}: Props = $props();
 
 	let showPassword = $state(false);
 </script>
 
-<div class="password-wrapper">
-	<Input
-		{label}
-		{id}
-		{name}
-		type={showPassword ? 'text' : 'password'}
-		{placeholder}
-		bind:value
-		{error}
-		{autocomplete}
-		{required}
-	/>
-	<button
-		type="button"
-		class="password-toggle"
-		onclick={() => (showPassword = !showPassword)}
-		aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-	>
-		{#if showPassword}
-			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-				<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-				<circle cx="12" cy="12" r="3"></circle>
+<AuthField
+	{label}
+	{id}
+	{name}
+	type={showPassword ? 'text' : 'password'}
+	{placeholder}
+	{autocomplete}
+	{error}
+	{hint}
+	{action}
+	bind:value
+>
+	{#snippet trailing()}
+		<button
+			type="button"
+			class="toggle"
+			onclick={() => (showPassword = !showPassword)}
+			aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+			aria-controls={id}
+		>
+			<svg
+				width="20"
+				height="20"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.8"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" />
+				<circle cx="12" cy="12" r="3" />
+				{#if !showPassword}
+					<path d="m3 3 18 18" />
+				{/if}
 			</svg>
-		{:else}
-			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-				<path
-					d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1 4.24 4.24"
-				></path>
-				<line x1="1" y1="1" x2="23" y2="23"></line>
-			</svg>
-		{/if}
-	</button>
-</div>
+		</button>
+	{/snippet}
+</AuthField>
 
 <style>
-	.password-wrapper {
-		position: relative;
-		width: 100%;
-	}
-
-	/*
-	 * El sitio del ojo lo reserva el campo que lo lleva. Estaba en `ui/input`
-	 * como un `padding-right: 3rem` fijo, así que los cientos de campos sin
-	 * icono de la aplicación escribían con tres centímetros de aire a la
-	 * derecha por culpa de este.
-	 */
-	.password-wrapper :global(.field-control) {
-		padding-right: 3rem;
-	}
-
-	.password-toggle {
+	.toggle {
 		position: absolute;
-		right: 0.75rem;
 		top: 50%;
-		margin-top: 1.125rem;
-		transform: translateY(-50%);
-		background: none;
+		right: 3px;
+		display: grid;
+		place-items: center;
+		width: 44px;
+		height: 44px;
+		padding: 0;
 		border: none;
-		color: var(--text-secondary);
+		border-radius: 6px;
+		background: transparent;
+		color: var(--lp-ink-2);
 		cursor: pointer;
-		transition: all 0.25s ease;
-		padding: 0.5rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 40px;
-		height: 40px;
-		z-index: 10;
+		transform: translateY(-50%);
 	}
 
-	.password-toggle:hover {
-		color: var(--gold-primary);
-		transform: translateY(-50%) scale(1.1);
-	}
-
-	.password-toggle svg {
-		stroke-width: 2;
+	.toggle:hover {
+		color: var(--lp-ink);
 	}
 </style>

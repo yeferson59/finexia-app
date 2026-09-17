@@ -8,11 +8,10 @@ describe('password-input.svelte', () => {
 		render(PasswordInput, {
 			label: 'Contraseña',
 			id: 'login-password',
-			name: 'password',
-			placeholder: 'Ingresa tu contraseña'
+			name: 'password'
 		});
 
-		const password = page.getByPlaceholder('Ingresa tu contraseña');
+		const password = page.getByLabelText('Contraseña', { exact: true });
 		await expect.element(password).toHaveAttribute('type', 'password');
 
 		await page.getByRole('button', { name: 'Mostrar contraseña' }).click();
@@ -22,11 +21,14 @@ describe('password-input.svelte', () => {
 	it('surfaces a field error passed down from the parent form', async () => {
 		render(PasswordInput, {
 			label: 'Contraseña',
+			id: 'login-password',
 			name: 'password',
-			placeholder: 'Ingresa tu contraseña',
 			error: 'La contraseña es obligatoria'
 		});
 
 		await expect.element(page.getByText('La contraseña es obligatoria')).toBeInTheDocument();
+		await expect
+			.element(page.getByLabelText('Contraseña', { exact: true }))
+			.toHaveAttribute('aria-describedby', 'login-password-error');
 	});
 });

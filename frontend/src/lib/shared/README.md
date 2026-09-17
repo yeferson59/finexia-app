@@ -6,6 +6,10 @@ Sustituye al antiguo cajón de sastre `lib/utils.ts`, repartido por tema.
 ## Contenido
 
 - `css.ts` — `cn()`, combinación condicional de clases.
+- `http-error.ts` — `errorCopy()` y `errorActions()`: qué dice y a dónde manda
+  la página de error según el código y la ruta. Antes todo lo que no era un 404
+  salía como «error interno del servidor» y el mensaje de cada `error()` no se
+  enseñaba.
 - `currency.ts` — `SUPPORTED_CURRENCIES` y `resolveDisplayCurrency()`: en qué
   monedas puede expresar dinero la app, copia de la lista que valida el backend.
 - `format/money.ts` — `formatCurrency()`, `currencySymbol()`.

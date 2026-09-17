@@ -1,19 +1,16 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import Button from '$lib/ui/button.svelte';
-	import Input from '$lib/ui/input.svelte';
+	import AuthField from './auth-field.svelte';
 	import PasswordInput from './password-input.svelte';
 	import type { AuthActionResult } from '../types';
 	import { parseErrors } from '../utils';
 
 	let {
 		form,
-		slideDirection = 'right',
 		onSwitchToLogin
 	}: {
 		form: AuthActionResult;
-		slideDirection?: 'left' | 'right';
 		onSwitchToLogin: () => void;
 	} = $props();
 
@@ -30,8 +27,7 @@
 <form
 	method="POST"
 	action="?/register"
-	class="form-content"
-	class:slide-left={slideDirection === 'left'}
+	class="lp-fields"
 	id="register-form"
 	use:enhance={() => {
 		isSubmitting = true;
@@ -41,42 +37,42 @@
 		};
 	}}
 >
-	<Input
-		label="Nombre completo"
+	<AuthField
+		label="Nombre"
 		id="register-name"
 		name="name"
-		type="text"
-		placeholder="Juan Pérez"
+		autocomplete="name"
+		placeholder="Laura Méndez"
 		bind:value={registerName}
 		error={errors['name']}
-		required
 	/>
 
-	<Input
-		label="Email"
+	<AuthField
+		label="Correo electrónico"
 		id="register-email"
 		name="email"
 		type="email"
-		placeholder="tu@email.com"
+		autocomplete="email"
+		placeholder="tu@correo.com"
 		bind:value={registerEmail}
 		error={errors['email']}
-		required
 	/>
 
 	<PasswordInput
 		label="Contraseña"
 		id="register-password"
 		name="password"
-		placeholder="Crea una contraseña segura"
+		autocomplete="new-password"
+		hint="Entre 8 y 20 caracteres."
 		bind:value={registerPassword}
 		error={errors['password']}
 	/>
 
 	<PasswordInput
-		label="Confirmar contraseña"
+		label="Repite la contraseña"
 		id="register-confirm"
 		name="confirmPassword"
-		placeholder="Repite tu contraseña"
+		autocomplete="new-password"
 		bind:value={registerConfirmPassword}
 		error={errors['confirmPassword']}
 	/>
@@ -86,112 +82,75 @@
 			type="checkbox"
 			id="terms"
 			name="terms"
-			class="consent-input"
+			class="lp-check"
 			bind:checked={agreeTerms}
+			aria-invalid={errors['terms'] ? 'true' : undefined}
+			aria-describedby={errors['terms'] ? 'terms-error' : undefined}
 		/>
-		<label for="terms" class="consent-label">
-			Autorizo el tratamiento de mis datos personales según la
-			<a href={resolve('/privacidad')} target="_blank" rel="noopener">Política de Privacidad</a>
+		<label for="terms">
+			Autorizo el tratamiento de mis datos según la
+			<a href={resolve('/privacidad')} target="_blank" rel="noopener" class="lp-link"
+				>política de privacidad</a
+			>
 			y acepto los
-			<a href={resolve('/terminos')} target="_blank" rel="noopener">Términos y Condiciones</a>.
+			<a href={resolve('/terminos')} target="_blank" rel="noopener" class="lp-link"
+				>términos y condiciones</a
+			>.
 		</label>
 	</div>
 	{#if errors['terms']}
-		<span class="error-message">{errors['terms']}</span>
+		<p class="lp-field-error terms-error" id="terms-error">{errors['terms']}</p>
 	{/if}
 
 	{#if errors['server']}
-		<p class="error-server" role="alert">{errors['server']}</p>
+		<div class="lp-alert error" role="alert">
+			<p>{errors['server']}</p>
+			{#if form?.type === 'register' && form.duplicateEmail}
+				<p class="shortcuts">
+					<button type="button" onclick={onSwitchToLogin} class="lp-link">
+						Iniciar sesión con este correo
+					</button>
+					<a href={resolve('/auth/forgot-password')} class="lp-link">¿Olvidaste tu contraseña?</a>
+				</p>
+			{/if}
+		</div>
 	{/if}
 
-	{#if form?.type === 'register' && form.duplicateEmail}
-		<button type="button" onclick={onSwitchToLogin} class="resend-link">
-			Iniciar sesión con este correo
-		</button>
-		<a href={resolve('/auth/forgot-password')} class="resend-link"> ¿Olvidaste tu contraseña? </a>
-	{/if}
-
-	<Button type="submit" variant="primary" size="lg" loading={isSubmitting} fullWidth>
-		{isSubmitting ? 'Creando cuenta...' : 'Crear cuenta'}
-	</Button>
-
-	<div class="form-switch">
-		¿Ya tienes cuenta?
-		<button type="button" onclick={onSwitchToLogin} class="switch-link"> Inicia sesión </button>
-	</div>
+	<button type="submit" class="lp-btn block" disabled={isSubmitting}>
+		{isSubmitting ? 'Creando tu cuenta…' : 'Crear cuenta'}
+	</button>
 </form>
 
 <style>
 	.consent {
 		display: flex;
 		align-items: flex-start;
-		gap: 0.75rem;
-	}
-
-	.consent-input {
-		appearance: none;
-		width: 20px;
-		height: 20px;
-		margin-top: 1px;
-		border: 1.5px solid rgba(212, 145, 42, 0.3);
-		border-radius: 6px;
-		background: rgba(255, 255, 255, 0.03);
-		cursor: pointer;
-		transition: all 0.25s ease;
-		position: relative;
-		flex-shrink: 0;
-	}
-
-	.consent-input:hover {
-		border-color: rgba(212, 145, 42, 0.5);
-	}
-
-	.consent-input:checked {
-		background: var(--amber);
-		border-color: var(--amber);
-	}
-
-	.consent-input:checked::after {
-		content: '✓';
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		color: #0d0800;
-		font-size: 0.875rem;
-		font-weight: 700;
-	}
-
-	.consent-input:focus-visible {
-		outline: 2px solid var(--amber);
-		outline-offset: 2px;
-	}
-
-	.consent-label {
-		font-size: 0.8rem;
+		gap: 12px;
+		font-size: 15px;
 		line-height: 1.5;
-		color: var(--text-secondary);
+		color: var(--lp-ink-2);
+	}
+
+	.consent label {
 		cursor: pointer;
-		letter-spacing: 0.2px;
-		font-weight: 500;
 	}
 
-	.consent-label a {
-		color: var(--gold-primary);
-		text-decoration: underline;
-		text-underline-offset: 2px;
-		font-weight: 600;
+	.terms-error {
+		margin-top: -14px;
 	}
 
-	.consent-label a:hover {
-		color: var(--gold-light);
+	.lp-alert p {
+		margin: 0;
 	}
 
-	.error-message {
-		font-size: 0.75rem;
-		color: var(--error-color);
-		margin-top: -1rem;
-		letter-spacing: 0.2px;
-		font-weight: 500;
+	.lp-alert .shortcuts {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 20px;
+		margin-top: 8px;
+	}
+
+	.shortcuts .lp-link {
+		color: var(--lp-ink);
 	}
 </style>

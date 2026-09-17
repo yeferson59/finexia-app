@@ -6,7 +6,10 @@ import { acceptInviteSchema } from '$lib/features/auth';
 export const load: PageServerLoad = async ({ url, fetch }) => {
 	const token = url.searchParams.get('token');
 	if (!token) {
-		return { valid: false as const, reason: 'Falta el token de invitación.' };
+		return {
+			valid: false as const,
+			reason: 'El enlace de la invitación está incompleto. Ábrelo de nuevo desde el correo.'
+		};
 	}
 
 	const res = await auth.validateInvitation(fetch, token);

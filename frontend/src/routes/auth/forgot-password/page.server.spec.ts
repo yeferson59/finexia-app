@@ -25,7 +25,7 @@ describe('forgot-password action', () => {
 		};
 
 		expect(result?.status).toBe(400);
-		expect(result?.data.errors).toEqual({ email: 'Ingresa un email válido' });
+		expect(result?.data.errors).toEqual({ email: 'Escribe un correo válido.' });
 		expect(fetch).not.toHaveBeenCalled();
 	});
 

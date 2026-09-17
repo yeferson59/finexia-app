@@ -6,7 +6,7 @@
 	 * único bloque verde, y cierra igual.
 	 */
 	import { resolve } from '$app/paths';
-	import Brand from './brand.svelte';
+	import Brand from '$lib/ui/brand.svelte';
 
 	const currentYear = new Date().getFullYear();
 	const home = resolve('/');

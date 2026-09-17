@@ -19,7 +19,7 @@ export const load: PageServerLoad = async (event) => {
 	const requestId = event.url.searchParams.get('request');
 
 	if (!requestId) {
-		error(400, 'Falta el identificador de la petición de autorización.');
+		error(400, 'El enlace de autorización está incompleto. Vuelve a conectar desde la aplicación.');
 	}
 
 	// Llegar sin sesión es lo normal aquí: se entra desde un enlace que abre el
@@ -61,7 +61,10 @@ export const actions = {
 		const requestId = formData.get('request');
 
 		if (typeof requestId !== 'string' || requestId === '') {
-			error(400, 'Falta el identificador de la petición de autorización.');
+			error(
+				400,
+				'El enlace de autorización está incompleto. Vuelve a conectar desde la aplicación.'
+			);
 		}
 
 		const approved = formData.get('decision') === 'approve';

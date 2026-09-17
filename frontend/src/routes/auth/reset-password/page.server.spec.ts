@@ -27,7 +27,10 @@ describe('reset-password load', () => {
 			buildLoadEvent('https://app.test/auth/reset-password', fetch) as LoadEvent
 		);
 
-		expect(result).toEqual({ valid: false, reason: 'Falta el token de recuperación.' });
+		expect(result).toEqual({
+			valid: false,
+			reason: 'El enlace está incompleto. Ábrelo de nuevo desde el correo o pide uno nuevo.'
+		});
 		expect(fetch).not.toHaveBeenCalled();
 	});
 

@@ -1,4 +1,4 @@
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import { describe, it, expect } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import LoginRegister from './login-register.svelte';
@@ -7,8 +7,8 @@ describe('login-register.svelte (container)', () => {
 	it('shows the login form by default', async () => {
 		render(LoginRegister, { form: null });
 
-		await expect.element(page.getByPlaceholder('tu@email.com')).toBeInTheDocument();
-		await expect.element(page.getByPlaceholder('Ingresa tu contraseña')).toBeInTheDocument();
+		await expect.element(page.getByLabelText('Correo electrónico')).toBeInTheDocument();
+		await expect.element(page.getByLabelText('Contraseña', { exact: true })).toBeInTheDocument();
 		await expect
 			.element(page.getByRole('tab', { name: 'Iniciar sesión' }))
 			.toHaveAttribute('aria-selected', 'true');
@@ -19,8 +19,8 @@ describe('login-register.svelte (container)', () => {
 
 		await page.getByRole('tab', { name: 'Crear cuenta' }).click();
 
-		await expect.element(page.getByPlaceholder('Juan Pérez')).toBeInTheDocument();
-		await expect.element(page.getByPlaceholder('Repite tu contraseña')).toBeInTheDocument();
+		await expect.element(page.getByLabelText('Nombre')).toBeInTheDocument();
+		await expect.element(page.getByLabelText('Repite la contraseña')).toBeInTheDocument();
 		await expect
 			.element(page.getByRole('tab', { name: 'Crear cuenta' }))
 			.toHaveAttribute('aria-selected', 'true');
@@ -35,7 +35,7 @@ describe('login-register.svelte (container)', () => {
 		await expect
 			.element(page.getByRole('link', { name: 'Unirme a la lista de espera' }))
 			.toBeInTheDocument();
-		await expect.element(page.getByPlaceholder('Juan Pérez')).not.toBeInTheDocument();
+		await expect.element(page.getByLabelText('Nombre')).not.toBeInTheDocument();
 	});
 
 	it('defaults to the invite-only notice when the prop is omitted', async () => {
@@ -44,5 +44,39 @@ describe('login-register.svelte (container)', () => {
 		await page.getByRole('tab', { name: 'Crear cuenta' }).click();
 
 		await expect.element(page.getByText('Registro por invitación')).toBeInTheDocument();
+	});
+
+	it('moves between the two modes with the arrow keys', async () => {
+		render(LoginRegister, { form: null });
+
+		const login = page.getByRole('tab', { name: 'Iniciar sesión' });
+		await login.click();
+		await userEvent.keyboard('{ArrowDown}');
+
+		await expect
+			.element(page.getByRole('tab', { name: 'Crear cuenta' }))
+			.toHaveAttribute('aria-selected', 'true');
+	});
+
+	it('opens on the register tab when the returning action was a registration', async () => {
+		render(LoginRegister, {
+			form: { type: 'register', errors: { server: 'Ya existe una cuenta con este correo.' } },
+			selfRegistrationEnabled: true
+		});
+
+		await expect
+			.element(page.getByRole('tab', { name: 'Crear cuenta' }))
+			.toHaveAttribute('aria-selected', 'true');
+		await expect
+			.element(page.getByRole('alert'))
+			.toHaveTextContent('Ya existe una cuenta con este correo.');
+	});
+
+	it('shows the notice that a previous screen sent back', async () => {
+		render(LoginRegister, { form: null, notice: 'Correo verificado. Ya puedes iniciar sesión.' });
+
+		await expect
+			.element(page.getByRole('status'))
+			.toHaveTextContent('Correo verificado. Ya puedes iniciar sesión.');
 	});
 });

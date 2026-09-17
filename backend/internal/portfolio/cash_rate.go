@@ -342,7 +342,7 @@ func (in NewCashRateInput) ValidateNew(today time.Time) error {
 		return err
 	}
 
-	return in.CashRateInput.Validate()
+	return in.Validate()
 }
 
 // ValidateCashRateEnd checks the first day a rate stops earning.

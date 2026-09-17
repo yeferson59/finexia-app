@@ -1,21 +1,12 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import Button from '$lib/ui/button.svelte';
-	import Input from '$lib/ui/input.svelte';
+	import AuthField from './auth-field.svelte';
 	import PasswordInput from './password-input.svelte';
 	import type { AuthActionResult } from '../types';
 	import { parseErrors } from '../utils';
 
-	let {
-		form,
-		slideDirection = 'right',
-		onSwitchToRegister
-	}: {
-		form: AuthActionResult;
-		slideDirection?: 'left' | 'right';
-		onSwitchToRegister: () => void;
-	} = $props();
+	let { form }: { form: AuthActionResult } = $props();
 
 	let loginEmail = $state('');
 	let loginPassword = $state('');
@@ -27,8 +18,7 @@
 <form
 	method="POST"
 	action="?/login"
-	class="form-content"
-	class:slide-left={slideDirection === 'left'}
+	class="lp-fields"
 	id="login-form"
 	use:enhance={() => {
 		isSubmitting = true;
@@ -38,46 +28,48 @@
 		};
 	}}
 >
-	<Input
-		label="Email"
+	<AuthField
+		label="Correo electrónico"
 		id="login-email"
 		name="email"
 		type="email"
-		placeholder="tu@email.com"
+		autocomplete="email"
+		placeholder="tu@correo.com"
 		bind:value={loginEmail}
 		error={errors['email']}
-		required
 	/>
 
 	<PasswordInput
 		label="Contraseña"
 		id="login-password"
 		name="password"
-		placeholder="Ingresa tu contraseña"
+		autocomplete="current-password"
 		bind:value={loginPassword}
 		error={errors['password']}
-	/>
-
-	<div class="form-footer">
-		<a href={resolve('/auth/forgot-password')} class="forgot-link">¿Olvidaste tu contraseña?</a>
-	</div>
+	>
+		{#snippet action()}
+			<a href={resolve('/auth/forgot-password')} class="lp-link">¿Olvidaste tu contraseña?</a>
+		{/snippet}
+	</PasswordInput>
 
 	{#if errors['server']}
-		<p class="error-server" role="alert">{errors['server']}</p>
+		<p class="lp-alert error" role="alert">
+			{errors['server']}
+			{#if form?.type === 'login' && form.unverified}
+				<a href={resolve('/auth/verify-email')} class="lp-link">Reenviar enlace de verificación</a>
+			{/if}
+		</p>
 	{/if}
 
-	{#if form?.type === 'login' && form.unverified}
-		<a href={resolve('/auth/verify-email')} class="resend-link">
-			Reenviar enlace de verificación
-		</a>
-	{/if}
-
-	<Button type="submit" variant="primary" size="lg" loading={isSubmitting} fullWidth>
-		{isSubmitting ? 'Iniciando sesión...' : 'Iniciar sesión'}
-	</Button>
-
-	<div class="form-switch">
-		¿No tienes cuenta?
-		<button type="button" onclick={onSwitchToRegister} class="switch-link"> Crear una </button>
-	</div>
+	<button type="submit" class="lp-btn block" disabled={isSubmitting}>
+		{isSubmitting ? 'Entrando…' : 'Iniciar sesión'}
+	</button>
 </form>
+
+<style>
+	.lp-alert .lp-link {
+		display: block;
+		margin-top: 6px;
+		color: var(--lp-ink);
+	}
+</style>

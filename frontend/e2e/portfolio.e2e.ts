@@ -125,8 +125,9 @@ test.describe('portfolio detail', () => {
 		await page.goto('/dashboard/portfolios/11111111-1111-4111-8111-111111111113/assets/USD');
 
 		// Y un activo cuyo valor no se ha movido no lleva ni signo ni color de
-		// ganancia.
-		await expect(page.getByText('Vale lo mismo que los $9,500.00 que invertiste.')).toBeVisible();
+		// ganancia. Es efectivo en su propia moneda, así que el dinero se
+		// depositó, no se invirtió (`asset-position-headline`).
+		await expect(page.getByText('Vale lo mismo que los $9,500.00 que depositaste.')).toBeVisible();
 
 		const row = page.getByRole('row').filter({ hasText: 'Interés' });
 		await expect(row).toContainText('$0.0021');

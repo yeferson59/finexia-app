@@ -91,7 +91,7 @@ func cashRateValues(rate, withholding decimal.Decimal, posting string, tiers []C
 
 	steps := make([]CashRateTierInput, 0, len(tiers)+1)
 	for _, tier := range tiers {
-		steps = append(steps, CashRateTierInput{FromBalance: tier.FromBalance, AnnualRatePct: tier.AnnualRatePct})
+		steps = append(steps, CashRateTierInput(tier))
 	}
 
 	if maxBalance != nil {

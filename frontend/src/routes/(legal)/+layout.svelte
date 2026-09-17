@@ -1,10 +1,15 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import '$lib/features/landing/landing.css';
-	import { Brand, Footer } from '$lib/features/landing';
+	import '$lib/ui/public.css';
+	import Brand from '$lib/ui/brand.svelte';
+	import { Footer } from '$lib/features/landing';
 
 	let { children } = $props();
 </script>
+
+<svelte:head>
+	<meta name="theme-color" content="#eef0ec" />
+</svelte:head>
 
 <div class="lp">
 	<header class="legal-header">

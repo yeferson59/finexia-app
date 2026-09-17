@@ -6,7 +6,10 @@ import { resetPasswordSchema } from '$lib/features/auth';
 export const load: PageServerLoad = async ({ url, fetch }) => {
 	const token = url.searchParams.get('token');
 	if (!token) {
-		return { valid: false as const, reason: 'Falta el token de recuperación.' };
+		return {
+			valid: false as const,
+			reason: 'El enlace está incompleto. Ábrelo de nuevo desde el correo o pide uno nuevo.'
+		};
 	}
 
 	const res = await auth.validatePasswordResetToken(fetch, token);

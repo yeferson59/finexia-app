@@ -6,7 +6,7 @@
 </script>
 
 <svelte:head>
-	<title>Activar cuenta — FINEXIA</title>
+	<title>Activar cuenta — Finexia</title>
 	<meta name="robots" content="noindex" />
 </svelte:head>
 

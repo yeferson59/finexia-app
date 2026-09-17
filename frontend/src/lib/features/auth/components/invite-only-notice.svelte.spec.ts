@@ -5,7 +5,7 @@ import InviteOnlyNotice from './invite-only-notice.svelte';
 
 describe('invite-only-notice.svelte', () => {
 	it('renders the invite-only copy and the waitlist call to action', async () => {
-		render(InviteOnlyNotice, { onSwitchToLogin: () => {} });
+		render(InviteOnlyNotice);
 
 		await expect.element(page.getByText('Registro por invitación')).toBeInTheDocument();
 		await expect

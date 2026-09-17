@@ -5,38 +5,23 @@
 
 	let { form, data }: { form: ActionData; data: PageData } = $props();
 
-	const notice = $derived(
-		page.url.searchParams.has('registered')
-			? 'Cuenta creada. Revisa tu correo para verificar tu cuenta antes de iniciar sesión.'
-			: page.url.searchParams.has('verified')
-				? 'Correo verificado. Ya puedes iniciar sesión.'
-				: undefined
-	);
+	/* Lo que dicen las pantallas que terminan aquí. Cada una vuelve con su marca
+	   en la URL y la frase dice qué ha pasado y qué toca ahora. */
+	const notice = $derived.by(() => {
+		const params = page.url.searchParams;
+		if (params.has('registered'))
+			return 'Cuenta creada. Te enviamos un enlace para verificar tu correo; ábrelo antes de iniciar sesión.';
+		if (params.has('verified')) return 'Correo verificado. Ya puedes iniciar sesión.';
+		if (params.has('reset')) return 'Contraseña cambiada. Inicia sesión con la nueva.';
+		if (params.has('invited'))
+			return 'Cuenta activada. Inicia sesión con tu correo y la contraseña que elegiste.';
+		return undefined;
+	});
 </script>
 
 <svelte:head>
-	<title>Iniciar sesión - FINEXIA</title>
-	<meta name="description" content="Inicia sesión o crea una cuenta en FINEXIA" />
+	<title>Iniciar sesión — Finexia</title>
+	<meta name="description" content="Inicia sesión en Finexia o pide acceso a la beta." />
 </svelte:head>
 
-{#if notice}
-	<p class="auth-notice" role="status">{notice}</p>
-{/if}
-
-<LoginRegister {form} selfRegistrationEnabled={data.selfRegistrationEnabled} />
-
-<style>
-	.auth-notice {
-		position: relative;
-		z-index: 20;
-		max-width: 32rem;
-		margin: 1.5rem auto 0;
-		padding: 0.85rem 1.25rem;
-		background: rgba(34, 201, 126, 0.08);
-		border: 1px solid rgba(34, 201, 126, 0.25);
-		border-radius: 0.75rem;
-		color: var(--text, #eceae5);
-		font-size: 0.85rem;
-		text-align: center;
-	}
-</style>
+<LoginRegister {form} {notice} selfRegistrationEnabled={data.selfRegistrationEnabled} />

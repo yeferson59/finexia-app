@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import Brand from './brand.svelte';
+	import Brand from '$lib/ui/brand.svelte';
 
 	let menuOpen = $state(false);
 	let scrolled = $state(false);

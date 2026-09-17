@@ -6,7 +6,7 @@
 </script>
 
 <svelte:head>
-	<title>Recuperar contraseña — FINEXIA</title>
+	<title>Recuperar contraseña — Finexia</title>
 	<meta name="robots" content="noindex" />
 </svelte:head>
 

@@ -1,72 +1,36 @@
 <script lang="ts">
+	/*
+	 * Lo que se ve en «Crear cuenta» mientras el registro está cerrado. No es un
+	 * formulario deshabilitado: dice por qué no hay formulario y las dos salidas
+	 * que sí existen, la lista de espera y el enlace de una invitación.
+	 */
 	import { resolve } from '$app/paths';
-
-	let {
-		slideDirection = 'right',
-		onSwitchToLogin
-	}: {
-		slideDirection?: 'left' | 'right';
-		onSwitchToLogin: () => void;
-	} = $props();
 </script>
 
-<div
-	class="form-content invite-only"
-	class:slide-left={slideDirection === 'left'}
-	id="register-form"
->
-	<p class="invite-only-title">Registro por invitación</p>
-	<p class="invite-only-copy">
-		FINEXIA está en fase beta y el acceso es solo por invitación. Únete a la lista de espera y te
-		avisaremos en cuanto tengas un cupo.
+<div class="invite-only" id="register-form">
+	<h2 class="title">Registro por invitación</h2>
+	<p class="shell-copy">
+		Durante la beta, las cuentas se crean por invitación. Únete a la lista de espera y te escribimos
+		cuando tengas acceso.
 	</p>
 
-	<a href="{resolve('/')}#waitlist" class="invite-only-cta"> Unirme a la lista de espera </a>
+	<a href="{resolve('/')}#waitlist" class="lp-btn cta block">Unirme a la lista de espera</a>
 
-	<div class="form-switch">
-		¿Ya tienes cuenta?
-		<button type="button" onclick={onSwitchToLogin} class="switch-link"> Inicia sesión </button>
-	</div>
+	<p class="shell-after">
+		¿Ya te llegó la invitación? Abre el enlace del correo para activar tu cuenta.
+	</p>
 </div>
 
 <style>
-	.invite-only {
-		text-align: center;
+	.title {
+		margin: 0 0 12px;
+		font-size: var(--lp-fs-h3);
+		font-stretch: 110%;
+		font-weight: 620;
+		line-height: 1.2;
 	}
 
-	.invite-only-title {
-		font-size: 1.1rem;
-		font-weight: 700;
-		color: var(--text-primary);
-		margin: 0;
-	}
-
-	.invite-only-copy {
-		font-size: 0.9rem;
-		line-height: 1.6;
-		color: var(--text-secondary);
-		margin: 0;
-	}
-
-	.invite-only-cta {
-		display: block;
-		width: 100%;
-		padding: 1rem 2rem;
-		border-radius: 8px;
-		background: var(--amber);
-		color: #0d0800;
-		font-weight: 600;
-		font-size: 0.95rem;
-		text-align: center;
-		text-decoration: none;
-		letter-spacing: 0.5px;
-		box-shadow: 0 4px 16px rgba(212, 145, 42, 0.2);
-		transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-	}
-
-	.invite-only-cta:hover {
-		background: var(--amber-light);
-		transform: translateY(-2px);
-		box-shadow: 0 6px 24px rgba(212, 145, 42, 0.35);
+	.cta {
+		margin-top: 28px;
 	}
 </style>
