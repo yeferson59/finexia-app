@@ -46,8 +46,8 @@
 </p>
 {#if transaction.cashCredited}
 	<p class="warning">
-		El dividendo también sale del efectivo de la plataforma. Si ese dinero ya salió en un retiro, no
-		se podrá borrar hasta quitar el retiro.
+		Lo que abonó al efectivo de la plataforma también sale de ahí. Si ese dinero ya salió en un
+		retiro, no se podrá borrar hasta quitar el retiro.
 	</p>
 {/if}
 

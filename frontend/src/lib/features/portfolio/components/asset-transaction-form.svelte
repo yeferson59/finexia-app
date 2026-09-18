@@ -81,14 +81,22 @@
 	);
 
 	/**
-	 * Un dividendo se abona al efectivo que la plataforma guarda en la moneda de
-	 * la cuenta, por lo que la cuenta recibió: el monto llevado por la tasa. Viene
-	 * marcado porque es lo que hace el bróker; se desmarca si el dinero ya se
-	 * anotó como depósito o llegó a otra cuenta. Un saldo de efectivo no se abona
-	 * a sí mismo.
+	 * Un dividendo o una venta se abonan al efectivo que la plataforma guarda en
+	 * la moneda de la cuenta, por lo que la cuenta recibió: el importe llevado por
+	 * la tasa y, en una venta, menos la comisión en esa moneda. Viene marcado
+	 * porque es lo que hace el bróker; se desmarca si el dinero ya se anotó como
+	 * depósito o llegó a otra cuenta. Un saldo de efectivo no se abona a sí mismo.
 	 */
-	const canCreditCash = $derived(txnForm.type === 'dividend' && entry?.assetType !== 'cash');
-	const creditAmount = $derived((parseFloat(txnForm.price) || 0) * rate);
+	const canCreditCash = $derived(
+		(txnForm.type === 'dividend' || txnForm.type === 'sell') && entry?.assetType !== 'cash'
+	);
+	const feesInCost = $derived(
+		(parseFloat(txnForm.fees) || 0) *
+			(crossCurrency && txnForm.feesCurrency !== costCurrency ? rate : 1)
+	);
+	const creditAmount = $derived(
+		txnForm.type === 'sell' ? settledTotal - feesInCost : (parseFloat(txnForm.price) || 0) * rate
+	);
 
 	// Para avisar si la fecha no parece la de la operación. Solo con precio unitario.
 	const dateCheck = $derived(

@@ -10,8 +10,9 @@
 	 * `compact` es un abono dentro de un grupo desplegado: la cuenta y el tipo ya
 	 * los dice el grupo, así que solo lleva la fecha, el importe y las acciones.
 	 *
-	 * Un dividendo no se edita ni se borra aquí: es el dinero que pagó una acción,
-	 * y cambia o se va con el dividendo. La fila lleva a él en su lugar.
+	 * Un dividendo o lo recibido por una venta no se editan ni se borran aquí: son
+	 * dinero que pagó una acción, y cambian o se van con esa transacción. La fila
+	 * lleva a ella en su lugar.
 	 */
 	import { resolve } from '$app/paths';
 	import { privacy } from '$lib/shared/privacy.svelte';
@@ -52,14 +53,14 @@
 	/* Lo que distingue un «Editar» de los otros catorce para quien no ve la fila. */
 	const described = $derived(`${formatCashKind(movement.kind).toLowerCase()} del ${fullDate}`);
 
-	const isDividend = $derived(movement.kind === 'dividend');
+	const isCredit = $derived(movement.kind === 'dividend' || movement.kind === 'sale');
 
-	/* La acción que pagó el dividendo, en el mismo portafolio que el saldo. */
-	const dividendHref = $derived(
-		isDividend && movement.dividendTicker
+	/* La acción de la que viene, en el mismo portafolio que el saldo. */
+	const originHref = $derived(
+		isCredit && movement.originTicker
 			? resolve('/dashboard/portfolios/[id]/assets/[symbol]', {
 					id: movement.portfolioId,
-					symbol: movement.dividendTicker
+					symbol: movement.originTicker
 				})
 			: null
 	);
@@ -78,8 +79,8 @@
 		<div class="what">
 			<p class="kind">
 				{formatCashKind(movement.kind)}
-				{#if isDividend && movement.dividendTicker}
-					<span class="tag">de {movement.dividendTicker}</span>
+				{#if isCredit && movement.originTicker}
+					<span class="tag">de {movement.originTicker}</span>
 				{/if}
 				{#if movement.automatic}
 					<span class="tag">automático</span>
@@ -100,17 +101,23 @@
 	{/if}
 
 	<p class="figures">
-		<span class="amount" class:income={movement.kind === 'interest' || isDividend}>{amount}</span>
+		<!-- Lo recibido por una venta no va en verde: es capital que vuelve a la
+		     cuenta, y su ganancia, si la hubo, ya estaba en la acción. -->
+		<span class="amount" class:income={movement.kind === 'interest' || movement.kind === 'dividend'}
+			>{amount}</span
+		>
 		{#if fee}
 			<span class="fee">comisión {fee}</span>
 		{/if}
 	</p>
 
 	<div class="actions">
-		{#if isDividend}
-			{#if dividendHref}
-				<a class="action" href={dividendHref}>
-					Ver dividendo<span class="sr-only"> {described}</span>
+		{#if isCredit}
+			{#if originHref}
+				<a class="action" href={originHref}>
+					{movement.kind === 'sale' ? 'Ver venta' : 'Ver dividendo'}<span class="sr-only">
+						{described}</span
+					>
 				</a>
 			{/if}
 		{:else}

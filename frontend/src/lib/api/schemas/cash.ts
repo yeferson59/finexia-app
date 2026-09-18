@@ -71,15 +71,16 @@ export const cashBalanceSchema = z.object({
  * `kind` es lo que hizo el dueño; `type`, la transacción con que se guardó.
  * `other` es un movimiento anotado sobre el saldo desde la posición —un
  * interés cobrado fuera, una comisión suelta— que esta pantalla enseña pero no
- * sabe reescribir: por eso llega con `editable: false`. `dividend` es un
- * dividendo que la acción pagó a esta cuenta: se registra, cambia y borra
- * desde el dividendo, nunca desde aquí.
+ * sabe reescribir: por eso llega con `editable: false`. `dividend` y `sale` son
+ * el dinero que una acción pagó a esta cuenta —un dividendo, lo recibido por
+ * una venta—: se registran, cambian y borran desde esa transacción, nunca desde
+ * aquí.
  */
 export const cashMovementSchema = z.object({
 	id: z.string(),
 	entryId: z.string(),
 	type: z.string(),
-	kind: z.enum(['deposit', 'withdrawal', 'interest', 'dividend', 'other']),
+	kind: z.enum(['deposit', 'withdrawal', 'interest', 'dividend', 'sale', 'other']),
 	/** Lo que se movió, en `currency`, la moneda del saldo. */
 	amount: z.string(),
 	currency: z.string(),
@@ -90,8 +91,8 @@ export const cashMovementSchema = z.object({
 	editable: z.boolean(),
 	/** Lo abonó sola la tasa de la cuenta, no el dueño. */
 	automatic: z.boolean().default(false),
-	/** El activo que pagó el dividendo, en el mismo portafolio; vacío en los demás. */
-	dividendTicker: z.string().default(''),
+	/** El activo cuyo dividendo o venta es este abono, en el mismo portafolio; vacío en los demás. */
+	originTicker: z.string().default(''),
 	portfolioId: z.string(),
 	portfolioName: z.string(),
 	sourceId: z.string(),

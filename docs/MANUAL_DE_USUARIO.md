@@ -478,7 +478,7 @@ Si tienes **varios portafolios**, el formulario pregunta al final en cuál suma 
 
 Finexia **no deja un saldo en negativo**. Un retiro mayor que lo que hay, o borrar un depósito cuyo dinero ya salió en un retiro, se rechaza con la explicación en el propio formulario. Cada movimiento se puede **Editar** —tipo, importe, fecha, comisión y nota; la cuenta no cambia— o **Borrar**; con ratón, los dos botones aparecen al pasar por la fila. Los que se anotaron desde la posición del activo aparecen en la lista, pero aquí solo se pueden borrar.
 
-> **Los dividendos llegan solos.** Un dividendo registrado desde la posición con la casilla **Abonar al efectivo de la plataforma** marcada (ver 10.2) aparece aquí como **Dividendo de AAPL**, en verde, porque es rendimiento. No se edita ni se borra desde esta lista: cambia o se va con el dividendo, y **Ver dividendo** te lleva a él.
+> **Los dividendos y las ventas llegan solos.** Un dividendo o una venta registrados desde la posición con la casilla **Abonar al efectivo de la plataforma** marcada (ver 10.2 y 10.4) aparecen aquí como **Dividendo de AAPL** —en verde, porque es rendimiento— o **Venta de AAPL**. No se editan ni se borran desde esta lista: cambian o se van con su transacción, y **Ver dividendo** o **Ver venta** te llevan a ella.
 
 > **Las compras no descuentan del efectivo.** Si pagas unas acciones con dinero de tu saldo, registra también el retiro por ese importe: así el saldo cuadra con tu cuenta, y tu rentabilidad no cambia, porque el retiro y la compra se compensan.
 
@@ -618,7 +618,7 @@ Las transacciones se registran desde la posición a la que pertenecen: entra al 
 2. Indica la **fecha** y, si tienes el mismo activo en más de una plataforma, en cuál de ellas fue.
 3. Añade la **comisión**, si la hubo, y las **notas** que quieras.
 4. Si la operación se liquidó en otra moneda, indica la **tasa** (apartado 7.4). Al lado verás el **coste en la moneda de tu cuenta** que sale de lo que llevas tecleado, para contrastarlo con lo que te debitaron.
-5. Si es un **dividendo**, la casilla **Abonar al efectivo de la plataforma** viene marcada: el importe, en la moneda de tu cuenta, se suma al efectivo de esa plataforma (sección 9.5), como hace el bróker. Tu rentabilidad no cambia por eso —el dividendo cuenta una sola vez—, pero el dinero ya no desaparece: queda en tu saldo. Desmárcala si ya anotaste ese dinero como un depósito o si te lo pagaron en otra cuenta.
+5. Si es un **dividendo** o una **venta**, la casilla **Abonar al efectivo de la plataforma** viene marcada: lo que recibiste, en la moneda de tu cuenta y ya sin la comisión, se suma al efectivo de esa plataforma (sección 9.5), como hace el bróker. Tu rentabilidad no cambia por eso —cada operación cuenta una sola vez—, pero el dinero ya no desaparece: queda en tu saldo. En una venta, la ganancia que realizaste sigue contando como ganancia mientras el dinero esté en el efectivo, y tu capital invertido sigue siendo lo que pagaste por las acciones. Desmárcala si ya anotaste ese dinero como un depósito o si te lo pagaron en otra cuenta.
 6. Guarda. La posición y el portafolio se recalculan automáticamente.
 
 ### 10.3 Editar o eliminar una transacción
@@ -628,7 +628,7 @@ En el historial de la posición, cada fila tiene sus acciones:
 - **Editar** — abre la operación en una ventana con todos sus datos, la tasa incluida. Corrige lo que haga falta y guarda; los totales se actualizan.
 - **Eliminar** — la borra tras una confirmación que muestra el tipo, la fecha y el total de esa fila, porque en la tabla todas se parecen. La posición se recalcula con las que queden; si era la última, la cantidad pasa a 0. No se puede deshacer.
 
-Un dividendo abonado al efectivo lleva debajo **Abonado al efectivo**. Editarlo cambia también lo que se abonó, desmarcar la casilla lo saca del efectivo y eliminarlo se lleva el abono con él. Si ese dinero ya salió en un retiro, Finexia no deja achicarlo ni borrarlo hasta que el saldo lo tenga de nuevo.
+Un dividendo o una venta abonados al efectivo llevan debajo **Abonado al efectivo**. Editarlos cambia también lo que se abonó, desmarcar la casilla lo saca del efectivo y eliminarlos se lleva el abono con ellos. Si ese dinero ya salió en un retiro, Finexia no deja achicarlo ni borrarlo hasta que el saldo lo tenga de nuevo.
 
 ### 10.4 Registrar una venta
 
@@ -637,6 +637,7 @@ El botón **Vender** de una fila del historial abre el panel de venta con ese lo
 - Vende **el lote entero** o **una parte**; en ese caso indícala **por unidades o por importe**, lo que tengas a mano de la confirmación del bróker.
 - El **precio** llega sugerido del mercado: cámbialo por el que se ejecutó de verdad.
 - Si la venta liquidó en otra moneda, indica la **tasa** y en cuál de las dos monedas te cobraron la **comisión** (apartado 7.4). Debajo verás lo que recibiría tu cuenta con lo tecleado.
+- La casilla **Abonar al efectivo de la plataforma** viene marcada: lo recibido, menos la comisión, se suma a tu efectivo en esa plataforma (sección 9.5). Desmárcala si el dinero fue a otra cuenta.
 
 La venta se registra como una transacción más, así que aparece en el historial y se puede editar o eliminar como cualquier otra.
 

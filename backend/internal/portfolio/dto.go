@@ -76,9 +76,10 @@ type CreateTransactionRequestDTO struct {
 	FeesCurrency    money.Currency `json:"feesCurrency"`
 	TransactionDate time.Time      `json:"transactionDate" validate:"required"`
 	Notes           string         `json:"notes"`
-	// CreditCash pays a dividend into the cash the platform holds in the
-	// position's currency. Omitted means no, which is what every dividend was
-	// before the app kept cash; it is refused on any other type.
+	// CreditCash pays a dividend, or the proceeds of a sale, into the cash the
+	// platform holds in the position's currency. Omitted means no, which is what
+	// every dividend and sale was before the app kept cash; it is refused on any
+	// other type.
 	CreditCash bool `json:"creditCash"`
 }
 
@@ -93,7 +94,7 @@ type UpdateTransactionRequestDTO struct {
 	TransactionDate time.Time       `json:"transactionDate"`
 	Notes           string          `json:"notes"`
 	// CreditCash is the whole answer, like every other field of this PUT: false
-	// takes back a credit the dividend had.
+	// takes back a credit the dividend or the sale had.
 	CreditCash bool `json:"creditCash"`
 }
 
@@ -182,8 +183,8 @@ type TransactionResponseDTO struct {
 	FeesCurrency    string    `json:"feesCurrency,omitempty"`
 	TransactionDate time.Time `json:"transactionDate"`
 	Notes           string    `json:"notes"`
-	// CashCredited is whether a dividend was paid into the platform's cash, so
-	// an edit form can send the same answer back.
+	// CashCredited is whether a dividend, or a sale's proceeds, was paid into the
+	// platform's cash, so an edit form can send the same answer back.
 	CashCredited bool      `json:"cashCredited"`
 	CreatedAt    time.Time `json:"createdAt"`
 }

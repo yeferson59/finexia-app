@@ -59,15 +59,16 @@ const (
 	// cash.go and migrations 000040/000041.
 	CashInterest TransactionType = "cash_interest"
 	// CashDividend is a dividend paid into the cash of the platform that holds
-	// the share: a row on that balance, linked to the Dividend it pays and
-	// written only with it. See postgres_dividend_credit.go and migrations
-	// 000049/000050.
+	// the share, and CashSale the proceeds of a Sell paid into it: rows on that
+	// balance, each linked to the transaction whose money it is and written only
+	// with it. See postgres_cash_credit.go and migrations 000049 to 000052.
 	CashDividend TransactionType = "cash_dividend"
+	CashSale     TransactionType = "cash_sale"
 )
 
 func (t TransactionType) IsValid() bool {
 	switch t {
-	case Buy, Sell, Dividend, Split, TransferIn, TransferOut, Fee, Interest, CashInterest, CashDividend:
+	case Buy, Sell, Dividend, Split, TransferIn, TransferOut, Fee, Interest, CashInterest, CashDividend, CashSale:
 		return true
 	default:
 		return false
@@ -246,8 +247,9 @@ type Transaction struct {
 	Fees            money.Money    `json:"fees"`
 	TransactionDate time.Time      `json:"transactionDate"`
 	Notes           string         `json:"notes"`
-	// CashCredited is whether a dividend's money was paid into the platform's
-	// cash (000050). Only the reads that serve an edit form select it.
+	// CashCredited is whether a dividend's money, or a sale's proceeds, was paid
+	// into the platform's cash (000050, 000052). Only the reads that serve an edit form
+	// select it.
 	CashCredited bool      `json:"cashCredited,omitempty"`
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
@@ -272,9 +274,9 @@ type TransactionInput struct {
 	FeesCurrency    money.Currency
 	TransactionDate time.Time
 	Notes           string
-	// CreditCash pays a dividend into the cash the platform holds in the
-	// position's currency. It is the whole answer on every write: an edit that
-	// leaves it false takes a credit the dividend had back out.
+	// CreditCash pays a dividend, or the proceeds of a sale, into the cash the
+	// platform holds in the position's currency. It is the whole answer on every
+	// write: an edit that leaves it false takes back a credit the row had.
 	CreditCash bool
 }
 
@@ -318,14 +320,14 @@ func (in TransactionInput) Rate() decimal.Decimal {
 // instead has to say so — which the forms do, explicitly, on the only screens
 // where the two can differ.
 //
-// CreditCash is refused on anything but a dividend. Whether this dividend can be
-// credited — the position, the account, the amount — depends on where it is
-// recorded, and is checked there (syncDividendCredit).
+// CreditCash is refused on anything but a dividend or a sale. Whether this one
+// can be credited — the position, the account, the amount — depends on where it
+// is recorded, and is checked there (syncCashCredit).
 func (in TransactionInput) Validate(costCurrency money.Currency) (TransactionInput, error) {
 	out := in
 
-	if in.CreditCash && in.Type != Dividend {
-		return in, fmt.Errorf("%w: only a dividend is paid into cash, not a %s", ErrDividendNotCreditable, in.Type)
+	if _, ok := in.Type.cashCredit(); in.CreditCash && !ok {
+		return in, fmt.Errorf("%w: only a dividend or a sale is paid into cash, not a %s", ErrNotCreditable, in.Type)
 	}
 
 	if out.Currency == money.XXX {

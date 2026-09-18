@@ -65,14 +65,14 @@ var ErrTransactionFeesCurrency = httpx.AsBadRequest(errors.New("invalid transact
 // another one.
 var ErrSettlementWithoutTransactions = httpx.AsBadRequest(errors.New("position has no transactions to restate"))
 
-// ErrDividendNotCreditable refuses to pay a dividend into cash when there is no
-// cash it could honestly land in: the transaction is not a dividend, it is
+// ErrNotCreditable refuses to pay a transaction's money into cash when there is
+// no cash it could honestly land in: it is neither a dividend nor a sale, it is
 // recorded on a cash balance, the position's currency is one no balance is kept
 // in, or the fees leave nothing to credit. It is wrapped with which.
-var ErrDividendNotCreditable = httpx.AsBadRequest(errors.New("dividend cannot be credited to cash"))
+var ErrNotCreditable = httpx.AsBadRequest(errors.New("transaction cannot be credited to cash"))
 
-// ErrDividendCreditLinked refuses to write a dividend's cash credit on its own.
-// The credit is the dividend's money landing in the account, so it follows the
-// dividend: it changes, moves and goes when the dividend does, and a credit
-// edited by hand would be a dividend the holding never paid.
-var ErrDividendCreditLinked = httpx.AsBadRequest(errors.New("this cash movement is the credit of a dividend: edit or delete the dividend instead"))
+// ErrCashCreditLinked refuses to write the cash credit of a dividend or a sale
+// on its own. The credit is that money landing in the account, so it follows
+// its transaction: it changes, moves and goes when that does, and a credit
+// edited by hand would be money the holding never paid.
+var ErrCashCreditLinked = httpx.AsBadRequest(errors.New("this cash movement is the credit of a dividend or a sale: edit or delete that transaction instead"))

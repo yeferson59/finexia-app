@@ -75,9 +75,10 @@
 		if (current?.mode === 'edit') {
 			const m = current.movement;
 			return {
-				// Ni «otro» ni un dividendo llegan aquí —no son editables—; el
-				// valor solo tiene que ser uno que este formulario sepa escribir.
-				kind: m.kind === 'other' || m.kind === 'dividend' ? 'deposit' : m.kind,
+				// Ni «otro» ni un abono de dividendo o venta llegan aquí —no son
+				// editables—; el valor solo tiene que ser uno que este formulario
+				// sepa escribir.
+				kind: m.kind === 'other' || m.kind === 'dividend' || m.kind === 'sale' ? 'deposit' : m.kind,
 				portfolioId: m.portfolioId,
 				sourceId: m.sourceId,
 				currency: m.currency,

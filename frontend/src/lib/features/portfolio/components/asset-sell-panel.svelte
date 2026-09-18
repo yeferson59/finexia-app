@@ -6,6 +6,7 @@
 	import type { Holding, Transaction } from '$lib/api/types';
 	import AssetSellPanelHeader from './asset-sell-panel-header.svelte';
 	import AssetSellCurrencyFields from './asset-sell-currency-fields.svelte';
+	import AssetCreditCashField from './asset-credit-cash-field.svelte';
 
 	let {
 		transaction,
@@ -36,6 +37,8 @@
 	let sellRate = $state('');
 	let sellDate = $state(todayLocalDateString());
 	let sellNotes = $state('');
+	// Lo recibido va al efectivo de la plataforma, como hace el bróker.
+	let sellCreditCash = $state(true);
 	let isSellSubmitting = $state(false);
 
 	$effect(() => {
@@ -49,6 +52,7 @@
 			sellFeesCurrency = '';
 			sellRate = '';
 			sellNotes = '';
+			sellCreditCash = true;
 			sellDate = todayLocalDateString();
 		}
 	});
@@ -108,6 +112,27 @@
 			(parseFloat(sellPrice) || 0) *
 			(parseFloat(sellRate) || (sellIsCrossCurrency ? 0 : 1))
 	);
+
+	/**
+	 * Lo que llega al efectivo: lo cobrado menos la comisión en la moneda de la
+	 * cuenta. Una comisión cobrada en la moneda del mercado pasa por la tasa.
+	 */
+	const sellCredited = $derived(
+		sellProceeds -
+			(parseFloat(sellFees) || 0) *
+				(sellIsCrossCurrency && sellFeesCurrency !== sellCostCurrency
+					? parseFloat(sellRate) || 0
+					: 1)
+	);
+	const sellCanCreditCash = $derived(sellEntry?.assetType !== 'cash');
+
+	function formatCredit(value: number): string {
+		return new Intl.NumberFormat('es-CO', {
+			style: 'currency',
+			currency: sellCostCurrency,
+			minimumFractionDigits: 2
+		}).format(value);
+	}
 </script>
 
 <div class="sell-panel">
@@ -260,6 +285,14 @@
 				/>
 			</div>
 		</div>
+
+		{#if sellCanCreditCash}
+			<AssetCreditCashField
+				bind:checked={sellCreditCash}
+				currency={sellCostCurrency}
+				amount={sellCredited > 0 ? formatCredit(sellCredited) : ''}
+			/>
+		{/if}
 
 		{#if formError}
 			<p class="feedback error" role="alert">No se pudo registrar la venta. Verifica los datos.</p>

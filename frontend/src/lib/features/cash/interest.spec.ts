@@ -14,7 +14,7 @@ const movement = (over: Partial<CashMovement> & { date: string }): CashMovement 
 	notes: '',
 	editable: true,
 	automatic: false,
-	dividendTicker: '',
+	originTicker: '',
 	portfolioId: 'p1',
 	portfolioName: 'Ahorro',
 	sourceId: 's1',

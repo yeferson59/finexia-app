@@ -172,6 +172,22 @@ test.describe('portfolio detail', () => {
 		await expect(credit).toHaveCount(0);
 	});
 
+	// Lo mismo con una venta: lo cobrado, menos la comisión, llega al efectivo.
+	test('the quick sell pays the proceeds into the platform cash', async ({ page }) => {
+		await login(page);
+		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}/assets/AAPL`);
+
+		await page.getByRole('button', { name: /^Vender/ }).click();
+		const dialog = page.getByRole('dialog', { name: 'Vender posición' });
+		const credit = dialog.getByRole('checkbox', { name: /Abonar al efectivo de la plataforma/ });
+
+		await expect(credit).toBeChecked();
+		await expect(dialog).toContainText(/Suma .* a tu efectivo en USD/);
+
+		await credit.uncheck();
+		await expect(credit).not.toBeChecked();
+	});
+
 	// Borrar una transacción es irreversible y el botón vive en una tabla de
 	// filas casi idénticas, así que pasa por una confirmación que dice cuál se
 	// va a borrar y qué le ocurre a la posición.

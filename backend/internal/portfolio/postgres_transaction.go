@@ -61,9 +61,9 @@ func (r *PostgresRepository) GetTopTransactionByPortfolioID(ctx context.Context,
 // GetRecentTransactionsByUserID lists the user's latest transactions: the
 // activity feed, the transactions page, the export and the MCP tool.
 //
-// A dividend's cash credit is left out. The dividend is already on the list,
-// and listing the money it paid into cash beside it would read as two payments.
-// The credit is where the cash screens show it.
+// The cash credit of a dividend or a sale is left out. The dividend or the sale
+// is already on the list, and listing the money it paid into cash beside it
+// would read as two operations. The credit is where the cash screens show it.
 func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]Transaction, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fx_rate,
@@ -75,7 +75,7 @@ func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, 
 		JOIN portfolios p ON p.id = pe.portfolio_id
 		JOIN assets a ON a.id = pe.asset_id
 		WHERE p.user_id = $1
-		  AND t.type <> 'cash_dividend'
+		  AND t.type NOT IN ('cash_dividend', 'cash_sale')
 		ORDER BY t.transaction_date DESC, t.created_at DESC
 		LIMIT $2
 	`, userID, limit)
@@ -273,7 +273,7 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fx_rate,
 		       pe.cost_currency, t.fees, t.fees_currency,
 		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at,
-		       EXISTS (SELECT 1 FROM transactions c WHERE c.dividend_id = t.id)
+		       EXISTS (SELECT 1 FROM transactions c WHERE c.credited_from = t.id)
 		FROM transactions t
 		JOIN portfolio_entries pe ON pe.id = t.entry_id
 		WHERE t.entry_id = $1
@@ -337,7 +337,7 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fx_rate,
 		       pe.cost_currency, t.fees, t.fees_currency,
 		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at,
-		       EXISTS (SELECT 1 FROM transactions c WHERE c.dividend_id = t.id)
+		       EXISTS (SELECT 1 FROM transactions c WHERE c.credited_from = t.id)
 		FROM transactions t
 		JOIN portfolio_entries pe ON pe.id = t.entry_id
 		JOIN assets a ON a.id = pe.asset_id
@@ -389,8 +389,10 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 // version issued them on r.db, so the surrounding transaction was opened,
 // committed and never actually used.
 //
-// A dividend stated with CreditCash is paid into the platform's cash in the same
-// transaction, so the two rows exist together or not at all.
+// A dividend or a sale stated with CreditCash is paid into the platform's cash
+// in the same transaction, so the two rows exist together or not at all. The
+// position's other credits are re-synced after it: a purchase moves the average
+// cost its credited sales carried out.
 func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, in TransactionInput) (Transaction, error) {
 	var txn Transaction
 
@@ -450,14 +452,14 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 		txn.Fees.SetCurrency(txn.FeesCurrency)
 
 		if settled.CreditCash {
-			if err := syncDividendCredit(ctx, tx, userID, txn.ID, true); err != nil {
+			if err := syncCashCredit(ctx, tx, userID, txn.ID, true); err != nil {
 				return err
 			}
 
 			txn.CashCredited = true
 		}
 
-		return nil
+		return syncEntryCashCredits(ctx, tx, userID, entryID, true)
 	}); err != nil {
 		return txn, err
 	}
@@ -474,9 +476,11 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 // own ownership predicate anyway — the read cannot be trusted to still hold by
 // the time the write lands, and the cost of restating it is one join.
 //
-// The dividend's credit is rewritten after it, from the row as it now stands:
+// The row's cash credit is rewritten after it, from the row as it now stands:
 // kept and resized when CreditCash still asks for it, taken out when it does
-// not or the row stopped being a dividend. A credit cannot be edited on its own.
+// not or the row stopped being a dividend or a sale. Then the position's other
+// credits, whose sales' cost the edit may have moved. A credit cannot be edited
+// on its own.
 func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, in TransactionInput) (Transaction, error) {
 	var txn Transaction
 
@@ -500,8 +504,8 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 			return err
 		}
 
-		if currentType == CashDividend {
-			return ErrDividendCreditLinked
+		if currentType.isCashCredit() {
+			return ErrCashCreditLinked
 		}
 
 		settled, err := in.Validate(costCurrency)
@@ -563,13 +567,13 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 		txn.Price.SetCurrency(txn.Currency)
 		txn.Fees.SetCurrency(txn.FeesCurrency)
 
-		if err := syncDividendCredit(ctx, tx, userID, txnID, settled.CreditCash); err != nil {
+		if err := syncCashCredit(ctx, tx, userID, txnID, settled.CreditCash); err != nil {
 			return err
 		}
 
 		txn.CashCredited = settled.CreditCash
 
-		return nil
+		return syncEntryCashCredits(ctx, tx, userID, entryID, true)
 	}); err != nil {
 		return Transaction{}, err
 	}
@@ -586,8 +590,10 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 // transaction id belonging to somebody else is indistinguishable from one that
 // does not exist — both delete no rows and answer 404.
 //
-// A dividend's credit goes with it, once its balance is known to spare the
-// money; the credit on its own cannot be deleted here.
+// The credit of a dividend or a sale goes with it, once its balance is known to
+// spare the money; the credit on its own cannot be deleted here. Deleting a
+// purchase moves the cost the position's credited sales carried out, so those
+// are re-synced after.
 func (r *PostgresRepository) DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID) error {
 	return database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		// A row of a fixed deposit is refused before the delete rather than left
@@ -612,15 +618,15 @@ func (r *PostgresRepository) DeleteTransaction(ctx context.Context, userID, txnI
 			return err
 		}
 
-		if txnType == CashDividend {
-			return ErrDividendCreditLinked
+		if txnType.isCashCredit() {
+			return ErrCashCreditLinked
 		}
 
 		if err := requireWritableEntry(ctx, tx, entryID); err != nil {
 			return err
 		}
 
-		if err := syncDividendCredit(ctx, tx, userID, txnID, false); err != nil {
+		if err := syncCashCredit(ctx, tx, userID, txnID, false); err != nil {
 			return err
 		}
 
@@ -633,7 +639,7 @@ func (r *PostgresRepository) DeleteTransaction(ctx context.Context, userID, txnI
 			return ErrTransactionNotFound
 		}
 
-		return nil
+		return syncEntryCashCredits(ctx, tx, userID, entryID, true)
 	})
 }
 
@@ -661,7 +667,9 @@ func (r *PostgresRepository) ImportEntryTransactions(ctx context.Context, userID
 		// Cache asset lookups: classic spreadsheets repeat the same ticker on
 		// many rows.
 		assetIDs := make(map[string]uuid.UUID)
-		imported := 0
+		// The positions the file wrote to, in the order it first reached them.
+		// A purchase moves the cost their credited sales carried out.
+		var touched []uuid.UUID
 		for _, row := range rows {
 			assetID, ok := assetIDs[row.Ticker]
 			if !ok {
@@ -733,12 +741,22 @@ func (r *PostgresRepository) ImportEntryTransactions(ctx context.Context, userID
 				return err
 			}
 
+			if !slices.Contains(touched, entryID) {
+				touched = append(touched, entryID)
+			}
+
 			imported++
+		}
+
+		for _, entryID := range touched {
+			if err := syncEntryCashCredits(ctx, tx, userID, entryID, true); err != nil {
+				return err
+			}
 		}
 
 		return nil
 	}); err != nil {
-		return imported, err
+		return 0, err
 	}
 
 	return imported, nil

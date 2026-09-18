@@ -123,9 +123,10 @@ export const actions: Actions = {
 			...(data.feesCurrency ? { feesCurrency: data.feesCurrency } : {}),
 			transactionDate: data.transactionDate,
 			notes: data.notes ?? '',
-			// Solo un dividendo se abona al efectivo; el backend rechaza la casilla
-			// en cualquier otro tipo, y el formulario la deja de mandar al cambiarlo.
-			creditCash: data.type === 'dividend' && data.creditCash
+			// Solo un dividendo o una venta se abonan al efectivo; el backend rechaza
+			// la casilla en cualquier otro tipo, y el formulario la deja de mandar al
+			// cambiarlo.
+			creditCash: (data.type === 'dividend' || data.type === 'sell') && data.creditCash
 		});
 
 		if (!response.ok) {
@@ -173,9 +174,10 @@ export const actions: Actions = {
 			...(data.feesCurrency ? { feesCurrency: data.feesCurrency } : {}),
 			transactionDate: data.transactionDate,
 			notes: data.notes ?? '',
-			// Solo un dividendo se abona al efectivo; el backend rechaza la casilla
-			// en cualquier otro tipo, y el formulario la deja de mandar al cambiarlo.
-			creditCash: data.type === 'dividend' && data.creditCash
+			// Solo un dividendo o una venta se abonan al efectivo; el backend rechaza
+			// la casilla en cualquier otro tipo, y el formulario la deja de mandar al
+			// cambiarlo.
+			creditCash: (data.type === 'dividend' || data.type === 'sell') && data.creditCash
 		});
 
 		if (!response.ok) {

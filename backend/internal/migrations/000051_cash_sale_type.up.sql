@@ -1,0 +1,17 @@
+-- A transaction type for the proceeds of a sale paid into the cash of the
+-- platform that held the shares: what cash_dividend (000049) is to a dividend.
+--
+-- 'sell' stays what it is: a row on the holding, booked by transaction_cash_flow
+-- (000027) as money leaving the measured pool. A broker pays the proceeds into
+-- the account's cash, and the app keeps that cash (000041), so they land as a
+-- row on the balance, linked to the sale and written and removed with it
+-- (000052).
+--
+-- It cannot be a cash_dividend. A dividend is gain and cost nothing; a sale's
+-- proceeds are the capital the shares carried plus the gain they made, and the
+-- balance has to take them at that capital or the gain would read as money the
+-- owner put in. The two differ in their cost rule, so they differ in type.
+--
+-- Its own migration for the reason 000040 gives: Postgres will not let a new
+-- enum value be used in the transaction that adds it, and 000052 uses it.
+ALTER TYPE transaction_type ADD VALUE IF NOT EXISTS 'cash_sale';

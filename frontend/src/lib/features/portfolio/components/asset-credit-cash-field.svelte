@@ -1,12 +1,12 @@
 <script lang="ts">
 	/**
-	 * La casilla que abona un dividendo al efectivo de la plataforma, en el alta y
-	 * en la edición de una transacción.
+	 * La casilla que abona al efectivo de la plataforma el dinero de un dividendo
+	 * o de una venta, en el alta, en la edición y en la venta rápida.
 	 *
-	 * En el alta viene marcada porque es lo que hace el bróker: el dividendo llega
-	 * a la cuenta. Se desmarca si ese dinero ya se anotó como un depósito o llegó
-	 * a otra cuenta. En la edición arranca como está el dividendo, y desmarcarla
-	 * lo saca del efectivo.
+	 * En el alta viene marcada porque es lo que hace el bróker: el dinero llega a
+	 * la cuenta. Se desmarca si ya se anotó como un depósito o llegó a otra
+	 * cuenta. En la edición arranca como está la transacción, y desmarcarla lo
+	 * saca del efectivo.
 	 */
 	let {
 		checked = $bindable(true),
@@ -29,10 +29,10 @@
 		<span class="name">Abonar al efectivo de la plataforma</span>
 		<span class="hint">
 			{#if editing}
-				El dividendo suma a tu efectivo en {currency} en esta plataforma. Si lo desmarcas, sale de ahí.
+				Lo recibido suma a tu efectivo en {currency} en esta plataforma. Si lo desmarcas, sale de ahí.
 			{:else}
-				Suma {amount || 'el dividendo'} a tu efectivo en {currency} en esta plataforma. Desmárcalo si
-				ya lo anotaste como un depósito o si te lo pagaron en otra cuenta.
+				Suma {amount || 'lo que recibiste'} a tu efectivo en {currency} en esta plataforma. Desmárcalo
+				si ya lo anotaste como un depósito o si te lo pagaron en otra cuenta.
 			{/if}
 		</span>
 	</span>

@@ -18,7 +18,7 @@
 		onClose
 	}: {
 		transaction: Transaction;
-		/** La posición es un saldo de efectivo, que no se abona dividendos a sí mismo. */
+		/** La posición es un saldo de efectivo, que no se abona dividendos ni ventas a sí mismo. */
 		onCash?: boolean;
 		onClose: () => void;
 	} = $props();
@@ -68,7 +68,9 @@
 		!!editCostCurrency && editCostCurrency !== editForm.currency
 	);
 
-	const canCreditCash = $derived(editForm.type === 'dividend' && !onCash);
+	const canCreditCash = $derived(
+		(editForm.type === 'dividend' || editForm.type === 'sell') && !onCash
+	);
 	const creditCurrency = $derived(editCostCurrency || editForm.currency);
 </script>
 

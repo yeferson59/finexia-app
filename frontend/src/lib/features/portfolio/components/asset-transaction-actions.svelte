@@ -45,15 +45,22 @@
 	const isBuyLot = $derived(transaction.type === 'buy' || transaction.type === 'transfer_in');
 
 	/**
-	 * El dinero que un dividendo abonó a este saldo. Cambia y se borra con el
-	 * dividendo, desde la acción que lo pagó; el backend rechaza tocarlo aquí.
+	 * El dinero que un dividendo o una venta abonaron a este saldo. Cambia y se
+	 * borra con esa transacción, desde la acción que lo pagó; el backend rechaza
+	 * tocarlo aquí.
 	 */
-	const isDividendCredit = $derived(transaction.type === 'cash_dividend');
+	const creditOf = $derived(
+		transaction.type === 'cash_dividend'
+			? 'el dividendo'
+			: transaction.type === 'cash_sale'
+				? 'la venta'
+				: null
+	);
 </script>
 
 <div class="actions">
-	{#if isDividendCredit}
-		<span class="linked">Se edita desde el dividendo</span>
+	{#if creditOf}
+		<span class="linked">Se edita desde {creditOf}</span>
 	{:else}
 		<button type="button" class="action" onclick={() => onEdit(transaction)}>
 			Editar<span class="sr-only"> {label}</span>

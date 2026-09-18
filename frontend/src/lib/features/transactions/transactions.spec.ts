@@ -17,10 +17,15 @@ describe('catálogos del import de transacciones', () => {
 		}
 		// Las únicas etiquetas de más son las del efectivo: el libro tiene que
 		// poder nombrarlas, pero los intereses solo se registran desde la pantalla
-		// de efectivo y el abono de un dividendo lo escribe el dividendo, así que
-		// el import no ofrece ninguno de los dos.
+		// de efectivo y los abonos los escriben el dividendo o la venta, así que
+		// el import no ofrece ninguno.
 		expect(Object.keys(TXN_TYPE_LABELS).sort()).toEqual(
-			[...TXN_TYPE_OPTIONS.map((t) => t.value), 'cash_interest', 'cash_dividend'].sort()
+			[
+				...TXN_TYPE_OPTIONS.map((t) => t.value),
+				'cash_interest',
+				'cash_dividend',
+				'cash_sale'
+			].sort()
 		);
 	});
 

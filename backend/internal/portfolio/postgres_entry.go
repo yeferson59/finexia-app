@@ -161,10 +161,10 @@ func (r *PostgresRepository) DeletePortfolioEntry(ctx context.Context, userID, e
 			return err
 		}
 
-		// The credits of its dividends sit on another position, the cash, and
-		// would cascade out of it unchecked. Taking them out first refuses the
-		// delete if the cash already spent them.
-		if err := syncEntryDividendCredits(ctx, tx, userID, entryID, false); err != nil {
+		// The credits of its dividends and sales sit on another position, the
+		// cash, and would cascade out of it unchecked. Taking them out first
+		// refuses the delete if the cash already spent them.
+		if err := syncEntryCashCredits(ctx, tx, userID, entryID, false); err != nil {
 			return err
 		}
 
@@ -257,6 +257,12 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, 0, $7::char(3), $8::date, $9)
 	`, entryID, settled.Type, settled.Quantity.String(), settled.Price.String(), settled.Currency,
 			settled.FXRate.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes); err != nil {
+			return err
+		}
+
+		// On a position that was already there the trade moves the average cost
+		// its credited sales carried out.
+		if err := syncEntryCashCredits(ctx, tx, userID, entryID, true); err != nil {
 			return err
 		}
 
