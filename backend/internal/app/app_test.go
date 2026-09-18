@@ -57,7 +57,7 @@ func TestAppWiresAndRoutes(t *testing.T) {
 			JWTSecret:          "test-secret",
 			JWTAccessDuration:  15 * time.Minute,
 			JWTRefreshDuration: 30 * 24 * time.Hour,
-			PublicURL:          "http://localhost:8080",
+			FrontendURL:        "http://localhost:5173",
 			CORSOrigin:         []string{"http://localhost:5173"},
 		}),
 		DB:      pool,

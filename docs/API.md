@@ -140,8 +140,8 @@ cual, redirecciones incluidas: el `302` de `/oauth/authorize` es para el
 navegador. La IP del cliente y su `User-Agent` llegan en `X-Forwarded-For` y
 `User-Agent`, como en cualquier otra llamada de la app.
 
-De ahí que `PUBLIC_URL` sea el origen de la app web y no el del backend (§2.12,
-«Configuración»).
+De ahí que el `issuer` del servidor OAuth salga de `FRONTEND_URL`, el origen de
+la app web, y no del backend (§2.12, «Configuración»).
 
 ---
 
@@ -1713,7 +1713,7 @@ forma o no lo parsea. Los errores viajan como
   usuario, y los tokens que salieron del primer canje dejan de valer (RFC 6749
   §10.5).
 - **`resource` (RFC 8707) se comprueba.** Un token emitido aquí es para
-  `PUBLIC_URL/mcp`; pedir otro recurso responde `invalid_target`.
+  `FRONTEND_URL/mcp`; pedir otro recurso responde `invalid_target`.
 
 #### Revocación
 
@@ -1723,15 +1723,15 @@ refresh un `invalid_grant`: no hay ventana.
 
 #### Configuración
 
-`PUBLIC_URL` es el `issuer` de la metadata. Un cliente compara ese valor con el
+`FRONTEND_URL` es el `issuer` de la metadata. Un cliente compara ese valor con el
 origen desde el que descargó el documento, así que si no coincide con cómo se
-llega de verdad al API, **todas** las conexiones fallan en el descubrimiento.
-`FRONTEND_URL` es a dónde se manda el navegador a consentir.
+llega de verdad al API, **todas** las conexiones fallan en el descubrimiento. Es
+también a dónde se manda el navegador a consentir.
 
-Desde fuera se llega al API a través de la app web (§1.6), así que `PUBLIC_URL`
-es el origen de la app: el mismo valor que `FRONTEND_URL`, `https://finexia.me`
-en producción. Apuntarla al backend publicaría como `issuer` una dirección que
-nadie puede alcanzar.
+Desde fuera se llega al API a través de la app web (§1.6), así que el origen
+público del API es el de la app, `https://finexia.me` en producción, y no hace
+falta una variable aparte para él. Apuntar el `issuer` al backend publicaría una
+dirección que nadie puede alcanzar.
 
 | Código | Cuándo |
 |---|---|

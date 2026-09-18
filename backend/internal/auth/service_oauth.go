@@ -256,7 +256,7 @@ func (s *service) consentURL(id uuid.UUID) string {
 // the RFC 8707 sense: the audience a token is minted for, and the "resource"
 // field of the protected-resource metadata.
 func (s *service) mcpResourceURI() string {
-	return strings.TrimSuffix(s.cfg.PublicURL, "/") + "/mcp"
+	return strings.TrimSuffix(s.cfg.FrontendURL, "/") + "/mcp"
 }
 
 // issuer is this authorization server's identity. It has to be the origin the
@@ -264,7 +264,7 @@ func (s *service) mcpResourceURI() string {
 // against where it fetched the document — which every correct one does —
 // rejects everything this server says.
 func (s *service) issuer() string {
-	return strings.TrimSuffix(s.cfg.PublicURL, "/")
+	return strings.TrimSuffix(s.cfg.FrontendURL, "/")
 }
 
 // GetConsent describes a parked request for the screen that will approve it.

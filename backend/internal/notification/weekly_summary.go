@@ -139,7 +139,7 @@ func (s *Service) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
 			TotalGainLossPct: fixed(overallReturn(totalValue, totalGain)),
 			GainLossColor:    color,
 			Portfolios:       portfolios,
-			DashboardURL:     s.cfg.PublicURL + "/dashboard",
+			DashboardURL:     s.cfg.FrontendURL + "/dashboard",
 			WeekLabel:        weekLabel,
 		}
 

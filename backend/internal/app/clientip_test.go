@@ -56,7 +56,7 @@ func probeApp(t *testing.T) string {
 			JWTSecret:          "kP4vN8xQ2mR7wL5tZ9bC3jH6yF1sD0aG",
 			JWTAccessDuration:  15 * time.Minute,
 			JWTRefreshDuration: 30 * 24 * time.Hour,
-			PublicURL:          "http://localhost:8080",
+			FrontendURL:        "http://localhost:5173",
 			CORSEnabled:        true,
 			CORSOrigin:         []string{"http://localhost:5173"},
 			TrustProxy:         true,

@@ -181,7 +181,7 @@ func TestOAuthRepositoryAgainstPostgres(t *testing.T) {
 		if err := r.CreateAuthorizationCode(ctx, codeHash, authorizationCode{
 			ClientID: clientID, UserID: userID, RedirectURI: "https://claude.test/cb",
 			Scope: MCPScope, CodeChallenge: "chal", CodeChallengeMethod: oauthCodeChallengeS256,
-			Resource:  "https://api.finexia.test/mcp",
+			Resource:  "https://finexia.test/mcp",
 			ExpiresAt: time.Now().UTC().Add(oauthCodeTTL),
 		}); err != nil {
 			t.Fatalf("CreateAuthorizationCode: %v", err)
@@ -196,7 +196,7 @@ func TestOAuthRepositoryAgainstPostgres(t *testing.T) {
 			t.Fatal("the first claim did not win the code")
 		}
 
-		if code.UserID != userID || code.Resource != "https://api.finexia.test/mcp" {
+		if code.UserID != userID || code.Resource != "https://finexia.test/mcp" {
 			t.Errorf("claimed code = %+v", code)
 		}
 
@@ -228,7 +228,7 @@ func TestOAuthRepositoryAgainstPostgres(t *testing.T) {
 		refreshExpiry := time.Now().UTC().Add(oauthRefreshTTL)
 
 		grantID, err := r.UpsertOAuthGrant(ctx, userID, clientID, MCPScope,
-			"https://api.finexia.test/mcp", accessHash, accessExpiry, refreshHash, &refreshExpiry)
+			"https://finexia.test/mcp", accessHash, accessExpiry, refreshHash, &refreshExpiry)
 		if err != nil {
 			t.Fatalf("UpsertOAuthGrant: %v", err)
 		}
@@ -238,7 +238,7 @@ func TestOAuthRepositoryAgainstPostgres(t *testing.T) {
 		secondHash := hashOAuthToken("a2")
 
 		sameID, err := r.UpsertOAuthGrant(ctx, userID, clientID, MCPScope,
-			"https://api.finexia.test/mcp", secondHash, accessExpiry, hashOAuthToken("r2"), &refreshExpiry)
+			"https://finexia.test/mcp", secondHash, accessExpiry, hashOAuthToken("r2"), &refreshExpiry)
 		if err != nil {
 			t.Fatalf("second UpsertOAuthGrant: %v", err)
 		}
@@ -270,7 +270,7 @@ func TestOAuthRepositoryAgainstPostgres(t *testing.T) {
 			t.Fatalf("GetGrantByRefreshToken: %v", err)
 		}
 
-		if refreshed.ClientID != clientID || refreshed.Resource != "https://api.finexia.test/mcp" {
+		if refreshed.ClientID != clientID || refreshed.Resource != "https://finexia.test/mcp" {
 			t.Errorf("refresh row = %+v", refreshed)
 		}
 

@@ -9,7 +9,7 @@ import { apiUrl } from './client';
  * is used by others — an MCP client, a connector running OAuth discovery, an
  * `<img>` tag — and so needs a public URL. `hooks.server.ts` forwards exactly
  * these paths, unchanged, to the same path on the backend, and the backend
- * advertises this app's origin as its own (`PUBLIC_URL`, docs/API.md §1.6).
+ * advertises this app's origin as its own (`FRONTEND_URL`, docs/API.md §1.6).
  *
  * The list is closed on purpose: a route that is not here does not exist from
  * the outside, which is the whole point of taking the backend off the internet.

@@ -612,10 +612,8 @@ func testConfig() Config {
 		JWTRefreshDuration:     30 * 24 * time.Hour,
 		RefreshGracePeriod:     30 * time.Second,
 		TwoFactorPendingExpiry: 5 * time.Minute,
-		// Both are load-bearing for the OAuth flow rather than decorative: the
-		// issuer in the metadata is built from PublicURL, and the consent
-		// redirect from FrontendURL.
-		PublicURL:   "https://api.finexia.test",
+		// Load-bearing for the OAuth flow rather than decorative: both the
+		// issuer in the metadata and the consent redirect are built from it.
 		FrontendURL: "https://finexia.test",
 	}
 }

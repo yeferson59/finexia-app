@@ -6,7 +6,7 @@ package notification
 // the module — and its tests — depend on a small, explicit struct instead of
 // the full Env.
 type Config struct {
-	// PublicURL is the base URL used to build the dashboard link in the
+	// FrontendURL is the base URL used to build the dashboard link in the
 	// weekly summary email.
-	PublicURL string
+	FrontendURL string
 }

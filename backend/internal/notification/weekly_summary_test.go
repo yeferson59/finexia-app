@@ -85,7 +85,7 @@ func (f *fakeMailer) SendWeeklySummary(email string, data mail.WeeklySummaryData
 }
 
 func newTestService(users *fakeUserReader, ports *fakePortfolioReader, mailer *fakeMailer) *Service {
-	return NewService(users, ports, mailer, Config{PublicURL: "https://finexia.test"})
+	return NewService(users, ports, mailer, Config{FrontendURL: "https://finexia.test"})
 }
 
 func TestSendWeeklySummaryEmails(t *testing.T) {

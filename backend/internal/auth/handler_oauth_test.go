@@ -129,7 +129,7 @@ func authorizeURL(clientID, challenge string, overrides map[string]string) strin
 		"state":                 {"opaque-client-state"},
 		"code_challenge":        {challenge},
 		"code_challenge_method": {"S256"},
-		"resource":              {"https://api.finexia.test/mcp"},
+		"resource":              {"https://finexia.test/mcp"},
 	}
 
 	for k, v := range overrides {
@@ -237,11 +237,11 @@ func TestOAuthDiscoveryDocuments(t *testing.T) {
 		var doc OAuthProtectedResourceMetadata
 		getJSON(t, app, "/.well-known/oauth-protected-resource/mcp", &doc)
 
-		if doc.Resource != "https://api.finexia.test/mcp" {
+		if doc.Resource != "https://finexia.test/mcp" {
 			t.Errorf("resource = %q", doc.Resource)
 		}
 
-		if len(doc.AuthorizationServers) != 1 || doc.AuthorizationServers[0] != "https://api.finexia.test" {
+		if len(doc.AuthorizationServers) != 1 || doc.AuthorizationServers[0] != "https://finexia.test" {
 			t.Errorf("authorization_servers = %v", doc.AuthorizationServers)
 		}
 
@@ -264,7 +264,7 @@ func TestOAuthDiscoveryDocuments(t *testing.T) {
 		var doc OAuthServerMetadata
 		getJSON(t, app, "/.well-known/oauth-authorization-server", &doc)
 
-		if doc.Issuer != "https://api.finexia.test" {
+		if doc.Issuer != "https://finexia.test" {
 			t.Errorf("issuer = %q", doc.Issuer)
 		}
 

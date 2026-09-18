@@ -487,7 +487,6 @@ func authConfig(env *config.EnvConfig) auth.Config {
 		LoginLockout:            env.LoginLockout,
 		Environment:             env.Environment,
 		FrontendURL:             env.FrontendURL,
-		PublicURL:               env.PublicURL,
 		InvitationExpiry:        env.InvitationExpiry,
 		PasswordResetExpiry:     env.PasswordResetExpiry,
 		EmailVerificationExpiry: env.EmailVerificationExpiry,
@@ -513,6 +512,6 @@ func portfolioConfig(env *config.EnvConfig) portfolio.Config {
 // notificationConfig projects the environment onto the notification module's Config.
 func notificationConfig(env *config.EnvConfig) notification.Config {
 	return notification.Config{
-		PublicURL: env.PublicURL,
+		FrontendURL: env.FrontendURL,
 	}
 }
