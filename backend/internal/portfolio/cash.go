@@ -73,13 +73,18 @@ const (
 	CashKindDeposit    CashMovementKind = "deposit"
 	CashKindWithdrawal CashMovementKind = "withdrawal"
 	CashKindInterest   CashMovementKind = "interest"
-	// CashKindOther is never written. It is how a row that is none of the three
+	// CashKindDividend is a dividend paid into the balance. The cash screens show
+	// it and never write it: it is written with the dividend it pays, from the
+	// holding (postgres_dividend_credit.go).
+	CashKindDividend CashMovementKind = "dividend"
+	// CashKindOther is never written. It is how a row that is none of the others
 	// reads back: a paid-out interest or a fee recorded against a balance before
 	// these screens existed.
 	CashKindOther CashMovementKind = "other"
 )
 
-// IsValid reports whether the kind can be written. Other cannot.
+// IsValid reports whether the kind can be written from the cash screens.
+// Dividend and Other cannot.
 func (k CashMovementKind) IsValid() bool {
 	switch k {
 	case CashKindDeposit, CashKindWithdrawal, CashKindInterest:
@@ -98,6 +103,8 @@ func (k CashMovementKind) TransactionType() TransactionType {
 		return TransferOut
 	case CashKindInterest:
 		return CashInterest
+	case CashKindDividend:
+		return CashDividend
 	default:
 		return ""
 	}
@@ -116,17 +123,20 @@ func cashKindOf(t TransactionType) CashMovementKind {
 		return CashKindWithdrawal
 	case CashInterest:
 		return CashKindInterest
+	case CashDividend:
+		return CashKindDividend
 	default:
 		return CashKindOther
 	}
 }
 
 // balanceEffect is how far a transaction moves the quantity of its position:
-// the Go side of the quantity arms in recalculate_avg_cost (000041). It is what
-// lets a write check the balance it will leave before the trigger computes it.
+// the Go side of the quantity arms in recalculate_avg_cost (000041, 000050). It
+// is what lets a write check the balance it will leave before the trigger
+// computes it.
 func balanceEffect(t TransactionType, quantity decimal.Decimal) decimal.Decimal {
 	switch t {
-	case Buy, TransferIn, CashInterest:
+	case Buy, TransferIn, CashInterest, CashDividend:
 		return quantity
 	case Sell, TransferOut:
 		return quantity.Neg()
@@ -145,6 +155,9 @@ type CashMovementInput struct {
 	Currency money.Currency
 	Date     time.Time
 	Notes    string
+	// dividend is the dividend a credit pays. Only syncDividendCredit sets it,
+	// and only with CashKindDividend: the owner never states it.
+	dividend *uuid.UUID
 }
 
 func invalidCash(format string, args ...any) error {
@@ -320,11 +333,14 @@ type CashMovement struct {
 	Editable bool `json:"editable"`
 	// Automatic is whether the interest ledger credited it (000044) rather than
 	// the owner.
-	Automatic     bool      `json:"automatic"`
-	PortfolioID   uuid.UUID `json:"portfolioId"`
-	PortfolioName string    `json:"portfolioName"`
-	SourceID      uuid.UUID `json:"sourceId"`
-	SourceName    string    `json:"sourceName"`
-	Ticker        string    `json:"ticker"`
-	CreatedAt     time.Time `json:"createdAt"`
+	Automatic bool `json:"automatic"`
+	// DividendTicker is the asset whose dividend this credit pays, empty on
+	// every other movement. The holding sits in the same portfolio.
+	DividendTicker string    `json:"dividendTicker"`
+	PortfolioID    uuid.UUID `json:"portfolioId"`
+	PortfolioName  string    `json:"portfolioName"`
+	SourceID       uuid.UUID `json:"sourceId"`
+	SourceName     string    `json:"sourceName"`
+	Ticker         string    `json:"ticker"`
+	CreatedAt      time.Time `json:"createdAt"`
 }

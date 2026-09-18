@@ -36,6 +36,9 @@ export const transactionSchema = z.object({
 	feesCurrency: z.string().optional(),
 	transactionDate: z.string(),
 	notes: z.string(),
+	// Si el dividendo se abonó al efectivo de la plataforma. Opcional para
+	// tolerar un backend anterior a la migración 000050, que no lo conocía.
+	cashCredited: z.boolean().optional(),
 	createdAt: z.string()
 });
 

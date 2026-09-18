@@ -58,11 +58,16 @@ const (
 	// other kind, income a holding pays out. Only a cash position takes it; see
 	// cash.go and migrations 000040/000041.
 	CashInterest TransactionType = "cash_interest"
+	// CashDividend is a dividend paid into the cash of the platform that holds
+	// the share: a row on that balance, linked to the Dividend it pays and
+	// written only with it. See postgres_dividend_credit.go and migrations
+	// 000049/000050.
+	CashDividend TransactionType = "cash_dividend"
 )
 
 func (t TransactionType) IsValid() bool {
 	switch t {
-	case Buy, Sell, Dividend, Split, TransferIn, TransferOut, Fee, Interest, CashInterest:
+	case Buy, Sell, Dividend, Split, TransferIn, TransferOut, Fee, Interest, CashInterest, CashDividend:
 		return true
 	default:
 		return false
@@ -241,9 +246,12 @@ type Transaction struct {
 	Fees            money.Money    `json:"fees"`
 	TransactionDate time.Time      `json:"transactionDate"`
 	Notes           string         `json:"notes"`
-	CreatedAt       time.Time      `json:"createdAt"`
-	UpdatedAt       time.Time      `json:"updatedAt"`
-	Entry           Entry          `json:"entry,omitzero"`
+	// CashCredited is whether a dividend's money was paid into the platform's
+	// cash (000050). Only the reads that serve an edit form select it.
+	CashCredited bool      `json:"cashCredited,omitempty"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+	Entry        Entry     `json:"entry,omitzero"`
 }
 
 // TransactionInput is one transaction as a caller states it, on its way to
@@ -264,6 +272,10 @@ type TransactionInput struct {
 	FeesCurrency    money.Currency
 	TransactionDate time.Time
 	Notes           string
+	// CreditCash pays a dividend into the cash the platform holds in the
+	// position's currency. It is the whole answer on every write: an edit that
+	// leaves it false takes a credit the dividend had back out.
+	CreditCash bool
 }
 
 // Rate resolves the omitted case. A caller that sends no rate at all is the
@@ -305,8 +317,16 @@ func (in TransactionInput) Rate() decimal.Decimal {
 // default changes no existing behaviour. A broker that bills the account
 // instead has to say so — which the forms do, explicitly, on the only screens
 // where the two can differ.
+//
+// CreditCash is refused on anything but a dividend. Whether this dividend can be
+// credited — the position, the account, the amount — depends on where it is
+// recorded, and is checked there (syncDividendCredit).
 func (in TransactionInput) Validate(costCurrency money.Currency) (TransactionInput, error) {
 	out := in
+
+	if in.CreditCash && in.Type != Dividend {
+		return in, fmt.Errorf("%w: only a dividend is paid into cash, not a %s", ErrDividendNotCreditable, in.Type)
+	}
 
 	if out.Currency == money.XXX {
 		out.Currency = costCurrency

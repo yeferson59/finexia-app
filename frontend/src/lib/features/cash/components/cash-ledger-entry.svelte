@@ -9,7 +9,11 @@
 	 *
 	 * `compact` es un abono dentro de un grupo desplegado: la cuenta y el tipo ya
 	 * los dice el grupo, así que solo lleva la fecha, el importe y las acciones.
+	 *
+	 * Un dividendo no se edita ni se borra aquí: es el dinero que pagó una acción,
+	 * y cambia o se va con el dividendo. La fila lleva a él en su lugar.
 	 */
+	import { resolve } from '$app/paths';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { formatCalendarDate } from '$lib/shared/format/date';
@@ -47,6 +51,18 @@
 
 	/* Lo que distingue un «Editar» de los otros catorce para quien no ve la fila. */
 	const described = $derived(`${formatCashKind(movement.kind).toLowerCase()} del ${fullDate}`);
+
+	const isDividend = $derived(movement.kind === 'dividend');
+
+	/* La acción que pagó el dividendo, en el mismo portafolio que el saldo. */
+	const dividendHref = $derived(
+		isDividend && movement.dividendTicker
+			? resolve('/dashboard/portfolios/[id]/assets/[symbol]', {
+					id: movement.portfolioId,
+					symbol: movement.dividendTicker
+				})
+			: null
+	);
 </script>
 
 <li class="entry" class:compact>
@@ -62,6 +78,9 @@
 		<div class="what">
 			<p class="kind">
 				{formatCashKind(movement.kind)}
+				{#if isDividend && movement.dividendTicker}
+					<span class="tag">de {movement.dividendTicker}</span>
+				{/if}
 				{#if movement.automatic}
 					<span class="tag">automático</span>
 				{/if}
@@ -81,21 +100,29 @@
 	{/if}
 
 	<p class="figures">
-		<span class="amount" class:income={movement.kind === 'interest'}>{amount}</span>
+		<span class="amount" class:income={movement.kind === 'interest' || isDividend}>{amount}</span>
 		{#if fee}
 			<span class="fee">comisión {fee}</span>
 		{/if}
 	</p>
 
 	<div class="actions">
-		{#if movement.editable}
-			<button type="button" class="action" onclick={onEdit}>
-				Editar<span class="sr-only"> {described}</span>
+		{#if isDividend}
+			{#if dividendHref}
+				<a class="action" href={dividendHref}>
+					Ver dividendo<span class="sr-only"> {described}</span>
+				</a>
+			{/if}
+		{:else}
+			{#if movement.editable}
+				<button type="button" class="action" onclick={onEdit}>
+					Editar<span class="sr-only"> {described}</span>
+				</button>
+			{/if}
+			<button type="button" class="action danger" onclick={onDelete}>
+				Borrar<span class="sr-only"> {described}</span>
 			</button>
 		{/if}
-		<button type="button" class="action danger" onclick={onDelete}>
-			Borrar<span class="sr-only"> {described}</span>
-		</button>
 	</div>
 </li>
 
@@ -253,6 +280,12 @@
 		font-size: 0.8rem;
 		color: var(--text-muted);
 		cursor: pointer;
+	}
+
+	a.action {
+		display: inline-block;
+		text-decoration: none;
+		white-space: nowrap;
 	}
 
 	.action:hover {

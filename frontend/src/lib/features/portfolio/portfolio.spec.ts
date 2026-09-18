@@ -11,7 +11,7 @@ import {
 	type RawHolding
 } from './portfolio';
 import type { PortfolioSummary } from '$lib/api/types';
-import { portfolioEntrySchema } from './schemas';
+import { portfolioEntrySchema, transactionCreateSchema, transactionUpdateSchema } from './schemas';
 
 // Un portafolio en USD: los totales en moneda base coinciden con
 // cantidad × precio porque no hay conversión de por medio.
@@ -335,6 +335,31 @@ function summary(over: Partial<PortfolioSummary> = {}): PortfolioSummary {
 		...over
 	};
 }
+
+describe('creditCash de una transacción', () => {
+	const dividend = {
+		type: 'dividend',
+		quantity: '1',
+		price: '25',
+		currency: 'USD',
+		transactionDate: '2026-09-01'
+	};
+	const entryId = '3f1c1c5e-1f5a-4f1e-9c2a-9a1d0b2f7e11';
+
+	// Una casilla marcada llega como «on»; desmarcada no llega, y eso es un «no».
+	it('lee la casilla marcada como sí y la ausente como no', () => {
+		const on = transactionCreateSchema.safeParse({ ...dividend, entryId, creditCash: 'on' });
+		const off = transactionCreateSchema.safeParse({ ...dividend, entryId, creditCash: null });
+		expect(on.data?.creditCash).toBe(true);
+		expect(off.data?.creditCash).toBe(false);
+	});
+
+	it('la edición también la lee, porque el PUT reemplaza la fila entera', () => {
+		const parsed = transactionUpdateSchema.safeParse({ ...dividend, txnId: entryId });
+		expect(parsed.success).toBe(true);
+		expect(parsed.data?.creditCash).toBe(false);
+	});
+});
 
 describe('toPortfolioRows', () => {
 	// El orden es lo que hace legible una escalera: la barra más larga primero

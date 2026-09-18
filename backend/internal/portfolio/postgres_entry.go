@@ -161,6 +161,13 @@ func (r *PostgresRepository) DeletePortfolioEntry(ctx context.Context, userID, e
 			return err
 		}
 
+		// The credits of its dividends sit on another position, the cash, and
+		// would cascade out of it unchecked. Taking them out first refuses the
+		// delete if the cash already spent them.
+		if err := syncEntryDividendCredits(ctx, tx, userID, entryID, false); err != nil {
+			return err
+		}
+
 		tag, err := tx.Exec(ctx, `
 		DELETE FROM portfolio_entries
 		WHERE id = $1

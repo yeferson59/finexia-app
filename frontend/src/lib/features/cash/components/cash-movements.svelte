@@ -8,7 +8,8 @@
 	 *
 	 * El importe lleva signo pero no color de ganancia: pintar un depósito de
 	 * verde diría justo lo que esta pantalla explica que no es. Solo los intereses
-	 * van en verde, porque son lo único de aquí que es rendimiento.
+	 * y los dividendos que pagaron las acciones van en verde, porque son lo único
+	 * de aquí que es rendimiento.
 	 *
 	 * Los intereses que abona sola la tasa de una cuenta van en una fila por saldo
 	 * y mes, que se despliega desde su nombre: una cuenta que rinde abona cada

@@ -41,6 +41,7 @@ func TestCashMovementInputValidate(t *testing.T) {
 		}},
 		{name: "an unknown kind", mutate: func(in *CashMovementInput) { in.Kind = "transfer" }, wantErr: "kind must be"},
 		{name: "other, which is only ever read back", mutate: func(in *CashMovementInput) { in.Kind = CashKindOther }, wantErr: "kind must be"},
+		{name: "a dividend, which only its dividend writes", mutate: func(in *CashMovementInput) { in.Kind = CashKindDividend }, wantErr: "kind must be"},
 		{name: "no amount", mutate: func(in *CashMovementInput) { in.Amount = decimal.Zero }, wantErr: "greater than zero"},
 		{name: "a negative amount", mutate: func(in *CashMovementInput) { in.Amount = mustDecimal(t, "-5") }, wantErr: "greater than zero"},
 		{name: "negative fees", mutate: func(in *CashMovementInput) { in.Fees = mustDecimal(t, "-1") }, wantErr: "cannot be negative"},
@@ -153,7 +154,7 @@ func TestCashMovementBecomesAParTransactionInTheBalanceCurrency(t *testing.T) {
 }
 
 func TestCashKindOf(t *testing.T) {
-	for _, kind := range []CashMovementKind{CashKindDeposit, CashKindWithdrawal, CashKindInterest} {
+	for _, kind := range []CashMovementKind{CashKindDeposit, CashKindWithdrawal, CashKindInterest, CashKindDividend} {
 		if got := cashKindOf(kind.TransactionType()); got != kind {
 			t.Errorf("cashKindOf(%s) = %s, want %s back", kind.TransactionType(), got, kind)
 		}
@@ -161,7 +162,8 @@ func TestCashKindOf(t *testing.T) {
 
 	// A balance recorded by hand before these screens existed was a buy and a
 	// sell of its cash asset; those read as what they did to it. A paid-out
-	// interest did nothing to it and is not one of the three.
+	// interest did nothing to it and is none of the kinds; neither is a dividend
+	// recorded on the balance itself, which is not the credit of one.
 	for txnType, want := range map[TransactionType]CashMovementKind{
 		Buy:      CashKindDeposit,
 		Sell:     CashKindWithdrawal,
@@ -185,6 +187,7 @@ func TestBalanceEffectMirrorsTheTrigger(t *testing.T) {
 		Buy:          "40",
 		TransferIn:   "40",
 		CashInterest: "40",
+		CashDividend: "40",
 		Sell:         "-40",
 		TransferOut:  "-40",
 		Interest:     "0",
@@ -244,3 +247,19 @@ func TestCashAssetNaming(t *testing.T) {
 
 // maxTickerLenForCash mirrors assets.ticker VARCHAR(20).
 const maxTickerLenForCash = 20
+
+// A credit is written only with the dividend it pays, so the generic writers
+// refuse the type outright; requireTypeAllowed checks it before the asset.
+func TestCashDividendIsAValidTypeNoOneWritesByHand(t *testing.T) {
+	if !CashDividend.IsValid() {
+		t.Fatal("cash_dividend is not a valid transaction type, so a credit could not be read back")
+	}
+
+	if CashKindDividend.IsValid() {
+		t.Error("the cash screens can write a dividend")
+	}
+
+	if got := CashKindDividend.TransactionType(); got != CashDividend {
+		t.Errorf("CashKindDividend.TransactionType() = %s, want cash_dividend", got)
+	}
+}

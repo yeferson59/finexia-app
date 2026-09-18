@@ -27,6 +27,7 @@ export const TYPE_STYLE: Record<string, string> = {
 	fee: 'type-fee',
 	interest: 'type-interest',
 	cash_interest: 'type-interest',
+	cash_dividend: 'type-dividend',
 	transfer_in: 'type-transfer',
 	transfer_out: 'type-transfer',
 	split: 'type-split'
@@ -39,6 +40,7 @@ export const TYPE_LABEL: Record<string, string> = {
 	fee: 'Comisión',
 	interest: 'Interés',
 	cash_interest: 'Interés',
+	cash_dividend: 'Dividendo',
 	transfer_in: 'T. Entrada',
 	transfer_out: 'T. Salida',
 	split: 'Split'

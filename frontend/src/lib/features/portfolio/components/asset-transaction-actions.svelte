@@ -43,15 +43,25 @@
 
 	/** Solo se puede vender lo que entró: un dividendo no es una posición. */
 	const isBuyLot = $derived(transaction.type === 'buy' || transaction.type === 'transfer_in');
+
+	/**
+	 * El dinero que un dividendo abonó a este saldo. Cambia y se borra con el
+	 * dividendo, desde la acción que lo pagó; el backend rechaza tocarlo aquí.
+	 */
+	const isDividendCredit = $derived(transaction.type === 'cash_dividend');
 </script>
 
 <div class="actions">
-	<button type="button" class="action" onclick={() => onEdit(transaction)}>
-		Editar<span class="sr-only"> {label}</span>
-	</button>
-	<button type="button" class="action danger" onclick={() => onDelete(transaction)}>
-		Eliminar<span class="sr-only"> {label}</span>
-	</button>
+	{#if isDividendCredit}
+		<span class="linked">Se edita desde el dividendo</span>
+	{:else}
+		<button type="button" class="action" onclick={() => onEdit(transaction)}>
+			Editar<span class="sr-only"> {label}</span>
+		</button>
+		<button type="button" class="action danger" onclick={() => onDelete(transaction)}>
+			Eliminar<span class="sr-only"> {label}</span>
+		</button>
+	{/if}
 	{#if isBuyLot}
 		<button
 			type="button"
@@ -87,6 +97,11 @@
 		color: var(--text);
 		text-decoration: underline;
 		text-underline-offset: 3px;
+	}
+
+	.linked {
+		font-size: 0.78rem;
+		color: var(--text-dim);
 	}
 
 	.action.danger:hover,

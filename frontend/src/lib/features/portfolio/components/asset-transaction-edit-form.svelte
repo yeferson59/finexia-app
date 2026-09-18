@@ -10,8 +10,18 @@
 	import DatePicker from '$lib/ui/date-picker.svelte';
 	import type { Transaction } from '$lib/api/types';
 	import { TRANSACTION_TYPES, priceLabelFor, txnModeFor } from '../asset';
+	import AssetCreditCashField from './asset-credit-cash-field.svelte';
 
-	let { transaction, onClose }: { transaction: Transaction; onClose: () => void } = $props();
+	let {
+		transaction,
+		onCash = false,
+		onClose
+	}: {
+		transaction: Transaction;
+		/** La posición es un saldo de efectivo, que no se abona dividendos a sí mismo. */
+		onCash?: boolean;
+		onClose: () => void;
+	} = $props();
 
 	// El modal monta este formulario al abrirse y lo desmonta al cerrarlo, así
 	// que los campos se llenan una sola vez, en el montaje: es un borrador, y
@@ -30,7 +40,10 @@
 			// no puede reinterpretar de qué lado se cobró la comisión.
 			feesCurrency: transaction.feesCurrency ?? transaction.currency,
 			transactionDate: transaction.transactionDate.split('T')[0],
-			notes: transaction.notes
+			notes: transaction.notes,
+			// Lo que el dividendo tiene hoy. El PUT reemplaza la fila entera, y
+			// sin la casilla un cambio de nota sacaría el dividendo del efectivo.
+			creditCash: transaction.cashCredited ?? false
 		}))
 	);
 
@@ -54,6 +67,9 @@
 	const editIsCrossCurrency = $derived(
 		!!editCostCurrency && editCostCurrency !== editForm.currency
 	);
+
+	const canCreditCash = $derived(editForm.type === 'dividend' && !onCash);
+	const creditCurrency = $derived(editCostCurrency || editForm.currency);
 </script>
 
 <form
@@ -223,6 +239,10 @@
 				</select>
 			</div>
 		</div>
+	{/if}
+
+	{#if canCreditCash}
+		<AssetCreditCashField bind:checked={editForm.creditCash} currency={creditCurrency} editing />
 	{/if}
 
 	<div class="form-group">

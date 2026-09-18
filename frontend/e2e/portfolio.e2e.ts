@@ -150,6 +150,28 @@ test.describe('portfolio detail', () => {
 		await expect(page.getByRole('button', { name: 'Confirmar Venta Total' })).toBeVisible();
 	});
 
+	// Un dividendo llega a la cuenta, así que el alta lo abona al efectivo de la
+	// plataforma salvo que se desmarque; los demás tipos no ofrecen la casilla.
+	test('asset detail offers to pay a dividend into the platform cash', async ({ page }) => {
+		await login(page);
+		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}/assets/AAPL`);
+
+		await page.getByRole('button', { name: 'Registrar movimiento' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Registrar transacción' });
+		const credit = dialog.getByRole('checkbox', { name: /Abonar al efectivo de la plataforma/ });
+
+		await expect(credit).toHaveCount(0);
+
+		await dialog.getByLabel('Tipo').selectOption('dividend');
+		await expect(credit).toBeChecked();
+
+		await dialog.getByLabel(/Monto del dividendo/).fill('25');
+		await expect(dialog).toContainText(/Suma .*25[.,]00 a tu efectivo en USD/);
+
+		await dialog.getByLabel('Tipo').selectOption('buy');
+		await expect(credit).toHaveCount(0);
+	});
+
 	// Borrar una transacción es irreversible y el botón vive en una tabla de
 	// filas casi idénticas, así que pasa por una confirmación que dice cuál se
 	// va a borrar y qué le ocurre a la posición.

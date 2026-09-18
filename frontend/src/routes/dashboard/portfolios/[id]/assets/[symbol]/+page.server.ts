@@ -101,7 +101,8 @@ export const actions: Actions = {
 			fees: formData.get('fees') ?? 0,
 			feesCurrency: formData.get('feesCurrency') ?? '',
 			transactionDate: formData.get('transactionDate'),
-			notes: formData.get('notes')
+			notes: formData.get('notes'),
+			creditCash: formData.get('creditCash')
 		});
 
 		if (!success) {
@@ -121,7 +122,10 @@ export const actions: Actions = {
 			// Ausente significa la moneda de la operación.
 			...(data.feesCurrency ? { feesCurrency: data.feesCurrency } : {}),
 			transactionDate: data.transactionDate,
-			notes: data.notes ?? ''
+			notes: data.notes ?? '',
+			// Solo un dividendo se abona al efectivo; el backend rechaza la casilla
+			// en cualquier otro tipo, y el formulario la deja de mandar al cambiarlo.
+			creditCash: data.type === 'dividend' && data.creditCash
 		});
 
 		if (!response.ok) {
@@ -147,7 +151,8 @@ export const actions: Actions = {
 			fees: formData.get('fees') ?? 0,
 			feesCurrency: formData.get('feesCurrency') ?? '',
 			transactionDate: formData.get('transactionDate'),
-			notes: formData.get('notes')
+			notes: formData.get('notes'),
+			creditCash: formData.get('creditCash')
 		});
 
 		if (!success) {
@@ -167,7 +172,10 @@ export const actions: Actions = {
 			// Ausente significa la moneda de la operación.
 			...(data.feesCurrency ? { feesCurrency: data.feesCurrency } : {}),
 			transactionDate: data.transactionDate,
-			notes: data.notes ?? ''
+			notes: data.notes ?? '',
+			// Solo un dividendo se abona al efectivo; el backend rechaza la casilla
+			// en cualquier otro tipo, y el formulario la deja de mandar al cambiarlo.
+			creditCash: data.type === 'dividend' && data.creditCash
 		});
 
 		if (!response.ok) {
@@ -201,7 +209,13 @@ export const actions: Actions = {
 		const response = await transactions.deleteTransaction({ cookies, fetch }, data.txnId);
 
 		if (!response.ok) {
-			return { success: false, deleted: true, error: response.message ?? response.action };
+			// `details` primero, como al editar: es el que dice por qué —«el saldo
+			// ya gastó ese dividendo»—, y `message` solo el titular del handler.
+			return {
+				success: false,
+				deleted: true,
+				error: response.details || response.message || response.action
+			};
 		}
 
 		return { success: response.success, deleted: true };

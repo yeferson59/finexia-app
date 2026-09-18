@@ -25,7 +25,8 @@ import (
 // Only the currency and the rates change. trg_recalculate_avg_cost reprices the
 // position from the rewritten rates, and no rewrite moves a quantity, so the
 // growth series keeps every flow where it was and retires nothing (000038): the
-// cost was wrong, the holding never was.
+// cost was wrong, the holding never was. The one exception is a dividend paid
+// into cash, whose credit is in the settlement currency and moves with it.
 func (r *PostgresRepository) ChangeEntrySettlement(ctx context.Context, userID, entryID uuid.UUID, costCurrency money.Currency, rates map[uuid.UUID]decimal.Decimal) (int, error) {
 	var changed int
 
@@ -71,6 +72,13 @@ func (r *PostgresRepository) ChangeEntrySettlement(ctx context.Context, userID, 
 		`, settled.TransactionID, settled.FXRate.String(), settled.FeesCurrency); err != nil {
 				return err
 			}
+		}
+
+		// A dividend paid into cash was paid in the currency the account settled
+		// in, which is the one that just changed: its credit moves to the balance
+		// kept in the new one, at the amount the new rate gives.
+		if err := syncEntryDividendCredits(ctx, tx, userID, entryID, true); err != nil {
+			return err
 		}
 
 		changed = len(plan)

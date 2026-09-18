@@ -58,6 +58,12 @@ func (r *PostgresRepository) GetTopTransactionByPortfolioID(ctx context.Context,
 	return dto, nil
 }
 
+// GetRecentTransactionsByUserID lists the user's latest transactions: the
+// activity feed, the transactions page, the export and the MCP tool.
+//
+// A dividend's cash credit is left out. The dividend is already on the list,
+// and listing the money it paid into cash beside it would read as two payments.
+// The credit is where the cash screens show it.
 func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]Transaction, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fx_rate,
@@ -69,6 +75,7 @@ func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, 
 		JOIN portfolios p ON p.id = pe.portfolio_id
 		JOIN assets a ON a.id = pe.asset_id
 		WHERE p.user_id = $1
+		  AND t.type <> 'cash_dividend'
 		ORDER BY t.transaction_date DESC, t.created_at DESC
 		LIMIT $2
 	`, userID, limit)
@@ -265,7 +272,8 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 	rows, err := r.db.Query(ctx, `
 		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fx_rate,
 		       pe.cost_currency, t.fees, t.fees_currency,
-		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at
+		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at,
+		       EXISTS (SELECT 1 FROM transactions c WHERE c.dividend_id = t.id)
 		FROM transactions t
 		JOIN portfolio_entries pe ON pe.id = t.entry_id
 		WHERE t.entry_id = $1
@@ -295,6 +303,7 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 			&txn.Notes,
 			&txn.CreatedAt,
 			&txn.UpdatedAt,
+			&txn.CashCredited,
 		); err != nil {
 			return nil, err
 		}
@@ -327,7 +336,8 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 	rows, err := r.db.Query(ctx, `
 		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fx_rate,
 		       pe.cost_currency, t.fees, t.fees_currency,
-		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at
+		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at,
+		       EXISTS (SELECT 1 FROM transactions c WHERE c.dividend_id = t.id)
 		FROM transactions t
 		JOIN portfolio_entries pe ON pe.id = t.entry_id
 		JOIN assets a ON a.id = pe.asset_id
@@ -360,6 +370,7 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 			&txn.Notes,
 			&txn.CreatedAt,
 			&txn.UpdatedAt,
+			&txn.CashCredited,
 		); err != nil {
 			return nil, err
 		}
@@ -377,6 +388,9 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 // does not own returns no row. Both it and the insert run on tx — the previous
 // version issued them on r.db, so the surrounding transaction was opened,
 // committed and never actually used.
+//
+// A dividend stated with CreditCash is paid into the platform's cash in the same
+// transaction, so the two rows exist together or not at all.
 func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, in TransactionInput) (Transaction, error) {
 	var txn Transaction
 
@@ -435,6 +449,14 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 		txn.Price.SetCurrency(txn.Currency)
 		txn.Fees.SetCurrency(txn.FeesCurrency)
 
+		if settled.CreditCash {
+			if err := syncDividendCredit(ctx, tx, userID, txn.ID, true); err != nil {
+				return err
+			}
+
+			txn.CashCredited = true
+		}
+
 		return nil
 	}); err != nil {
 		return txn, err
@@ -451,6 +473,10 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 // that depends on it is only safe if the two are atomic. The UPDATE keeps its
 // own ownership predicate anyway — the read cannot be trusted to still hold by
 // the time the write lands, and the cost of restating it is one join.
+//
+// The dividend's credit is rewritten after it, from the row as it now stands:
+// kept and resized when CreditCash still asks for it, taken out when it does
+// not or the row stopped being a dividend. A credit cannot be edited on its own.
 func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, in TransactionInput) (Transaction, error) {
 	var txn Transaction
 
@@ -458,19 +484,24 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 		var (
 			costCurrency money.Currency
 			entryID      uuid.UUID
+			currentType  TransactionType
 		)
 		if err := tx.QueryRow(ctx, `
-		SELECT pe.cost_currency, pe.id
+		SELECT pe.cost_currency, pe.id, t.type
 		FROM transactions t
 		JOIN portfolio_entries pe ON pe.id = t.entry_id
 		JOIN portfolios p        ON p.id = pe.portfolio_id
 		WHERE t.id = $1 AND p.user_id = $2
-	`, txnID, userID).Scan(&costCurrency, &entryID); err != nil {
+	`, txnID, userID).Scan(&costCurrency, &entryID, &currentType); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrTransactionNotFound
 			}
 
 			return err
+		}
+
+		if currentType == CashDividend {
+			return ErrDividendCreditLinked
 		}
 
 		settled, err := in.Validate(costCurrency)
@@ -532,6 +563,12 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 		txn.Price.SetCurrency(txn.Currency)
 		txn.Fees.SetCurrency(txn.FeesCurrency)
 
+		if err := syncDividendCredit(ctx, tx, userID, txnID, settled.CreditCash); err != nil {
+			return err
+		}
+
+		txn.CashCredited = settled.CreditCash
+
 		return nil
 	}); err != nil {
 		return Transaction{}, err
@@ -548,20 +585,26 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 // Ownership is enforced in the WHERE clause rather than by a prior read, so a
 // transaction id belonging to somebody else is indistinguishable from one that
 // does not exist — both delete no rows and answer 404.
+//
+// A dividend's credit goes with it, once its balance is known to spare the
+// money; the credit on its own cannot be deleted here.
 func (r *PostgresRepository) DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID) error {
 	return database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		// A row of a fixed deposit is refused before the delete rather than left
 		// out of it, so it answers "that is a deposit" and not "there is no such
 		// transaction". The read and the delete share a transaction so the
 		// position cannot become one in between.
-		var entryID uuid.UUID
+		var (
+			entryID uuid.UUID
+			txnType TransactionType
+		)
 		if err := tx.QueryRow(ctx, `
-			SELECT t.entry_id
+			SELECT t.entry_id, t.type
 			FROM transactions t
 			JOIN portfolio_entries pe ON pe.id = t.entry_id
 			JOIN portfolios p         ON p.id = pe.portfolio_id
 			WHERE t.id = $1 AND p.user_id = $2
-		`, txnID, userID).Scan(&entryID); err != nil {
+		`, txnID, userID).Scan(&entryID, &txnType); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrTransactionNotFound
 			}
@@ -569,7 +612,15 @@ func (r *PostgresRepository) DeleteTransaction(ctx context.Context, userID, txnI
 			return err
 		}
 
+		if txnType == CashDividend {
+			return ErrDividendCreditLinked
+		}
+
 		if err := requireWritableEntry(ctx, tx, entryID); err != nil {
+			return err
+		}
+
+		if err := syncDividendCredit(ctx, tx, userID, txnID, false); err != nil {
 			return err
 		}
 

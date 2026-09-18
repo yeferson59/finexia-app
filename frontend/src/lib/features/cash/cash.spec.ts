@@ -250,6 +250,13 @@ describe('formatCashKind y cashKindSign', () => {
 		expect(formatCashKind('other')).toBe('Otro movimiento');
 		expect(cashKindSign('other')).toBe(0);
 	});
+
+	// Lo abona el dividendo de una acción: entra al saldo como un depósito, pero
+	// no lo escribe esta pantalla.
+	it('un dividendo abonado suma al saldo', () => {
+		expect(formatCashKind('dividend')).toBe('Dividendo');
+		expect(cashKindSign('dividend')).toBe(1);
+	});
 });
 
 describe('cashAccountLabel', () => {

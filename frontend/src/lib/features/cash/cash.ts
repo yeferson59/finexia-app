@@ -42,6 +42,7 @@ const KIND_LABELS: Record<string, string> = {
 	deposit: 'Depósito',
 	withdrawal: 'Retiro',
 	interest: 'Intereses',
+	dividend: 'Dividendo',
 	other: 'Otro movimiento'
 };
 
@@ -52,7 +53,7 @@ export function formatCashKind(kind: string): string {
 
 /** Si el movimiento suma al saldo (1), lo resta (−1) o no lo toca (0). */
 export function cashKindSign(kind: string): 1 | -1 | 0 {
-	if (kind === 'deposit' || kind === 'interest') return 1;
+	if (kind === 'deposit' || kind === 'interest' || kind === 'dividend') return 1;
 	if (kind === 'withdrawal') return -1;
 	return 0;
 }

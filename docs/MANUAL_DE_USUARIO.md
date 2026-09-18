@@ -478,6 +478,8 @@ Si tienes **varios portafolios**, el formulario pregunta al final en cuál suma 
 
 Finexia **no deja un saldo en negativo**. Un retiro mayor que lo que hay, o borrar un depósito cuyo dinero ya salió en un retiro, se rechaza con la explicación en el propio formulario. Cada movimiento se puede **Editar** —tipo, importe, fecha, comisión y nota; la cuenta no cambia— o **Borrar**; con ratón, los dos botones aparecen al pasar por la fila. Los que se anotaron desde la posición del activo aparecen en la lista, pero aquí solo se pueden borrar.
 
+> **Los dividendos llegan solos.** Un dividendo registrado desde la posición con la casilla **Abonar al efectivo de la plataforma** marcada (ver 10.2) aparece aquí como **Dividendo de AAPL**, en verde, porque es rendimiento. No se edita ni se borra desde esta lista: cambia o se va con el dividendo, y **Ver dividendo** te lleva a él.
+
 > **Las compras no descuentan del efectivo.** Si pagas unas acciones con dinero de tu saldo, registra también el retiro por ese importe: así el saldo cuadra con tu cuenta, y tu rentabilidad no cambia, porque el retiro y la compra se compensan.
 
 ### 9.6 La rentabilidad de tu efectivo
@@ -616,7 +618,8 @@ Las transacciones se registran desde la posición a la que pertenecen: entra al 
 2. Indica la **fecha** y, si tienes el mismo activo en más de una plataforma, en cuál de ellas fue.
 3. Añade la **comisión**, si la hubo, y las **notas** que quieras.
 4. Si la operación se liquidó en otra moneda, indica la **tasa** (apartado 7.4). Al lado verás el **coste en la moneda de tu cuenta** que sale de lo que llevas tecleado, para contrastarlo con lo que te debitaron.
-5. Guarda. La posición y el portafolio se recalculan automáticamente.
+5. Si es un **dividendo**, la casilla **Abonar al efectivo de la plataforma** viene marcada: el importe, en la moneda de tu cuenta, se suma al efectivo de esa plataforma (sección 9.5), como hace el bróker. Tu rentabilidad no cambia por eso —el dividendo cuenta una sola vez—, pero el dinero ya no desaparece: queda en tu saldo. Desmárcala si ya anotaste ese dinero como un depósito o si te lo pagaron en otra cuenta.
+6. Guarda. La posición y el portafolio se recalculan automáticamente.
 
 ### 10.3 Editar o eliminar una transacción
 
@@ -624,6 +627,8 @@ En el historial de la posición, cada fila tiene sus acciones:
 
 - **Editar** — abre la operación en una ventana con todos sus datos, la tasa incluida. Corrige lo que haga falta y guarda; los totales se actualizan.
 - **Eliminar** — la borra tras una confirmación que muestra el tipo, la fecha y el total de esa fila, porque en la tabla todas se parecen. La posición se recalcula con las que queden; si era la última, la cantidad pasa a 0. No se puede deshacer.
+
+Un dividendo abonado al efectivo lleva debajo **Abonado al efectivo**. Editarlo cambia también lo que se abonó, desmarcar la casilla lo saca del efectivo y eliminarlo se lleva el abono con él. Si ese dinero ya salió en un retiro, Finexia no deja achicarlo ni borrarlo hasta que el saldo lo tenga de nuevo.
 
 ### 10.4 Registrar una venta
 

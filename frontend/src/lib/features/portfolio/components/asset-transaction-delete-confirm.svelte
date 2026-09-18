@@ -44,6 +44,12 @@
 	La posición se recalcula con las transacciones que queden; si era la última, la cantidad pasa a 0.
 	Esta acción no se puede deshacer.
 </p>
+{#if transaction.cashCredited}
+	<p class="warning">
+		El dividendo también sale del efectivo de la plataforma. Si ese dinero ya salió en un retiro, no
+		se podrá borrar hasta quitar el retiro.
+	</p>
+{/if}
 
 {#if deleteError}
 	<p class="error" role="alert">{deleteError}</p>

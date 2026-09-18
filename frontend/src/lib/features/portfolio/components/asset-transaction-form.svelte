@@ -6,6 +6,7 @@
 	import type { Holding } from '$lib/api/types';
 	import { TRANSACTION_TYPES, priceLabelFor, txnModeFor } from '../asset';
 	import TradeDateWarnings from './trade-date-warnings.svelte';
+	import AssetCreditCashField from './asset-credit-cash-field.svelte';
 
 	let {
 		entries,
@@ -24,7 +25,8 @@
 		fees: '',
 		feesCurrency: '',
 		transactionDate: todayLocalDateString(),
-		notes: ''
+		notes: '',
+		creditCash: true
 	});
 
 	$effect(() => {
@@ -77,6 +79,16 @@
 	const settledTotal = $derived(
 		(parseFloat(txnForm.quantity) || 0) * (parseFloat(txnForm.price) || 0) * rate
 	);
+
+	/**
+	 * Un dividendo se abona al efectivo que la plataforma guarda en la moneda de
+	 * la cuenta, por lo que la cuenta recibió: el monto llevado por la tasa. Viene
+	 * marcado porque es lo que hace el bróker; se desmarca si el dinero ya se
+	 * anotó como depósito o llegó a otra cuenta. Un saldo de efectivo no se abona
+	 * a sí mismo.
+	 */
+	const canCreditCash = $derived(txnForm.type === 'dividend' && entry?.assetType !== 'cash');
+	const creditAmount = $derived((parseFloat(txnForm.price) || 0) * rate);
 
 	// Para avisar si la fecha no parece la de la operación. Solo con precio unitario.
 	const dateCheck = $derived(
@@ -311,6 +323,14 @@
 				<p class="hint">Contrástalo con el importe que te debitaron.</p>
 			</div>
 		</div>
+	{/if}
+
+	{#if canCreditCash}
+		<AssetCreditCashField
+			bind:checked={txnForm.creditCash}
+			currency={costCurrency}
+			amount={creditAmount > 0 ? formatIn(creditAmount, costCurrency) : ''}
+		/>
 	{/if}
 
 	<div class="form-group">

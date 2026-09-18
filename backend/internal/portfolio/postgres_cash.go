@@ -139,6 +139,13 @@ const cashMovementColumns = `
 	t.transaction_date, COALESCE(t.notes, ''),
 	` + cashMovementEditable + `,
 	EXISTS (SELECT 1 FROM cash_interest_accruals ac WHERE ac.transaction_id = t.id),
+	COALESCE((
+		SELECT da.ticker
+		FROM transactions dt
+		JOIN portfolio_entries dpe ON dpe.id = dt.entry_id
+		JOIN assets da             ON da.id = dpe.asset_id
+		WHERE dt.id = t.dividend_id
+	), ''),
 	pe.portfolio_id, p.name, pe.source_id, COALESCE(s.name, ''), a.ticker, t.created_at`
 
 const cashMovementFrom = `
@@ -163,6 +170,7 @@ func scanCashMovement(row pgx.Row) (CashMovement, error) {
 		&m.Notes,
 		&m.Editable,
 		&m.Automatic,
+		&m.DividendTicker,
 		&m.PortfolioID,
 		&m.PortfolioName,
 		&m.SourceID,
@@ -369,11 +377,12 @@ func writeCashMovement(ctx context.Context, tx pgx.Tx, userID, portfolioID, sour
 
 	var txnID uuid.UUID
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes)
-		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::numeric, $8::char(3), $9::date, $10)
+		INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes, dividend_id)
+		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::numeric, $8::char(3), $9::date, $10, $11::uuid)
 		RETURNING id
 	`, entryID, settled.Type, settled.Quantity.String(), settled.Price.String(), settled.Currency,
-		settled.FXRate.String(), settled.Fees.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes).Scan(&txnID); err != nil {
+		settled.FXRate.String(), settled.Fees.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes,
+		in.dividend).Scan(&txnID); err != nil {
 		return CashMovement{}, err
 	}
 
@@ -622,6 +631,10 @@ func (r *PostgresRepository) UpdateCashMovement(ctx context.Context, userID, txn
 			return err
 		}
 
+		if current.txnType == CashDividend {
+			return ErrDividendCreditLinked
+		}
+
 		if !current.editable {
 			return ErrCashMovementNotEditable
 		}
@@ -669,12 +682,17 @@ func (r *PostgresRepository) UpdateCashMovement(ctx context.Context, userID, txn
 // DeleteCashMovement removes a movement unless that would take the balance
 // below zero — deleting a deposit whose money a later withdrawal already took.
 // Any movement on a cash position can go, including one the cash screens cannot
-// edit: removing a row does not reprice it.
+// edit: removing a row does not reprice it. The one exception is a dividend's
+// credit, which goes with its dividend.
 func (r *PostgresRepository) DeleteCashMovement(ctx context.Context, userID, txnID uuid.UUID) error {
 	return database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		current, err := lockCashMovement(ctx, tx, userID, txnID)
 		if err != nil {
 			return err
+		}
+
+		if current.txnType == CashDividend {
+			return ErrDividendCreditLinked
 		}
 
 		after := current.balance.Add(balanceEffect(current.txnType, current.quantity).Neg())
@@ -689,9 +707,14 @@ func (r *PostgresRepository) DeleteCashMovement(ctx context.Context, userID, txn
 }
 
 // requireTypeAllowed refuses a transaction whose type the position's asset
-// cannot take — cash_interest on anything but a cash balance. The generic
+// cannot take — cash_interest on anything but a cash balance — and a
+// cash_dividend on any position, which only its dividend writes. The generic
 // transaction writers call it; the cash writers only ever reach cash positions.
 func requireTypeAllowed(ctx context.Context, tx pgx.Tx, entryID uuid.UUID, t TransactionType) error {
+	if t == CashDividend {
+		return ErrDividendCreditLinked
+	}
+
 	var assetType market.AssetType
 
 	if err := tx.QueryRow(ctx, `

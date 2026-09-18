@@ -432,6 +432,50 @@ func TestHandlerTransactions(t *testing.T) {
 		}
 	})
 
+	// The form's checkbox is the whole answer, so it has to reach the repository
+	// on both writes and come back on the response the edit form is filled from.
+	t.Run("carries creditCash to the repository and back", func(t *testing.T) {
+		var created, updated bool
+		repo := new(fakeRepository{
+			getUserPreferences: alertsOff,
+			createTransaction: func(_ context.Context, _, eid uuid.UUID, in TransactionInput) (Transaction, error) {
+				created = in.CreditCash
+				return Transaction{ID: txnID, EntryID: eid, Type: in.Type, CashCredited: in.CreditCash}, nil
+			},
+			updateTransaction: func(_ context.Context, _, tid uuid.UUID, in TransactionInput) (Transaction, error) {
+				updated = in.CreditCash
+				return Transaction{ID: tid, Type: in.Type, CashCredited: in.CreditCash}, nil
+			},
+		})
+		app := newTestModule(t, repo, userID, "user")
+
+		body := `{"type":"dividend","quantity":"1","price":"25","currency":"USD","creditCash":true,"transactionDate":"` + txnDate.Format(time.RFC3339) + `"}`
+		resp := doJSON(t, app, http.MethodPost, "/portfolios/entries/"+entryID.String()+"/transactions", body)
+		if resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("POST status = %d, want 200", resp.StatusCode)
+		}
+		if !created {
+			t.Error("creditCash did not reach CreateTransaction")
+		}
+
+		_, data := decodeEnvelope(t, resp)
+		var got TransactionResponseDTO
+		if err := json.Unmarshal(data, &got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if !got.CashCredited {
+			t.Error("cashCredited = false in the response, want true")
+		}
+
+		resp = doJSON(t, app, http.MethodPut, "/portfolios/transactions/"+txnID.String(), body)
+		if resp.StatusCode != fiber.StatusOK {
+			t.Fatalf("PUT status = %d, want 200", resp.StatusCode)
+		}
+		if !updated {
+			t.Error("creditCash did not reach UpdateTransaction")
+		}
+	})
+
 	t.Run("updates a transaction", func(t *testing.T) {
 		var gotTxnID uuid.UUID
 		repo := new(fakeRepository{

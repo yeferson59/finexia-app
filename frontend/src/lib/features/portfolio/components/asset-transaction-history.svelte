@@ -113,7 +113,11 @@
 
 <Modal open={!!editingTxn} title="Editar transacción" onClose={() => (editingTxn = null)} size="lg">
 	{#if editingTxn}
-		<AssetTransactionEditForm transaction={editingTxn} onClose={() => (editingTxn = null)} />
+		<AssetTransactionEditForm
+			transaction={editingTxn}
+			onCash={entries.find((e) => e.id === editingTxn?.entryId)?.assetType === 'cash'}
+			onClose={() => (editingTxn = null)}
+		/>
 	{/if}
 </Modal>
 

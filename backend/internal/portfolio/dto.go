@@ -76,6 +76,10 @@ type CreateTransactionRequestDTO struct {
 	FeesCurrency    money.Currency `json:"feesCurrency"`
 	TransactionDate time.Time      `json:"transactionDate" validate:"required"`
 	Notes           string         `json:"notes"`
+	// CreditCash pays a dividend into the cash the platform holds in the
+	// position's currency. Omitted means no, which is what every dividend was
+	// before the app kept cash; it is refused on any other type.
+	CreditCash bool `json:"creditCash"`
 }
 
 type UpdateTransactionRequestDTO struct {
@@ -88,6 +92,9 @@ type UpdateTransactionRequestDTO struct {
 	FeesCurrency    money.Currency  `json:"feesCurrency"`
 	TransactionDate time.Time       `json:"transactionDate"`
 	Notes           string          `json:"notes"`
+	// CreditCash is the whole answer, like every other field of this PUT: false
+	// takes back a credit the dividend had.
+	CreditCash bool `json:"creditCash"`
 }
 
 // Input folds the three write DTOs into the one shape the service takes. The
@@ -104,6 +111,7 @@ func (d CreateTransactionRequestDTO) Input(txnType TransactionType) TransactionI
 		FeesCurrency:    d.FeesCurrency,
 		TransactionDate: d.TransactionDate,
 		Notes:           d.Notes,
+		CreditCash:      d.CreditCash,
 	}
 }
 
@@ -118,6 +126,7 @@ func (d UpdateTransactionRequestDTO) Input(txnType TransactionType) TransactionI
 		FeesCurrency:    d.FeesCurrency,
 		TransactionDate: d.TransactionDate,
 		Notes:           d.Notes,
+		CreditCash:      d.CreditCash,
 	}
 }
 
@@ -173,7 +182,10 @@ type TransactionResponseDTO struct {
 	FeesCurrency    string    `json:"feesCurrency,omitempty"`
 	TransactionDate time.Time `json:"transactionDate"`
 	Notes           string    `json:"notes"`
-	CreatedAt       time.Time `json:"createdAt"`
+	// CashCredited is whether a dividend was paid into the platform's cash, so
+	// an edit form can send the same answer back.
+	CashCredited bool      `json:"cashCredited"`
+	CreatedAt    time.Time `json:"createdAt"`
 }
 
 func NewTransactionResponse(t Transaction) TransactionResponseDTO {
@@ -190,6 +202,7 @@ func NewTransactionResponse(t Transaction) TransactionResponseDTO {
 		FeesCurrency:    feesCurrencyCode(t),
 		TransactionDate: t.TransactionDate,
 		Notes:           t.Notes,
+		CashCredited:    t.CashCredited,
 		CreatedAt:       t.CreatedAt,
 	}
 }

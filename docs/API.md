@@ -993,8 +993,39 @@ estrenar.
 `GET /portfolios/cash/movements` marca con `editable: false` lo que el `PUT` no
 puede reescribir como movimiento de efectivo —un `interest` o un `fee` anotados
 sobre el saldo, o una compra de efectivo a otro precio o con tasa— y le pone
-`kind: "other"` cuando no es ninguno de los tres. Todos se pueden borrar:
-quitar una fila no cambia el precio de nada.
+`kind: "other"` cuando no es ninguno de los tres. Todos se pueden borrar
+—quitar una fila no cambia el precio de nada— salvo el abono de un dividendo,
+que se va con su dividendo (abajo).
+
+**Dividendos abonados al efectivo** (migraciones 000049 y 000050).
+`POST /portfolios/entries/:entryId/transactions` y
+`PUT /portfolios/transactions/:txnId` aceptan `"creditCash": true` en un
+`dividend`: el dinero se abona al saldo de la cuenta principal de la misma
+plataforma y portfolio, en la moneda de coste de la posición, por
+`quantity × price × fxRate − comisión` en esa moneda. Se guarda como una fila
+`cash_dividend` sobre el saldo, con `dividend_id` apuntando al dividendo, en la
+misma transacción de base de datos. La respuesta, y las lecturas de una
+posición, devuelven `cashCredited`.
+
+| Campo | Qué pasa |
+|---|---|
+| `creditCash` ausente o `false` en el alta | El dividendo no toca el efectivo, como siempre |
+| `creditCash` en el `PUT` | Es la respuesta entera: `true` reescribe el abono con el importe y la fecha nuevos (o lo crea), `false` lo quita |
+| `creditCash: true` en otro tipo | **400** |
+| Dividendo sobre un saldo de efectivo, en una moneda fuera de la lista o que su comisión deja en cero | **400** |
+| Achicar, desabonar o borrar un dividendo —o su posición— cuyo dinero el saldo ya gastó | **409**, como un retiro |
+| Editar o borrar el `cash_dividend` por su cuenta, o escribir ese tipo a mano | **400**: se cambia desde el dividendo |
+| Cambiar la moneda de liquidación de la posición | El abono se muda al saldo de la moneda nueva, al importe de la tasa nueva |
+
+En la serie de crecimiento el dividendo sigue saliendo de la posición como
+renta (000027) y su abono entra al saldo por el mismo importe, el mismo día y en
+la misma moneda: los dos flujos se anulan y lo que queda es lo que ganó el
+saldo, así que la rentabilidad es la misma que sin abonar. En el coste medio el
+abono entra como unidades que no costaron nada, igual que un interés: la
+ganancia del portfolio lo cuenta. En `GET /portfolios/cash/movements` sale con
+`kind: "dividend"`, `editable: false` y `dividendTicker`; en
+`GET /portfolios/transactions` —la actividad, la exportación y la herramienta
+MCP— no sale, porque el dividendo ya está en la lista.
 
 **Bolsillos** (`/portfolios/cash/pockets`, migración 000047). Un **bolsillo** es
 una subcuenta de una cuenta: la «cajita» del banco, el subsaldo del bróker.

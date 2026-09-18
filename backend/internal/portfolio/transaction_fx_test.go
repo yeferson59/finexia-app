@@ -158,6 +158,24 @@ func TestTransactionInputValidate(t *testing.T) {
 	})
 }
 
+// Only a dividend is paid into cash; whether this one can be is decided where it
+// is recorded, against the position and the balance.
+func TestTransactionInputValidateCreditCash(t *testing.T) {
+	dividend := TransactionInput{Type: Dividend, Quantity: decimal.One, Price: mustUSD(t, "25"), CreditCash: true}
+	if _, err := dividend.Validate(money.USD); err != nil {
+		t.Errorf("credited dividend: %v", err)
+	}
+
+	for _, txnType := range []TransactionType{Buy, Sell, Interest, Fee, Split, TransferIn, TransferOut, CashInterest} {
+		in := dividend
+		in.Type = txnType
+
+		if _, err := in.Validate(money.USD); !errors.Is(err, ErrDividendNotCreditable) {
+			t.Errorf("credited %s: err = %v, want ErrDividendNotCreditable", txnType, err)
+		}
+	}
+}
+
 // A commission only adds to the trade once both are in the position's currency,
 // and which of the two rates gets it there depends on which side it was billed
 // on. Getting this backwards is invisible: the number stays plausible and the

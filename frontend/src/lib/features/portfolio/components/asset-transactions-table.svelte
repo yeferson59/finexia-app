@@ -90,6 +90,9 @@
 					<tr class:selling={isActiveSell}>
 						<th scope="row" class="col-kind kind">
 							{TYPE_LABEL[transaction.type] ?? transaction.type}
+							{#if transaction.cashCredited}
+								<span class="note">Abonado al efectivo</span>
+							{/if}
 							{#if transaction.notes}
 								<span class="note">{transaction.notes}</span>
 							{/if}

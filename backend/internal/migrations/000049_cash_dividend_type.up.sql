@@ -1,0 +1,20 @@
+-- A transaction type for a dividend credited to the cash of the platform that
+-- holds the share.
+--
+-- 'dividend' stays what it is: the income, recorded on the holding that paid
+-- it, and booked by transaction_cash_flow (000027) as money leaving the measured
+-- pool. What was missing is where that money goes. A broker pays a dividend into
+-- the account's cash, and the app now keeps that cash (000041), so the credit
+-- is a row on the balance — linked to its dividend, written and removed with it
+-- (000050).
+--
+-- It cannot be a cash_interest. Interest has no flow, because it was earned
+-- inside the pool; a dividend's money already left the pool once, on the
+-- holding, and a credit without a flow would count it as return a second time.
+-- Nor a transfer_in, which is money the owner put in: it would add the dividend
+-- to what the balance cost, and a figure that subtracts the cost would never see
+-- it as gain.
+--
+-- Its own migration for the reason 000040 gives: Postgres will not let a new
+-- enum value be used in the transaction that adds it, and 000050 uses it.
+ALTER TYPE transaction_type ADD VALUE IF NOT EXISTS 'cash_dividend';

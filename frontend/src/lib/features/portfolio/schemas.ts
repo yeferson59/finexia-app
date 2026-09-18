@@ -98,7 +98,13 @@ const transactionSchema = z.object({
 	// cualquiera que no sea esa o la de la posición.
 	feesCurrency: z.coerce.string().trim().toUpperCase().default(''),
 	transactionDate: z.coerce.date(),
-	notes: z.string().optional()
+	notes: z.string().optional(),
+	// La casilla de abonar un dividendo al efectivo: llega como «on» marcada y no
+	// llega desmarcada, que es un «no» y no un hueco.
+	creditCash: z
+		.union([z.string(), z.boolean(), z.null()])
+		.optional()
+		.transform((v) => v === true || v === 'on' || v === 'true')
 });
 
 /** Alta de una transacción sobre una posición existente. */
