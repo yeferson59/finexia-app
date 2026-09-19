@@ -26,6 +26,7 @@
 				<a href="{home}#como-funciona">Cómo funciona</a>
 				<a href="{home}#seguridad">Seguridad</a>
 				<a href="{home}#faq">Preguntas</a>
+				<a href={resolve('/blog')}>Blog</a>
 			</nav>
 
 			<nav class="col" aria-label="Legal">

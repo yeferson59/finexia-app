@@ -54,6 +54,48 @@ test.describe('SEO snapshot', () => {
 		});
 	}
 
+	// El blog es superficie pública nueva: mismas garantías que las legales, y
+	// un artículo que declara además que es un artículo.
+	const blogPages = [
+		{ path: '/blog', title: 'Blog — Finexia' },
+		{ path: '/blog/por-que-existe-finexia', title: 'Por qué existe Finexia — Finexia' },
+		{ path: '/blog/tag/producto', title: 'Artículos sobre producto — Finexia' }
+	];
+
+	for (const { path, title } of blogPages) {
+		test(`blog page head: ${path}`, async ({ page }) => {
+			await page.goto(path);
+
+			await expect(page).toHaveTitle(title);
+			await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+				'href',
+				`${SITE_URL}${path}`
+			);
+			await expect(meta(page, 'robots')).toHaveAttribute('content', 'index,follow');
+			await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+		});
+	}
+
+	test('a blog post declares itself as an article', async ({ page }) => {
+		await page.goto('/blog/por-que-existe-finexia');
+
+		await expect(og(page, 'og:type')).toHaveAttribute('content', 'article');
+		await expect(og(page, 'article:published_time')).toHaveAttribute('content', '2026-09-15');
+
+		const jsonLd = await page.locator('script[type="application/ld+json"]').textContent();
+		expect(JSON.parse(jsonLd ?? '{}')).toMatchObject({
+			'@type': 'BlogPosting',
+			headline: 'Por qué existe Finexia',
+			mainEntityOfPage: `${SITE_URL}/blog/por-que-existe-finexia`
+		});
+	});
+
+	// La otra cara del noindex de abajo: el blog está para que lo indexen.
+	test('the blog is indexable', async ({ page }) => {
+		const response = await page.goto('/blog');
+		expect(response?.headers()['x-robots-tag']).toBeUndefined();
+	});
+
 	test('private areas send X-Robots-Tag noindex', async ({ page }) => {
 		const authResponse = await page.goto('/auth');
 		expect(authResponse?.headers()['x-robots-tag']).toBe('noindex, nofollow');

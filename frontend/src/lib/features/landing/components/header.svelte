@@ -6,6 +6,7 @@
 	let scrolled = $state(false);
 
 	const login = resolve('/auth');
+	const blog = resolve('/blog');
 
 	// El `#` va literal en el marcado (`href="#{link.id}"`) y no dentro del dato:
 	// así `svelte/no-navigation-without-resolve` reconoce el enlace de fragmento.
@@ -35,6 +36,9 @@
 			{#each links as link (link.id)}
 				<a href="#{link.id}">{link.label}</a>
 			{/each}
+			<!-- El blog no es una sección de la portada sino otra página, así que
+			     va fuera del bucle de anclas. -->
+			<a href={blog}>Blog</a>
 		</nav>
 
 		<div class="actions">
@@ -66,6 +70,7 @@
 					{link.label}
 				</a>
 			{/each}
+			<a href={blog} onclick={() => (menuOpen = false)} tabindex={menuOpen ? 0 : -1}>Blog</a>
 			<!-- En móvil la barra solo guarda «Iniciar sesión»: la lista de espera
 			     baja aquí para que siga estando a un toque. -->
 			<a

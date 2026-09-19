@@ -12,6 +12,12 @@ export const DEFAULT_TITLE = 'Finexia — Tu patrimonio en un solo mapa';
 export const DEFAULT_DESCRIPTION =
 	'Registra manualmente dónde tienes tus activos y agrúpalos en los portafolios que tú imaginas, aunque estén en distintas plataformas. Sin conectar cuentas. Lanzamiento 1 oct 2026.';
 
+// Blog defaults. Individual posts override title/description from their own
+// front matter; these cover the index and the tag pages.
+export const BLOG_TITLE = `Blog — ${SITE_NAME}`;
+export const BLOG_DESCRIPTION =
+	'Artículos sobre cómo ordenar tu patrimonio, organizar tus portafolios y por qué Finexia no te pide las claves de tus cuentas.';
+
 // 1200×630 social share image served from /static.
 export const OG_IMAGE = `${SITE_URL}/og-image.png`;
 

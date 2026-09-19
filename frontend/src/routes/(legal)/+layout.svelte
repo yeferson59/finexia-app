@@ -18,6 +18,7 @@
 				<Brand />
 			</a>
 			<nav class="legal-nav" aria-label="Páginas legales">
+				<a href={resolve('/blog')}>Blog</a>
 				<a href={resolve('/privacidad')}>Privacidad</a>
 				<a href={resolve('/terminos')}>Términos</a>
 				<a href={resolve('/cookies')}>Cookies</a>

@@ -17,7 +17,7 @@ negocio vive en `lib/features/<feature>/` y todo el acceso al backend en
 frontend/src/
 ├── app.html · app.d.ts · hooks.server.ts   # sesión, guardas globales y proxy
 ├── routes/                                 # SOLO orquestación y composición
-│   ├── (legal)/ · auth/ · api/ · sitemap.xml/
+│   ├── (legal)/ · blog/ · auth/ · api/ · sitemap.xml/
 │   └── dashboard/                          # portfolios, assets, transactions,
 │                                           # platforms, reports, settings,
 │                                           # notifications, admin…
@@ -33,9 +33,9 @@ frontend/src/
     │     market.ts · user.ts · marketing.ts
     │
     ├── features/     # un directorio por dominio funcional
-    │   ├── admin/ · auth/ · dashboard/ · investments/ · landing/ · legal/ ·
-    │   │ notifications/ · platforms/ · portfolio/ · reports/ · settings/ ·
-    │   │ transactions/
+    │   ├── admin/ · auth/ · blog/ · cash/ · dashboard/ · guide/ ·
+    │   │ investments/ · landing/ · legal/ · notifications/ · platforms/ ·
+    │   │ portfolio/ · reports/ · settings/ · transactions/
     │   └── <feature>/
     │       ├── components/     # componentes del dominio
     │       ├── <feature>.ts    # helpers puros, constantes y tipos del dominio
