@@ -438,6 +438,13 @@ func (a *App) registerJobs(sched *scheduler.Scheduler, mods *modules, persistent
 		}),
 	)
 
+	sched.Register(
+		market.NewRotateKeyrings(a.deps.Keyring, a.deps.Log),
+		scheduler.Every{Interval: 3 * time.Hour},
+		scheduler.WithStore(persistent),
+		scheduler.WithRetry(scheduler.JobOptions{MaxRetries: scheduler.Retries(10)}),
+	)
+
 	// The shared exchange rates come from a keyless public feed, so this job is
 	// the opposite of the one above in every way that matters to scheduling: no
 	// user's quota is spent, one fetch serves everybody, and a retry costs

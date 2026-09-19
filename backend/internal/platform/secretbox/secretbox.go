@@ -22,6 +22,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	mathRand "math/rand/v2"
 	"strconv"
 	"strings"
 )
@@ -293,6 +294,28 @@ func (k *Keyring) unwrapDEK(wrapped []byte, version uint8) ([]byte, error) {
 	}
 
 	return dek, nil
+}
+
+func (k *Keyring) Rotate() error {
+	maxVersion := uint(len(k.keys))
+
+	if maxVersion <= 2 {
+		return errors.New("this keyring has too few versions to rotate")
+	}
+
+	newVersion := mathRand.UintN(maxVersion + 1)
+
+	if newVersion == 0 {
+		return errors.New("invalid new version")
+	}
+
+	if uint8(newVersion) == k.active {
+		return errors.New("new version is the same as active version")
+	}
+
+	k.active = uint8(newVersion)
+
+	return nil
 }
 
 // AAD builds the associated data that binds a sealed secret to its owner. Pass

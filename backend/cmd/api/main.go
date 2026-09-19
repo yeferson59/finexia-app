@@ -40,9 +40,6 @@ func main() {
 // run creates the infrastructure and hands it to the composition root; all
 // application wiring lives in internal/app.
 func run(ctx context.Context, envs *config.EnvConfig, log logger.Logger) error {
-	// Before anything is connected: a missing or guessable JWT_SECRET means
-	// every access token this process would issue is forgeable by anyone, so
-	// it stops the boot rather than degrading silently.
 	if err := envs.Validate(); err != nil {
 		return err
 	}

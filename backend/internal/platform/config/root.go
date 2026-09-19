@@ -134,9 +134,11 @@ func validateJWTSecret(raw string) error {
 	}
 
 	distinct := make(map[rune]struct{}, minJWTSecretDistinctChars)
+
 	for _, r := range secret {
 		distinct[r] = struct{}{}
 	}
+
 	if len(distinct) < minJWTSecretDistinctChars {
 		return fmt.Errorf("config: JWT_SECRET uses only %d distinct characters, so its length does not reflect real entropy%s", len(distinct), generate)
 	}
