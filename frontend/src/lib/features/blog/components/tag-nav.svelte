@@ -4,6 +4,10 @@
 	 *
 	 * «Todos» va primero y es un enlace como los demás: desde una etiqueta, la
 	 * salida tiene que estar en el mismo sitio donde se entró.
+	 *
+	 * Van como texto y no como píldoras: son un filtro de un archivo, no botones.
+	 * La activa lleva el subrayado grueso en tinta y el peso, que no dependen del
+	 * color.
 	 */
 	import { resolve } from '$app/paths';
 	import type { TagSummary } from '../blog';
@@ -28,8 +32,7 @@
 				class="tag"
 				aria-current={active === tag.slug ? 'page' : undefined}
 			>
-				{tag.label}
-				<span class="count" aria-hidden="true">{tag.count}</span>
+				{tag.label}<span class="count" aria-hidden="true">{tag.count}</span>
 			</a>
 		{/each}
 	</nav>
@@ -39,40 +42,46 @@
 	.tag-nav {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 10px;
-		margin-bottom: 8px;
+		gap: 6px 26px;
 	}
 
 	.tag {
 		display: inline-flex;
-		align-items: center;
-		gap: 7px;
-		padding: 7px 14px;
-		border: 1px solid var(--lp-rule);
-		border-radius: 999px;
-		font-size: var(--lp-fs-sm);
+		align-items: baseline;
+		gap: 5px;
+		padding-block: 6px;
+		font-size: 15px;
 		color: var(--lp-ink-2);
+		text-decoration: underline;
+		text-decoration-color: transparent;
+		text-decoration-thickness: 2px;
+		text-underline-offset: 6px;
 		transition:
-			border-color 0.15s ease,
-			background 0.15s ease,
-			color 0.15s ease;
+			color 0.15s ease,
+			text-decoration-color 0.15s ease;
 	}
 
 	.tag:hover {
-		border-color: var(--lp-ink);
 		color: var(--lp-ink);
+		text-decoration-color: var(--lp-rule);
 	}
 
-	/* La activa en tinta llena: es el único estado que no depende del color. */
 	.tag[aria-current='page'] {
-		border-color: var(--lp-ink);
-		background: var(--lp-ink);
-		color: var(--lp-paper);
+		font-weight: 600;
+		color: var(--lp-ink);
+		text-decoration-color: var(--lp-ink);
 	}
 
 	.count {
 		font-size: 12px;
+		font-weight: 400;
 		font-variant-numeric: tabular-nums;
-		opacity: 0.7;
+		color: var(--lp-ink-2);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.tag {
+			transition: none;
+		}
 	}
 </style>

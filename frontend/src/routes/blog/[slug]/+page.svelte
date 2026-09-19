@@ -1,5 +1,13 @@
 <script lang="ts">
-	import { PostBody, PostHeader, blogPostingJsonLd, postPath } from '$lib/features/blog';
+	import { resolve } from '$app/paths';
+	import {
+		PostAside,
+		PostBody,
+		PostHeader,
+		PostList,
+		blogPostingJsonLd,
+		postPath
+	} from '$lib/features/blog';
 	import { LOCALE, OG_IMAGE, SITE_NAME, absoluteUrl } from '$lib/seo';
 	import type { PageProps } from './$types';
 
@@ -39,7 +47,117 @@
 	{@html `<script type="application/ld+json">${jsonLd}</scr` + 'ipt>'}
 </svelte:head>
 
-<article>
-	<PostHeader post={data.post} />
-	<PostBody html={data.post.html} />
+<!--
+	La rejilla del extracto: el margen a la izquierda con la vuelta al índice,
+	la ficha y las secciones; el texto a la derecha.
+-->
+<article class="lp-wrap post">
+	<a class="back" href={resolve('/blog')}>Todos los artículos</a>
+	<div class="head">
+		<PostHeader post={data.post} />
+	</div>
+	<PostAside post={data.post} />
+	<div class="body">
+		<PostBody html={data.post.html} />
+	</div>
 </article>
+
+{#if data.related.length > 0}
+	<section class="lp-wrap more" aria-labelledby="more-title">
+		<h2 id="more-title">Sigue leyendo</h2>
+		<div class="more-list">
+			<PostList posts={data.related} headingLevel={3} />
+		</div>
+	</section>
+{/if}
+
+<style>
+	.post {
+		display: grid;
+		grid-template-columns: var(--blog-margin) minmax(0, 1fr);
+		grid-template-areas:
+			'back head'
+			'aside body';
+		column-gap: var(--blog-gap);
+		row-gap: 56px;
+		padding-top: 72px;
+	}
+
+	.back {
+		grid-area: back;
+		align-self: start;
+		padding-top: 12px;
+		font-size: 15px;
+		color: var(--lp-ink-2);
+		text-decoration: underline;
+		text-decoration-color: var(--lp-rule);
+		text-underline-offset: 4px;
+	}
+
+	.back:hover {
+		color: var(--lp-ink);
+		text-decoration-color: currentColor;
+	}
+
+	.head {
+		grid-area: head;
+	}
+
+	.post > :global(.post-aside) {
+		grid-area: aside;
+	}
+
+	.body {
+		grid-area: body;
+		min-width: 0;
+		padding-top: 6px;
+	}
+
+	/*
+	 * «Sigue leyendo» cuelga de un filete en tinta a todo el ancho: marca que el
+	 * artículo terminó. Las entradas son las del índice, con su propio margen.
+	 */
+	.more {
+		margin-top: 96px;
+	}
+
+	.more h2 {
+		margin: 0;
+		padding: 20px 0 8px;
+		border-top: 2px solid var(--lp-ink);
+		font-size: 21px;
+		font-stretch: 114%;
+		font-weight: 620;
+		letter-spacing: -0.01em;
+	}
+
+	@media (max-width: 1023px) {
+		.post {
+			grid-template-columns: minmax(0, 1fr);
+			grid-template-areas: 'back' 'head' 'aside' 'body';
+			row-gap: 0;
+		}
+		.back {
+			padding-top: 0;
+			margin-bottom: 24px;
+			justify-self: start;
+		}
+		.post > :global(.post-aside) {
+			margin: 28px 0 40px;
+			padding-top: 18px;
+			border-top: 1px solid var(--lp-rule);
+		}
+		.body {
+			padding-top: 0;
+		}
+	}
+
+	@media (max-width: 640px) {
+		.post {
+			padding-top: 36px;
+		}
+		.more {
+			margin-top: 64px;
+		}
+	}
+</style>

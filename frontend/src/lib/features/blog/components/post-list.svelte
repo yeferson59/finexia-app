@@ -14,9 +14,15 @@
 		posts: PostMeta[];
 		/** Qué decir cuando la lista está vacía. */
 		emptyTitle?: string;
+		/** El nivel de cada titular; 3 si la lista cuelga de un `h2`. */
+		headingLevel?: 2 | 3;
 	}
 
-	let { posts, emptyTitle = 'Todavía no hay artículos publicados.' }: Props = $props();
+	let {
+		posts,
+		emptyTitle = 'Todavía no hay artículos publicados.',
+		headingLevel = 2
+	}: Props = $props();
 </script>
 
 {#if posts.length === 0}
@@ -24,19 +30,17 @@
 {:else}
 	<div class="post-list">
 		{#each posts as post (post.slug)}
-			<PostCard {post} />
+			<PostCard {post} {headingLevel} />
 		{/each}
 	</div>
 {/if}
 
 <style>
 	.post-list {
-		max-width: 780px;
 		border-bottom: 1px solid var(--lp-rule);
 	}
 
 	.empty {
-		max-width: 52ch;
 		margin: 0;
 		padding-block: 40px;
 		border-top: 1px solid var(--lp-rule);

@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { getPost, listSlugs } from '$lib/features/blog';
+import { getPost, listPosts, listSlugs, relatedPosts } from '$lib/features/blog';
 import type { EntryGenerator, PageServerLoad } from './$types';
 
 // `'auto'` y no el `true` que hereda de `+layout.ts`: si todos los artículos son
@@ -16,5 +16,5 @@ export const entries: EntryGenerator = async () => (await listSlugs()).map((slug
 export const load: PageServerLoad = async ({ params }) => {
 	const post = await getPost(params.slug);
 	if (!post) error(404, 'Ese artículo no existe.');
-	return { post };
+	return { post, related: relatedPosts(post, await listPosts()) };
 };

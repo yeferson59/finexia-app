@@ -5,6 +5,11 @@
 	 *
 	 * La navegación lleva a la portada y al inicio de sesión, que es lo que
 	 * puede querer quien llega aquí desde una búsqueda y no conoce el producto.
+	 *
+	 * Cada página pone su propio `.lp-wrap`: el índice abre con una banda a
+	 * sangre que no cabe dentro del ancho del texto. Aquí se declaran los dos
+	 * tokens que solo usa el blog: la serif del texto corrido y la columna del
+	 * margen, que es donde van la fecha, la ficha y el índice del artículo.
 	 */
 	import { resolve } from '$app/paths';
 	import '$lib/ui/public.css';
@@ -33,9 +38,7 @@
 	</header>
 
 	<main class="blog-main">
-		<div class="lp-wrap">
-			{@render children()}
-		</div>
+		{@render children()}
 	</main>
 
 	<Footer />
@@ -80,8 +83,22 @@
 	}
 
 	.blog-main {
+		/* Fraunces con su eje óptico: a 19px dibuja los trazos para leer, no
+		   para titular. */
+		--blog-serif: 'Fraunces', Georgia, serif;
+		--blog-margin: 220px;
+		--blog-gap: 72px;
+		--blog-header: 72px;
+
 		min-height: 60vh;
-		padding: 64px 0 96px;
+		padding-bottom: 112px;
+	}
+
+	@media (max-width: 1100px) {
+		.blog-main {
+			--blog-margin: 180px;
+			--blog-gap: 48px;
+		}
 	}
 
 	@media (max-width: 860px) {
@@ -98,7 +115,8 @@
 			font-size: 13px;
 		}
 		.blog-main {
-			padding: 40px 0 64px;
+			--blog-header: 58px;
+			padding-bottom: 72px;
 		}
 	}
 </style>

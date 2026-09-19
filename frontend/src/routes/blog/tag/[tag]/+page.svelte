@@ -29,42 +29,38 @@
 	<meta name="twitter:card" content="summary_large_image" />
 </svelte:head>
 
-<div class="intro">
-	<p class="eyebrow">Etiqueta</p>
-	<h1>{label}</h1>
+<div class="lp-wrap">
+	<div class="intro">
+		<h1>Artículos sobre {label}</h1>
+		<TagNav tags={data.tags} active={slug} />
+	</div>
+
+	<PostList posts={data.posts} emptyTitle="Todavía no hay artículos con esta etiqueta." />
 </div>
-
-<TagNav tags={data.tags} active={slug} />
-
-<PostList posts={data.posts} emptyTitle="Todavía no hay artículos con esta etiqueta." />
 
 <style>
 	.intro {
-		max-width: 780px;
-		margin-bottom: 36px;
-	}
-
-	.eyebrow {
-		margin: 0 0 10px;
-		font-size: var(--lp-fs-sm);
-		font-weight: 600;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: var(--lp-ink-3);
+		display: flex;
+		flex-direction: column;
+		gap: 28px;
+		padding-block: 72px 36px;
 	}
 
 	h1 {
+		max-width: 16ch;
 		margin: 0;
-		font-size: clamp(40px, 5.4vw, 68px);
-		font-stretch: 118%;
-		font-weight: 640;
-		line-height: 1;
-		letter-spacing: -0.03em;
+		font-size: clamp(40px, 5.6vw, 76px);
+		font-stretch: 125%;
+		font-weight: 650;
+		line-height: 0.96;
+		letter-spacing: -0.035em;
+		text-wrap: balance;
 	}
 
 	@media (max-width: 640px) {
 		.intro {
-			margin-bottom: 26px;
+			gap: 20px;
+			padding-block: 44px 24px;
 		}
 	}
 </style>

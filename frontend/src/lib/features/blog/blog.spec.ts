@@ -7,6 +7,7 @@ import {
 	hasTag,
 	postPath,
 	readingMinutes,
+	relatedPosts,
 	renderRssFeed,
 	slugify,
 	sortByDate,
@@ -189,5 +190,27 @@ describe('renderRssFeed', () => {
 		const xml = renderRssFeed([post({ title: 'Acciones & bonos <hoy>' })], 'Blog', 'Artículos');
 
 		expect(xml).toContain('<title>Acciones &amp; bonos &lt;hoy&gt;</title>');
+	});
+});
+
+describe('relatedPosts', () => {
+	const current = post({ slug: 'actual', tags: ['producto'] });
+	const posts = [
+		current,
+		post({ slug: 'otra-cosa', tags: ['seguridad'] }),
+		post({ slug: 'mismo-tema', tags: ['Producto'] }),
+		post({ slug: 'tercero', tags: ['guías'] })
+	];
+
+	it('pone primero los que comparten etiqueta, aunque vayan después en el índice', () => {
+		expect(relatedPosts(current, posts).map((p) => p.slug)).toEqual(['mismo-tema', 'otra-cosa']);
+	});
+
+	it('nunca recomienda el propio artículo', () => {
+		expect(relatedPosts(current, posts, 10).map((p) => p.slug)).not.toContain('actual');
+	});
+
+	it('devuelve una lista vacía cuando no hay otros', () => {
+		expect(relatedPosts(current, [current])).toEqual([]);
 	});
 });

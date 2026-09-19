@@ -22,6 +22,7 @@ import {
 	hasTag,
 	tagSlug,
 	type Post,
+	type PostHeading,
 	type PostMeta
 } from './blog';
 import { splitFrontmatter } from './frontmatter';
@@ -43,16 +44,23 @@ function slugOf(path: string): string {
 
 /**
  * Markdown a HTML, con un `id` en cada encabezado para poder enlazar a una
- * sección concreta del artículo.
+ * sección concreta del artículo. De paso apunta los `##`, que son el índice
+ * «En este artículo» del lateral.
  */
-async function renderMarkdown(body: string): Promise<string> {
+async function renderMarkdown(body: string): Promise<{ html: string; headings: PostHeading[] }> {
 	const { marked } = await import('marked');
+	const headings: PostHeading[] = [];
 
 	const renderer = new marked.Renderer();
-	renderer.heading = ({ text, depth }) =>
-		`<h${depth} id="${headingId(text)}">${marked.parseInline(text)}</h${depth}>\n`;
+	renderer.heading = ({ text, depth }) => {
+		const id = headingId(text);
+		// El índice es texto plano: sin los `**` ni las comillas del Markdown.
+		if (depth === 2) headings.push({ id, text: text.replace(/[*_`]/g, '') });
+		return `<h${depth} id="${id}">${marked.parseInline(text)}</h${depth}>\n`;
+	};
 
-	return await marked.parse(body, { renderer, gfm: true });
+	const html = await marked.parse(body, { renderer, gfm: true });
+	return { html, headings };
 }
 
 /** Un archivo del contenido convertido en artículo, o un error que nombra cuál. */
@@ -70,7 +78,7 @@ async function readPost(path: string, load: () => Promise<string>): Promise<Post
 		...parsed.data,
 		slug,
 		readingMinutes: readingMinutes(body),
-		html: await renderMarkdown(body)
+		...(await renderMarkdown(body))
 	};
 }
 
@@ -84,7 +92,7 @@ function readAll(): Promise<Post[]> {
 }
 
 /** Sin el cuerpo: lo que necesitan el índice, las etiquetas y el sitemap. */
-function toMeta({ html: _html, ...meta }: Post): PostMeta {
+function toMeta({ html: _html, headings: _headings, ...meta }: Post): PostMeta {
 	return meta;
 }
 

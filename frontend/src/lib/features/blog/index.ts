@@ -10,9 +10,11 @@
  * el contenido de forma perezosa para que no acabe en el bundle del cliente.
  */
 export { default as PostCard } from './components/post-card.svelte';
+export { default as FeaturedPost } from './components/featured-post.svelte';
 export { default as PostList } from './components/post-list.svelte';
 export { default as PostHeader } from './components/post-header.svelte';
 export { default as PostBody } from './components/post-body.svelte';
+export { default as PostAside } from './components/post-aside.svelte';
 export { default as TagNav } from './components/tag-nav.svelte';
 export * from './blog';
 export * from './posts';

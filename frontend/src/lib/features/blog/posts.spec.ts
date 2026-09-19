@@ -27,6 +27,7 @@ describe('listPosts', () => {
 
 	it('no incluye el cuerpo: el índice no lo necesita', async () => {
 		expect((await listPosts())[0]).not.toHaveProperty('html');
+		expect((await listPosts())[0]).not.toHaveProperty('headings');
 	});
 
 	it('le pone a cada uno un slug y sus minutos de lectura', async () => {
@@ -52,6 +53,18 @@ describe('getPost', () => {
 		const post = await getPost('por-que-existe-finexia');
 
 		expect(post?.html).toMatch(/<h2 id="[a-z0-9-]+">/);
+	});
+
+	// El lateral del artículo enlaza a sus secciones: cada entrada del índice
+	// tiene que apuntar a un `id` que exista en el HTML.
+	it('apunta las secciones del artículo con el id de su encabezado', async () => {
+		const post = await getPost('por-que-existe-finexia');
+
+		expect(post?.headings.length).toBeGreaterThan(0);
+		for (const heading of post?.headings ?? []) {
+			expect(post?.html).toContain(`<h2 id="${heading.id}">`);
+			expect(heading.text).not.toMatch(/[*_`]/);
+		}
 	});
 
 	it('devuelve null cuando el slug no existe', async () => {

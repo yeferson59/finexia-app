@@ -1,11 +1,16 @@
 <script lang="ts">
-	import { PostList, TagNav } from '$lib/features/blog';
+	import { resolve } from '$app/paths';
+	import { FeaturedPost, PostList, TagNav } from '$lib/features/blog';
 	import { BLOG_DESCRIPTION, BLOG_TITLE, LOCALE, OG_IMAGE, SITE_NAME, absoluteUrl } from '$lib/seo';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
 	const canonical = absoluteUrl('/blog');
+
+	// El más nuevo abre la página en la banda verde; el resto sigue debajo.
+	const featured = $derived(data.posts[0]);
+	const rest = $derived(data.posts.slice(1));
 </script>
 
 <svelte:head>
@@ -29,46 +34,106 @@
 	/>
 </svelte:head>
 
-<div class="intro">
-	<h1>Blog</h1>
-	<p class="lead">{BLOG_DESCRIPTION}</p>
+<div class="lp-wrap intro">
+	<h1>El blog de Finexia</h1>
+	<div class="aside">
+		<p class="lead">{BLOG_DESCRIPTION}</p>
+		<a class="lp-link rss" href={resolve('/blog/rss.xml')}>Seguir por RSS</a>
+	</div>
 </div>
 
-<TagNav tags={data.tags} />
+{#if featured}
+	<FeaturedPost post={featured} />
+{:else}
+	<div class="lp-wrap">
+		<PostList posts={[]} />
+	</div>
+{/if}
 
-<PostList posts={data.posts} />
+{#if rest.length > 0}
+	<section class="lp-wrap archive" aria-labelledby="archive-title">
+		<div class="archive-head">
+			<h2 id="archive-title">Anteriores</h2>
+			<TagNav tags={data.tags} />
+		</div>
+		<PostList posts={rest} headingLevel={3} />
+	</section>
+{/if}
 
 <style>
 	.intro {
-		max-width: 780px;
-		margin-bottom: 36px;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 400px);
+		align-items: end;
+		gap: 24px 64px;
+		padding-block: 72px 48px;
 	}
 
 	h1 {
+		max-width: 9ch;
 		margin: 0;
-		font-size: clamp(40px, 5.4vw, 68px);
-		font-stretch: 118%;
-		font-weight: 640;
-		line-height: 1;
-		letter-spacing: -0.03em;
+		/* Un escalón por debajo del destacado: el titular que se lleva la
+		   página es el del artículo, no el del blog. */
+		font-size: clamp(40px, 4.8vw, 64px);
+		font-stretch: 125%;
+		font-weight: 650;
+		line-height: 0.94;
+		letter-spacing: -0.035em;
 	}
 
 	.lead {
-		max-width: 52ch;
-		margin: 18px 0 0;
-		font-size: var(--lp-fs-lead);
-		line-height: 1.55;
+		margin: 0;
+		font-family: var(--blog-serif);
+		font-size: 19px;
+		font-weight: 380;
+		line-height: 1.5;
 		color: var(--lp-ink-2);
 		text-wrap: pretty;
 	}
 
-	@media (max-width: 640px) {
+	.rss {
+		display: inline-block;
+		margin-top: 12px;
+		font-size: var(--lp-fs-sm);
+	}
+
+	.archive {
+		padding-top: 72px;
+	}
+
+	.archive-head {
+		display: grid;
+		grid-template-columns: var(--blog-margin) minmax(0, 1fr);
+		column-gap: var(--blog-gap);
+		align-items: baseline;
+		margin-bottom: 20px;
+	}
+
+	h2 {
+		margin: 0;
+		font-size: 21px;
+		font-stretch: 114%;
+		font-weight: 620;
+		letter-spacing: -0.01em;
+	}
+
+	@media (max-width: 860px) {
 		.intro {
-			margin-bottom: 26px;
+			grid-template-columns: minmax(0, 1fr);
+			padding-block: 44px 36px;
+		}
+	}
+
+	@media (max-width: 760px) {
+		.archive {
+			padding-top: 48px;
+		}
+		.archive-head {
+			grid-template-columns: minmax(0, 1fr);
+			row-gap: 10px;
 		}
 		.lead {
-			margin-top: 12px;
-			font-size: 16px;
+			font-size: 17px;
 		}
 	}
 </style>

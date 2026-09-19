@@ -21,9 +21,16 @@ export interface PostMeta extends PostFrontmatter {
 	readingMinutes: number;
 }
 
+/** Una sección del artículo (`##`), para el índice del lateral. */
+export interface PostHeading {
+	id: string;
+	text: string;
+}
+
 /** Un artículo entero, con el HTML ya renderizado. */
 export interface Post extends PostMeta {
 	html: string;
+	headings: PostHeading[];
 }
 
 /** Una etiqueta del índice: cómo se escribe, cómo se enlaza y cuántos lleva. */
@@ -126,6 +133,23 @@ export function formatPostDate(iso: string): string {
 /** «4 min de lectura», para poner junto a la fecha. */
 export function formatReadingTime(minutes: number): string {
 	return `${minutes} min de lectura`;
+}
+
+/**
+ * Qué más leer al terminar un artículo: primero los que comparten etiqueta,
+ * luego el resto, y dentro de cada grupo en el orden del índice. Nunca el
+ * propio artículo.
+ */
+export function relatedPosts<T extends Pick<PostMeta, 'slug' | 'tags'>>(
+	current: Pick<PostMeta, 'slug' | 'tags'>,
+	posts: T[],
+	limit = 2
+): T[] {
+	const tags = new Set(current.tags.map(tagSlug));
+	const others = posts.filter((post) => post.slug !== current.slug);
+	const shares = (post: T) => post.tags.some((tag) => tags.has(tagSlug(tag)));
+
+	return [...others.filter(shares), ...others.filter((post) => !shares(post))].slice(0, limit);
 }
 
 /** La URL pública de un artículo. */
