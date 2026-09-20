@@ -58,7 +58,7 @@ test.describe('SEO snapshot', () => {
 	// un artículo que declara además que es un artículo.
 	const blogPages = [
 		{ path: '/blog', title: 'Blog — Finexia' },
-		{ path: '/blog/por-que-existe-finexia', title: 'Por qué existe Finexia — Finexia' },
+		{ path: '/blog/bienvenida-a-finexia', title: 'Te damos la bienvenida a Finexia — Finexia' },
 		{ path: '/blog/tag/producto', title: 'Artículos sobre producto — Finexia' }
 	];
 
@@ -77,16 +77,16 @@ test.describe('SEO snapshot', () => {
 	}
 
 	test('a blog post declares itself as an article', async ({ page }) => {
-		await page.goto('/blog/por-que-existe-finexia');
+		await page.goto('/blog/bienvenida-a-finexia');
 
 		await expect(og(page, 'og:type')).toHaveAttribute('content', 'article');
-		await expect(og(page, 'article:published_time')).toHaveAttribute('content', '2026-09-15');
+		await expect(og(page, 'article:published_time')).toHaveAttribute('content', '2026-09-19');
 
 		const jsonLd = await page.locator('script[type="application/ld+json"]').textContent();
 		expect(JSON.parse(jsonLd ?? '{}')).toMatchObject({
 			'@type': 'BlogPosting',
-			headline: 'Por qué existe Finexia',
-			mainEntityOfPage: `${SITE_URL}/blog/por-que-existe-finexia`
+			headline: 'Te damos la bienvenida a Finexia',
+			mainEntityOfPage: `${SITE_URL}/blog/bienvenida-a-finexia`
 		});
 	});
 

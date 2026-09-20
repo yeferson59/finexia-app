@@ -3,63 +3,75 @@ import { expect, test } from '@playwright/test';
 /*
  * El blog público. No hace falta sesión ni el stub de la API: los artículos son
  * archivos del repositorio y las páginas salen prerenderizadas del build.
+ *
+ * Estos tests corren contra el build de producción, así que ven lo que verá
+ * quien entre: solo los artículos publicados. Los que están en `draft: true` no
+ * existen aquí, y eso es justo lo que comprueba «un borrador no se publica».
  */
+
+/** El artículo publicado contra el que se miran el índice, la etiqueta y el feed. */
+const POST = {
+	slug: 'bienvenida-a-finexia',
+	title: 'Te damos la bienvenida a Finexia',
+	date: '19 de septiembre de 2026',
+	heading: 'Qué es Finexia',
+	tag: 'producto'
+};
+
+/** Un borrador cualquiera: no entra en el índice, ni en las etiquetas, ni en el feed. */
+const DRAFT = { slug: 'por-que-existe-finexia', title: 'Por qué existe Finexia' };
 
 test.describe('blog', () => {
 	test('el índice lista los artículos publicados', async ({ page }) => {
 		await page.goto('/blog');
 
-		await expect(page.getByRole('heading', { level: 1, name: 'Blog' })).toBeVisible();
-		await expect(page.getByRole('link', { name: 'Por qué existe Finexia' })).toBeVisible();
-		await expect(
-			page.getByRole('link', { name: 'Por qué no te pedimos las claves de tus cuentas' })
-		).toBeVisible();
-		await expect(
-			page.getByRole('link', { name: 'Cómo organizar tus portafolios por objetivo' })
-		).toBeVisible();
+		await expect(page.getByRole('heading', { level: 1, name: 'El blog de Finexia' })).toBeVisible();
+		await expect(page.getByRole('link', { name: POST.title })).toBeVisible();
 	});
 
-	test('los más nuevos van primero', async ({ page }) => {
+	/*
+	 * El orden del índice lo prueban `blog.spec.ts` (`sortByDate`) y
+	 * `posts.spec.ts` sobre los artículos de verdad; aquí lo que importa es que
+	 * el artículo abre la página como destacado.
+	 */
+	test('el más nuevo abre el índice', async ({ page }) => {
 		await page.goto('/blog');
 
 		const titles = await page.locator('article .title a').allTextContents();
-		expect(titles[0]).toContain('Cómo organizar tus portafolios por objetivo');
+		expect(titles[0]).toContain(POST.title);
+	});
+
+	test('un borrador no se publica', async ({ page }) => {
+		await page.goto('/blog');
+		await expect(page.getByRole('link', { name: DRAFT.title })).toHaveCount(0);
+
+		const response = await page.goto(`/blog/${DRAFT.slug}`);
+		expect(response?.status()).toBe(404);
 	});
 
 	test('desde el índice se entra al artículo y se vuelve', async ({ page }) => {
 		await page.goto('/blog');
-		await page.getByRole('link', { name: 'Por qué existe Finexia' }).click();
+		await page.getByRole('link', { name: POST.title }).click();
 
-		await expect(page).toHaveURL('/blog/por-que-existe-finexia');
-		await expect(
-			page.getByRole('heading', { level: 1, name: 'Por qué existe Finexia' })
-		).toBeVisible();
-		await expect(page.getByText('15 de septiembre de 2026')).toBeVisible();
-		await expect(
-			page.getByRole('heading', { level: 2, name: 'El problema no es la falta de datos' })
-		).toBeVisible();
+		await expect(page).toHaveURL(`/blog/${POST.slug}`);
+		await expect(page.getByRole('heading', { level: 1, name: POST.title })).toBeVisible();
+		await expect(page.getByText(POST.date)).toBeVisible();
+		await expect(page.getByRole('heading', { level: 2, name: POST.heading })).toBeVisible();
 
 		await page.getByRole('link', { name: 'Todos los artículos' }).click();
 		await expect(page).toHaveURL('/blog');
 	});
 
+	// La etiqueta se enlaza desde el propio artículo del índice. `exact` porque
+	// «producto» es también parte de «El producto», que es el enlace a la portada.
 	test('las etiquetas filtran el índice', async ({ page }) => {
-		await page.goto('/blog/tag/seguridad');
-
-		await expect(page.getByRole('heading', { level: 1, name: 'seguridad' })).toBeVisible();
-		await expect(
-			page.getByRole('link', { name: 'Por qué no te pedimos las claves de tus cuentas' })
-		).toBeVisible();
-		await expect(page.getByRole('link', { name: 'Por qué existe Finexia' })).toHaveCount(0);
-	});
-
-	// La tilde no puede entrar en la URL, pero la etiqueta se sigue leyendo con ella.
-	test('una etiqueta con tilde se enlaza sin ella', async ({ page }) => {
 		await page.goto('/blog');
-		await page.getByRole('link', { name: 'guías' }).first().click();
+		await page.getByRole('link', { name: POST.tag, exact: true }).first().click();
 
-		await expect(page).toHaveURL('/blog/tag/guias');
-		await expect(page.getByRole('heading', { level: 1, name: 'guías' })).toBeVisible();
+		await expect(page).toHaveURL(`/blog/tag/${POST.tag}`);
+		await expect(page.getByRole('heading', { level: 1, name: POST.tag })).toBeVisible();
+		await expect(page.getByRole('link', { name: POST.title })).toBeVisible();
+		await expect(page.getByRole('link', { name: DRAFT.title })).toHaveCount(0);
 	});
 
 	test('una etiqueta que nadie usa devuelve 404', async ({ page }) => {
@@ -77,16 +89,18 @@ test.describe('blog', () => {
 
 		expect(response.headers()['content-type']).toContain('application/rss+xml');
 		const xml = await response.text();
-		expect(xml.match(/<item>/g)).toHaveLength(3);
-		expect(xml).toContain('<link>https://finexia.me/blog/por-que-existe-finexia</link>');
+		expect(xml.match(/<item>/g)).toHaveLength(1);
+		expect(xml).toContain(`<link>https://finexia.me/blog/${POST.slug}</link>`);
+		expect(xml).not.toContain(DRAFT.slug);
 	});
 
 	test('el sitemap incluye el blog, sus artículos y sus etiquetas', async ({ page }) => {
 		const xml = await (await page.request.get('/sitemap.xml')).text();
 
 		expect(xml).toContain('<loc>https://finexia.me/blog</loc>');
-		expect(xml).toContain('<loc>https://finexia.me/blog/por-que-existe-finexia</loc>');
-		expect(xml).toContain('<loc>https://finexia.me/blog/tag/producto</loc>');
+		expect(xml).toContain(`<loc>https://finexia.me/blog/${POST.slug}</loc>`);
+		expect(xml).toContain(`<loc>https://finexia.me/blog/tag/${POST.tag}</loc>`);
+		expect(xml).not.toContain(DRAFT.slug);
 	});
 
 	test('se llega al blog desde la portada y desde el pie', async ({ page }) => {
@@ -110,7 +124,7 @@ test.describe('blog', () => {
 			}
 		});
 
-		await page.goto('/blog/por-que-existe-finexia');
+		await page.goto(`/blog/${POST.slug}`);
 		await page.waitForLoadState('networkidle');
 
 		const bodies = await Promise.all(
