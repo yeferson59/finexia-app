@@ -90,6 +90,9 @@ function holding(ticker, quantity, price, entryDate, notes = '') {
 				? IDS.entry
 				: `55555555-5555-4555-8555-5555555555${String(entrySeq).padStart(2, '0')}`,
 		assetId: assetId(ticker),
+		// La plataforma en la que está: es la que dice de qué saldo de efectivo
+		// puede salir el dinero de una compra sobre esta posición.
+		sourceId: IDS.platform,
 		ticker,
 		name,
 		assetType,
@@ -156,6 +159,41 @@ export const PORTFOLIOS = [
 
 /** Todas las posiciones, sin importar el portafolio. */
 export const holdings = PORTFOLIOS.flatMap((p) => p.holdings);
+
+/**
+ * `GET /portfolios/cash` — el efectivo de la cartera principal.
+ *
+ * Uno solo, y en la plataforma y la moneda de sus posiciones, que es lo que
+ * hace falta para que la ficha de un activo pueda ofrecer pagar una compra con
+ * él. `pocketId: null` es la cuenta principal, que es de donde se paga.
+ */
+export const cashBalances = [
+	{
+		entryId: '66666666-6666-4666-8666-666666666666',
+		portfolioId: IDS.portfolio,
+		portfolioName: 'Cartera Principal',
+		sourceId: IDS.platform,
+		sourceName: 'Broker Demo',
+		assetId: '77777777-7777-4777-8777-777777777777',
+		ticker: 'CASH-USD',
+		name: 'Efectivo en dólares estadounidenses (USD)',
+		pocketId: null,
+		pocketName: '',
+		pocketKind: '',
+		balance: '2500.00',
+		currency: 'USD',
+		value: '2500.00',
+		displayCurrency: 'USD',
+		fxConverted: true,
+		movements: 3,
+		lastMovementDate: '2026-02-20T00:00:00Z',
+		interestEarned: '0.00',
+		interestThisMonth: '0.00',
+		interestThisMonthValue: '0.00',
+		pendingInterest: '0.00',
+		lastAccrualDate: null
+	}
+];
 
 const costOf = (h) => Number(h.quantity) * Number(h.price);
 const valueOf = (h) => Number(h.quantity) * Number(h.marketPrice);

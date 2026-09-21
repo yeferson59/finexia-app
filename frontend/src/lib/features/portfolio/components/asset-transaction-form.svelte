@@ -4,15 +4,23 @@
 	import DatePicker from '$lib/ui/date-picker.svelte';
 	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
 	import type { Holding } from '$lib/api/types';
-	import { TRANSACTION_TYPES, priceLabelFor, txnModeFor } from '../asset';
+	import { TRANSACTION_TYPES, formatSettled, priceLabelFor, txnModeFor } from '../asset';
 	import TradeDateWarnings from './trade-date-warnings.svelte';
 	import AssetCreditCashField from './asset-credit-cash-field.svelte';
+	import AssetPayFromCashField from './asset-pay-from-cash-field.svelte';
 
 	let {
 		entries,
+		cashByEntry = {},
 		formError = false,
 		onCancel
-	}: { entries: Holding[]; formError?: boolean; onCancel: () => void } = $props();
+	}: {
+		entries: Holding[];
+		/** Saldo por posición, en su moneda de coste; lo resuelve la página. */
+		cashByEntry?: Record<string, string>;
+		formError?: boolean;
+		onCancel: () => void;
+	} = $props();
 
 	// entryId/currency se rellenan de forma reactiva desde la primera entrada.
 	let txnForm = $state({
@@ -26,7 +34,10 @@
 		feesCurrency: '',
 		transactionDate: todayLocalDateString(),
 		notes: '',
-		creditCash: true
+		creditCash: true,
+		// Al revés que la de abonar: pagar con el saldo solo pasa cuando el dinero
+		// ya estaba en la cuenta, así que se marca a mano.
+		payFromCash: false
 	});
 
 	$effect(() => {
@@ -98,6 +109,18 @@
 		txnForm.type === 'sell' ? settledTotal - feesInCost : (parseFloat(txnForm.price) || 0) * rate
 	);
 
+	/**
+	 * Una compra puede salir del efectivo que la plataforma ya guarda: sale el
+	 * coste liquidado más la comisión en esa moneda, que es lo que el bróker
+	 * debitó. Sin saldo la casilla no se ofrece —no hay con qué pagar y el
+	 * backend rechazaría la compra—, y un saldo no se compra a sí mismo.
+	 */
+	const cashAvailable = $derived(parseFloat(cashByEntry[txnForm.entryId] ?? '0') || 0);
+	const canPayFromCash = $derived(
+		txnForm.type === 'buy' && entry?.assetType !== 'cash' && cashAvailable > 0
+	);
+	const payAmount = $derived(settledTotal + feesInCost);
+
 	// Para avisar si la fecha no parece la de la operación. Solo con precio unitario.
 	const dateCheck = $derived(
 		txnMode === 'trade' && entry
@@ -112,14 +135,6 @@
 				}
 			: null
 	);
-
-	function formatIn(value: number, code: string): string {
-		return new Intl.NumberFormat('es-CO', {
-			style: 'currency',
-			currency: code,
-			minimumFractionDigits: 2
-		}).format(value);
-	}
 </script>
 
 <form
@@ -327,7 +342,7 @@
 			</div>
 			<div class="form-group">
 				<span class="form-label">Coste en {costCurrency}</span>
-				<p class="fx-static">{formatIn(settledTotal, costCurrency)}</p>
+				<p class="fx-static">{formatSettled(settledTotal, costCurrency)}</p>
 				<p class="hint">Contrástalo con el importe que te debitaron.</p>
 			</div>
 		</div>
@@ -337,7 +352,17 @@
 		<AssetCreditCashField
 			bind:checked={txnForm.creditCash}
 			currency={costCurrency}
-			amount={creditAmount > 0 ? formatIn(creditAmount, costCurrency) : ''}
+			amount={creditAmount > 0 ? formatSettled(creditAmount, costCurrency) : ''}
+		/>
+	{/if}
+
+	{#if canPayFromCash}
+		<AssetPayFromCashField
+			bind:checked={txnForm.payFromCash}
+			currency={costCurrency}
+			amount={payAmount > 0 ? formatSettled(payAmount, costCurrency) : ''}
+			balance={formatSettled(cashAvailable, costCurrency)}
+			enough={payAmount <= cashAvailable}
 		/>
 	{/if}
 

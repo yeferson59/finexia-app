@@ -4,6 +4,7 @@
 	import DatePicker from '$lib/ui/date-picker.svelte';
 	import { todayLocalDateString } from '$lib/shared/format/date';
 	import type { Holding, Transaction } from '$lib/api/types';
+	import { formatSettled } from '../asset';
 	import AssetSellPanelHeader from './asset-sell-panel-header.svelte';
 	import AssetSellCurrencyFields from './asset-sell-currency-fields.svelte';
 	import AssetCreditCashField from './asset-credit-cash-field.svelte';
@@ -126,13 +127,7 @@
 	);
 	const sellCanCreditCash = $derived(sellEntry?.assetType !== 'cash');
 
-	function formatCredit(value: number): string {
-		return new Intl.NumberFormat('es-CO', {
-			style: 'currency',
-			currency: sellCostCurrency,
-			minimumFractionDigits: 2
-		}).format(value);
-	}
+	const formatCredit = $derived((value: number) => formatSettled(value, sellCostCurrency));
 </script>
 
 <div class="sell-panel">

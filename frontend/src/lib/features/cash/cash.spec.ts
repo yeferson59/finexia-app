@@ -6,6 +6,7 @@ import {
 	formatCashKind,
 	groupCashAccounts,
 	groupCashMovementsByMonth,
+	isEditableKind,
 	suggestCashPortfolio,
 	summarizeCash,
 	type CashBalance,
@@ -258,6 +259,30 @@ describe('formatCashKind y cashKindSign', () => {
 		expect(cashKindSign('dividend')).toBe(1);
 		expect(formatCashKind('sale')).toBe('Venta');
 		expect(cashKindSign('sale')).toBe(1);
+	});
+
+	// El espejo: lo que la compra de una acción se llevó del saldo. Tampoco lo
+	// escribe esta pantalla.
+	it('una compra pagada con el saldo lo resta', () => {
+		expect(formatCashKind('purchase')).toBe('Compra');
+		expect(cashKindSign('purchase')).toBe(-1);
+	});
+});
+
+describe('isEditableKind', () => {
+	it('solo los tres que el formulario sabe escribir', () => {
+		expect(isEditableKind('deposit')).toBe(true);
+		expect(isEditableKind('withdrawal')).toBe(true);
+		expect(isEditableKind('interest')).toBe(true);
+	});
+
+	// Cada uno de estos pertenece a otra transacción, o se anotó antes de que
+	// hubiera pantallas de efectivo: el formulario los lee y no los reescribe.
+	it('ni los que pertenecen a otra transacción ni los antiguos', () => {
+		expect(isEditableKind('dividend')).toBe(false);
+		expect(isEditableKind('sale')).toBe(false);
+		expect(isEditableKind('purchase')).toBe(false);
+		expect(isEditableKind('other')).toBe(false);
 	});
 });
 

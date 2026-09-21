@@ -118,6 +118,11 @@ func (r *PostgresRepository) GetEntryWithAsset(ctx context.Context, entryID uuid
 // convert, and in.FXRate is the rate it converted at; Validate refuses the
 // combinations that cannot be true.
 //
+// in.PayFromCash says the account paid with money it already held there, and
+// the balance is debited with the same rules a purchase recorded later follows
+// (syncCashLink). "Debited" is the word this comment always used for what the
+// account did; now the app can say where the money was.
+//
 // costCurrency only takes effect when this opens a new position. The endpoint
 // upserts, so calling it again for the same portfolio/asset/source adds a trade
 // to the position that is already there, and that position keeps the currency it
@@ -164,7 +169,7 @@ func (r *PostgresRepository) DeletePortfolioEntry(ctx context.Context, userID, e
 		// The credits of its dividends and sales sit on another position, the
 		// cash, and would cascade out of it unchecked. Taking them out first
 		// refuses the delete if the cash already spent them.
-		if err := syncEntryCashCredits(ctx, tx, userID, entryID, false); err != nil {
+		if err := syncEntryCashLinks(ctx, tx, userID, entryID, false); err != nil {
 			return err
 		}
 
@@ -252,17 +257,30 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 		// The opening trade carries no commission: this endpoint has never taken
 		// one, so its fee currency is the trade's by the same default every
 		// other zero-fee row gets.
-		if _, err := tx.Exec(ctx, `
+		//
+		// Its id comes back because the trade may be paid out of the platform's
+		// cash, and the debit that records that has to name it. It is written
+		// inside this same database transaction, so a purchase the balance cannot
+		// cover opens no position at all.
+		var txnID uuid.UUID
+		if err := tx.QueryRow(ctx, `
 		INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes)
 		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, 0, $7::char(3), $8::date, $9)
+		RETURNING id
 	`, entryID, settled.Type, settled.Quantity.String(), settled.Price.String(), settled.Currency,
-			settled.FXRate.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes); err != nil {
+			settled.FXRate.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes).Scan(&txnID); err != nil {
 			return err
+		}
+
+		if settled.PayFromCash {
+			if err := syncCashLink(ctx, tx, userID, txnID, true); err != nil {
+				return err
+			}
 		}
 
 		// On a position that was already there the trade moves the average cost
 		// its credited sales carried out.
-		if err := syncEntryCashCredits(ctx, tx, userID, entryID, true); err != nil {
+		if err := syncEntryCashLinks(ctx, tx, userID, entryID, true); err != nil {
 			return err
 		}
 

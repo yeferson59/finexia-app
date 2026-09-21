@@ -49,6 +49,10 @@ export const portfolioSummarySchema = z.object({
 export const holdingSchema = z.object({
 	id: z.string(),
 	assetId: z.string(),
+	// La plataforma en la que está la posición: es la que dice de qué saldo de
+	// efectivo puede salir el dinero de una compra. Con `default` para tolerar
+	// un backend anterior al campo, donde no hay saldo que ofrecer.
+	sourceId: z.string().default(''),
 	ticker: z.string(),
 	name: z.string(),
 	assetType: z.string(),

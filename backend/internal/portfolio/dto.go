@@ -56,6 +56,12 @@ type CreatePortfolioEntryRequestDTO struct {
 	FXRate       decimal.Decimal `json:"fxRate"`
 	EntryDate    time.Time       `json:"entryDate" validate:"required"`
 	Notes        string          `json:"notes"`
+	// PayFromCash takes what the opening trade cost out of the cash the platform
+	// holds in CostCurrency, instead of treating it as money arriving from
+	// outside. Omitted means no, which is what every position was before the app
+	// kept cash; it is refused on any type but a purchase, and refused outright
+	// when the balance does not hold enough.
+	PayFromCash bool `json:"payFromCash"`
 }
 
 type CreateTransactionRequestDTO struct {
@@ -81,6 +87,9 @@ type CreateTransactionRequestDTO struct {
 	// every dividend and sale was before the app kept cash; it is refused on any
 	// other type.
 	CreditCash bool `json:"creditCash"`
+	// PayFromCash is the same for a purchase, the other way round: the cost
+	// comes out of that balance. Refused on any type but a purchase.
+	PayFromCash bool `json:"payFromCash"`
 }
 
 type UpdateTransactionRequestDTO struct {
@@ -96,6 +105,11 @@ type UpdateTransactionRequestDTO struct {
 	// CreditCash is the whole answer, like every other field of this PUT: false
 	// takes back a credit the dividend or the sale had.
 	CreditCash bool `json:"creditCash"`
+	// PayFromCash likewise: true on a purchase that was never paid from cash
+	// takes the money out of the balance now, and false gives back money a
+	// purchase had taken. It is how a trade recorded before the app kept cash
+	// gets its funding recorded after the fact.
+	PayFromCash bool `json:"payFromCash"`
 }
 
 // Input folds the three write DTOs into the one shape the service takes. The
@@ -113,6 +127,7 @@ func (d CreateTransactionRequestDTO) Input(txnType TransactionType) TransactionI
 		TransactionDate: d.TransactionDate,
 		Notes:           d.Notes,
 		CreditCash:      d.CreditCash,
+		PayFromCash:     d.PayFromCash,
 	}
 }
 
@@ -128,6 +143,7 @@ func (d UpdateTransactionRequestDTO) Input(txnType TransactionType) TransactionI
 		TransactionDate: d.TransactionDate,
 		Notes:           d.Notes,
 		CreditCash:      d.CreditCash,
+		PayFromCash:     d.PayFromCash,
 	}
 }
 
@@ -143,6 +159,7 @@ func (d CreatePortfolioEntryRequestDTO) Input(txnType TransactionType) Transacti
 		FXRate:          d.FXRate,
 		TransactionDate: d.EntryDate,
 		Notes:           d.Notes,
+		PayFromCash:     d.PayFromCash,
 	}
 }
 
@@ -184,8 +201,10 @@ type TransactionResponseDTO struct {
 	TransactionDate time.Time `json:"transactionDate"`
 	Notes           string    `json:"notes"`
 	// CashCredited is whether a dividend, or a sale's proceeds, was paid into the
-	// platform's cash, so an edit form can send the same answer back.
+	// platform's cash, and CashPaid whether a purchase was paid out of it, so an
+	// edit form can send the same answer back.
 	CashCredited bool      `json:"cashCredited"`
+	CashPaid     bool      `json:"cashPaid"`
 	CreatedAt    time.Time `json:"createdAt"`
 }
 
@@ -204,6 +223,7 @@ func NewTransactionResponse(t Transaction) TransactionResponseDTO {
 		TransactionDate: t.TransactionDate,
 		Notes:           t.Notes,
 		CashCredited:    t.CashCredited,
+		CashPaid:        t.CashPaid,
 		CreatedAt:       t.CreatedAt,
 	}
 }
@@ -611,8 +631,13 @@ func gainOf(cost, market string) (string, float64) {
 // HoldingResponseDTO is a flattened representation of a portfolio entry joined
 // with its asset, ready to be consumed by the frontend holdings view.
 type HoldingResponseDTO struct {
-	ID           uuid.UUID `json:"id"`
-	AssetID      uuid.UUID `json:"assetId"`
+	ID      uuid.UUID `json:"id"`
+	AssetID uuid.UUID `json:"assetId"`
+	// SourceID is the platform the position is held on. It is what tells a
+	// client which cash balance funds a purchase on this position — the one
+	// that platform keeps in CostCurrency — and what tells two positions of the
+	// same ticker apart.
+	SourceID     uuid.UUID `json:"sourceId"`
 	Ticker       string    `json:"ticker"`
 	Name         string    `json:"name"`
 	AssetType    string    `json:"assetType"`
@@ -758,6 +783,7 @@ func NewPortfolioDetailResponse(p Portfolio) PortfolioDetailResponseDTO {
 		holdings = append(holdings, HoldingResponseDTO{
 			ID:              entry.ID,
 			AssetID:         entry.AssetID,
+			SourceID:        entry.SourceID,
 			Ticker:          entry.Asset.Ticker,
 			Name:            entry.Asset.Name,
 			AssetType:       string(entry.Asset.AssetType),

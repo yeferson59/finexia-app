@@ -14,6 +14,7 @@ function holding(partial: Partial<Holding>): Holding {
 	return {
 		id: 'h1',
 		assetId: 'a1',
+		sourceId: 's1',
 		ticker: 'AAPL',
 		name: 'Apple Inc.',
 		assetType: 'stock',

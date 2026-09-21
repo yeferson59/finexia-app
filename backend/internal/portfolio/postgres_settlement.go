@@ -75,10 +75,12 @@ func (r *PostgresRepository) ChangeEntrySettlement(ctx context.Context, userID, 
 			}
 		}
 
-		// A dividend or a sale paid into cash was paid in the currency the account
-		// settled in, which is the one that just changed: its credit moves to the
-		// balance kept in the new one, at the amount the new rate gives.
-		if err := syncEntryCashCredits(ctx, tx, userID, entryID, true); err != nil {
+		// A dividend or a sale paid into cash, and a purchase paid out of it, moved
+		// money in the currency the account settled in, which is the one that just
+		// changed: each row moves to the balance kept in the new one, at the amount
+		// the new rate gives. A purchase whose new balance cannot cover it is
+		// refused, like any other debit.
+		if err := syncEntryCashLinks(ctx, tx, userID, entryID, true); err != nil {
 			return err
 		}
 

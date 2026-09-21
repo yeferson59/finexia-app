@@ -64,11 +64,15 @@ const (
 	// with it. See postgres_cash_credit.go and migrations 000049 to 000052.
 	CashDividend TransactionType = "cash_dividend"
 	CashSale     TransactionType = "cash_sale"
+	// CashPurchase is what a Buy took out of that same cash when the account
+	// paid for it with money it already held: the debit that answers the two
+	// credits above. See postgres_cash_link.go and migrations 000053/000054.
+	CashPurchase TransactionType = "cash_purchase"
 )
 
 func (t TransactionType) IsValid() bool {
 	switch t {
-	case Buy, Sell, Dividend, Split, TransferIn, TransferOut, Fee, Interest, CashInterest, CashDividend, CashSale:
+	case Buy, Sell, Dividend, Split, TransferIn, TransferOut, Fee, Interest, CashInterest, CashDividend, CashSale, CashPurchase:
 		return true
 	default:
 		return false
@@ -248,9 +252,12 @@ type Transaction struct {
 	TransactionDate time.Time      `json:"transactionDate"`
 	Notes           string         `json:"notes"`
 	// CashCredited is whether a dividend's money, or a sale's proceeds, was paid
-	// into the platform's cash (000050, 000052). Only the reads that serve an edit form
-	// select it.
+	// into the platform's cash (000050, 000052), and CashPaid whether a purchase
+	// was paid out of it (000054). Only the reads that serve an edit form select
+	// them. A transaction has at most one of the two: they are the same link
+	// read from either side.
 	CashCredited bool      `json:"cashCredited,omitempty"`
+	CashPaid     bool      `json:"cashPaid,omitempty"`
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
 	Entry        Entry     `json:"entry,omitzero"`
@@ -278,6 +285,12 @@ type TransactionInput struct {
 	// platform holds in the position's currency. It is the whole answer on every
 	// write: an edit that leaves it false takes back a credit the row had.
 	CreditCash bool
+	// PayFromCash is the same answer for a purchase, the other way round: the
+	// money comes out of that balance instead of arriving from outside. An edit
+	// that leaves it false gives the money back, which is what lets a purchase
+	// recorded before any of this was offered be paid from cash afterwards — and
+	// what lets one paid by mistake stop being.
+	PayFromCash bool
 }
 
 // Rate resolves the omitted case. A caller that sends no rate at all is the
@@ -320,14 +333,19 @@ func (in TransactionInput) Rate() decimal.Decimal {
 // instead has to say so — which the forms do, explicitly, on the only screens
 // where the two can differ.
 //
-// CreditCash is refused on anything but a dividend or a sale. Whether this one
-// can be credited — the position, the account, the amount — depends on where it
-// is recorded, and is checked there (syncCashCredit).
+// CreditCash is refused on anything but a dividend or a sale, and PayFromCash
+// on anything but a purchase. Whether this one can settle against cash at all —
+// the position, the account, the amount, what the balance holds — depends on
+// where it is recorded, and is checked there (syncCashLink).
 func (in TransactionInput) Validate(costCurrency money.Currency) (TransactionInput, error) {
 	out := in
 
-	if _, ok := in.Type.cashCredit(); in.CreditCash && !ok {
+	if link, ok := in.Type.cashLink(); in.CreditCash && (!ok || link == CashPurchase) {
 		return in, fmt.Errorf("%w: only a dividend or a sale is paid into cash, not a %s", ErrNotCreditable, in.Type)
+	}
+
+	if in.PayFromCash && in.Type != Buy {
+		return in, fmt.Errorf("%w: only a purchase is paid out of cash, not a %s", ErrNotPayableFromCash, in.Type)
 	}
 
 	if out.Currency == money.XXX {

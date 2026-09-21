@@ -93,6 +93,9 @@
 							{#if transaction.cashCredited}
 								<span class="note">Abonado al efectivo</span>
 							{/if}
+							{#if transaction.cashPaid}
+								<span class="note">Pagado con el efectivo</span>
+							{/if}
 							{#if transaction.notes}
 								<span class="note">{transaction.notes}</span>
 							{/if}

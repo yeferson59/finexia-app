@@ -51,6 +51,10 @@
 	</p>
 {/if}
 
+{#if transaction.cashPaid}
+	<p class="warning">Lo que pagaste con el efectivo de la plataforma vuelve a ese saldo.</p>
+{/if}
+
 {#if deleteError}
 	<p class="error" role="alert">{deleteError}</p>
 {/if}

@@ -20,6 +20,7 @@ import {
 	allocation,
 	assetHoldings,
 	assets,
+	cashBalances,
 	exchangeRates,
 	growth,
 	growthFor,
@@ -38,6 +39,7 @@ import {
 // schemas Zod de los que salen los tipos de la aplicación.
 export {
 	assets,
+	cashBalances,
 	exchangeRates,
 	growth,
 	holdings,
@@ -408,6 +410,9 @@ const server = createServer(async (req, res) => {
 	}
 	if (route === 'GET /portfolios/holdings') {
 		return send(res, 200, envelope(assetHoldings));
+	}
+	if (route === 'GET /portfolios/cash') {
+		return send(res, 200, envelope(cashBalances));
 	}
 	if (route === 'GET /portfolios/growth') {
 		return send(res, 200, envelope(growth));

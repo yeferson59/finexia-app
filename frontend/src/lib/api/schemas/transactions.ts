@@ -40,6 +40,10 @@ export const transactionSchema = z.object({
 	// plataforma. Opcional para tolerar un backend anterior a la migración
 	// 000050, que no lo conocía.
 	cashCredited: z.boolean().optional(),
+	// Lo mismo al revés: si la compra se pagó con el efectivo que la plataforma
+	// ya tenía. Opcional por la misma razón, contra un backend anterior a la
+	// migración 000054.
+	cashPaid: z.boolean().optional(),
 	createdAt: z.string()
 });
 

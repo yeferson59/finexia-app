@@ -172,6 +172,35 @@ test.describe('portfolio detail', () => {
 		await expect(credit).toHaveCount(0);
 	});
 
+	// El espejo del dividendo: una compra puede salir del efectivo que la
+	// plataforma ya guarda, y solo una compra lo ofrece.
+	test('asset detail offers to pay a purchase from the platform cash', async ({ page }) => {
+		await login(page);
+		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}/assets/AAPL`);
+
+		await page.getByRole('button', { name: 'Registrar movimiento' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Registrar transacción' });
+		const pay = dialog.getByRole('checkbox', {
+			name: /Pagarlo con mi efectivo en esta plataforma/
+		});
+
+		// Sin marcar: el dinero llega de fuera salvo que se diga lo contrario.
+		await expect(pay).not.toBeChecked();
+		await expect(dialog).toContainText(/Tienes .*2.500[.,]00 en esta cuenta/);
+
+		await dialog.getByLabel('Cantidad').fill('2');
+		await dialog.getByLabel('Precio unitario').fill('150');
+		await pay.check();
+		await expect(dialog).toContainText(/Resta .*300[.,]00 de tu efectivo en USD/);
+
+		// Más de lo que hay: se avisa, sin bloquear —quien decide es el backend—.
+		await dialog.getByLabel('Cantidad').fill('100');
+		await expect(dialog).toContainText('No alcanza para esta compra');
+
+		await dialog.getByLabel('Tipo').selectOption('dividend');
+		await expect(pay).toHaveCount(0);
+	});
+
 	// Lo mismo con una venta: lo cobrado, menos la comisión, llega al efectivo.
 	test('the quick sell pays the proceeds into the platform cash', async ({ page }) => {
 		await login(page);

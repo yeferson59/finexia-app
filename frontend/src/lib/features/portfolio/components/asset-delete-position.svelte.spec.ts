@@ -8,6 +8,7 @@ function holding(overrides: Partial<Holding> = {}): Holding {
 	return {
 		id: '9f4c1b7a-2d3e-4f50-8a61-b2c3d4e5f607',
 		assetId: '7c3e8b5d-1f2a-4b6c-9d0e-3a4b5c6d7e8f',
+		sourceId: '5b1a2c3d-4e5f-4061-9273-84a5b6c7d8e9',
 		ticker: 'MC.FR',
 		name: 'LVMH Moet Hennessy Louis Vuitton SE',
 		assetType: 'stock',

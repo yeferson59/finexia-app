@@ -29,6 +29,7 @@
 	import {
 		CASH_KIND_OPTIONS,
 		cashAccountLabel,
+		isEditableKind,
 		suggestCashPortfolio,
 		type CashBalance,
 		type CashKind,
@@ -75,10 +76,10 @@
 		if (current?.mode === 'edit') {
 			const m = current.movement;
 			return {
-				// Ni «otro» ni un abono de dividendo o venta llegan aquí —no son
-				// editables—; el valor solo tiene que ser uno que este formulario
-				// sepa escribir.
-				kind: m.kind === 'other' || m.kind === 'dividend' || m.kind === 'sale' ? 'deposit' : m.kind,
+				// Ni «otro», ni un abono de dividendo o venta, ni el cargo de una
+				// compra llegan aquí —no son editables—; el valor solo tiene que ser
+				// uno que este formulario sepa escribir.
+				kind: isEditableKind(m.kind) ? m.kind : 'deposit',
 				portfolioId: m.portfolioId,
 				sourceId: m.sourceId,
 				currency: m.currency,

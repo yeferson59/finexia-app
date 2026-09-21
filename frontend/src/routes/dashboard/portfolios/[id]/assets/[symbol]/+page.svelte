@@ -14,6 +14,8 @@
 	const { params, data, form }: PageProps = $props();
 
 	const entries = $derived(data.entries);
+	// Con qué efectivo puede pagarse una compra en cada posición.
+	const cashByEntry = $derived(data.cashByEntry ?? {});
 	const transactions = $derived(data.transactions ?? []);
 	const txnMeta = $derived(data.txnMeta);
 	const portfolioName = $derived(data.portfolioName ?? '');
@@ -91,6 +93,7 @@
 		symbol={params.symbol}
 		bind:showAddForm
 		{entries}
+		{cashByEntry}
 		{transactions}
 		{txnMeta}
 		marketPrice={position.marketPrice}

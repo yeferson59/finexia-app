@@ -15,6 +15,7 @@
 		symbol,
 		showAddForm = $bindable(false),
 		entries,
+		cashByEntry = {},
 		transactions,
 		txnMeta,
 		marketPrice,
@@ -31,6 +32,11 @@
 		 */
 		showAddForm?: boolean;
 		entries: Holding[];
+		/**
+		 * El efectivo que la plataforma de cada posición guarda en la moneda de
+		 * esa posición: con qué se puede pagar una compra. Lo resuelve la página.
+		 */
+		cashByEntry?: Record<string, string>;
 		transactions: Transaction[];
 		txnMeta: TxnMeta;
 		marketPrice: number | undefined;
@@ -78,7 +84,12 @@
 		onClose={() => (showAddForm = false)}
 		size="lg"
 	>
-		<AssetTransactionForm {entries} {formError} onCancel={() => (showAddForm = false)} />
+		<AssetTransactionForm
+			{entries}
+			{cashByEntry}
+			{formError}
+			onCancel={() => (showAddForm = false)}
+		/>
 	</Modal>
 
 	<Modal
@@ -116,6 +127,7 @@
 		<AssetTransactionEditForm
 			transaction={editingTxn}
 			onCash={entries.find((e) => e.id === editingTxn?.entryId)?.assetType === 'cash'}
+			cashAvailable={parseFloat(cashByEntry[editingTxn.entryId] ?? '0') || 0}
 			onClose={() => (editingTxn = null)}
 		/>
 	{/if}

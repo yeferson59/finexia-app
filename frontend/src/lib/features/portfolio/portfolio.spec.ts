@@ -361,6 +361,50 @@ describe('creditCash de una transacción', () => {
 	});
 });
 
+describe('payFromCash de una compra', () => {
+	const buy = {
+		type: 'buy',
+		quantity: '5',
+		price: '100',
+		currency: 'USD',
+		transactionDate: '2026-09-01'
+	};
+	const entryId = '3f1c1c5e-1f5a-4f1e-9c2a-9a1d0b2f7e11';
+
+	it('lee la casilla marcada como sí y la ausente como no', () => {
+		const on = transactionCreateSchema.safeParse({ ...buy, entryId, payFromCash: 'on' });
+		const off = transactionCreateSchema.safeParse({ ...buy, entryId, payFromCash: null });
+		expect(on.data?.payFromCash).toBe(true);
+		expect(off.data?.payFromCash).toBe(false);
+	});
+
+	// Marcarla al editar es cómo se registra, después del hecho, que la compra
+	// salió del efectivo; la ausencia es cómo se deshace.
+	it('la edición también la lee', () => {
+		const on = transactionUpdateSchema.safeParse({ ...buy, txnId: entryId, payFromCash: 'on' });
+		const off = transactionUpdateSchema.safeParse({ ...buy, txnId: entryId });
+		expect(on.data?.payFromCash).toBe(true);
+		expect(off.data?.payFromCash).toBe(false);
+	});
+
+	it('el alta de una posición la lee igual', () => {
+		const parsed = portfolioEntrySchema.safeParse({
+			portfolioId: entryId,
+			assetId: entryId,
+			sourceId: entryId,
+			quantity: '5',
+			price: '100',
+			costCurrency: 'USD',
+			currency: 'USD',
+			fxRate: '',
+			entryDate: '2026-09-01',
+			payFromCash: 'on'
+		});
+		expect(parsed.success).toBe(true);
+		expect(parsed.data?.payFromCash).toBe(true);
+	});
+});
+
 describe('toPortfolioRows', () => {
 	// El orden es lo que hace legible una escalera: la barra más larga primero
 	// y las demás leídas contra ella.

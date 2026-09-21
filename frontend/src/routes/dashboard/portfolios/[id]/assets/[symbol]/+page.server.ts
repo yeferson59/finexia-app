@@ -1,7 +1,8 @@
+import * as cash from '$lib/api/cash';
 import * as portfolio from '$lib/api/portfolio';
 import * as transactions from '$lib/api/transactions';
 import type { PageServerLoad, Actions } from './$types';
-import type { Holding, Transaction } from '$lib/api/types';
+import type { CashBalance, Holding, Transaction } from '$lib/api/types';
 import {
 	entryDeleteSchema,
 	entrySettlementSchema,
@@ -19,6 +20,37 @@ export interface TxnMeta {
 
 const DEFAULT_META: TxnMeta = { total: 0, page: 1, limit: 20, totalPages: 0 };
 
+/**
+ * Lo que cada posición tiene disponible para pagar una compra: el efectivo que
+ * su plataforma guarda, en este portafolio y en la moneda en la que la posición
+ * liquida.
+ *
+ * Solo la cuenta principal. Un bolsillo es dinero apartado para otra cosa y un
+ * depósito a plazo está cerrado; el backend tampoco paga desde ninguno de los
+ * dos. Un saldo que no está es un cero, y entonces la casilla ni se ofrece.
+ */
+function cashByEntry(
+	portfolioId: string,
+	entries: Holding[],
+	balances: CashBalance[]
+): Record<string, string> {
+	const available: Record<string, string> = {};
+
+	for (const entry of entries) {
+		const match = balances.find(
+			(b) =>
+				b.pocketId === null &&
+				b.portfolioId === portfolioId &&
+				b.sourceId === entry.sourceId &&
+				b.currency === entry.costCurrency
+		);
+
+		available[entry.id] = match?.balance ?? '0';
+	}
+
+	return available;
+}
+
 export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 	const event = { cookies, fetch };
 
@@ -28,9 +60,13 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 		return raw >= 1 && raw <= 100 ? raw : 20;
 	})();
 
-	const [response, txnRes] = await Promise.all([
+	const [response, txnRes, cashRes] = await Promise.all([
 		portfolio.getPortfolio(event, params.id),
-		transactions.getAssetTransactions(event, params.id, params.symbol, page, limit)
+		transactions.getAssetTransactions(event, params.id, params.symbol, page, limit),
+		// El efectivo de la cuenta, para poder ofrecer pagar con él. Va aquí y no
+		// en la feature porque una feature no conoce a otra: la página lee y pasa
+		// cifras ya resueltas.
+		cash.getBalances(event)
 	]);
 
 	if (!response.ok || !response.success || !response.data) {
@@ -40,7 +76,8 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 			portfolioTotalValue: 0,
 			portfolioName: '',
 			baseCurrency: 'USD',
-			txnMeta: DEFAULT_META
+			txnMeta: DEFAULT_META,
+			cashByEntry: {} as Record<string, string>
 		};
 	}
 
@@ -80,7 +117,8 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 		portfolioTotalValue,
 		portfolioName,
 		baseCurrency,
-		txnMeta
+		txnMeta,
+		cashByEntry: cashByEntry(params.id, entries, cashRes.success ? (cashRes.data ?? []) : [])
 	};
 };
 
@@ -102,7 +140,8 @@ export const actions: Actions = {
 			feesCurrency: formData.get('feesCurrency') ?? '',
 			transactionDate: formData.get('transactionDate'),
 			notes: formData.get('notes'),
-			creditCash: formData.get('creditCash')
+			creditCash: formData.get('creditCash'),
+			payFromCash: formData.get('payFromCash')
 		});
 
 		if (!success) {
@@ -123,10 +162,11 @@ export const actions: Actions = {
 			...(data.feesCurrency ? { feesCurrency: data.feesCurrency } : {}),
 			transactionDate: data.transactionDate,
 			notes: data.notes ?? '',
-			// Solo un dividendo o una venta se abonan al efectivo; el backend rechaza
-			// la casilla en cualquier otro tipo, y el formulario la deja de mandar al
-			// cambiarlo.
-			creditCash: (data.type === 'dividend' || data.type === 'sell') && data.creditCash
+			// Solo un dividendo o una venta se abonan al efectivo, y solo una compra
+			// sale de él; el backend rechaza cada casilla en el tipo que no es el
+			// suyo, y el formulario las deja de mandar al cambiarlo.
+			creditCash: (data.type === 'dividend' || data.type === 'sell') && data.creditCash,
+			payFromCash: data.type === 'buy' && data.payFromCash
 		});
 
 		if (!response.ok) {
@@ -153,7 +193,8 @@ export const actions: Actions = {
 			feesCurrency: formData.get('feesCurrency') ?? '',
 			transactionDate: formData.get('transactionDate'),
 			notes: formData.get('notes'),
-			creditCash: formData.get('creditCash')
+			creditCash: formData.get('creditCash'),
+			payFromCash: formData.get('payFromCash')
 		});
 
 		if (!success) {
@@ -174,10 +215,11 @@ export const actions: Actions = {
 			...(data.feesCurrency ? { feesCurrency: data.feesCurrency } : {}),
 			transactionDate: data.transactionDate,
 			notes: data.notes ?? '',
-			// Solo un dividendo o una venta se abonan al efectivo; el backend rechaza
-			// la casilla en cualquier otro tipo, y el formulario la deja de mandar al
-			// cambiarlo.
-			creditCash: (data.type === 'dividend' || data.type === 'sell') && data.creditCash
+			// Solo un dividendo o una venta se abonan al efectivo, y solo una compra
+			// sale de él; el backend rechaza cada casilla en el tipo que no es el
+			// suyo, y el formulario las deja de mandar al cambiarlo.
+			creditCash: (data.type === 'dividend' || data.type === 'sell') && data.creditCash,
+			payFromCash: data.type === 'buy' && data.payFromCash
 		});
 
 		if (!response.ok) {

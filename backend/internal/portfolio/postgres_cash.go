@@ -382,7 +382,7 @@ func writeCashMovement(ctx context.Context, tx pgx.Tx, userID, portfolioID, sour
 		RETURNING id
 	`, entryID, settled.Type, settled.Quantity.String(), settled.Price.String(), settled.Currency,
 		settled.FXRate.String(), settled.Fees.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes,
-		in.creditOf, decimalParam(in.costBasis)).Scan(&txnID); err != nil {
+		in.linkedTo, decimalParam(in.costBasis)).Scan(&txnID); err != nil {
 		return CashMovement{}, err
 	}
 
@@ -631,7 +631,7 @@ func (r *PostgresRepository) UpdateCashMovement(ctx context.Context, userID, txn
 			return err
 		}
 
-		if current.txnType.isCashCredit() {
+		if current.txnType.isCashLinked() {
 			return ErrCashCreditLinked
 		}
 
@@ -682,8 +682,9 @@ func (r *PostgresRepository) UpdateCashMovement(ctx context.Context, userID, txn
 // DeleteCashMovement removes a movement unless that would take the balance
 // below zero — deleting a deposit whose money a later withdrawal already took.
 // Any movement on a cash position can go, including one the cash screens cannot
-// edit: removing a row does not reprice it. The one exception is the credit of
-// a dividend or a sale, which goes with its transaction.
+// edit: removing a row does not reprice it. The one exception is a row that
+// belongs to another transaction — a dividend's or a sale's credit, a
+// purchase's debit — which goes with it.
 func (r *PostgresRepository) DeleteCashMovement(ctx context.Context, userID, txnID uuid.UUID) error {
 	return database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		current, err := lockCashMovement(ctx, tx, userID, txnID)
@@ -691,7 +692,7 @@ func (r *PostgresRepository) DeleteCashMovement(ctx context.Context, userID, txn
 			return err
 		}
 
-		if current.txnType.isCashCredit() {
+		if current.txnType.isCashLinked() {
 			return ErrCashCreditLinked
 		}
 
@@ -707,11 +708,13 @@ func (r *PostgresRepository) DeleteCashMovement(ctx context.Context, userID, txn
 }
 
 // requireTypeAllowed refuses a transaction whose type the position's asset
-// cannot take — cash_interest on anything but a cash balance — and a cash
-// credit on any position, which only its dividend or sale writes. The generic
-// transaction writers call it; the cash writers only ever reach cash positions.
+// cannot take — cash_interest on anything but a cash balance — and, on any
+// position, a row that belongs to another transaction: the credit of a dividend
+// or a sale, the debit of a purchase, which only that transaction writes. The
+// generic transaction writers call it; the cash writers only ever reach cash
+// positions.
 func requireTypeAllowed(ctx context.Context, tx pgx.Tx, entryID uuid.UUID, t TransactionType) error {
-	if t.isCashCredit() {
+	if t.isCashLinked() {
 		return ErrCashCreditLinked
 	}
 

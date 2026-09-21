@@ -13,6 +13,7 @@
 <PortfolioEntryForm
 	portfolioId={params.id}
 	platforms={data?.platforms ?? []}
+	cashBalances={data?.cashBalances ?? []}
 	submitError={form?.success === false}
 	submitErrorDetail={form?.error ?? ''}
 />

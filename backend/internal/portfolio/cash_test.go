@@ -250,38 +250,74 @@ func TestCashAssetNaming(t *testing.T) {
 // maxTickerLenForCash mirrors assets.ticker VARCHAR(20).
 const maxTickerLenForCash = 20
 
-// A credit is written only with the dividend or the sale whose money it is, so
-// the generic writers refuse the types outright; requireTypeAllowed checks it
+// A cash row is written only with the transaction whose money it is, so the
+// generic writers refuse the types outright; requireTypeAllowed checks it
 // before the asset.
-func TestCashCreditsAreValidTypesNoOneWritesByHand(t *testing.T) {
-	for credited, want := range map[TransactionType]struct {
-		credit TransactionType
-		kind   CashMovementKind
+func TestCashLinksAreValidTypesNoOneWritesByHand(t *testing.T) {
+	for settled, want := range map[TransactionType]struct {
+		link TransactionType
+		kind CashMovementKind
+		// effect is which way the row moves the balance: a dividend and a sale
+		// pay in, a purchase pays out.
+		effect string
 	}{
-		Dividend: {CashDividend, CashKindDividend},
-		Sell:     {CashSale, CashKindSale},
+		Dividend: {CashDividend, CashKindDividend, "1"},
+		Sell:     {CashSale, CashKindSale, "1"},
+		Buy:      {CashPurchase, CashKindPurchase, "-1"},
 	} {
-		credit, ok := credited.cashCredit()
-		if !ok || credit != want.credit {
-			t.Errorf("%s.cashCredit() = %s, %v; want %s", credited, credit, ok, want.credit)
+		link, ok := settled.cashLink()
+		if !ok || link != want.link {
+			t.Errorf("%s.cashLink() = %s, %v; want %s", settled, link, ok, want.link)
 		}
-		if !credit.IsValid() || !credit.isCashCredit() {
-			t.Errorf("%s is not a valid cash credit, so it could not be read back", credit)
+		if !link.IsValid() || !link.isCashLinked() {
+			t.Errorf("%s is not a valid cash row, so it could not be read back", link)
 		}
 		if want.kind.IsValid() {
 			t.Errorf("the cash screens can write a %s", want.kind)
 		}
-		if got := want.kind.TransactionType(); got != credit {
-			t.Errorf("%s.TransactionType() = %s, want %s", want.kind, got, credit)
+		if got := want.kind.TransactionType(); got != link {
+			t.Errorf("%s.TransactionType() = %s, want %s", want.kind, got, link)
+		}
+		if got := cashKindOf(link); got != want.kind {
+			t.Errorf("cashKindOf(%s) = %s, want %s", link, got, want.kind)
+		}
+		if got := balanceEffect(link, decimal.One).String(); got != want.effect {
+			t.Errorf("balanceEffect(%s, 1) = %s, want %s", link, got, want.effect)
 		}
 	}
 
-	for _, txnType := range []TransactionType{Buy, TransferIn, TransferOut, Fee, Interest, Split, CashInterest} {
-		if _, ok := txnType.cashCredit(); ok {
-			t.Errorf("%s pays into cash", txnType)
+	for _, txnType := range []TransactionType{TransferIn, TransferOut, Fee, Interest, Split, CashInterest} {
+		if _, ok := txnType.cashLink(); ok {
+			t.Errorf("%s settles against cash", txnType)
 		}
-		if txnType.isCashCredit() {
-			t.Errorf("%s reads as a cash credit", txnType)
+		if txnType.isCashLinked() {
+			t.Errorf("%s reads as the cash side of another transaction", txnType)
 		}
+	}
+}
+
+// The two answers about cash each belong to one type, and Validate is where
+// that is said once for every writer. A buy does not pay into cash and a
+// dividend does not come out of it.
+func TestCashSideBelongsToItsTransactionType(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		in      TransactionInput
+		wantErr error
+	}{
+		{"a purchase paid from cash", TransactionInput{Type: Buy, PayFromCash: true}, nil},
+		{"a transfer paid from cash", TransactionInput{Type: TransferIn, PayFromCash: true}, ErrNotPayableFromCash},
+		{"a dividend paid from cash", TransactionInput{Type: Dividend, PayFromCash: true}, ErrNotPayableFromCash},
+		{"a purchase credited to cash", TransactionInput{Type: Buy, CreditCash: true}, ErrNotCreditable},
+		{"a dividend credited to cash", TransactionInput{Type: Dividend, CreditCash: true}, nil},
+		{"a sale credited to cash", TransactionInput{Type: Sell, CreditCash: true}, nil},
+		{"a fee credited to cash", TransactionInput{Type: Fee, CreditCash: true}, ErrNotCreditable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.in.Validate(money.USD)
+			if !errors.Is(err, tc.wantErr) {
+				t.Errorf("Validate() error = %v, want %v", err, tc.wantErr)
+			}
+		})
 	}
 }

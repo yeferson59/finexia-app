@@ -26,15 +26,23 @@
 	import PortfolioEntryPlatformField from './portfolio-entry-platform-field.svelte';
 	import PortfolioEntryPurchaseFields from './portfolio-entry-purchase-fields.svelte';
 	import PortfolioEntryTotal from './portfolio-entry-total.svelte';
+	import AssetPayFromCashField from './asset-pay-from-cash-field.svelte';
 
 	let {
 		portfolioId,
 		platforms,
+		cashBalances = [],
 		submitError = false,
 		submitErrorDetail = ''
 	}: {
 		portfolioId: string;
 		platforms: Platform[];
+		/**
+		 * El efectivo que cada plataforma guarda en este portafolio, por moneda.
+		 * Lo resuelve la página; aquí solo se busca el de la plataforma y la
+		 * moneda elegidas.
+		 */
+		cashBalances?: { sourceId: string; currency: string; balance: string }[];
 		submitError?: boolean;
 		/**
 		 * Lo que dijo el backend, cuando dijo algo.
@@ -87,6 +95,8 @@
 	let costCurrency = $state('');
 	let fxRate = $state('');
 
+	let payFromCash = $state(false);
+
 	let isSubmitting = $state(false);
 
 	const units = $derived(parseFloat(quantity) || 0);
@@ -99,6 +109,29 @@
 	 */
 	const converted = $derived(!!costCurrency && costCurrency !== currency);
 	const rate = $derived(converted ? parseFloat(fxRate) || 0 : 1);
+
+	/**
+	 * Lo que hay en el efectivo de la plataforma elegida, en la moneda en la que
+	 * la cuenta va a pagar, y lo que va a salir de ahí.
+	 *
+	 * La casilla solo se ofrece cuando hay saldo: sin él no hay nada con qué
+	 * pagar y el backend rechazaría el alta entera. Y se apaga sola al cambiar a
+	 * una plataforma o una moneda sin saldo, para no mandar marcado algo que la
+	 * pantalla ya no enseña.
+	 */
+	const settlementCurrency = $derived(costCurrency || currency);
+	const cashAvailable = $derived(
+		parseFloat(
+			cashBalances.find((b) => b.sourceId === platformId && b.currency === settlementCurrency)
+				?.balance ?? '0'
+		) || 0
+	);
+	const canPayFromCash = $derived(cashAvailable > 0);
+	const settledCost = $derived(units * unitPrice * rate);
+
+	$effect(() => {
+		if (!canPayFromCash) payFromCash = false;
+	});
 
 	/*
 	 * El mismo formateador que el resto del panel. Esta pantalla componía los
@@ -181,6 +214,18 @@
 		description="Hay una posición por plataforma: el mismo ticker comprado en dos brókers son dos posiciones, cada una con su propio coste."
 	>
 		<PortfolioEntryPlatformField {platforms} bind:selected={platformId} />
+
+		{#if canPayFromCash}
+			<div class="field">
+				<AssetPayFromCashField
+					bind:checked={payFromCash}
+					currency={settlementCurrency}
+					amount={settledCost > 0 ? formatCurrency(settledCost, settlementCurrency) : ''}
+					balance={formatCurrency(cashAvailable, settlementCurrency)}
+					enough={settledCost <= cashAvailable}
+				/>
+			</div>
+		{/if}
 
 		<div class="field">
 			<label for="notes">Notas <span class="optional">(opcional)</span></label>

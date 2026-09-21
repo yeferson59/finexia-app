@@ -12,13 +12,15 @@ import (
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
-// Dividends and sales paid into cash (000049 to 000052): a credit on the
-// platform's balance that follows its transaction. Same database contract as
-// postgres_cash_db_test.go.
+// Dividends and sales paid into cash (000049 to 000052), and purchases paid out
+// of it (000053, 000054): a row on the platform's balance that follows its
+// transaction. Same database contract as postgres_cash_db_test.go. The
+// purchases have their own file, postgres_cash_purchase_db_test.go.
 
 type creditFixture struct {
 	cashFixture
 	holdingID uuid.UUID
+	assetID   uuid.UUID
 	ticker    string
 }
 
@@ -31,9 +33,10 @@ func newCreditFixture(t *testing.T, opened time.Time) creditFixture {
 	f := creditFixture{
 		cashFixture: newCashFixture(t),
 		holdingID:   uuid.New(),
+		assetID:     uuid.New(),
 		ticker:      "CRD" + uuid.New().String()[:6],
 	}
-	assetID := uuid.New()
+	assetID := f.assetID
 
 	// A second teardown for the share. It runs before newCashFixture's, drops
 	// the entries that point at the asset, and then the asset.
@@ -103,7 +106,7 @@ func (f creditFixture) credits(t *testing.T) []CashMovement {
 
 	credits := make([]CashMovement, 0)
 	for _, m := range movements {
-		if m.Type.isCashCredit() {
+		if m.Type.isCashLinked() {
 			credits = append(credits, m)
 		}
 	}
@@ -201,7 +204,7 @@ func TestDividendCreditLandsInThePlatformsCash(t *testing.T) {
 		t.Fatalf("GetRecentTransactionsByUserID: %v", err)
 	}
 	for _, r := range recent {
-		if r.Type.isCashCredit() {
+		if r.Type.isCashLinked() {
 			t.Errorf("recent activity lists the credit %v beside its dividend", r.ID)
 		}
 	}
@@ -568,7 +571,7 @@ func TestSaleCreditLandsInThePlatformsCashAtTheSharesCost(t *testing.T) {
 		t.Fatalf("GetRecentTransactionsByUserID: %v", err)
 	}
 	for _, r := range recent {
-		if r.Type.isCashCredit() {
+		if r.Type.isCashLinked() {
 			t.Errorf("recent activity lists the credit %v beside its sale", r.ID)
 		}
 	}

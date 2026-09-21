@@ -63,6 +63,16 @@ const fxRate = z.preprocess(
 	z.coerce.number().positive('La tasa debe ser mayor que cero')
 );
 
+/**
+ * Una casilla de formulario: llega como «on» marcada y no llega desmarcada, que
+ * es un «no» y no un hueco. `z.coerce.boolean()` no sirve aquí —cualquier
+ * cadena no vacía es `true`— y el valor ausente tiene que leerse como `false`.
+ */
+const checkbox = z
+	.union([z.string(), z.boolean(), z.null()])
+	.optional()
+	.transform((v) => v === true || v === 'on' || v === 'true');
+
 /** Alta de una posición (`routes/dashboard/portfolios/[id]/add`). */
 export const portfolioEntrySchema = z.object({
 	portfolioId: z.uuid(),
@@ -79,7 +89,10 @@ export const portfolioEntrySchema = z.object({
 	currency: currencyCode,
 	fxRate,
 	entryDate: z.coerce.date(),
-	notes: z.coerce.string().optional()
+	notes: z.coerce.string().optional(),
+	// La casilla de pagar la compra con el efectivo de la plataforma: llega como
+	// «on» marcada y no llega desmarcada. Misma forma que `creditCash`.
+	payFromCash: checkbox
 });
 
 /**
@@ -99,12 +112,11 @@ const transactionSchema = z.object({
 	feesCurrency: z.coerce.string().trim().toUpperCase().default(''),
 	transactionDate: z.coerce.date(),
 	notes: z.string().optional(),
-	// La casilla de abonar un dividendo al efectivo: llega como «on» marcada y no
-	// llega desmarcada, que es un «no» y no un hueco.
-	creditCash: z
-		.union([z.string(), z.boolean(), z.null()])
-		.optional()
-		.transform((v) => v === true || v === 'on' || v === 'true')
+	// Abonar un dividendo o una venta al efectivo, y pagar una compra con él: las
+	// dos caras de la misma pregunta, y el backend rechaza cada una en el tipo
+	// que no es el suyo.
+	creditCash: checkbox,
+	payFromCash: checkbox
 });
 
 /** Alta de una transacción sobre una posición existente. */

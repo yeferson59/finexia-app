@@ -1,7 +1,27 @@
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
+import * as cash from '$lib/api/cash';
 import * as portfolio from '$lib/api/portfolio';
 import { portfolioEntrySchema } from '$lib/features/portfolio';
+
+/**
+ * El efectivo de este portafolio, para poder ofrecer pagar la compra con él.
+ *
+ * Solo la cuenta principal de cada plataforma: un bolsillo es dinero apartado
+ * para otra cosa y un depósito a plazo está cerrado, y el backend tampoco paga
+ * desde ninguno de los dos. El formulario recibe la lista y busca en ella la
+ * plataforma y la moneda que el usuario elija.
+ */
+export const load: PageServerLoad = async ({ cookies, fetch, params }) => {
+	const res = await cash.getBalances({ cookies, fetch });
+	const balances = res.success ? (res.data ?? []) : [];
+
+	return {
+		cashBalances: balances
+			.filter((b) => b.pocketId === null && b.portfolioId === params.id)
+			.map((b) => ({ sourceId: b.sourceId, currency: b.currency, balance: b.balance }))
+	};
+};
 
 export const actions = {
 	default: async ({ request, fetch, cookies, params }) => {
@@ -20,7 +40,8 @@ export const actions = {
 			currency: formData.get('currency'),
 			fxRate: formData.get('fxRate'),
 			entryDate: formData.get('purchaseDate'),
-			notes: formData.get('notes')
+			notes: formData.get('notes'),
+			payFromCash: formData.get('payFromCash')
 		});
 
 		/*

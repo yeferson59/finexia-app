@@ -29,6 +29,11 @@ import (
 // behind it live in SQL, next to the ones for every other transaction type:
 // see migrations 000040 and 000041, and 000042 for what interest adds to the
 // cost of a balance — nothing, which is what makes it gain.
+//
+// A balance also moves without any of that vocabulary, when another transaction
+// settles against it: a dividend or a sale paid in, a purchase paid out. Those
+// rows belong to the transaction that caused them and are written with it; see
+// postgres_cash_link.go.
 
 var (
 	// ErrInvalidCashMovement rejects a movement that cannot be recorded as
@@ -65,24 +70,27 @@ func (t TransactionType) AllowedOn(assetType market.AssetType) bool {
 	return t != CashInterest || assetType == market.Cash
 }
 
-// cashCredit is the row that holds a transaction's money on the platform's cash,
-// and whether the transaction pays any: a dividend and a sale do, the rest keep
-// or take their money elsewhere.
-func (t TransactionType) cashCredit() (TransactionType, bool) {
+// cashLink is the row that holds a transaction's money on the platform's cash,
+// and whether the transaction moves any: a dividend and a sale pay money in, a
+// purchase takes it out, the rest keep or take their money elsewhere.
+func (t TransactionType) cashLink() (TransactionType, bool) {
 	switch t {
 	case Dividend:
 		return CashDividend, true
 	case Sell:
 		return CashSale, true
+	case Buy:
+		return CashPurchase, true
 	default:
 		return "", false
 	}
 }
 
-// isCashCredit reports whether a row is the cash credit of a dividend or a
-// sale, which only its transaction writes.
-func (t TransactionType) isCashCredit() bool {
-	return t == CashDividend || t == CashSale
+// isCashLinked reports whether a row is the cash side of another transaction —
+// the credit of a dividend or a sale, the debit of a purchase — which only that
+// transaction writes.
+func (t TransactionType) isCashLinked() bool {
+	return t == CashDividend || t == CashSale || t == CashPurchase
 }
 
 // CashMovementKind is what the owner did with a cash balance, in the words the
@@ -95,9 +103,13 @@ const (
 	CashKindInterest   CashMovementKind = "interest"
 	// CashKindDividend is a dividend paid into the balance, and CashKindSale the
 	// proceeds of a sale. The cash screens show them and never write them: each
-	// is written with its transaction, from the holding (postgres_cash_credit.go).
+	// is written with its transaction, from the holding (postgres_cash_link.go).
 	CashKindDividend CashMovementKind = "dividend"
 	CashKindSale     CashMovementKind = "sale"
+	// CashKindPurchase is money the balance paid for a purchase. Like the two
+	// above it is shown and never written here: it is written with the buy it
+	// funded (postgres_cash_link.go).
+	CashKindPurchase CashMovementKind = "purchase"
 	// CashKindOther is never written. It is how a row that is none of the others
 	// reads back: a paid-out interest or a fee recorded against a balance before
 	// these screens existed.
@@ -105,7 +117,7 @@ const (
 )
 
 // IsValid reports whether the kind can be written from the cash screens.
-// Dividend, Sale and Other cannot.
+// Dividend, Sale, Purchase and Other cannot.
 func (k CashMovementKind) IsValid() bool {
 	switch k {
 	case CashKindDeposit, CashKindWithdrawal, CashKindInterest:
@@ -128,6 +140,8 @@ func (k CashMovementKind) TransactionType() TransactionType {
 		return CashDividend
 	case CashKindSale:
 		return CashSale
+	case CashKindPurchase:
+		return CashPurchase
 	default:
 		return ""
 	}
@@ -150,20 +164,23 @@ func cashKindOf(t TransactionType) CashMovementKind {
 		return CashKindDividend
 	case CashSale:
 		return CashKindSale
+	case CashPurchase:
+		return CashKindPurchase
 	default:
 		return CashKindOther
 	}
 }
 
 // balanceEffect is how far a transaction moves the quantity of its position:
-// the Go side of the quantity arms in recalculate_avg_cost (000041, 000050, 000052). It
+// the Go side of the quantity arms in recalculate_avg_cost (000041, 000050,
+// 000052, 000054). It
 // is what lets a write check the balance it will leave before the trigger
 // computes it.
 func balanceEffect(t TransactionType, quantity decimal.Decimal) decimal.Decimal {
 	switch t {
 	case Buy, TransferIn, CashInterest, CashDividend, CashSale:
 		return quantity
-	case Sell, TransferOut:
+	case Sell, TransferOut, CashPurchase:
 		return quantity.Neg()
 	default:
 		return decimal.Zero
@@ -180,10 +197,12 @@ type CashMovementInput struct {
 	Currency money.Currency
 	Date     time.Time
 	Notes    string
-	// creditOf is the dividend or the sale whose money a credit is, and costBasis
-	// what a sale's proceeds cost (000052). Only syncCashCredit sets them, and
-	// only with CashKindDividend or CashKindSale: the owner never states them.
-	creditOf  *uuid.UUID
+	// linkedTo is the transaction whose money this row holds — the dividend or
+	// the sale a credit pays in, the purchase a debit pays out — and costBasis
+	// what a sale's proceeds cost (000052). Only syncCashLink sets them, and only
+	// with CashKindDividend, CashKindSale or CashKindPurchase: the owner never
+	// states them.
+	linkedTo  *uuid.UUID
 	costBasis *decimal.Decimal
 }
 

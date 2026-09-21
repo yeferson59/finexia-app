@@ -10,9 +10,10 @@
 	 * `compact` es un abono dentro de un grupo desplegado: la cuenta y el tipo ya
 	 * los dice el grupo, así que solo lleva la fecha, el importe y las acciones.
 	 *
-	 * Un dividendo o lo recibido por una venta no se editan ni se borran aquí: son
-	 * dinero que pagó una acción, y cambian o se van con esa transacción. La fila
-	 * lleva a ella en su lugar.
+	 * Un dividendo, lo recibido por una venta y lo que se pagó por una compra no
+	 * se editan ni se borran aquí: son dinero que entró o salió por una operación
+	 * sobre una acción, y cambian o se van con ella. La fila lleva a ella en su
+	 * lugar.
 	 */
 	import { resolve } from '$app/paths';
 	import { privacy } from '$lib/shared/privacy.svelte';
@@ -29,6 +30,13 @@
 	}
 
 	let { movement, showPortfolio, compact = false, onEdit, onDelete }: Props = $props();
+
+	/** A dónde lleva la fila de un movimiento que pertenece a otra transacción. */
+	const LINKED_LABELS: Record<string, string> = {
+		sale: 'Ver venta',
+		dividend: 'Ver dividendo',
+		purchase: 'Ver compra'
+	};
 
 	const day = $derived(formatCalendarDate(movement.date, { day: 'numeric' }));
 	const weekday = $derived(
@@ -53,11 +61,16 @@
 	/* Lo que distingue un «Editar» de los otros catorce para quien no ve la fila. */
 	const described = $derived(`${formatCashKind(movement.kind).toLowerCase()} del ${fullDate}`);
 
-	const isCredit = $derived(movement.kind === 'dividend' || movement.kind === 'sale');
+	/* Las filas que pertenecen a otra transacción: no se editan ni se borran
+	   aquí, y llevan enlace a la operación de la que salieron. Un dividendo y
+	   una venta traen el dinero; una compra se lo lleva. */
+	const isLinked = $derived(
+		movement.kind === 'dividend' || movement.kind === 'sale' || movement.kind === 'purchase'
+	);
 
 	/* La acción de la que viene, en el mismo portafolio que el saldo. */
 	const originHref = $derived(
-		isCredit && movement.originTicker
+		isLinked && movement.originTicker
 			? resolve('/dashboard/portfolios/[id]/assets/[symbol]', {
 					id: movement.portfolioId,
 					symbol: movement.originTicker
@@ -79,7 +92,7 @@
 		<div class="what">
 			<p class="kind">
 				{formatCashKind(movement.kind)}
-				{#if isCredit && movement.originTicker}
+				{#if isLinked && movement.originTicker}
 					<span class="tag">de {movement.originTicker}</span>
 				{/if}
 				{#if movement.automatic}
@@ -112,12 +125,10 @@
 	</p>
 
 	<div class="actions">
-		{#if isCredit}
+		{#if isLinked}
 			{#if originHref}
 				<a class="action" href={originHref}>
-					{movement.kind === 'sale' ? 'Ver venta' : 'Ver dividendo'}<span class="sr-only">
-						{described}</span
-					>
+					{LINKED_LABELS[movement.kind]}<span class="sr-only"> {described}</span>
 				</a>
 			{/if}
 		{:else}

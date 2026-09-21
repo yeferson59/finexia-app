@@ -61,9 +61,10 @@ func (r *PostgresRepository) GetTopTransactionByPortfolioID(ctx context.Context,
 // GetRecentTransactionsByUserID lists the user's latest transactions: the
 // activity feed, the transactions page, the export and the MCP tool.
 //
-// The cash credit of a dividend or a sale is left out. The dividend or the sale
-// is already on the list, and listing the money it paid into cash beside it
-// would read as two operations. The credit is where the cash screens show it.
+// The cash side of another transaction is left out: the credit of a dividend or
+// a sale, the debit of a purchase. That transaction is already on the list, and
+// listing the money it moved through cash beside it would read as two
+// operations. The cash screens are where those rows show.
 func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]Transaction, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fx_rate,
@@ -75,7 +76,7 @@ func (r *PostgresRepository) GetRecentTransactionsByUserID(ctx context.Context, 
 		JOIN portfolios p ON p.id = pe.portfolio_id
 		JOIN assets a ON a.id = pe.asset_id
 		WHERE p.user_id = $1
-		  AND t.type NOT IN ('cash_dividend', 'cash_sale')
+		  AND t.type NOT IN ('cash_dividend', 'cash_sale', 'cash_purchase')
 		ORDER BY t.transaction_date DESC, t.created_at DESC
 		LIMIT $2
 	`, userID, limit)
@@ -273,7 +274,8 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fx_rate,
 		       pe.cost_currency, t.fees, t.fees_currency,
 		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at,
-		       EXISTS (SELECT 1 FROM transactions c WHERE c.credited_from = t.id)
+		       EXISTS (SELECT 1 FROM transactions c WHERE c.credited_from = t.id AND c.type <> 'cash_purchase'),
+		       EXISTS (SELECT 1 FROM transactions c WHERE c.credited_from = t.id AND c.type =  'cash_purchase')
 		FROM transactions t
 		JOIN portfolio_entries pe ON pe.id = t.entry_id
 		WHERE t.entry_id = $1
@@ -304,6 +306,7 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 			&txn.CreatedAt,
 			&txn.UpdatedAt,
 			&txn.CashCredited,
+			&txn.CashPaid,
 		); err != nil {
 			return nil, err
 		}
@@ -337,7 +340,8 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 		SELECT t.id, t.entry_id, t.type, t.quantity, t.price, t.currency, t.fx_rate,
 		       pe.cost_currency, t.fees, t.fees_currency,
 		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at,
-		       EXISTS (SELECT 1 FROM transactions c WHERE c.credited_from = t.id)
+		       EXISTS (SELECT 1 FROM transactions c WHERE c.credited_from = t.id AND c.type <> 'cash_purchase'),
+		       EXISTS (SELECT 1 FROM transactions c WHERE c.credited_from = t.id AND c.type =  'cash_purchase')
 		FROM transactions t
 		JOIN portfolio_entries pe ON pe.id = t.entry_id
 		JOIN assets a ON a.id = pe.asset_id
@@ -371,6 +375,7 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 			&txn.CreatedAt,
 			&txn.UpdatedAt,
 			&txn.CashCredited,
+			&txn.CashPaid,
 		); err != nil {
 			return nil, err
 		}
@@ -390,9 +395,10 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 // committed and never actually used.
 //
 // A dividend or a sale stated with CreditCash is paid into the platform's cash
-// in the same transaction, so the two rows exist together or not at all. The
-// position's other credits are re-synced after it: a purchase moves the average
-// cost its credited sales carried out.
+// in the same transaction, and a purchase stated with PayFromCash is paid out
+// of it, so the two rows exist together or not at all. The position's other
+// cash rows are re-synced after it: a purchase moves the average cost its
+// credited sales carried out.
 func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entryID uuid.UUID, in TransactionInput) (Transaction, error) {
 	var txn Transaction
 
@@ -451,15 +457,16 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 		txn.Price.SetCurrency(txn.Currency)
 		txn.Fees.SetCurrency(txn.FeesCurrency)
 
-		if settled.CreditCash {
-			if err := syncCashCredit(ctx, tx, userID, txn.ID, true); err != nil {
+		if settled.CreditCash || settled.PayFromCash {
+			if err := syncCashLink(ctx, tx, userID, txn.ID, true); err != nil {
 				return err
 			}
 
-			txn.CashCredited = true
+			txn.CashCredited = settled.CreditCash
+			txn.CashPaid = settled.PayFromCash
 		}
 
-		return syncEntryCashCredits(ctx, tx, userID, entryID, true)
+		return syncEntryCashLinks(ctx, tx, userID, entryID, true)
 	}); err != nil {
 		return txn, err
 	}
@@ -476,10 +483,13 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 // own ownership predicate anyway — the read cannot be trusted to still hold by
 // the time the write lands, and the cost of restating it is one join.
 //
-// The row's cash credit is rewritten after it, from the row as it now stands:
-// kept and resized when CreditCash still asks for it, taken out when it does
-// not or the row stopped being a dividend or a sale. Then the position's other
-// credits, whose sales' cost the edit may have moved. A credit cannot be edited
+// The row's cash side is rewritten after it, from the row as it now stands:
+// kept and resized while CreditCash or PayFromCash still asks for it, taken out
+// when neither does or the row stopped being a kind that settles against cash.
+// That is also how a purchase recorded before any of this was offered comes to
+// be paid from cash, and how one paid by mistake stops being: the edit states
+// the answer and the debit appears or goes. Then the position's other cash
+// rows, whose sales' cost the edit may have moved. A cash row cannot be edited
 // on its own.
 func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnID uuid.UUID, in TransactionInput) (Transaction, error) {
 	var txn Transaction
@@ -504,7 +514,7 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 			return err
 		}
 
-		if currentType.isCashCredit() {
+		if currentType.isCashLinked() {
 			return ErrCashCreditLinked
 		}
 
@@ -567,13 +577,14 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 		txn.Price.SetCurrency(txn.Currency)
 		txn.Fees.SetCurrency(txn.FeesCurrency)
 
-		if err := syncCashCredit(ctx, tx, userID, txnID, settled.CreditCash); err != nil {
+		if err := syncCashLink(ctx, tx, userID, txnID, settled.CreditCash || settled.PayFromCash); err != nil {
 			return err
 		}
 
 		txn.CashCredited = settled.CreditCash
+		txn.CashPaid = settled.PayFromCash
 
-		return syncEntryCashCredits(ctx, tx, userID, entryID, true)
+		return syncEntryCashLinks(ctx, tx, userID, entryID, true)
 	}); err != nil {
 		return Transaction{}, err
 	}
@@ -590,10 +601,11 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 // transaction id belonging to somebody else is indistinguishable from one that
 // does not exist — both delete no rows and answer 404.
 //
-// The credit of a dividend or a sale goes with it, once its balance is known to
-// spare the money; the credit on its own cannot be deleted here. Deleting a
-// purchase moves the cost the position's credited sales carried out, so those
-// are re-synced after.
+// The cash row of a dividend, a sale or a purchase goes with it — the credit
+// once its balance is known to spare the money, the debit by giving it back —
+// and that row on its own cannot be deleted here. Deleting a purchase moves the
+// cost the position's credited sales carried out, so those are re-synced
+// after.
 func (r *PostgresRepository) DeleteTransaction(ctx context.Context, userID, txnID uuid.UUID) error {
 	return database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		// A row of a fixed deposit is refused before the delete rather than left
@@ -618,7 +630,7 @@ func (r *PostgresRepository) DeleteTransaction(ctx context.Context, userID, txnI
 			return err
 		}
 
-		if txnType.isCashCredit() {
+		if txnType.isCashLinked() {
 			return ErrCashCreditLinked
 		}
 
@@ -626,7 +638,7 @@ func (r *PostgresRepository) DeleteTransaction(ctx context.Context, userID, txnI
 			return err
 		}
 
-		if err := syncCashCredit(ctx, tx, userID, txnID, false); err != nil {
+		if err := syncCashLink(ctx, tx, userID, txnID, false); err != nil {
 			return err
 		}
 
@@ -639,7 +651,7 @@ func (r *PostgresRepository) DeleteTransaction(ctx context.Context, userID, txnI
 			return ErrTransactionNotFound
 		}
 
-		return syncEntryCashCredits(ctx, tx, userID, entryID, true)
+		return syncEntryCashLinks(ctx, tx, userID, entryID, true)
 	})
 }
 
@@ -749,7 +761,7 @@ func (r *PostgresRepository) ImportEntryTransactions(ctx context.Context, userID
 		}
 
 		for _, entryID := range touched {
-			if err := syncEntryCashCredits(ctx, tx, userID, entryID, true); err != nil {
+			if err := syncEntryCashLinks(ctx, tx, userID, entryID, true); err != nil {
 				return err
 			}
 		}

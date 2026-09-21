@@ -843,6 +843,11 @@ incluya está mezclando monedas: hay que decirlo en pantalla en vez de sumar. La
 tasas son datos BYO-key (§2.10), así que la ausencia se resuelve sincronizando
 con la clave del propio usuario, no reintentando.
 
+Cada holding trae además `sourceId`, la plataforma en la que está: es la que
+distingue dos posiciones del mismo ticker compradas en dos brókers, y la que
+dice de qué saldo de efectivo puede salir el dinero de una compra
+(`payFromCash`, abajo).
+
 #### Moneda de una transacción: `currency` + `fxRate`
 
 Una operación también arrastra dos monedas, y por una razón distinta a la de los
@@ -994,8 +999,9 @@ estrenar.
 puede reescribir como movimiento de efectivo —un `interest` o un `fee` anotados
 sobre el saldo, o una compra de efectivo a otro precio o con tasa— y le pone
 `kind: "other"` cuando no es ninguno de los tres. Todos se pueden borrar
-—quitar una fila no cambia el precio de nada— salvo el abono de un dividendo,
-que se va con su dividendo (abajo).
+—quitar una fila no cambia el precio de nada— salvo los que pertenecen a una
+transacción sobre una acción: el abono de un dividendo o de una venta y el cargo
+de una compra, que se van con ella (abajo).
 
 **Dividendos y ventas abonados al efectivo** (migraciones 000049 a 000052).
 `POST /portfolios/entries/:entryId/transactions` y
@@ -1040,6 +1046,39 @@ En `GET /portfolios/cash/movements` salen con `kind: "dividend"` o
 `kind: "sale"`, `editable: false` y `originTicker`, el activo del que vienen. En
 `GET /portfolios/transactions` —la actividad, la exportación y la herramienta
 MCP— no salen, porque el dividendo o la venta ya están en la lista.
+
+**Compras pagadas con el efectivo** (migraciones 000053 y 000054). Es el espejo
+de lo anterior. `POST /portfolios/entries` —el alta de una posición—,
+`POST /portfolios/entries/:entryId/transactions` y
+`PUT /portfolios/transactions/:txnId` aceptan `"payFromCash": true` en un `buy`:
+el coste sale del saldo de la cuenta principal de la misma plataforma y
+portfolio, en la moneda de coste de la posición, por
+`quantity × price × fxRate + comisión` en esa moneda —lo que la cuenta pagó—. Se
+guarda como una fila `cash_purchase` sobre el saldo, con `credited_from`
+apuntando a la compra, en la misma transacción de base de datos. La respuesta, y
+las lecturas de una posición, devuelven `cashPaid`.
+
+| Caso | Qué pasa |
+|---|---|
+| `payFromCash` ausente o `false` en el alta | La compra no toca el efectivo, como siempre: el dinero llegó de fuera |
+| `payFromCash` en el `PUT` | Es la respuesta entera: `true` sobre una compra que no salía del efectivo la paga ahora —así se registra después del hecho—, y `false` devuelve el dinero al saldo |
+| `payFromCash: true` en otro tipo | **400** |
+| Sobre un saldo de efectivo, en una moneda fuera de la lista o con coste cero | **400** |
+| El saldo no llega, en el alta o al agrandar la compra | **409**, como un retiro. No se registra nada: ni la transacción, ni la posición que la abría |
+| Editar o borrar el cargo por su cuenta, o escribir `cash_purchase` a mano | **400**: se cambia desde la compra |
+| Borrar la compra, o su posición | El dinero vuelve al saldo |
+| Cambiar la moneda de liquidación de la posición | El cargo se muda al saldo de la moneda nueva, al importe de la tasa nueva; si ese saldo no llega, **409** |
+
+En la serie de crecimiento la compra sigue entrando a la posición (000027) y su
+cargo sale del saldo por el mismo importe, el mismo día y en la misma moneda:
+los dos flujos se anulan y la rentabilidad es la misma que sin pagar con el
+saldo, que es lo correcto —el dinero ya estaba dentro del portfolio y solo
+cambió de forma—. En el coste medio del saldo el cargo se lleva su parte de lo
+que costó, igual que un retiro.
+
+En `GET /portfolios/cash/movements` sale con `kind: "purchase"`,
+`editable: false` y `originTicker`, el activo que se compró. En
+`GET /portfolios/transactions` no sale, porque la compra ya está en la lista.
 
 **Saldos vaciados** (000052). Un saldo que solo tenía intereses, dividendos o
 ventas —o nada comprado— y se queda sin ellos vuelve a precio 1. Antes guardaba el

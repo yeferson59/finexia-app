@@ -89,6 +89,22 @@ const UNIT_NOUNS: Record<string, [string, string]> = {
  * Cripto, efectivo y las clases que el backend añada se quedan en «unidad»:
  * inventarles un nombre propio arriesga más de lo que aclara.
  */
+/**
+ * Un importe en la moneda de la cuenta, tal como lo escriben los formularios
+ * que liquidan contra el efectivo: el total convertido, lo que se abona y lo
+ * que se paga.
+ *
+ * Fija `es-CO` a propósito, que es el locale del panel; la copia que había en
+ * cada uno de esos formularios hacía lo mismo por separado.
+ */
+export function formatSettled(value: number, currency: string): string {
+	return new Intl.NumberFormat('es-CO', {
+		style: 'currency',
+		currency,
+		minimumFractionDigits: 2
+	}).format(value);
+}
+
 export function unitNoun(assetType: string, count = 2): string {
 	const [one, many] = UNIT_NOUNS[assetType] ?? ['unidad', 'unidades'];
 	return count === 1 ? one : many;

@@ -71,8 +71,17 @@ var ErrSettlementWithoutTransactions = httpx.AsBadRequest(errors.New("position h
 // in, or the fees leave nothing to credit. It is wrapped with which.
 var ErrNotCreditable = httpx.AsBadRequest(errors.New("transaction cannot be credited to cash"))
 
-// ErrCashCreditLinked refuses to write the cash credit of a dividend or a sale
-// on its own. The credit is that money landing in the account, so it follows
-// its transaction: it changes, moves and goes when that does, and a credit
-// edited by hand would be money the holding never paid.
-var ErrCashCreditLinked = httpx.AsBadRequest(errors.New("this cash movement is the credit of a dividend or a sale: edit or delete that transaction instead"))
+// ErrNotPayableFromCash is ErrNotCreditable's mirror: there is no cash the
+// purchase could honestly have come out of. It is not a purchase, it is
+// recorded on a cash balance, the position's currency is one no balance is kept
+// in, or it cost nothing. A balance that simply does not hold enough is
+// ErrInsufficientCash instead — that is a fact about the money, not about the
+// transaction.
+var ErrNotPayableFromCash = httpx.AsBadRequest(errors.New("transaction cannot be paid from cash"))
+
+// ErrCashCreditLinked refuses to write, on its own, the cash side of another
+// transaction: the credit of a dividend or a sale, the debit of a purchase. It
+// is that money entering or leaving the account, so it follows its transaction
+// — it changes, moves and goes when that does — and one edited by hand would be
+// money the holding never paid or never cost.
+var ErrCashCreditLinked = httpx.AsBadRequest(errors.New("this cash movement belongs to a transaction on a holding: edit or delete that transaction instead"))

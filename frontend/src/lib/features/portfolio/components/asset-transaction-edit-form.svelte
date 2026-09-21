@@ -9,17 +9,24 @@
 	import Button from '$lib/ui/button.svelte';
 	import DatePicker from '$lib/ui/date-picker.svelte';
 	import type { Transaction } from '$lib/api/types';
-	import { TRANSACTION_TYPES, priceLabelFor, txnModeFor } from '../asset';
+	import { TRANSACTION_TYPES, formatSettled, priceLabelFor, txnModeFor } from '../asset';
 	import AssetCreditCashField from './asset-credit-cash-field.svelte';
+	import AssetPayFromCashField from './asset-pay-from-cash-field.svelte';
 
 	let {
 		transaction,
 		onCash = false,
+		cashAvailable = 0,
 		onClose
 	}: {
 		transaction: Transaction;
 		/** La posición es un saldo de efectivo, que no se abona dividendos ni ventas a sí mismo. */
 		onCash?: boolean;
+		/**
+		 * Lo que queda en el efectivo de la plataforma, en la moneda de la cuenta.
+		 * Si la compra ya se paga de ahí, este saldo ya lo tiene descontado.
+		 */
+		cashAvailable?: number;
 		onClose: () => void;
 	} = $props();
 
@@ -43,7 +50,11 @@
 			notes: transaction.notes,
 			// Lo que el dividendo tiene hoy. El PUT reemplaza la fila entera, y
 			// sin la casilla un cambio de nota sacaría el dividendo del efectivo.
-			creditCash: transaction.cashCredited ?? false
+			creditCash: transaction.cashCredited ?? false,
+			// Y lo que la compra tiene hoy, por la misma razón. Marcarla aquí es
+			// lo que registra, después del hecho, que se pagó con el efectivo de
+			// la cuenta; desmarcarla devuelve el dinero al saldo.
+			payFromCash: transaction.cashPaid ?? false
 		}))
 	);
 
@@ -72,6 +83,24 @@
 		(editForm.type === 'dividend' || editForm.type === 'sell') && !onCash
 	);
 	const creditCurrency = $derived(editCostCurrency || editForm.currency);
+
+	/**
+	 * Pagar la compra con el efectivo de la plataforma. Aquí la casilla se ofrece
+	 * aunque el saldo sea cero: puede que la compra ya salga de él —y entonces
+	 * desmarcarla es cómo se deshace— y el saldo que se ve ya está descontado.
+	 */
+	const alreadyPaid = $derived(transaction.cashPaid ?? false);
+	const canPayFromCash = $derived(editForm.type === 'buy' && !onCash);
+	// La misma cuenta que hace el backend: la comisión va por la tasa solo si se
+	// cobró en la moneda de la operación; cobrada en la de la cuenta ya está en
+	// ella.
+	const payRate = $derived(parseFloat(editForm.fxRate) || 1);
+	const payFees = $derived(
+		(parseFloat(editForm.fees) || 0) * (editForm.feesCurrency === editForm.currency ? payRate : 1)
+	);
+	const payAmount = $derived(
+		(parseFloat(editForm.quantity) || 0) * (parseFloat(editForm.price) || 0) * payRate + payFees
+	);
 </script>
 
 <form
@@ -245,6 +274,17 @@
 
 	{#if canCreditCash}
 		<AssetCreditCashField bind:checked={editForm.creditCash} currency={creditCurrency} editing />
+	{/if}
+
+	{#if canPayFromCash}
+		<AssetPayFromCashField
+			bind:checked={editForm.payFromCash}
+			currency={creditCurrency}
+			amount={payAmount > 0 ? formatSettled(payAmount, creditCurrency) : ''}
+			balance={formatSettled(cashAvailable, creditCurrency)}
+			enough={alreadyPaid || payAmount <= cashAvailable}
+			editing
+		/>
 	{/if}
 
 	<div class="form-group">

@@ -1,0 +1,19 @@
+-- A transaction type for the money a purchase took out of the cash of the
+-- platform that holds the shares: what cash_sale (000051) is to a sale, with
+-- the sign the other way round.
+--
+-- 'buy' stays what it is: a row on the holding, booked by transaction_cash_flow
+-- (000027) as money put into the measured pool. When the money came from the
+-- account's own cash it was already in the pool, and the app keeps that cash
+-- (000041), so the purchase takes it out as a row on the balance, linked to the
+-- buy and written and removed with it (000054).
+--
+-- It cannot be a transfer_out. A withdrawal is money the owner took away; this
+-- money did not leave the portfolio, it turned into shares. The two differ in
+-- what they mean to the flow — a withdrawal is a flow out, this is no flow at
+-- all once it cancels its purchase — so they differ in type. They agree on the
+-- cost rule: both take their share of what the balance cost.
+--
+-- Its own migration for the reason 000040 gives: Postgres will not let a new
+-- enum value be used in the transaction that adds it, and 000054 uses it.
+ALTER TYPE transaction_type ADD VALUE IF NOT EXISTS 'cash_purchase';

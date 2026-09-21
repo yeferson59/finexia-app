@@ -15,6 +15,7 @@ import {
 	allocationItemSchema,
 	assetHoldingSchema,
 	assetSchema,
+	cashBalanceSchema,
 	exchangeRateSchema,
 	holdingSchema,
 	platformSchema,
@@ -26,6 +27,7 @@ import {
 	allocation,
 	assetHoldings,
 	assets,
+	cashBalances,
 	exchangeRates,
 	growth,
 	holdings,
@@ -43,6 +45,7 @@ describe('las fixtures del stub cumplen el contrato', () => {
 		['portfolios/assets', assetSchema.array(), assets],
 		['portfolios/allocation', allocationItemSchema.array(), allocation],
 		['portfolios/holdings', assetHoldingSchema.array(), assetHoldings],
+		['portfolios/cash', cashBalanceSchema.array(), cashBalances],
 		['portfolios/sources', platformSchema.array(), sources],
 		['exchange-rates', exchangeRateSchema.array(), exchangeRates]
 	])('%s', (_name, schema, fixture) => {

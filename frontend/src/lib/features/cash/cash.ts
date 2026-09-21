@@ -44,8 +44,18 @@ const KIND_LABELS: Record<string, string> = {
 	interest: 'Intereses',
 	dividend: 'Dividendo',
 	sale: 'Venta',
+	purchase: 'Compra',
 	other: 'Otro movimiento'
 };
+
+/**
+ * Si el formulario de efectivo sabe escribir un movimiento de este tipo. Los
+ * que no —un abono de dividendo o de venta, el cargo de una compra, o uno
+ * anotado antes de que existieran estas pantallas— se leen y no se editan.
+ */
+export function isEditableKind(kind: string): kind is CashKind {
+	return CASH_KIND_OPTIONS.some((option) => option.value === kind);
+}
 
 /** Nombre de un movimiento; el crudo si el backend manda uno que no se conoce. */
 export function formatCashKind(kind: string): string {
@@ -55,7 +65,7 @@ export function formatCashKind(kind: string): string {
 /** Si el movimiento suma al saldo (1), lo resta (−1) o no lo toca (0). */
 export function cashKindSign(kind: string): 1 | -1 | 0 {
 	if (kind === 'deposit' || kind === 'interest' || kind === 'dividend' || kind === 'sale') return 1;
-	if (kind === 'withdrawal') return -1;
+	if (kind === 'withdrawal' || kind === 'purchase') return -1;
 	return 0;
 }
 

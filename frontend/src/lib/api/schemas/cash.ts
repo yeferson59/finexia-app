@@ -73,14 +73,14 @@ export const cashBalanceSchema = z.object({
  * interés cobrado fuera, una comisión suelta— que esta pantalla enseña pero no
  * sabe reescribir: por eso llega con `editable: false`. `dividend` y `sale` son
  * el dinero que una acción pagó a esta cuenta —un dividendo, lo recibido por
- * una venta—: se registran, cambian y borran desde esa transacción, nunca desde
- * aquí.
+ * una venta— y `purchase` el que salió de ella para comprar una: se registran,
+ * cambian y borran desde esa transacción, nunca desde aquí.
  */
 export const cashMovementSchema = z.object({
 	id: z.string(),
 	entryId: z.string(),
 	type: z.string(),
-	kind: z.enum(['deposit', 'withdrawal', 'interest', 'dividend', 'sale', 'other']),
+	kind: z.enum(['deposit', 'withdrawal', 'interest', 'dividend', 'sale', 'purchase', 'other']),
 	/** Lo que se movió, en `currency`, la moneda del saldo. */
 	amount: z.string(),
 	currency: z.string(),

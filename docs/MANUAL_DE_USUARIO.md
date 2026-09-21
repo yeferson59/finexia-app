@@ -310,11 +310,13 @@ Entra al **detalle del portafolio** y pulsa **Añadir activo**. La pantalla va e
 |---|---|
 | **Qué compraste** | El **activo**. Escribe su ticker o su nombre (p. ej. `AAPL`, `Bitcoin`) y elígelo de la lista; debajo aparece cuál has elegido, dónde cotiza y a cuánto, para confirmar que es el que buscabas |
 | **Cuánto pagaste** | La **cantidad**, el **precio por unidad** con su **moneda** al lado —llega puesta la del activo y se cambia si tu bróker ejecutó en otra—, y la **fecha**. Se admiten todos los decimales que haga falta, así que un precio de `0.00004182` se guarda tal cual. Si tu cuenta liquidó en otra moneda, marca **«Mi cuenta liquidó en otra moneda»** e indica la moneda y la tasa (apartado 7.4) |
-| **Dónde lo tienes** | La **plataforma**, de tu lista de Plataformas, y las **notas** que quieras |
+| **Dónde lo tienes** | La **plataforma**, de tu lista de Plataformas, y las **notas** que quieras. Si esa plataforma guarda efectivo en la moneda con la que vas a pagar, aparece aquí la casilla **Pagarlo con mi efectivo en esta plataforma** |
 
 Al cerrar el segundo bloque está el **total invertido**, y debajo la cuenta de la que sale —`12 × $186.90`—, con la conversión desglosada si la hubo. Es el número que puedes contrastar contra la confirmación de tu bróker antes de guardar: si no coincide, el precio o la tasa están mal y se ve sin salir de la pantalla.
 
 Pulsa **Añadir activo**. La posición aparecerá en la lista del portafolio y sus importes se sumarán al valor total.
+
+> **Si el dinero salió de tu saldo, dilo.** Con la casilla **Pagarlo con mi efectivo en esta plataforma** marcada, el total invertido se resta del efectivo de esa cuenta (sección 9.5), que es lo que hace el bróker. Debajo de la casilla ves cuánto hay; si no alcanza, Finexia te avisa y no da de alta la posición. Tu rentabilidad no cambia por marcarla —ese dinero ya estaba en tu portafolio—, pero el saldo sigue cuadrando con tu extracto. Déjala sin marcar si transferiste el dinero para esta compra.
 
 > **¿No aparece el activo que buscas?** Añadirlo a tu portafolio y crearlo en el catálogo son dos cosas distintas, y el buscador te deja hacer la segunda sin salir: te ofrece **Crear TICKER**. Rellena nombre, tipo y moneda (el mercado es opcional), y al crearlo queda elegido para que sigas con la posición. Los activos que creas los ves solo tú, hasta que el equipo de Finexia los incorpore al catálogo general. Puedes añadir hasta 50 activos nuevos cada 24 horas.
 
@@ -480,7 +482,7 @@ Finexia **no deja un saldo en negativo**. Un retiro mayor que lo que hay, o borr
 
 > **Los dividendos y las ventas llegan solos.** Un dividendo o una venta registrados desde la posición con la casilla **Abonar al efectivo de la plataforma** marcada (ver 10.2 y 10.4) aparecen aquí como **Dividendo de AAPL** —en verde, porque es rendimiento— o **Venta de AAPL**. No se editan ni se borran desde esta lista: cambian o se van con su transacción, y **Ver dividendo** o **Ver venta** te llevan a ella.
 
-> **Las compras no descuentan del efectivo.** Si pagas unas acciones con dinero de tu saldo, registra también el retiro por ese importe: así el saldo cuadra con tu cuenta, y tu rentabilidad no cambia, porque el retiro y la compra se compensan.
+> **Y las compras se descuentan solas.** Una compra registrada con la casilla **Pagarlo con mi efectivo en esta plataforma** marcada (ver 8.2 y 10.2) aparece aquí como **Compra de AAPL**, restando del saldo lo que pagaste, comisión incluida. Tampoco se edita ni se borra desde esta lista: **Ver compra** te lleva a la operación, y es ahí donde se cambia o se deshace. Tu rentabilidad no cambia por eso —el dinero ya estaba en tu portafolio y solo cambió de forma—, pero el saldo vuelve a cuadrar con tu extracto sin que tengas que anotar un retiro.
 
 ### 9.6 La rentabilidad de tu efectivo
 
@@ -618,8 +620,9 @@ Las transacciones se registran desde la posición a la que pertenecen: entra al 
 2. Indica la **fecha** y, si tienes el mismo activo en más de una plataforma, en cuál de ellas fue.
 3. Añade la **comisión**, si la hubo, y las **notas** que quieras.
 4. Si la operación se liquidó en otra moneda, indica la **tasa** (apartado 7.4). Al lado verás el **coste en la moneda de tu cuenta** que sale de lo que llevas tecleado, para contrastarlo con lo que te debitaron.
-5. Si es un **dividendo** o una **venta**, la casilla **Abonar al efectivo de la plataforma** viene marcada: lo que recibiste, en la moneda de tu cuenta y ya sin la comisión, se suma al efectivo de esa plataforma (sección 9.5), como hace el bróker. Tu rentabilidad no cambia por eso —cada operación cuenta una sola vez—, pero el dinero ya no desaparece: queda en tu saldo. En una venta, la ganancia que realizaste sigue contando como ganancia mientras el dinero esté en el efectivo, y tu capital invertido sigue siendo lo que pagaste por las acciones. Desmárcala si ya anotaste ese dinero como un depósito o si te lo pagaron en otra cuenta.
-6. Guarda. La posición y el portafolio se recalculan automáticamente.
+5. Si es una **compra** y esa plataforma tiene efectivo en la moneda de tu cuenta, aparece la casilla **Pagarlo con mi efectivo en esta plataforma**, con lo que hay disponible debajo. Márcala si el dinero salió de ese saldo: se resta lo que pagaste, comisión incluida, y el saldo queda como en tu extracto. Déjala sin marcar si transferiste el dinero para esta compra. Si lo que hay no alcanza, Finexia te avisa y no registra la compra hasta que el saldo lo cubra.
+6. Si es un **dividendo** o una **venta**, la casilla **Abonar al efectivo de la plataforma** viene marcada: lo que recibiste, en la moneda de tu cuenta y ya sin la comisión, se suma al efectivo de esa plataforma (sección 9.5), como hace el bróker. Tu rentabilidad no cambia por eso —cada operación cuenta una sola vez—, pero el dinero ya no desaparece: queda en tu saldo. En una venta, la ganancia que realizaste sigue contando como ganancia mientras el dinero esté en el efectivo, y tu capital invertido sigue siendo lo que pagaste por las acciones. Desmárcala si ya anotaste ese dinero como un depósito o si te lo pagaron en otra cuenta.
+7. Guarda. La posición y el portafolio se recalculan automáticamente.
 
 ### 10.3 Editar o eliminar una transacción
 
@@ -629,6 +632,8 @@ En el historial de la posición, cada fila tiene sus acciones:
 - **Eliminar** — la borra tras una confirmación que muestra el tipo, la fecha y el total de esa fila, porque en la tabla todas se parecen. La posición se recalcula con las que queden; si era la última, la cantidad pasa a 0. No se puede deshacer.
 
 Un dividendo o una venta abonados al efectivo llevan debajo **Abonado al efectivo**. Editarlos cambia también lo que se abonó, desmarcar la casilla lo saca del efectivo y eliminarlos se lleva el abono con ellos. Si ese dinero ya salió en un retiro, Finexia no deja achicarlo ni borrarlo hasta que el saldo lo tenga de nuevo.
+
+Una compra pagada con el efectivo lleva debajo **Pagado con el efectivo**, y la ventana de edición trae su casilla marcada. Es también donde se registra después del hecho: **marca la casilla en una compra vieja y el dinero sale del saldo ahora**, aunque la anotaras hace meses sin que Finexia llevara tu efectivo. Al revés, desmarcarla devuelve el dinero al saldo, y eliminar la compra también.
 
 ### 10.4 Registrar una venta
 
@@ -1030,7 +1035,7 @@ Si el problema persiste, contacta con el equipo de soporte de Finexia.
 | **Posición** | Tenencia de un activo dentro de un portafolio (cantidad + coste) |
 | **Portafolio** | Conjunto de posiciones agrupadas bajo un objetivo, con moneda y nivel de riesgo propios |
 | **Plataforma** | Broker, exchange o entidad donde custodias tus activos |
-| **Saldo de efectivo** | Dinero sin invertir que guarda una plataforma en una moneda para un portafolio; vale exactamente su importe |
+| **Saldo de efectivo** | Dinero sin invertir que guarda una plataforma en una moneda para un portafolio; vale exactamente su importe. Un dividendo o una venta lo suben y una compra pagada con él lo baja, sin que tu rentabilidad cambie por ello |
 | **Intereses del efectivo** | Lo que te abona una cuenta sobre su saldo: lo suben y cuentan como rentabilidad, a diferencia de un depósito |
 | **Transacción** | Operación de compra o venta que modifica una posición |
 | **Asignación** | Porcentaje que representa un activo o tipo de activo dentro del total |
