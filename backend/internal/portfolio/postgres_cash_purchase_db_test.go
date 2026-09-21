@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"uuid"
+
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
@@ -15,6 +17,7 @@ import (
 // cost, so every figure below comes from the money moving.
 
 // buyInput is a purchase of quantity units at price, funded from cash or not.
+// Out of the main account: fromPocket is the version that names a drawer.
 func buyInput(t *testing.T, quantity, price string, fromCash bool, date time.Time) TransactionInput {
 	t.Helper()
 
@@ -22,6 +25,32 @@ func buyInput(t *testing.T, quantity, price string, fromCash bool, date time.Tim
 	in.PayFromCash = fromCash
 
 	return in
+}
+
+// fromPocket is buyInput paid out of one drawer of the account.
+func fromPocket(in TransactionInput, pocketID uuid.UUID) TransactionInput {
+	in.PayFromCash = true
+	in.CashPocketID = pocketID
+
+	return in
+}
+
+// balanceOfPocket is what one drawer of the fixture's account holds.
+func (f creditFixture) balanceOfPocket(t *testing.T, pocketID *uuid.UUID) string {
+	t.Helper()
+
+	balances, err := f.repo.GetCashBalancesByUserID(context.Background(), f.userID, money.XXX)
+	if err != nil {
+		t.Fatalf("GetCashBalancesByUserID: %v", err)
+	}
+
+	for _, b := range balances {
+		if samePocket(b.PocketID, pocketID) {
+			return b.Balance
+		}
+	}
+
+	return "0"
 }
 
 // debits lists every cash movement that holds a purchase.
@@ -267,6 +296,104 @@ func TestPurchaseFromCashNeedsABalanceInThePositionsCurrency(t *testing.T) {
 
 	in := buyInput(t, "1", "1", true, cashDay)
 	if _, err := f.repo.CreateTransaction(context.Background(), f.userID, cash.EntryID, in); !errors.Is(err, ErrNotPayableFromCash) {
+		t.Fatalf("error = %v, want ErrNotPayableFromCash", err)
+	}
+}
+
+// Where the money actually is. Most of what an owner keeps sits in a pocket —
+// the bank's «cajita», the broker's sub-balance — so a purchase has to be able
+// to come out of one, and to stay in the one it came out of.
+func TestPurchaseIsPaidFromThePocketItNames(t *testing.T) {
+	f := newCreditFixture(t, cashDay)
+	f.fund(t, "1000")
+
+	pocket := f.pocket(t, "acciones")
+	f.moveInto(t, pocket.ID, CashKindDeposit, "600", cashDay)
+
+	// Each deposit arrives from outside, so the two balances are independent.
+	sameAmount(t, "main account", f.balanceOfPocket(t, nil), "1000")
+	sameAmount(t, "pocket", f.balanceOfPocket(t, &pocket.ID), "600")
+
+	txn := f.mustTrade(t, fromPocket(buyInput(t, "5", "100", true, cashDay), pocket.ID))
+	if !txn.CashPaid {
+		t.Error("CashPaid = false, want true")
+	}
+
+	// It comes out of the drawer that paid, and the main account never hears
+	// about it.
+	sameAmount(t, "main account after the purchase", f.balanceOfPocket(t, nil), "1000")
+	sameAmount(t, "pocket after the purchase", f.balanceOfPocket(t, &pocket.ID), "100")
+
+	// Y una escritura que no tiene nada que ver no lo saca de ahí.
+	f.mustDividend(t, "10", false, cashDay.AddDate(0, 0, 1))
+	sameAmount(t, "pocket after an unrelated write", f.balanceOfPocket(t, &pocket.ID), "100")
+	sameAmount(t, "main account after an unrelated write", f.balanceOfPocket(t, nil), "1000")
+}
+
+// The drawer is part of the answer: naming another moves the money, and gives
+// the first one back what had come out of it.
+func TestEditingAPurchaseMovesItToTheNewPocket(t *testing.T) {
+	f := newCreditFixture(t, cashDay)
+
+	one := f.pocket(t, "uno")
+	two := f.pocket(t, "dos")
+	f.fund(t, "1000")
+	f.moveInto(t, one.ID, CashKindDeposit, "500", cashDay)
+	f.moveInto(t, two.ID, CashKindDeposit, "500", cashDay)
+
+	txn := f.mustTrade(t, fromPocket(buyInput(t, "3", "100", true, cashDay), one.ID))
+	sameAmount(t, "the pocket that paid", f.balanceOfPocket(t, &one.ID), "200")
+
+	moved := fromPocket(buyInput(t, "3", "100", true, cashDay), two.ID)
+	if _, err := f.repo.UpdateTransaction(context.Background(), f.userID, txn.ID, moved); err != nil {
+		t.Fatalf("UpdateTransaction: %v", err)
+	}
+
+	sameAmount(t, "the pocket that paid first", f.balanceOfPocket(t, &one.ID), "500")
+	sameAmount(t, "the pocket that pays now", f.balanceOfPocket(t, &two.ID), "200")
+}
+
+// A fixed deposit is closed until it matures: no money leaves it to buy
+// anything, just as none leaves it in a withdrawal.
+func TestPurchaseCannotBePaidFromAFixedDeposit(t *testing.T) {
+	f := newCreditFixture(t, cashDay)
+	f.fund(t, "1000")
+
+	matures := cashDay.AddDate(0, 6, 0)
+	deposit := f.deposit(t, "cdt 180", "500", "10", cashDay, &matures, PostingAtMaturity)
+
+	in := fromPocket(buyInput(t, "1", "100", true, cashDay), deposit.ID)
+	if _, err := f.trade(t, in); !errors.Is(err, ErrCashPocketFixed) {
+		t.Fatalf("error = %v, want ErrCashPocketFixed", err)
+	}
+
+	sameAmount(t, "the deposit", f.balanceOfPocket(t, &deposit.ID), "500")
+}
+
+// A pocket that does not exist, or belongs to another account, pays for
+// nothing: the whole purchase is refused before anything is written.
+func TestPurchaseFromAnUnknownPocketIsRefused(t *testing.T) {
+	f := newCreditFixture(t, cashDay)
+	f.fund(t, "1000")
+
+	in := fromPocket(buyInput(t, "1", "100", true, cashDay), uuid.New())
+	if _, err := f.trade(t, in); !errors.Is(err, ErrCashPocketNotFound) {
+		t.Fatalf("error = %v, want ErrCashPocketNotFound", err)
+	}
+
+	sameAmount(t, "balance", f.balanceIn(t, money.USD), "1000")
+}
+
+// A drawer without the answer that qualifies it is a request that disagrees
+// with itself: it is neither honoured nor ignored.
+func TestAPocketWithoutPayingFromCashIsRefused(t *testing.T) {
+	f := newCreditFixture(t, cashDay)
+	f.fund(t, "1000")
+
+	in := buyInput(t, "1", "100", false, cashDay)
+	in.CashPocketID = uuid.New()
+
+	if _, err := f.trade(t, in); !errors.Is(err, ErrNotPayableFromCash) {
 		t.Fatalf("error = %v, want ErrNotPayableFromCash", err)
 	}
 }

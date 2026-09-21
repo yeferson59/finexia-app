@@ -275,7 +275,13 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 		       pe.cost_currency, t.fees, t.fees_currency,
 		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at,
 		       EXISTS (SELECT 1 FROM transactions c WHERE c.credited_from = t.id AND c.type <> 'cash_purchase'),
-		       EXISTS (SELECT 1 FROM transactions c WHERE c.credited_from = t.id AND c.type =  'cash_purchase')
+		       EXISTS (SELECT 1 FROM transactions c WHERE c.credited_from = t.id AND c.type =  'cash_purchase'),
+		       -- Which drawer the purchase was paid from, so the edit form can send
+		       -- the same answer back instead of moving the money to the main one.
+		       (SELECT ce.pocket_id
+		          FROM transactions c
+		          JOIN portfolio_entries ce ON ce.id = c.entry_id
+		         WHERE c.credited_from = t.id AND c.type = 'cash_purchase')
 		FROM transactions t
 		JOIN portfolio_entries pe ON pe.id = t.entry_id
 		WHERE t.entry_id = $1
@@ -307,6 +313,7 @@ func (r *PostgresRepository) GetTransactionsByEntryID(ctx context.Context, userI
 			&txn.UpdatedAt,
 			&txn.CashCredited,
 			&txn.CashPaid,
+			&txn.CashPocketID,
 		); err != nil {
 			return nil, err
 		}
@@ -341,7 +348,13 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 		       pe.cost_currency, t.fees, t.fees_currency,
 		       t.transaction_date, COALESCE(t.notes, ''), t.created_at, t.updated_at,
 		       EXISTS (SELECT 1 FROM transactions c WHERE c.credited_from = t.id AND c.type <> 'cash_purchase'),
-		       EXISTS (SELECT 1 FROM transactions c WHERE c.credited_from = t.id AND c.type =  'cash_purchase')
+		       EXISTS (SELECT 1 FROM transactions c WHERE c.credited_from = t.id AND c.type =  'cash_purchase'),
+		       -- Which drawer the purchase was paid from, so the edit form can send
+		       -- the same answer back instead of moving the money to the main one.
+		       (SELECT ce.pocket_id
+		          FROM transactions c
+		          JOIN portfolio_entries ce ON ce.id = c.entry_id
+		         WHERE c.credited_from = t.id AND c.type = 'cash_purchase')
 		FROM transactions t
 		JOIN portfolio_entries pe ON pe.id = t.entry_id
 		JOIN assets a ON a.id = pe.asset_id
@@ -376,6 +389,7 @@ func (r *PostgresRepository) GetAssetTransactionsPaginated(ctx context.Context, 
 			&txn.UpdatedAt,
 			&txn.CashCredited,
 			&txn.CashPaid,
+			&txn.CashPocketID,
 		); err != nil {
 			return nil, err
 		}
@@ -458,12 +472,13 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 		txn.Fees.SetCurrency(txn.FeesCurrency)
 
 		if settled.CreditCash || settled.PayFromCash {
-			if err := syncCashLink(ctx, tx, userID, txn.ID, true); err != nil {
+			if err := syncCashLink(ctx, tx, userID, txn.ID, true, statedPocket(settled.CashPocketID)); err != nil {
 				return err
 			}
 
 			txn.CashCredited = settled.CreditCash
 			txn.CashPaid = settled.PayFromCash
+			txn.CashPocketID = paidFromPocket(settled)
 		}
 
 		return syncEntryCashLinks(ctx, tx, userID, entryID, true)
@@ -472,6 +487,18 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 	}
 
 	return txn, nil
+}
+
+// paidFromPocket is the drawer a written transaction reads back as paid from:
+// the one it stated, or none — the main account, or no cash at all.
+func paidFromPocket(in TransactionInput) *uuid.UUID {
+	if !in.PayFromCash || in.CashPocketID == (uuid.UUID{}) {
+		return nil
+	}
+
+	pocket := in.CashPocketID
+
+	return &pocket
 }
 
 // UpdateTransaction rewrites one transaction the caller owns.
@@ -577,12 +604,13 @@ func (r *PostgresRepository) UpdateTransaction(ctx context.Context, userID, txnI
 		txn.Price.SetCurrency(txn.Currency)
 		txn.Fees.SetCurrency(txn.FeesCurrency)
 
-		if err := syncCashLink(ctx, tx, userID, txnID, settled.CreditCash || settled.PayFromCash); err != nil {
+		if err := syncCashLink(ctx, tx, userID, txnID, settled.CreditCash || settled.PayFromCash, statedPocket(settled.CashPocketID)); err != nil {
 			return err
 		}
 
 		txn.CashCredited = settled.CreditCash
 		txn.CashPaid = settled.PayFromCash
+		txn.CashPocketID = paidFromPocket(settled)
 
 		return syncEntryCashLinks(ctx, tx, userID, entryID, true)
 	}); err != nil {
@@ -638,7 +666,7 @@ func (r *PostgresRepository) DeleteTransaction(ctx context.Context, userID, txnI
 			return err
 		}
 
-		if err := syncCashLink(ctx, tx, userID, txnID, false); err != nil {
+		if err := syncCashLink(ctx, tx, userID, txnID, false, cashPlacement{}); err != nil {
 			return err
 		}
 

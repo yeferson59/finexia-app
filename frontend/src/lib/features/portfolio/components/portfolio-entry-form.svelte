@@ -38,11 +38,17 @@
 		portfolioId: string;
 		platforms: Platform[];
 		/**
-		 * El efectivo que cada plataforma guarda en este portafolio, por moneda.
-		 * Lo resuelve la página; aquí solo se busca el de la plataforma y la
-		 * moneda elegidas.
+		 * El efectivo que cada plataforma guarda en este portafolio, por moneda y
+		 * por cajón. Lo resuelve la página; aquí solo se buscan los de la
+		 * plataforma y la moneda elegidas.
 		 */
-		cashBalances?: { sourceId: string; currency: string; balance: string }[];
+		cashBalances?: {
+			sourceId: string;
+			currency: string;
+			pocketId: string;
+			pocketName: string;
+			balance: string;
+		}[];
 		submitError?: boolean;
 		/**
 		 * Lo que dijo el backend, cuando dijo algo.
@@ -96,6 +102,7 @@
 	let fxRate = $state('');
 
 	let payFromCash = $state(false);
+	let payFromPocketId = $state('');
 
 	let isSubmitting = $state(false);
 
@@ -120,17 +127,25 @@
 	 * pantalla ya no enseña.
 	 */
 	const settlementCurrency = $derived(costCurrency || currency);
-	const cashAvailable = $derived(
-		parseFloat(
-			cashBalances.find((b) => b.sourceId === platformId && b.currency === settlementCurrency)
-				?.balance ?? '0'
-		) || 0
+	const cashSources = $derived(
+		cashBalances
+			.filter((b) => b.sourceId === platformId && b.currency === settlementCurrency)
+			.map((b) => ({
+				id: b.pocketId,
+				name: b.pocketName,
+				balance: parseFloat(b.balance) || 0
+			}))
+			.sort((a, b) => (a.id === '' ? -1 : b.id === '' ? 1 : a.name.localeCompare(b.name)))
 	);
-	const canPayFromCash = $derived(cashAvailable > 0);
+	const canPayFromCash = $derived(cashSources.length > 0);
 	const settledCost = $derived(units * unitPrice * rate);
 
+	// Al cambiar de plataforma o de moneda, lo elegido puede ya no existir.
 	$effect(() => {
 		if (!canPayFromCash) payFromCash = false;
+		if (!cashSources.some((s) => s.id === payFromPocketId)) {
+			payFromPocketId = cashSources[0]?.id ?? '';
+		}
 	});
 
 	/*
@@ -219,10 +234,10 @@
 			<div class="field">
 				<AssetPayFromCashField
 					bind:checked={payFromCash}
+					bind:pocketId={payFromPocketId}
 					currency={settlementCurrency}
-					amount={settledCost > 0 ? formatCurrency(settledCost, settlementCurrency) : ''}
-					balance={formatCurrency(cashAvailable, settlementCurrency)}
-					enough={settledCost <= cashAvailable}
+					amount={settledCost}
+					sources={cashSources}
 				/>
 			</div>
 		{/if}

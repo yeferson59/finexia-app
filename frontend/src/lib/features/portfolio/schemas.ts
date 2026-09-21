@@ -73,6 +73,17 @@ const checkbox = z
 	.optional()
 	.transform((v) => v === true || v === 'on' || v === 'true');
 
+/**
+ * El bolsillo del que sale el dinero de una compra. Vacío —o ausente— es la
+ * cuenta principal, que es lo que manda el formulario mientras no se elija otra
+ * cosa, y lo que el backend entiende por «sin bolsillo».
+ *
+ * No se valida como UUID aquí: la cadena vacía es un valor legítimo y la action
+ * omite el campo cuando lo es, así que un identificador que no exista lo
+ * rechaza el backend, que es quien sabe de quién es cada bolsillo.
+ */
+const pocketId = z.coerce.string().trim().optional().default('');
+
 /** Alta de una posición (`routes/dashboard/portfolios/[id]/add`). */
 export const portfolioEntrySchema = z.object({
 	portfolioId: z.uuid(),
@@ -92,7 +103,8 @@ export const portfolioEntrySchema = z.object({
 	notes: z.coerce.string().optional(),
 	// La casilla de pagar la compra con el efectivo de la plataforma: llega como
 	// «on» marcada y no llega desmarcada. Misma forma que `creditCash`.
-	payFromCash: checkbox
+	payFromCash: checkbox,
+	payFromPocketId: pocketId
 });
 
 /**
@@ -116,7 +128,8 @@ const transactionSchema = z.object({
 	// dos caras de la misma pregunta, y el backend rechaza cada una en el tipo
 	// que no es el suyo.
 	creditCash: checkbox,
-	payFromCash: checkbox
+	payFromCash: checkbox,
+	payFromPocketId: pocketId
 });
 
 /** Alta de una transacción sobre una posición existente. */

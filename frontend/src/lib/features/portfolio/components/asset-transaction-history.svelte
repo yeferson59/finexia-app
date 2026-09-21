@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import Modal from '$lib/ui/modal.svelte';
 	import type { Holding, Transaction } from '$lib/api/types';
-	import type { AssetActionResult, TxnMeta } from '../asset';
+	import type { AssetActionResult, CashSource, TxnMeta } from '../asset';
 	import AssetTransactionForm from './asset-transaction-form.svelte';
 	import AssetSellPanel from './asset-sell-panel.svelte';
 	import AssetTransactionsTable from './asset-transactions-table.svelte';
@@ -33,10 +33,11 @@
 		showAddForm?: boolean;
 		entries: Holding[];
 		/**
-		 * El efectivo que la plataforma de cada posición guarda en la moneda de
-		 * esa posición: con qué se puede pagar una compra. Lo resuelve la página.
+		 * De dónde puede salir el dinero de una compra en cada posición: la cuenta
+		 * principal de su plataforma y sus bolsillos, en la moneda de la posición.
+		 * Lo resuelve la página.
 		 */
-		cashByEntry?: Record<string, string>;
+		cashByEntry?: Record<string, CashSource[]>;
 		transactions: Transaction[];
 		txnMeta: TxnMeta;
 		marketPrice: number | undefined;
@@ -127,7 +128,7 @@
 		<AssetTransactionEditForm
 			transaction={editingTxn}
 			onCash={entries.find((e) => e.id === editingTxn?.entryId)?.assetType === 'cash'}
-			cashAvailable={parseFloat(cashByEntry[editingTxn.entryId] ?? '0') || 0}
+			cashSources={cashByEntry[editingTxn.entryId] ?? []}
 			onClose={() => (editingTxn = null)}
 		/>
 	{/if}

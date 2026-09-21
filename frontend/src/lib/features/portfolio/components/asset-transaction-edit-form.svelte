@@ -9,24 +9,24 @@
 	import Button from '$lib/ui/button.svelte';
 	import DatePicker from '$lib/ui/date-picker.svelte';
 	import type { Transaction } from '$lib/api/types';
-	import { TRANSACTION_TYPES, formatSettled, priceLabelFor, txnModeFor } from '../asset';
+	import { TRANSACTION_TYPES, priceLabelFor, txnModeFor, type CashSource } from '../asset';
 	import AssetCreditCashField from './asset-credit-cash-field.svelte';
 	import AssetPayFromCashField from './asset-pay-from-cash-field.svelte';
 
 	let {
 		transaction,
 		onCash = false,
-		cashAvailable = 0,
+		cashSources = [],
 		onClose
 	}: {
 		transaction: Transaction;
 		/** La posición es un saldo de efectivo, que no se abona dividendos ni ventas a sí mismo. */
 		onCash?: boolean;
 		/**
-		 * Lo que queda en el efectivo de la plataforma, en la moneda de la cuenta.
-		 * Si la compra ya se paga de ahí, este saldo ya lo tiene descontado.
+		 * De dónde puede salir el dinero, con lo que hay en cada sitio. Si la
+		 * compra ya se paga de uno de ellos, ese saldo ya lo tiene descontado.
 		 */
-		cashAvailable?: number;
+		cashSources?: CashSource[];
 		onClose: () => void;
 	} = $props();
 
@@ -54,7 +54,9 @@
 			// Y lo que la compra tiene hoy, por la misma razón. Marcarla aquí es
 			// lo que registra, después del hecho, que se pagó con el efectivo de
 			// la cuenta; desmarcarla devuelve el dinero al saldo.
-			payFromCash: transaction.cashPaid ?? false
+			payFromCash: transaction.cashPaid ?? false,
+			// El bolsillo del que sale hoy, para que editar una nota no lo mueva.
+			payFromPocketId: transaction.cashPocketId ?? ''
 		}))
 	);
 
@@ -89,8 +91,8 @@
 	 * aunque el saldo sea cero: puede que la compra ya salga de él —y entonces
 	 * desmarcarla es cómo se deshace— y el saldo que se ve ya está descontado.
 	 */
-	const alreadyPaid = $derived(transaction.cashPaid ?? false);
-	const canPayFromCash = $derived(editForm.type === 'buy' && !onCash);
+	const paidFromPocketId = $derived(transaction.cashPaid ? (transaction.cashPocketId ?? '') : null);
+	const canPayFromCash = $derived(editForm.type === 'buy' && !onCash && cashSources.length > 0);
 	// La misma cuenta que hace el backend: la comisión va por la tasa solo si se
 	// cobró en la moneda de la operación; cobrada en la de la cuenta ya está en
 	// ella.
@@ -279,10 +281,12 @@
 	{#if canPayFromCash}
 		<AssetPayFromCashField
 			bind:checked={editForm.payFromCash}
+			bind:pocketId={editForm.payFromPocketId}
 			currency={creditCurrency}
-			amount={payAmount > 0 ? formatSettled(payAmount, creditCurrency) : ''}
-			balance={formatSettled(cashAvailable, creditCurrency)}
-			enough={alreadyPaid || payAmount <= cashAvailable}
+			amount={payAmount}
+			sources={cashSources}
+			{paidFromPocketId}
+			paidAmount={payAmount}
 			editing
 		/>
 	{/if}

@@ -62,6 +62,10 @@ type CreatePortfolioEntryRequestDTO struct {
 	// kept cash; it is refused on any type but a purchase, and refused outright
 	// when the balance does not hold enough.
 	PayFromCash bool `json:"payFromCash"`
+	// PayFromPocketID is which drawer of that account paid, omitted for the main
+	// one. A pocket of another account, of another currency, or a fixed deposit
+	// is refused.
+	PayFromPocketID uuid.UUID `json:"payFromPocketId"`
 }
 
 type CreateTransactionRequestDTO struct {
@@ -90,6 +94,9 @@ type CreateTransactionRequestDTO struct {
 	// PayFromCash is the same for a purchase, the other way round: the cost
 	// comes out of that balance. Refused on any type but a purchase.
 	PayFromCash bool `json:"payFromCash"`
+	// PayFromPocketID is which drawer of that account paid, omitted for the main
+	// one.
+	PayFromPocketID uuid.UUID `json:"payFromPocketId"`
 }
 
 type UpdateTransactionRequestDTO struct {
@@ -110,6 +117,9 @@ type UpdateTransactionRequestDTO struct {
 	// purchase had taken. It is how a trade recorded before the app kept cash
 	// gets its funding recorded after the fact.
 	PayFromCash bool `json:"payFromCash"`
+	// PayFromPocketID is the whole answer too: naming another drawer moves the
+	// money, putting it back where it was and taking it out of the new one.
+	PayFromPocketID uuid.UUID `json:"payFromPocketId"`
 }
 
 // Input folds the three write DTOs into the one shape the service takes. The
@@ -128,6 +138,7 @@ func (d CreateTransactionRequestDTO) Input(txnType TransactionType) TransactionI
 		Notes:           d.Notes,
 		CreditCash:      d.CreditCash,
 		PayFromCash:     d.PayFromCash,
+		CashPocketID:    d.PayFromPocketID,
 	}
 }
 
@@ -144,6 +155,7 @@ func (d UpdateTransactionRequestDTO) Input(txnType TransactionType) TransactionI
 		Notes:           d.Notes,
 		CreditCash:      d.CreditCash,
 		PayFromCash:     d.PayFromCash,
+		CashPocketID:    d.PayFromPocketID,
 	}
 }
 
@@ -160,6 +172,7 @@ func (d CreatePortfolioEntryRequestDTO) Input(txnType TransactionType) Transacti
 		TransactionDate: d.EntryDate,
 		Notes:           d.Notes,
 		PayFromCash:     d.PayFromCash,
+		CashPocketID:    d.PayFromPocketID,
 	}
 }
 
@@ -203,9 +216,11 @@ type TransactionResponseDTO struct {
 	// CashCredited is whether a dividend, or a sale's proceeds, was paid into the
 	// platform's cash, and CashPaid whether a purchase was paid out of it, so an
 	// edit form can send the same answer back.
-	CashCredited bool      `json:"cashCredited"`
-	CashPaid     bool      `json:"cashPaid"`
-	CreatedAt    time.Time `json:"createdAt"`
+	CashCredited bool `json:"cashCredited"`
+	CashPaid     bool `json:"cashPaid"`
+	// CashPocketID is the drawer it was paid from, omitted for the main account.
+	CashPocketID *uuid.UUID `json:"cashPocketId,omitempty"`
+	CreatedAt    time.Time  `json:"createdAt"`
 }
 
 func NewTransactionResponse(t Transaction) TransactionResponseDTO {
@@ -224,6 +239,7 @@ func NewTransactionResponse(t Transaction) TransactionResponseDTO {
 		Notes:           t.Notes,
 		CashCredited:    t.CashCredited,
 		CashPaid:        t.CashPaid,
+		CashPocketID:    t.CashPocketID,
 		CreatedAt:       t.CreatedAt,
 	}
 }

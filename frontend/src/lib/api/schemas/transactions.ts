@@ -44,6 +44,10 @@ export const transactionSchema = z.object({
 	// ya tenía. Opcional por la misma razón, contra un backend anterior a la
 	// migración 000054.
 	cashPaid: z.boolean().optional(),
+	// El bolsillo del que salió el dinero; ausente es la cuenta principal. El
+	// formulario de edición lo devuelve tal cual: sin él, editar una nota movería
+	// la compra al saldo principal.
+	cashPocketId: z.string().nullable().optional(),
 	createdAt: z.string()
 });
 

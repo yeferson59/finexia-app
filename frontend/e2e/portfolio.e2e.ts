@@ -184,14 +184,24 @@ test.describe('portfolio detail', () => {
 			name: /Pagarlo con mi efectivo en esta plataforma/
 		});
 
-		// Sin marcar: el dinero llega de fuera salvo que se diga lo contrario.
+		// Sin marcar: el dinero llega de fuera salvo que se diga lo contrario, y el
+		// selector de cajón no estorba hasta que se marca.
 		await expect(pay).not.toBeChecked();
-		await expect(dialog).toContainText(/Tienes .*2.500[.,]00 en esta cuenta/);
+		await expect(dialog.getByLabel('De dónde sale')).toHaveCount(0);
+		await expect(dialog).toContainText(/En Cuenta principal tienes .*2.500[.,]00/);
 
 		await dialog.getByLabel('Cantidad').fill('2');
 		await dialog.getByLabel('Precio unitario').fill('150');
 		await pay.check();
 		await expect(dialog).toContainText(/Resta .*300[.,]00 de tu efectivo en USD/);
+
+		// Con más de un sitio de donde sacarlo, se elige cuál: la mayoría del
+		// dinero de una cuenta está en un bolsillo, no en el saldo principal.
+		const from = dialog.getByLabel('De dónde sale');
+		// Por valor, que es el id del bolsillo en las fixtures del stub: la
+		// etiqueta lleva el saldo pegado y no es un texto estable.
+		await from.selectOption('88888888-8888-4888-8888-888888888888');
+		await expect(dialog).toContainText(/En Para acciones tienes .*800[.,]00/);
 
 		// Más de lo que hay: se avisa, sin bloquear —quien decide es el backend—.
 		await dialog.getByLabel('Cantidad').fill('100');

@@ -7,10 +7,11 @@ import { portfolioEntrySchema } from '$lib/features/portfolio';
 /**
  * El efectivo de este portafolio, para poder ofrecer pagar la compra con él.
  *
- * Solo la cuenta principal de cada plataforma: un bolsillo es dinero apartado
- * para otra cosa y un depósito a plazo está cerrado, y el backend tampoco paga
- * desde ninguno de los dos. El formulario recibe la lista y busca en ella la
- * plataforma y la moneda que el usuario elija.
+ * La cuenta principal de cada plataforma y sus bolsillos flexibles, que es
+ * donde la gente guarda el dinero de verdad. Los depósitos a plazo quedan fuera
+ * —están cerrados hasta que vencen y el backend los rechaza— y los saldos en
+ * cero también. El formulario recibe la lista y busca en ella la plataforma y
+ * la moneda que el usuario elija.
  */
 export const load: PageServerLoad = async ({ cookies, fetch, params }) => {
 	const res = await cash.getBalances({ cookies, fetch });
@@ -18,8 +19,19 @@ export const load: PageServerLoad = async ({ cookies, fetch, params }) => {
 
 	return {
 		cashBalances: balances
-			.filter((b) => b.pocketId === null && b.portfolioId === params.id)
-			.map((b) => ({ sourceId: b.sourceId, currency: b.currency, balance: b.balance }))
+			.filter(
+				(b) =>
+					b.portfolioId === params.id &&
+					b.pocketKind !== 'fixed' &&
+					(parseFloat(b.balance) || 0) > 0
+			)
+			.map((b) => ({
+				sourceId: b.sourceId,
+				currency: b.currency,
+				pocketId: b.pocketId ?? '',
+				pocketName: b.pocketName || 'Cuenta principal',
+				balance: b.balance
+			}))
 	};
 };
 
@@ -41,7 +53,8 @@ export const actions = {
 			fxRate: formData.get('fxRate'),
 			entryDate: formData.get('purchaseDate'),
 			notes: formData.get('notes'),
-			payFromCash: formData.get('payFromCash')
+			payFromCash: formData.get('payFromCash'),
+			payFromPocketId: formData.get('payFromPocketId')
 		});
 
 		/*
@@ -55,7 +68,16 @@ export const actions = {
 			return fail(400, { success: false, error: error.issues[0].message });
 		}
 
-		const response = await portfolio.createEntry({ cookies, fetch }, data);
+		// El bolsillo vacío se omite: el backend lo decodifica a un UUID y la
+		// cadena vacía no lo es. Ausente significa la cuenta principal.
+		const { payFromPocketId, ...entry } = data;
+		const response = await portfolio.createEntry(
+			{ cookies, fetch },
+			{
+				...entry,
+				...(data.payFromCash && payFromPocketId ? { payFromPocketId } : {})
+			}
+		);
 
 		if (!response.ok || !response.success) {
 			// El backend rechaza combinaciones de moneda y tasa que no pueden ser

@@ -256,11 +256,16 @@ type Transaction struct {
 	// was paid out of it (000054). Only the reads that serve an edit form select
 	// them. A transaction has at most one of the two: they are the same link
 	// read from either side.
-	CashCredited bool      `json:"cashCredited,omitempty"`
-	CashPaid     bool      `json:"cashPaid,omitempty"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
-	Entry        Entry     `json:"entry,omitzero"`
+	CashCredited bool `json:"cashCredited,omitempty"`
+	CashPaid     bool `json:"cashPaid,omitempty"`
+	// CashPocketID is the drawer of the account a purchase was paid from, nil
+	// for the main one and for everything that is not paid from cash. An edit
+	// form has to send it back: without it, editing a note would move the money
+	// to the main account.
+	CashPocketID *uuid.UUID `json:"cashPocketId,omitempty"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	UpdatedAt    time.Time  `json:"updatedAt"`
+	Entry        Entry      `json:"entry,omitzero"`
 }
 
 // TransactionInput is one transaction as a caller states it, on its way to
@@ -291,6 +296,12 @@ type TransactionInput struct {
 	// recorded before any of this was offered be paid from cash afterwards — and
 	// what lets one paid by mistake stop being.
 	PayFromCash bool
+	// CashPocketID is the drawer of that account the money came out of, zero for
+	// the main account (000047). Most balances an owner keeps are in a pocket —
+	// the bank's «cajita», the broker's sub-balance — so a purchase that could
+	// only be paid from the main account could not be paid at all. A fixed
+	// deposit is refused: it is closed until it matures.
+	CashPocketID uuid.UUID
 }
 
 // Rate resolves the omitted case. A caller that sends no rate at all is the
@@ -346,6 +357,14 @@ func (in TransactionInput) Validate(costCurrency money.Currency) (TransactionInp
 
 	if in.PayFromCash && in.Type != Buy {
 		return in, fmt.Errorf("%w: only a purchase is paid out of cash, not a %s", ErrNotPayableFromCash, in.Type)
+	}
+
+	// A drawer without the answer it qualifies is a request that disagrees with
+	// itself, and guessing either way is worse than saying so: honouring it
+	// would move money the caller did not ask to move, and ignoring it would
+	// take the money from somewhere else.
+	if !in.PayFromCash && in.CashPocketID != (uuid.UUID{}) {
+		return in, fmt.Errorf("%w: a cash pocket was named but the transaction is not paid from cash", ErrNotPayableFromCash)
 	}
 
 	if out.Currency == money.XXX {

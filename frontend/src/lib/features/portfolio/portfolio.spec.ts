@@ -387,6 +387,21 @@ describe('payFromCash de una compra', () => {
 		expect(off.data?.payFromCash).toBe(false);
 	});
 
+	// El cajón del que sale es parte de la respuesta; vacío es la cuenta
+	// principal, y la action lo omite para que el backend no vea un UUID vacío.
+	it('lee el bolsillo del que sale, y lo deja vacío si no se eligió', () => {
+		const withPocket = transactionCreateSchema.safeParse({
+			...buy,
+			entryId,
+			payFromCash: 'on',
+			payFromPocketId: '  9c4f2d1e-3b5a-4c6d-8e7f-0a1b2c3d4e5f  '
+		});
+		expect(withPocket.data?.payFromPocketId).toBe('9c4f2d1e-3b5a-4c6d-8e7f-0a1b2c3d4e5f');
+
+		const main = transactionCreateSchema.safeParse({ ...buy, entryId, payFromCash: 'on' });
+		expect(main.data?.payFromPocketId).toBe('');
+	});
+
 	it('el alta de una posición la lee igual', () => {
 		const parsed = portfolioEntrySchema.safeParse({
 			portfolioId: entryId,

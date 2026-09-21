@@ -28,7 +28,8 @@ export const IDS = {
 	riskModerate: '44444444-4444-4444-8444-444444444444',
 	riskAggressive: '44444444-4444-4444-8444-444444444445',
 	riskConservative: '44444444-4444-4444-8444-444444444446',
-	entry: '55555555-5555-4555-8555-555555555555'
+	entry: '55555555-5555-4555-8555-555555555555',
+	pocket: '88888888-8888-4888-8888-888888888888'
 };
 
 const money = (value) => value.toFixed(2);
@@ -163,9 +164,11 @@ export const holdings = PORTFOLIOS.flatMap((p) => p.holdings);
 /**
  * `GET /portfolios/cash` — el efectivo de la cartera principal.
  *
- * Uno solo, y en la plataforma y la moneda de sus posiciones, que es lo que
- * hace falta para que la ficha de un activo pueda ofrecer pagar una compra con
- * él. `pocketId: null` es la cuenta principal, que es de donde se paga.
+ * Dos saldos en la plataforma y la moneda de sus posiciones: la cuenta
+ * principal y un bolsillo. Hacen falta los dos para que la ficha de un activo
+ * pueda ofrecer pagar una compra y, además, preguntar de cuál de los dos sale
+ * —que es donde la gente tiene el dinero de verdad—. `pocketId: null` es la
+ * cuenta principal.
  */
 export const cashBalances = [
 	{
@@ -186,6 +189,31 @@ export const cashBalances = [
 		displayCurrency: 'USD',
 		fxConverted: true,
 		movements: 3,
+		lastMovementDate: '2026-02-20T00:00:00Z',
+		interestEarned: '0.00',
+		interestThisMonth: '0.00',
+		interestThisMonthValue: '0.00',
+		pendingInterest: '0.00',
+		lastAccrualDate: null
+	},
+	{
+		entryId: '66666666-6666-4666-8666-666666666667',
+		portfolioId: IDS.portfolio,
+		portfolioName: 'Cartera Principal',
+		sourceId: IDS.platform,
+		sourceName: 'Broker Demo',
+		assetId: '77777777-7777-4777-8777-777777777777',
+		ticker: 'CASH-USD',
+		name: 'Efectivo en dólares estadounidenses (USD)',
+		pocketId: IDS.pocket,
+		pocketName: 'Para acciones',
+		pocketKind: 'flexible',
+		balance: '800.00',
+		currency: 'USD',
+		value: '800.00',
+		displayCurrency: 'USD',
+		fxConverted: true,
+		movements: 1,
 		lastMovementDate: '2026-02-20T00:00:00Z',
 		interestEarned: '0.00',
 		interestThisMonth: '0.00',

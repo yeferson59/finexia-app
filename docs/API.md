@@ -1055,19 +1055,35 @@ el coste sale del saldo de la cuenta principal de la misma plataforma y
 portfolio, en la moneda de coste de la posición, por
 `quantity × price × fxRate + comisión` en esa moneda —lo que la cuenta pagó—. Se
 guarda como una fila `cash_purchase` sobre el saldo, con `credited_from`
-apuntando a la compra, en la misma transacción de base de datos. La respuesta, y
-las lecturas de una posición, devuelven `cashPaid`.
+apuntando a la compra, en la misma transacción de base de datos.
+
+`payFromPocketId` dice de qué **cajón** de esa cuenta sale (000047): omitido es
+la cuenta principal, y cualquier bolsillo flexible de la misma plataforma y
+moneda vale. Es lo normal, no la excepción: casi todo el dinero que alguien
+guarda está en un bolsillo. Un **depósito a plazo se rechaza** —está cerrado
+hasta que vence, igual que para un retiro—, y también un bolsillo de otra
+cuenta, de otra moneda o de otro usuario.
+
+La respuesta, y las lecturas de una posición, devuelven `cashPaid` y
+`cashPocketId` —el cajón del que sale, ausente si es la cuenta principal—, que
+es lo que un formulario de edición tiene que devolver para no mover el dinero
+al saldo principal sin querer.
 
 | Caso | Qué pasa |
 |---|---|
 | `payFromCash` ausente o `false` en el alta | La compra no toca el efectivo, como siempre: el dinero llegó de fuera |
 | `payFromCash` en el `PUT` | Es la respuesta entera: `true` sobre una compra que no salía del efectivo la paga ahora —así se registra después del hecho—, y `false` devuelve el dinero al saldo |
 | `payFromCash: true` en otro tipo | **400** |
+| `payFromPocketId` sin `payFromCash` | **400**: la petición se contradice, y ni honrarla ni ignorarla es correcto |
+| `payFromPocketId` de un depósito a plazo | **409** |
+| `payFromPocketId` de otra cuenta, otra moneda o que no existe | **400** / **404** |
+| `payFromPocketId` distinto en el `PUT` | El dinero vuelve al cajón anterior y sale del nuevo |
+| Cualquier otra escritura sobre la posición | El cargo **se queda en su cajón**: solo lo mueve quien nombra otro |
 | Sobre un saldo de efectivo, en una moneda fuera de la lista o con coste cero | **400** |
 | El saldo no llega, en el alta o al agrandar la compra | **409**, como un retiro. No se registra nada: ni la transacción, ni la posición que la abría |
 | Editar o borrar el cargo por su cuenta, o escribir `cash_purchase` a mano | **400**: se cambia desde la compra |
 | Borrar la compra, o su posición | El dinero vuelve al saldo |
-| Cambiar la moneda de liquidación de la posición | El cargo se muda al saldo de la moneda nueva, al importe de la tasa nueva; si ese saldo no llega, **409** |
+| Cambiar la moneda de liquidación de la posición | El cargo se muda a la **cuenta principal** de la moneda nueva, al importe de la tasa nueva —un bolsillo guarda una sola moneda, así que el que lo tenía no puede tenerlo— y si ese saldo no llega, **409** |
 
 En la serie de crecimiento la compra sigue entrando a la posición (000027) y su
 cargo sale del saldo por el mismo importe, el mismo día y en la misma moneda:

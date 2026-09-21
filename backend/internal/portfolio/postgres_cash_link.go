@@ -25,13 +25,49 @@ import (
 // that touches a holding leaves its cash rows agreeing with it.
 
 // lockedCashLink is a cash side as a rewrite has to know it: what kind it is,
-// what it moved in the balance, and what the balance holds now.
+// what it moved in the balance, which drawer of the account that balance is,
+// and what it holds now.
 type lockedCashLink struct {
 	id       uuid.UUID
 	txnType  TransactionType
 	amount   decimal.Decimal
 	balance  decimal.Decimal
 	currency money.Currency
+	pocket   *uuid.UUID
+}
+
+// cashPlacement is which balance of the account a cash row goes in, as the
+// caller states it: nil pocket is the main account, and a caller that states
+// nothing leaves the row where it already is.
+//
+// The distinction is the whole point. A purchase names the drawer its money
+// came out of, and an edit that names another moves it. Everything else —
+// re-syncing a position's rows after an unrelated write — must not move
+// anything, and a plain *uuid.UUID could not tell "the main account" from "I am
+// not the one who decides".
+type cashPlacement struct {
+	stated bool
+	pocket *uuid.UUID
+}
+
+// statedPocket is the placement a writer builds from what the owner sent, where
+// the zero UUID is the main account — the same convention CreateCashMovement
+// takes.
+func statedPocket(pocketID uuid.UUID) cashPlacement {
+	if pocketID == (uuid.UUID{}) {
+		return cashPlacement{stated: true}
+	}
+
+	return cashPlacement{stated: true, pocket: &pocketID}
+}
+
+// samePocket compares two drawers, either of which may be the main account.
+func samePocket(a, b *uuid.UUID) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+
+	return *a == *b
 }
 
 // syncCashLink makes the cash row of one transaction what the transaction, as
@@ -39,8 +75,10 @@ type lockedCashLink struct {
 // money to move through cash; a row that settles against nothing — an edit that
 // turned a dividend into a fee — keeps no cash row whatever want says.
 //
-// The row lands on the main account of the platform that holds the position, in
-// the position's cost currency: the currency the account settled the money in.
+// The row lands on the balance the platform keeps in the position's cost
+// currency — the currency the account settled the money in — in the drawer
+// `where` names: the main account, or the pocket a purchase was paid from. A
+// fixed deposit is refused, like every other write into one.
 // Its amount is what the growth series books the transaction at — quantity ×
 // price × rate, and the fees in that currency subtracted on the way in or added
 // on the way out — so the flow through the holding and the flow through the
@@ -60,7 +98,7 @@ type lockedCashLink struct {
 // it leaves is checked first, as a withdrawal's would be: money the balance
 // already spent cannot shrink or go out from under it, and a purchase cannot
 // take out money that is not there.
-func syncCashLink(ctx context.Context, tx pgx.Tx, userID, txnID uuid.UUID, want bool) error {
+func syncCashLink(ctx context.Context, tx pgx.Tx, userID, txnID uuid.UUID, want bool, where cashPlacement) error {
 	var (
 		txnType     TransactionType
 		portfolioID uuid.UUID
@@ -121,6 +159,26 @@ func syncCashLink(ctx context.Context, tx pgx.Tx, userID, txnID uuid.UUID, want 
 		nothing = "it cost nothing, so there is nothing to pay"
 	}
 
+	// Where the row goes, if it has to be written. What the owner stated wins;
+	// otherwise it stays in the drawer it is in. The exception is a restatement:
+	// a pocket holds one currency, so the one the row sat in cannot hold the new
+	// one and the money goes back to the main account, which every account has
+	// in every currency.
+	target := current.pocket
+
+	switch {
+	case where.stated:
+		target = where.pocket
+	case found && current.currency != cur:
+		target = nil
+	}
+
+	if target != nil {
+		if _, err := requireWritablePocket(ctx, tx, userID, *target, sourceID, cur); err != nil {
+			return err
+		}
+	}
+
 	switch {
 	case assetType == market.Cash:
 		return fmt.Errorf("%w: it is recorded on a cash balance, which is cash already", refusal)
@@ -136,7 +194,7 @@ func syncCashLink(ctx context.Context, tx pgx.Tx, userID, txnID uuid.UUID, want 
 		costBasis = &soldCost
 	}
 
-	if found && current.txnType == linkType && current.currency == cur {
+	if found && current.txnType == linkType && current.currency == cur && samePocket(current.pocket, target) {
 		after := current.balance.
 			Sub(balanceEffect(linkType, current.amount)).
 			Add(balanceEffect(linkType, amount))
@@ -167,7 +225,7 @@ func syncCashLink(ctx context.Context, tx pgx.Tx, userID, txnID uuid.UUID, want 
 		}
 	}
 
-	_, err = writeCashMovement(ctx, tx, userID, portfolioID, sourceID, nil, CashMovementInput{
+	_, err = writeCashMovement(ctx, tx, userID, portfolioID, sourceID, target, CashMovementInput{
 		Kind:      cashKindOf(linkType),
 		Amount:    amount,
 		Currency:  cur,
@@ -198,12 +256,12 @@ func lockCashLink(ctx context.Context, tx pgx.Tx, txnID uuid.UUID) (lockedCashLi
 	var c lockedCashLink
 
 	err := tx.QueryRow(ctx, `
-		SELECT c.id, c.type, c.quantity, pe.quantity, pe.cost_currency
+		SELECT c.id, c.type, c.quantity, pe.quantity, pe.cost_currency, pe.pocket_id
 		FROM transactions c
 		JOIN portfolio_entries pe ON pe.id = c.entry_id
 		WHERE c.credited_from = $1
 		FOR UPDATE OF pe
-	`, txnID).Scan(&c.id, &c.txnType, &c.amount, &c.balance, &c.currency)
+	`, txnID).Scan(&c.id, &c.txnType, &c.amount, &c.balance, &c.currency, &c.pocket)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return lockedCashLink{}, false, nil
 	}
@@ -253,7 +311,9 @@ func syncEntryCashLinks(ctx context.Context, tx pgx.Tx, userID, entryID uuid.UUI
 	}
 
 	for _, id := range linked {
-		if err := syncCashLink(ctx, tx, userID, id, want); err != nil {
+		// No placement: an unrelated write to the position must not move a
+		// purchase's money out of the drawer the owner paid it from.
+		if err := syncCashLink(ctx, tx, userID, id, want, cashPlacement{}); err != nil {
 			return err
 		}
 	}

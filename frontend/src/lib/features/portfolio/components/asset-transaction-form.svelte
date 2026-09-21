@@ -4,10 +4,17 @@
 	import DatePicker from '$lib/ui/date-picker.svelte';
 	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
 	import type { Holding } from '$lib/api/types';
-	import { TRANSACTION_TYPES, formatSettled, priceLabelFor, txnModeFor } from '../asset';
+	import {
+		TRANSACTION_TYPES,
+		formatSettled,
+		priceLabelFor,
+		txnModeFor,
+		type CashSource
+	} from '../asset';
 	import TradeDateWarnings from './trade-date-warnings.svelte';
 	import AssetCreditCashField from './asset-credit-cash-field.svelte';
 	import AssetPayFromCashField from './asset-pay-from-cash-field.svelte';
+	import AssetTransactionFxFields from './asset-transaction-fx-fields.svelte';
 
 	let {
 		entries,
@@ -16,8 +23,8 @@
 		onCancel
 	}: {
 		entries: Holding[];
-		/** Saldo por posición, en su moneda de coste; lo resuelve la página. */
-		cashByEntry?: Record<string, string>;
+		/** De dónde puede salir el dinero en cada posición; lo resuelve la página. */
+		cashByEntry?: Record<string, CashSource[]>;
 		formError?: boolean;
 		onCancel: () => void;
 	} = $props();
@@ -36,8 +43,10 @@
 		notes: '',
 		creditCash: true,
 		// Al revés que la de abonar: pagar con el saldo solo pasa cuando el dinero
-		// ya estaba en la cuenta, así que se marca a mano.
-		payFromCash: false
+		// ya estaba en la cuenta, así que se marca a mano. El bolsillo vacío es la
+		// cuenta principal.
+		payFromCash: false,
+		payFromPocketId: ''
 	});
 
 	$effect(() => {
@@ -115,11 +124,18 @@
 	 * debitó. Sin saldo la casilla no se ofrece —no hay con qué pagar y el
 	 * backend rechazaría la compra—, y un saldo no se compra a sí mismo.
 	 */
-	const cashAvailable = $derived(parseFloat(cashByEntry[txnForm.entryId] ?? '0') || 0);
+	const cashSources = $derived(cashByEntry[txnForm.entryId] ?? []);
 	const canPayFromCash = $derived(
-		txnForm.type === 'buy' && entry?.assetType !== 'cash' && cashAvailable > 0
+		txnForm.type === 'buy' && entry?.assetType !== 'cash' && cashSources.length > 0
 	);
 	const payAmount = $derived(settledTotal + feesInCost);
+
+	// Al cambiar de posición el bolsillo elegido puede ser de otra plataforma.
+	$effect(() => {
+		if (!cashSources.some((s) => s.id === txnForm.payFromPocketId)) {
+			txnForm.payFromPocketId = cashSources[0]?.id ?? '';
+		}
+	});
 
 	// Para avisar si la fecha no parece la de la operación. Solo con precio unitario.
 	const dateCheck = $derived(
@@ -312,40 +328,13 @@
 	{/if}
 
 	{#if crossCurrency}
-		<div class="form-row fx-row">
-			<div class="form-group">
-				<span class="form-label">Moneda de la operación</span>
-				<p class="fx-static">{txnForm.currency}</p>
-				<p class="hint">
-					{assetCurrency} es la moneda en la que cotiza el activo; el precio y la comisión de arriba van
-					en ella.
-				</p>
-			</div>
-			<div class="form-group">
-				<label class="form-label" for="txn-fx"
-					>Tasa a {costCurrency} <span class="required">*</span></label
-				>
-				<input
-					id="txn-fx"
-					type="number"
-					class="form-input"
-					name="fxRate"
-					bind:value={txnForm.fxRate}
-					placeholder="1.0638"
-					min="0"
-					step="any"
-					required
-				/>
-				<p class="hint">
-					Cuántos {costCurrency} costaba 1 {assetCurrency} ese día, según la confirmación del bróker.
-				</p>
-			</div>
-			<div class="form-group">
-				<span class="form-label">Coste en {costCurrency}</span>
-				<p class="fx-static">{formatSettled(settledTotal, costCurrency)}</p>
-				<p class="hint">Contrástalo con el importe que te debitaron.</p>
-			</div>
-		</div>
+		<AssetTransactionFxFields
+			bind:fxRate={txnForm.fxRate}
+			tradeCurrency={txnForm.currency}
+			{assetCurrency}
+			{costCurrency}
+			{settledTotal}
+		/>
 	{/if}
 
 	{#if canCreditCash}
@@ -359,10 +348,10 @@
 	{#if canPayFromCash}
 		<AssetPayFromCashField
 			bind:checked={txnForm.payFromCash}
+			bind:pocketId={txnForm.payFromPocketId}
 			currency={costCurrency}
-			amount={payAmount > 0 ? formatSettled(payAmount, costCurrency) : ''}
-			balance={formatSettled(cashAvailable, costCurrency)}
-			enough={payAmount <= cashAvailable}
+			amount={payAmount}
+			sources={cashSources}
 		/>
 	{/if}
 
@@ -428,22 +417,6 @@
 		grid-template-columns: auto 1fr;
 		gap: 0.4rem;
 		align-items: center;
-	}
-
-	.fx-row {
-		padding: 0.9rem;
-		border: 1px dashed rgba(212, 145, 42, 0.3);
-		border-radius: 8px;
-		background: rgba(212, 145, 42, 0.04);
-	}
-
-	.fx-static {
-		margin: 0;
-		font-family: var(--font-mono);
-		font-variant-numeric: tabular-nums;
-		font-size: 0.95rem;
-		font-weight: 700;
-		color: var(--amber);
 	}
 
 	.form-input {

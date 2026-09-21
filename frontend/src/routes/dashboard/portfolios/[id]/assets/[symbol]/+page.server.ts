@@ -3,6 +3,7 @@ import * as portfolio from '$lib/api/portfolio';
 import * as transactions from '$lib/api/transactions';
 import type { PageServerLoad, Actions } from './$types';
 import type { CashBalance, Holding, Transaction } from '$lib/api/types';
+import type { CashSource } from '$lib/features/portfolio';
 import {
 	entryDeleteSchema,
 	entrySettlementSchema,
@@ -21,31 +22,41 @@ export interface TxnMeta {
 const DEFAULT_META: TxnMeta = { total: 0, page: 1, limit: 20, totalPages: 0 };
 
 /**
- * Lo que cada posición tiene disponible para pagar una compra: el efectivo que
- * su plataforma guarda, en este portafolio y en la moneda en la que la posición
- * liquida.
+ * De dónde puede salir el dinero de una compra en cada posición: los saldos que
+ * su plataforma guarda en este portafolio y en la moneda en la que la posición
+ * liquida, con lo que hay en cada uno.
  *
- * Solo la cuenta principal. Un bolsillo es dinero apartado para otra cosa y un
- * depósito a plazo está cerrado; el backend tampoco paga desde ninguno de los
- * dos. Un saldo que no está es un cero, y entonces la casilla ni se ofrece.
+ * La cuenta principal y los bolsillos flexibles, porque ahí es donde la gente
+ * tiene el dinero: la cajita del banco, el subsaldo del bróker. Los depósitos a
+ * plazo quedan fuera —están cerrados hasta que vencen y el backend los rechaza—
+ * y los saldos en cero también, que no pagan nada. Sin ninguno, la casilla ni
+ * se ofrece.
  */
 function cashByEntry(
 	portfolioId: string,
 	entries: Holding[],
 	balances: CashBalance[]
-): Record<string, string> {
-	const available: Record<string, string> = {};
+): Record<string, CashSource[]> {
+	const available: Record<string, CashSource[]> = {};
 
 	for (const entry of entries) {
-		const match = balances.find(
-			(b) =>
-				b.pocketId === null &&
-				b.portfolioId === portfolioId &&
-				b.sourceId === entry.sourceId &&
-				b.currency === entry.costCurrency
-		);
-
-		available[entry.id] = match?.balance ?? '0';
+		available[entry.id] = balances
+			.filter(
+				(b) =>
+					b.portfolioId === portfolioId &&
+					b.sourceId === entry.sourceId &&
+					b.currency === entry.costCurrency &&
+					b.pocketKind !== 'fixed' &&
+					(parseFloat(b.balance) || 0) > 0
+			)
+			.map((b) => ({
+				id: b.pocketId ?? '',
+				name: b.pocketName || 'Cuenta principal',
+				balance: parseFloat(b.balance) || 0
+			}))
+			// La cuenta principal primero; el resto por nombre, que es como se
+			// llaman en la pantalla de efectivo.
+			.sort((a, b) => (a.id === '' ? -1 : b.id === '' ? 1 : a.name.localeCompare(b.name)));
 	}
 
 	return available;
@@ -77,7 +88,7 @@ export const load: PageServerLoad = async ({ cookies, fetch, params, url }) => {
 			portfolioName: '',
 			baseCurrency: 'USD',
 			txnMeta: DEFAULT_META,
-			cashByEntry: {} as Record<string, string>
+			cashByEntry: {} as Record<string, CashSource[]>
 		};
 	}
 
@@ -141,7 +152,8 @@ export const actions: Actions = {
 			transactionDate: formData.get('transactionDate'),
 			notes: formData.get('notes'),
 			creditCash: formData.get('creditCash'),
-			payFromCash: formData.get('payFromCash')
+			payFromCash: formData.get('payFromCash'),
+			payFromPocketId: formData.get('payFromPocketId')
 		});
 
 		if (!success) {
@@ -166,7 +178,11 @@ export const actions: Actions = {
 			// sale de él; el backend rechaza cada casilla en el tipo que no es el
 			// suyo, y el formulario las deja de mandar al cambiarlo.
 			creditCash: (data.type === 'dividend' || data.type === 'sell') && data.creditCash,
-			payFromCash: data.type === 'buy' && data.payFromCash
+			payFromCash: data.type === 'buy' && data.payFromCash,
+			// Se omite vacío, como la moneda de la comisión: el backend lo decodifica
+			// a un UUID y la cadena vacía no lo es. Ausente significa la cuenta
+			// principal, que es donde estaba todo antes de que hubiera bolsillos.
+			...(data.payFromCash && data.payFromPocketId ? { payFromPocketId: data.payFromPocketId } : {})
 		});
 
 		if (!response.ok) {
@@ -194,7 +210,8 @@ export const actions: Actions = {
 			transactionDate: formData.get('transactionDate'),
 			notes: formData.get('notes'),
 			creditCash: formData.get('creditCash'),
-			payFromCash: formData.get('payFromCash')
+			payFromCash: formData.get('payFromCash'),
+			payFromPocketId: formData.get('payFromPocketId')
 		});
 
 		if (!success) {
@@ -219,7 +236,11 @@ export const actions: Actions = {
 			// sale de él; el backend rechaza cada casilla en el tipo que no es el
 			// suyo, y el formulario las deja de mandar al cambiarlo.
 			creditCash: (data.type === 'dividend' || data.type === 'sell') && data.creditCash,
-			payFromCash: data.type === 'buy' && data.payFromCash
+			payFromCash: data.type === 'buy' && data.payFromCash,
+			// Se omite vacío, como la moneda de la comisión: el backend lo decodifica
+			// a un UUID y la cadena vacía no lo es. Ausente significa la cuenta
+			// principal, que es donde estaba todo antes de que hubiera bolsillos.
+			...(data.payFromCash && data.payFromPocketId ? { payFromPocketId: data.payFromPocketId } : {})
 		});
 
 		if (!response.ok) {

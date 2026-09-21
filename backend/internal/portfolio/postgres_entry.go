@@ -273,7 +273,7 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 		}
 
 		if settled.PayFromCash {
-			if err := syncCashLink(ctx, tx, userID, txnID, true); err != nil {
+			if err := syncCashLink(ctx, tx, userID, txnID, true, statedPocket(settled.CashPocketID)); err != nil {
 				return err
 			}
 		}

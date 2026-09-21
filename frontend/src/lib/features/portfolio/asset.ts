@@ -90,6 +90,21 @@ const UNIT_NOUNS: Record<string, [string, string]> = {
  * inventarles un nombre propio arriesga más de lo que aclara.
  */
 /**
+ * Un sitio de donde puede salir el dinero de una compra: la cuenta principal de
+ * una plataforma o uno de sus bolsillos, con lo que hay en él.
+ *
+ * `id` vacío es la cuenta principal, que es la convención del backend —ahí no
+ * hay bolsillo que nombrar— y lo que manda el formulario cuando no se elige
+ * otra cosa. Los depósitos a plazo nunca entran en esta lista: están cerrados
+ * hasta que vencen.
+ */
+export interface CashSource {
+	id: string;
+	name: string;
+	balance: number;
+}
+
+/**
  * Un importe en la moneda de la cuenta, tal como lo escriben los formularios
  * que liquidan contra el efectivo: el total convertido, lo que se abona y lo
  * que se paga.
