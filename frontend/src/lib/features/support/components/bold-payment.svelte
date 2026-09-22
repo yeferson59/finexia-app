@@ -6,8 +6,9 @@
 	 *
 	 * Al enviar, el servidor crea la orden y la firma con la llave secreta
 	 * (acción `pagar`); el navegador carga la librería de Bold y abre la
-	 * pasarela con esa orden. Bold devuelve a quien paga a esta misma página,
-	 * que consulta el resultado.
+	 * pasarela en un modal encima de la página, sin salir de Finexia. Al
+	 * terminar el pago, Bold redirige a esta misma página, que consulta el
+	 * resultado.
 	 *
 	 * Sin llaves configuradas, la banda dice a quién escribir en vez de enseñar
 	 * un formulario que no llevaría a ninguna parte.
@@ -54,13 +55,15 @@
 					: undefined;
 			if (checkout) {
 				try {
-					// La pasarela navega fuera de la página: el botón sigue ocupado.
 					await openBoldCheckout(checkout);
 				} catch {
 					clientError =
 						'No se pudo abrir la pasarela de Bold. Revisa tu conexión e inténtalo de nuevo.';
-					pending = false;
 				}
+				// El modal queda encima de la página. Si quien paga lo cierra sin
+				// pagar, el botón tiene que volver a servir: cada clic crea una
+				// orden nueva, así que reintentar no repite una ya usada.
+				pending = false;
 				return;
 			}
 			pending = false;
@@ -124,8 +127,8 @@
 						{pending ? 'Abriendo Bold…' : cta}
 					</button>
 					<p class="note">
-						Pagas en la pasarela de Bold con el medio que prefieras y al terminar vuelves aquí. No
-						necesitas cuenta en Bold ni en Finexia.
+						La pasarela de Bold se abre aquí mismo; pagas con el medio que prefieras y al terminar
+						ves el resultado en esta página. No necesitas cuenta en Bold ni en Finexia.
 					</p>
 				</div>
 				<noscript>

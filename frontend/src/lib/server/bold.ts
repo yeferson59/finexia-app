@@ -31,6 +31,11 @@ export interface BoldCheckoutOptions {
 	integritySignature: string;
 	redirectionUrl: string;
 	description: string;
+	/**
+	 * `embedded`: la pasarela se abre en un modal de Bold encima de la página,
+	 * sin salir de Finexia. Al terminar el pago, Bold lleva a `redirectionUrl`.
+	 */
+	renderMode: 'embedded';
 }
 
 /** Estados de `payment_status` que documenta la consulta de transacciones. */
@@ -90,7 +95,8 @@ export function createCheckout(
 		apiKey: keys.apiKey,
 		integritySignature: integritySignature(orderId, amount, BOLD_CURRENCY, keys.secretKey),
 		redirectionUrl,
-		description: 'Aporte a Finexia'
+		description: 'Aporte a Finexia',
+		renderMode: 'embedded'
 	};
 }
 

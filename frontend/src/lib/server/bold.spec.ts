@@ -37,7 +37,8 @@ describe('createCheckout', () => {
 			currency: 'COP',
 			amount: '20000',
 			apiKey: 'identidad',
-			redirectionUrl: 'https://finexia.me/apoyar'
+			redirectionUrl: 'https://finexia.me/apoyar',
+			renderMode: 'embedded'
 		});
 		expect(checkout.integritySignature).toBe(
 			integritySignature(checkout.orderId, 20000, 'COP', 'secreta')

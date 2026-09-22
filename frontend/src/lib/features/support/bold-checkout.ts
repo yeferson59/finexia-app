@@ -4,7 +4,9 @@
  *
  * Integración personalizada (developers.bold.co): el script deja
  * `window.BoldCheckout`, que recibe la configuración firmada por el servidor
- * y con `open()` lleva a la pasarela.
+ * y con `open()` abre la pasarela. La orden llega con `renderMode: 'embedded'`,
+ * así que se abre en un modal de Bold sobre la página y, al terminar el pago,
+ * Bold redirige a la `redirectionUrl` de la orden.
  */
 
 const SCRIPT_URL = 'https://checkout.bold.co/library/boldPaymentButton.js';
@@ -47,7 +49,7 @@ export function loadBoldCheckout(): Promise<BoldCheckoutConstructor> {
 	return loading;
 }
 
-/** Abre la pasarela con una orden ya firmada. */
+/** Abre el modal de Bold con una orden ya firmada. */
 export async function openBoldCheckout(options: BoldCheckoutOptions): Promise<void> {
 	const BoldCheckout = await loadBoldCheckout();
 	new BoldCheckout(options).open();
