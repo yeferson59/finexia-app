@@ -15,6 +15,7 @@ interface Entry {
 const pages: Entry[] = [
 	{ path: '/', changefreq: 'daily', priority: '1.0' },
 	{ path: '/blog', changefreq: 'weekly', priority: '0.8' },
+	{ path: '/apoyar', changefreq: 'monthly', priority: '0.5' },
 	{ path: '/privacidad', changefreq: 'yearly', priority: '0.3' },
 	{ path: '/terminos', changefreq: 'yearly', priority: '0.3' },
 	{ path: '/cookies', changefreq: 'yearly', priority: '0.3' }

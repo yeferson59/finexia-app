@@ -27,6 +27,7 @@
 				<a href="{home}#seguridad">Seguridad</a>
 				<a href="{home}#faq">Preguntas</a>
 				<a href={resolve('/blog')}>Blog</a>
+				<a href={resolve('/apoyar')}>Apoyar el proyecto</a>
 			</nav>
 
 			<nav class="col" aria-label="Legal">
