@@ -26,9 +26,11 @@
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { SUPPORTED_CURRENCIES } from '$lib/shared/currency';
 	import { todayLocalDateString } from '$lib/shared/format/date';
+	import { OptimisticDialog, OptimisticList, pendingId } from '$lib/shared/optimistic.svelte';
 	import {
 		CASH_KIND_OPTIONS,
 		cashAccountLabel,
+		draftCashMovement,
 		isEditableKind,
 		suggestCashPortfolio,
 		type CashBalance,
@@ -53,10 +55,13 @@
 		pockets: CashPocket[];
 		/** Moneda que se propone para un saldo nuevo: la de la cuenta. */
 		currency: string;
+		/** El extracto: la fila nueva o editada se pinta ahí sin esperar al servidor. */
+		pending: OptimisticList<CashMovement>;
 		onClose: () => void;
 	}
 
-	let { target, portfolios, platforms, balances, pockets, currency, onClose }: Props = $props();
+	let { target, portfolios, platforms, balances, pockets, currency, pending, onClose }: Props =
+		$props();
 
 	interface Fields {
 		kind: CashKind;
@@ -125,14 +130,36 @@
 	let fees = $derived(initial.fees);
 	let date = $derived(initial.date);
 	let notes = $derived(initial.notes);
-	let submitting = $state(false);
-	let error = $state('');
+	/*
+	 * Se cierra al pulsar y el movimiento aparece en el extracto; la página se
+	 * refresca de fondo. Si el servidor lo rechaza, el diálogo vuelve con lo
+	 * escrito y el motivo.
+	 */
+	const dialog = new OptimisticDialog(() => target);
 
 	/* Cerrar limpia el error: la siguiente apertura no lo arrastra. */
 	function close() {
-		error = '';
+		dialog.reset();
 		onClose();
 	}
+
+	const submit = dialog.submit({
+		fallbackError: 'No pudimos guardar el movimiento.',
+		apply: (formData) => {
+			if (editing) return pending.patch(editing.id, draftCashMovement(formData, editing));
+
+			const portfolio = formData.get('portfolioId');
+			const source = formData.get('sourceId');
+			return pending.add(
+				draftCashMovement(formData, {
+					id: pendingId(),
+					portfolioName: portfolios.find((p) => p.id === portfolio)?.name ?? '',
+					sourceName: platforms.find((p) => p.id === source)?.name ?? ''
+				})
+			);
+		},
+		onDone: close
+	});
 
 	/*
 	 * Cambiar la cuenta propone dónde cuenta: si esa plataforma ya guarda esa
@@ -190,6 +217,7 @@
 
 <Modal
 	open={target !== null}
+	hidden={dialog.hidden}
 	title={editing ? 'Editar movimiento' : 'Registrar movimiento'}
 	description={editing
 		? cashAccountLabel(editing, choosePortfolio)
@@ -202,18 +230,7 @@
 			method="POST"
 			action={editing ? '?/update' : '?/create'}
 			class="rail-fields"
-			use:enhance={() => {
-				submitting = true;
-				return async ({ result, update }) => {
-					submitting = false;
-					if (result.type === 'failure') {
-						error = (result.data?.error as string) ?? 'No pudimos guardar el movimiento.';
-						return;
-					}
-					await update();
-					close();
-				};
-			}}
+			use:enhance={submit}
 		>
 			{#if editing}
 				<input type="hidden" name="id" value={editing.id} />
@@ -350,14 +367,15 @@
 				></textarea>
 			</div>
 
-			{#if error}
-				<p class="feedback error">{error}</p>
+			{#if dialog.error}
+				<p class="feedback error" role="alert">{dialog.error}</p>
 			{/if}
 
 			<div class="modal-actions">
-				<Button type="button" variant="ghost" onclick={close} disabled={submitting}>Cancelar</Button
+				<Button type="button" variant="ghost" onclick={close} disabled={dialog.submitting}
+					>Cancelar</Button
 				>
-				<Button type="submit" loading={submitting}>
+				<Button type="submit" loading={dialog.submitting}>
 					{editing ? 'Guardar cambios' : 'Guardar movimiento'}
 				</Button>
 			</div>

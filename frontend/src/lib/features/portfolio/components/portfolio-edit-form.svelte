@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import Button from '$lib/ui/button.svelte';
 	import { untrack } from 'svelte';
+	import { optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import { PORTFOLIO_TYPES } from '../portfolio';
 
 	interface EditablePortfolio {
@@ -15,16 +16,49 @@
 	let {
 		portfolio,
 		risks,
+		onApply,
 		onCancel,
 		onSaved,
 		onError
 	}: {
 		portfolio: EditablePortfolio;
 		risks: { id: string; name: string }[];
+		/**
+		 * Pinta los cambios en la cabecera al pulsar y oculta el diálogo sin
+		 * desmontarlo. Devuelve cómo deshacerlo si el servidor los rechaza.
+		 */
+		onApply: (changes: {
+			name: string;
+			description: string;
+			riskId: string;
+			riskName?: string;
+		}) => () => void;
 		onCancel: () => void;
 		onSaved: () => void;
+		/** Rechazado: el diálogo vuelve con lo escrito y el motivo. */
 		onError: (message: string) => void;
 	} = $props();
+
+	const submit = optimisticSubmit({
+		fallbackError: 'Error al actualizar el portafolio.',
+		apply: () => {
+			isSubmitting = true;
+			return onApply({
+				name: editName.trim(),
+				description: editDescription.trim(),
+				riskId: editRiskId,
+				riskName: risks.find((r) => r.id === editRiskId)?.name
+			});
+		},
+		onError: (message) => {
+			isSubmitting = false;
+			onError(message);
+		},
+		onSuccess: () => {
+			isSubmitting = false;
+			onSaved();
+		}
+	});
 
 	let isSubmitting = $state(false);
 
@@ -47,23 +81,7 @@
 	});
 </script>
 
-<form
-	method="POST"
-	action="?/updatePortfolio"
-	class="edit-form"
-	use:enhance={() => {
-		isSubmitting = true;
-		return async ({ result, update }) => {
-			if (result.type === 'success') {
-				onSaved();
-			} else if (result.type === 'failure') {
-				onError((result.data as { error?: string })?.error ?? 'Error al actualizar el portafolio.');
-			}
-			await update({ reset: false });
-			isSubmitting = false;
-		};
-	}}
->
+<form method="POST" action="?/updatePortfolio" class="edit-form" use:enhance={submit}>
 	<div class="form-group">
 		<label for="edit-name">Nombre</label>
 		<input id="edit-name" name="name" type="text" bind:value={editName} required minlength="2" />

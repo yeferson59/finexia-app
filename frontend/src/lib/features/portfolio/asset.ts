@@ -3,7 +3,7 @@
  * portafolio (`routes/dashboard/portfolios/[id]/assets/[symbol]`). Sin
  * dependencias de Svelte ni de red; los contratos vienen de `$lib/api/types`.
  */
-import type { Holding } from '$lib/api/types';
+import type { Holding, Transaction } from '$lib/api/types';
 import { dayGap } from '$lib/shared/finance/returns';
 import { formatCalendarDate } from '$lib/shared/format/date';
 import { formatCurrency } from '$lib/shared/format/money';
@@ -351,4 +351,47 @@ export interface AssetActionResult {
 	edited?: boolean;
 	deleted?: boolean;
 	error?: string;
+}
+
+/**
+ * La fila de una transacción tal como la dejará el servidor, sacada de lo que
+ * manda su formulario: es lo que la tabla pinta mientras el envío no se
+ * confirma. El backend no recalcula nada de la fila —solo de la posición—, así
+ * que coincide con la que llega después.
+ *
+ * `base` es la transacción que se edita, o lo que ya se sabe de una nueva (su
+ * id provisional y la moneda de la cuenta). Un campo que el formulario no manda
+ * se queda como estaba; las casillas, que desmarcadas no viajan, se leen de su
+ * presencia.
+ */
+export function draftTransaction(
+	formData: FormData,
+	base: Pick<Transaction, 'id'> & Partial<Transaction>
+): Transaction {
+	const field = (name: string, fallback: string) => {
+		const value = formData.get(name);
+		return typeof value === 'string' && value.trim() !== '' ? value.trim() : fallback;
+	};
+
+	const currency = field('currency', base.currency ?? 'USD');
+	const cashPaid = formData.has('payFromCash');
+
+	return {
+		id: base.id,
+		entryId: field('entryId', base.entryId ?? ''),
+		type: field('type', base.type ?? 'buy'),
+		quantity: field('quantity', base.quantity ?? '0'),
+		price: field('price', base.price ?? '0'),
+		currency,
+		fxRate: field('fxRate', base.fxRate ?? '1'),
+		costCurrency: base.costCurrency,
+		fees: field('fees', '0'),
+		feesCurrency: field('feesCurrency', currency).toUpperCase(),
+		transactionDate: field('transactionDate', base.transactionDate ?? ''),
+		notes: field('notes', ''),
+		cashCredited: formData.has('creditCash'),
+		cashPaid,
+		cashPocketId: cashPaid ? field('payFromPocketId', '') || null : null,
+		createdAt: base.createdAt ?? new Date().toISOString()
+	};
 }

@@ -14,7 +14,27 @@
 	import PlatformEditForm from './platform-edit-form.svelte';
 	import PlatformDeleteConfirm from './platform-delete-confirm.svelte';
 
-	let { platform }: { platform: Platform } = $props();
+	let { platform: stored }: { platform: Platform } = $props();
+
+	/*
+	 * Los cambios de la edición se ven en la ficha al pulsar; el refresco de
+	 * fondo trae los del servidor y entonces se retiran. Si los rechaza, se
+	 * deshacen y el diálogo vuelve con lo escrito.
+	 */
+	let changes = $state<Partial<Platform> | null>(null);
+	let editHidden = $state(false);
+	// Por versión y no por identidad: `$state` guarda un proxy de `next`.
+	let version = 0;
+	const platform = $derived(changes ? { ...stored, ...changes } : stored);
+
+	function applyChanges(next: Partial<Platform>) {
+		const mine = ++version;
+		changes = next;
+		editHidden = true;
+		return () => {
+			if (version === mine) changes = null;
+		};
+	}
 
 	function formatDate(dateString: string): string {
 		return new Date(dateString).toLocaleDateString('es-CO', {
@@ -44,6 +64,11 @@
 	let isEditing = $state(false);
 	let showDeleteConfirm = $state(false);
 	const saved = flash(3000);
+
+	function closeEdit() {
+		isEditing = false;
+		editHidden = false;
+	}
 
 	function goBack() {
 		goto(resolve('/dashboard/platforms'));
@@ -88,12 +113,14 @@
 	<p class="saved">{saved.text}</p>
 {/if}
 
-<Modal open={isEditing} title="Editar plataforma" onClose={() => (isEditing = false)} size="lg">
+<Modal open={isEditing} hidden={editHidden} title="Editar plataforma" onClose={closeEdit} size="lg">
 	<PlatformEditForm
-		{platform}
-		onCancel={() => (isEditing = false)}
+		platform={stored}
+		onApply={applyChanges}
+		onRejected={() => (editHidden = false)}
+		onCancel={closeEdit}
 		onSaved={() => {
-			isEditing = false;
+			closeEdit();
 			saved.show('Plataforma actualizada correctamente.');
 		}}
 	/>

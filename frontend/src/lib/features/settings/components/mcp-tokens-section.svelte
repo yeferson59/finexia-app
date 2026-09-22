@@ -13,6 +13,7 @@
 	import { enhance } from '$app/forms';
 	import Button from '$lib/ui/button.svelte';
 	import Input from '$lib/ui/input.svelte';
+	import { OptimisticList, optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import SettingsSection from './settings-section.svelte';
 	import {
 		actionError,
@@ -36,10 +37,50 @@
 	let expiresInDays = $state(90);
 	let creating = $state(false);
 	let rotatingId = $state<string | null>(null);
-	let deletingId = $state<string | null>(null);
 	let copied = $state(false);
 
-	const tokenList = $derived(tokens ?? []);
+	/*
+	 * Eliminar quita el token al pulsar y lo devuelve si el servidor se niega.
+	 * Crear y rotar sí esperan al servidor —el secreto lo genera él—, pero lo
+	 * enseñan en cuanto llega: la lista se refresca de fondo, sin esperar a que
+	 * se recargue toda la página de ajustes.
+	 */
+	const pending = new OptimisticList<MCPToken>();
+	const tokenList = $derived(pending.view(tokens ?? []));
+
+	const create = optimisticSubmit({
+		fallbackError: 'No se pudo crear el token.',
+		syncForm: true,
+		apply: () => {
+			creating = true;
+		},
+		onSuccess: () => {
+			creating = false;
+			// El siguiente token no hereda el nombre de este.
+			name = '';
+		},
+		onError: () => (creating = false)
+	});
+
+	function rotate(token: MCPToken) {
+		return optimisticSubmit({
+			fallbackError: 'No se pudo rotar el token.',
+			syncForm: true,
+			apply: () => {
+				rotatingId = token.id;
+			},
+			onSuccess: () => (rotatingId = null),
+			onError: () => (rotatingId = null)
+		});
+	}
+
+	function remove(token: MCPToken) {
+		return optimisticSubmit({
+			fallbackError: 'No se pudo eliminar el token.',
+			syncForm: true,
+			apply: () => pending.remove(token.id)
+		});
+	}
 	const issued = $derived(issuedMCPToken(form));
 	const error = $derived(
 		actionError(form, 'createMcpToken') ||
@@ -119,20 +160,7 @@
 		</div>
 	{/if}
 
-	<form
-		method="POST"
-		action="?/createMcpToken"
-		use:enhance={() => {
-			creating = true;
-			return async ({ update }) => {
-				creating = false;
-				// reset:false conserva el resto de la página de ajustes; el nombre
-				// se limpia a mano para que el siguiente token no herede el suyo.
-				await update({ reset: false });
-				name = '';
-			};
-		}}
-	>
+	<form method="POST" action="?/createMcpToken" use:enhance={create}>
 		<div class="create-row">
 			<Input
 				label="Nombre del token"
@@ -192,38 +220,16 @@
 					</div>
 
 					<div class="token-actions">
-						<form
-							method="POST"
-							action="?/rotateMcpToken"
-							use:enhance={() => {
-								rotatingId = token.id;
-								return async ({ update }) => {
-									rotatingId = null;
-									await update({ reset: false });
-								};
-							}}
-						>
+						<form method="POST" action="?/rotateMcpToken" use:enhance={rotate(token)}>
 							<input type="hidden" name="tokenId" value={token.id} />
 							<input type="hidden" name="expiresInDays" value={expiresInDays} />
 							<button type="submit" class="row-action" disabled={rotatingId === token.id}>
 								{rotatingId === token.id ? 'Rotando…' : 'Rotar'}
 							</button>
 						</form>
-						<form
-							method="POST"
-							action="?/deleteMcpToken"
-							use:enhance={() => {
-								deletingId = token.id;
-								return async ({ update }) => {
-									deletingId = null;
-									await update({ reset: false });
-								};
-							}}
-						>
+						<form method="POST" action="?/deleteMcpToken" use:enhance={remove(token)}>
 							<input type="hidden" name="tokenId" value={token.id} />
-							<button type="submit" class="row-action danger" disabled={deletingId === token.id}>
-								{deletingId === token.id ? 'Eliminando…' : 'Eliminar'}
-							</button>
+							<button type="submit" class="row-action danger">Eliminar</button>
 						</form>
 					</div>
 				</li>

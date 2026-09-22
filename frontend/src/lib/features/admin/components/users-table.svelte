@@ -16,6 +16,7 @@
 	import { enhance } from '$app/forms';
 	import Badge from '$lib/ui/badge.svelte';
 	import DataTable from '$lib/ui/data-table.svelte';
+	import { OptimisticList, optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import AdminBlock from './admin-block.svelte';
 	import { INVITE_ROLES, formatDay, type PageMeta, type UserItem } from '../admin';
 	import { describeUsers } from '../desk';
@@ -27,10 +28,30 @@
 		form: Record<string, unknown> | null;
 	}
 
-	let { users, meta, form }: Props = $props();
+	let { users: stored, meta, form }: Props = $props();
 
-	let deleting = $state<string | null>(null);
-	let banning = $state<string | null>(null);
+	/*
+	 * Banear y eliminar se ven al pulsar; si el servidor se niega, la fila
+	 * vuelve como estaba y su error llega a `form`, que es de donde sale.
+	 */
+	const pending = new OptimisticList<UserItem>();
+	const users = $derived(pending.view(stored));
+
+	function ban(user: UserItem, banned: boolean) {
+		return optimisticSubmit({
+			fallbackError: 'No se pudo cambiar el baneo.',
+			syncForm: true,
+			apply: () => pending.patch(user.id, { bannedAt: banned ? new Date().toISOString() : null })
+		});
+	}
+
+	function remove(user: UserItem) {
+		return optimisticSubmit({
+			fallbackError: 'No se pudo eliminar la cuenta.',
+			syncForm: true,
+			apply: () => pending.remove(user.id)
+		});
+	}
 
 	const total = $derived(Number(meta.totalUsers ?? users.length));
 	const roleLabel = (role: string) => INVITE_ROLES.find((r) => r.value === role)?.label ?? role;
@@ -69,43 +90,21 @@
 					<td class="cell-actions">
 						{#if !isAdmin}
 							<div class="row-actions">
-								<form
-									method="POST"
-									action="?/banUser"
-									use:enhance={() => {
-										banning = user.id;
-										return async ({ update }) => {
-											banning = null;
-											await update({ reset: false });
-										};
-									}}
-								>
+								<form method="POST" action="?/banUser" use:enhance={ban(user, !isBanned)}>
 									<input type="hidden" name="id" value={user.id} />
 									<input type="hidden" name="ban" value={isBanned ? 'false' : 'true'} />
 									<button
 										class="row-action"
 										class:danger={!isBanned}
 										type="submit"
-										disabled={banning === user.id}
+										disabled={pending.isPending(user.id)}
 									>
 										{isBanned ? 'Levantar el baneo' : 'Banear'}
 									</button>
 								</form>
-								<form
-									method="POST"
-									action="?/deleteUser"
-									use:enhance={() => {
-										deleting = user.id;
-										return async ({ update }) => {
-											deleting = null;
-											await update();
-										};
-									}}
-								>
+								<form method="POST" action="?/deleteUser" use:enhance={remove(user)}>
 									<input type="hidden" name="id" value={user.id} />
-									<button class="row-action danger" type="submit" disabled={deleting === user.id}>
-										Eliminar
-									</button>
+									<button class="row-action danger" type="submit"> Eliminar </button>
 								</form>
 							</div>
 							{#if form?.banError && form?.banId === user.id}

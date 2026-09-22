@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { OptimisticList, optimisticSubmit, pendingId } from '$lib/shared/optimistic.svelte';
 	import Button from '$lib/ui/button.svelte';
 	import DatePicker from '$lib/ui/date-picker.svelte';
 	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
-	import type { Holding } from '$lib/api/types';
+	import type { Holding, Transaction } from '$lib/api/types';
 	import {
 		TRANSACTION_TYPES,
+		draftTransaction,
 		formatSettled,
 		priceLabelFor,
 		txnModeFor,
@@ -19,13 +21,21 @@
 	let {
 		entries,
 		cashByEntry = {},
-		formError = false,
+		pending,
+		onSent,
+		onRejected,
 		onCancel
 	}: {
 		entries: Holding[];
 		/** De dónde puede salir el dinero en cada posición; lo resuelve la página. */
 		cashByEntry?: Record<string, CashSource[]>;
-		formError?: boolean;
+		/** Donde se pinta la fila nueva mientras el servidor la guarda. */
+		pending: OptimisticList<Transaction>;
+		/** Enviado: el diálogo se oculta sin desmontar el formulario. */
+		onSent: () => void;
+		/** Rechazado: el diálogo vuelve con lo escrito y el motivo. */
+		onRejected: () => void;
+		/** Cerrar; también cuando el servidor confirma el alta. */
 		onCancel: () => void;
 	} = $props();
 
@@ -54,6 +64,26 @@
 	});
 
 	let isSubmitting = $state(false);
+	let error = $state('');
+
+	const submit = optimisticSubmit({
+		fallbackError: 'No se pudo registrar la transacción. Verifica los datos.',
+		apply: (formData) => {
+			isSubmitting = true;
+			error = '';
+			onSent();
+			return pending.add(draftTransaction(formData, { id: pendingId(), costCurrency }));
+		},
+		onError: (message) => {
+			isSubmitting = false;
+			error = message;
+			onRejected();
+		},
+		onSuccess: () => {
+			isSubmitting = false;
+			onCancel();
+		}
+	});
 
 	const txnMode = $derived(txnModeFor(txnForm.type));
 	const priceLabel = $derived(priceLabelFor(txnForm.type));
@@ -153,18 +183,7 @@
 	);
 </script>
 
-<form
-	method="POST"
-	class="add-txn-form"
-	action="?/createTransaction"
-	use:enhance={() => {
-		isSubmitting = true;
-		return async ({ update }) => {
-			await update({ reset: false });
-			isSubmitting = false;
-		};
-	}}
->
+<form method="POST" class="add-txn-form" action="?/createTransaction" use:enhance={submit}>
 	<input type="hidden" name="entryId" value={txnForm.entryId} />
 	<input type="hidden" name="currency" value={txnForm.currency} />
 	{#if !crossCurrency}
@@ -367,10 +386,8 @@
 		/>
 	</div>
 
-	{#if formError}
-		<p class="feedback error" role="alert">
-			No se pudo registrar la transacción. Verifica los datos.
-		</p>
+	{#if error}
+		<p class="feedback error" role="alert">{error}</p>
 	{/if}
 
 	<div class="modal-actions">

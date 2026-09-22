@@ -12,6 +12,7 @@
 	 * así que se pinta como texto y nunca como enlace.
 	 */
 	import { enhance } from '$app/forms';
+	import { OptimisticList, optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import SettingsSection from './settings-section.svelte';
 	import {
 		actionError,
@@ -28,9 +29,18 @@
 
 	let { grants, form }: Props = $props();
 
-	let revokingId = $state<string | null>(null);
+	/* Desconectar la quita al pulsar; si el servidor se niega, vuelve con el
+	   motivo, que llega a `form` como siempre. */
+	const pending = new OptimisticList<OAuthGrant>();
+	const grantList = $derived(pending.view(grants ?? []));
 
-	const grantList = $derived(grants ?? []);
+	function revoke(grant: OAuthGrant) {
+		return optimisticSubmit({
+			fallbackError: 'No se pudo desconectar la aplicación.',
+			syncForm: true,
+			apply: () => pending.remove(grant.id)
+		});
+	}
 	const error = $derived(actionError(form, 'revokeOAuthGrant'));
 	const success = $derived(actionSucceeded(form, 'revokeOAuthGrant'));
 
@@ -64,22 +74,9 @@
 							con último uso {formatMCPTokenDate(grant.lastUsedAt)}.
 						</p>
 					</div>
-					<form
-						method="POST"
-						action="?/revokeOAuthGrant"
-						use:enhance={() => {
-							revokingId = grant.id;
-
-							return async ({ update }) => {
-								await update();
-								revokingId = null;
-							};
-						}}
-					>
+					<form method="POST" action="?/revokeOAuthGrant" use:enhance={revoke(grant)}>
 						<input type="hidden" name="grantId" value={grant.id} />
-						<button type="submit" class="row-action danger" disabled={revokingId === grant.id}>
-							{revokingId === grant.id ? 'Desconectando…' : 'Desconectar'}
-						</button>
+						<button type="submit" class="row-action danger">Desconectar</button>
 					</form>
 				</li>
 			{/each}

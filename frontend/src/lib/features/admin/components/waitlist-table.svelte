@@ -10,6 +10,7 @@
 	 */
 	import { enhance } from '$app/forms';
 	import DataTable from '$lib/ui/data-table.svelte';
+	import { OptimisticList, optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import AdminBlock from './admin-block.svelte';
 	import { formatDay, type WaitlistItem } from '../admin';
 	import { describeWaitlist, formatAge, isStale } from '../desk';
@@ -20,10 +21,37 @@
 		form: Record<string, unknown> | null;
 	}
 
-	let { waitlist, form }: Props = $props();
+	let { waitlist: stored, form }: Props = $props();
 
 	let invitingId = $state<string | null>(null);
-	let deletingId = $state<string | null>(null);
+
+	/*
+	 * Eliminar quita la fila al pulsar; si el servidor se niega, vuelve y su
+	 * error llega a `form`. Invitar espera al servidor —es él quien manda el
+	 * correo— pero no a que se recargue la página.
+	 */
+	const pending = new OptimisticList<WaitlistItem>();
+	const waitlist = $derived(pending.view(stored));
+
+	function invite(entry: WaitlistItem) {
+		return optimisticSubmit({
+			fallbackError: 'No se pudo invitar.',
+			syncForm: true,
+			apply: () => {
+				invitingId = entry.id;
+			},
+			onSuccess: () => (invitingId = null),
+			onError: () => (invitingId = null)
+		});
+	}
+
+	function remove(entry: WaitlistItem) {
+		return optimisticSubmit({
+			fallbackError: 'No se pudo eliminar de la lista.',
+			syncForm: true,
+			apply: () => pending.remove(entry.id)
+		});
+	}
 </script>
 
 <AdminBlock title="Lista de espera" summary={describeWaitlist(waitlist)}>
@@ -50,38 +78,16 @@
 					</td>
 					<td class="cell-actions">
 						<div class="row-actions">
-							<form
-								method="POST"
-								action="?/inviteUser"
-								use:enhance={() => {
-									invitingId = entry.id;
-									return async ({ update }) => {
-										invitingId = null;
-										await update({ reset: false });
-									};
-								}}
-							>
+							<form method="POST" action="?/inviteUser" use:enhance={invite(entry)}>
 								<input type="hidden" name="email" value={entry.email} />
 								<input type="hidden" name="role" value="customer" />
 								<button class="row-action" type="submit" disabled={invitingId === entry.id}>
 									{invitingId === entry.id ? 'Invitando…' : 'Invitar'}
 								</button>
 							</form>
-							<form
-								method="POST"
-								action="?/deleteWaitlist"
-								use:enhance={() => {
-									deletingId = entry.id;
-									return async ({ update }) => {
-										deletingId = null;
-										await update({ reset: false });
-									};
-								}}
-							>
+							<form method="POST" action="?/deleteWaitlist" use:enhance={remove(entry)}>
 								<input type="hidden" name="id" value={entry.id} />
-								<button class="row-action danger" type="submit" disabled={deletingId === entry.id}>
-									Eliminar
-								</button>
+								<button class="row-action danger" type="submit"> Eliminar </button>
 							</form>
 						</div>
 						{#if form?.waitlistError && form?.waitlistId === entry.id}

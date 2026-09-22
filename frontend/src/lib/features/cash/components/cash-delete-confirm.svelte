@@ -12,25 +12,35 @@
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { formatCalendarDate } from '$lib/shared/format/date';
+	import { OptimisticDialog, OptimisticList } from '$lib/shared/optimistic.svelte';
 	import { cashAccountLabel, cashKindSign, formatCashKind, type CashMovement } from '../cash';
 
 	interface Props {
 		movement: CashMovement | null;
 		/** Si la cuenta nombra también el portafolio. */
 		showPortfolio?: boolean;
+		/** El extracto: la fila se va al confirmar, sin esperar al servidor. */
+		pending: OptimisticList<CashMovement>;
 		onClose: () => void;
 	}
 
-	let { movement, showPortfolio = true, onClose }: Props = $props();
+	let { movement, showPortfolio = true, pending, onClose }: Props = $props();
 
-	let submitting = $state(false);
-	let error = $state('');
+	/* Si el servidor rechaza el borrado, la fila vuelve y el diálogo reaparece
+	   con el motivo. */
+	const dialog = new OptimisticDialog(() => movement);
 
 	/* Cerrar limpia el error: el siguiente movimiento que se abra no lo arrastra. */
 	function close() {
-		error = '';
+		dialog.reset();
 		onClose();
 	}
+
+	const submit = dialog.submit({
+		fallbackError: 'No pudimos borrar el movimiento.',
+		apply: () => (movement ? pending.remove(movement.id) : undefined),
+		onDone: close
+	});
 
 	const amount = $derived.by(() => {
 		if (!movement) return '';
@@ -44,6 +54,7 @@
 
 <Modal
 	open={movement !== null}
+	hidden={dialog.hidden}
 	title="Borrar movimiento"
 	description="El saldo se recalcula sin él."
 	size="sm"
@@ -51,22 +62,7 @@
 	onClose={close}
 >
 	{#if movement}
-		<form
-			method="POST"
-			action="?/delete"
-			use:enhance={() => {
-				submitting = true;
-				return async ({ result, update }) => {
-					submitting = false;
-					if (result.type === 'failure') {
-						error = (result.data?.error as string) ?? 'No pudimos borrar el movimiento.';
-						return;
-					}
-					await update();
-					close();
-				};
-			}}
-		>
+		<form method="POST" action="?/delete" use:enhance={submit}>
 			<input type="hidden" name="id" value={movement.id} />
 
 			<!-- El movimiento como se ve en el extracto, para reconocerlo antes de
@@ -89,14 +85,15 @@
 				</p>
 			{/if}
 
-			{#if error}
-				<p class="feedback error">{error}</p>
+			{#if dialog.error}
+				<p class="feedback error" role="alert">{dialog.error}</p>
 			{/if}
 
 			<div class="modal-actions">
-				<Button type="button" variant="ghost" onclick={close} disabled={submitting}>Cancelar</Button
+				<Button type="button" variant="ghost" onclick={close} disabled={dialog.submitting}
+					>Cancelar</Button
 				>
-				<Button type="submit" variant="danger" loading={submitting}>Borrar</Button>
+				<Button type="submit" variant="danger" loading={dialog.submitting}>Borrar</Button>
 			</div>
 		</form>
 	{/if}

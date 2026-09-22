@@ -25,11 +25,23 @@
 		movement: CashMovement;
 		showPortfolio: boolean;
 		compact?: boolean;
+		/**
+		 * Pintado pero sin confirmar por el servidor: se ve atenuado y sin
+		 * acciones, que todavía no tendrían sobre qué actuar.
+		 */
+		pending?: boolean;
 		onEdit: () => void;
 		onDelete: () => void;
 	}
 
-	let { movement, showPortfolio, compact = false, onEdit, onDelete }: Props = $props();
+	let {
+		movement,
+		showPortfolio,
+		compact = false,
+		pending = false,
+		onEdit,
+		onDelete
+	}: Props = $props();
 
 	/** A dónde lleva la fila de un movimiento que pertenece a otra transacción. */
 	const LINKED_LABELS: Record<string, string> = {
@@ -79,7 +91,7 @@
 	);
 </script>
 
-<li class="entry" class:compact>
+<li class="entry" class:compact class:pending aria-busy={pending}>
 	{#if compact}
 		<p class="date">{fullDate}</p>
 	{:else}
@@ -125,7 +137,9 @@
 	</p>
 
 	<div class="actions">
-		{#if isLinked}
+		{#if pending}
+			<span class="saving">Guardando…</span>
+		{:else if isLinked}
 			{#if originHref}
 				<a class="action" href={originHref}>
 					{LINKED_LABELS[movement.kind]}<span class="sr-only"> {described}</span>
@@ -145,6 +159,15 @@
 </li>
 
 <style>
+	.entry.pending > :not(.actions) {
+		opacity: 0.55;
+	}
+
+	.saving {
+		font-size: 0.75rem;
+		color: var(--text-dim);
+	}
+
 	.entry {
 		display: grid;
 		grid-template-columns: var(--ledger-columns);

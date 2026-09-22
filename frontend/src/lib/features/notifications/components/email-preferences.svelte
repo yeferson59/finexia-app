@@ -4,6 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { untrack } from 'svelte';
 	import Button from '$lib/ui/button.svelte';
+	import { optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import Checkbox from '$lib/ui/checkbox.svelte';
 	import NotificationSection from './notification-section.svelte';
 	import { actionError, actionSucceeded, type ActionForm } from '$lib/shared/form';
@@ -21,9 +22,22 @@
 	// Seeded from the server once; the user toggles locally from there.
 	let emailAlerts = $state(untrack(() => preferences.emailAlerts));
 	let weeklySummary = $state(untrack(() => preferences.weeklySummary));
-	let prefsLoading = $state(false);
 
-	const prefsSuccess = $derived(actionSucceeded(form, 'updatePreferences'));
+	/*
+	 * Las casillas ya dicen lo que se eligió, así que guardar se da por hecho al
+	 * pulsar. Si el servidor lo rechaza, el acuse se retira y queda su motivo.
+	 */
+	let savedLocally = $state(false);
+	const save = optimisticSubmit({
+		fallbackError: 'No se pudieron guardar las preferencias.',
+		syncForm: true,
+		apply: () => {
+			savedLocally = true;
+			return () => (savedLocally = false);
+		}
+	});
+
+	const prefsSuccess = $derived(savedLocally || actionSucceeded(form, 'updatePreferences'));
 	const prefsError = $derived(actionError(form, 'updatePreferences'));
 </script>
 
@@ -52,17 +66,7 @@
 		{/if}
 	{/if}
 
-	<form
-		method="POST"
-		action="?/updatePreferences"
-		use:enhance={() => {
-			prefsLoading = true;
-			return async ({ update }) => {
-				await update();
-				prefsLoading = false;
-			};
-		}}
-	>
+	<form method="POST" action="?/updatePreferences" use:enhance={save}>
 		<!--
 			La casilla delante y no al fondo de la fila: son opciones que se marcan
 			antes de guardar, no interruptores que actúan solos, y puestas en
@@ -110,7 +114,7 @@
 			</label>
 		</div>
 
-		{#if prefsError}
+		{#if prefsError && !savedLocally}
 			<p class="feedback error">{prefsError}</p>
 		{/if}
 		{#if prefsSuccess}
@@ -118,9 +122,7 @@
 		{/if}
 
 		<div class="form-actions">
-			<Button type="submit" size="sm" loading={prefsLoading}>
-				{prefsLoading ? 'Guardando…' : 'Guardar preferencias'}
-			</Button>
+			<Button type="submit" size="sm">Guardar preferencias</Button>
 		</div>
 	</form>
 </NotificationSection>

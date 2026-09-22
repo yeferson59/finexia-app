@@ -13,10 +13,10 @@
 	 * solo carga una hoja de transacciones, y ninguna puede quedarse sin su tasa.
 	 */
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
 	import Modal from '$lib/ui/modal.svelte';
 	import Button from '$lib/ui/button.svelte';
 	import { SUPPORTED_CURRENCIES } from '$lib/shared/currency';
+	import { OptimisticDialog } from '$lib/shared/optimistic.svelte';
 	import { formatCalendarDate } from '$lib/shared/format/date';
 	import type { Holding, Transaction } from '$lib/api/types';
 	import { TYPE_LABEL, transactionsNeedingRate } from '../asset';
@@ -34,8 +34,16 @@
 	let costCurrency = $state('');
 	let loadingEntry = $state<string | null>(null);
 	let loadError = $state('');
-	let saving = $state(false);
-	let saveError = $state('');
+
+	/*
+	 * Guardar cierra el diálogo al pulsar y recalcula la ficha de fondo; si el
+	 * servidor lo rechaza, vuelve con las tasas escritas y el motivo.
+	 */
+	const dialog = new OptimisticDialog(() => editing);
+	const save = dialog.submit({
+		fallbackError: 'No se pudo cambiar la moneda de liquidación.',
+		onDone: () => close()
+	});
 
 	const currencyOptions = $derived.by(() => {
 		const options: string[] = [...SUPPORTED_CURRENCIES];
@@ -53,13 +61,12 @@
 		editing = entry;
 		history = transactions;
 		costCurrency = entry.costCurrency.trim().toUpperCase();
-		saveError = '';
 	}
 
 	function close() {
 		editing = null;
 		history = [];
-		saveError = '';
+		dialog.reset();
 	}
 
 	/** La tasa guardada, si es una de verdad; una tasa 1 es la ausencia de una. */
@@ -120,30 +127,14 @@
 	{/if}
 </section>
 
-<Modal open={!!editing} title="Cambiar moneda de liquidación" onClose={close}>
+<Modal
+	open={!!editing}
+	hidden={dialog.hidden}
+	title="Cambiar moneda de liquidación"
+	onClose={close}
+>
 	{#if editing}
-		<form
-			method="POST"
-			action="?/changeSettlement"
-			use:enhance={() => {
-				saving = true;
-				saveError = '';
-
-				return async ({ result }) => {
-					saving = false;
-
-					if (result.type === 'success' && result.data?.success) {
-						close();
-						await invalidateAll();
-						return;
-					}
-
-					saveError =
-						(result.type === 'success' && (result.data?.error as string)) ||
-						'No se pudo cambiar la moneda de liquidación.';
-				};
-			}}
-		>
+		<form method="POST" action="?/changeSettlement" use:enhance={save}>
 			<input type="hidden" name="entryId" value={editing.id} />
 
 			<label class="field">
@@ -192,13 +183,15 @@
 				</ul>
 			{/if}
 
-			{#if saveError}
-				<p class="error" role="alert">{saveError}</p>
+			{#if dialog.error}
+				<p class="error" role="alert">{dialog.error}</p>
 			{/if}
 
 			<div class="modal-actions">
-				<Button type="button" variant="ghost" onclick={close} disabled={saving}>Cancelar</Button>
-				<Button type="submit" loading={saving}>Guardar</Button>
+				<Button type="button" variant="ghost" onclick={close} disabled={dialog.submitting}
+					>Cancelar</Button
+				>
+				<Button type="submit" loading={dialog.submitting}>Guardar</Button>
 			</div>
 		</form>
 	{/if}

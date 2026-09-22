@@ -38,6 +38,15 @@ Sustituye al antiguo cajón de sastre `lib/utils.ts`, repartido por tema.
 - `flash.svelte.ts` — `flash()`, acuse temporal que se retira solo. Estaba
   copiado en tres pantallas del dashboard y las tres copias dejaban el
   `setTimeout` vivo al desmontar y compartían reloj entre dos acuses seguidos.
+- `optimistic.svelte.ts` — envíos optimistas para `use:enhance`:
+  `optimisticSubmit()` pinta el cambio al pulsar, refresca la página una sola
+  vez de fondo y lo deshace si el servidor lo rechaza (`syncForm` sigue
+  pasando el resultado a `form` para las pantallas que leen de ahí sus
+  avisos); `OptimisticList` superpone filas nuevas, editadas o borradas a la
+  lista del servidor; `OptimisticDialog` oculta un diálogo sin desmontarlo y
+  lo devuelve con lo escrito si falla; `syncing` alimenta el «Guardando…» de
+  la cabecera del panel. Nació porque guardar en las pantallas pesadas
+  esperaba a recargar cotizaciones, a veces dos veces.
 - `form.ts` — reparto del `form` de una página entre sus secciones
   (`actionSucceeded`, `actionError`, `actionData`), que usan ajustes y
   notificaciones.

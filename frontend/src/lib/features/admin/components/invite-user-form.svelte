@@ -6,6 +6,7 @@
 	 * de un solo uso y la persona elige la suya.
 	 */
 	import { enhance } from '$app/forms';
+	import { optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import Button from '$lib/ui/button.svelte';
 	import { actionData, actionError } from '$lib/shared/form';
 	import { INVITE_ROLES } from '../admin';
@@ -32,25 +33,31 @@
 	let inviteRole = $state('customer');
 	let inviting = $state(false);
 
+	/*
+	 * Lo valida el servidor, así que se espera su respuesta; pero el diálogo se
+	 * cierra en cuanto llega y la página se refresca de fondo, en vez de esperar
+	 * a que se recargue entera con el botón girando.
+	 */
+	const submit = optimisticSubmit({
+		fallbackError: 'No se pudo enviar la invitación.',
+		syncForm: true,
+		apply: () => {
+			inviting = true;
+		},
+		onSuccess: () => {
+			inviting = false;
+			onSuccess?.();
+		},
+		onError: () => (inviting = false)
+	});
+
 	// La pantalla tiene seis actions y un solo `form`: sin filtrar por acción,
 	// un borrado fallido pintaba «No se pudo eliminar el usuario» aquí dentro.
 	const error = $derived(actionError(form, 'inviteUser'));
 	const invited = $derived(actionData<string>(form, 'inviteUser', 'invited'));
 </script>
 
-<form
-	class="rail-fields"
-	method="POST"
-	action="?/inviteUser"
-	use:enhance={() => {
-		inviting = true;
-		return async ({ result, update }) => {
-			inviting = false;
-			await update();
-			if (result.type === 'success') onSuccess?.();
-		};
-	}}
->
+<form class="rail-fields" method="POST" action="?/inviteUser" use:enhance={submit}>
 	<div class="field">
 		<label for="invite-email">Correo</label>
 		<input

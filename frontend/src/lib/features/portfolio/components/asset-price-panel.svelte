@@ -17,6 +17,7 @@
 	 * arreglar.
 	 */
 	import { enhance } from '$app/forms';
+	import { optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import { resolve } from '$app/paths';
 	import Modal from '$lib/ui/modal.svelte';
 	import Button from '$lib/ui/button.svelte';
@@ -83,6 +84,22 @@
 	const chosen = $derived(pick && pick.assetId === row?.assetId ? pick.provider : suggested);
 
 	let refreshing = $state(false);
+
+	/*
+	 * El precio lo trae el proveedor, así que se espera su respuesta; pero se
+	 * enseña en cuanto llega y la página se refresca de fondo, sin tener el botón
+	 * girando mientras se recalcula toda la cartera. `syncForm` deja el proveedor
+	 * elegido, como hacía `reset: false`: si falló, se reintenta con el otro.
+	 */
+	const refresh = optimisticSubmit({
+		fallbackError: 'No se pudo actualizar el precio.',
+		syncForm: true,
+		apply: () => {
+			refreshing = true;
+		},
+		onSuccess: () => (refreshing = false),
+		onError: () => (refreshing = false)
+	});
 
 	/*
 	 * El resultado solo se enseña si es de este activo: el panel se abre y se
@@ -154,20 +171,7 @@
 				<a href={resolve('/dashboard/settings')}>Ajustes → Datos de mercado</a>.
 			</p>
 		{:else}
-			<form
-				method="POST"
-				action="?/refreshPrice"
-				use:enhance={() => {
-					refreshing = true;
-					return async ({ update }) => {
-						refreshing = false;
-						// reset:false conserva el proveedor elegido: si la consulta
-						// falló, lo normal es reintentar con el otro, no volver a
-						// elegir desde cero.
-						await update({ reset: false });
-					};
-				}}
-			>
+			<form method="POST" action="?/refreshPrice" use:enhance={refresh}>
 				<input type="hidden" name="assetId" value={row.assetId} />
 
 				<fieldset>

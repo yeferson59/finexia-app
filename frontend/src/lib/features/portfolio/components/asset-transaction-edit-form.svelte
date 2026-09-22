@@ -4,12 +4,18 @@
 	 * `Modal` del historial, que es quien tiene el estado que lo abre.
 	 */
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
 	import { untrack } from 'svelte';
+	import { OptimisticList, optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import Button from '$lib/ui/button.svelte';
 	import DatePicker from '$lib/ui/date-picker.svelte';
 	import type { Transaction } from '$lib/api/types';
-	import { TRANSACTION_TYPES, priceLabelFor, txnModeFor, type CashSource } from '../asset';
+	import {
+		TRANSACTION_TYPES,
+		draftTransaction,
+		priceLabelFor,
+		txnModeFor,
+		type CashSource
+	} from '../asset';
 	import AssetCreditCashField from './asset-credit-cash-field.svelte';
 	import AssetPayFromCashField from './asset-pay-from-cash-field.svelte';
 
@@ -17,6 +23,9 @@
 		transaction,
 		onCash = false,
 		cashSources = [],
+		pending,
+		onSent,
+		onRejected,
 		onClose
 	}: {
 		transaction: Transaction;
@@ -27,6 +36,13 @@
 		 * compra ya se paga de uno de ellos, ese saldo ya lo tiene descontado.
 		 */
 		cashSources?: CashSource[];
+		/** Donde se pinta la fila editada mientras el servidor la guarda. */
+		pending: OptimisticList<Transaction>;
+		/** Enviada: el diálogo se oculta sin desmontar el formulario. */
+		onSent: () => void;
+		/** Rechazada: el diálogo vuelve con lo escrito y el motivo. */
+		onRejected: () => void;
+		/** Cerrar; también cuando el servidor confirma la edición. */
 		onClose: () => void;
 	} = $props();
 
@@ -61,8 +77,26 @@
 	);
 
 	let isEditSubmitting = $state(false);
-	let editError = $state(false);
-	let editErrorMessage = $state('');
+	let editError = $state('');
+
+	const submit = optimisticSubmit({
+		fallbackError: 'No se pudo actualizar la transacción. Verifica los datos.',
+		apply: (formData) => {
+			isEditSubmitting = true;
+			editError = '';
+			onSent();
+			return pending.patch(transaction.id, draftTransaction(formData, transaction));
+		},
+		onError: (message) => {
+			isEditSubmitting = false;
+			editError = message;
+			onRejected();
+		},
+		onSuccess: () => {
+			isEditSubmitting = false;
+			onClose();
+		}
+	});
 
 	const editTxnMode = $derived(txnModeFor(editForm.type));
 	const editPriceLabel = $derived(priceLabelFor(editForm.type));
@@ -105,31 +139,7 @@
 	);
 </script>
 
-<form
-	method="POST"
-	action="?/editTransaction"
-	class="txn-form"
-	use:enhance={() => {
-		isEditSubmitting = true;
-		editError = false;
-		editErrorMessage = '';
-		return async ({ result, update }) => {
-			await update({ reset: false });
-			isEditSubmitting = false;
-			const data =
-				result.type === 'success'
-					? (result.data as { success?: boolean; error?: string } | undefined)
-					: undefined;
-			if (data?.success) {
-				onClose();
-				await invalidateAll();
-			} else {
-				editError = true;
-				editErrorMessage = data?.error ?? '';
-			}
-		};
-	}}
->
+<form method="POST" action="?/editTransaction" class="txn-form" use:enhance={submit}>
 	<input type="hidden" name="txnId" value={transaction.id} />
 	<input type="hidden" name="currency" value={editForm.currency} />
 	{#if !editIsCrossCurrency}
@@ -304,9 +314,7 @@
 	</div>
 
 	{#if editError}
-		<p class="feedback error" role="alert">
-			{editErrorMessage || 'No se pudo actualizar la transacción. Verifica los datos.'}
-		</p>
+		<p class="feedback error" role="alert">{editError}</p>
 	{/if}
 
 	<div class="modal-actions">

@@ -7,7 +7,7 @@
 	 * deshacer. El diálogo lo pone el `Modal` del historial.
 	 */
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { OptimisticList, optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import Button from '$lib/ui/button.svelte';
 	import { formatCalendarDate } from '$lib/shared/format/date';
 	import type { Transaction } from '$lib/api/types';
@@ -15,16 +15,33 @@
 
 	let {
 		transaction,
+		pending,
+		onRejected,
 		onClose,
 		formatAmount
 	}: {
 		transaction: Transaction;
+		/** De donde la fila se va al confirmar, sin esperar al servidor. */
+		pending: OptimisticList<Transaction>;
+		/**
+		 * El servidor rechazó el borrado. El diálogo ya se cerró —no queda nada
+		 * que corregir en él—, así que el motivo lo enseña el historial, con la
+		 * fila de vuelta en su sitio.
+		 */
+		onRejected: (message: string) => void;
 		onClose: () => void;
 		formatAmount: (value: number, currency: string) => string;
 	} = $props();
 
-	let isDeleting = $state(false);
-	let deleteError = $state('');
+	const submit = optimisticSubmit({
+		fallbackError: 'No se pudo eliminar la transacción.',
+		apply: () => {
+			const undo = pending.remove(transaction.id);
+			onClose();
+			return undo;
+		},
+		onError: (message) => onRejected(message)
+	});
 
 	const total = $derived(
 		(parseFloat(transaction.quantity) || 0) * (parseFloat(transaction.price) || 0)
@@ -55,36 +72,11 @@
 	<p class="warning">Lo que pagaste con el efectivo de la plataforma vuelve a ese saldo.</p>
 {/if}
 
-{#if deleteError}
-	<p class="error" role="alert">{deleteError}</p>
-{/if}
-
-<form
-	method="POST"
-	action="?/deleteTransaction"
-	use:enhance={() => {
-		isDeleting = true;
-		deleteError = '';
-		return async ({ result, update }) => {
-			await update({ reset: false });
-			isDeleting = false;
-			const data =
-				result.type === 'success'
-					? (result.data as { success?: boolean; error?: string } | undefined)
-					: undefined;
-			if (data?.success) {
-				onClose();
-				await invalidateAll();
-			} else {
-				deleteError = data?.error ?? 'No se pudo eliminar la transacción.';
-			}
-		};
-	}}
->
+<form method="POST" action="?/deleteTransaction" use:enhance={submit}>
 	<input type="hidden" name="txnId" value={transaction.id} />
 	<div class="modal-actions">
-		<Button type="button" variant="ghost" onclick={onClose} disabled={isDeleting}>Cancelar</Button>
-		<Button type="submit" variant="danger" loading={isDeleting}>Eliminar</Button>
+		<Button type="button" variant="ghost" onclick={onClose}>Cancelar</Button>
+		<Button type="submit" variant="danger">Eliminar</Button>
 	</div>
 </form>
 
@@ -104,14 +96,5 @@
 		color: var(--text-muted);
 		font-size: 0.9rem;
 		line-height: 1.6;
-	}
-
-	.error {
-		margin: 1rem 0 0;
-		padding: 0.6rem 0.85rem;
-		border-left: 2px solid var(--red);
-		background: rgba(224, 90, 90, 0.08);
-		color: var(--red);
-		font-size: 0.85rem;
 	}
 </style>

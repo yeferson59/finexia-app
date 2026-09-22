@@ -16,6 +16,7 @@
 	 * el mundo— de uno aportado, que solo ven quienes lo aportaron.
 	 */
 	import { enhance } from '$app/forms';
+	import { optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import { untrack } from 'svelte';
 	import Button from '$lib/ui/button.svelte';
 	import Checkbox from '$lib/ui/checkbox.svelte';
@@ -64,6 +65,24 @@
 	let saving = $state(false);
 
 	/*
+	 * Lo valida el servidor, así que se espera su respuesta; pero el diálogo se
+	 * cierra en cuanto llega y la página se refresca de fondo, en vez de esperar
+	 * a que se recargue entera con el botón girando.
+	 */
+	const submit = optimisticSubmit({
+		fallbackError: 'No se pudo guardar el activo.',
+		syncForm: true,
+		apply: () => {
+			saving = true;
+		},
+		onSuccess: () => {
+			saving = false;
+			onSuccess?.();
+		},
+		onError: () => (saving = false)
+	});
+
+	/*
 	 * La industria depende del tipo y por eso se mira el borrador y no la prop:
 	 * cambiar un activo de acción a cripto tiene que hacer desaparecer el campo
 	 * en el acto, porque el backend rechaza un sector sobre algo que no lleva
@@ -90,19 +109,7 @@
 	);
 </script>
 
-<form
-	class="rail-fields"
-	method="POST"
-	action="?/updateAsset"
-	use:enhance={() => {
-		saving = true;
-		return async ({ result, update }) => {
-			saving = false;
-			await update({ reset: false });
-			if (result.type === 'success') onSuccess?.();
-		};
-	}}
->
+<form class="rail-fields" method="POST" action="?/updateAsset" use:enhance={submit}>
 	<input type="hidden" name="id" value={asset.id} />
 
 	<div class="pair">

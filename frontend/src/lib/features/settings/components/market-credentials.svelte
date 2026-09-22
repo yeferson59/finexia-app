@@ -13,6 +13,7 @@
 	import { enhance } from '$app/forms';
 	import Input from '$lib/ui/input.svelte';
 	import Button from '$lib/ui/button.svelte';
+	import { optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import SettingsSection from './settings-section.svelte';
 	import { formatMarketProvider } from '$lib/shared/format/market-provider';
 	import type { MarketCredential, MarketProvider } from '$lib/api/types';
@@ -49,14 +50,74 @@
 		}
 	];
 
-	const byProvider = $derived(new Map(credentials.map((c) => [c.provider, c])));
+	/* Las claves eliminadas que el servidor aún no confirmó: desaparecen al pulsar. */
+	let removedProviders = $state<MarketProvider[]>([]);
+
+	const byProvider = $derived(
+		new Map(
+			credentials.filter((c) => !removedProviders.includes(c.provider)).map((c) => [c.provider, c])
+		)
+	);
 
 	// Un campo por proveedor. Nunca se rellena con nada: no hay valor que leer.
 	let keyInputs = $state<Record<string, string>>({ finnhub: '', alphavantage: '' });
 	let savingProvider = $state<string | null>(null);
 	let verifyingProvider = $state<string | null>(null);
-	let deletingProvider = $state<string | null>(null);
 	let syncing = $state(false);
+
+	/*
+	 * Guardar, verificar y sincronizar necesitan la respuesta del proveedor, así
+	 * que esperan al servidor; pero su resultado se enseña en cuanto llega y la
+	 * página se refresca de fondo. Eliminar no espera: la clave se va al pulsar
+	 * y vuelve si el servidor se niega. Los avisos siguen saliendo de `form`.
+	 */
+	function save(provider: MarketProvider) {
+		return optimisticSubmit({
+			fallbackError: 'No se pudo guardar la clave.',
+			syncForm: true,
+			apply: () => {
+				savingProvider = provider;
+			},
+			onSuccess: () => {
+				savingProvider = null;
+				keyInputs[provider] = '';
+			},
+			onError: () => (savingProvider = null)
+		});
+	}
+
+	function verify(provider: MarketProvider) {
+		return optimisticSubmit({
+			fallbackError: 'No se pudo verificar la clave.',
+			syncForm: true,
+			apply: () => {
+				verifyingProvider = provider;
+			},
+			onSuccess: () => (verifyingProvider = null),
+			onError: () => (verifyingProvider = null)
+		});
+	}
+
+	function remove(provider: MarketProvider) {
+		return optimisticSubmit({
+			fallbackError: 'No se pudo eliminar la clave.',
+			syncForm: true,
+			apply: () => {
+				removedProviders = [...removedProviders, provider];
+				return () => (removedProviders = removedProviders.filter((p) => p !== provider));
+			}
+		});
+	}
+
+	const sync = optimisticSubmit({
+		fallbackError: 'No se pudo sincronizar.',
+		syncForm: true,
+		apply: () => {
+			syncing = true;
+		},
+		onSuccess: () => (syncing = false),
+		onError: () => (syncing = false)
+	});
 
 	/*
 	 * El estado de una clave, dicho en una frase. Eran una píldora en versalitas
@@ -93,7 +154,7 @@
 		return (form?.marketMessage as string) ?? null;
 	}
 
-	const hasAnyKey = $derived(credentials.length > 0);
+	const hasAnyKey = $derived(byProvider.size > 0);
 </script>
 
 <SettingsSection
@@ -145,20 +206,7 @@
 					<p class="provider-state">Sin configurar. {provider.hint}</p>
 				{/if}
 
-				<form
-					method="POST"
-					action="?/saveMarketKey"
-					use:enhance={() => {
-						savingProvider = provider.id;
-						return async ({ update }) => {
-							savingProvider = null;
-							// reset:false conserva el resto del formulario de ajustes;
-							// el campo de la clave se limpia abajo, a mano.
-							await update({ reset: false });
-							keyInputs[provider.id] = '';
-						};
-					}}
-				>
+				<form method="POST" action="?/saveMarketKey" use:enhance={save(provider.id)}>
 					<input type="hidden" name="provider" value={provider.id} />
 					<div class="key-row">
 						<Input
@@ -185,41 +233,15 @@
 
 				{#if stored}
 					<div class="provider-actions">
-						<form
-							method="POST"
-							action="?/verifyMarketKey"
-							use:enhance={() => {
-								verifyingProvider = provider.id;
-								return async ({ update }) => {
-									verifyingProvider = null;
-									await update({ reset: false });
-								};
-							}}
-						>
+						<form method="POST" action="?/verifyMarketKey" use:enhance={verify(provider.id)}>
 							<input type="hidden" name="provider" value={provider.id} />
 							<button type="submit" class="row-action" disabled={verifyingProvider === provider.id}>
 								{verifyingProvider === provider.id ? 'Verificando…' : 'Verificar'}
 							</button>
 						</form>
-						<form
-							method="POST"
-							action="?/deleteMarketKey"
-							use:enhance={() => {
-								deletingProvider = provider.id;
-								return async ({ update }) => {
-									deletingProvider = null;
-									await update({ reset: false });
-								};
-							}}
-						>
+						<form method="POST" action="?/deleteMarketKey" use:enhance={remove(provider.id)}>
 							<input type="hidden" name="provider" value={provider.id} />
-							<button
-								type="submit"
-								class="row-action danger"
-								disabled={deletingProvider === provider.id}
-							>
-								{deletingProvider === provider.id ? 'Eliminando…' : 'Eliminar'}
-							</button>
+							<button type="submit" class="row-action danger">Eliminar</button>
 						</form>
 					</div>
 				{/if}
@@ -236,17 +258,7 @@
 					automáticamente.
 				</p>
 			</div>
-			<form
-				method="POST"
-				action="?/syncMarketData"
-				use:enhance={() => {
-					syncing = true;
-					return async ({ update }) => {
-						syncing = false;
-						await update({ reset: false });
-					};
-				}}
-			>
+			<form method="POST" action="?/syncMarketData" use:enhance={sync}>
 				<Button type="submit" size="sm" loading={syncing}>Sincronizar</Button>
 			</form>
 		</div>

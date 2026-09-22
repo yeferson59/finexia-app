@@ -15,7 +15,28 @@
 
 	const { params, data }: PageProps = $props();
 
-	const portfolio = $derived(data.portfolio);
+	/* Lo editado se ve en la cabecera al pulsar; el refresco de fondo trae lo
+	   guardado. Por versión, no por identidad: `$state` guarda un proxy. */
+	let changes = $state<Record<string, string | undefined> | null>(null);
+	let editHidden = $state(false);
+	let version = 0;
+	const portfolio = $derived(
+		data.portfolio && changes ? { ...data.portfolio, ...changes } : data.portfolio
+	);
+
+	function applyChanges(next: Record<string, string | undefined>) {
+		const mine = ++version;
+		changes = next;
+		editHidden = true;
+		return () => {
+			if (version === mine) changes = null;
+		};
+	}
+
+	function closeEdit() {
+		isEditing = false;
+		editHidden = false;
+	}
 	const risks = $derived(data.risks);
 	const growth = $derived(data.growth);
 
@@ -70,24 +91,29 @@
 {/if}
 
 <Modal
-	open={isEditing && !!portfolio}
+	open={isEditing && !!data.portfolio}
+	hidden={editHidden}
 	title="Editar portafolio"
-	onClose={() => (isEditing = false)}
+	onClose={closeEdit}
 	size="lg"
 >
-	{#if portfolio}
+	{#if data.portfolio}
 		<PortfolioEditForm
-			{portfolio}
+			portfolio={data.portfolio}
 			{risks}
-			onCancel={() => (isEditing = false)}
+			onApply={applyChanges}
+			onCancel={closeEdit}
 			onSaved={() => {
 				// El error de un intento anterior tiene que irse con el acuse nuevo:
 				// si no, la pantalla mostraba las dos alertas a la vez.
 				submitError = '';
-				isEditing = false;
+				closeEdit();
 				saved.show('Portafolio actualizado correctamente.');
 			}}
-			onError={(msg) => (submitError = msg)}
+			onError={(msg) => {
+				submitError = msg;
+				editHidden = false;
+			}}
 		/>
 	{/if}
 </Modal>

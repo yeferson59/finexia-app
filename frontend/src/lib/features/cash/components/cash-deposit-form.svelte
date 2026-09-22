@@ -15,6 +15,7 @@
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
+	import { OptimisticDialog } from '$lib/shared/optimistic.svelte';
 	import type { CashPocket, CashRate } from '$lib/api/types';
 	import { formatAnnualRate } from '../rates';
 	import CashDepositOpen from './cash-deposit-open.svelte';
@@ -56,15 +57,21 @@
 	/* Cancelar: el día en que el dinero vuelve, y lo que cobra la entidad. */
 	let closesOn = $state(today);
 	let penalty = $state<string | number | null>('');
-	let submitting = $state(false);
-	let error = $state('');
+	/* Se cierra al pulsar y guarda de fondo; si el servidor lo rechaza, vuelve
+	   con lo escrito y el motivo. Lo comparte el alta, que va en su diálogo. */
+	const dialog = new OptimisticDialog(() => target);
 
 	function close() {
-		error = '';
+		dialog.reset();
 		penalty = '';
 		closesOn = today;
 		onClose();
 	}
+
+	const submit = dialog.submit({
+		fallbackError: 'No pudimos guardar el depósito.',
+		onDone: close
+	});
 
 	const money = (value: number, currency: string) => privacy.money(formatCurrency(value, currency));
 
@@ -74,6 +81,7 @@
 
 <Modal
 	open={target !== null}
+	hidden={dialog.hidden}
 	title={open ? open.name : 'Nuevo depósito a plazo'}
 	{description}
 	size={open ? 'sm' : 'md'}
@@ -84,26 +92,11 @@
 			sourceId={target.sourceId}
 			currency={target.currency}
 			portfolioId={target.portfolioId}
+			{dialog}
 			onClose={close}
 		/>
 	{:else if target?.mode === 'manage' && open}
-		<form
-			method="POST"
-			action="?/closeDeposit"
-			class="rail-fields"
-			use:enhance={() => {
-				submitting = true;
-				return async ({ result, update }) => {
-					submitting = false;
-					if (result.type === 'failure') {
-						error = (result.data?.error as string) ?? 'No pudimos guardar el depósito.';
-						return;
-					}
-					await update();
-					close();
-				};
-			}}
-		>
+		<form method="POST" action="?/closeDeposit" class="rail-fields" use:enhance={submit}>
 			<input type="hidden" name="id" value={open.id} />
 
 			<!-- La ficha: lo que vale hoy en grande, y debajo a qué tasa y cuánto
@@ -178,20 +171,20 @@
 					class="danger-link"
 					formaction="?/deletePocket"
 					formnovalidate
-					disabled={submitting}
+					disabled={dialog.submitting}
 				>
 					Borrar depósito
 				</button>
 			</div>
 
-			{#if error}
-				<p class="feedback error">{error}</p>
+			{#if dialog.error}
+				<p class="feedback error" role="alert">{dialog.error}</p>
 			{/if}
 
 			<div class="modal-actions">
 				<Button type="button" variant="ghost" onclick={close}>Cerrar</Button>
 				{#if !open.closedOn}
-					<Button type="submit" loading={submitting}>Cancelar depósito</Button>
+					<Button type="submit" loading={dialog.submitting}>Cancelar depósito</Button>
 				{/if}
 			</div>
 		</form>

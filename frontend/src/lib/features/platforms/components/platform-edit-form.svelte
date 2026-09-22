@@ -1,36 +1,58 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import Button from '$lib/ui/button.svelte';
+	import { optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import { PLATFORM_TYPES, type Platform } from '../platforms';
 
 	let {
 		platform,
+		onApply,
+		onRejected,
 		onCancel,
 		onSaved
 	}: {
 		platform: Platform;
+		/**
+		 * Pinta los cambios en la ficha al pulsar, sin esperar al servidor, y
+		 * oculta el diálogo sin desmontarlo. Devuelve cómo deshacerlo.
+		 */
+		onApply: (changes: Partial<Platform>) => () => void;
+		/** Rechazado: el diálogo vuelve con lo escrito y el motivo. */
+		onRejected: () => void;
 		onCancel: () => void;
 		onSaved: () => void;
 	} = $props();
 
 	let isSubmitting = $state(false);
+	// Antes la action devolvía su motivo y nadie lo leía: un cambio rechazado
+	// cerraba nada y no decía nada.
+	let error = $state('');
+
+	const submit = optimisticSubmit({
+		fallbackError: 'Error al actualizar la plataforma',
+		apply: (formData) => {
+			isSubmitting = true;
+			error = '';
+			return onApply({
+				name: String(formData.get('name') ?? '').trim(),
+				description: String(formData.get('description') ?? '').trim(),
+				sourceType: String(formData.get('type') ?? platform.sourceType),
+				isActive: formData.get('isActive') !== 'false'
+			});
+		},
+		onError: (message) => {
+			isSubmitting = false;
+			error = message;
+			onRejected();
+		},
+		onSuccess: () => {
+			isSubmitting = false;
+			onSaved();
+		}
+	});
 </script>
 
-<form
-	method="POST"
-	action="?/update"
-	class="platform-form"
-	use:enhance={() => {
-		isSubmitting = true;
-		return async ({ result, update }) => {
-			await update({ reset: false });
-			isSubmitting = false;
-			if (result.type === 'success' && result.data?.success) {
-				onSaved();
-			}
-		};
-	}}
->
+<form method="POST" action="?/update" class="platform-form" use:enhance={submit}>
 	<div class="form-group">
 		<label for="name" class="form-label">Nombre <span class="required">*</span></label>
 		<input id="name" name="name" type="text" value={platform.name} class="form-input" required />
@@ -61,6 +83,10 @@
 			</select>
 		</div>
 	</div>
+
+	{#if error}
+		<p class="feedback error" role="alert">{error}</p>
+	{/if}
 
 	<div class="modal-actions">
 		<Button type="button" variant="ghost" onclick={onCancel} disabled={isSubmitting}

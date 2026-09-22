@@ -5,6 +5,7 @@
 	import EmptyState from '$lib/ui/empty-state.svelte';
 	import CurrencySelect from '$lib/ui/currency-select.svelte';
 	import { todayLocalDateString } from '$lib/shared/format/date';
+	import { OptimisticList } from '$lib/shared/optimistic.svelte';
 	import {
 		CashAccounts,
 		CashDepositForm,
@@ -28,7 +29,7 @@
 		type CashRateTarget,
 		type CashYieldBlock
 	} from '$lib/features/cash';
-	import type { CashPocket } from '$lib/api/types';
+	import type { CashMovement, CashPocket } from '$lib/api/types';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
@@ -36,8 +37,7 @@
 	const today = todayLocalDateString();
 
 	const summary = $derived(summarizeCash(data.balances, data.currency));
-	/* Cada cajón por su lado: la tasa media y el mapa miden las mismas cuentas
-	   que suma el total. */
+	/* Cada cajón por su lado: la tasa media y el mapa miden lo que suma el total. */
 	const accounts = $derived(groupCashAccounts(data.balances));
 	const yielding = $derived(cashYield(accounts, data.rates, today));
 	const yieldMap = $derived(cashYieldMap(accounts, data.rates, today));
@@ -49,6 +49,7 @@
 	const showPortfolio = $derived(data.portfolios.length > 1);
 
 	let target = $state<CashFormTarget | null>(null);
+	const pendingMovements = new OptimisticList<CashMovement>();
 
 	/* La cuenta cuya rentabilidad está abierta. */
 	let rateTarget = $state<CashRateTarget | null>(null);
@@ -120,10 +121,7 @@
 		};
 	}
 
-	/*
-	 * Mover es dentro de un portafolio: el dinero cambia de cajón o de
-	 * plataforma, no de sitio donde cuenta.
-	 */
+	/* Mover es dentro de un portafolio: cambia de cajón o de plataforma, no de dónde cuenta. */
 	function openMove(account: CashAccount) {
 		moveTarget = { account, ...suggestPortfolio(account) };
 	}
@@ -212,7 +210,7 @@
 	</section>
 {/if}
 
-{#if data.movements.length > 0}
+{#if data.movements.length > 0 || pendingMovements.delta > 0}
 	<section class="block" aria-labelledby="cash-movements-title">
 		<header class="block-head">
 			<h2 id="cash-movements-title">Movimientos</h2>
@@ -227,6 +225,7 @@
 			movements={data.movements}
 			total={data.movementsTotal}
 			{showPortfolio}
+			pending={pendingMovements}
 			onEdit={(movement) => (target = { mode: 'edit', movement })}
 		/>
 	</section>
@@ -239,6 +238,7 @@
 	balances={data.balances}
 	pockets={data.pockets}
 	currency={data.currency}
+	pending={pendingMovements}
 	onClose={() => (target = null)}
 />
 

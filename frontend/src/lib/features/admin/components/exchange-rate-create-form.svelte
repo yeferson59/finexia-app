@@ -7,6 +7,7 @@
 	 * escribirla y no después.
 	 */
 	import { enhance } from '$app/forms';
+	import { optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import Button from '$lib/ui/button.svelte';
 
 	interface Props {
@@ -23,21 +24,27 @@
 	let { error = '', onSuccess, onCancel }: Props = $props();
 
 	let creating = $state(false);
+
+	/*
+	 * Lo valida el servidor, así que se espera su respuesta; pero el diálogo se
+	 * cierra en cuanto llega y la página se refresca de fondo, en vez de esperar
+	 * a que se recargue entera con el botón girando.
+	 */
+	const submit = optimisticSubmit({
+		fallbackError: 'No se pudo crear la tasa.',
+		syncForm: true,
+		apply: () => {
+			creating = true;
+		},
+		onSuccess: () => {
+			creating = false;
+			onSuccess?.();
+		},
+		onError: () => (creating = false)
+	});
 </script>
 
-<form
-	class="rail-fields"
-	method="POST"
-	action="?/createRate"
-	use:enhance={() => {
-		creating = true;
-		return async ({ result, update }) => {
-			creating = false;
-			await update();
-			if (result.type === 'success') onSuccess?.();
-		};
-	}}
->
+<form class="rail-fields" method="POST" action="?/createRate" use:enhance={submit}>
 	<div class="pair">
 		<div class="field">
 			<label for="fromCurrency">Moneda origen</label>

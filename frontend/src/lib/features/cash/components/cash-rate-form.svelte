@@ -28,6 +28,7 @@
 	import DatePicker from '$lib/ui/date-picker.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
+	import { OptimisticDialog } from '$lib/shared/optimistic.svelte';
 	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
 	import type { CashAccount } from '../cash';
 	import {
@@ -136,14 +137,20 @@
 	let endsOn = $derived(initial.date);
 	/* Recalcular mira hacia atrás, así que arranca en el primer día del mes. */
 	let recalcFrom = $derived(`${today.slice(0, 7)}-01`);
-	let submitting = $state(false);
-	let error = $state('');
+	/* Se cierra al pulsar y guarda de fondo; si el servidor lo rechaza, vuelve
+	   con lo escrito y el motivo. */
+	const dialog = new OptimisticDialog(() => target);
 
 	/* Cerrar limpia el error: la siguiente apertura no lo arrastra. */
 	function close() {
-		error = '';
+		dialog.reset();
 		onClose();
 	}
+
+	const submit = dialog.submit({
+		fallbackError: () => (mode === 'recalc' ? CASH_RECALCULATE_FALLBACK : CASH_RATE_FALLBACK),
+		onDone: close
+	});
 
 	/*
 	 * Con intereses ya calculados la tasa no se corrige ni se borra: esos días se
@@ -255,6 +262,7 @@
 
 <Modal
 	open={target !== null}
+	hidden={dialog.hidden}
 	title="Tasa de la cuenta"
 	description={title}
 	size="md"
@@ -262,25 +270,7 @@
 >
 	{#if target}
 		{@const account = target.account}
-		<form
-			method="POST"
-			action={ACTIONS[mode]}
-			class="rail-fields"
-			use:enhance={() => {
-				submitting = true;
-				return async ({ result, update }) => {
-					submitting = false;
-					if (result.type === 'failure') {
-						error =
-							(result.data?.error as string) ??
-							(mode === 'recalc' ? CASH_RECALCULATE_FALLBACK : CASH_RATE_FALLBACK);
-						return;
-					}
-					await update();
-					close();
-				};
-			}}
-		>
+		<form method="POST" action={ACTIONS[mode]} class="rail-fields" use:enhance={submit}>
 			<!-- Lo que rinde hoy, antes de tocar nada: es lo que se viene a mirar
 			     más veces de las que se viene a cambiar. -->
 			<div class="now" class:earning={current?.earning}>
@@ -387,17 +377,18 @@
 				/>
 			{/if}
 
-			{#if error}
-				<p class="feedback error">{error}</p>
+			{#if dialog.error}
+				<p class="feedback error" role="alert">{dialog.error}</p>
 			{/if}
 
 			<div class="modal-actions">
-				<Button type="button" variant="ghost" onclick={close} disabled={submitting}>Cancelar</Button
+				<Button type="button" variant="ghost" onclick={close} disabled={dialog.submitting}
+					>Cancelar</Button
 				>
 				<Button
 					type="submit"
 					variant={mode === 'delete' ? 'danger' : 'primary'}
-					loading={submitting}
+					loading={dialog.submitting}
 				>
 					{SUBMIT_LABELS[mode]}
 				</Button>

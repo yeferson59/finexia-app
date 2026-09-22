@@ -3,6 +3,7 @@ import {
 	cashAccountLabel,
 	cashErrorMessage,
 	cashKindSign,
+	draftCashMovement,
 	formatCashKind,
 	groupCashAccounts,
 	groupCashMovementsByMonth,
@@ -319,5 +320,67 @@ describe('cashErrorMessage', () => {
 
 	it('no inventa un motivo que no conoce', () => {
 		expect(cashErrorMessage(500)).toContain('Vuelve a intentarlo');
+	});
+});
+
+describe('draftCashMovement — la fila mientras el envío no se confirma', () => {
+	function form(fields: Record<string, string>): FormData {
+		const data = new FormData();
+		for (const [name, value] of Object.entries(fields)) data.append(name, value);
+		return data;
+	}
+
+	it('arma un depósito nuevo y lo deja sin acciones', () => {
+		const movement = draftCashMovement(
+			form({
+				kind: 'deposit',
+				portfolioId: 'p1',
+				sourceId: 's1',
+				currency: 'COP',
+				amount: '250000',
+				fees: '',
+				date: '2026-09-20',
+				notes: 'Nómina'
+			}),
+			{ id: 'pending-1', portfolioName: 'Principal', sourceName: 'Banco' }
+		);
+
+		expect(movement).toMatchObject({
+			id: 'pending-1',
+			kind: 'deposit',
+			amount: '250000',
+			currency: 'COP',
+			fees: '0',
+			date: '2026-09-20',
+			notes: 'Nómina',
+			editable: false,
+			portfolioId: 'p1',
+			portfolioName: 'Principal',
+			sourceId: 's1',
+			sourceName: 'Banco'
+		});
+	});
+
+	it('una edición conserva el saldo y los intereses no llevan comisión', () => {
+		const movement = draftCashMovement(
+			form({ kind: 'interest', amount: '12', fees: '3', date: '2026-09-01', notes: '' }),
+			{
+				id: 'm1',
+				currency: 'USD',
+				portfolioId: 'p1',
+				sourceId: 's1',
+				date: '2026-08-01T00:00:00Z'
+			}
+		);
+
+		expect(movement).toMatchObject({
+			id: 'm1',
+			kind: 'interest',
+			fees: '0',
+			currency: 'USD',
+			portfolioId: 'p1',
+			sourceId: 's1',
+			date: '2026-09-01'
+		});
 	});
 });

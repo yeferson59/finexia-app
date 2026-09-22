@@ -9,6 +9,7 @@
 	import { enhance } from '$app/forms';
 	import Badge from '$lib/ui/badge.svelte';
 	import DataTable from '$lib/ui/data-table.svelte';
+	import { OptimisticList, optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import AdminBlock from './admin-block.svelte';
 	import {
 		INVITE_ROLES,
@@ -25,7 +26,35 @@
 		form: Record<string, unknown> | null;
 	}
 
-	let { invitations, form }: Props = $props();
+	let { invitations: stored, form }: Props = $props();
+
+	/*
+	 * Revocar se ve al pulsar; si el servidor se niega, la fila vuelve como
+	 * estaba y su error llega a `form`. Reenviar no cambia nada que se vea, pero
+	 * tampoco espera a que se recargue la página para soltar el botón.
+	 */
+	const optimistic = new OptimisticList<InvitationItem>();
+	const invitations = $derived(optimistic.view(stored));
+
+	function resend(inv: InvitationItem) {
+		return optimisticSubmit({
+			fallbackError: 'No se pudo reenviar la invitación.',
+			syncForm: true,
+			apply: () => {
+				resendingId = inv.id;
+			},
+			onSuccess: () => (resendingId = null),
+			onError: () => (resendingId = null)
+		});
+	}
+
+	function revoke(inv: InvitationItem) {
+		return optimisticSubmit({
+			fallbackError: 'No se pudo revocar la invitación.',
+			syncForm: true,
+			apply: () => optimistic.patch(inv.id, { status: 'revoked' })
+		});
+	}
 
 	/*
 	 * La columna de estado solo aparece cuando hay algo que no esté pendiente.
@@ -36,7 +65,6 @@
 	const mixed = $derived(invitations.some((inv) => inv.status !== 'pending'));
 
 	let resendingId = $state<string | null>(null);
-	let revokingId = $state<string | null>(null);
 
 	/** «customer» es el nombre del rol en el backend, no el que se lee aquí. */
 	const roleLabel = (role: string) => INVITE_ROLES.find((r) => r.value === role)?.label ?? role;
@@ -80,35 +108,19 @@
 					</td>
 					<td class="cell-actions">
 						<div class="row-actions">
-							<form
-								method="POST"
-								action="?/resendInvitation"
-								use:enhance={() => {
-									resendingId = inv.id;
-									return async ({ update }) => {
-										resendingId = null;
-										await update({ reset: false });
-									};
-								}}
-							>
+							<form method="POST" action="?/resendInvitation" use:enhance={resend(inv)}>
 								<input type="hidden" name="id" value={inv.id} />
 								<button class="row-action" type="submit" disabled={resendingId === inv.id}>
 									{resendingId === inv.id ? 'Reenviando…' : 'Reenviar'}
 								</button>
 							</form>
-							<form
-								method="POST"
-								action="?/revokeInvitation"
-								use:enhance={() => {
-									revokingId = inv.id;
-									return async ({ update }) => {
-										revokingId = null;
-										await update({ reset: false });
-									};
-								}}
-							>
+							<form method="POST" action="?/revokeInvitation" use:enhance={revoke(inv)}>
 								<input type="hidden" name="id" value={inv.id} />
-								<button class="row-action danger" type="submit" disabled={revokingId === inv.id}>
+								<button
+									class="row-action danger"
+									type="submit"
+									disabled={optimistic.isPending(inv.id)}
+								>
 									Revocar
 								</button>
 							</form>

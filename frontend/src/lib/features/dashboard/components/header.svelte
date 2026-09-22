@@ -14,6 +14,7 @@
 	 */
 	import { resolve } from '$app/paths';
 	import { privacy } from '$lib/shared/privacy.svelte';
+	import { syncing } from '$lib/shared/optimistic.svelte';
 	import { page } from '$app/state';
 	import Icon from './icon.svelte';
 	import { sectionTitle } from '../nav';
@@ -41,6 +42,18 @@
 	</button>
 
 	<p class="section">{section}</p>
+
+	<!-- Los formularios pesados cierran al pulsar y guardan de fondo: hasta que
+	     el servidor confirma, lo que se ve puede no ser aún lo guardado. La
+	     región está siempre montada para que el lector anuncie el cambio. -->
+	<p class="syncing" role="status" aria-live="polite">
+		{#if syncing.error}
+			<span class="sync-error">No se guardó: {syncing.error}</span>
+			<button type="button" class="dismiss" onclick={() => syncing.dismiss()}>Cerrar</button>
+		{:else if syncing.active}
+			<span class="dot" aria-hidden="true"></span>Guardando…
+		{/if}
+	</p>
 
 	<div class="actions">
 		<button
@@ -105,6 +118,49 @@
 		font-size: 0.95rem;
 		font-weight: 500;
 		color: var(--text);
+	}
+
+	.syncing {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		margin: 0;
+		font-size: 0.78rem;
+		color: var(--text-dim);
+	}
+
+	.sync-error {
+		color: var(--red);
+	}
+
+	.dismiss {
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--text-muted);
+		font: inherit;
+		text-decoration: underline;
+		cursor: pointer;
+	}
+
+	.dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--amber);
+		animation: pulse 1.2s ease-in-out infinite;
+	}
+
+	@keyframes pulse {
+		50% {
+			opacity: 0.3;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.dot {
+			animation: none;
+		}
 	}
 
 	.actions {

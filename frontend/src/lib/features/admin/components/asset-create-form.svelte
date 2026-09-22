@@ -11,6 +11,7 @@
 	 * campos, y no había razón para que aquí se vieran de otra manera.
 	 */
 	import { enhance } from '$app/forms';
+	import { optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import Button from '$lib/ui/button.svelte';
 	import { typeHasSector } from '$lib/shared/format/sector';
 	import { ASSET_TYPES } from '../admin';
@@ -32,6 +33,24 @@
 	let creating = $state(false);
 
 	/*
+	 * Lo valida el servidor, así que se espera su respuesta; pero el diálogo se
+	 * cierra en cuanto llega y la página se refresca de fondo, en vez de esperar
+	 * a que se recargue entera con el botón girando.
+	 */
+	const submit = optimisticSubmit({
+		fallbackError: 'No se pudo crear el activo.',
+		syncForm: true,
+		apply: () => {
+			creating = true;
+		},
+		onSuccess: () => {
+			creating = false;
+			onSuccess?.();
+		},
+		onError: () => (creating = false)
+	});
+
+	/*
 	 * El tipo se sigue desde aquí porque la industria depende de él: detrás de
 	 * una cripto, un saldo o un inmueble no hay empresa que clasificar, y el
 	 * backend contesta 400 a quien lo intente. Enseñar el campo y que el
@@ -47,19 +66,7 @@
 	let weights = $state<Record<string, number | null>>({});
 </script>
 
-<form
-	class="rail-fields"
-	method="POST"
-	action="?/createAsset"
-	use:enhance={() => {
-		creating = true;
-		return async ({ result, update }) => {
-			creating = false;
-			await update();
-			if (result.type === 'success') onSuccess?.();
-		};
-	}}
->
+<form class="rail-fields" method="POST" action="?/createAsset" use:enhance={submit}>
 	<div class="pair">
 		<div class="field">
 			<label for="ticker">Ticker</label>

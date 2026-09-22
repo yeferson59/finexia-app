@@ -13,6 +13,7 @@
 	import { enhance } from '$app/forms';
 	import Button from '$lib/ui/button.svelte';
 	import Modal from '$lib/ui/modal.svelte';
+	import { OptimisticDialog } from '$lib/shared/optimistic.svelte';
 	import type { CashPocket } from '$lib/api/types';
 
 	/** Abrir uno en una cuenta, o editar el que ya existe. */
@@ -32,11 +33,12 @@
 	/* Como en el resto de los formularios: `$derived` reasignable, así que lo que
 	   se escribe pisa el valor inicial hasta la siguiente apertura. */
 	let name = $derived(editing?.name ?? '');
-	let submitting = $state(false);
-	let error = $state('');
+	/* Se cierra al pulsar y guarda de fondo; si el servidor lo rechaza, vuelve
+	   con lo escrito y el motivo. */
+	const dialog = new OptimisticDialog(() => target);
 
 	function close() {
-		error = '';
+		dialog.reset();
 		onClose();
 	}
 
@@ -52,28 +54,15 @@
 	   porque su historia es lo que se llevaría por delante. */
 	const canDelete = $derived(editing !== null && editing.movements === 0);
 
-	function handler() {
-		submitting = true;
-		return async ({
-			result,
-			update
-		}: {
-			result: { type: string; data?: Record<string, unknown> };
-			update: () => Promise<void>;
-		}) => {
-			submitting = false;
-			if (result.type === 'failure') {
-				error = (result.data?.error as string) ?? 'No pudimos guardar el bolsillo.';
-				return;
-			}
-			await update();
-			close();
-		};
-	}
+	const handler = dialog.submit({
+		fallbackError: 'No pudimos guardar el bolsillo.',
+		onDone: close
+	});
 </script>
 
 <Modal
 	open={target !== null}
+	hidden={dialog.hidden}
 	title={editing ? 'Editar bolsillo' : 'Nuevo bolsillo'}
 	description={account}
 	size="sm"
@@ -124,7 +113,7 @@
 							class="danger-link"
 							formaction="?/deletePocket"
 							formnovalidate
-							disabled={submitting}
+							disabled={dialog.submitting}
 						>
 							Borrar bolsillo
 						</button>
@@ -138,13 +127,13 @@
 				</div>
 			{/if}
 
-			{#if error}
-				<p class="feedback error">{error}</p>
+			{#if dialog.error}
+				<p class="feedback error" role="alert">{dialog.error}</p>
 			{/if}
 
 			<div class="modal-actions">
 				<Button type="button" variant="ghost" onclick={close}>Cancelar</Button>
-				<Button type="submit" loading={submitting}>
+				<Button type="submit" loading={dialog.submitting}>
 					{editing ? 'Guardar nombre' : 'Crear bolsillo'}
 				</Button>
 			</div>

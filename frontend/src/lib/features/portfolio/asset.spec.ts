@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Holding } from '$lib/api/types';
 import {
 	computePosition,
+	draftTransaction,
 	formatUnits,
 	priceLabelFor,
 	tradeDateWarnings,
@@ -272,5 +273,71 @@ describe('tradeDateWarnings', () => {
 				marketPrice: 433.24
 			})
 		).toHaveLength(2);
+	});
+});
+
+describe('draftTransaction — la fila mientras el envío no se confirma', () => {
+	function form(fields: Record<string, string>): FormData {
+		const data = new FormData();
+		for (const [name, value] of Object.entries(fields)) data.append(name, value);
+		return data;
+	}
+
+	it('arma una compra nueva con lo que manda el formulario', () => {
+		const txn = draftTransaction(
+			form({
+				entryId: 'e1',
+				type: 'buy',
+				quantity: '3',
+				price: '10.5',
+				currency: 'EUR',
+				fxRate: '1.1',
+				fees: '',
+				feesCurrency: 'usd',
+				transactionDate: '2026-09-01',
+				payFromCash: 'on',
+				payFromPocketId: 'p1'
+			}),
+			{ id: 'pending-1', costCurrency: 'USD' }
+		);
+
+		expect(txn).toMatchObject({
+			id: 'pending-1',
+			entryId: 'e1',
+			quantity: '3',
+			price: '10.5',
+			currency: 'EUR',
+			fxRate: '1.1',
+			costCurrency: 'USD',
+			fees: '0',
+			feesCurrency: 'USD',
+			transactionDate: '2026-09-01',
+			cashCredited: false,
+			cashPaid: true,
+			cashPocketId: 'p1'
+		});
+	});
+
+	it('en una edición conserva lo que el formulario no manda', () => {
+		const txn = draftTransaction(form({ notes: 'nueva nota', quantity: '2' }), {
+			id: 't1',
+			entryId: 'e1',
+			type: 'dividend',
+			quantity: '1',
+			price: '4',
+			currency: 'USD',
+			transactionDate: '2026-01-02',
+			createdAt: '2026-01-02T00:00:00Z'
+		});
+
+		expect(txn).toMatchObject({
+			id: 't1',
+			type: 'dividend',
+			quantity: '2',
+			price: '4',
+			notes: 'nueva nota',
+			createdAt: '2026-01-02T00:00:00Z',
+			cashPocketId: null
+		});
 	});
 });

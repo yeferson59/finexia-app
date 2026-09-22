@@ -27,6 +27,12 @@
 
 	interface Props {
 		open: boolean;
+		/**
+		 * Cerrado a la vista pero con el contenido montado. Un envío optimista
+		 * cierra el diálogo al pulsar y, si el servidor lo rechaza, lo vuelve a
+		 * abrir con lo que se había escrito: desmontarlo lo habría vaciado.
+		 */
+		hidden?: boolean;
 		/** Encabezado del diálogo; nombra también el `<dialog>` para el lector. */
 		title: string;
 		/** Línea de apoyo bajo el título; la lee también el lector al abrir. */
@@ -49,6 +55,7 @@
 
 	let {
 		open,
+		hidden = false,
 		title,
 		description = '',
 		size = 'md',
@@ -67,15 +74,17 @@
 
 	// `showModal()` es imperativo y vive fuera del modelo de Svelte, así que
 	// sincronizarlo con `open` es justo para lo que está `$effect`.
+	const shown = $derived(open && !hidden);
+
 	$effect(() => {
 		if (!dialog) return;
-		if (open && !dialog.open) dialog.showModal();
-		else if (!open && dialog.open) dialog.close();
+		if (shown && !dialog.open) dialog.showModal();
+		else if (!shown && dialog.open) dialog.close();
 	});
 
 	// El `<dialog>` nativo no bloquea el scroll de la página que queda detrás.
 	$effect(() => {
-		if (!open) return;
+		if (!shown) return;
 		const previous = document.body.style.overflow;
 		document.body.style.overflow = 'hidden';
 		return () => {
@@ -99,7 +108,7 @@
 	aria-labelledby={titleId}
 	aria-describedby={description ? descriptionId : undefined}
 	onclick={onDialogClick}
-	onclose={() => open && onClose()}
+	onclose={() => shown && onClose()}
 >
 	<!--
 		El contenido se monta sólo mientras está abierto. Un `<dialog>` cerrado

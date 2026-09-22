@@ -23,6 +23,7 @@
 		transactions,
 		txnMeta,
 		sellingTxnId = null,
+		isPending = () => false,
 		formatAmount,
 		onEdit,
 		onToggleSell,
@@ -31,6 +32,8 @@
 		transactions: Transaction[];
 		txnMeta: TxnMeta;
 		sellingTxnId?: string | null;
+		/** Pintada sin confirmar: atenuada y sin acciones. */
+		isPending?: (id: string) => boolean;
 		/**
 		 * Cada fila se formatea con la moneda de su propia transacción: una
 		 * compra liquidada en EUR no es la misma cifra con el símbolo de la
@@ -87,7 +90,8 @@
 					     mercado, y la tasa los lleva a la de la cuenta. -->
 					{@const total = qty * price * rate}
 					{@const isActiveSell = sellingTxnId === transaction.id}
-					<tr class:selling={isActiveSell}>
+					{@const rowPending = isPending(transaction.id)}
+					<tr class:selling={isActiveSell} class:pending={rowPending} aria-busy={rowPending}>
 						<th scope="row" class="col-kind kind">
 							{TYPE_LABEL[transaction.type] ?? transaction.type}
 							{#if transaction.cashCredited}
@@ -120,13 +124,17 @@
 						</td>
 
 						<td class="col-actions">
-							<AssetTransactionActions
-								{transaction}
-								selling={isActiveSell}
-								{onEdit}
-								{onToggleSell}
-								{onDelete}
-							/>
+							{#if rowPending}
+								<span class="saving">Guardando…</span>
+							{:else}
+								<AssetTransactionActions
+									{transaction}
+									selling={isActiveSell}
+									{onEdit}
+									{onToggleSell}
+									{onDelete}
+								/>
+							{/if}
 						</td>
 					</tr>
 				{/each}
@@ -246,6 +254,15 @@
 
 	/* El lote que se está vendiendo, señalado con el filete rojo de la venta:
 	   el diálogo tapa parte de la tabla y al cerrarlo hay que saber cuál era. */
+	.pending > :not(.col-actions) {
+		opacity: 0.55;
+	}
+
+	.saving {
+		font-size: 0.75rem;
+		color: var(--text-dim);
+	}
+
 	.selling th:first-child {
 		box-shadow: inset 2px 0 0 var(--red);
 	}

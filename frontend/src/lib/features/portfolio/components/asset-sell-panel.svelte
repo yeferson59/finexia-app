@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { OptimisticList, optimisticSubmit, pendingId } from '$lib/shared/optimistic.svelte';
 	import Button from '$lib/ui/button.svelte';
 	import DatePicker from '$lib/ui/date-picker.svelte';
 	import { todayLocalDateString } from '$lib/shared/format/date';
 	import type { Holding, Transaction } from '$lib/api/types';
-	import { formatSettled } from '../asset';
+	import { draftTransaction, formatSettled } from '../asset';
 	import AssetSellPanelHeader from './asset-sell-panel-header.svelte';
 	import AssetSellCurrencyFields from './asset-sell-currency-fields.svelte';
 	import AssetCreditCashField from './asset-credit-cash-field.svelte';
@@ -14,16 +15,24 @@
 		entries,
 		marketPrice,
 		fallbackCurrency,
-		formError = false,
+		pending,
 		formatCurrency,
+		onSent,
+		onRejected,
 		onClose
 	}: {
 		transaction: Transaction;
 		entries: Holding[];
 		marketPrice: number | undefined;
 		fallbackCurrency: string;
-		formError?: boolean;
+		/** Donde se pinta la venta mientras el servidor la guarda. */
+		pending: OptimisticList<Transaction>;
 		formatCurrency: (value: number, decimals?: number) => string;
+		/** Enviada: el diálogo se oculta sin desmontar el panel. */
+		onSent: () => void;
+		/** Rechazada: el diálogo vuelve con lo escrito y el motivo. */
+		onRejected: () => void;
+		/** Cerrar; también cuando el servidor confirma la venta. */
 		onClose: () => void;
 	} = $props();
 
@@ -41,6 +50,28 @@
 	// Lo recibido va al efectivo de la plataforma, como hace el bróker.
 	let sellCreditCash = $state(true);
 	let isSellSubmitting = $state(false);
+	let sellError = $state('');
+
+	const submit = optimisticSubmit({
+		fallbackError: 'No se pudo registrar la venta. Verifica los datos.',
+		apply: (formData) => {
+			isSellSubmitting = true;
+			sellError = '';
+			onSent();
+			return pending.add(
+				draftTransaction(formData, { id: pendingId(), costCurrency: sellCostCurrency })
+			);
+		},
+		onError: (message) => {
+			isSellSubmitting = false;
+			sellError = message;
+			onRejected();
+		},
+		onSuccess: () => {
+			isSellSubmitting = false;
+			onClose();
+		}
+	});
 
 	$effect(() => {
 		if (transaction) {
@@ -146,18 +177,7 @@
 		</button>
 	</div>
 
-	<form
-		method="POST"
-		class="sell-form"
-		action="?/createTransaction"
-		use:enhance={() => {
-			isSellSubmitting = true;
-			return async ({ update }) => {
-				await update({ reset: false });
-				isSellSubmitting = false;
-			};
-		}}
-	>
+	<form method="POST" class="sell-form" action="?/createTransaction" use:enhance={submit}>
 		<input type="hidden" name="entryId" value={transaction.entryId} />
 		<input type="hidden" name="type" value="sell" />
 		<input type="hidden" name="currency" value={sellTradeCurrency} />
@@ -289,8 +309,8 @@
 			/>
 		{/if}
 
-		{#if formError}
-			<p class="feedback error" role="alert">No se pudo registrar la venta. Verifica los datos.</p>
+		{#if sellError}
+			<p class="feedback error" role="alert">{sellError}</p>
 		{/if}
 
 		<div class="modal-actions">

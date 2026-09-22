@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import PageHeader from '$lib/ui/page-header.svelte';
 	import Button from '$lib/ui/button.svelte';
 	import Modal from '$lib/ui/modal.svelte';
@@ -18,6 +19,23 @@
 	let showCreateForm = $state(false);
 	let showImportForm = $state(false);
 	let refreshing = $state(false);
+
+	/* El acuse sale en cuanto responde el feed; la tabla se repinta de fondo. */
+	const refresh = optimisticSubmit({
+		fallbackError: 'No se pudieron actualizar las tasas.',
+		syncForm: true,
+		apply: () => {
+			refreshing = true;
+		},
+		onSuccess: (data) => {
+			refreshing = false;
+			const count = Number(data?.refreshedCount ?? 0);
+			refreshed.show(
+				`${count} tasa${count === 1 ? '' : 's'} actualizada${count === 1 ? '' : 's'} desde el feed.`
+			);
+		},
+		onError: () => (refreshing = false)
+	});
 	const created = flash();
 	const refreshed = flash();
 
@@ -35,23 +53,7 @@
 			página al terminar, que es lo que repinta la tabla con las tasas nuevas
 			sin tener que sincronizarlas a mano en el cliente.
 		-->
-		<form
-			method="POST"
-			action="?/refreshRates"
-			use:enhance={() => {
-				refreshing = true;
-				return async ({ result, update }) => {
-					refreshing = false;
-					await update({ reset: false });
-					if (result.type === 'success') {
-						const count = Number(result.data?.refreshedCount ?? 0);
-						refreshed.show(
-							`${count} tasa${count === 1 ? '' : 's'} actualizada${count === 1 ? '' : 's'} desde el feed.`
-						);
-					}
-				};
-			}}
-		>
+		<form method="POST" action="?/refreshRates" use:enhance={refresh}>
 			<button class="row-action" type="submit" disabled={refreshing}>
 				{refreshing ? 'Actualizando…' : 'Actualizar desde el feed'}
 			</button>

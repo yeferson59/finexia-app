@@ -14,6 +14,7 @@
 	import { enhance } from '$app/forms';
 	import Badge from '$lib/ui/badge.svelte';
 	import DataTable from '$lib/ui/data-table.svelte';
+	import { OptimisticList, optimisticSubmit } from '$lib/shared/optimistic.svelte';
 	import EmptyState from '$lib/ui/empty-state.svelte';
 	import AdminBlock from './admin-block.svelte';
 	import { formatDateTime, formatRate, rateSourceLabel, type ExchangeRate } from '../admin';
@@ -25,9 +26,27 @@
 		form: Record<string, unknown> | null;
 	}
 
-	let { rates, form }: Props = $props();
+	let { rates: stored, form }: Props = $props();
 
-	let updatingId = $state<string | null>(null);
+	/*
+	 * La tasa nueva se ve en la fila al pulsar, como manual y de ahora; si el
+	 * servidor la rechaza, vuelve la anterior y el error llega a `form`.
+	 */
+	const pending = new OptimisticList<ExchangeRate>();
+	const rates = $derived(pending.view(stored));
+
+	function saveRate(rate: ExchangeRate) {
+		return optimisticSubmit({
+			fallbackError: 'No se pudo guardar la tasa.',
+			syncForm: true,
+			apply: (formData) =>
+				pending.patch(rate.id, {
+					rate: String(formData.get('rate') ?? rate.rate),
+					source: 'manual',
+					rateDate: new Date().toISOString()
+				})
+		});
+	}
 	let rateInputs = $state<Record<string, string>>({});
 
 	/** Un feed parado dos días ya es noticia; una tasa a mano, no. */
@@ -86,18 +105,7 @@
 							{formatAge(rate.rateDate)}
 						</td>
 						<td class="num">
-							<form
-								class="edit"
-								method="POST"
-								action="?/updateRate"
-								use:enhance={() => {
-									updatingId = rate.id;
-									return async ({ update }) => {
-										updatingId = null;
-										await update({ reset: false });
-									};
-								}}
-							>
+							<form class="edit" method="POST" action="?/updateRate" use:enhance={saveRate(rate)}>
 								<input type="hidden" name="id" value={rate.id} />
 								<label class="sr-only" for="rate-{rate.id}">
 									Nueva tasa de {rate.fromCurrency} a {rate.toCurrency}
@@ -114,8 +122,8 @@
 									placeholder="0.00"
 									required
 								/>
-								<button class="row-action" type="submit" disabled={updatingId === rate.id}>
-									{updatingId === rate.id ? 'Guardando…' : 'Guardar'}
+								<button class="row-action" type="submit" disabled={pending.isPending(rate.id)}>
+									{pending.isPending(rate.id) ? 'Guardando…' : 'Guardar'}
 								</button>
 							</form>
 							{#if hasError}

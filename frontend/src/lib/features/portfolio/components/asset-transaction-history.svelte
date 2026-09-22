@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import Modal from '$lib/ui/modal.svelte';
+	import { OptimisticList } from '$lib/shared/optimistic.svelte';
 	import type { Holding, Transaction } from '$lib/api/types';
-	import type { AssetActionResult, CashSource, TxnMeta } from '../asset';
+	import type { CashSource, TxnMeta } from '../asset';
 	import AssetTransactionForm from './asset-transaction-form.svelte';
 	import AssetSellPanel from './asset-sell-panel.svelte';
 	import AssetTransactionsTable from './asset-transactions-table.svelte';
@@ -11,20 +10,15 @@
 	import AssetTransactionDeleteConfirm from './asset-transaction-delete-confirm.svelte';
 
 	let {
-		portfolioId,
-		symbol,
 		showAddForm = $bindable(false),
 		entries,
 		cashByEntry = {},
 		transactions,
 		txnMeta,
 		marketPrice,
-		form,
 		formatCurrency,
 		formatAmount
 	}: {
-		portfolioId: string;
-		symbol: string;
 		/**
 		 * Abierto el formulario de alta. Lo controla la página porque el botón
 		 * que lo abre vive en la cabecera, junto al nombre del activo: allí es
@@ -41,7 +35,6 @@
 		transactions: Transaction[];
 		txnMeta: TxnMeta;
 		marketPrice: number | undefined;
-		form: AssetActionResult | null;
 		/** Importes de la posición, en la moneda de coste. */
 		formatCurrency: (value: number, decimals?: number) => string;
 		/** Importes de una transacción, en la moneda de esa transacción. */
@@ -52,51 +45,80 @@
 	let editingTxn = $state<Transaction | null>(null);
 	let deletingTxn = $state<Transaction | null>(null);
 
-	const formError = $derived(form?.success === false);
+	/*
+	 * Los envíos no esperan al servidor: la fila nueva, la editada o la borrada
+	 * se pintan al pulsar y el diálogo se cierra, aunque se queda montado —oculto—
+	 * hasta la respuesta. Si el servidor la rechaza, se deshace lo pintado y el
+	 * diálogo vuelve con lo escrito y el motivo. Mientras uno está en vuelo no se
+	 * abre otro igual: compartirían la instancia del formulario.
+	 */
+	const pending = new OptimisticList<Transaction>();
+	const shownTransactions = $derived(pending.view(transactions));
+	const shownMeta = $derived({ ...txnMeta, total: Math.max(0, txnMeta.total + pending.delta) });
 
-	// Tras crear una transacción (no una edición) se cierra el formulario y se
-	// recarga la página del activo.
-	$effect(() => {
-		if (form?.success === true && !form?.edited) {
-			showAddForm = false;
-			sellFromTxn = null;
-			goto(
-				resolve('/dashboard/portfolios/[id]/assets/[symbol]', {
-					id: portfolioId,
-					symbol
-				})
-			);
-		}
-	});
+	let addHidden = $state(false);
+	let sellHidden = $state(false);
+	let editHidden = $state(false);
+
+	/** El borrado que el servidor rechazó, con el diálogo ya cerrado. */
+	let deleteError = $state('');
+
+	function closeAdd() {
+		showAddForm = false;
+		addHidden = false;
+	}
+
+	function closeSell() {
+		sellFromTxn = null;
+		sellHidden = false;
+	}
+
+	function closeEdit() {
+		editingTxn = null;
+		editHidden = false;
+	}
+
+	function toggleSell(txn: Transaction) {
+		if (sellHidden) return;
+		sellFromTxn = sellFromTxn?.id === txn.id ? null : txn;
+	}
 </script>
 
 <section class="movements" aria-labelledby="movements-title">
 	<header class="head">
 		<h2 id="movements-title">Movimientos</h2>
 		<p class="count">
-			{txnMeta.total}
-			{txnMeta.total === 1 ? 'movimiento' : 'movimientos'}
+			{shownMeta.total}
+			{shownMeta.total === 1 ? 'movimiento' : 'movimientos'}
 		</p>
 	</header>
 
+	{#if deleteError}
+		<p class="feedback error" role="alert">{deleteError}</p>
+	{/if}
+
 	<Modal
 		open={showAddForm}
+		hidden={addHidden}
 		title="Registrar transacción"
-		onClose={() => (showAddForm = false)}
+		onClose={closeAdd}
 		size="lg"
 	>
 		<AssetTransactionForm
 			{entries}
 			{cashByEntry}
-			{formError}
-			onCancel={() => (showAddForm = false)}
+			{pending}
+			onSent={() => (addHidden = true)}
+			onRejected={() => (addHidden = false)}
+			onCancel={closeAdd}
 		/>
 	</Modal>
 
 	<Modal
 		open={!!sellFromTxn}
+		hidden={sellHidden}
 		title="Vender posición"
-		onClose={() => (sellFromTxn = null)}
+		onClose={closeSell}
 		size="lg"
 	>
 		{#if sellFromTxn}
@@ -105,31 +127,48 @@
 				{entries}
 				{marketPrice}
 				fallbackCurrency={entries[0]?.costCurrency ?? 'USD'}
-				formError={formError && !showAddForm}
+				{pending}
 				{formatCurrency}
-				onClose={() => (sellFromTxn = null)}
+				onSent={() => (sellHidden = true)}
+				onRejected={() => (sellHidden = false)}
+				onClose={closeSell}
 			/>
 		{/if}
 	</Modal>
 
 	<AssetTransactionsTable
-		{transactions}
-		{txnMeta}
+		transactions={shownTransactions}
+		txnMeta={shownMeta}
 		sellingTxnId={sellFromTxn?.id ?? null}
+		isPending={(id) => pending.isPending(id)}
 		{formatAmount}
-		onEdit={(txn) => (editingTxn = txn)}
-		onToggleSell={(txn) => (sellFromTxn = sellFromTxn?.id === txn.id ? null : txn)}
-		onDelete={(txn) => (deletingTxn = txn)}
+		onEdit={(txn) => {
+			if (!editHidden) editingTxn = txn;
+		}}
+		onToggleSell={toggleSell}
+		onDelete={(txn) => {
+			deleteError = '';
+			deletingTxn = txn;
+		}}
 	/>
 </section>
 
-<Modal open={!!editingTxn} title="Editar transacción" onClose={() => (editingTxn = null)} size="lg">
+<Modal
+	open={!!editingTxn}
+	hidden={editHidden}
+	title="Editar transacción"
+	onClose={closeEdit}
+	size="lg"
+>
 	{#if editingTxn}
 		<AssetTransactionEditForm
 			transaction={editingTxn}
 			onCash={entries.find((e) => e.id === editingTxn?.entryId)?.assetType === 'cash'}
 			cashSources={cashByEntry[editingTxn.entryId] ?? []}
-			onClose={() => (editingTxn = null)}
+			{pending}
+			onSent={() => (editHidden = true)}
+			onRejected={() => (editHidden = false)}
+			onClose={closeEdit}
 		/>
 	{/if}
 </Modal>
@@ -145,6 +184,8 @@
 		<AssetTransactionDeleteConfirm
 			transaction={deletingTxn}
 			{formatAmount}
+			{pending}
+			onRejected={(message) => (deleteError = message)}
 			onClose={() => (deletingTxn = null)}
 		/>
 	{/if}
@@ -175,6 +216,10 @@
 	/* El contador que era una tarjeta «TRANSACCIONES 6» arriba del todo. La
 	   página que se está viendo la dice el pie de la tabla, junto a sus
 	   botones, que es donde se cambia. */
+	.feedback {
+		margin: 1rem 0 0;
+	}
+
 	.count {
 		margin: 0;
 		font-family: var(--font-mono);

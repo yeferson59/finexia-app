@@ -21,6 +21,7 @@
 	 * siempre.
 	 */
 	import Pagination from '$lib/ui/pagination.svelte';
+	import type { OptimisticList } from '$lib/shared/optimistic.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { formatCalendarDate } from '$lib/shared/format/date';
@@ -39,16 +40,30 @@
 		total: number;
 		/** Si se nombra también el portafolio. Con uno solo, sobra. */
 		showPortfolio?: boolean;
+		/**
+		 * Lo que los formularios pintaron y el servidor aún no confirmó: filas
+		 * nuevas, editadas o borradas. Lo crea la página porque el formulario de
+		 * alta vive fuera del extracto.
+		 */
+		pending: OptimisticList<CashMovement>;
 		onEdit: (movement: CashMovement) => void;
 	}
 
-	let { movements, total, showPortfolio = true, onEdit }: Props = $props();
+	let { movements, total, showPortfolio = true, pending, onEdit }: Props = $props();
+
+	/* Lo pendiente, en su fecha: un movimiento nuevo de ayer no va encima de hoy.
+	   El orden es estable, así que el del servidor se respeta entre iguales. */
+	const shown = $derived(
+		pending
+			.view(movements)
+			.toSorted((a, b) => b.date.slice(0, 10).localeCompare(a.date.slice(0, 10)))
+	);
 
 	const PER_PAGE = 15;
 	let page = $state(1);
 
 	/* Se agrupa antes de paginar: un mes de abonos es una fila, no dos páginas. */
-	const rows = $derived(groupAutomaticInterest(movements));
+	const rows = $derived(groupAutomaticInterest(shown));
 	const months = $derived(
 		groupCashLedgerByMonth(rows.slice((page - 1) * PER_PAGE, page * PER_PAGE))
 	);
@@ -137,6 +152,7 @@
 										{movement}
 										{showPortfolio}
 										compact
+										pending={pending.isPending(movement.id)}
 										onEdit={() => onEdit(movement)}
 										onDelete={() => (deleting = movement)}
 									/>
@@ -147,6 +163,7 @@
 						<CashLedgerEntry
 							movement={row.movement}
 							{showPortfolio}
+							pending={pending.isPending(row.movement.id)}
 							onEdit={() => onEdit(row.movement)}
 							onDelete={() => (deleting = row.movement)}
 						/>
@@ -164,7 +181,12 @@
 	{/if}
 </div>
 
-<CashDeleteConfirm movement={deleting} {showPortfolio} onClose={() => (deleting = null)} />
+<CashDeleteConfirm
+	movement={deleting}
+	{showPortfolio}
+	{pending}
+	onClose={() => (deleting = null)}
+/>
 
 <style>
 	.ledger {

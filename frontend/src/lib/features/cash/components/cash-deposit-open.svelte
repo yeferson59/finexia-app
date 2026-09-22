@@ -18,6 +18,8 @@
 	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
 	import { formatAnnualRate } from '../rates';
 	import { addCalendarDays, daysBetween, projectInterestOverDays } from '../deposits';
+	import type { SubmitFunction } from '@sveltejs/kit';
+	import type { OptimisticDialog } from '$lib/shared/optimistic.svelte';
 	import CashChoice from './cash-choice.svelte';
 	import CashMoneyInput from './cash-money-input.svelte';
 	import CashTermTrack from './cash-term-track.svelte';
@@ -27,10 +29,12 @@
 		currency: string;
 		/** El portafolio que pone el dinero; un depósito es de uno solo. */
 		portfolioId: string;
+		/** El del diálogo que lo aloja: lo oculta al enviar y lo devuelve si falla. */
+		dialog: OptimisticDialog;
 		onClose: () => void;
 	}
 
-	let { sourceId, currency, portfolioId, onClose }: Props = $props();
+	let { sourceId, currency, portfolioId, dialog, onClose }: Props = $props();
 
 	const today = todayLocalDateString();
 
@@ -50,8 +54,6 @@
 	let annualRatePct = $state<string | number | null>('');
 	let withholdingPct = $state<string | number | null>('');
 	let posting = $state<'daily' | 'at_maturity'>('daily');
-	let submitting = $state(false);
-	let error = $state('');
 
 	/* El día en que vence, según el plazo elegido; vacío si no tiene. */
 	const maturesOn = $derived(
@@ -82,25 +84,17 @@
 
 	const longDay = (iso: string) =>
 		formatCalendarDate(iso.slice(0, 10), { day: 'numeric', month: 'long', year: 'numeric' });
+
+	// El diálogo es del padre y no cambia, pero se lee al enviar: así no se
+	// captura la prop tal como llegó en el montaje.
+	const submit: SubmitFunction = (input) =>
+		dialog.submit({
+			fallbackError: 'No pudimos guardar el depósito.',
+			onDone: () => onClose()
+		})(input);
 </script>
 
-<form
-	method="POST"
-	action="?/openDeposit"
-	class="rail-fields"
-	use:enhance={() => {
-		submitting = true;
-		return async ({ result, update }) => {
-			submitting = false;
-			if (result.type === 'failure') {
-				error = (result.data?.error as string) ?? 'No pudimos guardar el depósito.';
-				return;
-			}
-			await update();
-			onClose();
-		};
-	}}
->
+<form method="POST" action="?/openDeposit" class="rail-fields" use:enhance={submit}>
 	<input type="hidden" name="portfolioId" value={portfolioId} />
 	<input type="hidden" name="sourceId" value={sourceId} />
 	<input type="hidden" name="currency" value={currency} />
@@ -238,13 +232,13 @@
 		{/if}
 	</div>
 
-	{#if error}
-		<p class="feedback error">{error}</p>
+	{#if dialog.error}
+		<p class="feedback error" role="alert">{dialog.error}</p>
 	{/if}
 
 	<div class="modal-actions">
 		<Button type="button" variant="ghost" onclick={onClose}>Cancelar</Button>
-		<Button type="submit" loading={submitting}>Abrir depósito</Button>
+		<Button type="submit" loading={dialog.submitting}>Abrir depósito</Button>
 	</div>
 </form>
 

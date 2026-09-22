@@ -365,3 +365,48 @@ export function cashErrorMessage(status: number, details = ''): string {
 
 	return 'No pudimos guardar el movimiento. Vuelve a intentarlo en un momento.';
 }
+
+/**
+ * El movimiento tal como lo dejará el servidor, sacado de lo que manda su
+ * formulario: es la fila que el extracto pinta mientras el envío no se
+ * confirma. Sale como no editable —aún no tiene id con el que editarse— y los
+ * nombres de portafolio y plataforma los pone quien sabe cuáles son.
+ *
+ * `base` es el movimiento que se edita, o lo que ya se sabe de uno nuevo. Una
+ * edición no cambia de saldo, así que portafolio, plataforma y moneda se
+ * quedan los suyos aunque el formulario no los mande.
+ */
+export function draftCashMovement(
+	formData: FormData,
+	base: Pick<CashMovement, 'id'> & Partial<CashMovement>
+): CashMovement {
+	const field = (name: string, fallback: string) => {
+		const value = formData.get(name);
+		return typeof value === 'string' && value.trim() !== '' ? value.trim() : fallback;
+	};
+
+	const kind = field('kind', base.kind ?? 'deposit') as CashMovement['kind'];
+	const currency = field('currency', base.currency ?? 'USD');
+
+	return {
+		id: base.id,
+		entryId: base.entryId ?? '',
+		type: base.type ?? 'cash',
+		kind,
+		amount: field('amount', base.amount ?? '0'),
+		currency,
+		fees: kind === 'interest' ? '0' : field('fees', '0'),
+		feesCurrency: base.feesCurrency ?? currency,
+		date: field('date', base.date?.slice(0, 10) ?? ''),
+		notes: field('notes', ''),
+		editable: false,
+		automatic: false,
+		originTicker: base.originTicker ?? '',
+		portfolioId: field('portfolioId', base.portfolioId ?? ''),
+		portfolioName: base.portfolioName ?? '',
+		sourceId: field('sourceId', base.sourceId ?? ''),
+		sourceName: base.sourceName ?? '',
+		ticker: base.ticker ?? currency,
+		createdAt: base.createdAt ?? new Date().toISOString()
+	};
+}

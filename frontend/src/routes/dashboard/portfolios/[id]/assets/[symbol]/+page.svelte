@@ -11,7 +11,7 @@
 	} from '$lib/features/portfolio';
 	import type { PageProps } from './$types';
 
-	const { params, data, form }: PageProps = $props();
+	const { params, data }: PageProps = $props();
 
 	const entries = $derived(data.entries);
 	// Con qué efectivo puede pagarse una compra en cada posición.
@@ -89,15 +89,12 @@
 	<AssetPositionHeadline {position} {portfolioName} />
 
 	<AssetTransactionHistory
-		portfolioId={params.id}
-		symbol={params.symbol}
 		bind:showAddForm
 		{entries}
 		{cashByEntry}
 		{transactions}
 		{txnMeta}
 		marketPrice={position.marketPrice}
-		{form}
 		{formatCurrency}
 		{formatAmount}
 	/>

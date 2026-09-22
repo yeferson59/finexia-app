@@ -30,6 +30,7 @@
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { todayLocalDateString } from '$lib/shared/format/date';
 	import { SUPPORTED_CURRENCIES } from '$lib/shared/currency';
+	import { OptimisticDialog } from '$lib/shared/optimistic.svelte';
 	import type { CashPocket } from '$lib/api/types';
 	import type { CashAccount } from '../cash';
 	import CashMoneyInput from './cash-money-input.svelte';
@@ -89,8 +90,9 @@
 	let toAmount = $state('');
 	let date = $derived(todayLocalDateString());
 	let notes = $state('');
-	let submitting = $state(false);
-	let error = $state('');
+	/* Se cierra al pulsar y guarda de fondo; si el servidor lo rechaza, vuelve
+	   con lo escrito y el motivo. */
+	const dialog = new OptimisticDialog(() => target);
 
 	const origin = $derived(
 		target === null ? [] : drawersOf(target.account.sourceId, target.account.currency)
@@ -150,12 +152,17 @@
 	}
 
 	function close() {
-		error = '';
+		dialog.reset();
 		amount = '';
 		toAmount = '';
 		notes = '';
 		onClose();
 	}
+
+	const submit = dialog.submit({
+		fallbackError: 'No pudimos mover el dinero.',
+		onDone: close
+	});
 
 	/* Lo que guarda el cajón del que sale, para no pedir más de lo que hay. */
 	const available = $derived.by(() => {
@@ -188,6 +195,7 @@
 
 <Modal
 	open={target !== null}
+	hidden={dialog.hidden}
 	title="Mover dinero"
 	description={target
 		? `Desde ${target.account.sourceName || 'Sin plataforma'} en ${target.account.currency}, dentro de ${target.portfolioName}.`
@@ -196,23 +204,7 @@
 	onClose={close}
 >
 	{#if target}
-		<form
-			method="POST"
-			action="?/move"
-			class="rail-fields"
-			use:enhance={() => {
-				submitting = true;
-				return async ({ result, update }) => {
-					submitting = false;
-					if (result.type === 'failure') {
-						error = (result.data?.error as string) ?? 'No pudimos mover el dinero.';
-						return;
-					}
-					await update();
-					close();
-				};
-			}}
-		>
+		<form method="POST" action="?/move" class="rail-fields" use:enhance={submit}>
 			<input type="hidden" name="portfolioId" value={target.portfolioId} />
 			<input type="hidden" name="sourceId" value={target.account.sourceId} />
 			<input type="hidden" name="currency" value={target.account.currency} />
@@ -336,13 +328,13 @@
 				{/if}
 			</p>
 
-			{#if error}
-				<p class="feedback error">{error}</p>
+			{#if dialog.error}
+				<p class="feedback error" role="alert">{dialog.error}</p>
 			{/if}
 
 			<div class="modal-actions">
 				<Button type="button" variant="ghost" onclick={close}>Cancelar</Button>
-				<Button type="submit" loading={submitting} disabled={destinations.length === 0}>
+				<Button type="submit" loading={dialog.submitting} disabled={destinations.length === 0}>
 					Mover dinero
 				</Button>
 			</div>
