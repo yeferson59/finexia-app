@@ -14,11 +14,18 @@
 	interface Props {
 		view: GrowthView;
 		period: Period;
+		/**
+		 * Si la gráfica prolonga la curva con la proyección. `null` cuando no hay
+		 * ninguna que enseñar, y entonces el conmutador no se dibuja: un botón que
+		 * no cambia nada solo sirve para probarlo y no entender por qué.
+		 */
+		forecast: boolean | null;
 		onview: (view: GrowthView) => void;
 		onperiod: (period: Period) => void;
+		onforecast: (on: boolean) => void;
 	}
 
-	let { view, period, onview, onperiod }: Props = $props();
+	let { view, period, forecast, onview, onperiod, onforecast }: Props = $props();
 </script>
 
 <div class="chart-controls">
@@ -36,6 +43,19 @@
 			>
 		{/each}
 	</div>
+
+	{#if forecast !== null}
+		<div class="tab-group" role="group" aria-label="Proyección">
+			<button
+				type="button"
+				class="tab-btn"
+				class:active={forecast}
+				aria-pressed={forecast}
+				title="Prolonga la curva con lo que rendirían los próximos meses al ritmo de los anteriores"
+				onclick={() => onforecast(!forecast)}>Proyección</button
+			>
+		</div>
+	{/if}
 
 	<div class="tab-group" role="tablist" aria-label="Período">
 		{#each PERIODS as option (option)}

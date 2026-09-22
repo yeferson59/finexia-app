@@ -266,3 +266,29 @@ export function toPlotX(i: number, n: number): number {
 export function toPlotY(v: number, scale: { yMin: number; yRange: number }): number {
 	return PLOT.padT + PLOT.plotH - ((v - scale.yMin) / scale.yRange) * PLOT.plotH;
 }
+
+/**
+ * Etiqueta del eje horizontal de la gráfica de crecimiento.
+ *
+ * En rangos largos pasa a «mes año» y suelta el día: con «01 de jun de 25» las
+ * seis etiquetas se pisaban unas a otras, y a esa escala el día no aporta nada
+ * —el detalle exacto lo da el cursor—.
+ */
+export function growthAxisDate(iso: string, spansYears: boolean): string {
+	const date = new Date(iso + 'T00:00:00');
+	return spansYears
+		? date.toLocaleDateString('es-CO', { month: 'short', year: '2-digit' })
+		: date.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
+}
+
+/**
+ * La fecha completa de un punto, para el cursor y la tabla accesible: ahí una
+ * fila tiene que identificarse sin ambigüedad, y la del eje abrevia.
+ */
+export function growthFullDate(iso: string): string {
+	return new Date(iso + 'T00:00:00').toLocaleDateString('es-CO', {
+		day: '2-digit',
+		month: 'long',
+		year: 'numeric'
+	});
+}

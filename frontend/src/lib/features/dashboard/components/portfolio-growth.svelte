@@ -5,6 +5,7 @@
 	import GrowthChart from './growth-chart.svelte';
 	import GrowthControls from './growth-controls.svelte';
 	import GrowthReadout from './growth-readout.svelte';
+	import GrowthForecast from './growth-forecast.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCompactCurrency, formatCurrency } from '$lib/shared/format/money';
 	import { formatPercent, formatSignedPercent } from '$lib/shared/format/percent';
@@ -12,11 +13,14 @@
 	import {
 		GROWTH_LABELS,
 		filterByPeriod,
+		growthAxisDate,
+		growthFullDate,
 		growthScale,
 		toGrowthPoints,
 		type GrowthView,
 		type Period
 	} from '../dashboard';
+	import { buildValueForecast, completeMonthlyReturns, forecastCurve } from '../projection';
 
 	import type { GrowthDataPoint, GrowthSummary } from '$lib/api/types';
 
@@ -52,6 +56,9 @@
 	let view = $state<GrowthView>('value');
 	/** Punto bajo el cursor (ratón o teclado); `null` cuando no hay ninguno. */
 	let activeIndex = $state<number | null>(null);
+	/* La proyección viene puesta: es lo que se pidió ver, y apagada por defecto
+	   habría que descubrirla. El conmutador la quita para mirar solo el dato. */
+	let showForecast = $state(true);
 
 	const isPercent = $derived(view === 'percent');
 	const labels = $derived(GROWTH_LABELS[view]);
@@ -59,19 +66,6 @@
 	const filteredData = $derived(filterByPeriod(data, selectedPeriod));
 
 	const points = $derived(toGrowthPoints(filteredData, view));
-
-	/*
-	 * En porcentaje el cero entra siempre en la escala: sin él una racha entera
-	 * en negativo se dibujaba como una curva que sube, con el eje empezando en
-	 * −12 % y ninguna referencia que dijera dónde estaba el equilibrio.
-	 */
-	const scale = $derived(
-		growthScale(
-			isPercent ? [...points.flatMap((p) => [p.mv, p.cb]), 0] : points.flatMap((p) => [p.mv, p.cb])
-		)
-	);
-
-	const activePoint = $derived(activeIndex === null ? null : (points[activeIndex] ?? null));
 
 	/*
 	 * La rentabilidad del tramo a la vista, limpia de aportes y retiros.
@@ -113,6 +107,56 @@
 				: 0
 	);
 	const isPositive = $derived(absoluteGain >= 0);
+
+	/*
+	 * La proyección sale del historial entero y no del tramo a la vista: la media
+	 * mensual necesita meses cerrados, y un filtro de «1M» no deja ninguno.
+	 *
+	 * Solo en la vista de dinero. En porcentaje lo dibujado es rentabilidad
+	 * acumulada contra ganancia sobre coste, dos lecturas que una extrapolación
+	 * del valor no sabe continuar sin significar otra cosa.
+	 */
+	const completeMonths = $derived(completeMonthlyReturns(data).length);
+	const forecast = $derived(isPercent ? null : buildValueForecast(data, currentVal));
+	/*
+	 * La banda proyectada, como puntos de la misma serie para que el eje, la
+	 * escala y el cursor los traten igual. A partir de aquí las dos series
+	 * significan otra cosa: `mv` es el techo —si se repitiera el mejor mes— y
+	 * `cb` el suelo. No hay coste que prolongar, porque la proyección no supone
+	 * aportes futuros, así que ese carril queda libre para el otro borde.
+	 *
+	 * Se descarta el primer punto de la curva, que es el último del historial:
+	 * ya está en la serie, y repetirlo dejaría dos puntos en la misma fecha.
+	 */
+	const forecastPoints = $derived(
+		showForecast && forecast
+			? forecastCurve(data, forecast, currentVal)
+					.slice(1)
+					.map((entry) => ({ date: entry.date, mv: entry.high, cb: entry.low }))
+			: []
+	);
+	const chartPoints = $derived(forecastPoints.length > 0 ? [...points, ...forecastPoints] : points);
+	const forecastFrom = $derived(forecastPoints.length > 0 ? points.length : null);
+	/* Si el punto señalado cae en la banda: allí las dos cifras son sus bordes y
+	   no el valor contra el coste, así que se nombran de otra forma. */
+	const onForecast = $derived(
+		forecastFrom !== null && activeIndex !== null && activeIndex >= forecastFrom
+	);
+
+	/*
+	 * En porcentaje el cero entra siempre en la escala: sin él una racha entera
+	 * en negativo se dibujaba como una curva que sube, con el eje empezando en
+	 * −12 % y ninguna referencia que dijera dónde estaba el equilibrio.
+	 */
+	const scale = $derived(
+		growthScale(
+			isPercent
+				? [...chartPoints.flatMap((p) => [p.mv, p.cb]), 0]
+				: chartPoints.flatMap((p) => [p.mv, p.cb])
+		)
+	);
+
+	const activePoint = $derived(activeIndex === null ? null : (chartPoints[activeIndex] ?? null));
 
 	/*
 	 * La serie viene en una sola moneda: el backend convierte cada portafolio a
@@ -183,25 +227,11 @@
 	 * para no recargar los rangos cortos.
 	 */
 	const spansYears = $derived(
-		points.length > 1 && points[0].date.slice(0, 4) !== points[points.length - 1].date.slice(0, 4)
+		chartPoints.length > 1 &&
+			chartPoints[0].date.slice(0, 4) !== chartPoints[chartPoints.length - 1].date.slice(0, 4)
 	);
 
-	/*
-	 * En rangos largos el eje pasa a "mes año" y suelta el día: con
-	 * "01 de jun de 25" las seis etiquetas se pisaban unas a otras, y a esa
-	 * escala el día no aporta nada —el detalle exacto lo da el cursor—.
-	 */
-	function fmtDate(iso: string): string {
-		const d = new Date(iso + 'T00:00:00');
-		return spansYears
-			? d.toLocaleDateString('es-CO', { month: 'short', year: '2-digit' })
-			: d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
-	}
-
-	function fmtLongDate(iso: string): string {
-		const d = new Date(iso + 'T00:00:00');
-		return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
-	}
+	const fmtDate = (iso: string) => growthAxisDate(iso, spansYears);
 </script>
 
 <div class="growth-card" class:bare>
@@ -214,8 +244,13 @@
 		<GrowthControls
 			{view}
 			period={selectedPeriod}
+			forecast={isPercent || forecast === null ? null : showForecast}
 			onview={(next) => (view = next)}
 			onperiod={selectPeriod}
+			onforecast={(on) => {
+				showForecast = on;
+				activeIndex = null;
+			}}
 		/>
 	</div>
 
@@ -263,16 +298,17 @@
 	{:else}
 		<GrowthReadout
 			point={activePoint}
-			primaryLabel={labels.primary}
-			secondaryLabel={labels.secondary}
+			primaryLabel={onForecast ? 'Si repitiera su mejor mes' : labels.primary}
+			secondaryLabel={onForecast ? 'Si repitiera su peor mes' : labels.secondary}
 			{isPercent}
 			{formatValue}
-			formatDate={fmtLongDate}
+			formatDate={growthFullDate}
 		/>
 
 		<GrowthChart
-			{points}
+			points={chartPoints}
 			{scale}
+			{forecastFrom}
 			active={activeIndex}
 			primaryLabel={labels.primary}
 			secondaryLabel={labels.secondary}
@@ -280,7 +316,7 @@
 			baseline={isPercent ? 0 : null}
 			{formatAbbrev}
 			formatDate={fmtDate}
-			formatFullDate={fmtLongDate}
+			formatFullDate={growthFullDate}
 			{formatValue}
 			onactivate={(index) => (activeIndex = index)}
 		/>
@@ -301,6 +337,8 @@
 				La rentabilidad descuenta aportes y retiros: solo se mueve con el mercado. La ganancia sobre
 				coste sí depende de cuándo entró cada aporte, y por eso las dos líneas se separan.
 			</p>
+		{:else}
+			<GrowthForecast {forecast} {completeMonths} formatMoney={fmtMoney} />
 		{/if}
 	{/if}
 </div>

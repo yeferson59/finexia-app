@@ -53,6 +53,15 @@
 		formatFullDate: (iso: string) => string;
 		/** Texto para el lector de pantalla y la tabla oculta. */
 		formatValue: (value: number) => string;
+		/**
+		 * Índice del primer punto proyectado; `null` cuando no se proyecta nada.
+		 *
+		 * Los puntos vienen en una sola serie —el historial y luego la proyección—
+		 * para que el eje, el cursor y la escala los traten igual. Lo único que
+		 * cambia a partir de aquí es cómo se dibujan: la línea pasa a discontinua
+		 * y el relleno se corta, porque lo de la derecha no ocurrió.
+		 */
+		forecastFrom?: number | null;
 		onactivate: (index: number | null) => void;
 	}
 
@@ -68,6 +77,7 @@
 		formatDate,
 		formatFullDate,
 		formatValue,
+		forecastFrom = null,
 		onactivate
 	}: Props = $props();
 
@@ -78,8 +88,49 @@
 	const toX = (i: number) => toPlotX(i, points.length);
 	const toY = (v: number) => toPlotY(v, scale);
 
-	const mvPoints = $derived(points.map((p, i) => `${toX(i)},${toY(p.mv)}`).join(' '));
-	const cbPoints = $derived(points.map((p, i) => `${toX(i)},${toY(p.cb)}`).join(' '));
+	/*
+	 * Dónde acaba lo que de verdad pasó. Sin proyección es la serie entera, y con
+	 * ella el último día con dato: es el punto que las dos líneas comparten, así
+	 * que entra en los dos trazos y la curva no se rompe en el empalme.
+	 */
+	const historyEnd = $derived(forecastFrom === null ? points.length : Math.max(0, forecastFrom));
+	const hasForecast = $derived(historyEnd > 0 && historyEnd < points.length);
+
+	const coords = (from: number, to: number, pick: (p: GrowthPoint) => number) =>
+		points
+			.slice(from, to)
+			.map((p, i) => `${toX(from + i)},${toY(pick(p))}`)
+			.join(' ');
+
+	const mvPoints = $derived(coords(0, historyEnd, (p) => p.mv));
+	const cbPoints = $derived(coords(0, historyEnd, (p) => p.cb));
+	/*
+	 * La banda proyectada: `mv` lleva el techo —si se repitiera el mejor mes— y
+	 * `cb` el suelo —si se repitiera el peor—. Los dos trazos arrancan en el
+	 * último punto real, así que la banda se abre desde donde está la cartera
+	 * hoy en vez de aparecer ya separada.
+	 *
+	 * El coste no se prolonga: proyectar aportes futuros sería inventarse lo que
+	 * su dueño va a ingresar, y por eso `cb` significa otra cosa a partir de aquí.
+	 */
+	const forecastHigh = $derived(
+		hasForecast ? coords(historyEnd - 1, points.length, (p) => p.mv) : ''
+	);
+	const forecastLow = $derived(
+		hasForecast ? coords(historyEnd - 1, points.length, (p) => p.cb) : ''
+	);
+	/* El relleno de la banda: el techo de ida y el suelo de vuelta. */
+	const forecastBand = $derived.by(() => {
+		if (!hasForecast) return '';
+		const back = points
+			.slice(historyEnd - 1)
+			.map((p, i) => ({ x: toX(historyEnd - 1 + i), y: toY(p.cb) }))
+			.reverse()
+			.map((c) => `${c.x},${c.y}`)
+			.join(' ');
+
+		return `${forecastHigh} ${back}`;
+	});
 	/*
 	 * El relleno cierra contra la línea de referencia, no siempre contra el
 	 * suelo: en porcentaje una racha negativa tiene que verse colgando por
@@ -89,8 +140,10 @@
 	const floorY = $derived(
 		baseline === null ? padT + plotH : Math.min(Math.max(toY(baseline), padT), padT + plotH)
 	);
+	/* El relleno solo cubre el historial: sombrear la proyección la pintaría
+	   con el mismo peso que lo que de verdad ocurrió. */
 	const mvFill = $derived(
-		points.length < 2 ? '' : `${mvPoints} ${toX(points.length - 1)},${floorY} ${toX(0)},${floorY}`
+		historyEnd < 2 ? '' : `${mvPoints} ${toX(historyEnd - 1)},${floorY} ${toX(0)},${floorY}`
 	);
 
 	const yTicks = $derived(scale.ticks.map((value) => ({ value, y: toY(value) })));
@@ -119,9 +172,34 @@
 	 * patrón `slider` de ARIA: el lector de pantalla anuncia `aria-valuetext` en
 	 * cada flecha sin necesidad de una región `aria-live` que lo repita.
 	 */
+	/** Si el punto `i` es proyección y no historial. */
+	const isForecast = (i: number) => hasForecast && i >= historyEnd;
+
+	/*
+	 * Las filas de la tabla oculta: el historial entero y, de la proyección, solo
+	 * los cierres de mes.
+	 *
+	 * La curva proyectada avanza al mismo paso que el historial para que el eje
+	 * no mienta, así que un año son cientos de puntos. Dictarlos uno a uno no
+	 * informa de nada —es una exponencial, y entre dos días consecutivos no pasa
+	 * nada— y sepulta el historial, que sí es dato.
+	 */
+	const tableRows = $derived(
+		points
+			.map((point, i) => ({ point, i }))
+			.filter(
+				({ point, i }) =>
+					!isForecast(i) ||
+					i === points.length - 1 ||
+					points[i + 1].date.slice(0, 7) !== point.date.slice(0, 7)
+			)
+	);
+
 	const valueText = $derived(
-		activePoint
-			? `${formatDate(activePoint.date)}: ${primaryLabel} ${formatValue(activePoint.mv)}, ${secondaryLabel} ${formatValue(activePoint.cb)}`
+		activePoint && active !== null
+			? isForecast(active)
+				? `${formatDate(activePoint.date)}, proyección: entre ${formatValue(activePoint.cb)} y ${formatValue(activePoint.mv)}`
+				: `${formatDate(activePoint.date)}: ${primaryLabel} ${formatValue(activePoint.mv)}, ${secondaryLabel} ${formatValue(activePoint.cb)}`
 			: 'Ningún punto seleccionado'
 	);
 
@@ -197,8 +275,25 @@
 		<polyline points={cbPoints} class="line-cost" />
 		<polyline points={mvPoints} class="line-value" />
 
-		{#if points.length > 0}
-			{@const lastIndex = points.length - 1}
+		{#if hasForecast}
+			<!-- La banda va debajo de sus bordes y de la raya de hoy: es el fondo
+			     sobre el que se leen, no una figura más. -->
+			<polygon points={forecastBand} class="band" />
+			<!-- La raya de hoy: sin ella la banda parece parte del historial, y lo
+			     que separa las dos mitades es justo que una pasó. -->
+			<line
+				x1={toX(historyEnd - 1)}
+				y1={padT}
+				x2={toX(historyEnd - 1)}
+				y2={padT + plotH}
+				class="today"
+			/>
+			<polyline points={forecastLow} class="line-forecast" />
+			<polyline points={forecastHigh} class="line-forecast" />
+		{/if}
+
+		{#if historyEnd > 0}
+			{@const lastIndex = historyEnd - 1}
 			<circle cx={toX(lastIndex)} cy={toY(points[lastIndex].mv)} r="4" class="last-dot" />
 		{/if}
 
@@ -217,7 +312,17 @@
 
 		{#if active !== null && activePoint}
 			<line x1={toX(active)} y1={padT} x2={toX(active)} y2={padT + plotH} class="cursor" />
-			<circle cx={toX(active)} cy={toY(activePoint.cb)} r="3.5" class="cursor-dot cost" />
+			<!-- Sobre la banda los dos puntos son sus dos bordes, así que el de
+			     abajo se marca en ámbar como el de arriba: ahí no hay coste que
+			     señalar, porque la proyección no supone aportes. -->
+			<circle
+				cx={toX(active)}
+				cy={toY(activePoint.cb)}
+				r={isForecast(active) ? 4 : 3.5}
+				class="cursor-dot"
+				class:cost={!isForecast(active)}
+				class:value={isForecast(active)}
+			/>
 			<circle cx={toX(active)} cy={toY(activePoint.mv)} r="4.5" class="cursor-dot value" />
 		{/if}
 	</svg>
@@ -241,9 +346,12 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each points as point (point.date)}
+				{#each tableRows as { point, i } (point.date)}
 					<tr>
-						<th scope="row"><time datetime={point.date}>{formatFullDate(point.date)}</time></th>
+						<th scope="row">
+							<time datetime={point.date}>{formatFullDate(point.date)}</time>
+							{#if isForecast(i)}(proyección: mejor y peor mes){/if}
+						</th>
 						<td>{formatValue(point.mv)}</td>
 						<td>{formatValue(point.cb)}</td>
 					</tr>
@@ -306,6 +414,32 @@
 		stroke-width: 2.5;
 		stroke-linecap: round;
 		stroke-linejoin: round;
+	}
+
+	/* La proyección, del mismo color pero discontinua y más fina: es la misma
+	   cartera, y la línea rota dice que a partir de ahí no es un dato. */
+	.line-forecast {
+		fill: none;
+		stroke: var(--amber);
+		stroke-width: 2;
+		stroke-dasharray: 5 5;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		opacity: 0.7;
+	}
+
+	.today {
+		stroke: var(--border-strong);
+		stroke-width: 1;
+		stroke-dasharray: 2 4;
+	}
+
+	/* El rango entre los dos extremos. Muy tenue a propósito: lo que hay dentro
+	   no es un dato, es todo lo que cabe entre el mejor mes y el peor. */
+	.band {
+		fill: var(--amber);
+		fill-opacity: 0.09;
+		stroke: none;
 	}
 
 	.last-dot {
