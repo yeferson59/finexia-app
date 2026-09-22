@@ -549,7 +549,7 @@ Una vez creado, el bolsillo cuelga de su cuenta por una línea que baja desde el
 
 **Mover a otra plataforma.** En el recuadro **A** eliges la plataforma, la moneda y el cajón a los que va, así que el mismo botón sirve para pasar dinero de tu app de ahorro a tu bróker. Es el paso que ocurre de verdad antes de comprar: el dinero llega al bróker y, desde ahí, una compra en esa plataforma se puede pagar con él (ver 5.3). El saldo de destino no tiene que existir todavía; se abre solo.
 
-Si la moneda de destino es otra, se te pide **la tasa**: cuántas unidades de la moneda de destino te dieron por cada una de la de origen. Pon la que te aplicó la plataforma ese día, no la de hoy. Debajo verás cuánto llega. Sin tasa el importe viajaría tal cual con otra etiqueta, que es la diferencia entre cuatrocientos mil pesos y cuatrocientos mil dólares.
+Si la moneda de destino es otra, aparece un segundo importe: **Llegan**. Escribes los dos números de tu extracto —lo que salió y lo que entró, por ejemplo 400.000 COP y 98,50 USD— y la app te enseña debajo la tasa que sale de ahí, «1 USD = 4.060,91 COP», solo para que la reconozcas. No se te pide la tasa: los dos importes los tienes delante y la tasa no, y así lo que queda guardado es exactamente lo que llegó, sin centavos de más ni de menos.
 
 > **Mover no cambia tu rentabilidad.** Las dos patas —lo que sale de un lado y entra en el otro— se anotan a la vez y se compensan. El dinero cambió de sitio dentro del portafolio, no entró ni salió: lo único que cambia es dónde está y a qué tasa rinde desde ese día.
 

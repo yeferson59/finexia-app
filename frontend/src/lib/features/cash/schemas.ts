@@ -284,19 +284,25 @@ export const cashPocketDeleteSchema = z.object({
 });
 
 /**
- * La tasa de un traslado: a cuánto convirtió la plataforma.
+ * Lo que llega al otro lado de un traslado, en la moneda de destino.
  *
- * Vacía es «no la dijeron», no «uno». La diferencia importa: dentro de una
- * moneda no hace falta ninguna, y entre dos, tomarla por uno trasladaría el
- * importe tal cual con otra etiqueta —400.000 pesos llegando como 400.000
- * dólares—. Cuál de los dos casos es lo decide el objeto entero, más abajo.
+ * Vacío es «no lo dijeron», no «cero». Dentro de una moneda no hace falta
+ * —llega lo mismo que sale— y entre dos es obligatorio: sin él el importe
+ * viajaría tal cual con otra etiqueta, que es la diferencia entre 400.000 pesos
+ * y 400.000 dólares. Cuál de los dos casos es lo decide el objeto entero.
+ *
+ * Se pide el importe y no la tasa porque los dos importes son los que están en
+ * el extracto —lo que salió y lo que entró— y la tasa entre ellos no. Guardarlo
+ * tal cual además deja el saldo exacto: un importe calculado desde una tasa cae
+ * a unos centavos de lo que de verdad llegó, y esos centavos se leerían como
+ * ganancia.
  */
-const moveRate = z
+const arrivingAmount = z
 	.union([z.string(), z.number(), z.null()])
 	.nullish()
 	.transform((v) => (v === null || v === undefined || v === '' ? undefined : Number(v)))
 	.refine((v) => v === undefined || (Number.isFinite(v) && v > 0), {
-		error: 'La tasa tiene que ser mayor que cero.'
+		error: 'Lo que llega tiene que ser mayor que cero.'
 	});
 
 /**
@@ -320,7 +326,7 @@ export const cashMoveSchema = z
 		amount: z.coerce
 			.number('Escribe el importe con números.')
 			.positive('El importe tiene que ser mayor que cero.'),
-		fxRate: moveRate,
+		toAmount: arrivingAmount,
 		date: z.iso.date('Elige la fecha del movimiento.'),
 		notes: z
 			.string()
@@ -337,21 +343,21 @@ export const cashMoveSchema = z
 	)
 	.superRefine((v, ctx) => {
 		if (v.toCurrency === v.currency) {
-			if (v.fxRate !== undefined && v.fxRate !== 1) {
+			if (v.toAmount !== undefined && v.toAmount !== v.amount) {
 				ctx.addIssue({
 					code: 'custom',
-					path: ['fxRate'],
-					message: `El ${v.currency} no se convierte en sí mismo: deja la tasa vacía.`
+					path: ['toAmount'],
+					message: `Dentro de ${v.currency} llega lo mismo que sale.`
 				});
 			}
 			return;
 		}
 
-		if (v.fxRate === undefined) {
+		if (v.toAmount === undefined) {
 			ctx.addIssue({
 				code: 'custom',
-				path: ['fxRate'],
-				message: `Escribe a cuánto convirtió: cuánto ${v.toCurrency} te dieron por cada ${v.currency}.`
+				path: ['toAmount'],
+				message: `Escribe cuántos ${v.toCurrency} llegaron.`
 			});
 		}
 	});

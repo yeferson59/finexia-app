@@ -349,7 +349,7 @@ func TestCashMoveInputValidate(t *testing.T) {
 		}},
 		{name: "to another platform and another currency", mutate: func(in *CashMoveInput) {
 			in.ToSource, in.To = broker, uuid.UUID{}
-			in.ToCurrency, in.FXRate = money.USD, mustDecimal(t, "0.00025")
+			in.ToCurrency, in.ToAmount = money.USD, mustDecimal(t, "98.50")
 		}},
 		// The main account of another platform is not the main account of this
 		// one, so two zero drawers are two different places.
@@ -359,13 +359,13 @@ func TestCashMoveInputValidate(t *testing.T) {
 		{name: "to where it already is", mutate: func(in *CashMoveInput) {
 			in.From, in.To = pocket, pocket
 		}, wantErr: "moving money to where it already is"},
-		{name: "converting a currency into itself", mutate: func(in *CashMoveInput) {
-			in.FXRate = mustDecimal(t, "1.07")
-		}, wantErr: "does not convert into itself"},
-		{name: "crossing currencies without a rate", mutate: func(in *CashMoveInput) {
+		{name: "arriving at something else in the same currency", mutate: func(in *CashMoveInput) {
+			in.ToAmount = mustDecimal(t, "399000")
+		}, wantErr: "arrives at what it left"},
+		{name: "crossing currencies without saying what arrived", mutate: func(in *CashMoveInput) {
 			in.ToSource, in.To = broker, uuid.UUID{}
-			in.ToCurrency, in.FXRate = money.USD, decimal.Decimal{}
-		}, wantErr: "needs the rate the platform applied"},
+			in.ToCurrency, in.ToAmount = money.USD, decimal.Decimal{}
+		}, wantErr: "how much USD arrived"},
 		{name: "arriving in a currency nobody keeps", mutate: func(in *CashMoveInput) {
 			in.ToCurrency = money.DKK
 		}, wantErr: "the currency it arrives in"},
@@ -397,8 +397,9 @@ func TestCashMoveInputValidate(t *testing.T) {
 	}
 }
 
-// What arrives is what left, converted at the stated rate: the legs are the
-// same value on both sides, which is why the move does not touch the return.
+// The two legs are the two amounts the move states: what left the savings app
+// and what reached the broker, each in its own currency and neither derived
+// from the other.
 func TestCashMoveLegsConvert(t *testing.T) {
 	bank := uuid.New()
 
@@ -407,8 +408,9 @@ func TestCashMoveLegsConvert(t *testing.T) {
 		Amount:   mustDecimal(t, "400000"),
 		Date:     time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC),
 		Notes:    "para comprar AAPL",
-	}.withDefaults(bank)
-	in.ToSource, in.ToCurrency, in.FXRate = uuid.New(), money.USD, mustDecimal(t, "0.00025")
+	}
+	in.ToSource, in.ToCurrency, in.ToAmount = uuid.New(), money.USD, mustDecimal(t, "98.50")
+	in = in.withDefaults(bank)
 
 	out, into := in.legs()
 
@@ -418,8 +420,11 @@ func TestCashMoveLegsConvert(t *testing.T) {
 	if out.Currency != money.COP || out.Amount.String() != "400000" {
 		t.Errorf("what left = %s %s, want 400000 COP", out.Amount, out.Currency)
 	}
-	if into.Currency != money.USD || into.Amount.String() != "100" {
-		t.Errorf("what arrived = %s %s, want 100 USD", into.Amount, into.Currency)
+	// To the cent the statement says, not to what a rate would have computed.
+	// The trailing zero goes in the rounding to eight decimals; the value does
+	// not change.
+	if into.Currency != money.USD || into.Amount.String() != "98.5" {
+		t.Errorf("what arrived = %s %s, want 98.50 USD", into.Amount, into.Currency)
 	}
 	// Neither leg carries a fee: one would stop the two cancelling out and the
 	// money would read as a loss.

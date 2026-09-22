@@ -1180,7 +1180,7 @@ saldos de un portafolio: dos cajones de una cuenta, o dos cuentas distintas.
   "toCurrency": "USD",
   "toPocketId": null,
   "amount": "400000",
-  "fxRate": "0.00025",
+  "toAmount": "98.50",
   "date": "2026-09-21T00:00:00Z",
   "notes": "para comprar AAPL"
 }
@@ -1200,11 +1200,14 @@ filas, `{from, to}`.
   disponible para `payFromCash`.
 - El saldo de destino **no tiene que existir**: se abre como lo abriría un primer
   depósito, así que se puede trasladar a un bróker que nunca tuvo efectivo.
-- `fxRate` es cuántos `toCurrency` se recibieron por cada `currency`. Entre dos
-  monedas es **obligatorio** (**400** sin él): sin tasa el importe llegaría tal
-  cual con otra etiqueta. Dentro de una sola moneda tiene que ser 1 u omitirse
-  (**400** con cualquier otra: una moneda no se convierte en sí misma). Lo que
-  llega es `amount × fxRate`, redondeado a ocho decimales.
+- `amount` es lo que sale y `toAmount` lo que llega, cada uno en su moneda.
+  Entre dos monedas `toAmount` es **obligatorio** (**400** sin él): sin él el
+  importe llegaría tal cual con otra etiqueta. Dentro de una sola moneda se
+  omite, o se manda igual a `amount` (**400** con cualquier otro: dentro de una
+  moneda llega lo mismo que sale). Se depositan los `toAmount` que se dicen,
+  redondeados a ocho decimales: **no hay tasa en el cuerpo**, porque los dos
+  importes son los que trae el extracto y un importe derivado de una tasa cae a
+  unos centavos del real, que se leerían como ganancia.
 - Origen y destino tienen que ser sitios distintos (**400**), y **el sitio es
   plataforma, moneda y cajón a la vez**: la cuenta principal de dos plataformas
   son dos destinos aunque las dos manden `pocketId` nulo.

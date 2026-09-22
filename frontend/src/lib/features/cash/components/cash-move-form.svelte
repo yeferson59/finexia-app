@@ -11,9 +11,12 @@
 	 * una vez aplicada la tasa— la rentabilidad del portafolio no se mueve: el
 	 * dinero cambió de sitio, no entró ni salió.
 	 *
-	 * Cruzando monedas hace falta la tasa a la que convirtió la plataforma. Sin
-	 * ella el importe llegaría tal cual con otra etiqueta, que es la diferencia
-	 * entre cuatrocientos mil pesos y cuatrocientos mil dólares.
+	 * Cruzando monedas se piden los dos importes: lo que salió y lo que llegó.
+	 * No la tasa —0,00025 no es un número que nadie tenga a mano, mientras que
+	 * los dos importes están los dos en el extracto—, y así lo que se guarda es
+	 * exactamente lo que llegó, sin los centavos que sobran o faltan al
+	 * calcularlo desde una tasa. La tasa se enseña debajo, ya despejada y en la
+	 * dirección en que se piensa: cuántos pesos por cada dólar.
 	 *
 	 * El portafolio no se pregunta: el dinero se mueve dentro del portafolio en
 	 * que ya está. Moverlo a otro portafolio sería un retiro y un depósito, y
@@ -83,7 +86,7 @@
 	let to = $state('');
 
 	let amount = $state('');
-	let fxRate = $state('');
+	let toAmount = $state('');
 	let date = $derived(todayLocalDateString());
 	let notes = $state('');
 	let submitting = $state(false);
@@ -125,10 +128,10 @@
 		}
 	});
 
-	/* Dentro de una moneda no hay nada que convertir, y una tasa colgada de un
-	   traslado anterior mandaría una conversión que el backend rechaza. */
+	/* Dentro de una moneda llega lo mismo que sale, y un importe de llegada
+	   colgado de un traslado anterior sería una conversión que no hubo. */
 	$effect(() => {
-		if (!crossing || toCurrency === target?.account.currency) fxRate = '';
+		if (toCurrency === target?.account.currency) toAmount = '';
 	});
 
 	function chooseOrigin(id: string) {
@@ -149,7 +152,7 @@
 	function close() {
 		error = '';
 		amount = '';
-		fxRate = '';
+		toAmount = '';
 		notes = '';
 		onClose();
 	}
@@ -169,10 +172,12 @@
 		);
 	});
 
-	/* Lo que llega al otro lado: el importe a la tasa escrita. Sin tasa todavía
-	   no hay nada que enseñar, que es distinto de que llegue cero. */
-	const rate = $derived(parseFloat(fxRate) || 0);
-	const arrives = $derived((parseFloat(amount) || 0) * rate);
+	/* La tasa que sale de los dos importes, para poder reconocerla: se enseña
+	   como «1 USD = 4.060,91 COP», que es como se dice, y no como el 0,00025 que
+	   habría que escribir al revés. */
+	const leaves = $derived(parseFloat(amount) || 0);
+	const arrives = $derived(parseFloat(toAmount) || 0);
+	const impliedRate = $derived(leaves > 0 && arrives > 0 ? leaves / arrives : 0);
 
 	const money = (value: number, code = target?.account.currency ?? 'USD') =>
 		privacy.money(formatCurrency(value, code));
@@ -281,28 +286,23 @@
 				</div>
 			</div>
 
-			{#if crossing && toCurrency !== target.account.currency}
+			{#if toCurrency !== target.account.currency}
 				<div class="field">
-					<label for="cash-move-rate">
-						Tasa: cuántos {toCurrency} por cada {target.account.currency}
-					</label>
-					<input
-						id="cash-move-rate"
-						name="fxRate"
-						type="number"
-						step="any"
-						min="0"
-						inputmode="decimal"
-						placeholder="0.00025"
-						bind:value={fxRate}
+					<label for="cash-move-arrives">Llegan</label>
+					<CashMoneyInput
+						id="cash-move-arrives"
+						name="toAmount"
+						unit={toCurrency}
+						size="lg"
+						bind:value={toAmount}
 						required
-						aria-describedby="cash-move-rate-hint"
+						aria-describedby="cash-move-arrives-hint"
 					/>
-					<p class="hint" id="cash-move-rate-hint">
-						{#if rate > 0 && arrives > 0}
-							Llegan <strong>{money(arrives, toCurrency)}</strong>.
+					<p class="hint" id="cash-move-arrives-hint">
+						{#if impliedRate > 0}
+							Son <strong>1 {toCurrency} = {money(impliedRate, target.account.currency)}</strong>.
 						{:else}
-							La que aplicó la plataforma ese día, no la de hoy.
+							Lo que de verdad entró en la otra cuenta, según tu extracto.
 						{/if}
 					</p>
 				</div>

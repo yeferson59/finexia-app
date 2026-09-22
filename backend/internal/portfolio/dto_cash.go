@@ -76,9 +76,12 @@ type PaginatedCashMovementsDTO struct {
 // toSourceId and toCurrency are the account it arrives at, and both default to
 // the one it left — the move between drawers, which is what this was before.
 // Naming another platform transfers the money to it, which is what happens
-// before a purchase on a broker funded from a savings app. fxRate is what one
-// unit of currency was worth in toCurrency that day; it is only needed when the
-// two differ.
+// before a purchase on a broker funded from a savings app.
+//
+// amount is what leaves and toAmount what arrives; across two currencies both
+// are required, and within one, toAmount can be left out because it is the
+// same money. The two amounts are stated rather than a rate: they are the
+// figures on the statement, and they record exactly what arrived.
 type MoveCashRequestDTO struct {
 	PortfolioID  uuid.UUID       `json:"portfolioId"`
 	SourceID     uuid.UUID       `json:"sourceId"`
@@ -88,7 +91,7 @@ type MoveCashRequestDTO struct {
 	ToCurrency   money.Currency  `json:"toCurrency"`
 	ToPocketID   uuid.UUID       `json:"toPocketId"`
 	Amount       decimal.Decimal `json:"amount"`
-	FXRate       decimal.Decimal `json:"fxRate"`
+	ToAmount     decimal.Decimal `json:"toAmount"`
 	Date         time.Time       `json:"date"`
 	Notes        string          `json:"notes"`
 }
@@ -100,8 +103,8 @@ func (d MoveCashRequestDTO) Input() CashMoveInput {
 		To:         d.ToPocketID,
 		ToSource:   d.ToSourceID,
 		ToCurrency: d.ToCurrency,
-		FXRate:     d.FXRate,
 		Amount:     d.Amount,
+		ToAmount:   d.ToAmount,
 		Date:       d.Date,
 		Notes:      d.Notes,
 	}

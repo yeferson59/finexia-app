@@ -414,8 +414,8 @@ func (r *PostgresRepository) MoveCash(ctx context.Context, userID, portfolioID, 
 
 	// The same defaults the service applies, because the fields below are read
 	// here: a caller that named only a drawer means the account the money is
-	// already in, and reading its zero values as a platform and a rate would
-	// look up nothing and multiply by nothing.
+	// already in, and reading its zero values as a platform and an arriving
+	// amount would look up nothing and deposit nothing.
 	in = in.withDefaults(sourceID)
 
 	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {

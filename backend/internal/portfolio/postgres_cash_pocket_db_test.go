@@ -8,7 +8,6 @@ import (
 
 	"uuid"
 
-	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
@@ -335,7 +334,7 @@ func TestMoveCashCrossesPlatformsAndCurrencies(t *testing.T) {
 		ToSource:   broker,
 		ToCurrency: money.USD,
 		Amount:     mustDecimal(t, "400000"),
-		FXRate:     mustDecimal(t, "0.00025"),
+		ToAmount:   mustDecimal(t, "98.50"),
 		Date:       cashDay,
 		Notes:      "para comprar AAPL",
 	})
@@ -352,18 +351,20 @@ func TestMoveCashCrossesPlatformsAndCurrencies(t *testing.T) {
 	}
 
 	sameAmount(t, "what the savings app keeps", f.balanceOf(t, savings.EntryID).Balance, "200000")
-	sameAmount(t, "what reached the broker", f.balanceOf(t, move.To.EntryID).Balance, "100")
+	// To the cent the statement says: the deposit is the amount the move stated,
+	// not one recomputed from a rate.
+	sameAmount(t, "what reached the broker", f.balanceOf(t, move.To.EntryID).Balance, "98.5")
 
 	// More than the origin holds is refused whole: neither leg is written, so
 	// the broker does not end up with money the bank never sent.
 	_, err = f.repo.MoveCash(ctx, f.userID, f.portfolioID, f.sourceID, CashMoveInput{
 		Currency: money.COP, ToSource: broker, ToCurrency: money.USD,
-		Amount: mustDecimal(t, "9000000"), FXRate: mustDecimal(t, "0.00025"), Date: cashDay,
+		Amount: mustDecimal(t, "9000000"), ToAmount: mustDecimal(t, "2216"), Date: cashDay,
 	})
 	if !errors.Is(err, ErrInsufficientCash) {
 		t.Errorf("moving more than it holds = %v, want ErrInsufficientCash", err)
 	}
-	sameAmount(t, "the broker after the refusal", f.balanceOf(t, move.To.EntryID).Balance, "100")
+	sameAmount(t, "the broker after the refusal", f.balanceOf(t, move.To.EntryID).Balance, "98.5")
 
 	// A platform that is not the owner's is not a destination, whatever it holds.
 	stranger := uuid.New()
@@ -376,7 +377,7 @@ func TestMoveCashCrossesPlatformsAndCurrencies(t *testing.T) {
 
 	_, err = f.repo.MoveCash(ctx, f.userID, f.portfolioID, f.sourceID, CashMoveInput{
 		Currency: money.COP, ToSource: theirs, ToCurrency: money.COP,
-		Amount: mustDecimal(t, "1000"), FXRate: decimal.One, Date: cashDay,
+		Amount: mustDecimal(t, "1000"), Date: cashDay,
 	})
 	if !errors.Is(err, ErrPortfolioOrSourceNotFound) {
 		t.Errorf("moving to somebody else's platform = %v, want ErrPortfolioOrSourceNotFound", err)

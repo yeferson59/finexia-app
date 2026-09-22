@@ -209,15 +209,20 @@ type CashMoveInput struct {
 	// the conversion the platform applied.
 	ToSource   uuid.UUID
 	ToCurrency money.Currency
-	// FXRate is what one unit of Currency was worth in ToCurrency the day the
-	// money moved. Within a currency it is one — a currency does not convert
-	// into itself at anything else — and between two it is required: without it
-	// the arriving amount would be the departing one relabelled.
-	FXRate decimal.Decimal
-	// Amount is what moves, in Currency.
-	Amount decimal.Decimal
-	Date   time.Time
-	Notes  string
+	// Amount is what leaves, in Currency, and ToAmount what arrives, in
+	// ToCurrency. Within one currency they are the same number and ToAmount can
+	// be left out; between two it is required.
+	//
+	// The two amounts are stated rather than derived from a rate because the two
+	// amounts are what the mover has in front of them — the pesos that left the
+	// app and the dollars that reached the broker are both printed on the
+	// statement, and the rate between them is not. Stating them also records
+	// exactly what happened: an amount computed from a rate lands a few cents
+	// away from what really arrived, and those cents would read as a gain.
+	Amount   decimal.Decimal
+	ToAmount decimal.Decimal
+	Date     time.Time
+	Notes    string
 }
 
 // withDefaults fills the destination a move left unsaid: the account the money
@@ -232,11 +237,12 @@ func (in CashMoveInput) withDefaults(sourceID uuid.UUID) CashMoveInput {
 		in.ToCurrency = in.Currency
 	}
 
-	// Only within one currency, where one is the only rate there is. Left at
-	// zero across two, the move is one that forgot to say what it converted at,
-	// and Validate refuses it rather than moving the amount over unchanged.
-	if in.FXRate.IsZero() && in.ToCurrency == in.Currency {
-		in.FXRate = decimal.One
+	// Within one currency what arrives is what left, so it need not be said.
+	// Across two, left at zero, the move is one that forgot to say how much
+	// reached the other side, and Validate refuses it rather than carrying the
+	// departing amount over unchanged.
+	if in.ToAmount.IsZero() && in.ToCurrency == in.Currency {
+		in.ToAmount = in.Amount
 	}
 
 	return in
@@ -269,20 +275,21 @@ func (in CashMoveInput) Validate(sourceID uuid.UUID) error {
 		return invalidCashMove("from and to must be different: moving money to where it already is does nothing")
 	}
 
-	// The rate is checked both ways round. A rate of one between two currencies
-	// would file a conversion as if there had been none, and any other rate
-	// within one currency is the mistake the entry form already refuses: a
-	// currency does not convert into itself.
-	if in.ToCurrency == in.Currency {
-		if in.FXRate.Cmp(decimal.One) != 0 {
-			return invalidCashMove("%s does not convert into itself: leave the rate out of a move that stays in one currency", in.Currency)
-		}
-	} else if !in.FXRate.IsPos() {
-		return invalidCashMove("a move from %s to %s needs the rate the platform applied", in.Currency, in.ToCurrency)
-	}
-
 	if !in.Amount.IsPos() {
 		return invalidCashMove("amount must be greater than zero")
+	}
+
+	// What arrives is checked against what leaves. Within one currency they are
+	// the same money and any other figure is a conversion that did not happen;
+	// across two, a missing one would carry the departing amount over with a
+	// different label, which is the difference between four hundred thousand
+	// pesos and four hundred thousand dollars.
+	if in.ToCurrency == in.Currency {
+		if in.ToAmount.Cmp(in.Amount) != 0 {
+			return invalidCashMove("a move that stays in %s arrives at what it left: leave out what arrives, or state the same amount", in.Currency)
+		}
+	} else if !in.ToAmount.IsPos() {
+		return invalidCashMove("a move from %s to %s has to say how much %s arrived", in.Currency, in.ToCurrency, in.ToCurrency)
 	}
 
 	if in.Date.IsZero() {
@@ -302,10 +309,10 @@ func (in CashMoveInput) Validate(sourceID uuid.UUID) error {
 // stop cancelling out, and the money would read as a loss rather than as money
 // that changed hands.
 //
-// The deposit arrives in the destination's currency, converted at the stated
-// rate and rounded to the eight decimals the balances are kept at. Within one
-// currency the rate is one and the two amounts are the same number, which is
-// the move this was before it could cross accounts.
+// The deposit arrives in the destination's currency, for the amount the move
+// states, rounded to the eight decimals the balances are kept at. Within one
+// currency that is the amount that left, which is the move this was before it
+// could cross accounts.
 func (in CashMoveInput) legs() (out, into CashMovementInput) {
 	out = CashMovementInput{
 		Kind:     CashKindWithdrawal,
@@ -318,7 +325,7 @@ func (in CashMoveInput) legs() (out, into CashMovementInput) {
 	into = out
 	into.Kind = CashKindDeposit
 	into.Currency = in.ToCurrency
-	into.Amount = in.Amount.Mul(in.FXRate).RoundHAZ(8)
+	into.Amount = in.ToAmount.RoundHAZ(8)
 
 	return out, into
 }

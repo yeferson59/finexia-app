@@ -224,29 +224,30 @@ describe('formularios de bolsillos', () => {
 		const converted = cashMoveSchema.safeParse({
 			...move,
 			toCurrency: 'USD',
-			fxRate: '0.00025'
+			toAmount: '98.50'
 		});
 		expect(converted.success && converted.data).toMatchObject({
 			toSourceId: BROKER,
 			toCurrency: 'USD',
-			fxRate: 0.00025
+			toAmount: 98.5
 		});
 
-		// Cruzar monedas sin tasa trasladaría el importe con otra etiqueta.
-		const noRate = cashMoveSchema.safeParse({ ...move, toCurrency: 'USD' });
-		expect(noRate.success).toBe(false);
+		// Cruzar monedas sin decir lo que llegó trasladaría el importe con otra
+		// etiqueta: 400.000 pesos entrando como 400.000 dólares.
+		const noArrival = cashMoveSchema.safeParse({ ...move, toCurrency: 'USD' });
+		expect(noArrival.success).toBe(false);
 
-		// Y una tasa dentro de una misma moneda no es ninguna conversión.
-		const selfRate = cashMoveSchema.safeParse({ ...move, fxRate: '1.07' });
-		expect(selfRate.success).toBe(false);
+		// Y dentro de una misma moneda llega lo mismo que sale.
+		const shrunk = cashMoveSchema.safeParse({ ...move, toAmount: '399000' });
+		expect(shrunk.success).toBe(false);
 
-		// Sin tasa y sin cruzar monedas queda fuera del cuerpo, que es lo que el
-		// backend entiende por «no hubo conversión».
+		// Sin cruzar monedas queda fuera del cuerpo, que es lo que el backend
+		// entiende por «llega lo mismo».
 		const plain = cashMoveSchema.safeParse(move);
-		expect(plain.success && plain.data.fxRate).toBeUndefined();
+		expect(plain.success && plain.data.toAmount).toBeUndefined();
 
-		const badRate = cashMoveSchema.safeParse({ ...move, toCurrency: 'USD', fxRate: '0' });
-		expect(badRate.success).toBe(false);
+		const nothingArrives = cashMoveSchema.safeParse({ ...move, toCurrency: 'USD', toAmount: '0' });
+		expect(nothingArrives.success).toBe(false);
 	});
 
 	it('traduce los rechazos del backend', () => {
