@@ -8,15 +8,17 @@
 	 * portafolios que volvía a sumar el total de arriba y un donut de ocho
 	 * porciones cuya paleta no pasaba la comprobación de daltonismo —el morado
 	 * de «Bonos» y el azul de «Cripto» quedaban a ΔE 3,4, y el verde de «ETFs»
-	 * era exactamente el verde de «+21 %»—. Una barra no necesita ocho colores:
-	 * la identidad la lleva el nombre de la fila y la magnitud, el largo.
+	 * era exactamente el verde de «+21 %»—. La franja de arriba no necesita
+	 * ocho colores: es un solo ámbar a cinco intensidades, en el orden de las
+	 * filas, y la identidad la lleva el nombre.
 	 */
 	import { resolve } from '$app/paths';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { formatPercent, formatSignedPercent } from '$lib/shared/format/percent';
 	import { FALLBACK_CURRENCY } from '$lib/shared/currency';
-	import { CUTS, breakdownFor, type CutId } from '../breakdown';
+	import BreakdownStrip from './breakdown-strip.svelte';
+	import { CUTS, breakdownFor, stripSegments, toneOf, type CutId } from '../breakdown';
 	import type {
 		AllocationItem,
 		Platform,
@@ -54,6 +56,8 @@
 	);
 	const cut = $derived(chosen ?? fallback);
 	const data = $derived(breakdownFor(cut, source, currency));
+	const segments = $derived(stripSegments(data.rows));
+	const cutLabel = $derived(CUTS.find((c) => c.id === cut)?.label ?? '');
 
 	const money = (value: number) => privacy.money(formatCurrency(value, currency));
 
@@ -116,56 +120,67 @@
 		{#if data.rows.length === 0}
 			<p class="empty">{EMPTY[cut]}</p>
 		{:else}
+			<BreakdownStrip {segments} />
+
 			<table class="rows">
-				<caption class="sr-only">
-					Reparto del patrimonio por {CUTS.find((c) => c.id === cut)?.label.toLowerCase()}
-				</caption>
+				<caption class="sr-only">Reparto del patrimonio por {cutLabel.toLowerCase()}</caption>
 				<thead>
 					<tr>
-						<th scope="col">{CUTS.find((c) => c.id === cut)?.label}</th>
-						<th scope="col" class="col-bar">Participación</th>
+						<th scope="col">{cutLabel}</th>
+						<th scope="col" class="num">Del total</th>
 						<th scope="col" class="num">Valor</th>
-						<th scope="col" class="num">
-							{data.trailing === 'gain' ? 'Rendimiento' : 'Del total'}
-						</th>
+						{#if data.trailing === 'gain'}
+							<th scope="col" class="num">Rendimiento</th>
+						{/if}
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.rows as row (row.key)}
+					{#each data.rows as row, i (row.key)}
 						<tr>
 							<th scope="row" class="who">
-								{#if cut === 'platform'}
-									<a class="name" href={resolve(`/dashboard/platforms/${row.key}`)}>{row.label}</a>
-								{:else if cut === 'portfolio'}
-									<a class="name" href={resolve(`/dashboard/portfolios/${row.key}`)}>{row.label}</a>
-								{:else}
-									<span class="name">{row.label}</span>
-								{/if}
-								{#if row.detail}<span class="detail">{row.detail}</span>{/if}
+								<span class="who-in">
+									<span
+										class="swatch"
+										style="background: var(--tone-{toneOf(i)})"
+										aria-hidden="true"
+									></span>
+									<span class="names">
+										{#if cut === 'platform'}
+											<a class="name" href={resolve(`/dashboard/platforms/${row.key}`)}
+												>{row.label}</a
+											>
+										{:else if cut === 'portfolio'}
+											<a class="name" href={resolve(`/dashboard/portfolios/${row.key}`)}
+												>{row.label}</a
+											>
+										{:else}
+											<span class="name">{row.label}</span>
+										{/if}
+										{#if row.detail}<span class="detail">{row.detail}</span>{/if}
+									</span>
+								</span>
 							</th>
 
-							<td class="col-bar">
-								<span class="track" aria-hidden="true">
-									<span class="fill" style="width: {(row.share * 100).toFixed(2)}%"></span>
-								</span>
+							<td class="num share">
+								<span aria-hidden="true">{formatPercent(row.share * 100)}</span>
 								<span class="sr-only">{formatPercent(row.share * 100)} del total</span>
 							</td>
 
 							<td class="num value">{money(row.value)}</td>
 
-							<td
-								class="num trail"
-								class:up={(row.gainPct ?? 0) >= 0}
-								class:has={row.gainPct !== null}
-							>
-								{#if data.trailing === 'share'}
-									{formatPercent(row.share * 100)}
-								{:else if row.gainPct === null}
-									<span class="none" title="Sin precio de mercado con el que calcularlo">—</span>
-								{:else}
-									{formatSignedPercent(row.gainPct, 2)}
-								{/if}
-							</td>
+							{#if data.trailing === 'gain'}
+								<td
+									class="num trail"
+									class:up={(row.gainPct ?? 0) >= 0}
+									class:has={row.gainPct !== null}
+								>
+									{#if row.gainPct === null}
+										<span class="none" title="Sin precio de mercado con el que calcularlo">—</span>
+									{:else}
+										{formatSignedPercent(row.gainPct, 2)}
+									{/if}
+								</td>
+							{/if}
 						</tr>
 					{/each}
 				</tbody>
@@ -189,8 +204,22 @@
 </section>
 
 <style>
+	/*
+	 * Va pegado a la cifra de arriba, sin filete entre los dos: es esa misma
+	 * cifra partida, no una sección aparte.
+	 *
+	 * Los cinco tonos de la franja, mezclados con el fondo y no con opacidad:
+	 * uno translúcido cambiaría según lo que tuviera detrás. El salto entre
+	 * escalones se lee también en escala de grises, que es lo que pide una rampa.
+	 */
 	.where {
-		padding: 2rem 0;
+		--tone-0: var(--amber);
+		--tone-1: color-mix(in oklab, var(--amber) 62%, var(--bg));
+		--tone-2: color-mix(in oklab, var(--amber) 40%, var(--bg));
+		--tone-3: color-mix(in oklab, var(--amber) 29%, var(--bg));
+		--tone-4: color-mix(in oklab, var(--amber) 21%, var(--bg));
+
+		padding: 0 0 2.5rem;
 		border-bottom: 1px solid var(--border);
 	}
 
@@ -200,14 +229,14 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 1rem;
-		margin-bottom: 1.5rem;
+		margin-bottom: 1.1rem;
 	}
 
 	h2 {
 		margin: 0;
-		font-family: var(--font-body);
-		font-size: 1.05rem;
-		font-weight: 500;
+		font-family: var(--font-display);
+		font-size: 1.3rem;
+		font-weight: 400;
 		color: var(--text);
 	}
 
@@ -248,6 +277,7 @@
 
 	.rows {
 		width: 100%;
+		margin-top: 1.75rem;
 		border-collapse: collapse;
 	}
 
@@ -260,39 +290,26 @@
 		text-align: left;
 	}
 
-	tbody tr {
-		transition: background 0.15s ease;
-	}
-
-	/* Solo donde hay puntero: en una pantalla táctil el `:hover` se queda pegado
-	   a la última fila tocada y parece que estuviera seleccionada. */
-	@media (hover: hover) {
-		tbody tr:hover {
-			background: var(--panel);
-		}
+	thead th + th {
+		padding-left: 1.5rem;
 	}
 
 	tbody th,
 	tbody td {
-		padding: 0.7rem 0.75rem 0.7rem 0;
+		padding: 0.75rem 0;
 		border-bottom: 1px solid var(--border);
 		vertical-align: middle;
 	}
 
-	tbody th:first-child,
-	tbody td:first-child {
-		padding-left: 0.6rem;
+	tbody td {
+		padding-left: 1.5rem;
 	}
 
-	/* La última fila no lleva filete: el de la sección va dos dedos más abajo y
-	   las dos líneas juntas se leían como una fila vacía. */
+	/* La última fila no lleva filete: el de la sección va justo debajo y las dos
+	   líneas juntas se leían como una fila vacía. */
 	tbody tr:last-child th,
 	tbody tr:last-child td {
 		border-bottom: none;
-	}
-
-	tbody td:last-child {
-		padding-right: 0.6rem;
 	}
 
 	.who {
@@ -300,9 +317,29 @@
 		text-align: left;
 	}
 
+	.who-in {
+		display: flex;
+		align-items: baseline;
+		gap: 0.75rem;
+	}
+
+	/* El tono del tramo de la franja: es lo que ata cada fila a su parte, así
+	   que no hace falta leyenda. */
+	.swatch {
+		flex-shrink: 0;
+		width: 10px;
+		height: 10px;
+		border-radius: 2px;
+		transform: translateY(1px);
+	}
+
+	.names {
+		min-width: 0;
+	}
+
 	.name {
 		display: block;
-		font-size: 0.9rem;
+		font-size: 0.92rem;
 		color: var(--text);
 		text-decoration: none;
 		overflow-wrap: anywhere;
@@ -320,49 +357,25 @@
 		color: var(--text-dim);
 	}
 
-	/* El nombre no necesita un tercio de la fila: acotarlo acerca la barra a su
-	   etiqueta y quita el vacío que quedaba entre la barra y las cifras. */
-	thead th:first-child {
-		width: 26%;
-	}
-
-	.col-bar {
-		width: 38%;
-	}
-
-	/*
-	 * Una sola serie, así que un solo color y ninguna leyenda: el largo dice la
-	 * magnitud y el nombre de la fila, de quién es. El ámbar es el color del
-	 * valor de mercado en toda la página.
-	 */
-	.track {
-		display: block;
-		height: 6px;
-		border-radius: 3px;
-		background: var(--panel-2);
-		overflow: hidden;
-	}
-
-	.fill {
-		display: block;
-		height: 100%;
-		min-width: 2px;
-		border-radius: 0 3px 3px 0;
-		background: var(--amber);
-	}
-
 	.num {
+		width: 1%;
 		text-align: right;
+		white-space: nowrap;
 	}
 
-	/* Tabulares aquí sí: son columnas y tienen que cuadrar entre filas. */
+	/* Tabulares: son columnas y tienen que cuadrar entre filas. */
+	.share,
 	.value,
 	.trail {
-		font-family: var(--font-mono);
-		font-size: 0.85rem;
+		font-family: var(--font-figures);
+		font-size: 0.92rem;
+		font-stretch: 88%;
 		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
 		color: var(--text);
+	}
+
+	.share {
+		color: var(--text-muted);
 	}
 
 	.trail.has {
@@ -406,15 +419,12 @@
 		white-space: nowrap;
 	}
 
-	@media (max-width: 700px) {
-		.col-bar {
-			display: none;
-		}
-
-		/* Sin la barra, el nombre se queda con el ancho que necesite: acotado al
-		   26 % partía «Broker Demo» en dos líneas. */
-		thead th:first-child {
-			width: auto;
+	/* En un teléfono la franja pierde los rótulos, así que la participación se
+	   queda en su columna; lo que se estrecha es el aire entre ellas. */
+	@media (max-width: 560px) {
+		thead th + th,
+		tbody td {
+			padding-left: 0.85rem;
 		}
 	}
 </style>

@@ -1,11 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
+	STRIP_TONES,
 	breakdownFor,
 	platformBreakdown,
 	plural,
 	portfolioBreakdown,
 	sectorBreakdown,
-	typeBreakdown
+	stripSegments,
+	toneOf,
+	typeBreakdown,
+	type BreakdownRow
 } from './breakdown';
 import type {
 	AllocationItem,
@@ -310,5 +314,41 @@ describe('breakdownFor', () => {
 		expect(breakdownFor('platform', empty, 'USD').rows).toEqual([]);
 		expect(breakdownFor('type', empty, 'USD').total).toBe(0);
 		expect(breakdownFor('sector', empty, 'USD').total).toBe(0);
+	});
+});
+
+describe('stripSegments', () => {
+	const row = (key: string, share: number): BreakdownRow => ({
+		key,
+		label: key.toUpperCase(),
+		detail: '',
+		value: share * 100,
+		share,
+		gainPct: null
+	});
+
+	it('da un tramo por fila, con el tono según su puesto', () => {
+		const segments = stripSegments([row('a', 0.6), row('b', 0.3), row('c', 0.1)]);
+
+		expect(segments.map((s) => [s.key, s.tone])).toEqual([
+			['a', 0],
+			['b', 1],
+			['c', 2]
+		]);
+	});
+
+	it('junta en un último tramo las filas que no caben', () => {
+		const rows = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((key) => row(key, 1 / 7));
+		const segments = stripSegments(rows);
+
+		expect(segments).toHaveLength(STRIP_TONES);
+		expect(segments.at(-1)).toMatchObject({ key: 'resto', label: '3 más', tone: 4 });
+		expect(segments.at(-1)!.share).toBeCloseTo(3 / 7);
+		// La tabla pinta esas mismas filas con el tono del tramo que las junta.
+		expect(toneOf(6)).toBe(STRIP_TONES - 1);
+	});
+
+	it('deja fuera las filas sin peso, que no tendrían ancho', () => {
+		expect(stripSegments([row('a', 1), row('b', 0)]).map((s) => s.key)).toEqual(['a']);
 	});
 });

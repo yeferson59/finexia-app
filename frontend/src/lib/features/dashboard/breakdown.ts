@@ -223,3 +223,53 @@ export function breakdownFor(
 	if (cut === 'sector') return sectorBreakdown(data.sectors, currency);
 	return typeBreakdown(data.allocation, currency);
 }
+
+/**
+ * Tonos de la franja: el ámbar a cinco intensidades, de la fila mayor a la
+ * menor. Es una rampa ordinal y no una paleta categórica —las filas ya vienen
+ * ordenadas—, así que no hace falta que dos tonos vecinos se distingan como
+ * colores: se distinguen por el orden y por el hueco que los separa.
+ */
+export const STRIP_TONES = 5;
+
+/** Tono de la fila `index` del reparto: las que no caben comparten el último. */
+export const toneOf = (index: number): number => Math.min(index, STRIP_TONES - 1);
+
+/** Un tramo de la franja que parte el patrimonio. */
+export interface StripSegment {
+	key: string;
+	label: string;
+	/** Parte del total, de 0 a 1: el ancho del tramo. */
+	share: number;
+	tone: number;
+}
+
+/**
+ * La franja: el total partido en tramos, uno por fila.
+ *
+ * Con más filas que tonos, las pequeñas se juntan en un último tramo. Cinco
+ * tramos todavía se leen como partes de una cifra; quince astillas no, y la
+ * tabla de debajo sigue enseñando cada fila por separado con su tono.
+ */
+export function stripSegments(rows: BreakdownRow[]): StripSegment[] {
+	const visible = rows.filter((row) => row.share > 0);
+	const segment = (row: BreakdownRow, index: number): StripSegment => ({
+		key: row.key,
+		label: row.label,
+		share: row.share,
+		tone: toneOf(index)
+	});
+
+	if (visible.length <= STRIP_TONES) return visible.map(segment);
+
+	const rest = visible.slice(STRIP_TONES - 1);
+	return [
+		...visible.slice(0, STRIP_TONES - 1).map(segment),
+		{
+			key: 'resto',
+			label: `${rest.length} más`,
+			share: rest.reduce((acc, row) => acc + row.share, 0),
+			tone: STRIP_TONES - 1
+		}
+	];
+}

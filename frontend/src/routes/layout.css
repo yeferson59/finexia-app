@@ -36,6 +36,12 @@
 	--font-display: 'Fraunces', Georgia, serif;
 	--font-mono: 'JetBrains Mono', 'Courier New', monospace;
 	--font-body: 'Outfit', system-ui, sans-serif;
+	/*
+	 * Cifras en columna: Archivo trae dígitos tabulares y un eje de ancho, así
+	 * que un importe cuadra con el de la fila de arriba sin la cara de terminal
+	 * del monoespaciado. Quien la use la estrecha con `font-stretch`.
+	 */
+	--font-figures: 'Archivo', system-ui, sans-serif;
 }
 
 @layer base {

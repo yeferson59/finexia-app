@@ -23,7 +23,6 @@
 	summaries={data.portfolioSummaries}
 	currency={data.currency}
 	displayRate={data.displayRate}
-	series={data.portfolioGrowth.points}
 />
 
 <Breakdown
@@ -38,6 +37,7 @@
 	<section class="growth" aria-label="Crecimiento del portafolio">
 		<PortfolioGrowth
 			bare
+			totals={false}
 			data={data.portfolioGrowth.points}
 			summary={data.portfolioGrowth.summary}
 		/>
@@ -56,8 +56,8 @@
 	.lower {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) 300px;
-		gap: 3rem;
-		padding-top: 2rem;
+		gap: 3.5rem;
+		padding-top: 2.5rem;
 	}
 
 	.growth {

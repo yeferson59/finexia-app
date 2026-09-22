@@ -12,12 +12,17 @@ test.describe('dashboard charts', () => {
 		await expect(page.getByText(/Pasa el cursor por la gráfica/)).toBeVisible();
 
 		await chart.focus();
-		await chart.press('End');
+		await chart.press('Home');
 
 		// El punto señalado se anuncia y además se pinta en el detalle de arriba.
 		await expect(chart).toHaveAttribute('aria-valuetext', /Valor de mercado \$/);
 		await expect(page.getByText(/^Capital invertido \$/)).toBeVisible();
 		await expect(page.getByText(/^Ganancia [+−]\$/)).toBeVisible();
+
+		// Con la proyección puesta, el final de la gráfica ya no es el último día
+		// del historial sino el de la banda: se anuncia como tal y no como dato.
+		await chart.press('End');
+		await expect(chart).toHaveAttribute('aria-valuetext', /proyección: entre \$/);
 	});
 
 	test('la gráfica se puede leer en rentabilidad en vez de en dinero', async ({ page }) => {

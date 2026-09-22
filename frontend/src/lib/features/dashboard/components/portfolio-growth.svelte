@@ -28,6 +28,7 @@
 		data = [],
 		summary = { firstDate: '', initialValue: '0', currentValue: '0', totalGrowthPct: '0' },
 		bare = false,
+		totals = true,
 		formatMoney = undefined
 	}: {
 		data: GrowthDataPoint[];
@@ -38,6 +39,8 @@
 		 * detalle de portafolio, que dejó de apilar tarjetas alrededor.
 		 */
 		bare?: boolean;
+		/** Ganancia, rendimiento y valor actual; el panel los da ya en su cifra de arriba. */
+		totals?: boolean;
 		/**
 		 * Cómo escribir un importe, para quien necesite imponer un formato propio.
 		 * Sin él manda el ayudante compartido, que es lo que usan tanto el panel
@@ -257,16 +260,18 @@
 	<div class="divider"></div>
 
 	<div class="metrics-row">
-		<Stat
-			label="Total ganancia"
-			tone={isPositive ? 'positive' : 'negative'}
-			value="{isPositive ? '+' : '−'}{fmtMoney(Math.abs(absoluteGain))}"
-		/>
-		<Stat
-			label="Rendimiento"
-			tone={isPositive ? 'positive' : 'negative'}
-			value="{isPositive ? '+' : ''}{fmt(gainPct)}%"
-		/>
+		{#if totals}
+			<Stat
+				label="Total ganancia"
+				tone={isPositive ? 'positive' : 'negative'}
+				value="{isPositive ? '+' : '−'}{fmtMoney(Math.abs(absoluteGain))}"
+			/>
+			<Stat
+				label="Rendimiento"
+				tone={isPositive ? 'positive' : 'negative'}
+				value="{isPositive ? '+' : ''}{fmt(gainPct)}%"
+			/>
+		{/if}
 		<!-- La cifra que el «Rendimiento» de al lado no puede dar: aquella divide
 		     la ganancia entre lo invertido hoy y se hunde con un aporte hecho tras
 		     una subida; esta encadena tramos y solo se mueve con el mercado. Va
@@ -279,7 +284,9 @@
 		/>
 		<!-- El código va en la etiqueta porque el símbolo no siempre distingue:
 		     en es-CO el peso y el dólar comparten el "$". -->
-		<Stat label="Valor actual en {currency}" tone="highlight" value={fmtMoney(currentVal)} />
+		{#if totals}
+			<Stat label="Valor actual en {currency}" tone="highlight" value={fmtMoney(currentVal)} />
+		{/if}
 	</div>
 
 	{#if unconvertedDates > 0}
@@ -372,9 +379,9 @@
 
 	.growth-title {
 		margin: 0;
-		font-family: var(--font-body);
-		font-size: 1.05rem;
-		font-weight: 500;
+		font-family: var(--font-display);
+		font-size: 1.3rem;
+		font-weight: 400;
 		color: var(--text);
 	}
 

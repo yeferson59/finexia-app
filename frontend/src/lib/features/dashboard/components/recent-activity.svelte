@@ -7,6 +7,10 @@
 	 * página que ya usaba el verde para las ganancias, y ninguna decía nada que
 	 * no dijera el propio título de la fila. El signo del importe basta para
 	 * saber si el dinero entró o salió.
+	 *
+	 * Después cada fila fue una cajita propia, y cinco cajitas en columna se
+	 * leían como cinco avisos. Un extracto es una lista corrida bajo la fecha:
+	 * los movimientos del mismo día van juntos y el día se escribe una vez.
 	 */
 	import { resolve } from '$app/paths';
 	import { privacy } from '$lib/shared/privacy.svelte';
@@ -59,6 +63,17 @@
 		if (days === -1) return 'Ayer';
 		return formatCalendarDate(iso, { day: 'numeric', month: 'short' });
 	}
+
+	/** Los movimientos en el orden en que llegan, bajo el día en que ocurrieron. */
+	const days = $derived(
+		transactions.reduce<{ label: string; items: Transaction[] }[]>((acc, tx) => {
+			const label = when(tx.transactionDate);
+			const last = acc.at(-1);
+			if (last?.label === label) last.items.push(tx);
+			else acc.push({ label, items: [tx] });
+			return acc;
+		}, [])
+	);
 </script>
 
 <section class="activity" aria-labelledby="activity-title">
@@ -73,25 +88,31 @@
 			<a href={resolve('/dashboard/transactions/import')}>Importar un CSV</a>
 		</p>
 	{:else}
-		<ul class="list">
-			{#each transactions as tx (tx.id)}
-				{@const incoming = INCOMING.includes(tx.type)}
-				<li class="row">
-					<div class="what">
-						<p class="kind">{LABELS[tx.type] ?? tx.type}</p>
-						<p class="asset">{tx.assetName} ({tx.assetTicker})</p>
-					</div>
-					<div class="figures">
-						<p class="amount" class:incoming>
-							{incoming ? '+' : '−'}{privacy.money(
-								formatCurrency(Math.abs(total(tx)), tx.currency || 'USD')
-							)}
-						</p>
-						<time class="date" datetime={tx.transactionDate}>{when(tx.transactionDate)}</time>
-					</div>
+		<ol class="days">
+			{#each days as day (day.label)}
+				<li>
+					<h3 class="day">
+						<time datetime={day.items[0].transactionDate.split('T')[0]}>{day.label}</time>
+					</h3>
+					<ul class="list">
+						{#each day.items as tx (tx.id)}
+							{@const incoming = INCOMING.includes(tx.type)}
+							<li class="row">
+								<div class="what">
+									<p class="kind">{LABELS[tx.type] ?? tx.type}</p>
+									<p class="asset">{tx.assetName} ({tx.assetTicker})</p>
+								</div>
+								<p class="amount" class:incoming>
+									{incoming ? '+' : '−'}{privacy.money(
+										formatCurrency(Math.abs(total(tx)), tx.currency || 'USD')
+									)}
+								</p>
+							</li>
+						{/each}
+					</ul>
 				</li>
 			{/each}
-		</ul>
+		</ol>
 
 		<a class="statement" href={resolve('/dashboard/reports')}>Descargar el extracto</a>
 	{/if}
@@ -109,14 +130,14 @@
 		align-items: baseline;
 		justify-content: space-between;
 		gap: 1rem;
-		margin-bottom: 1.25rem;
+		margin-bottom: 1rem;
 	}
 
 	h2 {
 		margin: 0;
-		font-family: var(--font-body);
-		font-size: 1.05rem;
-		font-weight: 500;
+		font-family: var(--font-display);
+		font-size: 1.3rem;
+		font-weight: 400;
 		color: var(--text);
 	}
 
@@ -140,27 +161,30 @@
 		margin-top: 1.25rem;
 	}
 
+	.days,
 	.list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
 		margin: 0;
 		padding: 0;
 		list-style: none;
 	}
 
-	/*
-	 * La única superficie levantada de la página, y por eso significa algo: cada
-	 * fila es un objeto suelto del extracto, no una sección.
-	 */
+	/* El día abre su grupo con un filete: es el único corte que tiene el
+	   extracto, y lo que separa un grupo del siguiente. */
+	.day {
+		margin: 0;
+		padding: 0.9rem 0 0.35rem;
+		border-top: 1px solid var(--border);
+		font-size: 0.75rem;
+		font-weight: 400;
+		color: var(--text-dim);
+	}
+
 	.row {
 		display: flex;
 		align-items: baseline;
 		justify-content: space-between;
 		gap: 1rem;
-		padding: 0.7rem 0.85rem;
-		border-radius: 8px;
-		background: var(--panel);
+		padding: 0.45rem 0;
 	}
 
 	.what {
@@ -169,40 +193,29 @@
 
 	.kind {
 		margin: 0;
-		font-size: 0.85rem;
+		font-size: 0.88rem;
 		color: var(--text);
 	}
 
 	.asset {
-		margin: 0.15rem 0 0;
+		margin: 0.1rem 0 0;
 		font-size: 0.75rem;
 		color: var(--text-dim);
 		overflow-wrap: anywhere;
 	}
 
-	.figures {
-		flex-shrink: 0;
-		text-align: right;
-	}
-
 	.amount {
+		flex-shrink: 0;
 		margin: 0;
-		font-family: var(--font-mono);
-		font-size: 0.85rem;
+		font-family: var(--font-figures);
+		font-size: 0.92rem;
+		font-stretch: 88%;
 		font-variant-numeric: tabular-nums;
 		color: var(--text);
 	}
 
 	.amount.incoming {
 		color: var(--green);
-	}
-
-	.date {
-		display: block;
-		margin-top: 0.15rem;
-		font-family: var(--font-mono);
-		font-size: 0.7rem;
-		color: var(--text-dim);
 	}
 
 	.empty {

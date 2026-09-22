@@ -349,8 +349,10 @@
 				{#each tableRows as { point, i } (point.date)}
 					<tr>
 						<th scope="row">
-							<time datetime={point.date}>{formatFullDate(point.date)}</time>
-							{#if isForecast(i)}(proyección: mejor y peor mes){/if}
+							<!-- En la misma línea que la fecha: el salto entre las dos dejaba un
+							     espacio colgando al final de cada fila del historial. -->
+							<time datetime={point.date}>{formatFullDate(point.date)}</time>{#if isForecast(i)}
+								(proyección: mejor y peor mes){/if}
 						</th>
 						<td>{formatValue(point.mv)}</td>
 						<td>{formatValue(point.cb)}</td>
