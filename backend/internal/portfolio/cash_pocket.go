@@ -186,35 +186,99 @@ func invalidCashMove(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalidCashMove, fmt.Sprintf(format, args...))
 }
 
-// CashMoveInput moves money between two balances of one account inside one
-// portfolio: the main account and a pocket, or two pockets.
+// CashMoveInput moves money between two cash balances inside one portfolio:
+// two drawers of one account, or two accounts — the savings app and the broker
+// the money is transferred to before a purchase.
 //
 // It is not a deposit and a withdrawal recorded by hand. The two legs go in one
 // transaction, so the money is never in both places or in neither, and because
 // they offset each other the portfolio's net flow — and its return — does not
-// move.
+// move. Across currencies they offset at the rate the mover states rather than
+// nominally: what leaves is Amount and what arrives is Amount × FXRate, so the
+// value is the same on both sides and only a wrong rate books a gain.
 type CashMoveInput struct {
 	Currency money.Currency
 	// From and To are the pockets the money leaves and arrives at. The zero UUID
 	// is the main account, on either side.
 	From uuid.UUID
 	To   uuid.UUID
+	// ToSource is the platform the money arrives at and ToCurrency the currency
+	// it arrives in. Both default to the ones it left, which is the move within
+	// one account that pockets were built for; naming another platform is the
+	// transfer between them, and naming another currency is that transfer with
+	// the conversion the platform applied.
+	ToSource   uuid.UUID
+	ToCurrency money.Currency
+	// FXRate is what one unit of Currency was worth in ToCurrency the day the
+	// money moved. Within a currency it is one — a currency does not convert
+	// into itself at anything else — and between two it is required: without it
+	// the arriving amount would be the departing one relabelled.
+	FXRate decimal.Decimal
 	// Amount is what moves, in Currency.
 	Amount decimal.Decimal
 	Date   time.Time
 	Notes  string
 }
 
-// Validate checks what the move states. Whether the balance it leaves holds
-// enough, and whether the pockets are the owner's and flexible, is checked
-// where they can be locked.
-func (in CashMoveInput) Validate() error {
+// withDefaults fills the destination a move left unsaid: the account the money
+// is already in. It is applied before Validate, so every caller — the HTTP
+// request and anything else that builds the input — states the same move.
+func (in CashMoveInput) withDefaults(sourceID uuid.UUID) CashMoveInput {
+	if in.ToSource == (uuid.UUID{}) {
+		in.ToSource = sourceID
+	}
+
+	if in.ToCurrency == money.XXX {
+		in.ToCurrency = in.Currency
+	}
+
+	// Only within one currency, where one is the only rate there is. Left at
+	// zero across two, the move is one that forgot to say what it converted at,
+	// and Validate refuses it rather than moving the amount over unchanged.
+	if in.FXRate.IsZero() && in.ToCurrency == in.Currency {
+		in.FXRate = decimal.One
+	}
+
+	return in
+}
+
+// crosses reports whether the move leaves the account it started in, which is
+// what makes it a transfer rather than a change of drawer.
+func (in CashMoveInput) crosses(sourceID uuid.UUID) bool {
+	return in.ToSource != sourceID || in.ToCurrency != in.Currency
+}
+
+// Validate checks what the move states, against the account it starts from.
+// Whether the balance it leaves holds enough, and whether the pockets are the
+// owner's and flexible, is checked where they can be locked.
+//
+// sourceID is the platform the money leaves, which is what says whether the
+// destination is somewhere else: two drawers are only the same drawer when the
+// account is the same too, and the same drawer number of two platforms is two
+// different places.
+func (in CashMoveInput) Validate(sourceID uuid.UUID) error {
 	if !currency.IsSupported(in.Currency) {
 		return invalidCashMove("currency must be one of: %s", currency.List())
 	}
 
-	if in.From == in.To {
+	if !currency.IsSupported(in.ToCurrency) {
+		return invalidCashMove("the currency it arrives in must be one of: %s", currency.List())
+	}
+
+	if !in.crosses(sourceID) && in.From == in.To {
 		return invalidCashMove("from and to must be different: moving money to where it already is does nothing")
+	}
+
+	// The rate is checked both ways round. A rate of one between two currencies
+	// would file a conversion as if there had been none, and any other rate
+	// within one currency is the mistake the entry form already refuses: a
+	// currency does not convert into itself.
+	if in.ToCurrency == in.Currency {
+		if in.FXRate.Cmp(decimal.One) != 0 {
+			return invalidCashMove("%s does not convert into itself: leave the rate out of a move that stays in one currency", in.Currency)
+		}
+	} else if !in.FXRate.IsPos() {
+		return invalidCashMove("a move from %s to %s needs the rate the platform applied", in.Currency, in.ToCurrency)
 	}
 
 	if !in.Amount.IsPos() {
@@ -236,7 +300,12 @@ func (in CashMoveInput) Validate() error {
 // empties one side and the deposit that fills the other, both on the same day
 // and with the same note, and neither carrying a fee. A fee would make the two
 // stop cancelling out, and the money would read as a loss rather than as money
-// that changed drawer.
+// that changed hands.
+//
+// The deposit arrives in the destination's currency, converted at the stated
+// rate and rounded to the eight decimals the balances are kept at. Within one
+// currency the rate is one and the two amounts are the same number, which is
+// the move this was before it could cross accounts.
 func (in CashMoveInput) legs() (out, into CashMovementInput) {
 	out = CashMovementInput{
 		Kind:     CashKindWithdrawal,
@@ -248,6 +317,8 @@ func (in CashMoveInput) legs() (out, into CashMovementInput) {
 
 	into = out
 	into.Kind = CashKindDeposit
+	into.Currency = in.ToCurrency
+	into.Amount = in.Amount.Mul(in.FXRate).RoundHAZ(8)
 
 	return out, into
 }

@@ -38,7 +38,13 @@
 		onRate: (account: CashAccount) => void;
 		/** Abre el formulario de un bolsillo: uno nuevo en la cuenta, o el que ya hay. */
 		onPocket: (account: CashAccount, pocket: CashPocket | null) => void;
-		/** Mueve dinero entre los cajones de una cuenta. */
+		/**
+		 * Si hay otra plataforma a la que trasladar el dinero. Sin ella un
+		 * traslado solo puede ir a otro cajón de la misma cuenta, así que una
+		 * cuenta sin bolsillos no tendría a dónde mandarlo.
+		 */
+		canTransfer: boolean;
+		/** Mueve dinero a otro cajón de la cuenta, o a otra plataforma. */
 		onMove: (account: CashAccount) => void;
 		/** Abre un depósito a tasa fija en la cuenta, o mira el que ya está abierto. */
 		onDeposit: (account: CashAccount, pocket: CashPocket | null) => void;
@@ -50,6 +56,7 @@
 		pockets,
 		showPortfolio,
 		today,
+		canTransfer,
 		onRecord,
 		onRate,
 		onPocket,
@@ -139,12 +146,12 @@
 								<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
 								Abrir depósito a plazo<span class="sr-only"> en {name}, {account.currency}</span>
 							</button>
-							{#if drawers.length > 0}
+							{#if drawers.length > 0 || canTransfer}
 								<button type="button" class="tool" onclick={() => onMove(account)}>
 									<svg viewBox="0 0 16 16" aria-hidden="true">
 										<path d="M3 5.5h9.5M10 3l2.5 2.5L10 8M13 10.5H3.5M6 8l-2.5 2.5L6 13" />
 									</svg>
-									Mover entre cajones<span class="sr-only"> de {name}, {account.currency}</span>
+									Mover dinero<span class="sr-only"> de {name}, {account.currency}</span>
 								</button>
 							{/if}
 						</div>

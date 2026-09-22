@@ -1119,7 +1119,7 @@ bolsillos se comporta exactamente igual que antes.
 | `POST /portfolios/cash/pockets` | Abre uno flexible: `{sourceId, currency, name}` |
 | `PUT /portfolios/cash/pockets/:pocketId` | Lo renombra; es lo único que se cambia |
 | `DELETE /portfolios/cash/pockets/:pocketId` | Lo borra, si nunca tuvo movimientos |
-| `POST /portfolios/cash/movements/move` | Mueve dinero entre dos saldos de una cuenta |
+| `POST /portfolios/cash/movements/move` | Mueve dinero entre dos saldos: dos cajones de una cuenta, o dos plataformas |
 
 ```json
 {
@@ -1168,7 +1168,7 @@ una cuenta con `sourceId` y `currency`, ahora se nombra con `pocketId` también:
   saldo, y el listado de posiciones trae `pocketName` en las filas de efectivo.
 
 **Mover** (`POST /portfolios/cash/movements/move`) traslada dinero entre dos
-saldos de una misma cuenta dentro de un portafolio:
+saldos de un portafolio: dos cajones de una cuenta, o dos cuentas distintas.
 
 ```json
 {
@@ -1176,21 +1176,41 @@ saldos de una misma cuenta dentro de un portafolio:
   "sourceId": "…",
   "currency": "COP",
   "fromPocketId": null,
-  "toPocketId": "3f7c…",
-  "amount": "2000000",
-  "date": "2026-09-15T00:00:00Z",
-  "notes": "para el viaje"
+  "toSourceId": "9b4e…",
+  "toCurrency": "USD",
+  "toPocketId": null,
+  "amount": "400000",
+  "fxRate": "0.00025",
+  "date": "2026-09-21T00:00:00Z",
+  "notes": "para comprar AAPL"
 }
 ```
 
 Son **dos patas en una sola transacción** —un retiro de un lado y un depósito del
 otro—, así que el dinero nunca está en los dos sitios ni en ninguno. Como se
-compensan exactamente —mismo importe, mismo día, sin comisión—, el flujo neto del
-portafolio no se mueve y **su rentabilidad tampoco**: el dinero cambió de cajón,
-no entró ni salió. Responde con las dos filas, `{from, to}`.
+compensan —mismo día, sin comisión, y el mismo valor una vez aplicada la tasa—,
+el flujo neto del portafolio no se mueve y **su rentabilidad tampoco**: el dinero
+cambió de sitio dentro del portafolio, no entró ni salió. Responde con las dos
+filas, `{from, to}`.
 
-- Origen y destino tienen que ser distintos (**400**), y los dos de la cuenta que
-  se nombra (**400**).
+- `toSourceId` y `toCurrency` son la cuenta a la que llega y **por omisión son la
+  de origen**, que es el traslado entre cajones de siempre. Nombrar otra
+  plataforma es el traslado a ella: el paso que ocurre de verdad antes de comprar
+  en un bróker con dinero que estaba en una app de ahorro, y que deja ese saldo
+  disponible para `payFromCash`.
+- El saldo de destino **no tiene que existir**: se abre como lo abriría un primer
+  depósito, así que se puede trasladar a un bróker que nunca tuvo efectivo.
+- `fxRate` es cuántos `toCurrency` se recibieron por cada `currency`. Entre dos
+  monedas es **obligatorio** (**400** sin él): sin tasa el importe llegaría tal
+  cual con otra etiqueta. Dentro de una sola moneda tiene que ser 1 u omitirse
+  (**400** con cualquier otra: una moneda no se convierte en sí misma). Lo que
+  llega es `amount × fxRate`, redondeado a ocho decimales.
+- Origen y destino tienen que ser sitios distintos (**400**), y **el sitio es
+  plataforma, moneda y cajón a la vez**: la cuenta principal de dos plataformas
+  son dos destinos aunque las dos manden `pocketId` nulo.
+- Las dos plataformas tienen que ser del usuario (**404**) y los bolsillos, de la
+  cuenta que cada lado nombra (**400**). Un depósito a plazo no admite ninguno de
+  los dos lados (**409**).
 - Si el saldo del que sale no da, responde **409**, como un retiro, y no se
   escribe ninguna de las dos patas.
 

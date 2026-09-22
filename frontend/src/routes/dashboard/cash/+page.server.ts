@@ -426,6 +426,9 @@ export const actions = {
 	/*
 	 * Mover no es un retiro y un depósito anotados a mano: las dos patas van en
 	 * una sola transacción y se compensan, así que la rentabilidad no se mueve.
+	 * Vale entre cajones de una cuenta y entre dos plataformas, que es el
+	 * traslado al bróker antes de comprar; cruzando monedas se compensan al
+	 * cambio que diga `fxRate`.
 	 */
 	move: async ({ request, cookies, fetch }) => {
 		const formData = await request.formData();
@@ -435,8 +438,11 @@ export const actions = {
 			sourceId: formData.get('sourceId'),
 			currency: formData.get('currency'),
 			fromPocketId: formData.get('fromPocketId'),
+			toSourceId: formData.get('toSourceId'),
+			toCurrency: formData.get('toCurrency'),
 			toPocketId: formData.get('toPocketId'),
 			amount: formData.get('amount'),
+			fxRate: formData.get('fxRate'),
 			date: formData.get('date'),
 			notes: formData.get('notes')
 		});

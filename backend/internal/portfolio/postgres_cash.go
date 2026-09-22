@@ -389,23 +389,44 @@ func writeCashMovement(ctx context.Context, tx pgx.Tx, userID, portfolioID, sour
 	return getCashMovement(ctx, tx, userID, txnID)
 }
 
-// MoveCash moves money between two balances of one account inside one
-// portfolio: the main account and a pocket, or two pockets.
+// MoveCash moves money between two cash balances inside one portfolio: two
+// drawers of one account — the main account and a pocket, or two pockets — or
+// two accounts, which is the transfer from the app that holds the savings to
+// the broker that is about to spend them.
 //
 // It is one transaction with two legs, a withdrawal on one side and a deposit
-// on the other, so the money is never in both places or in neither. Because the
-// two flows offset each other exactly — same amount, same day, no fee — the
-// portfolio's net flow does not move, and neither does its return: the money
-// changed drawer, it did not arrive or leave.
+// on the other, so the money is never in both places or in neither. The two
+// flows offset each other — same day, no fee, and the same value once the
+// stated rate is applied — so the portfolio's net flow does not move, and
+// neither does its return: the money changed hands inside the portfolio, it did
+// not arrive or leave.
+//
+// The destination account is checked on its own: a transfer names two
+// platforms, and the second one has to be the owner's too. The destination
+// balance need not exist yet — writeCashMovement opens it, the same way a first
+// deposit does — so money can be transferred to a broker that has never held
+// cash.
 //
 // Both balances are locked before either is written, in the order of their
 // position, so a move each way at the same time queues instead of deadlocking.
 func (r *PostgresRepository) MoveCash(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMoveInput) (CashMove, error) {
 	var move CashMove
 
+	// The same defaults the service applies, because the fields below are read
+	// here: a caller that named only a drawer means the account the money is
+	// already in, and reading its zero values as a platform and a rate would
+	// look up nothing and multiply by nothing.
+	in = in.withDefaults(sourceID)
+
 	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		if err := requireCashAccount(ctx, tx, userID, portfolioID, sourceID); err != nil {
 			return err
+		}
+
+		if in.ToSource != sourceID {
+			if err := requireCashAccount(ctx, tx, userID, portfolioID, in.ToSource); err != nil {
+				return err
+			}
 		}
 
 		from, err := requireWritablePocket(ctx, tx, userID, in.From, sourceID, in.Currency)
@@ -413,7 +434,7 @@ func (r *PostgresRepository) MoveCash(ctx context.Context, userID, portfolioID, 
 			return err
 		}
 
-		to, err := requireWritablePocket(ctx, tx, userID, in.To, sourceID, in.Currency)
+		to, err := requireWritablePocket(ctx, tx, userID, in.To, in.ToSource, in.ToCurrency)
 		if err != nil {
 			return err
 		}
@@ -422,11 +443,11 @@ func (r *PostgresRepository) MoveCash(ctx context.Context, userID, portfolioID, 
 			SELECT pe.id
 			FROM portfolio_entries pe
 			WHERE pe.portfolio_id = $1
-			  AND pe.source_id    = $2
-			  AND (pe.pocket_id IS NOT DISTINCT FROM $3::uuid OR pe.pocket_id IS NOT DISTINCT FROM $4::uuid)
+			  AND ((pe.source_id = $2 AND pe.pocket_id IS NOT DISTINCT FROM $3::uuid)
+			    OR (pe.source_id = $4 AND pe.pocket_id IS NOT DISTINCT FROM $5::uuid))
 			ORDER BY pe.id
 			FOR UPDATE OF pe
-		`, portfolioID, sourceID, from, to); err != nil {
+		`, portfolioID, sourceID, from, in.ToSource, to); err != nil {
 			return err
 		}
 
@@ -436,7 +457,7 @@ func (r *PostgresRepository) MoveCash(ctx context.Context, userID, portfolioID, 
 			return err
 		}
 
-		move.To, err = writeCashMovement(ctx, tx, userID, portfolioID, sourceID, to, into)
+		move.To, err = writeCashMovement(ctx, tx, userID, portfolioID, in.ToSource, to, into)
 
 		return err
 	}); err != nil {

@@ -284,9 +284,29 @@ export const cashPocketDeleteSchema = z.object({
 });
 
 /**
- * Mover dinero entre dos saldos de una misma cuenta, dentro de un portafolio.
- * Origen y destino vacíos son la cuenta principal, y no pueden ser el mismo:
- * mover el dinero a donde ya está no hace nada.
+ * La tasa de un traslado: a cuánto convirtió la plataforma.
+ *
+ * Vacía es «no la dijeron», no «uno». La diferencia importa: dentro de una
+ * moneda no hace falta ninguna, y entre dos, tomarla por uno trasladaría el
+ * importe tal cual con otra etiqueta —400.000 pesos llegando como 400.000
+ * dólares—. Cuál de los dos casos es lo decide el objeto entero, más abajo.
+ */
+const moveRate = z
+	.union([z.string(), z.number(), z.null()])
+	.nullish()
+	.transform((v) => (v === null || v === undefined || v === '' ? undefined : Number(v)))
+	.refine((v) => v === undefined || (Number.isFinite(v) && v > 0), {
+		error: 'La tasa tiene que ser mayor que cero.'
+	});
+
+/**
+ * Mover dinero entre dos saldos de un portafolio: dos cajones de una cuenta, o
+ * dos cuentas distintas —de la app donde está el ahorro al bróker que va a
+ * gastarlo—. Los bolsillos vacíos son la cuenta principal de su plataforma.
+ *
+ * Origen y destino no pueden ser el mismo sitio, pero «el mismo sitio» es
+ * plataforma, moneda y cajón a la vez: la cuenta principal de dos plataformas
+ * son dos sitios, aunque las dos manden el bolsillo vacío.
  */
 export const cashMoveSchema = z
 	.object({
@@ -294,10 +314,13 @@ export const cashMoveSchema = z
 		sourceId: z.uuid('Elige la plataforma.'),
 		currency: z.enum(SUPPORTED_CURRENCIES, 'Elige la moneda.'),
 		fromPocketId: pocketField,
+		toSourceId: z.uuid('Elige la plataforma a la que va.'),
+		toCurrency: z.enum(SUPPORTED_CURRENCIES, 'Elige la moneda a la que llega.'),
 		toPocketId: pocketField,
 		amount: z.coerce
 			.number('Escribe el importe con números.')
 			.positive('El importe tiene que ser mayor que cero.'),
+		fxRate: moveRate,
 		date: z.iso.date('Elige la fecha del movimiento.'),
 		notes: z
 			.string()
@@ -305,9 +328,32 @@ export const cashMoveSchema = z
 			.nullish()
 			.transform((v) => (v ?? '').trim())
 	})
-	.refine((v) => (v.fromPocketId ?? '') !== (v.toPocketId ?? ''), {
-		path: ['toPocketId'],
-		error: 'Elige un destino distinto del origen.'
+	.refine(
+		(v) =>
+			v.toSourceId !== v.sourceId ||
+			v.toCurrency !== v.currency ||
+			(v.fromPocketId ?? '') !== (v.toPocketId ?? ''),
+		{ path: ['toPocketId'], error: 'Elige un destino distinto del origen.' }
+	)
+	.superRefine((v, ctx) => {
+		if (v.toCurrency === v.currency) {
+			if (v.fxRate !== undefined && v.fxRate !== 1) {
+				ctx.addIssue({
+					code: 'custom',
+					path: ['fxRate'],
+					message: `El ${v.currency} no se convierte en sí mismo: deja la tasa vacía.`
+				});
+			}
+			return;
+		}
+
+		if (v.fxRate === undefined) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['fxRate'],
+				message: `Escribe a cuánto convirtió: cuánto ${v.toCurrency} te dieron por cada ${v.currency}.`
+			});
+		}
 	});
 
 /**

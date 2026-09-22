@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"uuid"
+
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
@@ -319,5 +321,112 @@ func TestCashSideBelongsToItsTransactionType(t *testing.T) {
 				t.Errorf("Validate() error = %v, want %v", err, tc.wantErr)
 			}
 		})
+	}
+}
+
+// A move states where the money lands as well as where it leaves, and the two
+// currencies are what decides whether a rate belongs in it.
+func TestCashMoveInputValidate(t *testing.T) {
+	bank := uuid.New()
+	broker := uuid.New()
+	pocket := uuid.New()
+
+	base := CashMoveInput{
+		Currency: money.COP,
+		To:       pocket,
+		Amount:   mustDecimal(t, "400000"),
+		Date:     time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC),
+	}
+
+	for _, tc := range []struct {
+		name    string
+		mutate  func(in *CashMoveInput)
+		wantErr string
+	}{
+		{name: "between two drawers of one account"},
+		{name: "to another platform", mutate: func(in *CashMoveInput) {
+			in.ToSource, in.To = broker, uuid.UUID{}
+		}},
+		{name: "to another platform and another currency", mutate: func(in *CashMoveInput) {
+			in.ToSource, in.To = broker, uuid.UUID{}
+			in.ToCurrency, in.FXRate = money.USD, mustDecimal(t, "0.00025")
+		}},
+		// The main account of another platform is not the main account of this
+		// one, so two zero drawers are two different places.
+		{name: "to the main account of another platform", mutate: func(in *CashMoveInput) {
+			in.ToSource, in.From, in.To = broker, uuid.UUID{}, uuid.UUID{}
+		}},
+		{name: "to where it already is", mutate: func(in *CashMoveInput) {
+			in.From, in.To = pocket, pocket
+		}, wantErr: "moving money to where it already is"},
+		{name: "converting a currency into itself", mutate: func(in *CashMoveInput) {
+			in.FXRate = mustDecimal(t, "1.07")
+		}, wantErr: "does not convert into itself"},
+		{name: "crossing currencies without a rate", mutate: func(in *CashMoveInput) {
+			in.ToSource, in.To = broker, uuid.UUID{}
+			in.ToCurrency, in.FXRate = money.USD, decimal.Decimal{}
+		}, wantErr: "needs the rate the platform applied"},
+		{name: "arriving in a currency nobody keeps", mutate: func(in *CashMoveInput) {
+			in.ToCurrency = money.DKK
+		}, wantErr: "the currency it arrives in"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in := base
+			if tc.mutate != nil {
+				tc.mutate(&in)
+			}
+
+			// withDefaults is what every caller applies first: a move that says
+			// nothing about its destination means the account it starts in.
+			err := in.withDefaults(bank).Validate(bank)
+
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("Validate() = %v, want nil", err)
+				}
+				return
+			}
+
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("Validate() = %v, want an error about %q", err, tc.wantErr)
+			}
+			if !errors.Is(err, ErrInvalidCashMove) {
+				t.Errorf("Validate() = %v, want ErrInvalidCashMove", err)
+			}
+		})
+	}
+}
+
+// What arrives is what left, converted at the stated rate: the legs are the
+// same value on both sides, which is why the move does not touch the return.
+func TestCashMoveLegsConvert(t *testing.T) {
+	bank := uuid.New()
+
+	in := CashMoveInput{
+		Currency: money.COP,
+		Amount:   mustDecimal(t, "400000"),
+		Date:     time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC),
+		Notes:    "para comprar AAPL",
+	}.withDefaults(bank)
+	in.ToSource, in.ToCurrency, in.FXRate = uuid.New(), money.USD, mustDecimal(t, "0.00025")
+
+	out, into := in.legs()
+
+	if out.Kind != CashKindWithdrawal || into.Kind != CashKindDeposit {
+		t.Fatalf("legs = %s and %s, want a withdrawal and a deposit", out.Kind, into.Kind)
+	}
+	if out.Currency != money.COP || out.Amount.String() != "400000" {
+		t.Errorf("what left = %s %s, want 400000 COP", out.Amount, out.Currency)
+	}
+	if into.Currency != money.USD || into.Amount.String() != "100" {
+		t.Errorf("what arrived = %s %s, want 100 USD", into.Amount, into.Currency)
+	}
+	// Neither leg carries a fee: one would stop the two cancelling out and the
+	// money would read as a loss.
+	if out.Fees.IsPos() || into.Fees.IsPos() {
+		t.Errorf("legs carry fees %s and %s, want none", out.Fees, into.Fees)
+	}
+	if into.Notes != in.Notes || !into.Date.Equal(out.Date) {
+		t.Errorf("the legs disagree on the note or the day")
 	}
 }

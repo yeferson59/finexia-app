@@ -18,6 +18,7 @@ import {
 const PORTFOLIO = '1a2b3c4d-5e6f-4a8b-9c0d-1e2f3a4b5c6d';
 const SOURCE = '7a2b3c4d-5e6f-4a8b-9c0d-1e2f3a4b5c6d';
 const POCKET = '6f1e2d3c-4b5a-4c7d-8e9f-0a1b2c3d4e5f';
+const BROKER = '9c8b7a6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
 
 const balance = (over: Partial<CashBalance> & { balance: string }): CashBalance => ({
 	entryId: crypto.randomUUID(),
@@ -172,6 +173,8 @@ describe('formularios de bolsillos', () => {
 			sourceId: SOURCE,
 			currency: 'COP',
 			fromPocketId: '',
+			toSourceId: SOURCE,
+			toCurrency: 'COP',
 			toPocketId: POCKET,
 			amount: '2000000',
 			date: '2026-09-15',
@@ -197,6 +200,53 @@ describe('formularios de bolsillos', () => {
 
 		const nothing = cashMoveSchema.safeParse({ ...move, amount: '0' });
 		expect(nothing.success).toBe(false);
+	});
+
+	// El traslado a otra plataforma: el mismo cajón vacío a los dos lados es otro
+	// sitio si la cuenta es otra, y cruzar monedas exige decir a cuánto.
+	it('lee el traslado entre plataformas', () => {
+		const move = {
+			portfolioId: PORTFOLIO,
+			sourceId: SOURCE,
+			currency: 'COP',
+			fromPocketId: '',
+			toSourceId: BROKER,
+			toCurrency: 'COP',
+			toPocketId: '',
+			amount: '400000',
+			date: '2026-09-21',
+			notes: ''
+		};
+
+		// La cuenta principal de otra plataforma sí es un destino distinto.
+		expect(cashMoveSchema.safeParse(move).success).toBe(true);
+
+		const converted = cashMoveSchema.safeParse({
+			...move,
+			toCurrency: 'USD',
+			fxRate: '0.00025'
+		});
+		expect(converted.success && converted.data).toMatchObject({
+			toSourceId: BROKER,
+			toCurrency: 'USD',
+			fxRate: 0.00025
+		});
+
+		// Cruzar monedas sin tasa trasladaría el importe con otra etiqueta.
+		const noRate = cashMoveSchema.safeParse({ ...move, toCurrency: 'USD' });
+		expect(noRate.success).toBe(false);
+
+		// Y una tasa dentro de una misma moneda no es ninguna conversión.
+		const selfRate = cashMoveSchema.safeParse({ ...move, fxRate: '1.07' });
+		expect(selfRate.success).toBe(false);
+
+		// Sin tasa y sin cruzar monedas queda fuera del cuerpo, que es lo que el
+		// backend entiende por «no hubo conversión».
+		const plain = cashMoveSchema.safeParse(move);
+		expect(plain.success && plain.data.fxRate).toBeUndefined();
+
+		const badRate = cashMoveSchema.safeParse({ ...move, toCurrency: 'USD', fxRate: '0' });
+		expect(badRate.success).toBe(false);
 	});
 
 	it('traduce los rechazos del backend', () => {

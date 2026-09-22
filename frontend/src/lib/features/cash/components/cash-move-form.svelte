@@ -1,13 +1,19 @@
 <script lang="ts">
 	/**
-	 * Mover dinero entre los saldos de una misma cuenta: de la cuenta principal a
-	 * un bolsillo, o al revés.
+	 * Mover dinero entre dos saldos del portafolio: entre los cajones de una
+	 * cuenta —de la principal a un bolsillo, o al revés— y entre dos
+	 * plataformas, que es el traslado de la app donde está el ahorro al bróker
+	 * que va a gastarlo.
 	 *
 	 * No es un retiro y un depósito anotados a mano. Las dos patas van en una
 	 * sola transacción, así que el dinero nunca está en los dos sitios ni en
-	 * ninguno, y como se compensan exactamente —mismo importe, mismo día, sin
-	 * comisión— la rentabilidad del portafolio no se mueve: el dinero cambió de
-	 * cajón, no entró ni salió.
+	 * ninguno, y como se compensan —mismo día, sin comisión, y el mismo valor
+	 * una vez aplicada la tasa— la rentabilidad del portafolio no se mueve: el
+	 * dinero cambió de sitio, no entró ni salió.
+	 *
+	 * Cruzando monedas hace falta la tasa a la que convirtió la plataforma. Sin
+	 * ella el importe llegaría tal cual con otra etiqueta, que es la diferencia
+	 * entre cuatrocientos mil pesos y cuatrocientos mil dólares.
 	 *
 	 * El portafolio no se pregunta: el dinero se mueve dentro del portafolio en
 	 * que ya está. Moverlo a otro portafolio sería un retiro y un depósito, y
@@ -20,6 +26,7 @@
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { todayLocalDateString } from '$lib/shared/format/date';
+	import { SUPPORTED_CURRENCIES } from '$lib/shared/currency';
 	import type { CashPocket } from '$lib/api/types';
 	import type { CashAccount } from '../cash';
 	import CashMoneyInput from './cash-money-input.svelte';
@@ -34,60 +41,115 @@
 
 	interface Props {
 		target: CashMoveTarget | null;
-		/** Los bolsillos del usuario; la cuenta toma los suyos. */
+		/** Los bolsillos del usuario; cada cuenta toma los suyos. */
 		pockets: CashPocket[];
+		/** Las plataformas activas, que son los destinos posibles. */
+		platforms: { id: string; name: string }[];
 		onClose: () => void;
 	}
 
-	let { target, pockets, onClose }: Props = $props();
+	let { target, pockets, platforms, onClose }: Props = $props();
 
 	/**
-	 * Los cajones de la cuenta: la principal primero y luego sus bolsillos
+	 * Los cajones de una cuenta: la principal primero y luego sus bolsillos
 	 * abiertos. Un bolsillo sin saldo también está, que es de donde sale un
 	 * primer traslado.
+	 *
+	 * Los depósitos a plazo quedan fuera. Están cerrados hasta que vencen y el
+	 * backend rechaza cualquier movimiento a mano sobre ellos, así que ofrecerlos
+	 * solo sirve para que el traslado falle al enviarlo.
 	 */
-	const drawers = $derived(
-		target === null
-			? []
-			: [
-					{ id: '', name: 'Cuenta principal' },
-					...pockets
-						.filter(
-							(p) =>
-								p.sourceId === target.account.sourceId &&
-								p.currency === target.account.currency &&
-								p.closedOn === null
-						)
-						.map((p) => ({ id: p.id, name: p.name }))
-				]
-	);
+	function drawersOf(sourceId: string, currency: string) {
+		return [
+			{ id: '', name: 'Cuenta principal' },
+			...pockets
+				.filter(
+					(p) =>
+						p.sourceId === sourceId &&
+						p.currency === currency &&
+						p.kind !== 'fixed' &&
+						p.closedOn === null
+				)
+				.map((p) => ({ id: p.id, name: p.name }))
+		];
+	}
 
 	let from = $derived(target?.account.pocketId ?? '');
-	let to = $derived('');
+
+	/* A dónde va: plataforma, moneda y cajón. Arranca en la cuenta de la que
+	   sale, que es el traslado entre cajones de siempre. */
+	let toSourceId = $derived(target?.account.sourceId ?? '');
+	let toCurrency = $derived(target?.account.currency ?? '');
+	let to = $state('');
+
 	let amount = $state('');
+	let fxRate = $state('');
 	let date = $derived(todayLocalDateString());
 	let notes = $state('');
 	let submitting = $state(false);
 	let error = $state('');
 
-	/* El destino nunca es el origen: mover el dinero a donde ya está no hace
-	   nada, y el backend lo rechaza igual. */
-	const destinations = $derived(drawers.filter((d) => d.id !== from));
+	const origin = $derived(
+		target === null ? [] : drawersOf(target.account.sourceId, target.account.currency)
+	);
+
+	/* El traslado sale de la cuenta en la que estaba: otra plataforma, otra
+	   moneda, o las dos. Es lo que decide si hace falta tasa y qué se puede
+	   intercambiar. */
+	const crossing = $derived(
+		target !== null &&
+			(toSourceId !== target.account.sourceId || toCurrency !== target.account.currency)
+	);
+
+	/* El destino nunca es el origen, pero «el origen» es plataforma, moneda y
+	   cajón a la vez: la cuenta principal de otro bróker es otro sitio aunque
+	   las dos manden el cajón vacío. */
+	const destinations = $derived.by(() => {
+		const drawers = drawersOf(toSourceId, toCurrency);
+
+		return crossing ? drawers : drawers.filter((d) => d.id !== from);
+	});
+
+	/*
+	 * El destino elegido siempre es uno de los que se ofrecen.
+	 *
+	 * Antes el desplegable arrancaba en una opción vacía de relleno que valía lo
+	 * mismo que «Cuenta principal», así que elegir la cuenta principal no
+	 * cambiaba nada y el botón de mover seguía apagado: desde un bolsillo no se
+	 * podía devolver el dinero a la cuenta. Ahora arranca en el primer destino
+	 * real y no hay ningún valor ambiguo.
+	 */
+	$effect(() => {
+		if (!destinations.some((d) => d.id === to)) {
+			to = destinations[0]?.id ?? '';
+		}
+	});
+
+	/* Dentro de una moneda no hay nada que convertir, y una tasa colgada de un
+	   traslado anterior mandaría una conversión que el backend rechaza. */
+	$effect(() => {
+		if (!crossing || toCurrency === target?.account.currency) fxRate = '';
+	});
 
 	function chooseOrigin(id: string) {
 		from = id;
-		if (to === id) to = '';
+		if (to === id && !crossing) to = '';
 	}
 
-	/* Darle la vuelta: lo que era el destino pasa a ser el origen. */
+	/* Darle la vuelta: lo que era el destino pasa a ser el origen. Solo dentro de
+	   una cuenta —el origen lo fija la tarjeta desde la que se abrió esto, así
+	   que un traslado a otra plataforma no se puede invertir aquí—. */
+	const canSwap = $derived(!crossing && destinations.length > 0);
+
 	function swap() {
-		if (to === '') return;
+		if (!canSwap) return;
 		[from, to] = [to, from];
 	}
 
 	function close() {
 		error = '';
 		amount = '';
+		fxRate = '';
 		notes = '';
 		onClose();
 	}
@@ -107,17 +169,23 @@
 		);
 	});
 
-	const money = (value: number) =>
-		privacy.money(formatCurrency(value, target?.account.currency ?? 'USD'));
+	/* Lo que llega al otro lado: el importe a la tasa escrita. Sin tasa todavía
+	   no hay nada que enseñar, que es distinto de que llegue cero. */
+	const rate = $derived(parseFloat(fxRate) || 0);
+	const arrives = $derived((parseFloat(amount) || 0) * rate);
 
-	const fromName = $derived(drawers.find((d) => d.id === from)?.name ?? '');
+	const money = (value: number, code = target?.account.currency ?? 'USD') =>
+		privacy.money(formatCurrency(value, code));
+
+	const fromName = $derived(origin.find((d) => d.id === from)?.name ?? '');
+	const toPlatformName = $derived(platforms.find((p) => p.id === toSourceId)?.name ?? '');
 </script>
 
 <Modal
 	open={target !== null}
 	title="Mover dinero"
 	description={target
-		? `Entre los cajones de ${target.account.sourceName || 'Sin plataforma'} en ${target.account.currency}, dentro de ${target.portfolioName}.`
+		? `Desde ${target.account.sourceName || 'Sin plataforma'} en ${target.account.currency}, dentro de ${target.portfolioName}.`
 		: ''}
 	size="sm"
 	onClose={close}
@@ -143,6 +211,8 @@
 			<input type="hidden" name="portfolioId" value={target.portfolioId} />
 			<input type="hidden" name="sourceId" value={target.account.sourceId} />
 			<input type="hidden" name="currency" value={target.account.currency} />
+			<input type="hidden" name="toSourceId" value={toSourceId} />
+			<input type="hidden" name="toCurrency" value={toCurrency} />
 
 			<!-- De dónde sale y a dónde va, uno encima del otro como el trayecto que
 			     son, con la vuelta a mano entre los dos. -->
@@ -150,7 +220,7 @@
 				<div class="field">
 					<label for="cash-move-from">De</label>
 					<select id="cash-move-from" name="fromPocketId" bind:value={() => from, chooseOrigin}>
-						{#each drawers as drawer (drawer.id)}
+						{#each origin as drawer (drawer.id)}
 							<option value={drawer.id}>{drawer.name}</option>
 						{/each}
 					</select>
@@ -159,7 +229,7 @@
 					type="button"
 					class="swap"
 					onclick={swap}
-					disabled={to === ''}
+					disabled={!canSwap}
 					aria-label="Intercambiar origen y destino"
 				>
 					<svg viewBox="0 0 16 16" aria-hidden="true">
@@ -168,8 +238,19 @@
 				</button>
 				<div class="field">
 					<label for="cash-move-to">A</label>
-					<select id="cash-move-to" name="toPocketId" bind:value={to} required>
-						<option value="" disabled>Elige el destino</option>
+					<div class="where">
+						<select id="cash-move-to-platform" bind:value={toSourceId} aria-label="Plataforma">
+							{#each platforms as platform (platform.id)}
+								<option value={platform.id}>{platform.name}</option>
+							{/each}
+						</select>
+						<select id="cash-move-to-currency" bind:value={toCurrency} aria-label="Moneda">
+							{#each SUPPORTED_CURRENCIES as code (code)}
+								<option value={code}>{code}</option>
+							{/each}
+						</select>
+					</div>
+					<select id="cash-move-to" name="toPocketId" bind:value={to}>
 						{#each destinations as drawer (drawer.id)}
 							<option value={drawer.id}>{drawer.name}</option>
 						{/each}
@@ -200,6 +281,33 @@
 				</div>
 			</div>
 
+			{#if crossing && toCurrency !== target.account.currency}
+				<div class="field">
+					<label for="cash-move-rate">
+						Tasa: cuántos {toCurrency} por cada {target.account.currency}
+					</label>
+					<input
+						id="cash-move-rate"
+						name="fxRate"
+						type="number"
+						step="any"
+						min="0"
+						inputmode="decimal"
+						placeholder="0.00025"
+						bind:value={fxRate}
+						required
+						aria-describedby="cash-move-rate-hint"
+					/>
+					<p class="hint" id="cash-move-rate-hint">
+						{#if rate > 0 && arrives > 0}
+							Llegan <strong>{money(arrives, toCurrency)}</strong>.
+						{:else}
+							La que aplicó la plataforma ese día, no la de hoy.
+						{/if}
+					</p>
+				</div>
+			{/if}
+
 			<div class="field">
 				<span class="field-label">Fecha</span>
 				<DatePicker name="date" bind:value={date} required />
@@ -218,8 +326,14 @@
 			</div>
 
 			<p class="hint rule">
-				El dinero sigue en la misma plataforma, así que tu rentabilidad no se mueve: solo cambia a
-				qué tasa rinde.
+				{#if crossing}
+					El dinero sigue dentro de {target.portfolioName}, así que tu rentabilidad no se mueve:
+					solo cambia dónde está y a qué tasa rinde. Una vez en {toPlatformName ||
+						'la otra plataforma'}, una compra ahí puede pagarse con él.
+				{:else}
+					El dinero sigue en la misma plataforma, así que tu rentabilidad no se mueve: solo cambia a
+					qué tasa rinde.
+				{/if}
 			</p>
 
 			{#if error}
@@ -228,7 +342,9 @@
 
 			<div class="modal-actions">
 				<Button type="button" variant="ghost" onclick={close}>Cancelar</Button>
-				<Button type="submit" loading={submitting} disabled={to === ''}>Mover dinero</Button>
+				<Button type="submit" loading={submitting} disabled={destinations.length === 0}>
+					Mover dinero
+				</Button>
 			</div>
 		</form>
 	{/if}
@@ -243,6 +359,15 @@
 		border: 1px solid var(--border);
 		border-radius: 10px;
 		background: rgba(255, 255, 255, 0.02);
+	}
+
+	/* Plataforma y moneda comparten renglón: juntas nombran la cuenta a la que
+	   llega, y el cajón va debajo porque es una elección dentro de ella. */
+	.where {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: 0.35rem;
+		margin-bottom: 0.35rem;
 	}
 
 	.swap {

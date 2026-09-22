@@ -8,6 +8,7 @@ import (
 
 	"uuid"
 
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 )
 
@@ -303,6 +304,86 @@ func TestMoveCashLeavesTheNetFlowAlone(t *testing.T) {
 		t.Errorf("moving more than it holds = %v, want ErrInsufficientCash", err)
 	}
 	sameAmount(t, "the pocket after the refusal", f.balanceOf(t, move.To.EntryID).Balance, "2000")
+}
+
+// Money moves to another platform, converting on the way: the pesos the savings
+// app held leave it and dollars arrive at the broker, which is the transfer
+// that happens before a purchase is funded from the broker's own cash.
+//
+// The broker has never held cash here, so the move also has to open the balance
+// it lands on, the way a first deposit would.
+func TestMoveCashCrossesPlatformsAndCurrencies(t *testing.T) {
+	f := newCashFixture(t)
+	ctx := context.Background()
+
+	broker := uuid.New()
+	f.exec(t, `INSERT INTO investment_sources (id, user_id, name, source_type)
+	           VALUES ($1, $2, 'broker', 'broker')`, broker, f.userID)
+
+	savings, err := f.repo.CreateCashMovement(ctx, f.userID, f.portfolioID, f.sourceID, uuid.UUID{}, CashMovementInput{
+		Kind:     CashKindDeposit,
+		Amount:   mustDecimal(t, "600000"),
+		Currency: money.COP,
+		Date:     cashDay,
+	})
+	if err != nil {
+		t.Fatalf("the first deposit in pesos: %v", err)
+	}
+
+	move, err := f.repo.MoveCash(ctx, f.userID, f.portfolioID, f.sourceID, CashMoveInput{
+		Currency:   money.COP,
+		ToSource:   broker,
+		ToCurrency: money.USD,
+		Amount:     mustDecimal(t, "400000"),
+		FXRate:     mustDecimal(t, "0.00025"),
+		Date:       cashDay,
+		Notes:      "para comprar AAPL",
+	})
+	if err != nil {
+		t.Fatalf("MoveCash across platforms: %v", err)
+	}
+
+	if move.From.Currency != money.COP || move.To.Currency != money.USD {
+		t.Errorf("legs in %s and %s, want COP and USD", move.From.Currency, move.To.Currency)
+	}
+	if move.From.SourceID != f.sourceID || move.To.SourceID != broker {
+		t.Errorf("legs on %v and %v, want the bank %v and the broker %v",
+			move.From.SourceID, move.To.SourceID, f.sourceID, broker)
+	}
+
+	sameAmount(t, "what the savings app keeps", f.balanceOf(t, savings.EntryID).Balance, "200000")
+	sameAmount(t, "what reached the broker", f.balanceOf(t, move.To.EntryID).Balance, "100")
+
+	// More than the origin holds is refused whole: neither leg is written, so
+	// the broker does not end up with money the bank never sent.
+	_, err = f.repo.MoveCash(ctx, f.userID, f.portfolioID, f.sourceID, CashMoveInput{
+		Currency: money.COP, ToSource: broker, ToCurrency: money.USD,
+		Amount: mustDecimal(t, "9000000"), FXRate: mustDecimal(t, "0.00025"), Date: cashDay,
+	})
+	if !errors.Is(err, ErrInsufficientCash) {
+		t.Errorf("moving more than it holds = %v, want ErrInsufficientCash", err)
+	}
+	sameAmount(t, "the broker after the refusal", f.balanceOf(t, move.To.EntryID).Balance, "100")
+
+	// A platform that is not the owner's is not a destination, whatever it holds.
+	stranger := uuid.New()
+	f.exec(t, `INSERT INTO users (id, name, email, role_id, preferred_currency)
+	           VALUES ($1, 'somebody else', $2, (SELECT id FROM roles WHERE name = 'customer'), 'USD')`,
+		stranger, stranger.String()+"@probe.test")
+	theirs := uuid.New()
+	f.exec(t, `INSERT INTO investment_sources (id, user_id, name, source_type)
+	           VALUES ($1, $2, 'their broker', 'broker')`, theirs, stranger)
+
+	_, err = f.repo.MoveCash(ctx, f.userID, f.portfolioID, f.sourceID, CashMoveInput{
+		Currency: money.COP, ToSource: theirs, ToCurrency: money.COP,
+		Amount: mustDecimal(t, "1000"), FXRate: decimal.One, Date: cashDay,
+	})
+	if !errors.Is(err, ErrPortfolioOrSourceNotFound) {
+		t.Errorf("moving to somebody else's platform = %v, want ErrPortfolioOrSourceNotFound", err)
+	}
+
+	f.exec(t, `DELETE FROM investment_sources WHERE user_id = $1`, stranger)
+	f.exec(t, `DELETE FROM users WHERE id = $1`, stranger)
 }
 
 // A pocket is deleted while it never held anything, and held back once it does.

@@ -543,11 +543,15 @@ Al pie de cada cuenta, debajo de sus cajones, están las acciones de la cuenta e
 |---|---|
 | **Agregar bolsillo** | Crea la cajita. Solo le pones nombre: «Viajes», «Cajita», «Meta» |
 | **Abrir depósito a plazo** | Abre un depósito a tasa fija (ver 9.8) |
-| **Mover entre cajones** | Traslada dinero entre la cuenta principal y sus bolsillos. Aparece cuando la cuenta ya tiene alguno |
+| **Mover dinero** | Traslada dinero a otro cajón de la cuenta, o a otra plataforma |
 
-Una vez creado, el bolsillo cuelga de su cuenta por una línea que baja desde el código de la moneda, y la fila de la cuenta pasa a llamarse **Cuenta principal**. Tiene su propio botón **Tasa**: le das la suya igual que a cualquier cuenta. Para meterle dinero tienes dos caminos: **Mover entre cajones** lo que ya está en la cuenta principal —con **Mover todo** si lo quieres entero—, o elegir el bolsillo en el selector **Bolsillo** al registrar un movimiento.
+Una vez creado, el bolsillo cuelga de su cuenta por una línea que baja desde el código de la moneda, y la fila de la cuenta pasa a llamarse **Cuenta principal**. Tiene su propio botón **Tasa**: le das la suya igual que a cualquier cuenta. Para meterle dinero tienes dos caminos: **Mover dinero** desde la cuenta principal —con **Mover todo** si lo quieres entero—, o elegir el bolsillo en el selector **Bolsillo** al registrar un movimiento.
 
-> **Mover no cambia tu rentabilidad.** Las dos patas —lo que sale de un lado y entra en el otro— se anotan a la vez y se compensan. El dinero cambió de cajón, no entró ni salió: lo único que cambia es a qué tasa rinde desde ese día.
+**Mover a otra plataforma.** En el recuadro **A** eliges la plataforma, la moneda y el cajón a los que va, así que el mismo botón sirve para pasar dinero de tu app de ahorro a tu bróker. Es el paso que ocurre de verdad antes de comprar: el dinero llega al bróker y, desde ahí, una compra en esa plataforma se puede pagar con él (ver 5.3). El saldo de destino no tiene que existir todavía; se abre solo.
+
+Si la moneda de destino es otra, se te pide **la tasa**: cuántas unidades de la moneda de destino te dieron por cada una de la de origen. Pon la que te aplicó la plataforma ese día, no la de hoy. Debajo verás cuánto llega. Sin tasa el importe viajaría tal cual con otra etiqueta, que es la diferencia entre cuatrocientos mil pesos y cuatrocientos mil dólares.
+
+> **Mover no cambia tu rentabilidad.** Las dos patas —lo que sale de un lado y entra en el otro— se anotan a la vez y se compensan. El dinero cambió de sitio dentro del portafolio, no entró ni salió: lo único que cambia es dónde está y a qué tasa rinde desde ese día.
 
 **Renombrar y borrar.** Pulsa **Editar** en la línea del bolsillo. El nombre es lo único que se cambia: lo que guarda se mueve con movimientos, y cuándo rinde se mueve con su tasa. Solo se puede **borrar** un bolsillo que nunca tuvo movimientos; con historia, borrarlo se la llevaría por delante, así que primero mueve el dinero de vuelta y borra sus movimientos.
 

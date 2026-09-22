@@ -75,6 +75,23 @@
 				};
 	}
 
+	/* El portafolio que se propone para una cuenta, y cómo se llama: aquel en
+	   que ya guarda más, que es el que casi siempre se quiere. Lo comparten el
+	   depósito y el traslado, que lo proponen igual. */
+	function suggestPortfolio(account: CashAccount) {
+		const portfolioId = suggestCashPortfolio(
+			data.balances,
+			account.sourceId,
+			account.currency,
+			data.portfolios[0]?.id ?? ''
+		);
+
+		return {
+			portfolioId,
+			portfolioName: data.portfolios.find((p) => p.id === portfolioId)?.name ?? ''
+		};
+	}
+
 	/*
 	 * Un depósito es un lote de dinero comprado una vez, así que es de un solo
 	 * portafolio: se propone aquel en que la cuenta ya guarda más, como al mover.
@@ -94,41 +111,21 @@
 			return;
 		}
 
-		const portfolioId = suggestCashPortfolio(
-			data.balances,
-			account.sourceId,
-			account.currency,
-			data.portfolios[0]?.id ?? ''
-		);
-
 		depositTarget = {
 			mode: 'create',
 			sourceId: account.sourceId,
 			sourceName: account.sourceName,
 			currency: account.currency,
-			portfolioId,
-			portfolioName: data.portfolios.find((p) => p.id === portfolioId)?.name ?? ''
+			...suggestPortfolio(account)
 		};
 	}
 
 	/*
-	 * Mover es dentro de un portafolio: el dinero cambia de cajón, no de sitio
-	 * donde cuenta. Se propone aquel en que la cuenta ya guarda más, que es el
-	 * que casi siempre se quiere.
+	 * Mover es dentro de un portafolio: el dinero cambia de cajón o de
+	 * plataforma, no de sitio donde cuenta.
 	 */
 	function openMove(account: CashAccount) {
-		const portfolioId = suggestCashPortfolio(
-			data.balances,
-			account.sourceId,
-			account.currency,
-			data.portfolios[0]?.id ?? ''
-		);
-
-		moveTarget = {
-			account,
-			portfolioId,
-			portfolioName: data.portfolios.find((p) => p.id === portfolioId)?.name ?? ''
-		};
+		moveTarget = { account, ...suggestPortfolio(account) };
 	}
 
 	/* Un bloque del mapa abre lo que rinde su cajón: la ficha si es un depósito,
@@ -205,6 +202,7 @@
 			pockets={data.pockets}
 			{showPortfolio}
 			{today}
+			canTransfer={data.platforms.length > 1}
 			onRecord={(balance) => (target = { mode: 'create', balance })}
 			onRate={(account) => (rateTarget = { account })}
 			onPocket={openPocket}
@@ -248,7 +246,12 @@
 
 <CashPocketForm target={pocketTarget} onClose={() => (pocketTarget = null)} />
 
-<CashMoveForm target={moveTarget} pockets={data.pockets} onClose={() => (moveTarget = null)} />
+<CashMoveForm
+	target={moveTarget}
+	pockets={data.pockets}
+	platforms={data.platforms}
+	onClose={() => (moveTarget = null)}
+/>
 
 <CashDepositForm target={depositTarget} onClose={() => (depositTarget = null)} />
 

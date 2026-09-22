@@ -61,15 +61,21 @@ func (s *service) CreateCashMovement(ctx context.Context, userID, portfolioID, s
 	return s.repo.CreateCashMovement(ctx, userID, portfolioID, sourceID, pocketID, in)
 }
 
-// MoveCash moves money between two balances of one account inside a portfolio.
-// It is the one write that touches two balances, and it is not two movements:
-// the legs offset each other, so the portfolio's return does not move.
+// MoveCash moves money between two cash balances inside a portfolio: two
+// drawers of one account, or two accounts. It is the one write that touches two
+// balances, and it is not two movements: the legs offset each other, so the
+// portfolio's return does not move.
+//
+// The destination is filled in before it is checked, so a request that names
+// only a drawer still means the account the money is already in.
 func (s *service) MoveCash(ctx context.Context, userID, portfolioID, sourceID uuid.UUID, in CashMoveInput) (CashMove, error) {
 	if portfolioID == (uuid.UUID{}) || sourceID == (uuid.UUID{}) {
 		return CashMove{}, invalidCashMove("portfolioId and sourceId are required")
 	}
 
-	if err := in.Validate(); err != nil {
+	in = in.withDefaults(sourceID)
+
+	if err := in.Validate(sourceID); err != nil {
 		return CashMove{}, err
 	}
 
