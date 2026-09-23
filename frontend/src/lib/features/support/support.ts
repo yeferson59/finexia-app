@@ -1,12 +1,14 @@
 /**
  * Los aportes de `/apoyar`: los montos que se ofrecen y cómo se lee el
- * resultado que Bold devuelve al volver de la pasarela.
+ * resultado al volver de la pasarela.
  *
- * La firma, las llaves y la consulta a Bold viven en `$lib/server/bold`; aquí
- * solo lo que también necesita el navegador.
+ * La firma, las llaves, el guardado de cada orden y el webhook de Bold viven en
+ * el backend (`docs/API.md` §2.13); aquí solo lo que también necesita el
+ * navegador.
  */
+import type { SupportStatus } from '$lib/api/types';
 
-/** Bold no cobra menos de $1.000 COP. */
+/** Bold no cobra menos de $1.000 COP. Los dos topes repiten los del backend. */
 export const MIN_AMOUNT = 1_000;
 /** Un techo propio, por debajo de los límites de la cuenta de Bold. */
 export const MAX_AMOUNT = 2_000_000;
@@ -28,7 +30,16 @@ export interface SupportResult {
 	total: number | null;
 }
 
-const OUTCOMES: Record<string, PaymentOutcome> = {
+/** Los estados que guarda el backend. `created` no está: aún no hay pago. */
+const STORED: Partial<Record<SupportStatus, PaymentOutcome>> = {
+	approved: 'approved',
+	pending: 'pending',
+	rejected: 'failed',
+	voided: 'failed'
+};
+
+/** Lo que Bold escribe en `bold-tx-status` al devolver a quien paga. */
+const CLAIMED: Record<string, PaymentOutcome> = {
 	APPROVED: 'approved',
 	PROCESSING: 'pending',
 	PENDING: 'pending',
@@ -40,20 +51,20 @@ const OUTCOMES: Record<string, PaymentOutcome> = {
 /**
  * El resultado que se le enseña a quien vuelve de Bold.
  *
- * Manda el estado que Bold responde a la consulta (`confirmed`). El
- * `bold-tx-status` de la URL solo se usa si Bold no contesta, y nunca para
- * dar un pago por aprobado: esa URL la puede escribir cualquiera.
+ * Manda el estado que guarda el backend (`stored`), que ya viene de Bold: del
+ * webhook o de preguntarle al volver. Si el backend no contesta o la orden
+ * sigue en `created`, se usa el `bold-tx-status` de la URL, pero nunca para dar
+ * un pago por aprobado: esa URL la puede escribir cualquiera.
  */
 export function supportResult(
-	confirmed: string | null,
+	stored: SupportStatus | null,
 	total: number | null,
 	fromUrl: string | null
 ): SupportResult | null {
-	if (confirmed) {
-		const outcome = OUTCOMES[confirmed];
-		return outcome ? { outcome, total } : null;
-	}
-	const claimed = OUTCOMES[(fromUrl ?? '').toUpperCase()];
+	const outcome = stored ? STORED[stored] : undefined;
+	if (outcome) return { outcome, total };
+
+	const claimed = CLAIMED[(fromUrl ?? '').toUpperCase()];
 	if (!claimed) return null;
 	return { outcome: claimed === 'failed' ? 'failed' : 'pending', total: null };
 }

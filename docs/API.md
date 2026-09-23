@@ -132,12 +132,15 @@ rutas, y solo estas, a la misma ruta del backend
 | `/.well-known/oauth-protected-resource` y `/.well-known/oauth-authorization-server`, con y sin `/mcp` | §2.12 |
 | `/oauth/register`, `/oauth/authorize`, `/oauth/token` | §2.12 |
 | `/users/:id/avatar` | §2.3 |
+| `/support/webhooks/bold` | §2.13 |
 
 El resto de rutas de este documento no existe desde fuera. El reenvío pasa las
 cabeceras que estas rutas usan (`Authorization`, `Content-Type`, `Accept`, las de
 MCP…) pero **nunca** la cookie de sesión de la app, y devuelve la respuesta tal
 cual, redirecciones incluidas: el `302` de `/oauth/authorize` es para el
-navegador. La IP del cliente y su `User-Agent` llegan en `X-Forwarded-For` y
+navegador. El cuerpo pasa byte a byte, que es lo que necesita el webhook de Bold:
+su firma es un HMAC de esos bytes exactos, y por eso `X-Bold-Signature` está
+entre las cabeceras que se reenvían. La IP del cliente y su `User-Agent` llegan en `X-Forwarded-For` y
 `User-Agent`, como en cualquier otra llamada de la app.
 
 De ahí que el `issuer` del servidor OAuth salga de `FRONTEND_URL`, el origen de
@@ -1868,6 +1871,121 @@ dirección que nadie puede alcanzar.
 | 400 | `invalid_request`, `invalid_grant`, `invalid_scope`, `invalid_client_metadata`, `invalid_redirect_uri`, `invalid_target`, `unsupported_grant_type` |
 | 401 | `invalid_client` — el cliente no existe o su secreto no vale |
 | 403 | `access_denied` — el usuario dijo que no |
+
+### 2.13 Aportes — Bold (público; *admin* donde se indica)
+
+Los aportes voluntarios de `/apoyar`, cobrados con el botón de pagos de Bold
+(integración personalizada, `renderMode: "embedded"`). Las rutas del pagador no
+piden sesión: la página es pública y aportar no cambia nada en una cuenta, así
+que un aporte es una orden y su estado, sin `user_id` ni datos del pagador.
+
+| Método | Path | Descripción |
+|---|---|---|
+| GET | `/support` | `{ enabled, currency, minAmount, maxAmount }` |
+| POST | `/support/checkouts` | Crea y firma una orden. Body `{ "amount": 20000 }` (pesos enteros, 1.000–2.000.000). `201` con la orden; límite de 20 por IP cada 15 min |
+| GET | `/support/checkouts/:orderId` | Estado de la orden |
+| POST | `/support/webhooks/bold` | Webhook de Bold. Se alcanza desde fuera (§1.6) |
+| GET | `/support/contributions?status=&page=&limit=` | *admin* — los aportes, del más nuevo al más viejo (§1.5). `status` es uno de los cinco estados; sin él, todos. Cada item añade `paymentId`, `paymentMethod` y `updatedAt` |
+| GET | `/support/contributions/summary` | *admin* — `{ counts: {estado: n}, approvedTotal, approvedRecent, lastApprovedAt }`. Los totales suman lo cobrado de lo aprobado (el monto de la orden si Bold no dio total); `approvedRecent`, los últimos 30 días |
+
+#### La orden
+
+`POST /support/checkouts` guarda la orden en `support_contributions` como
+`created` **antes** de que el pagador vea Bold, y devuelve lo que el navegador le
+pasa a `new BoldCheckout(…)` tal cual:
+
+```json
+{
+  "orderId": "FNX-APOYO-1790135374233-9f2c0e1a7b3d4c5e",
+  "currency": "COP",
+  "amount": "20000",
+  "apiKey": "<llave de identidad>",
+  "integritySignature": "<sha256 hex de orderId+amount+currency+llave secreta>",
+  "redirectionUrl": "https://finexia.me/apoyar",
+  "description": "Aporte a Finexia",
+  "renderMode": "embedded"
+}
+```
+
+La llave secreta nunca sale del backend: solo la firma. `redirectionUrl` sale de
+`FRONTEND_URL`. El id lleva 64 bits aleatorios porque quien lo tiene puede leer
+el estado de esa orden.
+
+#### El estado
+
+`created` → `pending` / `rejected` / `approved` → `voided`. Lo mueven solo dos
+fuentes, las dos de Bold: el webhook y la consulta
+`GET https://payments.api.bold.co/v2/payment-voucher/:orderId`, que
+`GET /support/checkouts/:orderId` hace mientras la orden no esté `approved` ni
+`voided` (quien vuelve de la pasarela suele llegar antes que el webhook). El
+`bold-tx-status` de la URL de vuelta lo puede escribir cualquiera y **nunca** se
+guarda.
+
+Los avisos pueden llegar tarde, repetidos o desordenados, así que no toda
+transición vale: un rechazo solo cae sobre una orden que sigue esperando (el
+rechazo tardío del primer intento no deshace la aprobación del reintento), una
+aprobación cae sobre todo menos una anulación, y nada deshace una anulación. La
+tabla es el `WHERE` de un único `UPDATE`, así que dos entregas simultáneas no
+pueden pisarse.
+
+`GET /support/checkouts/:orderId` responde:
+
+```json
+{ "orderId": "FNX-APOYO-…", "amount": 20000, "currency": "COP", "status": "approved",
+  "totalCharged": 20000, "approvedAt": "2026-09-22T22:50:03Z", "createdAt": "…" }
+```
+
+Un id con otro formato o que no existe es `404`, sin preguntarle a Bold.
+
+#### El webhook
+
+Se configura en el panel de Bold con la URL pública de la app:
+`https://finexia.me/support/webhooks/bold`.
+
+- La firma es `X-Bold-Signature`: HMAC-SHA256, con la llave secreta, del cuerpo
+  crudo codificado en base64, en hex. En el ambiente de pruebas Bold firma con
+  una llave **vacía**: `BOLD_WEBHOOK_TEST_MODE=true` verifica así, y el backend
+  se niega a arrancar con ella si `ENVIRONMENT=production`.
+- Idempotente por el `id` del evento: se guarda en `support_payment_events` en la
+  misma transacción que el cambio de estado, y una segunda entrega del mismo id
+  no cambia nada. De cada evento se guarda solo lo que hace falta para conciliar
+  (tipo, pago, orden, total); el correo y la tarjeta del pagador no.
+- `SALE_APPROVED` → `approved`, `SALE_REJECTED` → `rejected`, `VOID_APPROVED` →
+  `voided`; `VOID_REJECTED` se registra y no cambia nada.
+- Un pago que no viene de una orden nuestra (un link de pago hecho desde el
+  panel) se registra y se responde `200` igual: rechazarlo solo haría que Bold lo
+  reintentara.
+
+| Código | Cuándo |
+|---|---|
+| 200 | Registrado, o ya lo estaba |
+| 400 | Firma buena, cuerpo que no es un evento |
+| 401 | Firma que no coincide |
+| 503 | Faltan las llaves de Bold: Bold reintenta (15 min, 1 h, 4 h, 8 h, 24 h) |
+| 500 | No se pudo guardar: Bold reintenta |
+
+#### Conciliación
+
+Un job cada hora (`support-reconcile`) hace lo que habría hecho un webhook
+perdido —la app caída más de lo que Bold reintenta, la URL mal escrita en su
+panel—: pregunta a Bold por las órdenes abiertas y guarda lo que responda. Son
+abiertas las `pending` y las `created` de menos de 7 días, siempre que tengan
+más de 15 minutos (antes, el webhook suele estar en camino). Como mucho 100 por
+pasada, las más nuevas primero.
+
+Después borra las `created` de más de 7 días: pasarelas que alguien abrió y
+cerró sin pagar, que Bold confirmó cada hora durante una semana. Solo borra tras
+una pasada en la que Bold respondió por todas; si alguna consulta falló, espera a
+la siguiente, porque borrar una orden que sí se pagó no tiene arreglo. Un webhook
+que llegue después de borrada su orden se sigue registrando en
+`support_payment_events`.
+
+#### Configuración
+
+`BOLD_API_KEY` y `BOLD_SECRET_KEY`, las dos del panel de Bold (cada una tiene
+versión de pruebas y de producción; el ambiente lo decide la pareja). Sin las
+dos, `GET /support` dice `enabled: false`, crear una orden es `503` y la página
+lo explica.
 
 ---
 

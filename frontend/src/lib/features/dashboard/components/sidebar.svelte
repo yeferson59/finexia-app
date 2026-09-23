@@ -15,7 +15,7 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import Icon from './icon.svelte';
-	import { ADMIN_NAV, MAIN_NAV, isActive, type NavItem } from '../nav';
+	import { ADMIN_NAV, MAIN_NAV, activeItem, type NavItem } from '../nav';
 
 	interface Props {
 		sidebarOpen?: boolean;
@@ -25,6 +25,7 @@
 	let { sidebarOpen = false, user }: Props = $props();
 
 	const adminItems = $derived(user?.role === 'admin' ? ADMIN_NAV : []);
+	const current = $derived(activeItem(page.url.pathname)?.href);
 </script>
 
 <aside id="dashboard-sidebar" class="sidebar" class:open={sidebarOpen}>
@@ -82,7 +83,7 @@
 {#snippet list(items: NavItem[])}
 	<ul>
 		{#each items as item (item.href)}
-			{@const active = isActive(item.href, page.url.pathname)}
+			{@const active = item.href === current}
 			<li>
 				<!-- `nav.ts` ya resolvió cada ruta al construir la lista; la regla no
 				     puede seguir el rastro hasta allí. -->

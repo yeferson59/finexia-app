@@ -80,6 +80,13 @@ type EnvConfig struct {
 	EmailVerificationExpiry time.Duration `env:"EMAIL_VERIFICATION_EXPIRY" default:"1d"`
 	SelfRegistrationEnabled bool          `env:"SELF_REGISTRATION_ENABLED" default:"false"`
 	TwoFactorPendingExpiry  time.Duration `env:"TWO_FACTOR_PENDING_EXPIRY" default:"5m"`
+	// Bold, the payment gateway behind /apoyar. Without both keys the page
+	// stays up and says contributions are unavailable.
+	BoldAPIKey    string `env:"BOLD_API_KEY"`
+	BoldSecretKey string `env:"BOLD_SECRET_KEY"`
+	// BoldWebhookTestMode verifies webhooks with the empty key Bold's test
+	// environment signs them with. Validate refuses it in production.
+	BoldWebhookTestMode bool `env:"BOLD_WEBHOOK_TEST_MODE" default:"false"`
 }
 
 func New() (*EnvConfig, error) {
@@ -105,6 +112,12 @@ func (e *EnvConfig) Validate() error {
 
 	if e.DatabaseURL == "" {
 		return errors.New("config: DATABASE_URL is required")
+	}
+
+	// In test mode anyone who knows the webhook URL can sign a notification,
+	// since the key is empty — and mark any contribution approved with it.
+	if e.BoldWebhookTestMode && e.Environment == "production" {
+		return errors.New("config: BOLD_WEBHOOK_TEST_MODE must be off in production: test-mode webhooks are signed with an empty key")
 	}
 
 	return nil

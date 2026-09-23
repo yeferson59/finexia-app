@@ -96,8 +96,9 @@ No hay aliases propios: todo se importa por `$lib`.
   (exports, import de CSV, combobox de assets) y los flujos públicos de
   `auth`/`marketing` devuelven la `Response` cruda.
 - `proxy.ts` tiene la lista **cerrada** de rutas del backend alcanzables desde
-  fuera (`/mcp`, su OAuth, avatares por id). `hooks.server.ts` las reenvía sin
-  cookies, antes de la sesión y del check CSRF.
+  fuera (`/mcp`, su OAuth, avatares por id, el webhook de Bold).
+  `hooks.server.ts` las reenvía sin cookies, antes de la sesión y del check
+  CSRF.
 
 ### Sesión y CSRF
 

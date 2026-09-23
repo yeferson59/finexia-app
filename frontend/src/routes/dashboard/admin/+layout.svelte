@@ -10,7 +10,7 @@
 
 <style>
 	/*
-	 * Lo que comparten las cuatro pantallas de administración y solo ellas.
+	 * Lo que comparten las pantallas de administración y solo ellas.
 	 *
 	 * `display: contents` para no meter una caja más en la columna del panel: ni
 	 * el color heredado ni las reglas `:global` de aquí dependen de que este div

@@ -8,7 +8,8 @@
  *
  * `admin-block` es el chrome interno que comparten esas pantallas —el título, la
  * frase de estado y el idioma de las celdas— y no forma parte de la superficie
- * pública. `desk.ts` aporta la edad de los datos y la lista de lo pendiente.
+ * pública. `desk.ts` aporta la edad de los datos y la lista de lo pendiente;
+ * `contributions.ts`, el vocabulario de los aportes de `/apoyar`.
  */
 export { default as InviteUserForm } from './components/invite-user-form.svelte';
 export { default as InvitationsTable } from './components/invitations-table.svelte';
@@ -21,7 +22,9 @@ export { default as ExchangeRateCreateForm } from './components/exchange-rate-cr
 export { default as ExchangeRatesTable } from './components/exchange-rates-table.svelte';
 export { default as ImportCard } from './components/import-card.svelte';
 export { default as Worklist } from './components/worklist.svelte';
+export { default as ContributionsTable } from './components/contributions-table.svelte';
 
 export * from './admin';
 export * from './desk';
+export * from './contributions';
 export * from './schemas';

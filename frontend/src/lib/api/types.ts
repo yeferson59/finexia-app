@@ -48,6 +48,12 @@ import type {
 	portfolioGrowthSchema,
 	portfolioSummarySchema,
 	riskSchema,
+	adminContributionSchema,
+	supportCheckoutSchema,
+	supportConfigSchema,
+	supportContributionSchema,
+	supportStatusSchema,
+	supportSummarySchema,
 	topTransactionSchema,
 	transactionSchema,
 	twoFactorStatusSchema,
@@ -236,3 +242,21 @@ export type MarketRate = z.infer<typeof marketRateSchema>;
 
 /** Resultado de `POST /market/sync`. */
 export type MarketSyncResult = z.infer<typeof marketSyncResultSchema>;
+
+/** `GET /support`: si `/apoyar` puede recibir aportes. */
+export type SupportConfig = z.infer<typeof supportConfigSchema>;
+
+/** Orden firmada para el botón de pagos de Bold. */
+export type SupportCheckout = z.infer<typeof supportCheckoutSchema>;
+
+/** Estado de un aporte en el backend. */
+export type SupportStatus = z.infer<typeof supportStatusSchema>;
+
+/** Un aporte y lo que Bold dijo de él. */
+export type SupportContribution = z.infer<typeof supportContributionSchema>;
+
+/** Un aporte tal como lo lista la administración. */
+export type AdminContribution = z.infer<typeof adminContributionSchema>;
+
+/** Los aportes en conjunto, para la administración. */
+export type SupportSummary = z.infer<typeof supportSummarySchema>;

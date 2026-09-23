@@ -12,8 +12,8 @@ aquí.
   del response: `ok`, `status`, `success`, `data`, `message`, `details`,
   `action`) sobre los que se construyen los módulos de dominio.
 - `proxy.ts` — la parte del backend que se alcanza desde fuera (`/mcp`, el OAuth
-  de `/mcp` y los avatares). `hooks.server.ts` reenvía esas rutas, y solo esas,
-  a la misma ruta del backend y sin la cookie de sesión. La lista es cerrada: una
+  de `/mcp`, los avatares y el webhook de Bold). `hooks.server.ts` reenvía esas
+  rutas, y solo esas, a la misma ruta del backend y sin la cookie de sesión. La lista es cerrada: una
   ruta que no está ahí no existe desde fuera (`docs/API.md` §1.6).
 - `schemas/` — los contratos como schemas Zod, mantenidos a mano contra
   `docs/API.md`. **Fuente de verdad de los shapes de la API.** Repartidos por

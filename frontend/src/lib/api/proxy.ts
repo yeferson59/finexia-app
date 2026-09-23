@@ -22,6 +22,10 @@ const PUBLIC_API_PATHS: readonly RegExp[] = [
 	// The three OAuth endpoints the client drives itself. The fourth step of the
 	// flow, `/oauth/consent`, is a page of this app and never reaches here.
 	/^\/oauth\/(?:register|authorize|token)$/,
+	// Bold's webhook for the contributions of /apoyar (§2.13). Bold calls it
+	// from outside and signs the body, which is why the body goes through
+	// byte for byte and `x-bold-signature` is among the forwarded headers.
+	/^\/support\/webhooks\/bold$/,
 	// Public avatars (§2.3). Ids only: `/users/me/avatar` is the upload, which is
 	// authenticated and goes through the settings action instead.
 	/^\/users\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/avatar$/i
@@ -45,7 +49,8 @@ const FORWARDED_REQUEST_HEADERS = [
 	'if-none-match',
 	'last-event-id',
 	'mcp-protocol-version',
-	'mcp-session-id'
+	'mcp-session-id',
+	'x-bold-signature'
 ];
 
 /**

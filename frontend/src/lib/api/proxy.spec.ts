@@ -33,6 +33,7 @@ describe('isPublicApiPath', () => {
 		'/oauth/register',
 		'/oauth/authorize',
 		'/oauth/token',
+		'/support/webhooks/bold',
 		AVATAR_PATH
 	])('exposes %s', (path) => {
 		expect(isPublicApiPath(path)).toBe(true);
@@ -48,6 +49,11 @@ describe('isPublicApiPath', () => {
 		'/mcp/',
 		'/mcp/tools',
 		'/.well-known/security.txt',
+		// Only Bold's webhook is public: the checkouts are created and read by
+		// this app's server, on the payer's behalf.
+		'/support',
+		'/support/checkouts',
+		'/support/webhooks/bold/',
 		'/dashboard'
 	])('keeps %s private', (path) => {
 		expect(isPublicApiPath(path)).toBe(false);
@@ -92,6 +98,24 @@ describe('proxyToBackend', () => {
 		// Set by handleFetch from the real client address, not trusted from here.
 		expect(init.headers.get('x-forwarded-for')).toBeNull();
 		expect(init.credentials).toBe('omit');
+	});
+
+	it("forwards Bold's webhook byte for byte with its signature", async () => {
+		// The signature is an HMAC of these exact bytes: a proxy that re-encoded
+		// the JSON would make every webhook fail verification.
+		const body = '{"id":"evt-1",  "type":"SALE_APPROVED"}';
+		const { event, fetch } = proxyEvent('/support/webhooks/bold', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', 'x-bold-signature': 'abc123' },
+			body
+		});
+
+		await proxyToBackend(event);
+
+		const [target, init] = fetch.mock.calls[0];
+		expect(target).toBe('http://backend.internal:8080/support/webhooks/bold');
+		expect(new TextDecoder().decode(init.body)).toBe(body);
+		expect(init.headers.get('x-bold-signature')).toBe('abc123');
 	});
 
 	it('hands the redirect of /oauth/authorize back to the browser instead of following it', async () => {

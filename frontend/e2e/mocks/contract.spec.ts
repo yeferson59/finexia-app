@@ -12,6 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+	adminContributionSchema,
 	allocationItemSchema,
 	assetHoldingSchema,
 	assetSchema,
@@ -21,6 +22,7 @@ import {
 	platformSchema,
 	portfolioGrowthSchema,
 	portfolioSummarySchema,
+	supportSummarySchema,
 	userTransactionSchema
 } from '$lib/api/schemas';
 import {
@@ -33,6 +35,8 @@ import {
 	holdings,
 	portfolioSummary,
 	sources,
+	supportContributions,
+	supportSummary,
 	transactions
 } from './mock-api.mjs';
 
@@ -47,7 +51,9 @@ describe('las fixtures del stub cumplen el contrato', () => {
 		['portfolios/holdings', assetHoldingSchema.array(), assetHoldings],
 		['portfolios/cash', cashBalanceSchema.array(), cashBalances],
 		['portfolios/sources', platformSchema.array(), sources],
-		['exchange-rates', exchangeRateSchema.array(), exchangeRates]
+		['exchange-rates', exchangeRateSchema.array(), exchangeRates],
+		['support/contributions', adminContributionSchema.array(), supportContributions],
+		['support/contributions/summary', supportSummarySchema, supportSummary]
 	])('%s', (_name, schema, fixture) => {
 		const parsed = schema.safeParse(fixture);
 		expect(parsed.success ? [] : parsed.error.issues).toEqual([]);

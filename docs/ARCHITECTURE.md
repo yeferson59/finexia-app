@@ -29,7 +29,8 @@ backend/
     │   ├── mail/  geoip/  httpx/         # httpx: middlewares genéricos + envelope de respuesta
     │   ├── spreadsheet/                  # lectura genérica de CSV/XLSX (compartida por los importers)
     │   ├── marketdata/                   # provider de precios (BYO-key) + alphavantage/finnhub + fallback + providers/ + dolarapi y ecb (feeds públicos, sin clave)
-    │   └── secretbox/                    # cifrado de sobre de las claves que aportan los usuarios
+    │   ├── secretbox/                    # cifrado de sobre de las claves que aportan los usuarios
+    │   └── bold/                         # pasarela Bold: firma de órdenes, firma del webhook, consulta del voucher
     ├── identity/                # tipos compartidos (User, Account, Session, Role) — sin lógica
     │
     ├── auth/                    # login, sesiones, refresh, 2FA, verificación de email,
@@ -39,6 +40,7 @@ backend/
     │                            # snapshots, import/export (lee exchange-rates para conversión)
     ├── market/                  # catálogo de assets, exchange rates, claves BYO-key y sync por usuario
     ├── marketing/               # waitlist
+    ├── support/                 # aportes de /apoyar: órdenes firmadas para Bold y su webhook
     ├── notification/            # resumen semanal por email
     ├── mcp/                     # servidor Model Context Protocol: reexpone las
     │                            # lecturas de portfolio y market como tools
@@ -137,6 +139,7 @@ graph TD
     app --> marketing
     app --> notification
     app --> mcp
+    app --> support
     app --> scheduler
 
     auth --> identity

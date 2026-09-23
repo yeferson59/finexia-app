@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import * as user from '$lib/api/user';
 import * as market from '$lib/api/market';
+import * as support from '$lib/api/support';
 import { summarizeDesk } from '$lib/features/admin';
 import type { Asset, ExchangeRate, InvitationItem, WaitlistItem } from '$lib/api/types';
 
@@ -13,13 +14,15 @@ export const load: PageServerLoad = async ({ cookies, fetch }) => {
 	 * cae, qué precios se quedaron viejos y qué tasas manuales llevan un mes.
 	 * Van en paralelo porque ninguna depende de otra.
 	 */
-	const [usersRes, assetsRes, ratesRes, invitationsRes, waitlistRes] = await Promise.all([
-		user.getUsers(event, { page: 1, limit: 1 }),
-		market.getAssets(event, { page: 1, limit: 100 }),
-		market.getExchangeRates(event, { page: 1, limit: 100 }),
-		user.getInvitations(event, { page: 1, limit: 50 }),
-		user.getWaitlist(event, { page: 1, limit: 50 })
-	]);
+	const [usersRes, assetsRes, ratesRes, invitationsRes, waitlistRes, supportRes] =
+		await Promise.all([
+			user.getUsers(event, { page: 1, limit: 1 }),
+			market.getAssets(event, { page: 1, limit: 100 }),
+			market.getExchangeRates(event, { page: 1, limit: 100 }),
+			user.getInvitations(event, { page: 1, limit: 50 }),
+			user.getWaitlist(event, { page: 1, limit: 50 }),
+			support.getSupportSummary(event)
+		]);
 
 	let totalUsers = 0;
 	if (usersRes.ok && usersRes.success && usersRes.data?.metaData) {
@@ -41,6 +44,9 @@ export const load: PageServerLoad = async ({ cookies, fetch }) => {
 		totalUsers,
 		totalAssets: assets.length,
 		totalRates: rates.length,
+		// `null` si el backend no contestó: la cifra no se enseña antes que
+		// enseñar un cero que no es cierto.
+		approvedTotal: supportRes.success ? (supportRes.data?.approvedTotal ?? 0) : null,
 		desk: summarizeDesk({ assets, rates, invitations, waitlist })
 	};
 };

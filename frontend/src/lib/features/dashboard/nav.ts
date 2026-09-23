@@ -37,12 +37,13 @@ export const ADMIN_NAV: NavItem[] = [
 	{ label: 'Panel de administración', icon: 'shield', href: resolve('/dashboard/admin') },
 	{ label: 'Usuarios', icon: 'users', href: resolve('/dashboard/admin/users') },
 	{ label: 'Activos', icon: 'database', href: resolve('/dashboard/admin/assets') },
-	{ label: 'Tasas de cambio', icon: 'rates', href: resolve('/dashboard/admin/exchange-rates') }
+	{ label: 'Tasas de cambio', icon: 'rates', href: resolve('/dashboard/admin/exchange-rates') },
+	{ label: 'Aportes', icon: 'heart', href: resolve('/dashboard/admin/contributions') }
 ];
 
 const HOME = resolve('/dashboard');
 
-/** Si `href` es la sección que se está mirando. */
+/** Si `href` es la sección que se está mirando o una de sus antecesoras. */
 export function isActive(href: string, pathname: string): boolean {
 	// El resumen es la única ruta que no manda sobre sus hijas: cualquier página
 	// del panel empieza por `/dashboard` y si no, saldría siempre marcada.
@@ -50,15 +51,20 @@ export function isActive(href: string, pathname: string): boolean {
 }
 
 /**
- * Nombre de la sección abierta, para la cabecera.
+ * La entrada del menú que corresponde a la página abierta: de las que encajan,
+ * la de ruta más larga.
  *
- * Gana la coincidencia más larga: `/dashboard/admin/users` es «Usuarios» y no
- * «Panel de administración», aunque las dos rutas encajen.
+ * `/dashboard/admin/users` encaja con «Usuarios» y con «Panel de
+ * administración», y el menú marcaba las dos. Con una sola regla para el menú y
+ * para la cabecera, los dos dicen el mismo sitio y solo uno.
  */
-export function sectionTitle(pathname: string): string {
-	const match = [...MAIN_NAV, ...ADMIN_NAV]
+export function activeItem(pathname: string): NavItem | undefined {
+	return [...MAIN_NAV, ...ADMIN_NAV]
 		.filter((item) => isActive(item.href, pathname))
 		.sort((a, b) => b.href.length - a.href.length)[0];
+}
 
-	return match?.label ?? 'Panel';
+/** Nombre de la sección abierta, para la cabecera. */
+export function sectionTitle(pathname: string): string {
+	return activeItem(pathname)?.label ?? 'Panel';
 }

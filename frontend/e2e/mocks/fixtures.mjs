@@ -700,3 +700,55 @@ export const marketCredentials = [
 		updatedAt: NOW
 	}
 ];
+
+/*
+ * `GET /support/contributions` — los aportes de `/apoyar`, para la pantalla de
+ * administración. Uno por estado que se pinta distinto: el aprobado con su
+ * pago en Bold, uno en proceso por PSE y una pasarela que nadie pagó.
+ */
+export const supportContributions = [
+	{
+		orderId: 'FNX-APOYO-1782864000000-0123456789abcdef',
+		amount: 50000,
+		currency: 'COP',
+		status: 'approved',
+		totalCharged: 50000,
+		approvedAt: NOW,
+		createdAt: NOW,
+		paymentId: 'CNPVI70CQc0EY',
+		paymentMethod: 'CARD',
+		updatedAt: NOW
+	},
+	{
+		orderId: 'FNX-APOYO-1782863000000-fedcba9876543210',
+		amount: 20000,
+		currency: 'COP',
+		status: 'pending',
+		totalCharged: null,
+		approvedAt: null,
+		createdAt: NOW,
+		paymentId: 'PSE00000001',
+		paymentMethod: 'PSE',
+		updatedAt: NOW
+	},
+	{
+		orderId: 'FNX-APOYO-1782862000000-00112233445566ff',
+		amount: 10000,
+		currency: 'COP',
+		status: 'created',
+		totalCharged: null,
+		approvedAt: null,
+		createdAt: NOW,
+		paymentId: '',
+		paymentMethod: '',
+		updatedAt: NOW
+	}
+];
+
+/** `GET /support/contributions/summary`, coherente con la lista de arriba. */
+export const supportSummary = {
+	counts: { created: 1, pending: 1, rejected: 0, approved: 1, voided: 0 },
+	approvedTotal: 50000,
+	approvedRecent: 50000,
+	lastApprovedAt: NOW
+};

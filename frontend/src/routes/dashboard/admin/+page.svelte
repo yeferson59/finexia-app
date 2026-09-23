@@ -10,6 +10,7 @@
 	 */
 	import { resolve } from '$app/paths';
 	import { Worklist, buildWorklist, describeDesk } from '$lib/features/admin';
+	import { formatCurrency } from '$lib/shared/format/money';
 
 	import type { PageProps } from './$types';
 
@@ -42,6 +43,12 @@
 		<span class="label">Tasas compartidas</span>
 		<span class="figure">{data.totalRates}</span>
 	</a>
+	{#if data.approvedTotal !== null}
+		<a class="entry" href={resolve('/dashboard/admin/contributions')}>
+			<span class="label">Aportado</span>
+			<span class="figure">{formatCurrency(data.approvedTotal, 'COP')}</span>
+		</a>
+	{/if}
 </nav>
 
 <style>
@@ -59,9 +66,8 @@
 	/*
 	 * Lo que hay guardado, que no es lo mismo que lo que hay pendiente: las
 	 * cifras van en el color del texto y las de la lista de tareas en el ámbar
-	 * apagado, al mismo cuerpo. Son además las tres únicas puertas de esta
-	 * pantalla, así que hacen de navegación sin necesitar tres tarjetas con
-	 * icono.
+	 * apagado, al mismo cuerpo. Son además las únicas puertas de esta pantalla,
+	 * así que hacen de navegación sin necesitar una tarjeta con icono cada una.
 	 */
 	/* Sin filete propio: cuando hay tareas ya lo puso la última de la lista, y
 	   cuando no las hay el titular no necesita que lo subrayen. */

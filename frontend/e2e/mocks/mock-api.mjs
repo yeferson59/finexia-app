@@ -31,6 +31,8 @@ import {
 	portfolioSummary,
 	risks,
 	sources,
+	supportContributions,
+	supportSummary,
 	topTransaction,
 	transactions
 } from './fixtures.mjs';
@@ -48,7 +50,9 @@ export {
 	transactions,
 	allocation,
 	assetHoldings,
-	marketCredentials
+	marketCredentials,
+	supportContributions,
+	supportSummary
 };
 
 const ACCOUNTS = {
@@ -367,6 +371,33 @@ const server = createServer(async (req, res) => {
 				]
 			})
 		);
+	}
+	if (route === 'GET /support/contributions') {
+		if (account.user.role !== 'admin') return send(res, 403, errorEnvelope('forbidden'));
+		const status = url.searchParams.get('status');
+		const items = status
+			? supportContributions.filter((c) => c.status === status)
+			: supportContributions;
+		return send(
+			res,
+			200,
+			envelope({
+				items,
+				metaData: {
+					currentPage: 1,
+					offset: 0,
+					limit: 25,
+					total: items.length,
+					totalPages: 1,
+					previous: false,
+					next: false
+				}
+			})
+		);
+	}
+	if (route === 'GET /support/contributions/summary') {
+		if (account.user.role !== 'admin') return send(res, 403, errorEnvelope('forbidden'));
+		return send(res, 200, envelope(supportSummary));
 	}
 	if (route === 'GET /users/waitlist') {
 		if (account.user.role !== 'admin') return send(res, 403, errorEnvelope('forbidden'));

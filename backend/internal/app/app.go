@@ -7,6 +7,7 @@ package app
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -38,6 +39,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/portfolio"
 	"github.com/yeferson59/finexia-app/internal/scheduler"
 	"github.com/yeferson59/finexia-app/internal/scheduler/fiberstore"
+	"github.com/yeferson59/finexia-app/internal/support"
 	"github.com/yeferson59/finexia-app/internal/user"
 )
 
@@ -205,6 +207,7 @@ type modules struct {
 	market       *market.Module
 	portfolio    *portfolio.Module
 	mcp          *mcp.Module
+	support      *support.Module
 	notification *notification.Service
 }
 
@@ -351,6 +354,16 @@ func (a *App) buildModules() *modules {
 		Log:       a.deps.Log,
 	})
 
+	// support reads no other module; it only takes auth's guard, for the
+	// admin listing. The payer's routes are public.
+	supportModule := support.New(support.Deps{
+		DB:        a.deps.DB,
+		Cfg:       supportConfig(a.deps.Envs),
+		Log:       a.deps.Log,
+		AuthMiddl: authModule,
+		Limiter:   userLimiter,
+	})
+
 	return new(modules{
 		health:       health.New(),
 		marketing:    marketingModule,
@@ -359,6 +372,7 @@ func (a *App) buildModules() *modules {
 		market:       marketModule,
 		portfolio:    portfolioModule,
 		mcp:          mcpModule,
+		support:      supportModule,
 		notification: notification.NewService(userService, portfolioModule.Service(), a.deps.Mail, notificationConfig(a.deps.Envs)),
 	})
 }
@@ -384,6 +398,7 @@ func (a *App) mountRoutes(mods *modules) {
 	mods.user.Routes(a.fiber)
 	mods.portfolio.Routes(a.fiber)
 	mods.mcp.Routes(a.fiber)
+	mods.support.Routes(a.fiber)
 }
 
 // startScheduler builds the job runner and scheduler, registers every job and
@@ -474,6 +489,20 @@ func (a *App) registerJobs(sched *scheduler.Scheduler, mods *modules, persistent
 	sched.Register(notification.NewWeeklySummaryScheduler(mods.notification, a.deps.Log), scheduler.WeeklyAt{Day: time.Monday, Hour: 8, Minute: 30}, scheduler.WithStore(persistent))
 	sched.Register(auth.NewCleanupJob(mods.auth.Service(), a.deps.Log), scheduler.Every{Interval: 5 * time.Hour}, scheduler.WithStore(persistent))
 
+	// Asks Bold about the contributions a lost webhook left open, and deletes
+	// the checkouts nobody paid. Each run makes up to 100 voucher queries of a
+	// few hundred milliseconds, sequentially, so it gets more than the 30s
+	// default; retries are off because the next hourly run is the retry.
+	sched.Register(
+		support.NewReconcileJob(mods.support.Service(), a.deps.Log),
+		scheduler.Every{Interval: time.Hour},
+		scheduler.WithStore(persistent),
+		scheduler.WithRetry(scheduler.JobOptions{
+			Timeout:    10 * time.Minute,
+			MaxRetries: scheduler.Retries(0),
+		}),
+	)
+
 	sched.Start()
 }
 
@@ -520,5 +549,15 @@ func portfolioConfig(env *config.EnvConfig) portfolio.Config {
 func notificationConfig(env *config.EnvConfig) notification.Config {
 	return notification.Config{
 		FrontendURL: env.FrontendURL,
+	}
+}
+
+// supportConfig projects the environment onto the support module's Config.
+func supportConfig(env *config.EnvConfig) support.Config {
+	return support.Config{
+		FrontendURL:     env.FrontendURL,
+		APIKey:          strings.TrimSpace(env.BoldAPIKey),
+		SecretKey:       strings.TrimSpace(env.BoldSecretKey),
+		WebhookTestMode: env.BoldWebhookTestMode,
 	}
 }

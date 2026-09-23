@@ -138,4 +138,40 @@ test.describe('admin', () => {
 
 		await expect(page.getByText('1 tasa actualizada desde el feed.')).toBeVisible();
 	});
+
+	test('lists the contributions with what was approved', async ({ page }) => {
+		await login(page, ADMIN_EMAIL);
+		await page.goto('/dashboard/admin/contributions');
+
+		await expect(page.getByRole('heading', { name: 'Historial' })).toBeVisible();
+		// Una sola entrada marcada en el menú: la de la página, no también la
+		// portada de administración, que es prefijo de todas.
+		const current = page.locator('#dashboard-sidebar [aria-current="page"]');
+		await expect(current).toHaveCount(1);
+		await expect(current).toHaveText('Aportes');
+		await expect(page.getByText(/en 1 aporte aprobado/)).toBeVisible();
+		await expect(
+			page.getByText('1 pago sigue en proceso en Bold.', { exact: false })
+		).toBeVisible();
+		await expect(page.getByText('Bold CNPVI70CQc0EY')).toBeVisible();
+
+		// El filtro es un GET: la URL lleva el estado y la tabla solo ese.
+		await page.getByRole('button', { name: 'Aprobados' }).click();
+		await expect(page).toHaveURL(/status=approved/);
+		await expect(page.getByRole('button', { name: 'Aprobados' })).toHaveAttribute(
+			'aria-pressed',
+			'true'
+		);
+		await expect(page.getByText('Bold PSE00000001')).toHaveCount(0);
+	});
+
+	test('the admin home links to the contributions with the total', async ({ page }) => {
+		await login(page, ADMIN_EMAIL);
+		await page.goto('/dashboard/admin');
+
+		const entry = page.getByRole('link', { name: /Aportado/ });
+		await expect(entry).toContainText('50.000');
+		await entry.click();
+		await expect(page).toHaveURL(/\/dashboard\/admin\/contributions$/);
+	});
 });

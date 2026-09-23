@@ -11,7 +11,7 @@
 
 const SCRIPT_URL = 'https://checkout.bold.co/library/boldPaymentButton.js';
 
-/** La configuración que firma `$lib/server/bold` y que Bold espera tal cual. */
+/** La orden que firma el backend y que Bold espera tal cual. */
 export type BoldCheckoutOptions = Record<string, string>;
 
 interface BoldCheckoutInstance {

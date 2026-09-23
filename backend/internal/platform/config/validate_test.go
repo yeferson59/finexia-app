@@ -90,3 +90,19 @@ func TestLoadEnvsHasNoJWTSecretDefault(t *testing.T) {
 		t.Fatal("cfg should be nil")
 	}
 }
+
+// Bold's test environment signs webhooks with an empty key, so test mode lets
+// anyone who knows the URL approve a contribution. It may run anywhere but
+// production.
+func TestValidateRefusesBoldWebhookTestModeInProduction(t *testing.T) {
+	env := EnvConfig{JWTSecret: goodSecret, DatabaseURL: "postgres://localhost/db", BoldWebhookTestMode: true}
+
+	if err := env.Validate(); err != nil {
+		t.Fatalf("Validate rejected test mode outside production: %v", err)
+	}
+
+	env.Environment = "production"
+	if err := env.Validate(); err == nil {
+		t.Fatal("Validate accepted BOLD_WEBHOOK_TEST_MODE in production")
+	}
+}

@@ -7,6 +7,7 @@ import * as platforms from './platforms';
 import * as market from './market';
 import * as user from './user';
 import * as auth from './auth';
+import * as support from './support';
 
 /** Authed event whose `fetch` is a spy returning `response`. */
 function authedEvent(response = jsonResponse({ success: true, data: [] })) {
@@ -161,5 +162,41 @@ describe('auth module (public)', () => {
 		expect(init.method).toBe('POST');
 		expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
 		expect(res).toBeInstanceOf(Response);
+	});
+});
+
+describe('support module (public)', () => {
+	it('createSupportCheckout POSTs the amount without any session header', async () => {
+		const fetch = vi
+			.fn()
+			.mockResolvedValue(
+				jsonResponse({ success: true, data: { orderId: 'FNX-APOYO-1' } }, { status: 201 })
+			);
+
+		const res = await support.createSupportCheckout(fetch, 20000);
+
+		const [url, init] = lastCall(fetch);
+		expect(url).toMatch(/\/support\/checkouts$/);
+		expect(init.method).toBe('POST');
+		expect(init.body).toBe(JSON.stringify({ amount: 20000 }));
+		expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
+		expect(res.ok).toBe(true);
+		expect(res.data).toEqual({ orderId: 'FNX-APOYO-1' });
+	});
+
+	it('getSupportContribution encodes the order id into the path', async () => {
+		const fetch = vi.fn().mockResolvedValue(jsonResponse({ success: true, data: {} }));
+
+		await support.getSupportContribution(fetch, 'FNX-APOYO-1/../x');
+
+		expect(lastCall(fetch)[0]).toMatch(/\/support\/checkouts\/FNX-APOYO-1%2F\.\.%2Fx$/);
+	});
+
+	it('degrades to ok:false with status 0 when the backend is unreachable', async () => {
+		const fetch = vi.fn().mockRejectedValue(new TypeError('fetch failed'));
+
+		const res = await support.getSupportConfig(fetch);
+
+		expect(res).toMatchObject({ ok: false, status: 0, data: null });
 	});
 });

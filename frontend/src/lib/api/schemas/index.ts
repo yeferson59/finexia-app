@@ -22,3 +22,4 @@ export * from './platforms';
 export * from './cash';
 export * from './market';
 export * from './user';
+export * from './support';

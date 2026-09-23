@@ -28,17 +28,22 @@ describe('supportAmountSchema', () => {
 });
 
 describe('supportResult', () => {
-	it('usa el estado que confirma Bold', () => {
-		expect(supportResult('APPROVED', 20000, 'rejected')).toEqual({
+	it('usa el estado que guarda el backend', () => {
+		expect(supportResult('approved', 20000, 'rejected')).toEqual({
 			outcome: 'approved',
 			total: 20000
 		});
-		expect(supportResult('PENDING', null, null)?.outcome).toBe('pending');
-		expect(supportResult('VOIDED', null, null)?.outcome).toBe('failed');
-		expect(supportResult('NO_TRANSACTION_FOUND', null, 'approved')).toBeNull();
+		expect(supportResult('pending', null, null)?.outcome).toBe('pending');
+		expect(supportResult('rejected', null, 'approved')?.outcome).toBe('failed');
+		expect(supportResult('voided', null, null)?.outcome).toBe('failed');
 	});
 
-	it('sin confirmación, la URL nunca da un pago por aprobado', () => {
+	it('una orden que sigue en «created» se lee de la URL, sin aprobarla', () => {
+		expect(supportResult('created', null, 'approved')).toEqual({ outcome: 'pending', total: null });
+		expect(supportResult('created', null, null)).toBeNull();
+	});
+
+	it('sin respuesta del backend, la URL nunca da un pago por aprobado', () => {
 		expect(supportResult(null, null, 'approved')).toEqual({ outcome: 'pending', total: null });
 		expect(supportResult(null, null, 'rejected')?.outcome).toBe('failed');
 		expect(supportResult(null, null, null)).toBeNull();

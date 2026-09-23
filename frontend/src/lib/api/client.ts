@@ -195,3 +195,24 @@ export async function apiRequestSafe<T>(
 ) {
 	return toResult<T>(await authedFetchSafe(event, path, init), path, schema);
 }
+
+/**
+ * Envelope parse for the public routes, which carry no session: no token, no
+ * refresh and no redirect to `/auth`. Like {@link apiRequestSafe}, a backend
+ * that does not answer is `ok: false` with status `0` rather than a throw, so a
+ * public page can degrade instead of failing whole.
+ */
+export async function publicRequest<T>(
+	fetchFn: typeof fetch,
+	path: string,
+	init: RequestInit = {},
+	schema?: ZodType<T>
+) {
+	let res: Response | null;
+	try {
+		res = await fetchFn(apiUrl(path), init);
+	} catch {
+		res = null;
+	}
+	return toResult<T>(res, path, schema);
+}
