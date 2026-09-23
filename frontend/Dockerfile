@@ -1,5 +1,5 @@
 # Stage 1: Builder
-FROM ghcr.io/pnpm/pnpm:11 AS builder
+FROM ghcr.io/pnpm/pnpm:12 AS builder
 RUN pnpm runtime set node 24 -g
 
 WORKDIR /app
