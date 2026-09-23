@@ -61,6 +61,12 @@
 	{/if}
 
 	<div class="foot">
+		<!-- No es una sección del panel sino una página pública, así que va aquí
+		     abajo, fuera de la lista y sin estado activo. -->
+		<a class="support" href={resolve('/apoyar')}>
+			<Icon name="heart" size={16} />
+			Apoyar Finexia
+		</a>
 		<form action="/dashboard?/logout" method="POST" use:enhance>
 			<button class="signout" type="submit">
 				<Icon name="logout" size={16} />
@@ -192,6 +198,7 @@
 		padding-top: 1.25rem;
 	}
 
+	.support,
 	.signout {
 		display: flex;
 		align-items: center;
@@ -205,15 +212,22 @@
 		font-family: inherit;
 		font-size: 0.875rem;
 		text-align: left;
+		text-decoration: none;
 		cursor: pointer;
 		transition:
 			background 0.15s ease,
 			color 0.15s ease;
 	}
 
+	.support:hover,
 	.signout:hover {
 		background: var(--panel);
 		color: var(--text);
+	}
+
+	/* El ámbar solo en el corazón, y solo al pasar: una invitación, no un aviso. */
+	.support:hover :global(svg) {
+		color: var(--amber);
 	}
 
 	.version {

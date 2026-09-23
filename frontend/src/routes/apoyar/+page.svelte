@@ -32,7 +32,11 @@
 			<a href={resolve('/')} class="home" aria-label="Finexia, volver al inicio">
 				<Brand />
 			</a>
-			<a href={resolve('/')} class="back">Volver al inicio</a>
+			{#if data.signedIn}
+				<a href={resolve('/dashboard')} class="back">Volver al panel</a>
+			{:else}
+				<a href={resolve('/')} class="back">Volver al inicio</a>
+			{/if}
 		</div>
 	</header>
 

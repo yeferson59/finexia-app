@@ -1,11 +1,12 @@
 import { fail } from '@sveltejs/kit';
 import { boldKeys, createCheckout, fetchPayment, isOrderId } from '$lib/server/bold';
+import { ACCESS_COOKIE, REFRESH_COOKIE } from '$lib/server/session';
 import { supportAmountSchema, supportResult } from '$lib/features/support';
 import type { Actions, PageServerLoad } from './$types';
 
 // Bold devuelve a quien paga aquí con `?bold-order-id=…&bold-tx-status=…`. El
 // estado se pregunta a Bold: el de la URL solo sirve si Bold no contesta.
-export const load: PageServerLoad = async ({ url, fetch }) => {
+export const load: PageServerLoad = async ({ url, fetch, cookies }) => {
 	const keys = boldKeys();
 	const orderId = url.searchParams.get('bold-order-id');
 
@@ -19,7 +20,12 @@ export const load: PageServerLoad = async ({ url, fetch }) => {
 		);
 	}
 
-	return { enabled: keys !== null, result };
+	// Quien tiene sesión vuelve al panel y no a la portada. La página es pública
+	// y el hook no valida la sesión aquí: basta con ver la cookie, y si ya no
+	// vale el panel lo manda a entrar.
+	const signedIn = Boolean(cookies.get(ACCESS_COOKIE) ?? cookies.get(REFRESH_COOKIE));
+
+	return { enabled: keys !== null, result, signedIn };
 };
 
 export const actions: Actions = {

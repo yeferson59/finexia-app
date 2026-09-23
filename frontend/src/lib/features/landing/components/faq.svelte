@@ -2,6 +2,8 @@
 	interface Faq {
 		q: string;
 		a: string;
+		/** Una salida tras la respuesta, cuando la respuesta sigue en otra página. */
+		link?: { href: string; label: string };
 	}
 
 	interface Props {
@@ -47,7 +49,14 @@
 						larga no queda recortada en pantallas estrechas.
 					-->
 					<div id="faq-a-{i}" class="a" role="region" aria-labelledby="faq-q-{i}">
-						<div class="a-inner"><p>{faq.a}</p></div>
+						<div class="a-inner">
+							<p>{faq.a}</p>
+							{#if faq.link}
+								<!-- Quien arma la lista ya resolvió la ruta. -->
+								<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+								<a class="more" href={faq.link.href}>{faq.link.label}</a>
+							{/if}
+						</div>
 					</div>
 				</div>
 			{/each}
@@ -159,6 +168,25 @@
 		padding: 0 40px 24px 0;
 		color: var(--lp-ink-2);
 		text-wrap: pretty;
+	}
+
+	/* Un solo margen inferior por respuesta: cuando hay enlace, lo pone él. */
+	.a p:has(+ .more) {
+		padding-bottom: 12px;
+	}
+
+	.more {
+		display: inline-block;
+		margin-bottom: 24px;
+		font-weight: 600;
+		color: var(--lp-ink);
+		text-decoration: underline;
+		text-decoration-thickness: 1px;
+		text-underline-offset: 4px;
+	}
+
+	.more:hover {
+		text-decoration-thickness: 2px;
 	}
 
 	@media (max-width: 900px) {

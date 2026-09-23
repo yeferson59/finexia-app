@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import {
 		SITE_URL,
 		SITE_NAME,
@@ -31,6 +32,11 @@
 		{
 			q: '¿Tiene algún costo unirse ahora?',
 			a: 'No. Unirse a la lista de espera es totalmente gratuito y sin compromiso. Solo necesitamos tu correo para avisarte el día del lanzamiento.'
+		},
+		{
+			q: '¿Finexia es gratis? ¿Cómo se sostiene?',
+			a: 'Sí, usar Finexia es gratis y no tiene funciones de pago. La construye y la mantiene una sola persona en Colombia; si te resulta útil, puedes apoyar el proyecto con un aporte voluntario que ayuda a pagar el servidor, el dominio y el correo.',
+			link: { href: resolve('/apoyar'), label: 'Apoyar el proyecto' }
 		},
 		{
 			q: '¿Qué podré hacer desde el panel?',
