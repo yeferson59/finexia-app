@@ -15,6 +15,7 @@ import {
 	cashRateDeleteSchema,
 	cashRateEndSchema,
 	cashRateErrorMessage,
+	cashRateRescheduleSchema,
 	cashRateFields,
 	cashRateUpdateSchema,
 	cashPocketCreateSchema,
@@ -177,14 +178,15 @@ export const actions = {
 			sourceId: formData.get('sourceId'),
 			currency: formData.get('currency'),
 			pocketId: formData.get('pocketId'),
-			effectiveFrom: formData.get('effectiveFrom')
+			effectiveFrom: formData.get('effectiveFrom'),
+			recompute: formData.get('recompute')
 		});
 
 		if (!parsed.success) {
 			return fail(400, { error: parsed.error.issues[0].message });
 		}
 
-		const { sourceId, currency, pocketId, effectiveFrom, ...values } = parsed.data;
+		const { sourceId, currency, pocketId, effectiveFrom, recompute, ...values } = parsed.data;
 		const res = await cash.createRate(
 			{ cookies, fetch },
 			{
@@ -192,6 +194,7 @@ export const actions = {
 				currency,
 				pocketId,
 				effectiveFrom: toCalendarDateTime(effectiveFrom),
+				recompute,
 				...toCashRateBody(values)
 			}
 		);
@@ -239,6 +242,32 @@ export const actions = {
 
 		const res = await cash.endRate({ cookies, fetch }, parsed.data.id, {
 			endsOn: toCalendarDateTime(parsed.data.endsOn)
+		});
+
+		if (!res.ok || !res.success) {
+			return failed(res, cashRateErrorMessage(res.status, res.details));
+		}
+
+		return { success: true };
+	},
+
+	/* Mover el día en que empieza la versión más reciente. */
+	rescheduleRate: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed = cashRateRescheduleSchema.safeParse({
+			id: formData.get('id'),
+			effectiveFrom: formData.get('effectiveFrom'),
+			recompute: formData.get('recompute')
+		});
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const res = await cash.rescheduleRate({ cookies, fetch }, parsed.data.id, {
+			effectiveFrom: toCalendarDateTime(parsed.data.effectiveFrom),
+			recompute: parsed.data.recompute
 		});
 
 		if (!res.ok || !res.success) {

@@ -89,7 +89,8 @@ export function getRates(event: ApiEvent): Promise<ApiResult<CashRate[]>> {
 
 /**
  * `POST /portfolios/cash/rates` — anota una tasa, o una versión nueva que cierra
- * la anterior la víspera.
+ * la anterior la víspera. Desde un día pasado, calcula los intereses desde
+ * entonces.
  */
 export function createRate(
 	event: ApiEvent,
@@ -122,6 +123,22 @@ export function endRate(
 	body: Record<string, unknown>
 ): Promise<ApiResult<CashRate>> {
 	return apiRequest<CashRate>(event, `/portfolios/cash/rates/${id}/end`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+}
+
+/**
+ * `POST /portfolios/cash/rates/:id/reschedule` — mueve el día en que empieza la
+ * versión más reciente; la anterior termina la víspera del día nuevo.
+ */
+export function rescheduleRate(
+	event: ApiEvent,
+	id: string,
+	body: Record<string, unknown>
+): Promise<ApiResult<CashRate>> {
+	return apiRequest<CashRate>(event, `/portfolios/cash/rates/${id}/reschedule`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(body)

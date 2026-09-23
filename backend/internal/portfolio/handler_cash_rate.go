@@ -1,6 +1,6 @@
 package portfolio
 
-// Cash rate handlers: the rates cash accounts earn, and the four writes.
+// Cash rate handlers: the rates cash accounts earn, and the five writes.
 
 import (
 	"github.com/gofiber/fiber/v3"
@@ -87,6 +87,31 @@ func (h *handler) EndCashRate(c fiber.Ctx) error {
 	}
 
 	return httpx.OK(c, "Cash rate ended", "Cash rate ended successfully", rate)
+}
+
+// RescheduleCashRate moves the first day of the latest version of a rate.
+func (h *handler) RescheduleCashRate(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	rateID, err := httpx.ParamUUID(c, "rateId")
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid rate ID", err.Error())
+	}
+
+	req, err := httpx.Bind[RescheduleCashRateRequestDTO](c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid request", err.Error())
+	}
+
+	rate, err := h.service.RescheduleCashRate(c, userID, rateID, req.Input())
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error rescheduling cash rate", "Could not reschedule cash rate")
+	}
+
+	return httpx.OK(c, "Cash rate rescheduled", "Cash rate rescheduled successfully", rate)
 }
 
 func (h *handler) DeleteCashRate(c fiber.Ctx) error {

@@ -163,13 +163,18 @@ func getCashRate(ctx context.Context, tx pgx.Tx, userID, rateID uuid.UUID) (Cash
 //
 // The version running on that day, if any, ends the day before, so no day has
 // two rates. One that starts on that day or later is refused instead: slotting
-// a version in before it would rewrite what it said. So is a first day whose
-// interest was already computed at the rate before: that day keeps the rate it
-// was earned at.
+// a version in before it would rewrite what it said.
+//
+// The first day can be in the past: the rate the account earned before it was
+// recorded. A first day whose interest was already computed at the rate before
+// is refused unless in.Recompute says otherwise; with it, the account's days
+// from then are thrown away (clearCashInterestFrom), and the service computes
+// them again at this version once it is written.
 //
 // The platform row is locked first. Every write to a rate takes that lock, so
 // versions of one account are written one at a time — including the first,
-// which has no version yet to lock.
+// which has no version yet to lock. The account's balances follow, before any
+// version is touched (lockCashAccountBalances).
 func (r *PostgresRepository) CreateCashRate(ctx context.Context, userID uuid.UUID, in NewCashRateInput) (CashRate, error) {
 	var rate CashRate
 	start := cashRateDay(in.EffectiveFrom)
@@ -196,6 +201,11 @@ func (r *PostgresRepository) CreateCashRate(ctx context.Context, userID uuid.UUI
 			return err
 		}
 
+		balances, err := lockCashAccountBalances(ctx, tx, in.SourceID, in.Currency, pocket)
+		if err != nil {
+			return err
+		}
+
 		var (
 			latestID   uuid.UUID
 			latestFrom time.Time
@@ -216,18 +226,19 @@ func (r *PostgresRepository) CreateCashRate(ctx context.Context, userID uuid.UUI
 		case !latestFrom.Before(start):
 			return fmt.Errorf("%w: the latest starts on %s", ErrCashRateOverlaps, latestFrom.Format(time.DateOnly))
 		default:
-			var accruedThrough *time.Time
-			if err := tx.QueryRow(ctx, `
-				SELECT MAX(ac.accrual_date)
-				FROM cash_interest_accruals ac
-				JOIN cash_yield_rates v ON v.id = ac.rate_id
-				WHERE v.source_id = $1 AND v.currency = $2::char(3) AND v.pocket_id IS NOT DISTINCT FROM $3::uuid
-			`, in.SourceID, in.Currency, pocket).Scan(&accruedThrough); err != nil {
+			accruedThrough, err := cashAccountAccruedThrough(ctx, tx, in.SourceID, in.Currency, pocket)
+			if err != nil {
 				return err
 			}
 
 			if accruedThrough != nil && !accruedThrough.Before(start) {
-				return cashRateInUse(*accruedThrough, "the new version can start from "+accruedThrough.AddDate(0, 0, 1).Format(time.DateOnly))
+				if !in.Recompute {
+					return cashRateInUse(*accruedThrough, "the new version can start from "+accruedThrough.AddDate(0, 0, 1).Format(time.DateOnly))
+				}
+
+				if _, err := clearCashInterestFrom(ctx, tx, balances, start); err != nil {
+					return err
+				}
 			}
 
 			if latestEnd == nil || !latestEnd.Before(start) {
@@ -448,6 +459,151 @@ func (r *PostgresRepository) DeleteCashRate(ctx context.Context, userID, rateID 
 
 		return err
 	})
+}
+
+// cashAccountAccruedThrough is the last day the ledger computed at any version
+// of an account's rate, nil if none has been.
+func cashAccountAccruedThrough(ctx context.Context, tx pgx.Tx, sourceID uuid.UUID, cur money.Currency, pocketID *uuid.UUID) (*time.Time, error) {
+	var accruedThrough *time.Time
+	err := tx.QueryRow(ctx, `
+		SELECT MAX(ac.accrual_date)
+		FROM cash_interest_accruals ac
+		JOIN cash_yield_rates v ON v.id = ac.rate_id
+		WHERE v.source_id = $1 AND v.currency = $2::char(3) AND v.pocket_id IS NOT DISTINCT FROM $3::uuid
+	`, sourceID, cur, pocketID).Scan(&accruedThrough)
+
+	return accruedThrough, err
+}
+
+// RescheduleCashRate moves the first day of the latest version, while no day
+// has been computed at it: a change of rate announced for one day and made on
+// another.
+//
+// It moves within the room the versions around it leave. It starts after the
+// version before it does, and not after the day it stops earning if it was
+// paused. The version before it follows it: if it was ended to make room for
+// this one — it ended the day before this one started — it now ends the day
+// before the new first day, whether that is earlier or later. One paused with
+// days of no rate before this one keeps its pause, unless the new first day
+// falls inside it.
+//
+// Moving the first day back into days already computed at the version before
+// is CreateCashRate's past first day: refused, unless in.Recompute throws them
+// away to compute them again.
+func (r *PostgresRepository) RescheduleCashRate(ctx context.Context, userID, rateID uuid.UUID, in RescheduleCashRateInput) (CashRate, error) {
+	var rate CashRate
+	start := cashRateDay(in.EffectiveFrom)
+
+	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		// The platform, then the account's balances, then the versions: the
+		// order CreateCashRate takes them in. lockLatestCashRate takes the
+		// platform again, which the transaction already holds.
+		var (
+			sourceID uuid.UUID
+			cur      money.Currency
+			pocketID *uuid.UUID
+		)
+		err := tx.QueryRow(ctx, `
+			SELECT r.source_id, r.currency, r.pocket_id
+			FROM cash_yield_rates r
+			JOIN investment_sources s ON s.id = r.source_id
+			WHERE r.id = $1 AND s.user_id = $2
+			FOR UPDATE OF s
+		`, rateID, userID).Scan(&sourceID, &cur, &pocketID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrCashRateNotFound
+		}
+		if err != nil {
+			return err
+		}
+
+		balances, err := lockCashAccountBalances(ctx, tx, sourceID, cur, pocketID)
+		if err != nil {
+			return err
+		}
+
+		locked, err := lockLatestCashRate(ctx, tx, userID, rateID)
+		if err != nil {
+			return err
+		}
+
+		if locked.accruedThrough != nil {
+			return cashRateInUse(*locked.accruedThrough, "record a new version instead")
+		}
+
+		var endedOn *time.Time
+		if err := tx.QueryRow(ctx, `SELECT ended_on FROM cash_yield_rates WHERE id = $1`, rateID).Scan(&endedOn); err != nil {
+			return err
+		}
+
+		if endedOn != nil && start.After(*endedOn) {
+			return invalidCashRate("the rate stops earning after %s, so it cannot start later", endedOn.Format(time.DateOnly))
+		}
+
+		var (
+			previousID   uuid.UUID
+			previousFrom time.Time
+			previousEnd  *time.Time
+		)
+		err = tx.QueryRow(ctx, `
+			SELECT id, effective_from, ended_on
+			FROM cash_yield_rates
+			WHERE source_id = $1 AND currency = $2::char(3) AND pocket_id IS NOT DISTINCT FROM $3::uuid
+			  AND effective_from < $4::date
+			ORDER BY effective_from DESC
+			LIMIT 1
+			FOR UPDATE
+		`, sourceID, cur, pocketID, locked.effectiveFrom.Format(time.DateOnly)).Scan(&previousID, &previousFrom, &previousEnd)
+
+		previous := !errors.Is(err, pgx.ErrNoRows)
+		if err != nil && previous {
+			return err
+		}
+
+		if previous {
+			if !previousFrom.Before(start) {
+				return invalidCashRate("effectiveFrom must be after %s, when the version before it starts", previousFrom.Format(time.DateOnly))
+			}
+
+			accruedThrough, err := cashAccountAccruedThrough(ctx, tx, sourceID, cur, pocketID)
+			if err != nil {
+				return err
+			}
+
+			if accruedThrough != nil && !accruedThrough.Before(start) {
+				if !in.Recompute {
+					return cashRateInUse(*accruedThrough, "it can start from "+accruedThrough.AddDate(0, 0, 1).Format(time.DateOnly))
+				}
+
+				if _, err := clearCashInterestFrom(ctx, tx, balances, start); err != nil {
+					return err
+				}
+			}
+
+			madeRoom := previousEnd != nil && previousEnd.Equal(locked.effectiveFrom.AddDate(0, 0, -1))
+			if previousEnd == nil || madeRoom || !previousEnd.Before(start) {
+				if _, err := tx.Exec(ctx, `
+					UPDATE cash_yield_rates SET ended_on = $2::date - 1 WHERE id = $1
+				`, previousID, start.Format(time.DateOnly)); err != nil {
+					return err
+				}
+			}
+		}
+
+		if _, err := tx.Exec(ctx, `
+			UPDATE cash_yield_rates SET effective_from = $2::date WHERE id = $1
+		`, rateID, start.Format(time.DateOnly)); err != nil {
+			return err
+		}
+
+		rate, err = getCashRate(ctx, tx, userID, rateID)
+
+		return err
+	}); err != nil {
+		return CashRate{}, err
+	}
+
+	return rate, nil
 }
 
 // requireRatePocket turns the pocket a rate names into the value

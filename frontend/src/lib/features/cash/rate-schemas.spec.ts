@@ -3,6 +3,7 @@ import {
 	cashRateCreateSchema,
 	cashRateDeleteSchema,
 	cashRateEndSchema,
+	cashRateRescheduleSchema,
 	cashRateUpdateSchema,
 	toCalendarDateTime,
 	toCashRateBody
@@ -199,5 +200,27 @@ describe('toCashRateBody', () => {
 			posting: 'monthly',
 			tiers
 		});
+	});
+});
+
+describe('recompute', () => {
+	it('solo es verdadero si el formulario lo manda', () => {
+		expect(cashRateCreateSchema.parse(form()).recompute).toBe(false);
+		expect(cashRateCreateSchema.parse(form({ recompute: 'true' })).recompute).toBe(true);
+		expect(cashRateCreateSchema.safeParse(form({ recompute: 'yes' })).success).toBe(false);
+	});
+});
+
+describe('cashRateRescheduleSchema', () => {
+	it('pide la tasa y el día nuevo', () => {
+		expect(
+			cashRateRescheduleSchema.parse({ id: RATE, effectiveFrom: '2026-10-01', recompute: null })
+		).toEqual({ id: RATE, effectiveFrom: '2026-10-01', recompute: false });
+		expect(firstMessage(cashRateRescheduleSchema.safeParse({ id: RATE, effectiveFrom: '' }))).toBe(
+			'Elige desde qué día rige la tasa.'
+		);
+		expect(
+			firstMessage(cashRateRescheduleSchema.safeParse({ id: 'x', effectiveFrom: '2026-10-01' }))
+		).toBe('No sabemos qué tasa mover.');
 	});
 });

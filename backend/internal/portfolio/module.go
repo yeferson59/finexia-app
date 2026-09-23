@@ -160,6 +160,7 @@ func (m *Module) Routes(router fiber.Router) {
 	portfolios.Post("/cash/rates", m.handler.CreateCashRate)
 	portfolios.Put("/cash/rates/:rateId", m.handler.UpdateCashRate)
 	portfolios.Post("/cash/rates/:rateId/end", m.handler.EndCashRate)
+	portfolios.Post("/cash/rates/:rateId/reschedule", m.handler.RescheduleCashRate)
 	portfolios.Delete("/cash/rates/:rateId", m.handler.DeleteCashRate)
 	// Computing an account's days again, after a movement was recorded with a
 	// past date; see RecalculateCashInterest.

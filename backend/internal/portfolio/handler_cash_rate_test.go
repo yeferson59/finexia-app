@@ -143,7 +143,7 @@ func TestHandlerCreateCashRateRefusesBeforeTheRepository(t *testing.T) {
 		"an unknown posting": `{` + source + `"currency":"COP","annualRatePct":9,"posting":"weekly","effectiveFrom":"` + today + `"}`,
 		"a cap of nothing":   `{` + source + `"currency":"COP","annualRatePct":9,"maxBalance":0,"effectiveFrom":"` + today + `"}`,
 		"steps out of order": `{` + source + `"currency":"COP","annualRatePct":9,"tiers":[{"fromBalance":20000000,"annualRatePct":8},{"fromBalance":5000000,"annualRatePct":0}],"effectiveFrom":"` + today + `"}`,
-		"a past start":       `{` + source + `"currency":"COP","annualRatePct":9,"effectiveFrom":"2020-01-01T00:00:00Z"}`,
+		"five years back":    `{` + source + `"currency":"COP","annualRatePct":9,"effectiveFrom":"2020-01-01T00:00:00Z"}`,
 		"unsupported":        `{` + source + `"currency":"ARS","annualRatePct":9,"effectiveFrom":"` + today + `"}`,
 		"no platform":        `{"currency":"COP","annualRatePct":9,"effectiveFrom":"` + today + `"}`,
 	}
@@ -209,6 +209,7 @@ func TestHandlerCashRateErrorsMapToStatuses(t *testing.T) {
 	rateID := uuid.New()
 	values := `{"annualRatePct":8.5,"withholdingPct":0}`
 	end := `{"endsOn":"` + todayJSON() + `"}`
+	move := `{"effectiveFrom":"` + todayJSON() + `"}`
 
 	cases := []struct {
 		name   string
@@ -227,6 +228,10 @@ func TestHandlerCashRateErrorsMapToStatuses(t *testing.T) {
 		{"pausing a version a later one follows", ErrCashRateNotLatest, http.MethodPost, "/end", end, http.StatusConflict},
 		{"deleting a version a later one follows", ErrCashRateNotLatest, http.MethodDelete, "", "", http.StatusConflict},
 		{"deleting a missing rate", ErrCashRateNotFound, http.MethodDelete, "", "", http.StatusNotFound},
+		{"moving a rate that earned interest", cashRateInUse(time.Date(2026, 9, 13, 0, 0, 0, 0, time.UTC), "record a new version instead"), http.MethodPost, "/reschedule", move, http.StatusConflict},
+		{"moving a version a later one follows", ErrCashRateNotLatest, http.MethodPost, "/reschedule", move, http.StatusConflict},
+		{"moving it before the version before", invalidCashRate("effectiveFrom must be after 2026-09-01, when the version before it starts"), http.MethodPost, "/reschedule", move, http.StatusBadRequest},
+		{"moving someone else's rate", ErrCashRateNotFound, http.MethodPost, "/reschedule", move, http.StatusNotFound},
 	}
 
 	for _, tc := range cases {
@@ -250,6 +255,10 @@ func TestHandlerCashRateErrorsMapToStatuses(t *testing.T) {
 					checkID(id)
 					return tc.err
 				},
+				rescheduleCashRate: func(_ context.Context, _, id uuid.UUID, _ RescheduleCashRateInput) (CashRate, error) {
+					checkID(id)
+					return CashRate{}, tc.err
+				},
 			})
 			app := newTestModule(t, repo, uuid.New(), "user")
 
@@ -259,6 +268,90 @@ func TestHandlerCashRateErrorsMapToStatuses(t *testing.T) {
 			}
 			wantDomainDetails(t, resp, tc.err)
 		})
+	}
+}
+
+// A rate that starts in the past computes its account's days at once, through
+// yesterday, instead of leaving them to the nightly job.
+func TestHandlerCreateCashRateInThePastComputesItsDays(t *testing.T) {
+	userID, sourceID, pocketID := uuid.New(), uuid.New(), uuid.New()
+	start := time.Now().UTC().AddDate(0, -2, 0)
+	from := start.Format(time.DateOnly) + "T00:00:00Z"
+
+	var (
+		got       NewCashRateInput
+		gotFilter CashAccrualFilter
+		through   time.Time
+	)
+
+	repo := new(fakeRepository{
+		createCashRate: func(_ context.Context, _ uuid.UUID, in NewCashRateInput) (CashRate, error) {
+			got = in
+			return CashRate{ID: uuid.New(), SourceID: in.SourceID, Currency: in.Currency, PocketID: &pocketID,
+				AnnualRatePct: "9", Posting: PostingDaily, EffectiveFrom: in.EffectiveFrom, Latest: true}, nil
+		},
+		getCashAccrualTargets: func(_ context.Context, day time.Time, filter CashAccrualFilter) ([]CashAccrualTarget, error) {
+			through, gotFilter = day, filter
+			return nil, nil
+		},
+		getHeldCashInterest: func(context.Context, time.Time, CashAccrualFilter) ([]uuid.UUID, error) {
+			return nil, nil
+		},
+	})
+	app := newTestModule(t, repo, userID, "user")
+
+	body := `{"sourceId":"` + sourceID.String() + `","currency":"COP","pocketId":"` + pocketID.String() +
+		`","annualRatePct":9,"effectiveFrom":"` + from + `","recompute":true}`
+	resp := doJSON(t, app, http.MethodPost, "/portfolios/cash/rates", body)
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, want 200: %s", resp.StatusCode, raw)
+	}
+
+	if !got.Recompute {
+		t.Error("recompute was not passed on")
+	}
+	if gotFilter.UserID != userID || gotFilter.SourceID != sourceID || gotFilter.Currency != money.COP ||
+		gotFilter.Pocket == nil || *gotFilter.Pocket != pocketID {
+		t.Errorf("filter = %+v, want the pocket's account", gotFilter)
+	}
+	if yesterday := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -1); !through.Equal(yesterday) {
+		t.Errorf("through = %v, want yesterday %v", through, yesterday)
+	}
+}
+
+func TestHandlerRescheduleCashRate(t *testing.T) {
+	userID, rateID := uuid.New(), uuid.New()
+	day := time.Now().UTC().AddDate(0, 1, 0).Format(time.DateOnly) + "T00:00:00Z"
+
+	var got RescheduleCashRateInput
+
+	repo := new(fakeRepository{
+		rescheduleCashRate: func(_ context.Context, uid, id uuid.UUID, in RescheduleCashRateInput) (CashRate, error) {
+			if uid != userID || id != rateID {
+				t.Errorf("user, rate = %v, %v; want %v, %v", uid, id, userID, rateID)
+			}
+			got = in
+			return CashRate{ID: id, Currency: money.COP, AnnualRatePct: "9", Posting: PostingDaily, EffectiveFrom: in.EffectiveFrom, Latest: true}, nil
+		},
+	})
+	app := newTestModule(t, repo, userID, "user")
+
+	resp := doJSON(t, app, http.MethodPost, "/portfolios/cash/rates/"+rateID.String()+"/reschedule", `{"effectiveFrom":"`+day+`"}`)
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, want 200: %s", resp.StatusCode, raw)
+	}
+
+	if got.EffectiveFrom.UTC().Format(time.DateOnly)+"T00:00:00Z" != day || got.Recompute {
+		t.Errorf("input = %+v, want %s without recompute", got, day)
+	}
+
+	// Too far back is the service's to refuse; the repository is not reached.
+	app = newTestModule(t, new(fakeRepository{}), userID, "user")
+	resp = doJSON(t, app, http.MethodPost, "/portfolios/cash/rates/"+rateID.String()+"/reschedule", `{"effectiveFrom":"2020-01-01T00:00:00Z"}`)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400 for a start further back than five years", resp.StatusCode)
 	}
 }
 

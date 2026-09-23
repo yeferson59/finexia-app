@@ -8,7 +8,13 @@
 	 *
 	 * - «Cambiar tasa» anota una versión desde un día: la anterior termina la
 	 *   víspera y los días pasados conservan la suya. Con la tasa ya terminada se
-	 *   llama «Reanudar».
+	 *   llama «Reanudar». El día puede ser pasado —la tasa que la cuenta ya rendía
+	 *   antes de anotarla— y los intereses desde entonces se calculan al guardar;
+	 *   si ya había días calculados desde ese día, se rehacen con la tasa nueva.
+	 * - «Cambiar fecha» mueve el día en que empieza la versión más reciente,
+	 *   mientras no haya generado intereses: la anterior rige hasta la víspera del
+	 *   día nuevo. Es para un cambio que la entidad anunció para un día y aplicó
+	 *   otro, o que se anotó con la fecha equivocada.
 	 * - «Corregir» reescribe los valores sin tocar las fechas: es para un error al
 	 *   escribirla, no para un cambio de la entidad.
 	 * - «Pausar» dice desde qué día la cuenta deja de rendir.
@@ -61,7 +67,7 @@
 
 	let { target, rates, onClose }: Props = $props();
 
-	type Mode = 'new' | 'edit' | 'end' | 'delete' | 'recalc';
+	type Mode = 'new' | 'move' | 'edit' | 'end' | 'delete' | 'recalc';
 	type Posting = 'daily' | 'monthly';
 
 	interface Fields {
@@ -134,6 +140,8 @@
 	let posting: Posting = $derived(initial.posting);
 	let tiers: TierRow[] = $derived(initial.tiers);
 	let effectiveFrom = $derived(initial.date);
+	/* Mover arranca en el día en que empieza hoy la versión, no en hoy. */
+	let moveTo = $derived(latest ? latest.effectiveFrom.slice(0, 10) : today);
 	let endsOn = $derived(initial.date);
 	/* Recalcular mira hacia atrás, así que arranca en el primer día del mes. */
 	let recalcFrom = $derived(`${today.slice(0, 7)}-01`);
@@ -165,6 +173,7 @@
 		latest
 			? [
 					{ value: 'new', label: stopped ? 'Reanudar' : 'Cambiar tasa' },
+					...(used ? [] : [{ value: 'move' as const, label: 'Cambiar fecha' }]),
 					...(used ? [] : [{ value: 'edit' as const, label: 'Corregir' }]),
 					...(stopped ? [] : [{ value: 'end' as const, label: 'Pausar' }]),
 					...(used ? [] : [{ value: 'delete' as const, label: 'Borrar' }]),
@@ -175,6 +184,7 @@
 
 	const ACTIONS: Record<Mode, string> = {
 		new: '?/createRate',
+		move: '?/rescheduleRate',
 		edit: '?/updateRate',
 		end: '?/endRate',
 		delete: '?/deleteRate',
@@ -183,6 +193,7 @@
 
 	const SUBMIT_LABELS: Record<Mode, string> = {
 		new: 'Guardar tasa',
+		move: 'Guardar fecha',
 		edit: 'Guardar corrección',
 		end: 'Pausar rentabilidad',
 		delete: 'Borrar tasa',
@@ -192,18 +203,49 @@
 	const longDate = (iso: string) =>
 		formatCalendarDate(iso.slice(0, 10), { day: 'numeric', month: 'long', year: 'numeric' });
 
+	/* El día desde el que rige la tasa en el modo abierto: anotarla o moverla. */
+	const startDay = $derived(mode === 'move' ? moveTo : effectiveFrom);
+
+	/*
+	 * Si ese día cae en días ya calculados, guardar los rehace: se borran los
+	 * abonos automáticos desde entonces y se calculan con esta tasa. El
+	 * formulario lo dice antes y manda el permiso; el backend no lo hace sin él.
+	 */
+	const recomputes = $derived(
+		(mode === 'new' || mode === 'move') &&
+			!!computed &&
+			!!startDay &&
+			startDay <= computed.slice(0, 10)
+	);
+
+	/* Un día pasado sin nada calculado: los intereses se calculan al guardar. */
+	const backfills = $derived(
+		(mode === 'new' || mode === 'move') && !recomputes && !!startDay && startDay < today
+	);
+
+	/** Lo que pasa con los días pasados al guardar, detrás de lo que dice cada opción. */
+	const pastNote = $derived(
+		recomputes
+			? ` Los intereses ya calculados desde el ${longDate(startDay)} se borran y se vuelven a calcular con esta tasa.`
+			: backfills
+				? ` Los intereses desde el ${longDate(startDay)} hasta ayer se calculan al guardar, sobre lo que la cuenta tenía cada día.`
+				: ''
+	);
+
 	/** Qué le pasa a la historia de la cuenta con cada opción. */
 	const hint = $derived.by(() => {
-		if (!latest) return 'Desde ese día, la cuenta rinde esta tasa.';
+		if (!latest) return `Desde ese día, la cuenta rinde esta tasa.${pastNote}`;
 
 		switch (mode) {
 			case 'new':
 				if (pending) {
-					return `Ya hay una tasa anotada desde el ${longDate(latest.effectiveFrom)}: la nueva tiene que empezar después. Para cambiar esa, usa «Corregir».`;
+					return `Ya hay una tasa anotada desde el ${longDate(latest.effectiveFrom)}: la nueva tiene que empezar después. Para cambiar esa, usa «Corregir» o «Cambiar fecha».`;
 				}
 				return stopped
-					? 'Desde ese día la cuenta vuelve a rendir. La pausa se queda como estaba.'
-					: `La tasa de ahora, ${formatAnnualRate(latest.annualRatePct)}, termina la víspera. Los días anteriores conservan la suya.`;
+					? `Desde ese día la cuenta vuelve a rendir. La pausa se queda como estaba.${pastNote}`
+					: `La tasa de ahora, ${formatAnnualRate(latest.annualRatePct)}, termina la víspera. Los días anteriores conservan la suya.${pastNote}`;
+			case 'move':
+				return `Mueve el inicio de la tasa de ${formatAnnualRate(latest.annualRatePct)}, que hoy empieza el ${longDate(latest.effectiveFrom)}. La tasa anterior rige hasta la víspera del día nuevo.${pastNote}`;
 			case 'edit':
 				return `Corrige la tasa anotada desde el ${longDate(latest.effectiveFrom)}, sin crear otra. Si la entidad cambió la tasa, usa «Cambiar tasa».`;
 			case 'end':
@@ -351,6 +393,15 @@
 				<div class="field">
 					<span class="field-label">Rige desde</span>
 					<DatePicker name="effectiveFrom" bind:value={effectiveFrom} required />
+					<p class="hint">
+						Puede ser un día pasado, si la cuenta ya rendía esta tasa, o uno futuro, si la entidad
+						anunció el cambio.
+					</p>
+				</div>
+			{:else if mode === 'move'}
+				<div class="field">
+					<span class="field-label">Rige desde</span>
+					<DatePicker name="effectiveFrom" bind:value={moveTo} required />
 				</div>
 			{:else if mode === 'end'}
 				<div class="field">
@@ -364,7 +415,13 @@
 				</div>
 			{/if}
 
-			<p class="consequence" class:warn={mode === 'delete' || mode === 'recalc'}>{hint}</p>
+			{#if recomputes}
+				<input type="hidden" name="recompute" value="true" />
+			{/if}
+
+			<p class="consequence" class:warn={mode === 'delete' || mode === 'recalc' || recomputes}>
+				{hint}
+			</p>
 
 			{#if projection && (mode === 'new' || mode === 'edit')}
 				<CashRateProjection

@@ -147,6 +147,7 @@ type CashRateStore interface {
 	CreateCashRate(ctx context.Context, userID uuid.UUID, in NewCashRateInput) (CashRate, error)
 	UpdateCashRate(ctx context.Context, userID, rateID uuid.UUID, in CashRateInput) (CashRate, error)
 	EndCashRate(ctx context.Context, userID, rateID uuid.UUID, endsOn time.Time) (CashRate, error)
+	RescheduleCashRate(ctx context.Context, userID, rateID uuid.UUID, in RescheduleCashRateInput) (CashRate, error)
 	DeleteCashRate(ctx context.Context, userID, rateID uuid.UUID) error
 }
 

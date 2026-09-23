@@ -174,6 +174,7 @@ type fakeRepository struct {
 	createCashRate                  func(ctx context.Context, userID uuid.UUID, in NewCashRateInput) (CashRate, error)
 	updateCashRate                  func(ctx context.Context, userID, rateID uuid.UUID, in CashRateInput) (CashRate, error)
 	endCashRate                     func(ctx context.Context, userID, rateID uuid.UUID, endsOn time.Time) (CashRate, error)
+	rescheduleCashRate              func(ctx context.Context, userID, rateID uuid.UUID, in RescheduleCashRateInput) (CashRate, error)
 	deleteCashRate                  func(ctx context.Context, userID, rateID uuid.UUID) error
 	getCashAccrualTargets           func(ctx context.Context, through time.Time, filter CashAccrualFilter) ([]CashAccrualTarget, error)
 	clearCashInterest               func(ctx context.Context, filter CashAccrualFilter, from time.Time) (CashInterestCleared, error)
@@ -587,6 +588,10 @@ func (f *fakeRepository) UpdateCashRate(ctx context.Context, userID, rateID uuid
 
 func (f *fakeRepository) EndCashRate(ctx context.Context, userID, rateID uuid.UUID, endsOn time.Time) (CashRate, error) {
 	return f.endCashRate(ctx, userID, rateID, endsOn)
+}
+
+func (f *fakeRepository) RescheduleCashRate(ctx context.Context, userID, rateID uuid.UUID, in RescheduleCashRateInput) (CashRate, error) {
+	return f.rescheduleCashRate(ctx, userID, rateID, in)
 }
 
 func (f *fakeRepository) DeleteCashRate(ctx context.Context, userID, rateID uuid.UUID) error {

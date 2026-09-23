@@ -498,7 +498,7 @@ Arriba, el **mapa de rendimiento** enseña todo tu efectivo de un vistazo. Cada 
 |---|---|
 | **Tasa efectiva anual** | La que publica la entidad: `9,25` es 9,25 % E.A. Un APY en dólares es la misma cifra |
 | **Cuándo lo abona** | **Cada día**, o **cada mes** si tu banco te paga los intereses el último día del mes |
-| **Rige desde** | El día en que empieza a contar. Hoy o más adelante |
+| **Rige desde** | El día en que empieza a contar. Puede ser **pasado**, hasta cinco años atrás, si la cuenta ya rendía esa tasa antes de anotarla, o **futuro**, si la entidad anunció el cambio |
 
 En **Retención, tramos y tasa nominal**, plegado bajo la tasa, hay dos cosas que casi nunca hacen falta:
 
@@ -520,12 +520,17 @@ Cuando la entidad cambia la tasa, vuelve a abrir la ventana y elige qué quieres
 | Opción | Qué hace |
 |---|---|
 | **Cambiar tasa** | Anota una versión nueva desde un día. La anterior termina la víspera y los días pasados conservan la suya |
+| **Cambiar fecha** | Mueve el día en que empieza la tasa más reciente. La anterior rige hasta la víspera del día nuevo. Solo mientras no haya generado intereses |
 | **Corregir** | Reescribe lo que escribiste mal, sin crear otra versión. Solo mientras no haya generado intereses |
 | **Pausar** | Desde ese día la cuenta deja de rendir. **Reanudar** la vuelve a encender |
 | **Borrar** | Quita la versión. Si al anotarla cerró otra, esa vuelve a regir |
 | **Recalcular** | Rehace los intereses desde una fecha |
 
-> **Una tasa que ya generó intereses no se corrige ni se borra.** Esos días se ganaron con ella, así que se quedan como están: para cambiarla, anota una versión nueva desde hoy.
+> **Una tasa que ya generó intereses no se corrige, no se mueve ni se borra.** Esos días se ganaron con ella, así que se quedan como están: para cambiarla, anota una versión nueva.
+
+> **Tasas con fecha pasada.** Si la cuenta ya rendía una tasa antes de que la anotaras, pon en **Rige desde** el día en que empezó. Al guardar, Finexia calcula los intereses de esos días sobre lo que la cuenta tenía cada uno; un depósito anotado con fecha pasada rinde desde esa fecha. Si ese día cae en días que ya estaban calculados con otra tasa, el formulario te avisa: esos abonos automáticos se borran y se vuelven a calcular con la tasa nueva.
+
+> **Cambios programados.** Si la entidad anuncia que la tasa cambia el 1 del mes que viene, anótala hoy con esa fecha en **Rige desde**. La cuenta sigue con la de ahora hasta la víspera y ese día pasa a la nueva sola. Si la entidad lo aplica otro día, usa **Cambiar fecha**.
 
 **Recalcular** es para una sola cosa: cuando anotas un depósito o un retiro **con fecha pasada**. Los días que ya estaban calculados rindieron sobre un saldo que ahora sabes que era otro. Elige desde qué día y Finexia borra esos abonos automáticos y los vuelve a calcular sobre lo que la cuenta guarda ahora. Los movimientos que anotaste tú no se tocan.
 

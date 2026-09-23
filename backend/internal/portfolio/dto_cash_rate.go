@@ -24,6 +24,9 @@ type CreateCashRateRequestDTO struct {
 	Tiers          []CashRateTierDTO `json:"tiers"`
 	MaxBalance     *decimal.Decimal  `json:"maxBalance"`
 	EffectiveFrom  time.Time         `json:"effectiveFrom"`
+	// Recompute throws away the days already computed from effectiveFrom and
+	// computes them again at this version; see NewCashRateInput.
+	Recompute bool `json:"recompute"`
 }
 
 func (d CreateCashRateRequestDTO) Input() NewCashRateInput {
@@ -32,6 +35,7 @@ func (d CreateCashRateRequestDTO) Input() NewCashRateInput {
 		Currency:      d.Currency,
 		PocketID:      d.PocketID,
 		EffectiveFrom: d.EffectiveFrom,
+		Recompute:     d.Recompute,
 		CashRateInput: cashRateValues(d.AnnualRatePct, d.WithholdingPct, d.Posting, d.Tiers, d.MaxBalance),
 	}
 }
@@ -69,6 +73,16 @@ type RecalculateCashRequestDTO struct {
 
 func (d RecalculateCashRequestDTO) Input() RecalculateCashInterestInput {
 	return RecalculateCashInterestInput(d)
+}
+
+// RescheduleCashRateRequestDTO moves the first day of the latest version.
+type RescheduleCashRateRequestDTO struct {
+	EffectiveFrom time.Time `json:"effectiveFrom"`
+	Recompute     bool      `json:"recompute"`
+}
+
+func (d RescheduleCashRateRequestDTO) Input() RescheduleCashRateInput {
+	return RescheduleCashRateInput(d)
 }
 
 // EndCashRateRequestDTO names the first day the rate stops earning.

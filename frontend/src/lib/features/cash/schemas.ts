@@ -203,13 +203,39 @@ const rateValues = {
 		.default([])
 };
 
-/** Una tasa, o una versión nueva: la cuenta y el día desde el que rige. */
+/**
+ * El permiso para rehacer los intereses ya calculados desde el primer día de la
+ * tasa. El formulario lo manda cuando ese día cae en días ya calculados, después
+ * de decir en pantalla lo que va a pasar; sin él, el backend lo rechaza.
+ */
+const recomputeField = z
+	.literal('true')
+	.nullish()
+	.transform((v) => v === 'true');
+
+/**
+ * Una tasa, o una versión nueva: la cuenta y el día desde el que rige. El día
+ * puede ser pasado —la tasa que la cuenta ya rendía antes de anotarla— y los
+ * intereses desde entonces se calculan al guardarla.
+ */
 export const cashRateCreateSchema = z.object({
 	sourceId: z.uuid('No sabemos a qué cuenta darle la tasa.'),
 	currency: z.enum(SUPPORTED_CURRENCIES, 'No sabemos a qué cuenta darle la tasa.'),
 	pocketId: pocketField,
 	effectiveFrom: z.iso.date('Elige desde qué día rige la tasa.'),
+	recompute: recomputeField,
 	...rateValues
+});
+
+/**
+ * Mover el día en que empieza la versión más reciente, mientras no haya
+ * generado intereses: un cambio de tasa que la entidad anunció para un día y
+ * aplicó otro.
+ */
+export const cashRateRescheduleSchema = z.object({
+	id: z.uuid('No sabemos qué tasa mover.'),
+	effectiveFrom: z.iso.date('Elige desde qué día rige la tasa.'),
+	recompute: recomputeField
 });
 
 /** Corrección de la versión más reciente: sus valores, no sus fechas. */

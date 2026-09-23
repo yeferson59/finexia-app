@@ -108,18 +108,27 @@ func cashRateSteps(ctx context.Context, tx pgx.Tx, rateID uuid.UUID) ([]CashRate
 // Only the balances the cash writers keep earn: in their own currency, at one
 // unit per unit. A dollar position bought with pesos is not a savings account.
 //
-// A balance earns from the day it was opened in Finexia, because whatever it was
-// opened with already carried the interest it had earned before that. A fixed
-// deposit (000048) is the exception: it earns from the day the money went in,
-// which is what its pocket says and which can be weeks back, because nothing is
-// ever recorded in it by hand and so nothing can be counted twice.
+// A balance earns from the day its money went in: the date of its first
+// movement, or the day it was opened in Finexia if that is earlier. A deposit
+// recorded today with last month's date was in the account last month, and
+// with a rate that ran then it earned then too. What a balance earned before a
+// rate was recorded is only computed if the rate says it ran then — its first
+// day is the other bound — and the days already computed are never revisited
+// on their own, so reading the date this way computes nothing twice.
+//
+// A fixed deposit (000048) earns from the day its pocket says the money went
+// in, which is the same day read from the pocket rather than the movements.
 func (r *PostgresRepository) GetCashAccrualTargets(ctx context.Context, through time.Time, filter CashAccrualFilter) ([]CashAccrualTarget, error) {
 	userID, sourceID, cur, scoped, pocketID := scopeArgs(filter)
 
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			pe.id,
-			CASE WHEN pk.kind = 'fixed' THEN pk.opened_on ELSE (pe.created_at AT TIME ZONE 'UTC')::date END,
+			CASE WHEN pk.kind = 'fixed' THEN pk.opened_on ELSE LEAST(
+				(pe.created_at AT TIME ZONE 'UTC')::date,
+				(SELECT MIN(t.transaction_date) FROM transactions t
+				 WHERE t.entry_id = pe.id AND t.type <> 'cash_interest')
+			) END,
 			(SELECT MAX(ac.accrual_date) FROM cash_interest_accruals ac WHERE ac.entry_id = pe.id),
 			r.id,
 			r.annual_rate,
@@ -593,57 +602,102 @@ func (r *PostgresRepository) ClearCashInterest(ctx context.Context, filter CashA
 			return err
 		}
 
-		for _, entryID := range entries {
-			var first time.Time
-			if err := tx.QueryRow(ctx, `
-				SELECT LEAST($2::date, COALESCE(MIN(ac.accrual_date), $2::date))
-				FROM cash_interest_accruals ac
-				WHERE ac.entry_id = $1
-				  AND ac.transaction_id IN (
-				    SELECT paid.transaction_id FROM cash_interest_accruals paid
-				    WHERE paid.entry_id = $1
-				      AND paid.accrual_date >= $2::date
-				      AND paid.transaction_id IS NOT NULL
-				  )
-			`, entryID, asked).Scan(&first); err != nil {
-				return err
-			}
+		cleared, err = clearCashInterestFrom(ctx, tx, entries, cleared.From)
 
-			day := first.Format(time.DateOnly)
-
-			if _, err := tx.Exec(ctx, `
-				DELETE FROM transactions WHERE id IN (
-					SELECT DISTINCT ac.transaction_id FROM cash_interest_accruals ac
-					WHERE ac.entry_id = $1 AND ac.accrual_date >= $2::date AND ac.transaction_id IS NOT NULL
-				)
-			`, entryID, day); err != nil {
-				return err
-			}
-
-			tag, err := tx.Exec(ctx, `
-				DELETE FROM cash_interest_accruals WHERE entry_id = $1 AND accrual_date >= $2::date
-			`, entryID, day)
-			if err != nil {
-				return err
-			}
-
-			if days := int(tag.RowsAffected()); days > 0 {
-				cleared.Balances++
-				cleared.Days += days
-
-				if first.Before(cleared.From) {
-					cleared.From = first
-				}
-			}
-		}
-
-		return nil
+		return err
 	})
 	if err != nil {
 		return CashInterestCleared{}, err
 	}
 
 	return cleared, nil
+}
+
+// clearCashInterestFrom throws away the days the given balances computed from a
+// day, and the credits that paid them. The caller holds the lock on every one
+// of them: a credit takes it too, so none lands halfway through.
+//
+// It is ClearCashInterest without the choosing and the locking, which is also
+// what a rate that starts inside the computed days runs (CreateCashRate,
+// RescheduleCashRate).
+func clearCashInterestFrom(ctx context.Context, tx pgx.Tx, entries []uuid.UUID, from time.Time) (CashInterestCleared, error) {
+	cleared := CashInterestCleared{From: cashRateDay(from)}
+	asked := cleared.From.Format(time.DateOnly)
+
+	for _, entryID := range entries {
+		var first time.Time
+		if err := tx.QueryRow(ctx, `
+			SELECT LEAST($2::date, COALESCE(MIN(ac.accrual_date), $2::date))
+			FROM cash_interest_accruals ac
+			WHERE ac.entry_id = $1
+			  AND ac.transaction_id IN (
+			    SELECT paid.transaction_id FROM cash_interest_accruals paid
+			    WHERE paid.entry_id = $1
+			      AND paid.accrual_date >= $2::date
+			      AND paid.transaction_id IS NOT NULL
+			  )
+		`, entryID, asked).Scan(&first); err != nil {
+			return CashInterestCleared{}, err
+		}
+
+		day := first.Format(time.DateOnly)
+
+		if _, err := tx.Exec(ctx, `
+			DELETE FROM transactions WHERE id IN (
+				SELECT DISTINCT ac.transaction_id FROM cash_interest_accruals ac
+				WHERE ac.entry_id = $1 AND ac.accrual_date >= $2::date AND ac.transaction_id IS NOT NULL
+			)
+		`, entryID, day); err != nil {
+			return CashInterestCleared{}, err
+		}
+
+		tag, err := tx.Exec(ctx, `
+			DELETE FROM cash_interest_accruals WHERE entry_id = $1 AND accrual_date >= $2::date
+		`, entryID, day)
+		if err != nil {
+			return CashInterestCleared{}, err
+		}
+
+		if days := int(tag.RowsAffected()); days > 0 {
+			cleared.Balances++
+			cleared.Days += days
+
+			if first.Before(cleared.From) {
+				cleared.From = first
+			}
+		}
+	}
+
+	return cleared, nil
+}
+
+// lockCashAccountBalances takes the lock a credit takes on every balance of an
+// account — a platform, a currency and a pocket of it — in a fixed order, and
+// returns them in it.
+//
+// A write to a rate takes it after the platform and before any version of the
+// rate: a day's credit locks its balance and then reads the version it earns
+// at, so the other order could leave each waiting for the other. Holding them
+// also means no day is computed at the old version while the new one is being
+// written.
+func lockCashAccountBalances(ctx context.Context, tx pgx.Tx, sourceID uuid.UUID, cur money.Currency, pocketID *uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := tx.Query(ctx, `
+		SELECT pe.id
+		FROM portfolio_entries pe
+		JOIN assets a ON a.id = pe.asset_id
+		WHERE pe.source_id = $1
+		  AND pe.cost_currency = $2::char(3)
+		  AND pe.pocket_id IS NOT DISTINCT FROM $3::uuid
+		  AND a.asset_type = 'cash'
+		  AND a.currency = pe.cost_currency
+		ORDER BY pe.id
+		FOR UPDATE OF pe
+	`, sourceID, cur, pocketID)
+	if err != nil {
+		return nil, err
+	}
+
+	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 }
 
 // addCashInterest fills in what each balance has earned: the interest credited

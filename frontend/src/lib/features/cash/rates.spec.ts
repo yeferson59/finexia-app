@@ -348,11 +348,44 @@ describe('cashRateErrorMessage', () => {
 		expect(
 			cashRateErrorMessage(
 				400,
-				'invalid cash rate: effectiveFrom cannot be before 2026-09-13: past days are not recomputed'
+				'invalid cash rate: effectiveFrom cannot be before 2021-09-23: a rate starts at most 5 years back'
+			)
+		).toMatch(/cinco años atrás/);
+		expect(
+			cashRateErrorMessage(
+				400,
+				'invalid cash rate: endsOn cannot be before 2026-09-22: past days are not recomputed'
 			)
 		).toMatch(/hoy o una fecha posterior/);
 		expect(cashRateErrorMessage(404, 'cash rate not found')).toMatch(/ya no existe/);
 		expect(cashRateErrorMessage(500)).toBe(CASH_RATE_FALLBACK);
+	});
+
+	it('traduce los rechazos de mover el día en que empieza', () => {
+		expect(
+			cashRateErrorMessage(
+				400,
+				'invalid cash rate: effectiveFrom must be after 2026-09-01, when the version before it starts'
+			)
+		).toMatch(/después del 1 de sep.*tasa anterior/);
+		expect(
+			cashRateErrorMessage(
+				400,
+				'invalid cash rate: the rate stops earning after 2026-10-15, so it cannot start later'
+			)
+		).toMatch(/deja de rendir después del 15 de oct/);
+		expect(
+			cashRateErrorMessage(
+				409,
+				'the cash rate already earned interest: interest through 2026-09-20 was computed at it; record a new version instead'
+			)
+		).toMatch(/no se puede corregir, mover ni borrar/);
+		expect(
+			cashRateErrorMessage(
+				409,
+				'the cash rate already earned interest: interest through 2026-09-20 was computed at it; it can start from 2026-09-21'
+			)
+		).toMatch(/hasta la víspera del 21 de sep/);
 	});
 
 	// Los de un tramo contienen los de la tasa principal, así que se miran antes.

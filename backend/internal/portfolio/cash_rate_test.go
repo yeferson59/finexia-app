@@ -86,7 +86,9 @@ func TestNewCashRateInputValidate(t *testing.T) {
 		{"no platform", func(in *NewCashRateInput) { in.SourceID = uuid.UUID{} }, "sourceId is required"},
 		{"a currency with no rate", func(in *NewCashRateInput) { in.Currency = money.XXX }, "currency must be one of"},
 		{"no first day", func(in *NewCashRateInput) { in.EffectiveFrom = time.Time{} }, "effectiveFrom is required"},
-		{"two days ago", func(in *NewCashRateInput) { in.EffectiveFrom = day.AddDate(0, 0, -2) }, "effectiveFrom cannot be before 2026-09-13"},
+		{"from two months ago, a rate recorded late", func(in *NewCashRateInput) { in.EffectiveFrom = day.AddDate(0, -2, 0) }, ""},
+		{"five years back", func(in *NewCashRateInput) { in.EffectiveFrom = day.AddDate(-5, 0, 0) }, ""},
+		{"further back than five years", func(in *NewCashRateInput) { in.EffectiveFrom = day.AddDate(-5, 0, -1) }, "effectiveFrom cannot be before 2021-09-14"},
 	}
 
 	for _, tc := range cases {
@@ -117,4 +119,30 @@ func TestValidateCashRateEnd(t *testing.T) {
 	checkCashRateError(t, ValidateCashRateEnd(day.AddDate(0, 0, 10), now), "")
 	checkCashRateError(t, ValidateCashRateEnd(time.Time{}, now), "endsOn is required")
 	checkCashRateError(t, ValidateCashRateEnd(day.AddDate(0, 0, -2), now), "endsOn cannot be before 2026-09-13")
+}
+
+func TestRescheduleCashRateInputValidate(t *testing.T) {
+	now := time.Date(2026, time.September, 14, 15, 30, 0, 0, time.UTC)
+	day := time.Date(2026, time.September, 14, 0, 0, 0, 0, time.UTC)
+
+	checkCashRateError(t, RescheduleCashRateInput{EffectiveFrom: day.AddDate(0, 1, 0)}.Validate(now), "")
+	checkCashRateError(t, RescheduleCashRateInput{EffectiveFrom: day.AddDate(0, -3, 0)}.Validate(now), "")
+	checkCashRateError(t, RescheduleCashRateInput{}.Validate(now), "effectiveFrom is required")
+	checkCashRateError(t, RescheduleCashRateInput{EffectiveFrom: day.AddDate(-6, 0, 0)}.Validate(now), "effectiveFrom cannot be before 2021-09-14")
+}
+
+func TestComputesPast(t *testing.T) {
+	// Late in the UTC day, as it is in the evening in Bogotá.
+	now := time.Date(2026, time.September, 14, 23, 30, 0, 0, time.UTC)
+	day := time.Date(2026, time.September, 14, 0, 0, 0, 0, time.UTC)
+
+	if computesPast(day, now) {
+		t.Error("today is not over, so it is not computed yet")
+	}
+	if computesPast(day.AddDate(0, 0, 1), now) {
+		t.Error("tomorrow is not computed yet")
+	}
+	if !computesPast(day.AddDate(0, 0, -1), now) {
+		t.Error("yesterday is computed")
+	}
 }

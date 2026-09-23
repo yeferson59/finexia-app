@@ -1306,6 +1306,7 @@ abonan según `posting`; ver *Intereses* más abajo.
 | `POST /portfolios/cash/rates` | Anota una tasa, o una versión nueva que cierra la anterior |
 | `PUT /portfolios/cash/rates/:rateId` | Corrige `annualRatePct`, `withholdingPct`, `posting` y `tiers` de la versión más reciente; las fechas no cambian |
 | `POST /portfolios/cash/rates/:rateId/end` | La versión más reciente deja de rendir desde `endsOn` (`endedOn` queda en la víspera) |
+| `POST /portfolios/cash/rates/:rateId/reschedule` | Mueve el `effectiveFrom` de la versión más reciente mientras no haya generado intereses; la anterior rige hasta la víspera del día nuevo |
 | `DELETE /portfolios/cash/rates/:rateId` | Borra la versión más reciente; si la anterior terminaba justo la víspera, vuelve a regir |
 | `POST /portfolios/cash/interest/recalculate` | Recalcula los días de una cuenta desde `from` |
 
@@ -1318,7 +1319,8 @@ abonan según `posting`; ver *Intereses* más abajo.
   "posting": "daily",
   "tiers": [{ "fromBalance": "5000000", "annualRatePct": "8" }],
   "pocketId": null,
-  "effectiveFrom": "2026-09-15T00:00:00Z"
+  "effectiveFrom": "2026-09-15T00:00:00Z",
+  "recompute": false
 }
 ```
 
@@ -1349,9 +1351,26 @@ pausar o borrar.
   es «solo paga hasta 25 millones». `maxBalance`, como se mandaba el tope antes
   de 000046, se sigue leyendo y se guarda como ese tramo, pero ya no se
   devuelve.
-- `effectiveFrom` y `endsOn` no pueden ser anteriores a ayer en UTC. Los días
-  pasados no se recalculan, y el día de margen es para quien está al oeste de
-  Greenwich, que por la noche ya vive el día siguiente en UTC — **400**.
+- `effectiveFrom` puede ser **pasado**, hasta cinco años atrás (**400** si va
+  más allá): es la tasa que la cuenta ya rendía antes de anotarla. Al guardarla
+  se calculan en el acto los días desde entonces hasta ayer, sin esperar al job.
+  Un saldo rinde desde su primer movimiento —o desde que se abrió en Finexia, si
+  es antes—, así que un depósito anotado hoy con fecha pasada rinde desde esa
+  fecha si la tasa ya regía.
+- Si `effectiveFrom` cae en días que ya estaban calculados con la versión
+  anterior, hace falta `"recompute": true`: esos días y sus abonos automáticos
+  se borran y se vuelven a calcular con la versión nueva. Sin él responde
+  **409** diciendo desde qué día puede empezar.
+- `endsOn` no puede ser anterior a ayer en UTC: una pausa no se pone en días
+  que ya rindieron. El día de margen es para quien está al oeste de Greenwich,
+  que por la noche ya vive el día siguiente en UTC — **400**.
+- `reschedule` recibe `{"effectiveFrom": "…", "recompute": false}` con las
+  mismas reglas de fecha. El día nuevo tiene que ser posterior al inicio de la
+  versión anterior y, si la versión está pausada, no posterior a su `endedOn`
+  (**400**). Una versión que ya generó intereses no se mueve (**409**). Si la
+  anterior terminaba la víspera del inicio viejo, pasa a terminar la víspera
+  del nuevo; una pausa con días sin tasa en medio se conserva, salvo que el día
+  nuevo caiga dentro de ella.
 - La plataforma tiene que ser del usuario (**404**) y estar activa (**400**).
 - Una versión que no empieza después de la más reciente responde **409**, igual
   que corregir, pausar o borrar una versión que ya no es la más reciente.

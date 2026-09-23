@@ -395,7 +395,7 @@ export function cashRateErrorMessage(
 		const from = details.match(/can (?:stop|start) from (\d{4}-\d{2}-\d{2})/)?.[1];
 		return from
 			? `Los intereses ya se calcularon con esta tasa hasta la víspera del ${dayAndMonth(from)}. Elige ese día o uno posterior.`
-			: 'Esta tasa ya generó intereses, así que no se puede corregir ni borrar. Anota una tasa nueva o páusala.';
+			: 'Esta tasa ya generó intereses, así que no se puede corregir, mover ni borrar. Anota una tasa nueva o páusala.';
 	}
 	if (details.includes('only the latest version')) {
 		return 'Solo se puede cambiar la versión más reciente de la tasa. Recarga la página.';
@@ -409,8 +409,23 @@ export function cashRateErrorMessage(
 	if (details.includes('delete it instead')) {
 		return 'La tasa todavía no ha empezado ese día. Si no la quieres, bórrala.';
 	}
+	if (details.includes('effectiveFrom cannot be before')) {
+		return 'Una tasa puede empezar como mucho cinco años atrás.';
+	}
 	if (details.includes('cannot be before')) {
-		return 'Elige hoy o una fecha posterior: los días pasados no se recalculan.';
+		return 'Elige hoy o una fecha posterior: una pausa no se pone en días pasados.';
+	}
+	if (details.includes('when the version before it starts')) {
+		const from = details.match(/must be after (\d{4}-\d{2}-\d{2})/)?.[1];
+		return from
+			? `Tiene que empezar después del ${dayAndMonth(from)}, que es cuando empieza la tasa anterior.`
+			: 'Tiene que empezar después de la tasa anterior.';
+	}
+	if (details.includes('so it cannot start later')) {
+		const until = details.match(/stops earning after (\d{4}-\d{2}-\d{2})/)?.[1];
+		return until
+			? `La tasa deja de rendir después del ${dayAndMonth(until)}, así que no puede empezar más tarde. Bórrala y anota otra.`
+			: 'La tasa deja de rendir antes de ese día, así que no puede empezar más tarde.';
 	}
 	// Antes que los de la tasa principal: sus mensajes contienen los de ella.
 	if (details.includes('tiers take at most')) {

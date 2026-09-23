@@ -257,11 +257,10 @@ type CashRecalculation struct {
 // ledger stands.
 type CashAccrualTarget struct {
 	EntryID uuid.UUID
-	// OpenedOn is the day the balance was opened. It earns from then, not from
-	// its account's first day with a rate: whatever it was opened with was
-	// loaded with the interest it had already earned. For a fixed deposit it is
-	// the day the money went in, which can be in the past — see
-	// GetCashAccrualTargets.
+	// OpenedOn is the day the balance's money went in: its first movement, or
+	// the day it was opened in Finexia if that is earlier. It earns from then,
+	// or from its account's first day with a rate if that is later. For a fixed
+	// deposit it is the day its pocket says — see GetCashAccrualTargets.
 	OpenedOn time.Time
 	// LastAccrued is the last day already computed, nil if none.
 	LastAccrued *time.Time

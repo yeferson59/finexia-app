@@ -36,7 +36,8 @@ func (f cashFixture) usdRate(t *testing.T, pct string, from time.Time) CashRate 
 }
 
 // openedOn backdates the day a balance was opened. The fixtures open it now, and
-// a balance earns nothing for the days before it was opened.
+// a balance earns nothing before it was opened or its first movement, whichever
+// is earlier.
 func (f cashFixture) openedOn(t *testing.T, entryID uuid.UUID, day time.Time) {
 	t.Helper()
 

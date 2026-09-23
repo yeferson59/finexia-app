@@ -23,7 +23,9 @@ import (
 // Only the latest version of an account can change, and only for the days its
 // interest has not been computed yet (000044). The versions before it, and the
 // days already computed, are the rates the interest was earned at: a new rate is
-// a new version, not an edit.
+// a new version, not an edit. The one way back into computed days is the
+// owner's: a version recorded from a past day with Recompute, which computes
+// the account's days from then again at it.
 
 var (
 	// ErrInvalidCashRate rejects a rate that cannot be recorded as stated. It is
@@ -81,11 +83,16 @@ const (
 	// from zero. Platforms quote two or three.
 	maxCashRateTiers = 10
 
-	// cashRateDateGrace is how many days before the server's a rate may start
-	// or end. Days are UTC, as they are for snapshots, and an owner west of
-	// Greenwich is still on the previous one for part of the evening: at 7 p.m.
-	// in Bogotá it is already tomorrow in UTC.
+	// cashRateDateGrace is how many days before the server's a rate may end.
+	// Days are UTC, as they are for snapshots, and an owner west of Greenwich is
+	// still on the previous one for part of the evening: at 7 p.m. in Bogotá it
+	// is already tomorrow in UTC.
 	cashRateDateGrace = 1
+	// maxCashRateBackdateYears is how far back a version may start. A rate the
+	// account already earned before it was recorded is computed from its first
+	// day (Recompute), and a deposit opened that long ago is as far as a fixed
+	// one goes too.
+	maxCashRateBackdateYears = maxFixedDepositYears
 )
 
 // CashRate is one version of the rate a cash account earns.
@@ -222,7 +229,22 @@ type NewCashRateInput struct {
 	// a pocket's never meet.
 	PocketID      uuid.UUID
 	EffectiveFrom time.Time
+	// Recompute is the owner's leave to throw away the account's days already
+	// computed from EffectiveFrom, and compute them again at this version.
+	// Without it a first day inside the computed ones is refused, as it always
+	// was: those days keep the rate they were earned at unless asked.
+	Recompute bool
 	CashRateInput
+}
+
+// RescheduleCashRateInput moves the first day of the latest version, while no
+// day has been computed at it: a change of rate the platform announced for one
+// day and made on another.
+type RescheduleCashRateInput struct {
+	EffectiveFrom time.Time
+	// Recompute is NewCashRateInput's: a first day moved back into days already
+	// computed at the version before throws them away and computes them again.
+	Recompute bool
 }
 
 func invalidCashRate(format string, args ...any) error {
@@ -242,8 +264,8 @@ func cashRateDay(t time.Time) time.Time {
 	return time.Date(u.Year(), u.Month(), u.Day(), 0, 0, 0, 0, time.UTC)
 }
 
-// notBeforeGrace refuses a date earlier than the grace allows. Past days are
-// not recomputed, so a rate cannot start or stop in them.
+// notBeforeGrace refuses a date earlier than the grace allows. A rate cannot
+// stop in the past: the days it earned keep what they earned.
 func notBeforeGrace(field string, day, today time.Time) error {
 	earliest := cashRateDay(today).AddDate(0, 0, -cashRateDateGrace)
 	if cashRateDay(day).Before(earliest) {
@@ -324,7 +346,8 @@ func (in CashRateInput) validateValues(atMaturity bool) error {
 }
 
 // ValidateNew is Validate plus what only a new version states: the account, a
-// currency the app can convert, and a first day that is not in the past.
+// currency the app can convert, and a first day no further back than a rate is
+// computed for.
 func (in NewCashRateInput) ValidateNew(today time.Time) error {
 	if in.SourceID == (uuid.UUID{}) {
 		return invalidCashRate("sourceId is required")
@@ -338,11 +361,40 @@ func (in NewCashRateInput) ValidateNew(today time.Time) error {
 		return invalidCashRate("effectiveFrom is required")
 	}
 
-	if err := notBeforeGrace("effectiveFrom", in.EffectiveFrom, today); err != nil {
+	if err := validateRateStart(in.EffectiveFrom, today); err != nil {
 		return err
 	}
 
 	return in.Validate()
+}
+
+// Validate checks the day a version is moved to. today is the server's clock.
+func (in RescheduleCashRateInput) Validate(today time.Time) error {
+	if in.EffectiveFrom.IsZero() {
+		return invalidCashRate("effectiveFrom is required")
+	}
+
+	return validateRateStart(in.EffectiveFrom, today)
+}
+
+// validateRateStart refuses a first day further back than a rate is computed
+// for. A day in the past is not refused: the account earned the rate then,
+// and the days are computed when it is recorded.
+func validateRateStart(day, today time.Time) error {
+	earliest := cashRateDay(today).AddDate(-maxCashRateBackdateYears, 0, 0)
+	if cashRateDay(day).Before(earliest) {
+		return invalidCashRate("effectiveFrom cannot be before %s: a rate starts at most %d years back", earliest.Format(time.DateOnly), maxCashRateBackdateYears)
+	}
+
+	return nil
+}
+
+// computesPast reports whether a version starting on day reaches a day the
+// ledger may already have computed, or would compute on the next run: any day
+// before today. Those are computed when the version is written, instead of
+// waiting for the nightly job.
+func computesPast(day, today time.Time) bool {
+	return cashRateDay(day).Before(snapshotDay(today))
 }
 
 // ValidateCashRateEnd checks the first day a rate stops earning.
