@@ -150,3 +150,116 @@ func (h *handler) DeleteFundMark(c fiber.Ctx) error {
 
 	return httpx.OK(c, "Fund mark deleted", "Fund mark deleted successfully", nil)
 }
+
+func (h *handler) GetFundMovements(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	assetID, err := httpx.ParamUUID(c, "assetId")
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid fund ID", err.Error())
+	}
+
+	movements, err := h.service.GetFundMovements(c, userID, assetID)
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error retrieving fund movements", "Could not retrieve fund movements")
+	}
+
+	return httpx.OK(c, "Fund movements retrieved", "Fund movements retrieved successfully", movements)
+}
+
+// ContributeToFund puts money into a fund followed by balance.
+func (h *handler) ContributeToFund(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	assetID, err := httpx.ParamUUID(c, "assetId")
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid fund ID", err.Error())
+	}
+
+	req, err := httpx.Bind[ContributeToFundRequestDTO](c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid request", err.Error())
+	}
+
+	movement, err := h.service.ContributeToFund(c, userID, assetID, req.Input())
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error recording contribution", "Could not record contribution")
+	}
+
+	return httpx.OK(c, "Contribution recorded", "Contribution recorded successfully", movement)
+}
+
+// WithdrawFromFund takes money out of a position of a fund followed by balance.
+func (h *handler) WithdrawFromFund(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	assetID, err := httpx.ParamUUID(c, "assetId")
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid fund ID", err.Error())
+	}
+
+	req, err := httpx.Bind[WithdrawFromFundRequestDTO](c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid request", err.Error())
+	}
+
+	movement, err := h.service.WithdrawFromFund(c, userID, assetID, req.Input())
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error recording withdrawal", "Could not record withdrawal")
+	}
+
+	return httpx.OK(c, "Withdrawal recorded", "Withdrawal recorded successfully", movement)
+}
+
+// UpdateFundMovement restates a contribution or withdrawal.
+func (h *handler) UpdateFundMovement(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	txnID, err := httpx.ParamUUID(c, "txnId")
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid movement ID", err.Error())
+	}
+
+	req, err := httpx.Bind[UpdateFundMovementRequestDTO](c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid request", err.Error())
+	}
+
+	movement, err := h.service.UpdateFundMovement(c, userID, txnID, req.Input())
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error updating fund movement", "Could not update fund movement")
+	}
+
+	return httpx.OK(c, "Fund movement updated", "Fund movement updated successfully", movement)
+}
+
+// DeleteFundMovement takes a contribution or withdrawal back.
+func (h *handler) DeleteFundMovement(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	txnID, err := httpx.ParamUUID(c, "txnId")
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid movement ID", err.Error())
+	}
+
+	if err := h.service.DeleteFundMovement(c, userID, txnID); err != nil {
+		return httpx.FromDomain(c, err, "Error deleting fund movement", "Could not delete fund movement")
+	}
+
+	return httpx.OK(c, "Fund movement deleted", "Fund movement deleted successfully", nil)
+}

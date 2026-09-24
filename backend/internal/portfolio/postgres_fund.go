@@ -3,6 +3,7 @@ package portfolio
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"uuid"
@@ -254,11 +255,13 @@ func (r *PostgresRepository) CreateFund(ctx context.Context, userID uuid.UUID, i
 			return err
 		}
 
-		if in.CurrentUnitValue.IsPos() {
-			if _, err := writeFundMark(ctx, tx, userID, assetID, FundMarkInput{
-				Date:      in.CurrentDate,
-				UnitValue: in.CurrentUnitValue,
-			}); err != nil {
+		mark, err := in.openingMark()
+		if err != nil {
+			return err
+		}
+
+		if mark != nil {
+			if _, err := writeFundMark(ctx, tx, userID, assetID, *mark); err != nil {
 				return err
 			}
 
@@ -267,11 +270,24 @@ func (r *PostgresRepository) CreateFund(ctx context.Context, userID uuid.UUID, i
 			}
 		}
 
-		if _, err := createPortfolioEntryTx(ctx, tx, userID, in.PortfolioID, assetID, in.SourceID, in.Currency, in.purchase()); err != nil {
+		_, txnID, err := createPortfolioEntryTx(ctx, tx, userID, in.PortfolioID, assetID, in.SourceID, in.Currency, in.purchase())
+		if err != nil {
 			return err
 		}
 
-		var err error
+		// Followed by balance, the purchase is a contribution whose fact is its
+		// money. The replay gives it the units it already has — its amount, at
+		// the opening unit value of 1 — and checks the balance against them.
+		if in.Tracking == FundBalance {
+			if err := recordFundMovement(ctx, tx, txnID, in.Amount, false); err != nil {
+				return err
+			}
+
+			if _, err := replayAndRestate(ctx, tx, userID, assetID, cashRateDay(in.Date)); err != nil {
+				return err
+			}
+		}
+
 		fund, err = readFund(ctx, tx, userID, assetID)
 
 		return err
@@ -391,20 +407,46 @@ func (r *PostgresRepository) UpsertFundMark(ctx context.Context, userID, assetID
 	var mark FundMark
 
 	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
-		if _, err := lockFund(ctx, tx, userID, assetID); err != nil {
+		tracking, err := lockFund(ctx, tx, userID, assetID)
+		if err != nil {
 			return err
 		}
 
-		var err error
+		day := cashRateDay(in.Date)
+
+		if tracking == FundBalance {
+			// The unit value is the replay's: written provisionally, and fixed
+			// by it from the units held that day.
+			in.UnitValue = fundOpeningUnitValue
+		}
+
 		if mark, err = writeFundMark(ctx, tx, userID, assetID, in); err != nil {
 			return err
 		}
 
-		if err := syncFundPrice(ctx, tx, userID, assetID); err != nil {
+		if tracking != FundBalance {
+			if err := syncFundPrice(ctx, tx, userID, assetID); err != nil {
+				return err
+			}
+
+			return restateFundSnapshots(ctx, tx, userID, assetID, day)
+		}
+
+		replay, err := replayAndRestate(ctx, tx, userID, assetID, day)
+		if err != nil {
 			return err
 		}
 
-		return restateFundSnapshots(ctx, tx, userID, assetID, cashRateDay(in.Date))
+		if replay.skipped(day) {
+			return fmt.Errorf("%w: %s", ErrFundNoUnits, day.Format(time.DateOnly))
+		}
+
+		mark, err = scanFundMark(tx.QueryRow(ctx, `
+			SELECT `+fundMarkColumns+` FROM fund_marks
+			WHERE user_id = $1 AND asset_id = $2 AND mark_date = $3::date
+		`, userID, assetID, day.Format(time.DateOnly)))
+
+		return err
 	}); err != nil {
 		return FundMark{}, err
 	}
@@ -419,7 +461,8 @@ func (r *PostgresRepository) DeleteFundMark(ctx context.Context, userID, assetID
 	day := cashRateDay(date)
 
 	return database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
-		if _, err := lockFund(ctx, tx, userID, assetID); err != nil {
+		tracking, err := lockFund(ctx, tx, userID, assetID)
+		if err != nil {
 			return err
 		}
 
@@ -432,6 +475,12 @@ func (r *PostgresRepository) DeleteFundMark(ctx context.Context, userID, assetID
 
 		if tag.RowsAffected() == 0 {
 			return ErrFundMarkNotFound
+		}
+
+		if tracking == FundBalance {
+			_, err := replayAndRestate(ctx, tx, userID, assetID, day)
+
+			return err
 		}
 
 		if err := syncFundPrice(ctx, tx, userID, assetID); err != nil {

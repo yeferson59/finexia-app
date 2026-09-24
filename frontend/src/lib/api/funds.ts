@@ -3,8 +3,8 @@
  * escribe el dueño desde el extracto, como marcas por fecha.
  */
 import { apiRequest, apiRequestSafe, type ApiEvent, type ApiResult } from './client';
-import type { Fund, FundMark } from './types';
-import { fundMarkSchema, fundSchema } from './schemas';
+import type { Fund, FundMark, FundMovement } from './types';
+import { fundMarkSchema, fundMovementSchema, fundSchema } from './schemas';
 import { z } from 'zod';
 
 /** `GET /portfolios/funds` — los fondos del usuario, por nombre. */
@@ -63,4 +63,48 @@ export function deleteMark(
 	return apiRequest<unknown>(event, `/portfolios/funds/${assetId}/marks/${date}`, {
 		method: 'DELETE'
 	});
+}
+
+/** `GET /portfolios/funds/:id/movements` — aportes y retiros, del más reciente. */
+export function getMovements(event: ApiEvent, assetId: string): Promise<ApiResult<FundMovement[]>> {
+	return apiRequestSafe(
+		event,
+		`/portfolios/funds/${assetId}/movements`,
+		{},
+		z.array(fundMovementSchema)
+	);
+}
+
+/**
+ * `POST /portfolios/funds/:id/contributions` — dinero que entra a un fondo que
+ * se sigue por saldo. Las unidades las calcula el backend.
+ */
+export function contribute(
+	event: ApiEvent,
+	assetId: string,
+	body: Record<string, unknown>
+): Promise<ApiResult<FundMovement>> {
+	return apiRequest<FundMovement>(event, `/portfolios/funds/${assetId}/contributions`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+}
+
+/** `POST /portfolios/funds/:id/withdrawals` — dinero que sale de una posición del fondo. */
+export function withdraw(
+	event: ApiEvent,
+	assetId: string,
+	body: Record<string, unknown>
+): Promise<ApiResult<FundMovement>> {
+	return apiRequest<FundMovement>(event, `/portfolios/funds/${assetId}/withdrawals`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+}
+
+/** `DELETE /portfolios/funds/movements/:txnId` — borra un aporte o un retiro. */
+export function deleteMovement(event: ApiEvent, txnId: string): Promise<ApiResult<unknown>> {
+	return apiRequest<unknown>(event, `/portfolios/funds/movements/${txnId}`, { method: 'DELETE' });
 }

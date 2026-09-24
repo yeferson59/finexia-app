@@ -778,5 +778,30 @@ func requireWritableEntry(ctx context.Context, tx pgx.Tx, entryID uuid.UUID) err
 		return fmt.Errorf("%w: cancel it or delete it whole", ErrCashPocketFixed)
 	}
 
+	return requireGenericFundWrite(ctx, tx, entryID)
+}
+
+// requireGenericFundWrite refuses a position of a fund its owner follows by
+// balance (D12 of docs/PLAN_FONDOS_INVERSION.md). Its quantities are derived
+// from the money that went in and out, and a purchase written by hand, in
+// units, would stop matching them at the next replay.
+func requireGenericFundWrite(ctx context.Context, tx pgx.Tx, entryID uuid.UUID) error {
+	var managed bool
+
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM portfolio_entries pe
+			JOIN portfolios p  ON p.id = pe.portfolio_id
+			JOIN user_funds uf ON uf.user_id = p.user_id AND uf.asset_id = pe.asset_id
+			WHERE pe.id = $1 AND uf.tracking = 'balance'
+		)
+	`, entryID).Scan(&managed); err != nil {
+		return err
+	}
+
+	if managed {
+		return ErrFundBalanceManaged
+	}
+
 	return nil
 }

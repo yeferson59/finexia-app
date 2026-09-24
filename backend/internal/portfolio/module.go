@@ -169,11 +169,19 @@ func (m *Module) Routes(router fiber.Router) {
 	// from the statement, as marks by date; see FundStore.
 	portfolios.Get("/funds", m.handler.GetFunds)
 	portfolios.Post("/funds", m.handler.CreateFund)
+	// The movements of a fund followed by balance, before "/:assetId" so the
+	// literal segment is not read as a fund. Their units are derived: every
+	// write replays the fund.
+	portfolios.Put("/funds/movements/:txnId", m.handler.UpdateFundMovement)
+	portfolios.Delete("/funds/movements/:txnId", m.handler.DeleteFundMovement)
 	portfolios.Get("/funds/:assetId", m.handler.GetFund)
 	portfolios.Delete("/funds/:assetId", m.handler.DeleteFund)
 	portfolios.Get("/funds/:assetId/marks", m.handler.GetFundMarks)
 	portfolios.Post("/funds/:assetId/marks", m.handler.SaveFundMark)
 	portfolios.Delete("/funds/:assetId/marks/:date", m.handler.DeleteFundMark)
+	portfolios.Get("/funds/:assetId/movements", m.handler.GetFundMovements)
+	portfolios.Post("/funds/:assetId/contributions", m.handler.ContributeToFund)
+	portfolios.Post("/funds/:assetId/withdrawals", m.handler.WithdrawFromFund)
 	portfolios.Post("", m.handler.CreatePortfolio)
 	portfolios.Post("/sources", m.handler.CreatePlatform)
 	portfolios.Post("/entries", m.handler.CreatePortfolioEntry)

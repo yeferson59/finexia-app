@@ -182,6 +182,14 @@ type FundStore interface {
 	// mark's day on, in the same transaction.
 	UpsertFundMark(ctx context.Context, userID, assetID uuid.UUID, in FundMarkInput) (FundMark, error)
 	DeleteFundMark(ctx context.Context, userID, assetID uuid.UUID, date time.Time) error
+	// The movements of a fund followed by balance (000058). Every write replays
+	// the whole fund and revalues its snapshots in the same transaction.
+	GetFundMovements(ctx context.Context, userID, assetID uuid.UUID) ([]FundMovement, error)
+	GetFundMovement(ctx context.Context, userID, txnID uuid.UUID) (FundMovement, error)
+	ContributeToFund(ctx context.Context, userID, assetID uuid.UUID, in FundContributionInput) (FundMovement, error)
+	WithdrawFromFund(ctx context.Context, userID, assetID uuid.UUID, in FundWithdrawalInput) (FundMovement, error)
+	UpdateFundMovement(ctx context.Context, userID, txnID uuid.UUID, in FundMovementEdit) (FundMovement, error)
+	DeleteFundMovement(ctx context.Context, userID, txnID uuid.UUID) error
 }
 
 // Repository is the union of the module's stores, satisfied by

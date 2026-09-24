@@ -1,7 +1,13 @@
 <script lang="ts">
 	/**
 	 * Actualizar el valor de un fondo: el valor de unidad de un día, leído del
-	 * extracto, y la lista de los que ya se escribieron.
+	 * extracto —o el saldo, en un fondo que se sigue por saldo—, y la lista de
+	 * los que ya se escribieron.
+	 *
+	 * En un fondo por saldo, lo que se compara de un saldo a otro no es el saldo:
+	 * un aporte lo sube sin que el fondo haya ganado nada. Es el valor de unidad
+	 * que Finexia lleva por dentro, así que la rentabilidad de cada saldo se ve en
+	 * la lista después de guardarlo.
 	 *
 	 * La fecha es la del extracto, no la de hoy. Una marca con fecha pasada
 	 * corrige la gráfica de crecimiento desde ese día, así que la ganancia cae el
@@ -51,16 +57,23 @@
 
 	const history = $derived(marksWithChange(marks));
 
+	const byBalance = $derived(fund?.tracking === 'balance');
+
 	/* Contra qué se compara el valor que se escribe: la marca anterior a su día. */
 	const previous = $derived(markBefore(marks, date));
 	const typed = $derived(parseFloat(String(unitValue)) || 0);
 	const change = $derived(
-		previous && typed > 0 ? markChange(previous, { date, unitValue: String(typed) }) : null
+		!byBalance && previous && typed > 0
+			? markChange(previous, { date, unitValue: String(typed) })
+			: null
 	);
 	const replaces = $derived(marks.some((m) => m.date.slice(0, 10) === date));
 
 	const price = (value: string) =>
 		fund ? privacy.money(formatCurrency(parseFloat(value) || 0, fund.currency, 6)) : value;
+
+	const money = (value: string) =>
+		fund ? privacy.money(formatCurrency(parseFloat(value) || 0, fund.currency)) : value;
 
 	const day = (iso: string) =>
 		formatCalendarDate(iso, { day: 'numeric', month: 'short', year: 'numeric' });
@@ -73,7 +86,9 @@
 	open={fund !== null}
 	hidden={dialog.hidden}
 	title={fund ? `Actualizar ${fund.name}` : 'Actualizar valor'}
-	description="Escribe el valor de unidad que trae tu extracto, con su fecha."
+	description={byBalance
+		? 'Escribe el saldo que muestra tu app, con su fecha.'
+		: 'Escribe el valor de unidad que trae tu extracto, con su fecha.'}
 	size="md"
 	onClose={close}
 >
@@ -83,10 +98,10 @@
 
 			<div class="pair">
 				<div class="field">
-					<label for="fund-mark-value">Valor de unidad</label>
+					<label for="fund-mark-value">{byBalance ? 'Saldo' : 'Valor de unidad'}</label>
 					<input
 						id="fund-mark-value"
-						name="unitValue"
+						name={byBalance ? 'balance' : 'unitValue'}
 						type="number"
 						inputmode="decimal"
 						step="any"
@@ -108,6 +123,9 @@
 					</span>
 					en {change.days}
 					{change.days === 1 ? 'día' : 'días'}, desde el valor del {day(previous?.date ?? '')}.
+				{:else if byBalance}
+					El saldo al cierre de ese día, con los aportes y retiros de ese día ya dentro. Si es de un
+					día pasado, la gráfica de crecimiento se corrige desde ese día.
 				{:else}
 					Si es de un día pasado, la gráfica de crecimiento se corrige desde ese día.
 				{/if}
@@ -127,7 +145,12 @@
 		</form>
 
 		<section class="history" aria-labelledby="fund-marks-title">
-			<h3 id="fund-marks-title">Valores anotados</h3>
+			<h3 id="fund-marks-title">{byBalance ? 'Saldos anotados' : 'Valores anotados'}</h3>
+			{#if byBalance && history.length > 1}
+				<p class="hint legend">
+					El porcentaje es lo que rindió desde el saldo anterior, sin contar aportes ni retiros.
+				</p>
+			{/if}
 			{#if history.length === 0}
 				<p class="hint">Todavía no hay ninguno: el fondo vale lo que costó.</p>
 			{:else}
@@ -135,7 +158,9 @@
 					{#each history as { mark, change: delta } (mark.date)}
 						<li>
 							<span class="when">{day(mark.date)}</span>
-							<span class="price">{price(mark.unitValue)}</span>
+							<span class="price">
+								{byBalance && mark.balance ? money(mark.balance) : price(mark.unitValue)}
+							</span>
 							<span
 								class="delta"
 								class:gain={delta && delta.pct >= 0}
@@ -199,6 +224,10 @@
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
 		color: var(--text-dim);
+	}
+
+	.legend {
+		margin-bottom: 0.6rem;
 	}
 
 	.history ul {

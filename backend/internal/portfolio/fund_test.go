@@ -47,7 +47,8 @@ func TestNewFundInputValidate(t *testing.T) {
 		{"blank name", func(in *NewFundInput) { in.Name = "   " }, "name is required"},
 		{"long name", func(in *NewFundInput) { in.Name = strings.Repeat("a", maxFundNameLen+1) }, "cannot exceed"},
 		{"unsupported currency", func(in *NewFundInput) { in.Currency = money.XXX }, "currency must be one of"},
-		{"by balance", func(in *NewFundInput) { in.Tracking = FundBalance }, "not available yet"},
+		{"by balance with units", func(in *NewFundInput) { in.Tracking = FundBalance }, "states amounts and balances"},
+		{"by units with an amount", func(in *NewFundInput) { in.Amount = mustDecimal(t, "100") }, "states units and unit values"},
 		{"unknown tracking", func(in *NewFundInput) { in.Tracking = "shares" }, "tracking must be"},
 		{"no date", func(in *NewFundInput) { in.Date = time.Time{} }, "date is required"},
 		{"future date", func(in *NewFundInput) { in.Date = fundToday.AddDate(0, 0, 1) }, "future"},
@@ -153,7 +154,12 @@ func TestFundMarkInputValidate(t *testing.T) {
 		{"future", func(in *FundMarkInput) { in.Date = fundToday.AddDate(0, 0, 1) }, FundUnits, "future"},
 		{"no unit value", func(in *FundMarkInput) { in.UnitValue = mustDecimal(t, "0") }, FundUnits, "unit value must be"},
 		{"a balance on a fund by units", func(in *FundMarkInput) { in.Balance = mustDecimal(t, "100") }, FundUnits, "not a balance"},
-		{"a fund by balance", func(*FundMarkInput) {}, FundBalance, "only funds followed by units"},
+		{"a unit value on a fund by balance", func(*FundMarkInput) {}, FundBalance, "not a unit value"},
+		{"a fund by balance", func(in *FundMarkInput) {
+			in.UnitValue = mustDecimal(t, "0")
+			in.Balance = mustDecimal(t, "13050000")
+		}, FundBalance, ""},
+		{"a fund by balance with no balance", func(in *FundMarkInput) { in.UnitValue = mustDecimal(t, "0") }, FundBalance, "balance must be"},
 		{"long notes", func(in *FundMarkInput) { in.Notes = strings.Repeat("n", maxCashNotesLen+1) }, FundUnits, "notes cannot exceed"},
 	}
 
@@ -262,4 +268,158 @@ func TestSaveFundMarkChecksTheFundFirst(t *testing.T) {
 	}); err != nil || !wrote {
 		t.Fatalf("SaveFundMark(10) = %v (wrote %v), want the mark written", err, wrote)
 	}
+}
+
+func validBalanceFund(t *testing.T) NewFundInput {
+	t.Helper()
+
+	return NewFundInput{
+		PortfolioID: uuid.New(),
+		SourceID:    uuid.New(),
+		Name:        "Bolsillo de inversión",
+		Currency:    money.COP,
+		Tracking:    FundBalance,
+		Date:        time.Date(2026, time.January, 10, 0, 0, 0, 0, time.UTC),
+		Amount:      mustDecimal(t, "12000000"),
+	}
+}
+
+func TestNewBalanceFundInputValidate(t *testing.T) {
+	cases := []struct {
+		name   string
+		mutate func(*NewFundInput)
+		want   string
+	}{
+		{"valid", func(*NewFundInput) {}, ""},
+		{"with a current balance", func(in *NewFundInput) {
+			in.CurrentBalance = mustDecimal(t, "12640000")
+			in.CurrentDate = fundToday
+		}, ""},
+		{"no amount", func(in *NewFundInput) { in.Amount = mustDecimal(t, "0") }, "amount must be"},
+		{"a unit value", func(in *NewFundInput) { in.CurrentUnitValue = mustDecimal(t, "1") }, "not units"},
+		{"a negative balance", func(in *NewFundInput) { in.CurrentBalance = mustDecimal(t, "-1") }, "cannot be negative"},
+		{"a balance before the contribution", func(in *NewFundInput) {
+			in.CurrentBalance = mustDecimal(t, "1")
+			in.CurrentDate = in.Date.AddDate(0, 0, -1)
+		}, "before the contribution"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			in := validBalanceFund(t)
+			tc.mutate(&in)
+
+			err := in.Validate(fundToday)
+			if tc.want == "" {
+				if err != nil {
+					t.Fatalf("Validate() = %v, want nil", err)
+				}
+
+				return
+			}
+
+			if !errors.Is(err, ErrInvalidFund) || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Validate() = %v, want ErrInvalidFund mentioning %q", err, tc.want)
+			}
+		})
+	}
+}
+
+// The quick start of a fund followed by balance: its amount buys at the
+// opening unit value, and the balance it says it holds now fixes the unit value
+// the replay will give it.
+func TestBalanceFundOpening(t *testing.T) {
+	in := validBalanceFund(t)
+	in.CurrentBalance = mustDecimal(t, "12640000")
+	in.CurrentDate = fundToday
+
+	p := in.purchase()
+	sameAmount(t, "units", p.Quantity.String(), "120000")
+	sameAmount(t, "price", p.Price.String(), "100")
+
+	mark, err := in.openingMark()
+	if err != nil || mark == nil {
+		t.Fatalf("openingMark() = %v, %v", mark, err)
+	}
+
+	sameAmount(t, "unit value", mark.UnitValue.String(), "105.33333333")
+	sameAmount(t, "balance", mark.Balance.String(), "12640000")
+
+	in.CurrentBalance = mustDecimal(t, "0")
+	if mark, err := in.openingMark(); err != nil || mark != nil {
+		t.Fatalf("openingMark() without a balance = %v, %v; want none", mark, err)
+	}
+}
+
+func TestFundMovementInputsValidate(t *testing.T) {
+	day := fundToday.AddDate(0, 0, -3)
+
+	contribution := func() FundContributionInput {
+		return FundContributionInput{PortfolioID: uuid.New(), SourceID: uuid.New(), Date: day, Amount: mustDecimal(t, "5000000")}
+	}
+	withdrawal := func() FundWithdrawalInput {
+		return FundWithdrawalInput{EntryID: uuid.New(), Date: day, Amount: mustDecimal(t, "2000000")}
+	}
+
+	check := func(t *testing.T, err error, want string) {
+		t.Helper()
+
+		if want == "" {
+			if err != nil {
+				t.Fatalf("Validate() = %v, want nil", err)
+			}
+
+			return
+		}
+
+		if !errors.Is(err, ErrInvalidFund) || !strings.Contains(err.Error(), want) {
+			t.Fatalf("Validate() = %v, want ErrInvalidFund mentioning %q", err, want)
+		}
+	}
+
+	t.Run("contribution", func(t *testing.T) {
+		check(t, contribution().Validate(fundToday), "")
+
+		in := contribution()
+		in.SourceID = uuid.UUID{}
+		check(t, in.Validate(fundToday), "portfolioId and sourceId")
+
+		in = contribution()
+		in.Amount = mustDecimal(t, "0")
+		check(t, in.Validate(fundToday), "amount must be")
+
+		in = contribution()
+		in.BalanceBefore = mustDecimal(t, "-1")
+		check(t, in.Validate(fundToday), "balanceBefore cannot be negative")
+
+		in = contribution()
+		in.Date = fundToday.AddDate(0, 0, 1)
+		check(t, in.Validate(fundToday), "future")
+	})
+
+	t.Run("withdrawal", func(t *testing.T) {
+		check(t, withdrawal().Validate(fundToday), "")
+
+		in := withdrawal()
+		in.EntryID = uuid.UUID{}
+		check(t, in.Validate(fundToday), "entryId is required")
+
+		in = withdrawal()
+		in.Fees = mustDecimal(t, "2000000")
+		check(t, in.Validate(fundToday), "fees must be less")
+
+		in = withdrawal()
+		in.Fees = mustDecimal(t, "-1")
+		check(t, in.Validate(fundToday), "fees cannot be negative")
+	})
+
+	t.Run("edit", func(t *testing.T) {
+		edit := FundMovementEdit{Date: day, Amount: mustDecimal(t, "100"), All: true}
+		check(t, edit.Validate(fundToday, FundWithdrawal), "")
+		check(t, edit.Validate(fundToday, FundContribution), "only a withdrawal")
+
+		edit.All = false
+		edit.Fees = mustDecimal(t, "1")
+		check(t, edit.Validate(fundToday, FundContribution), "carries no fees")
+	})
 }

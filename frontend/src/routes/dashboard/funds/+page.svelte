@@ -4,7 +4,13 @@
 	import Button from '$lib/ui/button.svelte';
 	import EmptyState from '$lib/ui/empty-state.svelte';
 	import { todayLocalDateString } from '$lib/shared/format/date';
-	import { FundCreateForm, FundList, FundMarkForm, type Fund } from '$lib/features/funds';
+	import {
+		FundCreateForm,
+		FundList,
+		FundMarkForm,
+		FundMovementForm,
+		type Fund
+	} from '$lib/features/funds';
 	import type { PageProps } from './$types';
 
 	const { data }: PageProps = $props();
@@ -20,6 +26,10 @@
 	   guardar, la página se recarga y el diálogo lee la versión nueva. */
 	let markingId = $state<string | null>(null);
 	const marking = $derived<Fund | null>(data.funds.find((f) => f.assetId === markingId) ?? null);
+
+	/* El fondo por saldo cuyos aportes y retiros están abiertos. */
+	let movingId = $state<string | null>(null);
+	const moving = $derived<Fund | null>(data.funds.find((f) => f.assetId === movingId) ?? null);
 </script>
 
 <svelte:head>
@@ -72,15 +82,16 @@
 	</EmptyState>
 {:else}
 	<p class="rule">
-		Un fondo vale sus unidades por el último valor de unidad que escribiste. Finexia no estima lo
-		que pasa entre un extracto y otro: actualízalo con la fecha del extracto y la gráfica de
-		crecimiento se corrige desde ese día.
+		Un fondo vale lo último que anotaste: el valor de unidad del extracto o el saldo de la app.
+		Finexia no estima lo que pasa entre uno y otro: actualízalo con la fecha del extracto y la
+		gráfica de crecimiento se corrige desde ese día.
 	</p>
 	<FundList
 		funds={data.funds}
 		{today}
 		showPortfolio={data.portfolios.length > 1}
 		onMark={(fund) => (markingId = fund.assetId)}
+		onMove={(fund) => (movingId = fund.assetId)}
 	/>
 {/if}
 
@@ -96,6 +107,14 @@
 	fund={marking}
 	marks={marking ? (data.marks[marking.assetId] ?? []) : []}
 	onClose={() => (markingId = null)}
+/>
+
+<FundMovementForm
+	fund={moving}
+	movements={moving ? (data.movements[moving.assetId] ?? []) : []}
+	portfolios={data.portfolios}
+	platforms={data.platforms}
+	onClose={() => (movingId = null)}
 />
 
 <style>

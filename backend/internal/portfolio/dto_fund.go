@@ -26,14 +26,18 @@ type CreateFundRequestDTO struct {
 	UnitValue        decimal.Decimal `json:"unitValue"`
 	CurrentUnitValue decimal.Decimal `json:"currentUnitValue"`
 	CurrentDate      time.Time       `json:"currentDate"`
-	PayFromCash      bool            `json:"payFromCash"`
-	CashPocketID     uuid.UUID       `json:"cashPocketId"`
-	Notes            string          `json:"notes"`
+	// Amount and CurrentBalance replace units and unit values for a fund
+	// followed by balance: what went in on date, and what the app shows now.
+	Amount         decimal.Decimal `json:"amount"`
+	CurrentBalance decimal.Decimal `json:"currentBalance"`
+	PayFromCash    bool            `json:"payFromCash"`
+	CashPocketID   uuid.UUID       `json:"cashPocketId"`
+	Notes          string          `json:"notes"`
 }
 
 func (d CreateFundRequestDTO) Input() NewFundInput {
 	tracking := FundTracking(d.Tracking)
-	// Omitted is the only kind there is today.
+	// Omitted is the kind there was first.
 	if tracking == "" {
 		tracking = FundUnits
 	}
@@ -49,6 +53,8 @@ func (d CreateFundRequestDTO) Input() NewFundInput {
 		UnitValue:        d.UnitValue,
 		CurrentUnitValue: d.CurrentUnitValue,
 		CurrentDate:      d.CurrentDate,
+		Amount:           d.Amount,
+		CurrentBalance:   d.CurrentBalance,
 		PayFromCash:      d.PayFromCash,
 		CashPocketID:     d.CashPocketID,
 		Notes:            d.Notes,
@@ -66,4 +72,51 @@ type SaveFundMarkRequestDTO struct {
 
 func (d SaveFundMarkRequestDTO) Input() FundMarkInput {
 	return FundMarkInput(d)
+}
+
+// ContributeToFundRequestDTO is money put into a fund followed by balance, on
+// the position its portfolio holds on the platform.
+type ContributeToFundRequestDTO struct {
+	PortfolioID   uuid.UUID       `json:"portfolioId"`
+	SourceID      uuid.UUID       `json:"sourceId"`
+	Date          time.Time       `json:"date"`
+	Amount        decimal.Decimal `json:"amount"`
+	BalanceBefore decimal.Decimal `json:"balanceBefore"`
+	PayFromCash   bool            `json:"payFromCash"`
+	CashPocketID  uuid.UUID       `json:"cashPocketId"`
+	Notes         string          `json:"notes"`
+}
+
+func (d ContributeToFundRequestDTO) Input() FundContributionInput {
+	return FundContributionInput(d)
+}
+
+// WithdrawFromFundRequestDTO is money taken out of one position of a fund
+// followed by balance.
+type WithdrawFromFundRequestDTO struct {
+	EntryID      uuid.UUID       `json:"entryId"`
+	Date         time.Time       `json:"date"`
+	Amount       decimal.Decimal `json:"amount"`
+	Fees         decimal.Decimal `json:"fees"`
+	All          bool            `json:"all"`
+	CreditCash   bool            `json:"creditCash"`
+	CashPocketID uuid.UUID       `json:"cashPocketId"`
+	Notes        string          `json:"notes"`
+}
+
+func (d WithdrawFromFundRequestDTO) Input() FundWithdrawalInput {
+	return FundWithdrawalInput(d)
+}
+
+// UpdateFundMovementRequestDTO restates a contribution or withdrawal.
+type UpdateFundMovementRequestDTO struct {
+	Date   time.Time       `json:"date"`
+	Amount decimal.Decimal `json:"amount"`
+	Fees   decimal.Decimal `json:"fees"`
+	All    bool            `json:"all"`
+	Notes  string          `json:"notes"`
+}
+
+func (d UpdateFundMovementRequestDTO) Input() FundMovementEdit {
+	return FundMovementEdit(d)
 }

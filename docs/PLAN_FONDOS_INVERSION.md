@@ -1,8 +1,8 @@
 # Plan — Fondos de inversión (rentabilidad variable)
 
-> **Estado:** Fase 1 implementada (000056 – 000057) · 23 sep 2026; fases 2 – 4 pendientes
+> **Estado:** Fases 1 y 2 implementadas (000056 – 000058) · 23 sep 2026; fases 3 y 4 pendientes
 > **Alcance:** módulos `market` y `portfolio` (backend), feature nueva `funds` (frontend)
-> **Migraciones:** 000056 – 000057 (+ 000058 opcional) · **Fases:** 3 + 1 opcional
+> **Migraciones:** 000056 – 000058 (+ 000059 opcional) · **Fases:** 3 + 1 opcional
 > **Relacionado con:** [`PLAN_RENTABILIDAD_EFECTIVO.md`](./PLAN_RENTABILIDAD_EFECTIVO.md)
 > y [`PLAN_TASAS_MULTIPLES_EFECTIVO.md`](./PLAN_TASAS_MULTIPLES_EFECTIVO.md).
 > Esos planes cubren el dinero que rinde a una **tasa conocida**; este cubre el
@@ -82,7 +82,7 @@ tiene un **modo de seguimiento**, que se elige al crearlo y no cambia:
 
 **D4. El modo `balance` usa unidades sintéticas (unitización).** Es la técnica
 con la que los fondos mismos separan aportes de rendimiento:
-- El primer aporte compra a valor de unidad **1**.
+- El primer aporte compra a valor de unidad **100**: un índice, base 100.
 - Un aporte o retiro del día *d* opera al valor de unidad de la **última marca
   anterior a *d***: `unidades = monto / VU`.
 - Un saldo *S* del día *d* (fin del día, con los movimientos de ese día) fija
@@ -196,12 +196,18 @@ Fondo creado el 1 jul 2026, registrado solo con saldos de la app:
 
 | Fecha | Evento | VU usado | Unidades | Total unidades | VU de la marca |
 |---|---|---:|---:|---:|---:|
-| 1 jul | Aporte 10.000.000 | 1 (primer aporte) | 10.000.000,00000000 | 10.000.000,00000000 | — |
-| 31 jul | Saldo 10.080.000 | — | — | 10.000.000,00000000 | 1,00800000 |
-| 15 ago | Aporte 5.000.000 | 1,00800000 | 4.960.317,46031746 | 14.960.317,46031746 | — |
-| 31 ago | Saldo 15.110.000 | — | — | 14.960.317,46031746 | 1,01000531 |
-| 20 sep | Retiro 2.000.000 | 1,01000531 | −1.980.187,60911267 | 12.980.129,85120479 | — |
-| 30 sep | Saldo 13.050.000 | — | — | 12.980.129,85120479 | 1,00538285 |
+| 1 jul | Aporte 10.000.000 | 100 (primer aporte) | 100.000,00000000 | 100.000,00000000 | — |
+| 31 jul | Saldo 10.080.000 | — | — | 100.000,00000000 | 100,80000000 |
+| 15 ago | Aporte 5.000.000 | 100,80000000 | 49.603,17460317 | 149.603,17460317 | — |
+| 31 ago | Saldo 15.110.000 | — | — | 149.603,17460317 | 101,00053050 |
+| 20 sep | Retiro 2.000.000 | 101,00053050 | −19.801,87618916 | 129.801,29841401 | — |
+| 30 sep | Saldo 13.050.000 | — | — | 129.801,29841401 | 100,53828551 |
+
+**Por qué base 100 y no 1.** El valor de unidad se guarda con ocho decimales,
+y su redondeo cae sobre cada unidad. Empezando en 1, este fondo tendría 13
+millones de unidades y el saldo leído de ellas saldría 13.049.999,94: seis
+centavos de un redondeo. En base 100 tiene la centésima parte de unidades y
+sale 13.049.999,9995, que es 13.050.000 al centavo.
 
 Rentabilidad por mes (ponderada por tiempo):
 
@@ -213,8 +219,8 @@ Rentabilidad por mes (ponderada por tiempo):
 | Desde el inicio | +0,5383 % | — |
 
 En dinero: aportó 15.000.000, retiró 2.000.000 y tiene 13.050.000, así que
-ganó **50.000**: 14.559,90 realizados en el retiro (costo promedio
-1,00265252 por unidad) y 35.440,10 sin realizar.
+ganó **50.000**: 14.559,89 realizados en el retiro (costo promedio
+100,26525199 por unidad) y 35.440,11 sin realizar.
 
 Las dos cifras dicen cosas distintas y las dos se muestran: el 0,54 % es cómo
 le fue al fondo; los 50.000 son cuánto ganó el usuario con sus aportes.
@@ -222,7 +228,7 @@ le fue al fondo; los 50.000 son cuánto ganó el usuario con sus aportes.
 ### Por qué el aporte opera a la marca anterior
 
 El 15 ago el fondo ya había ganado algo desde el 31 jul, pero nadie lo dijo.
-Operar el aporte a 1,008 atribuye esa ganancia a todas las unidades, también a
+Operar el aporte a 100,8 atribuye esa ganancia a todas las unidades, también a
 las nuevas. El **valor total** queda exacto en la siguiente marca
 (`S / unidades`); lo único aproximado es el reparto del rendimiento entre antes
 y después del aporte, y en un fondo de renta fija a la vista eso es del orden
@@ -310,7 +316,22 @@ CREATE INDEX IF NOT EXISTS idx_fund_snapshot_values_asset
 - Down: borra las dos tablas y el tipo, y las filas `source = 'user'` de
   `user_asset_prices` de activos `fund` (sin ellas vuelven a valer su costo).
 
-### 000058 — `fund_public_values` (Fase 4, opcional)
+### 000058 — `fund_movements` (Fase 2)
+
+```sql
+-- El hecho de un aporte o retiro de un fondo por saldo: el dinero. Cantidad y
+-- precio de la transacción se derivan de él en cada replay (D5).
+CREATE TABLE IF NOT EXISTS fund_movements (
+  txn_id        UUID PRIMARY KEY REFERENCES transactions(id) ON DELETE CASCADE,
+  amount        NUMERIC(20, 8) NOT NULL CHECK (amount > 0),
+  withdraws_all BOOLEAN NOT NULL DEFAULT FALSE
+);
+```
+
+Sin esta tabla, el replay tendría que partir de `quantity × price` de la vez
+anterior, y cada replay redondearía sobre el redondeo del anterior.
+
+### 000059 — `fund_public_values` (Fase 4, opcional)
 
 ```sql
 -- Valores de unidad publicados (datos abiertos de la Superfinanciera). No son
@@ -397,25 +418,25 @@ GET /portfolios/funds/:assetId/performance
   "tracking": "balance",
   "currency": "COP",
   "valuedOn": "2026-09-30",
-  "unitValue": "1.00538285",
-  "units": "12980129.85120479",
+  "unitValue": "100.53828551",
+  "units": "129801.29841401",
   "value": "13050000.00",
   "invested": "15000000.00",
   "withdrawn": "2000000.00",
-  "realizedGain": "14559.90",
-  "unrealizedGain": "35440.10",
+  "realizedGain": "14559.89",
+  "unrealizedGain": "35440.11",
   "periods": [
     { "key": "30d", "from": "2026-08-31", "to": "2026-09-30", "days": 30, "pct": "-0.4577", "eaPct": "-5.43" },
     { "key": "90d", "from": null, "to": "2026-09-30", "days": null, "pct": null, "eaPct": null },
     { "key": "ytd", "from": null, "to": "2026-09-30", "days": null, "pct": null, "eaPct": null },
     { "key": "inception", "from": "2026-07-01", "to": "2026-09-30", "days": 91, "pct": "0.5383", "eaPct": "2.18" }
   ],
-  "series": [{ "date": "2026-07-01", "unitValue": "1" }, { "date": "2026-07-31", "unitValue": "1.008" }]
+  "series": [{ "date": "2026-07-01", "unitValue": "100" }, { "date": "2026-07-31", "unitValue": "100.8" }]
 }
 ```
 
 En modo `balance` el «desde el inicio» parte de la marca implícita del primer
-aporte (VU = 1). El año corrido necesita una marca al 31 dic o antes; un fondo
+aporte (VU = 100). El año corrido necesita una marca al 31 dic o antes; un fondo
 abierto en julio no la tiene, y por eso va `null` y no se confunde con el
 «desde el inicio».
 
@@ -483,11 +504,38 @@ Fase 3 solo lee lo que las dos primeras guardan.
 - **Pendiente de la Fase 1:** `docs/MANUAL_DE_USUARIO.md` (obliga a regenerar el
   PDF) y ver la pantalla en la app.
 
+**Lo que cambió al implementar la Fase 2:**
+
+- **Base 100** para el primer aporte, no 1 (ver §4): con 1 el saldo leído de
+  las unidades salía unos centavos por debajo del escrito.
+- **000058 `fund_movements`** guarda el dinero de cada movimiento, que es el
+  hecho; el plan no lo tenía y el replay lo necesita para no redondear sobre sus
+  propios redondeos. La tabla de valores públicos de la Fase 4 pasa a 000059.
+- **Escrituras provisionales.** Un aporte se inserta primero como su importe a
+  precio 1, y un retiro como todas las unidades de la posición al precio que da
+  el importe: así lo que se paga desde el efectivo, o se abona a él, es
+  exactamente el importe. El replay les pone después sus unidades reales, y
+  `syncEntryCashLinks` reescribe la fila de efectivo si cambió.
+- **Todo el fondo se reproduce en cada escritura**, no solo desde el día
+  tocado: un saldo valora las unidades de todos los portafolios (D7). Los
+  snapshots se revaloran desde el día más temprano que cambió.
+- **Borrar una posición** de un fondo por saldo también lo reproduce, y un saldo
+  de un día sin unidades queda sin usar en vez de romper el borrado.
+- **La guarda de D12** vive en `requireWritableEntry` (crear, editar y borrar
+  transacciones) y en `CreatePortfolioEntry`. `createTransactionTx` es
+  `CreateTransaction` dentro de una transacción ajena, con un indicador para
+  la única escritora que la salta: la del propio fondo.
+- **Frontend:** «¿Tu extracto muestra unidades?» al crear; en un fondo por
+  saldo, «Actualizar saldo» y «Aportar o retirar», y la lista de saldos enseña
+  la rentabilidad de cada periodo, no la variación del saldo. Los movimientos se
+  borran desde el diálogo; **corregir uno solo existe en la API**
+  (`PUT /portfolios/funds/movements/:txnId`).
+
 ## 11. Pruebas
 
 - **Unitarias:**
   - `replay` con el ejemplo de §4, cifra por cifra.
-  - `replay`: primer aporte a VU 1; aporte y marca el mismo día (el aporte va
+  - `replay`: primer aporte a VU 100; aporte y marca el mismo día (el aporte va
     primero); marca con unidades en cero (`ErrFundNoUnits`); retiro mayor que
     lo que hay; `all: true`; `balanceBefore` crea la marca de la víspera.
   - Periodos: marca exacta, marca anterior más cercana, sin historia (`null`),
@@ -567,10 +615,10 @@ Fase 1:
 
 Fase 2:
 
-- [ ] Registro el ejemplo de §4 solo con montos y saldos, y el fondo vale 13.050.000 con 50.000 de ganancia (14.559,90 realizada).
-- [ ] Corrijo el aporte del 15 ago y todo lo que viene después se recalcula.
-- [ ] No puedo editar ese fondo desde la pantalla de transacciones.
-- [ ] Un fondo que ya tenía ganancia al darlo de alta no infla la serie de crecimiento.
+- [x] Registro el ejemplo de §4 solo con montos y saldos, y el fondo vale 13.050.000 con 50.000 de ganancia (14.559,89 realizada). *(TestBalanceFundPlanExample; la ganancia realizada se enseña en la Fase 3)*
+- [x] Corrijo el aporte del 15 ago y todo lo que viene después se recalcula. *(TestBalanceFundEditReplaysWhatFollows; desde la API)*
+- [x] No puedo editar ese fondo desde la pantalla de transacciones. *(TestBalanceFundRefusesGenericWrites)*
+- [x] Un fondo que ya tenía ganancia al darlo de alta no infla la serie de crecimiento. *(TestBalanceFundOpeningAndBalanceBefore: el aporte entra a 105, su valor)*
 
 Fase 3:
 

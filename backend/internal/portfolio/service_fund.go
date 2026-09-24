@@ -67,3 +67,47 @@ func (s *service) SaveFundMark(ctx context.Context, userID, assetID uuid.UUID, i
 func (s *service) DeleteFundMark(ctx context.Context, userID, assetID uuid.UUID, date time.Time) error {
 	return s.repo.DeleteFundMark(ctx, userID, assetID, date)
 }
+
+// GetFundMovements lists a fund's purchases and sales, the most recent first.
+func (s *service) GetFundMovements(ctx context.Context, userID, assetID uuid.UUID) ([]FundMovement, error) {
+	return s.repo.GetFundMovements(ctx, userID, assetID)
+}
+
+// ContributeToFund puts money into a fund followed by balance.
+func (s *service) ContributeToFund(ctx context.Context, userID, assetID uuid.UUID, in FundContributionInput) (FundMovement, error) {
+	if err := in.Validate(time.Now()); err != nil {
+		return FundMovement{}, err
+	}
+
+	return s.repo.ContributeToFund(ctx, userID, assetID, in)
+}
+
+// WithdrawFromFund takes money out of a position of a fund followed by balance.
+func (s *service) WithdrawFromFund(ctx context.Context, userID, assetID uuid.UUID, in FundWithdrawalInput) (FundMovement, error) {
+	if err := in.Validate(time.Now()); err != nil {
+		return FundMovement{}, err
+	}
+
+	return s.repo.WithdrawFromFund(ctx, userID, assetID, in)
+}
+
+// UpdateFundMovement restates a contribution or withdrawal. Which of the two
+// it is decides what it may say — only a withdrawal takes fees or everything —
+// so the movement is read first; its kind never changes.
+func (s *service) UpdateFundMovement(ctx context.Context, userID, txnID uuid.UUID, in FundMovementEdit) (FundMovement, error) {
+	current, err := s.repo.GetFundMovement(ctx, userID, txnID)
+	if err != nil {
+		return FundMovement{}, err
+	}
+
+	if err := in.Validate(time.Now(), current.Kind); err != nil {
+		return FundMovement{}, err
+	}
+
+	return s.repo.UpdateFundMovement(ctx, userID, txnID, in)
+}
+
+// DeleteFundMovement takes a contribution or withdrawal back.
+func (s *service) DeleteFundMovement(ctx context.Context, userID, txnID uuid.UUID) error {
+	return s.repo.DeleteFundMovement(ctx, userID, txnID)
+}

@@ -417,76 +417,92 @@ func (r *PostgresRepository) CreateTransaction(ctx context.Context, userID, entr
 	var txn Transaction
 
 	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
-		var costCurrency money.Currency
-		if err := tx.QueryRow(ctx, `
-		SELECT pe.cost_currency
-		FROM portfolio_entries pe
-		JOIN portfolios p ON p.id = pe.portfolio_id
-		WHERE pe.id = $1 AND p.user_id = $2
-	`, entryID, userID).Scan(&costCurrency); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrEntryNotFound
-			}
+		var err error
+		txn, err = createTransactionTx(ctx, tx, userID, entryID, in, false)
 
-			return err
-		}
-
-		settled, err := in.Validate(costCurrency)
-		if err != nil {
-			return err
-		}
-
-		if err := requireTypeAllowed(ctx, tx, entryID, settled.Type); err != nil {
-			return err
-		}
-
-		if err := requireWritableEntry(ctx, tx, entryID); err != nil {
-			return err
-		}
-
-		if err := tx.QueryRow(ctx, `
-		INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes)
-		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::numeric, $8::char(3), $9::date, $10)
-		RETURNING id, entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, COALESCE(notes, ''), created_at, updated_at
-	`, entryID, settled.Type, settled.Quantity.String(), settled.Price.String(), settled.Currency,
-			settled.FXRate.String(), settled.Fees.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes).Scan(
-			&txn.ID,
-			&txn.EntryID,
-			&txn.Type,
-			&txn.Quantity,
-			&txn.Price,
-			&txn.Currency,
-			&txn.FXRate,
-			&txn.Fees,
-			&txn.FeesCurrency,
-			&txn.TransactionDate,
-			&txn.Notes,
-			&txn.CreatedAt,
-			&txn.UpdatedAt,
-		); err != nil {
-			return err
-		}
-
-		txn.CostCurrency = costCurrency
-		txn.Price.SetCurrency(txn.Currency)
-		txn.Fees.SetCurrency(txn.FeesCurrency)
-
-		if settled.CreditCash || settled.PayFromCash {
-			if err := syncCashLink(ctx, tx, userID, txn.ID, true, statedPocket(settled.CashPocketID)); err != nil {
-				return err
-			}
-
-			txn.CashCredited = settled.CreditCash
-			txn.CashPaid = settled.PayFromCash
-			txn.CashPocketID = paidFromPocket(settled)
-		}
-
-		return syncEntryCashLinks(ctx, tx, userID, entryID, true)
+		return err
 	}); err != nil {
 		return txn, err
 	}
 
 	return txn, nil
+}
+
+// createTransactionTx is CreateTransaction inside a transaction the caller
+// holds. fundWrite is a write of a fund followed by balance, the one writer
+// requireWritableEntry lets through to such a fund.
+func createTransactionTx(ctx context.Context, tx pgx.Tx, userID, entryID uuid.UUID, in TransactionInput, fundWrite bool) (Transaction, error) {
+	var txn Transaction
+
+	var costCurrency money.Currency
+	if err := tx.QueryRow(ctx, `
+	SELECT pe.cost_currency
+	FROM portfolio_entries pe
+	JOIN portfolios p ON p.id = pe.portfolio_id
+	WHERE pe.id = $1 AND p.user_id = $2
+`, entryID, userID).Scan(&costCurrency); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return txn, ErrEntryNotFound
+		}
+
+		return txn, err
+	}
+
+	settled, err := in.Validate(costCurrency)
+	if err != nil {
+		return txn, err
+	}
+
+	if err := requireTypeAllowed(ctx, tx, entryID, settled.Type); err != nil {
+		return txn, err
+	}
+
+	// A fund followed by balance writes its own purchases and sales, whose
+	// quantities its replay derives; only the generic writers are refused.
+	if !fundWrite {
+		if err := requireWritableEntry(ctx, tx, entryID); err != nil {
+			return txn, err
+		}
+	}
+
+	if err := tx.QueryRow(ctx, `
+	INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes)
+	VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, $7::numeric, $8::char(3), $9::date, $10)
+	RETURNING id, entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, COALESCE(notes, ''), created_at, updated_at
+`, entryID, settled.Type, settled.Quantity.String(), settled.Price.String(), settled.Currency,
+		settled.FXRate.String(), settled.Fees.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes).Scan(
+		&txn.ID,
+		&txn.EntryID,
+		&txn.Type,
+		&txn.Quantity,
+		&txn.Price,
+		&txn.Currency,
+		&txn.FXRate,
+		&txn.Fees,
+		&txn.FeesCurrency,
+		&txn.TransactionDate,
+		&txn.Notes,
+		&txn.CreatedAt,
+		&txn.UpdatedAt,
+	); err != nil {
+		return txn, err
+	}
+
+	txn.CostCurrency = costCurrency
+	txn.Price.SetCurrency(txn.Currency)
+	txn.Fees.SetCurrency(txn.FeesCurrency)
+
+	if settled.CreditCash || settled.PayFromCash {
+		if err := syncCashLink(ctx, tx, userID, txn.ID, true, statedPocket(settled.CashPocketID)); err != nil {
+			return txn, err
+		}
+
+		txn.CashCredited = settled.CreditCash
+		txn.CashPaid = settled.PayFromCash
+		txn.CashPocketID = paidFromPocket(settled)
+	}
+
+	return txn, syncEntryCashLinks(ctx, tx, userID, entryID, true)
 }
 
 // paidFromPocket is the drawer a written transaction reads back as paid from:

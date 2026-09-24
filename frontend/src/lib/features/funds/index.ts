@@ -7,14 +7,20 @@
  * cómo se movió. Son posiciones de unidades cuyo valor escribe el dueño desde
  * el extracto, como marcas por fecha (000057).
  *
+ * Se siguen por unidades (el extracto trae unidades y valor de unidad) o por
+ * saldo (la app solo enseña el saldo, y las unidades las lleva Finexia por
+ * dentro, 000058).
+ *
  * `fund-list` los enseña como tarjetas, `fund-create-form` registra uno con su
- * primera compra y `fund-mark-form` anota el valor de unidad de un día y lista
- * los que ya hay. `funds.ts` aporta los helpers puros y reexporta los contratos
+ * primera compra, `fund-mark-form` anota el valor de unidad —o el saldo— de un
+ * día y lista los que ya hay, y `fund-movement-form` anota los aportes y
+ * retiros de un fondo por saldo. `funds.ts` aporta los helpers puros y reexporta los contratos
  * `Fund` y `FundMark` de `$lib/api/types`.
  */
 export { default as FundList } from './components/fund-list.svelte';
 export { default as FundCreateForm } from './components/fund-create-form.svelte';
 export { default as FundMarkForm } from './components/fund-mark-form.svelte';
+export { default as FundMovementForm } from './components/fund-movement-form.svelte';
 
 export * from './funds';
 export * from './schemas';

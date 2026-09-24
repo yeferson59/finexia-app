@@ -1534,7 +1534,9 @@ Cuerpo de `POST /portfolios/funds`:
   escribe **antes** que la compra, para que el precio que registra 000036 sea lo
   que el fondo vale y la ganancia que ya traía no cuente como rentabilidad del
   día del alta.
-- `tracking: "balance"` (seguir solo el saldo) todavía no está abierto: **400**.
+- Con `tracking: "balance"` (la app solo enseña el saldo) no se mandan unidades:
+  `amount` es lo que entró el día `date` y `currentBalance`, opcional, el saldo
+  en `currentDate`. Ver «Fondos por saldo» abajo.
 - El activo es contribuido (000021): privado del usuario, con un ticker generado
   `FND-XXXXXXXX`.
 - Un activo `fund` que el usuario guarda sin haberlo creado aquí —por ejemplo,
@@ -1577,6 +1579,40 @@ unidad que les toca es la última marca en o antes de su día (o el costo por
 unidad, si no hay ninguna), y la diferencia mueve `total_value`,
 `total_gain_loss`, `total_gain_loss_pct` y la porción `fund` de `allocation`.
 Los flujos no cambian: una marca no es dinero que entra ni que sale.
+
+**Fondos por saldo** (migración 000058). Un fondo con `tracking: "balance"`
+lleva unidades **sintéticas**: el primer aporte compra a valor de unidad 100
+(un índice), un saldo de un día fija `valor de unidad = saldo / unidades` de
+ese día (al cierre, con los movimientos del día dentro), y cada aporte o retiro
+opera al valor del último saldo anterior a su día. El dueño solo escribe
+dinero; se guarda en `fund_movements` y cada escritura reproduce el fondo
+entero, reescribe cantidades, precios y valores de unidad, sincroniza las filas
+de efectivo de los movimientos pagados desde o abonados a él, y revalora los
+snapshots desde el día más temprano que cambió.
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET /portfolios/funds/:assetId/movements` | Compras y ventas del fondo, del más reciente; en uno por saldo, con el dinero que se dijo |
+| `POST /portfolios/funds/:assetId/contributions` | Aporte: `{portfolioId, sourceId, date, amount, balanceBefore?, payFromCash?, cashPocketId?, notes?}` |
+| `POST /portfolios/funds/:assetId/withdrawals` | Retiro de una posición: `{entryId, date, amount, fees?, all?, creditCash?, cashPocketId?, notes?}` |
+| `PUT /portfolios/funds/movements/:txnId` | Corrige día, importe, comisión, `all` y nota; reproduce el fondo |
+| `DELETE /portfolios/funds/movements/:txnId` | Borra un aporte o retiro, con su fila de efectivo |
+
+- La marca de un fondo por saldo es `{"date": …, "balance": "13050000"}`; con
+  `unitValue` responde **400**, y un día en que el fondo no tenía unidades,
+  **409**. En un fondo por unidades es al revés.
+- `balanceBefore` escribe el saldo del día anterior al aporte, para que entre al
+  valor exacto de ese día. Antes del primer aporte no hay nada que valorar:
+  **409**.
+- `fees` de un retiro es lo que se quedó la entidad y cuenta como pérdida; un
+  aporte no lleva comisión (**400**). `all: true` vende todas las unidades de
+  la posición a `amount / unidades`; sin él, un retiro mayor que lo que la
+  posición tenía ese día responde **409** (con un centavo de margen, que se lee
+  como «todo»).
+- Las rutas genéricas de transacciones (`POST /portfolios/entries`,
+  `POST/PUT/DELETE` de transacciones) responden **409** sobre un fondo por
+  saldo: sus cantidades son derivadas. Las rutas de aportes y retiros responden
+  **409** sobre un fondo por unidades.
 
 ### 2.8 Assets (JWT; *admin* donde se indica)
 

@@ -8,7 +8,7 @@
  */
 import type { Fund, FundMark } from '$lib/api/types';
 
-export type { Fund, FundMark, FundPosition } from '$lib/api/types';
+export type { Fund, FundMark, FundMovement, FundPosition } from '$lib/api/types';
 
 /**
  * Pasados estos días sin marca, el valor se avisa como viejo. Un extracto

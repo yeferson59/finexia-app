@@ -57,3 +57,26 @@ export const fundMarkSchema = z.object({
 	createdAt: z.string(),
 	updatedAt: z.string()
 });
+
+/**
+ * Un aporte o un retiro de un fondo (`GET /portfolios/funds/:id/movements`).
+ * En un fondo que se sigue por saldo, `amount` es el dinero que se dijo y las
+ * unidades salen de él; en uno por unidades, `amount` es unidades × precio.
+ */
+export const fundMovementSchema = z.object({
+	txnId: z.string(),
+	entryId: z.string(),
+	portfolioId: z.string(),
+	portfolioName: z.string(),
+	sourceName: z.string(),
+	kind: z.enum(['contribution', 'withdrawal']),
+	date: z.string(),
+	amount: z.string(),
+	fees: z.string(),
+	/** Un retiro de todo lo que guardaba la posición. */
+	all: z.boolean(),
+	units: z.string(),
+	unitValue: z.string(),
+	notes: z.string(),
+	createdAt: z.string()
+});

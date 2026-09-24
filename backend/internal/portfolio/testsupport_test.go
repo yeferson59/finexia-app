@@ -189,6 +189,12 @@ type fakeRepository struct {
 	getFundMarks                    func(ctx context.Context, userID, assetID uuid.UUID) ([]FundMark, error)
 	upsertFundMark                  func(ctx context.Context, userID, assetID uuid.UUID, in FundMarkInput) (FundMark, error)
 	deleteFundMark                  func(ctx context.Context, userID, assetID uuid.UUID, date time.Time) error
+	getFundMovements                func(ctx context.Context, userID, assetID uuid.UUID) ([]FundMovement, error)
+	getFundMovement                 func(ctx context.Context, userID, txnID uuid.UUID) (FundMovement, error)
+	contributeToFund                func(ctx context.Context, userID, assetID uuid.UUID, in FundContributionInput) (FundMovement, error)
+	withdrawFromFund                func(ctx context.Context, userID, assetID uuid.UUID, in FundWithdrawalInput) (FundMovement, error)
+	updateFundMovement              func(ctx context.Context, userID, txnID uuid.UUID, in FundMovementEdit) (FundMovement, error)
+	deleteFundMovement              func(ctx context.Context, userID, txnID uuid.UUID) error
 
 	// Consumed by fakeUserReader, not part of portfolio.Repository.
 	getUserPreferences func(ctx context.Context, userID uuid.UUID) (user.UserPreferences, error)
@@ -664,4 +670,28 @@ func (f *fakeRepository) UpsertFundMark(ctx context.Context, userID, assetID uui
 
 func (f *fakeRepository) DeleteFundMark(ctx context.Context, userID, assetID uuid.UUID, date time.Time) error {
 	return f.deleteFundMark(ctx, userID, assetID, date)
+}
+
+func (f *fakeRepository) GetFundMovements(ctx context.Context, userID, assetID uuid.UUID) ([]FundMovement, error) {
+	return f.getFundMovements(ctx, userID, assetID)
+}
+
+func (f *fakeRepository) GetFundMovement(ctx context.Context, userID, txnID uuid.UUID) (FundMovement, error) {
+	return f.getFundMovement(ctx, userID, txnID)
+}
+
+func (f *fakeRepository) ContributeToFund(ctx context.Context, userID, assetID uuid.UUID, in FundContributionInput) (FundMovement, error) {
+	return f.contributeToFund(ctx, userID, assetID, in)
+}
+
+func (f *fakeRepository) WithdrawFromFund(ctx context.Context, userID, assetID uuid.UUID, in FundWithdrawalInput) (FundMovement, error) {
+	return f.withdrawFromFund(ctx, userID, assetID, in)
+}
+
+func (f *fakeRepository) UpdateFundMovement(ctx context.Context, userID, txnID uuid.UUID, in FundMovementEdit) (FundMovement, error) {
+	return f.updateFundMovement(ctx, userID, txnID, in)
+}
+
+func (f *fakeRepository) DeleteFundMovement(ctx context.Context, userID, txnID uuid.UUID) error {
+	return f.deleteFundMovement(ctx, userID, txnID)
 }

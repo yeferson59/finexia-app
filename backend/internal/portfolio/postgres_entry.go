@@ -151,14 +151,15 @@ func (r *PostgresRepository) DeletePortfolioEntry(ctx context.Context, userID, e
 	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		// Counted before the delete, inside the transaction that performs it, so
 		// the number describes exactly the rows that went.
+		var assetID uuid.UUID
 		if err := tx.QueryRow(ctx, `
-		SELECT COUNT(t.id)
+		SELECT COUNT(t.id), pe.asset_id
 		FROM portfolio_entries pe
 		JOIN portfolios p ON p.id = pe.portfolio_id
 		LEFT JOIN transactions t ON t.entry_id = pe.id
 		WHERE pe.id = $1 AND p.user_id = $2
 		GROUP BY pe.id
-	`, entryID, userID).Scan(&deleted); err != nil {
+	`, entryID, userID).Scan(&deleted, &assetID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrEntryNotFound
 			}
@@ -186,7 +187,9 @@ func (r *PostgresRepository) DeletePortfolioEntry(ctx context.Context, userID, e
 			return ErrEntryNotFound
 		}
 
-		return nil
+		// A fund followed by balance values the units of all its positions at
+		// once, so one fewer moves its unit values.
+		return replayAfterPositionDeleted(ctx, tx, userID, assetID)
 	}); err != nil {
 		return 0, err
 	}
@@ -199,9 +202,13 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 
 	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
-		entry, err = createPortfolioEntryTx(ctx, tx, userID, portfolioID, assetID, sourceID, costCurrency, in)
+		if entry, _, err = createPortfolioEntryTx(ctx, tx, userID, portfolioID, assetID, sourceID, costCurrency, in); err != nil {
+			return err
+		}
 
-		return err
+		// Checked once the position exists, on the position it landed on: a
+		// fund followed by balance is written from its own screen.
+		return requireGenericFundWrite(ctx, tx, entry.ID)
 	}); err != nil {
 		return entry, err
 	}
@@ -211,9 +218,13 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 
 // createPortfolioEntryTx is CreatePortfolioEntry inside a transaction the caller
 // holds, so a write that does more around the position — a fund, opened with
-// its asset and its first mark — commits or fails whole.
-func createPortfolioEntryTx(ctx context.Context, tx pgx.Tx, userID, portfolioID, assetID, sourceID uuid.UUID, costCurrency money.Currency, in TransactionInput) (Entry, error) {
-	var entry Entry
+// its asset and its first mark — commits or fails whole. It also answers with
+// the transaction it wrote, which such a write may have to name.
+func createPortfolioEntryTx(ctx context.Context, tx pgx.Tx, userID, portfolioID, assetID, sourceID uuid.UUID, costCurrency money.Currency, in TransactionInput) (Entry, uuid.UUID, error) {
+	var (
+		entry Entry
+		txnID uuid.UUID
+	)
 
 	rate := in.Rate()
 	// The seeded price is in the position's currency, like the column it goes
@@ -231,11 +242,11 @@ func createPortfolioEntryTx(ctx context.Context, tx pgx.Tx, userID, portfolioID,
 	SELECT EXISTS (SELECT 1 FROM portfolios WHERE id = $1 AND user_id = $2)
 	   AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM investment_sources WHERE id = $3 AND user_id = $2))
 `, portfolioID, userID, sourceID).Scan(&owned); err != nil {
-		return entry, err
+		return entry, txnID, err
 	}
 
 	if !owned {
-		return entry, ErrPortfolioOrSourceNotFound
+		return entry, txnID, ErrPortfolioOrSourceNotFound
 	}
 
 	// cost_currency comes back from the upsert rather than being assumed to
@@ -255,7 +266,7 @@ func createPortfolioEntryTx(ctx context.Context, tx pgx.Tx, userID, portfolioID,
 	DO UPDATE SET updated_at = NOW()
 	RETURNING id, cost_currency
 `, portfolioID, assetID, sourceID, costPrice.String(), costCurrency, in.TransactionDate, in.Notes).Scan(&entryID, &entryCostCurrency); err != nil {
-		return entry, err
+		return entry, txnID, err
 	}
 
 	// A refusal here rolls the upsert back with it, so a rejected request
@@ -264,11 +275,11 @@ func createPortfolioEntryTx(ctx context.Context, tx pgx.Tx, userID, portfolioID,
 	// what keeps a defaulted currency from being written as an empty string.
 	settled, err := in.Validate(entryCostCurrency)
 	if err != nil {
-		return entry, err
+		return entry, txnID, err
 	}
 
 	if err := requireTypeAllowed(ctx, tx, entryID, settled.Type); err != nil {
-		return entry, err
+		return entry, txnID, err
 	}
 
 	// The opening trade carries no commission: this endpoint has never taken
@@ -279,26 +290,25 @@ func createPortfolioEntryTx(ctx context.Context, tx pgx.Tx, userID, portfolioID,
 	// cash, and the debit that records that has to name it. It is written
 	// inside this same database transaction, so a purchase the balance cannot
 	// cover opens no position at all.
-	var txnID uuid.UUID
 	if err := tx.QueryRow(ctx, `
 	INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes)
 	VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, 0, $7::char(3), $8::date, $9)
 	RETURNING id
 `, entryID, settled.Type, settled.Quantity.String(), settled.Price.String(), settled.Currency,
 		settled.FXRate.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes).Scan(&txnID); err != nil {
-		return entry, err
+		return entry, txnID, err
 	}
 
 	if settled.PayFromCash {
 		if err := syncCashLink(ctx, tx, userID, txnID, true, statedPocket(settled.CashPocketID)); err != nil {
-			return entry, err
+			return entry, txnID, err
 		}
 	}
 
 	// On a position that was already there the trade moves the average cost
 	// its credited sales carried out.
 	if err := syncEntryCashLinks(ctx, tx, userID, entryID, true); err != nil {
-		return entry, err
+		return entry, txnID, err
 	}
 
 	if err := tx.QueryRow(ctx, `
@@ -320,10 +330,10 @@ func createPortfolioEntryTx(ctx context.Context, tx pgx.Tx, userID, portfolioID,
 		&entry.CreatedAt,
 		&entry.UpdatedAt,
 	); err != nil {
-		return entry, err
+		return entry, txnID, err
 	}
 
 	entry.Price.SetCurrency(entry.CostCurrency)
 
-	return entry, nil
+	return entry, txnID, nil
 }

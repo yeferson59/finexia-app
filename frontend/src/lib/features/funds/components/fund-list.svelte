@@ -6,6 +6,10 @@
 	 * Un fondo sin marca vale lo que costó, y la tarjeta lo dice en vez de
 	 * enseñar una ganancia de cero: no es que no se haya movido, es que nadie ha
 	 * dicho cuánto vale. Una marca vieja se avisa por lo mismo.
+	 *
+	 * Un fondo que se sigue por saldo no enseña unidades: son de Finexia, no del
+	 * extracto, y no significan nada fuera de aquí. Lo que se anota en él son
+	 * saldos, aportes y retiros.
 	 */
 	import Button from '$lib/ui/button.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
@@ -20,9 +24,11 @@
 		/** Con un solo portafolio no hay otro sitio donde pueda estar: no se nombra. */
 		showPortfolio: boolean;
 		onMark: (fund: Fund) => void;
+		/** Aportes y retiros, solo en un fondo que se sigue por saldo. */
+		onMove: (fund: Fund) => void;
 	}
 
-	let { funds, today, showPortfolio, onMark }: Props = $props();
+	let { funds, today, showPortfolio, onMark, onMove }: Props = $props();
 
 	const money = (value: string | number, currency: string) =>
 		privacy.money(
@@ -44,6 +50,7 @@
 		{@const gain = fundGain(fund)}
 		{@const stale = isStale(fund, today)}
 		{@const age = daysSinceMark(fund, today)}
+		{@const byBalance = fund.tracking === 'balance'}
 		<li class="fund">
 			<header>
 				<div class="title">
@@ -55,9 +62,16 @@
 						{/if}
 					</p>
 				</div>
-				<Button type="button" variant="ghost" size="sm" onclick={() => onMark(fund)}>
-					Actualizar valor
-				</Button>
+				<div class="actions">
+					{#if byBalance}
+						<Button type="button" variant="ghost" size="sm" onclick={() => onMove(fund)}>
+							Aportar o retirar
+						</Button>
+					{/if}
+					<Button type="button" variant="ghost" size="sm" onclick={() => onMark(fund)}>
+						{byBalance ? 'Actualizar saldo' : 'Actualizar valor'}
+					</Button>
+				</div>
 			</header>
 
 			<p class="value">{money(fund.value, fund.currency)}</p>
@@ -72,21 +86,29 @@
 				</p>
 			{:else}
 				<p class="at-cost">
-					Sin valor actualizado: vale lo que costó. Escribe el valor de unidad de tu extracto para
-					ver lo que gana.
+					Sin valor actualizado: vale lo que costó. Escribe {byBalance
+						? 'el saldo que muestra tu app'
+						: 'el valor de unidad de tu extracto'} para ver lo que gana.
 				</p>
 			{/if}
 
 			<dl class="figures">
-				<div>
-					<dt>Unidades</dt>
-					<dd>{units(fund.units)}</dd>
-				</div>
+				{#if !byBalance}
+					<div>
+						<dt>Unidades</dt>
+						<dd>{units(fund.units)}</dd>
+					</div>
+				{/if}
 				<div>
 					<dt>Costo</dt>
 					<dd>{money(fund.cost, fund.currency)}</dd>
 				</div>
-				{#if fund.unitValue && fund.valuedOn}
+				{#if byBalance && fund.valuedOn}
+					<div>
+						<dt>Último saldo anotado</dt>
+						<dd>{day(fund.valuedOn)}</dd>
+					</div>
+				{:else if fund.unitValue && fund.valuedOn}
 					<div>
 						<dt>Valor de unidad al {day(fund.valuedOn)}</dt>
 						<dd>{unitValue(fund.unitValue, fund.currency)}</dd>
@@ -133,6 +155,13 @@
 
 	.title {
 		min-width: 0;
+	}
+
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		gap: 0.25rem;
 	}
 
 	h3 {

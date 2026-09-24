@@ -28,6 +28,7 @@ import type {
 	sectorWeightSchema,
 	exchangeRateSchema,
 	fundMarkSchema,
+	fundMovementSchema,
 	fundPositionSchema,
 	fundSchema,
 	growthDataPointSchema,
@@ -189,6 +190,9 @@ export type FundPosition = z.infer<typeof fundPositionSchema>;
 
 /** Lo que valía un fondo un día. */
 export type FundMark = z.infer<typeof fundMarkSchema>;
+
+/** Un aporte o un retiro de un fondo. */
+export type FundMovement = z.infer<typeof fundMovementSchema>;
 
 // ---------------------------------------------------------------------------
 // Assets y tasas de cambio (mercado)

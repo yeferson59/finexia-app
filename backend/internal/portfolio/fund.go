@@ -59,7 +59,8 @@ const (
 	// written as they appear there.
 	FundUnits FundTracking = "units"
 	// FundBalance is a fund whose app only shows a balance. Its units are
-	// synthetic; it is not open yet (docs/PLAN_FONDOS_INVERSION.md, phase 2).
+	// synthetic, derived from the money that went in and out and the balances
+	// the owner read (fund_units.go).
 	FundBalance FundTracking = "balance"
 )
 
@@ -142,8 +143,13 @@ func invalidFundMark(format string, args ...any) error {
 }
 
 // NewFundInput is a fund as the owner states it the first time: what it is,
-// where it is held, and the first purchase of units — plus, optionally, what a
-// unit is worth now, so a fund bought months ago does not open at cost.
+// where it is held, and the first purchase — plus, optionally, what it is
+// worth now, so a fund bought months ago does not open at cost.
+//
+// A fund followed by units states the purchase in units and unit value, and
+// what it is worth now as a unit value. A fund followed by balance states only
+// money: Amount is what went in on Date — all of it, for the quick start "I
+// have put in this much since then" — and CurrentBalance what the app shows.
 type NewFundInput struct {
 	PortfolioID uuid.UUID
 	SourceID    uuid.UUID
@@ -158,6 +164,10 @@ type NewFundInput struct {
 	// that is left out.
 	CurrentUnitValue decimal.Decimal
 	CurrentDate      time.Time
+	// Amount and CurrentBalance are the same two facts for a fund followed by
+	// balance: the money that went in on Date, and the balance on CurrentDate.
+	Amount         decimal.Decimal
+	CurrentBalance decimal.Decimal
 	// PayFromCash and CashPocketID pay the purchase out of the platform's cash,
 	// as any purchase can be (TransactionInput).
 	PayFromCash  bool
@@ -172,7 +182,7 @@ func (in NewFundInput) CleanName() string {
 
 // withDefaults dates the current mark today when one was given without a day.
 func (in NewFundInput) withDefaults(today time.Time) NewFundInput {
-	if in.CurrentUnitValue.IsPos() && in.CurrentDate.IsZero() {
+	if (in.CurrentUnitValue.IsPos() || in.CurrentBalance.IsPos()) && in.CurrentDate.IsZero() {
 		in.CurrentDate = cashRateDay(today)
 	}
 
@@ -200,16 +210,23 @@ func (in NewFundInput) Validate(today time.Time) error {
 		return invalidFund("currency must be one of: %s", currency.List())
 	}
 
+	if err := validateFundDate(in.Date, today, invalidFund); err != nil {
+		return err
+	}
+
 	switch in.Tracking {
 	case FundUnits:
+		return in.validateUnits(today)
 	case FundBalance:
-		return invalidFund("tracking by balance is not available yet; follow the fund by units")
+		return in.validateBalance(today)
 	default:
 		return invalidFund("tracking must be units or balance")
 	}
+}
 
-	if err := validateFundDate(in.Date, today, invalidFund); err != nil {
-		return err
+func (in NewFundInput) validateUnits(today time.Time) error {
+	if in.Amount.IsPos() || in.CurrentBalance.IsPos() {
+		return invalidFund("a fund followed by units states units and unit values, not amounts")
 	}
 
 	if !in.Units.IsPos() {
@@ -241,18 +258,94 @@ func (in NewFundInput) Validate(today time.Time) error {
 	return nil
 }
 
+func (in NewFundInput) validateBalance(today time.Time) error {
+	if in.Units.IsPos() || in.UnitValue.IsPos() || in.CurrentUnitValue.IsPos() {
+		return invalidFund("a fund followed by balance states amounts and balances, not units")
+	}
+
+	if err := validateFundAmount(in.Amount, "amount", invalidFund); err != nil {
+		return err
+	}
+
+	if in.CurrentBalance.IsNeg() {
+		return invalidFund("currentBalance cannot be negative")
+	}
+
+	if in.CurrentBalance.IsPos() {
+		if err := validateFundAmount(in.CurrentBalance, "currentBalance", invalidFund); err != nil {
+			return err
+		}
+
+		if err := validateFundDate(in.CurrentDate, today, invalidFund); err != nil {
+			return err
+		}
+
+		if cashRateDay(in.CurrentDate).Before(cashRateDay(in.Date)) {
+			return invalidFund("the current balance cannot be dated before the contribution")
+		}
+	}
+
+	return nil
+}
+
 // purchase is the first purchase as the transaction every position opens with.
+//
+// Followed by balance, the first contribution buys at the opening unit value,
+// which is what the replay that runs after it gives it too.
 func (in NewFundInput) purchase() TransactionInput {
+	units, unitValue := in.Units, in.UnitValue
+	if in.Tracking == FundBalance {
+		units, unitValue = in.openingUnits(), fundOpeningUnitValue
+	}
+
 	return TransactionInput{
 		Type:            Buy,
-		Quantity:        in.Units,
-		Price:           money.NewFromDecimal(in.UnitValue, in.Currency),
+		Quantity:        units,
+		Price:           money.NewFromDecimal(unitValue, in.Currency),
 		Currency:        in.Currency,
 		TransactionDate: cashRateDay(in.Date),
 		Notes:           in.Notes,
 		PayFromCash:     in.PayFromCash,
 		CashPocketID:    in.CashPocketID,
 	}
+}
+
+// openingMark is what the fund is worth now, when the owner said it: nil
+// otherwise.
+//
+// Followed by balance, the unit value is the one the replay will fix — the
+// balance over the units of the first contribution — and it is written with
+// the mark so the price is in place before the purchase (D13).
+func (in NewFundInput) openingMark() (*FundMarkInput, error) {
+	switch {
+	case in.Tracking == FundUnits && in.CurrentUnitValue.IsPos():
+		return &FundMarkInput{Date: in.CurrentDate, UnitValue: in.CurrentUnitValue}, nil
+	case in.Tracking == FundBalance && in.CurrentBalance.IsPos():
+		v, err := in.CurrentBalance.Div(in.openingUnits())
+		if err != nil {
+			return nil, err
+		}
+
+		v = v.RoundHAZ(8)
+		if !v.IsPos() {
+			return nil, invalidFund("the current balance is too small against what went in")
+		}
+
+		return &FundMarkInput{Date: in.CurrentDate, UnitValue: v, Balance: in.CurrentBalance}, nil
+	}
+
+	return nil, nil
+}
+
+// openingUnits is what the first contribution of a fund followed by balance
+// buys: its amount at the opening unit value, as the replay rounds it.
+func (in NewFundInput) openingUnits() decimal.Decimal {
+	units, err := in.Amount.Div(fundOpeningUnitValue)
+	if err != nil {
+		return decimal.Decimal{}
+	}
+
+	return units.RoundHAZ(8)
 }
 
 // FundMarkInput is what a fund was worth on a day, as the owner read it.
@@ -272,16 +365,25 @@ func (in FundMarkInput) Validate(today time.Time, tracking FundTracking) error {
 		return err
 	}
 
-	if tracking != FundUnits {
-		return invalidFundMark("only funds followed by units take marks for now")
-	}
+	switch tracking {
+	case FundUnits:
+		if !in.Balance.IsZero() {
+			return invalidFundMark("a fund followed by units is marked with its unit value, not a balance")
+		}
 
-	if !in.Balance.IsZero() {
-		return invalidFundMark("a fund followed by units is marked with its unit value, not a balance")
-	}
+		if err := validateUnitValue(in.UnitValue, invalidFundMark); err != nil {
+			return err
+		}
+	case FundBalance:
+		if !in.UnitValue.IsZero() {
+			return invalidFundMark("a fund followed by balance is marked with its balance, not a unit value")
+		}
 
-	if err := validateUnitValue(in.UnitValue, invalidFundMark); err != nil {
-		return err
+		if err := validateFundAmount(in.Balance, "balance", invalidFundMark); err != nil {
+			return err
+		}
+	default:
+		return invalidFundMark("unknown tracking %q", tracking)
 	}
 
 	if utf8.RuneCountInString(in.Notes) > maxCashNotesLen {
@@ -301,6 +403,16 @@ func validateFundDate(date, today time.Time, invalid func(string, ...any) error)
 		return invalid("date cannot be in the future")
 	case cashRateDay(date).Before(day.AddDate(-maxFundMarkYears, 0, 0)):
 		return invalid("date cannot be more than %d years ago", maxFundMarkYears)
+	}
+
+	return nil
+}
+
+// validateFundAmount checks an amount of money a fund is told: positive, and
+// inside NUMERIC(20, 8).
+func validateFundAmount(v decimal.Decimal, field string, invalid func(string, ...any) error) error {
+	if !v.IsPos() || !v.LessThan(maxFundUnitValue) {
+		return invalid("%s must be greater than 0 and less than %s", field, maxFundUnitValue)
 	}
 
 	return nil
