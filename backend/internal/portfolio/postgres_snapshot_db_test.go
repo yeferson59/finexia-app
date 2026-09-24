@@ -770,8 +770,8 @@ func mixedPortfolio(t *testing.T, pool *pgxpool.Pool) (userID, portfolioID uuid.
 		currentPrice *float64
 		ownPrice     *float64
 	}{
-		{assetType: "stock", quantity: 10, cost: 100, currentPrice: ptr(151.91)},
-		{assetType: "etf", quantity: 4, cost: 60, currentPrice: ptr(70.00), ownPrice: ptr(77.35)},
+		{assetType: "stock", quantity: 10, cost: 100, currentPrice: new(151.91)},
+		{assetType: "etf", quantity: 4, cost: 60, currentPrice: new(70.00), ownPrice: new(77.35)},
 		{assetType: "bond", quantity: 2, cost: 10.105},
 	}
 
@@ -799,7 +799,8 @@ func mixedPortfolio(t *testing.T, pool *pgxpool.Pool) (userID, portfolioID uuid.
 	return userID, portfolioID
 }
 
-func ptr(v float64) *float64 { return &v }
+//go:fix inline
+func ptr(v float64) *float64 { return new(v) }
 
 // The allocation a snapshot stores has to be a breakdown *of the total stored
 // beside it*. It is aggregated by a second expression, so nothing but a test

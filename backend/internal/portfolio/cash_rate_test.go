@@ -94,14 +94,12 @@ func TestNewCashRateInputValidate(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			in := NewCashRateInput{
-				SourceID:      uuid.New(),
-				Currency:      money.COP,
-				EffectiveFrom: day,
-				CashRateInput: CashRateInput{
-					AnnualRatePct:  mustDecimal(t, "9.25"),
-					WithholdingPct: mustDecimal(t, "0"),
-					Posting:        PostingDaily,
-				},
+				SourceID:       uuid.New(),
+				Currency:       money.COP,
+				EffectiveFrom:  day,
+				AnnualRatePct:  mustDecimal(t, "9.25"),
+				WithholdingPct: mustDecimal(t, "0"),
+				Posting:        PostingDaily,
 			}
 			tc.edit(&in)
 

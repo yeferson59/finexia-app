@@ -48,15 +48,13 @@ func (f cashFixture) rateOn(t *testing.T, pocketID uuid.UUID, pct string, from t
 	t.Helper()
 
 	rate, err := f.repo.CreateCashRate(context.Background(), f.userID, NewCashRateInput{
-		SourceID:      f.sourceID,
-		Currency:      money.USD,
-		PocketID:      pocketID,
-		EffectiveFrom: from,
-		CashRateInput: CashRateInput{
-			AnnualRatePct:  mustDecimal(t, pct),
-			WithholdingPct: mustDecimal(t, "0"),
-			Posting:        PostingDaily,
-		},
+		SourceID:       f.sourceID,
+		Currency:       money.USD,
+		PocketID:       pocketID,
+		EffectiveFrom:  from,
+		AnnualRatePct:  mustDecimal(t, pct),
+		WithholdingPct: mustDecimal(t, "0"),
+		Posting:        PostingDaily,
 	})
 	if err != nil {
 		t.Fatalf("CreateCashRate(%s on %v): %v", pct, pocketID, err)
@@ -223,15 +221,13 @@ func TestCashPocketTiersCountOnlyTheirOwnDrawer(t *testing.T) {
 	f.moveInto(t, viajes.ID, CashKindDeposit, "4000", cashDay)
 
 	rate, err := f.repo.CreateCashRate(context.Background(), f.userID, NewCashRateInput{
-		SourceID:      f.sourceID,
-		Currency:      money.USD,
-		EffectiveFrom: cashDay,
-		CashRateInput: CashRateInput{
-			AnnualRatePct:  mustDecimal(t, "12"),
-			WithholdingPct: mustDecimal(t, "0"),
-			Posting:        PostingDaily,
-			Tiers:          tierSteps(t, "5000", "8"),
-		},
+		SourceID:       f.sourceID,
+		Currency:       money.USD,
+		EffectiveFrom:  cashDay,
+		AnnualRatePct:  mustDecimal(t, "12"),
+		WithholdingPct: mustDecimal(t, "0"),
+		Posting:        PostingDaily,
+		Tiers:          tierSteps(t, "5000", "8"),
 	})
 	if err != nil {
 		t.Fatalf("CreateCashRate: %v", err)
@@ -507,7 +503,7 @@ func TestCashPocketOfAnotherAccountIsRefused(t *testing.T) {
 
 	if _, err := f.repo.CreateCashRate(ctx, f.userID, NewCashRateInput{
 		SourceID: f.sourceID, Currency: money.USD, PocketID: elsewhere.ID, EffectiveFrom: cashDay,
-		CashRateInput: CashRateInput{AnnualRatePct: mustDecimal(t, "8"), Posting: PostingDaily},
+		AnnualRatePct: mustDecimal(t, "8"), Posting: PostingDaily,
 	}); !errors.Is(err, ErrInvalidCashRate) {
 		t.Errorf("a rate on another account's pocket = %v, want ErrInvalidCashRate", err)
 	}

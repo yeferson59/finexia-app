@@ -31,15 +31,13 @@ func (f cashFixture) usdRateInput(t *testing.T, pct string, from time.Time, reco
 	t.Helper()
 
 	return NewCashRateInput{
-		SourceID:      f.sourceID,
-		Currency:      money.USD,
-		EffectiveFrom: from,
-		Recompute:     recompute,
-		CashRateInput: CashRateInput{
-			AnnualRatePct:  mustDecimal(t, pct),
-			WithholdingPct: mustDecimal(t, "0"),
-			Posting:        PostingDaily,
-		},
+		SourceID:       f.sourceID,
+		Currency:       money.USD,
+		EffectiveFrom:  from,
+		Recompute:      recompute,
+		AnnualRatePct:  mustDecimal(t, pct),
+		WithholdingPct: mustDecimal(t, "0"),
+		Posting:        PostingDaily,
 	}
 }
 

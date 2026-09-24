@@ -189,14 +189,12 @@ func TestCashAccrualWithholds(t *testing.T) {
 
 	deposit := f.mustMove(t, CashKindDeposit, "10000", cashDay)
 	rate, err := f.repo.CreateCashRate(context.Background(), f.userID, NewCashRateInput{
-		SourceID:      f.sourceID,
-		Currency:      money.USD,
-		EffectiveFrom: cashDay,
-		CashRateInput: CashRateInput{
-			AnnualRatePct:  mustDecimal(t, "9"),
-			WithholdingPct: mustDecimal(t, "7"),
-			Posting:        PostingDaily,
-		},
+		SourceID:       f.sourceID,
+		Currency:       money.USD,
+		EffectiveFrom:  cashDay,
+		AnnualRatePct:  mustDecimal(t, "9"),
+		WithholdingPct: mustDecimal(t, "7"),
+		Posting:        PostingDaily,
 	})
 	if err != nil {
 		t.Fatalf("CreateCashRate: %v", err)

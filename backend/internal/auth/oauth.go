@@ -470,7 +470,7 @@ func normalizeScope(requested string) (string, error) {
 		return MCPScope, nil
 	}
 
-	for _, s := range strings.Fields(requested) {
+	for s := range strings.FieldsSeq(requested) {
 		if s != MCPScope {
 			return "", oauthInvalidScope("unsupported scope: " + s)
 		}

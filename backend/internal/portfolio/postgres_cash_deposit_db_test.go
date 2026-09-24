@@ -31,18 +31,16 @@ func (f cashFixture) deposit(t *testing.T, name, amount, pct string, opened time
 	t.Helper()
 
 	pocket, err := f.accrualService().OpenFixedDeposit(context.Background(), f.userID, NewFixedDepositInput{
-		PortfolioID: f.portfolioID,
-		SourceID:    f.sourceID,
-		Currency:    money.USD,
-		Name:        name,
-		Amount:      mustDecimal(t, amount),
-		OpenedOn:    opened,
-		MaturesOn:   matures,
-		CashRateInput: CashRateInput{
-			AnnualRatePct:  mustDecimal(t, pct),
-			WithholdingPct: decimal.Zero,
-			Posting:        posting,
-		},
+		PortfolioID:    f.portfolioID,
+		SourceID:       f.sourceID,
+		Currency:       money.USD,
+		Name:           name,
+		Amount:         mustDecimal(t, amount),
+		OpenedOn:       opened,
+		MaturesOn:      matures,
+		AnnualRatePct:  mustDecimal(t, pct),
+		WithholdingPct: decimal.Zero,
+		Posting:        posting,
 	})
 	if err != nil {
 		t.Fatalf("OpenFixedDeposit(%q): %v", name, err)
@@ -310,7 +308,7 @@ func TestFixedDepositRefusesWritesByHand(t *testing.T) {
 		"a new version of its rate": func() error {
 			_, err := f.repo.CreateCashRate(ctx, f.userID, NewCashRateInput{
 				SourceID: f.sourceID, Currency: money.USD, PocketID: cdt.ID, EffectiveFrom: depositDay(0),
-				CashRateInput: CashRateInput{AnnualRatePct: mustDecimal(t, "12"), Posting: PostingDaily},
+				AnnualRatePct: mustDecimal(t, "12"), Posting: PostingDaily,
 			})
 			return err
 		},

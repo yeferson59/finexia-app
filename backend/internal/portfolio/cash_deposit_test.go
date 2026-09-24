@@ -127,18 +127,16 @@ func TestNewFixedDepositInputValidate(t *testing.T) {
 		matures := time.Date(2026, time.November, 30, 0, 0, 0, 0, time.UTC)
 
 		return NewFixedDepositInput{
-			PortfolioID: uuid.New(),
-			SourceID:    uuid.New(),
-			Currency:    money.COP,
-			Name:        "CDT 90 días",
-			Amount:      mustDecimal(t, "10000000"),
-			OpenedOn:    sept(1),
-			MaturesOn:   &matures,
-			CashRateInput: CashRateInput{
-				AnnualRatePct:  mustDecimal(t, "10"),
-				WithholdingPct: mustDecimal(t, "4"),
-				Posting:        PostingDaily,
-			},
+			PortfolioID:    uuid.New(),
+			SourceID:       uuid.New(),
+			Currency:       money.COP,
+			Name:           "CDT 90 días",
+			Amount:         mustDecimal(t, "10000000"),
+			OpenedOn:       sept(1),
+			MaturesOn:      &matures,
+			AnnualRatePct:  mustDecimal(t, "10"),
+			WithholdingPct: mustDecimal(t, "4"),
+			Posting:        PostingDaily,
 		}
 	}
 

@@ -19,14 +19,12 @@ func (f cashFixture) rate(t *testing.T, cur money.Currency, pct string, from tim
 	t.Helper()
 
 	return f.repo.CreateCashRate(context.Background(), f.userID, NewCashRateInput{
-		SourceID:      f.sourceID,
-		Currency:      cur,
-		EffectiveFrom: from,
-		CashRateInput: CashRateInput{
-			AnnualRatePct:  mustDecimal(t, pct),
-			WithholdingPct: mustDecimal(t, "0"),
-			Posting:        PostingDaily,
-		},
+		SourceID:       f.sourceID,
+		Currency:       cur,
+		EffectiveFrom:  from,
+		AnnualRatePct:  mustDecimal(t, pct),
+		WithholdingPct: mustDecimal(t, "0"),
+		Posting:        PostingDaily,
 	})
 }
 

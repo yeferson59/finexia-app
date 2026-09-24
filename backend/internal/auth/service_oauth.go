@@ -15,6 +15,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -144,13 +145,7 @@ func requireSubset(requested, supported []string, field string) error {
 }
 
 func contains(haystack []string, needle string) bool {
-	for _, h := range haystack {
-		if h == needle {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(haystack, needle)
 }
 
 // StartAuthorization validates an /authorize call and returns the URL the
