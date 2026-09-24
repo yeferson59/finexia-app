@@ -37,20 +37,20 @@
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { OptimisticDialog } from '$lib/shared/optimistic.svelte';
-	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
+	import { todayLocalDateString } from '$lib/shared/format/date';
 	import type { CashAccount } from '../cash';
 	import {
 		CASH_RATE_FALLBACK,
 		CASH_RECALCULATE_FALLBACK,
 		cashAccountRate,
 		effectiveAnnualRate,
-		formatAnnualRate,
 		projectInterest,
 		type CashRate,
 		type RateTier
 	} from '../rates';
 	import { cashRateLines } from '../yield';
 	import { cashRecalcSent, type CashRecalcSent } from '../interest';
+	import { cashRateHistory, type CashRateMode } from '../rate-history';
 	import { cashRecalc } from '../recalc.svelte';
 	import type { CashRecalculation } from '$lib/api/types';
 	import CashChoice from './cash-choice.svelte';
@@ -72,7 +72,7 @@
 
 	let { target, rates, onClose }: Props = $props();
 
-	type Mode = 'new' | 'move' | 'edit' | 'end' | 'delete' | 'recalc';
+	type Mode = CashRateMode;
 	type Posting = 'daily' | 'monthly';
 
 	interface Fields {
@@ -222,74 +222,13 @@
 		recalc: 'Recalcular intereses'
 	};
 
-	const longDate = (iso: string) =>
-		formatCalendarDate(iso.slice(0, 10), { day: 'numeric', month: 'long', year: 'numeric' });
-
 	/* El día desde el que rige la tasa en el modo abierto: anotarla o moverla. */
 	const startDay = $derived(mode === 'move' ? moveTo : effectiveFrom);
 
-	/*
-	 * Si ese día cae en días ya calculados, guardar los rehace: se borran los
-	 * abonos automáticos desde entonces y se calculan con esta tasa. El
-	 * formulario lo dice antes y manda el permiso; el backend no lo hace sin él.
-	 *
-	 * Mover una tasa que ya generó intereses los rehace siempre: hacia atrás gana
-	 * días que nunca se calcularon con ella, y hacia adelante los que deja ya no
-	 * son suyos.
-	 */
-	const recomputes = $derived(
-		(mode === 'move' && used) ||
-			((mode === 'new' || mode === 'move') &&
-				!!computed &&
-				!!startDay &&
-				startDay <= computed.slice(0, 10))
+	/* Qué le pasa a la historia de la cuenta con la opción abierta. */
+	const history = $derived(
+		cashRateHistory({ mode, latest, used, stopped, pending, computed, startDay, today })
 	);
-
-	/* El primer día que se rehace: al mover hacia adelante, el inicio de antes. */
-	const redoFrom = $derived(
-		mode === 'move' && used && latest && latest.effectiveFrom.slice(0, 10) < startDay
-			? latest.effectiveFrom.slice(0, 10)
-			: startDay
-	);
-
-	/* Un día pasado sin nada calculado: los intereses se calculan al guardar. */
-	const backfills = $derived(
-		(mode === 'new' || mode === 'move') && !recomputes && !!startDay && startDay < today
-	);
-
-	/** Lo que pasa con los días pasados al guardar, detrás de lo que dice cada opción. */
-	const pastNote = $derived(
-		recomputes
-			? ` Los intereses ya calculados desde el ${longDate(redoFrom)} se borran y se vuelven a calcular con las fechas nuevas.`
-			: backfills
-				? ` Los intereses desde el ${longDate(startDay)} hasta el último día terminado se calculan al guardar, sobre lo que la cuenta tenía cada día.`
-				: ''
-	);
-
-	/** Qué le pasa a la historia de la cuenta con cada opción. */
-	const hint = $derived.by(() => {
-		if (!latest) return `Desde ese día, la cuenta rinde esta tasa.${pastNote}`;
-
-		switch (mode) {
-			case 'new':
-				if (pending) {
-					return `Ya hay una tasa anotada desde el ${longDate(latest.effectiveFrom)}: la nueva tiene que empezar después. Para cambiar esa, usa «Corregir» o «Cambiar fecha».`;
-				}
-				return stopped
-					? `Desde ese día la cuenta vuelve a rendir. La pausa se queda como estaba.${pastNote}`
-					: `La tasa de ahora, ${formatAnnualRate(latest.annualRatePct)}, termina la víspera. Los días anteriores conservan la suya.${pastNote}`;
-			case 'move':
-				return `Mueve el inicio de la tasa de ${formatAnnualRate(latest.annualRatePct)}, que hoy empieza el ${longDate(latest.effectiveFrom)}. La tasa anterior rige hasta la víspera del día nuevo.${pastNote}`;
-			case 'edit':
-				return `Corrige la tasa anotada desde el ${longDate(latest.effectiveFrom)}, sin crear otra. Si la entidad cambió la tasa, usa «Cambiar tasa».`;
-			case 'end':
-				return 'Desde ese día la cuenta deja de rendir. Los días anteriores conservan su tasa.';
-			case 'delete':
-				return `Borra la tasa de ${formatAnnualRate(latest.annualRatePct)} anotada desde el ${longDate(latest.effectiveFrom)}. Si al empezar cerró otra, esa vuelve a regir.`;
-			case 'recalc':
-				return `Los intereses están calculados hasta el ${longDate(computed ?? today)}. Desde el día que elijas hasta ese se borran los abonos automáticos y se vuelven a calcular sobre lo que la cuenta guarda ahora. Úsalo si anotaste un depósito o un retiro con fecha pasada. Si la tasa empezó antes de lo anotado, usa «Cambiar fecha».`;
-		}
-	});
 
 	/* Los campos numéricos entregan un número al escribir y una cadena al abrirse. */
 	const rateValue = $derived(parseFloat(String(annualRatePct)) || 0);
@@ -449,12 +388,15 @@
 				</div>
 			{/if}
 
-			{#if recomputes}
+			{#if history.recomputes}
 				<input type="hidden" name="recompute" value="true" />
 			{/if}
 
-			<p class="consequence" class:warn={mode === 'delete' || mode === 'recalc' || recomputes}>
-				{hint}
+			<p
+				class="consequence"
+				class:warn={mode === 'delete' || mode === 'recalc' || history.recomputes}
+			>
+				{history.hint}
 			</p>
 
 			{#if projection && (mode === 'new' || mode === 'edit')}

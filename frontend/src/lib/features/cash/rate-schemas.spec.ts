@@ -5,9 +5,9 @@ import {
 	cashRateEndSchema,
 	cashRateRescheduleSchema,
 	cashRateUpdateSchema,
-	toCalendarDateTime,
 	toCashRateBody
-} from './schemas';
+} from './rate-schemas';
+import { toCalendarDateTime } from './schemas';
 
 const SOURCE = '7a2b3c4d-5e6f-4a8b-9c0d-1e2f3a4b5c6d';
 const RATE = '6f1e2d3c-4b5a-4c7d-8e9f-0a1b2c3d4e5f';

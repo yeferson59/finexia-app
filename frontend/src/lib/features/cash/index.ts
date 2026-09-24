@@ -47,7 +47,9 @@ export {
 export * from './cash';
 export * from './pockets';
 export * from './rates';
+export * from './rate-history';
 export * from './deposits';
 export * from './interest';
 export * from './yield';
 export * from './schemas';
+export * from './rate-schemas';

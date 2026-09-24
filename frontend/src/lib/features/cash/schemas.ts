@@ -1,9 +1,12 @@
 /**
- * Schemas Zod de los formularios de efectivo (`routes/dashboard/cash`).
+ * Schemas Zod de los formularios de efectivo (`routes/dashboard/cash`): los
+ * movimientos, los bolsillos, los traslados y los depósitos. Los de la tasa
+ * están en `rate-schemas.ts`, y los campos que comparten, en `form-fields.ts`.
  */
 
 import { z } from 'zod';
 import { SUPPORTED_CURRENCIES } from '$lib/shared/currency';
+import { pocketField, rateValues } from './form-fields';
 
 const movementFields = {
 	kind: z.enum(['deposit', 'withdrawal', 'interest'], 'Elige qué tipo de movimiento es.'),
@@ -50,15 +53,6 @@ function checkFees(v: { kind: string; amount: number; fees: number }, ctx: z.Ref
 		});
 	}
 }
-
-/**
- * Un bolsillo del formulario: vacío es la cuenta principal, que es donde cae
- * todo mientras la cuenta no tenga cajitas.
- */
-const pocketField = z
-	.union([z.uuid('Elige el bolsillo.'), z.literal('')])
-	.nullish()
-	.transform((v) => v || undefined);
 
 /** Alta de un movimiento: también dice sobre qué saldo cae. */
 export const cashMovementCreateSchema = z
@@ -116,174 +110,6 @@ export function cashMovementFields(formData: FormData) {
 		notes: formData.get('notes')
 	};
 }
-
-/**
- * Los tramos llegan como dos listas paralelas, una entrada por fila. Una fila en
- * blanco no es un tramo, y el resto se ordena por saldo: el orden en que se
- * escribieron no cambia lo que dicen.
- */
-function cashRateTierFields(formData: FormData) {
-	const from = formData.getAll('tierFromBalance').map(String);
-	const pct = formData.getAll('tierAnnualRatePct').map(String);
-
-	return from
-		.map((fromBalance, i) => ({ fromBalance, annualRatePct: pct[i] ?? '' }))
-		.filter((tier) => tier.fromBalance.trim() !== '' || tier.annualRatePct.trim() !== '')
-		.sort((a, b) => (parseFloat(a.fromBalance) || 0) - (parseFloat(b.fromBalance) || 0));
-}
-
-/** Los valores de una versión de la tasa como los manda su formulario. */
-export function cashRateFields(formData: FormData) {
-	return {
-		annualRatePct: formData.get('annualRatePct'),
-		withholdingPct: formData.get('withholdingPct'),
-		posting: formData.get('posting') ?? 'daily',
-		tiers: cashRateTierFields(formData)
-	};
-}
-
-/** Si `value` no tiene más decimales de los que caben, sin tropezar con la coma flotante. */
-function hasAtMostDecimals(value: number, decimals: number): boolean {
-	const scaled = value * 10 ** decimals;
-	return Math.abs(scaled - Math.round(scaled)) < 1e-6;
-}
-
-/**
- * Los valores de una versión de la tasa, en porcentaje como los publica la
- * entidad: `9.25` es 9,25 % E.A. Los decimales son los que guarda el backend.
- */
-const rateValues = {
-	annualRatePct: z.coerce
-		.number('Escribe la tasa con números.')
-		.positive('La tasa tiene que ser mayor que cero.')
-		.max(100, 'La tasa no puede pasar de 100 %.')
-		.refine((v) => hasAtMostDecimals(v, 4), 'Escribe la tasa con hasta cuatro decimales.'),
-	// Vacía es que no hay retención.
-	withholdingPct: z.coerce
-		.number('Escribe la retención con números.')
-		.min(0, 'La retención no puede ser negativa.')
-		.lt(100, 'La retención tiene que ser menor que 100 %.')
-		.refine((v) => hasAtMostDecimals(v, 2), 'Escribe la retención con hasta dos decimales.')
-		.default(0),
-	/** Cada cuánto la entidad abona lo que la cuenta rinde. */
-	posting: z
-		.enum(['daily', 'monthly'], 'Elige cada cuánto se abonan los intereses.')
-		.default('daily'),
-	/**
-	 * Los tramos por encima de la tasa, del más bajo al más alto: desde qué saldo
-	 * de la cuenta rige cada uno y a qué tasa. Un tramo al 0 % es un tope. Sin
-	 * tramos, la cuenta rinde la tasa sobre todo el saldo.
-	 */
-	tiers: z
-		.array(
-			z.object({
-				fromBalance: z.coerce
-					.number('Escribe el saldo de cada tramo con números.')
-					.positive('El saldo desde el que rige un tramo tiene que ser mayor que cero.')
-					.lt(1e12, 'El saldo de un tramo es demasiado grande.')
-					.refine(
-						(v) => hasAtMostDecimals(v, 8),
-						'Escribe el saldo de cada tramo con hasta ocho decimales.'
-					),
-				annualRatePct: z.coerce
-					.number('Escribe la tasa de cada tramo con números.')
-					.min(0, 'La tasa de un tramo no puede ser negativa.')
-					.max(100, 'La tasa de un tramo no puede pasar de 100 %.')
-					.refine(
-						(v) => hasAtMostDecimals(v, 4),
-						'Escribe la tasa de cada tramo con hasta cuatro decimales.'
-					)
-			})
-		)
-		.max(10, 'Una tasa tiene como mucho 10 tramos.')
-		.refine(
-			(tiers) => tiers.every((t, i) => i === 0 || t.fromBalance > tiers[i - 1].fromBalance),
-			'Cada tramo tiene que empezar en un saldo mayor que el anterior.'
-		)
-		.default([])
-};
-
-/**
- * El permiso para rehacer los intereses ya calculados desde el primer día de la
- * tasa. El formulario lo manda cuando ese día cae en días ya calculados, después
- * de decir en pantalla lo que va a pasar; sin él, el backend lo rechaza.
- */
-const recomputeField = z
-	.literal('true')
-	.nullish()
-	.transform((v) => v === 'true');
-
-/**
- * Una tasa, o una versión nueva: la cuenta y el día desde el que rige. El día
- * puede ser pasado —la tasa que la cuenta ya rendía antes de anotarla— y los
- * intereses desde entonces se calculan al guardarla.
- */
-export const cashRateCreateSchema = z.object({
-	sourceId: z.uuid('No sabemos a qué cuenta darle la tasa.'),
-	currency: z.enum(SUPPORTED_CURRENCIES, 'No sabemos a qué cuenta darle la tasa.'),
-	pocketId: pocketField,
-	effectiveFrom: z.iso.date('Elige desde qué día rige la tasa.'),
-	recompute: recomputeField,
-	...rateValues
-});
-
-/**
- * Mover el día en que empieza la versión más reciente, mientras no haya
- * generado intereses: un cambio de tasa que la entidad anunció para un día y
- * aplicó otro.
- */
-export const cashRateRescheduleSchema = z.object({
-	id: z.uuid('No sabemos qué tasa mover.'),
-	effectiveFrom: z.iso.date('Elige desde qué día rige la tasa.'),
-	recompute: recomputeField
-});
-
-/** Corrección de la versión más reciente: sus valores, no sus fechas. */
-export const cashRateUpdateSchema = z.object({
-	id: z.uuid('No sabemos qué tasa corregir.'),
-	...rateValues
-});
-
-/** Pausa: el primer día en que la cuenta ya no rinde. */
-export const cashRateEndSchema = z.object({
-	id: z.uuid('No sabemos qué tasa pausar.'),
-	endsOn: z.iso.date('Elige desde qué día deja de rendir.')
-});
-
-export const cashRateDeleteSchema = z.object({
-	id: z.uuid('No sabemos qué tasa borrar.')
-});
-
-/**
- * Los valores como los espera el backend.
- *
- * Una corrección dice la versión entera, así que los tramos viajan siempre, y
- * una lista vacía los quita.
- */
-export function toCashRateBody(data: {
-	annualRatePct: number;
-	withholdingPct: number;
-	posting: 'daily' | 'monthly';
-	tiers: { fromBalance: number; annualRatePct: number }[];
-}) {
-	return {
-		annualRatePct: data.annualRatePct,
-		withholdingPct: data.withholdingPct,
-		posting: data.posting,
-		tiers: data.tiers
-	};
-}
-
-/**
- * Recalcular los intereses de una cuenta desde un día: se tiran los que ya
- * estaban calculados y se vuelven a calcular sobre lo que guarda hoy.
- */
-export const cashRecalculateSchema = z.object({
-	sourceId: z.uuid('No sabemos de qué cuenta recalcular los intereses.'),
-	currency: z.enum(SUPPORTED_CURRENCIES, 'No sabemos de qué cuenta recalcular los intereses.'),
-	pocketId: pocketField,
-	from: z.iso.date('Elige desde qué día recalcular.')
-});
 
 /** El nombre de un cajón de la cuenta, como lo guarda el backend: recortado. */
 const cashPocketName = z
