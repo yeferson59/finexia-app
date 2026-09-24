@@ -10,12 +10,14 @@ import type {
 	CashMovement,
 	CashPocket,
 	CashRate,
+	CashRecalculation,
 	PagedCashMovements
 } from './types';
 import {
 	cashBalanceSchema,
 	cashPocketSchema,
 	cashRateSchema,
+	cashRecalculationSchema,
 	pagedCashMovementsSchema
 } from './schemas';
 import { z } from 'zod';
@@ -153,12 +155,17 @@ export function rescheduleRate(
 export function recalculateInterest(
 	event: ApiEvent,
 	body: Record<string, unknown>
-): Promise<ApiResult<unknown>> {
-	return apiRequest<unknown>(event, '/portfolios/cash/interest/recalculate', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(body)
-	});
+): Promise<ApiResult<CashRecalculation>> {
+	return apiRequest(
+		event,
+		'/portfolios/cash/interest/recalculate',
+		{
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body)
+		},
+		cashRecalculationSchema
+	);
 }
 
 /** `DELETE /portfolios/cash/rates/:id` — borra la versión más reciente. */

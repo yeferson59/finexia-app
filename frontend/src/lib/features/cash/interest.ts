@@ -1,10 +1,10 @@
 /**
  * Helpers puros de los intereses que abona el efectivo: los abonos automáticos
- * agrupados en el extracto. Sin dependencias de Svelte ni de red; el contrato
- * `CashMovement` viene de `$lib/api/types`.
+ * agrupados en el extracto, y lo que cambió un recálculo. Sin dependencias de
+ * Svelte ni de red; los contratos vienen de `$lib/api/types`.
  */
 
-import type { CashMovement } from '$lib/api/types';
+import type { CashBalance, CashMovement, CashRate, CashRecalculation } from '$lib/api/types';
 import { formatCalendarDate } from '$lib/shared/format/date';
 
 /** Los abonos automáticos de un saldo en un mes, como una sola fila. */
@@ -120,4 +120,78 @@ export function groupCashLedgerByMonth(rows: CashLedgerRow[]): CashLedgerMonth[]
 	}
 
 	return [...months.values()];
+}
+
+/**
+ * Lo que una cuenta lleva generado: lo abonado —solo o a mano— y lo calculado
+ * que espera su abono. Es lo que un recálculo puede mover: con abono mensual o
+ * al vencer, lo del mes en curso está todo en lo pendiente.
+ */
+export function cashInterestTotal(
+	balances: Pick<CashBalance, 'interestEarned' | 'pendingInterest'>[]
+): number {
+	return balances.reduce(
+		(sum, b) => sum + (parseFloat(b.interestEarned) || 0) + (parseFloat(b.pendingInterest) || 0),
+		0
+	);
+}
+
+/** El primer día en que rinde una cuenta: el de su versión de tasa más antigua. */
+export function firstRateDay(
+	rates: CashRate[],
+	sourceId: string,
+	currency: string,
+	pocketId: string | null
+): string | null {
+	return (
+		rates
+			.filter(
+				(r) =>
+					r.sourceId === sourceId && r.currency === currency && (r.pocketId ?? null) === pocketId
+			)
+			.map((r) => r.effectiveFrom.slice(0, 10))
+			.sort()[0] ?? null
+	);
+}
+
+/** Un recálculo hecho, con lo que hace falta para contarlo cuando la página se refresca. */
+export interface CashRecalcDone {
+	/** La cuenta, con la clave de `groupCashAccounts`. */
+	key: string;
+	/** «Rappi, education». */
+	where: string;
+	currency: string;
+	/** Lo que llevaba generado antes, según `cashInterestTotal`. */
+	before: number;
+	/** El día desde el que se pidió. */
+	from: string;
+	/** El primer día con tasa de la cuenta, si lo tiene. */
+	rateFrom: string | null;
+	result: CashRecalculation;
+}
+
+/** Cómo quedó una cuenta tras recalcular. */
+export interface CashRecalcChange {
+	after: number;
+	/** `after - before`, cero si no se mueve ni medio centavo. */
+	delta: number;
+	/** Se pidió desde antes de que la cuenta rindiera: esos días no generan nada. */
+	beforeRate: boolean;
+}
+
+/**
+ * Lo que cambió un recálculo: lo generado antes y después, y si se pidió desde
+ * un día en que la cuenta todavía no rendía.
+ *
+ * Una diferencia de menos de medio centavo es ruido de redondeo y se cuenta
+ * como ninguna: anunciar «+0,00» diría que cambió algo que no se ve.
+ */
+export function cashRecalcChange(done: CashRecalcDone, after: number): CashRecalcChange {
+	const delta = after - done.before;
+
+	return {
+		after,
+		delta: Math.abs(delta) < 0.005 ? 0 : delta,
+		beforeRate: !!done.rateFrom && done.from < done.rateFrom
+	};
 }

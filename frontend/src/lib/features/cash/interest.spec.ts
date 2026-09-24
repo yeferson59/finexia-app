@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { groupAutomaticInterest, groupCashLedgerByMonth, type CashLedgerRow } from './interest';
+import {
+	cashInterestTotal,
+	cashRecalcChange,
+	firstRateDay,
+	groupAutomaticInterest,
+	groupCashLedgerByMonth,
+	type CashLedgerRow,
+	type CashRecalcDone
+} from './interest';
+import type { CashRate } from '$lib/api/types';
 import type { CashMovement } from './cash';
 
 const movement = (over: Partial<CashMovement> & { date: string }): CashMovement => ({
@@ -101,5 +110,73 @@ describe('groupCashLedgerByMonth', () => {
 		expect(months.map((m) => m.key)).toEqual(['2026-09', '2026-08']);
 		expect(months[0].label).toBe('Septiembre de 2026');
 		expect(shape(months[0].rows)).toEqual(['deposit', 'grupo de 2']);
+	});
+});
+
+describe('cashInterestTotal', () => {
+	it('suma lo abonado y lo que espera abono', () => {
+		expect(
+			cashInterestTotal([
+				{ interestEarned: '0.01', pendingInterest: '0' },
+				{ interestEarned: '10', pendingInterest: '333.73619817' }
+			])
+		).toBeCloseTo(343.74619817, 8);
+	});
+
+	it('trata lo ilegible como cero', () => {
+		expect(cashInterestTotal([{ interestEarned: '', pendingInterest: 'x' }])).toBe(0);
+	});
+});
+
+describe('firstRateDay', () => {
+	const rate = (effectiveFrom: string, pocketId: string | null = null) =>
+		({ sourceId: 's1', currency: 'COP', pocketId, effectiveFrom }) as CashRate;
+
+	it('toma la versión más antigua del cajón', () => {
+		const rates = [
+			rate('2026-09-20T00:00:00Z'),
+			rate('2026-09-16T00:00:00Z'),
+			rate('2026-09-01T00:00:00Z', 'p1')
+		];
+		expect(firstRateDay(rates, 's1', 'COP', null)).toBe('2026-09-16');
+		expect(firstRateDay(rates, 's1', 'COP', 'p1')).toBe('2026-09-01');
+	});
+
+	it('es null sin tasa', () => {
+		expect(firstRateDay([], 's1', 'COP', null)).toBeNull();
+	});
+});
+
+describe('cashRecalcChange', () => {
+	const done = (over: Partial<CashRecalcDone> = {}): CashRecalcDone => ({
+		key: 's1:COP',
+		where: 'Rappi, COP',
+		currency: 'COP',
+		before: 333.74,
+		from: '2026-09-01',
+		rateFrom: '2026-09-16',
+		result: {
+			cleared: { from: '2026-09-01', balances: 1, days: 7 },
+			through: '2026-09-22T00:00:00Z',
+			credited: 0,
+			recomputed: 7
+		},
+		...over
+	});
+
+	it('da la diferencia con lo que había', () => {
+		const change = cashRecalcChange(done(), 380.12);
+		expect(change.after).toBe(380.12);
+		expect(change.delta).toBeCloseTo(46.38, 8);
+	});
+
+	it('no cuenta el ruido de redondeo como cambio', () => {
+		expect(cashRecalcChange(done(), 333.744).delta).toBe(0);
+	});
+
+	it('avisa si se pidió desde antes de que la cuenta rindiera', () => {
+		expect(cashRecalcChange(done(), 333.74).beforeRate).toBe(true);
+		expect(cashRecalcChange(done({ from: '2026-09-16' }), 333.74).beforeRate).toBe(false);
+		expect(cashRecalcChange(done({ rateFrom: null }), 333.74).beforeRate).toBe(false);
 	});
 });

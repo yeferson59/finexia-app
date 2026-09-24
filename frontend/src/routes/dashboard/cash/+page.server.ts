@@ -310,7 +310,9 @@ export const actions = {
 			return failed(res, cashRateErrorMessage(res.status, res.details, CASH_RECALCULATE_FALLBACK));
 		}
 
-		return { success: true };
+		// Lo que hizo, para que la página lo diga: sin esto un recálculo que da lo
+		// mismo no se distingue de uno que no se hizo.
+		return { success: true, recalculation: res.data };
 	},
 
 	/*

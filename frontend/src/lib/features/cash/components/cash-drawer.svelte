@@ -33,6 +33,8 @@
 		last?: boolean;
 		/** Una cuenta principal con cajones debajo: el riel empieza en ella. */
 		rail?: boolean;
+		/** Se acaba de recalcular: la fila destella para que se vea dónde cambió. */
+		highlighted?: boolean;
 		onRecord: () => void;
 		onRate: () => void;
 		onPocket: () => void;
@@ -49,6 +51,7 @@
 		nested = false,
 		last = false,
 		rail = false,
+		highlighted = false,
 		onRecord,
 		onRate,
 		onPocket,
@@ -95,6 +98,7 @@
 	class:nested
 	class:last
 	class:rail
+	class:highlighted
 	class:emptied={account.balance === 0}
 	class:has-term={fixed && !!pocket?.maturesOn}
 >
@@ -208,6 +212,28 @@
 	 * Las columnas tienen ancho fijo salvo las dos de texto: así los importes y
 	 * las acciones caen en la misma vertical en todas las plataformas.
 	 */
+	/* Un destello que se apaga solo: señala la fila sin quedarse pintado. */
+	.drawer.highlighted {
+		animation: recalculated 2.4s ease-out;
+	}
+
+	@keyframes recalculated {
+		0%,
+		35% {
+			background: rgba(34, 201, 126, 0.1);
+		}
+		100% {
+			background: transparent;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.drawer.highlighted {
+			animation: none;
+			background: rgba(34, 201, 126, 0.06);
+		}
+	}
+
 	.drawer {
 		--mark: 3.5rem;
 		--elbow: 1.25rem;

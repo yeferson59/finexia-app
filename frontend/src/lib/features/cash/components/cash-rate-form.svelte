@@ -48,6 +48,8 @@
 		type RateTier
 	} from '../rates';
 	import { cashRateLines } from '../yield';
+	import { cashInterestTotal, firstRateDay, type CashRecalcDone } from '../interest';
+	import type { CashRecalculation } from '$lib/api/types';
 	import CashChoice from './cash-choice.svelte';
 	import CashMoneyInput from './cash-money-input.svelte';
 	import CashRateAdvanced, { type TierRow } from './cash-rate-advanced.svelte';
@@ -63,9 +65,11 @@
 		/** Todas las versiones de todas las cuentas; el formulario toma las de la suya. */
 		rates: CashRate[];
 		onClose: () => void;
+		/** Un recálculo terminó y la página ya trae los intereses nuevos. */
+		onRecalculated?: (done: CashRecalcDone) => void;
 	}
 
-	let { target, rates, onClose }: Props = $props();
+	let { target, rates, onClose, onRecalculated }: Props = $props();
 
 	type Mode = 'new' | 'move' | 'edit' | 'end' | 'delete' | 'recalc';
 	type Posting = 'daily' | 'monthly';
@@ -155,9 +159,37 @@
 		onClose();
 	}
 
+	/*
+	 * Cómo estaba la cuenta al pedir el recálculo. Se toma al enviar porque,
+	 * cuando la página se refresca, el diálogo ya se cerró y los saldos son los
+	 * nuevos: es contra esto que se ve si cambió algo.
+	 */
+	let recalcSent: Omit<CashRecalcDone, 'result'> | null = null;
+
 	const submit = dialog.submit({
 		fallbackError: () => (mode === 'recalc' ? CASH_RECALCULATE_FALLBACK : CASH_RATE_FALLBACK),
-		onDone: close
+		apply: () => {
+			if (mode !== 'recalc' || !target) {
+				recalcSent = null;
+				return;
+			}
+
+			const { account } = target;
+			recalcSent = {
+				key: account.key,
+				where: `${account.sourceName}, ${account.pocketId ? account.pocketName : account.currency}`,
+				currency: account.currency,
+				before: cashInterestTotal(account.balances),
+				from: recalcFrom,
+				rateFrom: firstRateDay(rates, account.sourceId, account.currency, account.pocketId)
+			};
+		},
+		onDone: close,
+		onSaved: (data) => {
+			const result = data?.recalculation as CashRecalculation | undefined;
+			if (recalcSent && result) onRecalculated?.({ ...recalcSent, result });
+			recalcSent = null;
+		}
 	});
 
 	/*

@@ -81,6 +81,11 @@ interface OptimisticSubmit {
 	onError?: (message: string) => void;
 	/** El servidor lo aceptó, antes del refresco de fondo. */
 	onSuccess?: (data: Record<string, unknown> | undefined) => void;
+	/**
+	 * El servidor lo aceptó y la página ya trae lo real: para lo que compara
+	 * cómo estaba antes con cómo quedó.
+	 */
+	onRefreshed?: (data: Record<string, unknown> | undefined) => void;
 	/** Lo que se dice si el rechazo no trae motivo. */
 	fallbackError: string;
 	/**
@@ -123,11 +128,13 @@ export function optimisticSubmit(options: OptimisticSubmit): SubmitFunction {
 					return;
 				}
 
-				options.onSuccess?.(result.type === 'success' ? result.data : undefined);
+				const data = result.type === 'success' ? result.data : undefined;
+				options.onSuccess?.(data);
 				// Lo pintado se queda hasta que llega lo real: quitarlo antes haría
 				// parpadear la fila de vuelta a como estaba.
 				await invalidateAll();
 				undo?.();
+				options.onRefreshed?.(data);
 			} finally {
 				inFlight--;
 			}
@@ -173,6 +180,11 @@ export class OptimisticDialog {
 		apply?: (formData: FormData) => (() => void) | void;
 		/** El servidor confirmó: cerrar el diálogo. */
 		onDone: () => void;
+		/**
+		 * Lo guardado ya está en la página. Llega aunque el diálogo ya tenga
+		 * otra cosa abierta: lo que se hace aquí es de la página, no de él.
+		 */
+		onSaved?: (data: Record<string, unknown> | undefined) => void;
 	}): SubmitFunction {
 		return (input) => {
 			const sent = this.#current();
@@ -201,7 +213,8 @@ export class OptimisticDialog {
 					if (!isCurrent()) return;
 					this.submitting = false;
 					options.onDone();
-				}
+				},
+				onRefreshed: options.onSaved
 			})(input);
 		};
 	}

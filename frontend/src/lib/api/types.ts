@@ -24,6 +24,7 @@ import type {
 	cashMoveSchema,
 	cashPocketSchema,
 	cashRateSchema,
+	cashRecalculationSchema,
 	sectorWeightSchema,
 	exchangeRateSchema,
 	growthDataPointSchema,
@@ -169,6 +170,9 @@ export type CashPocket = z.infer<typeof cashPocketSchema>;
 
 /** Las dos patas de un movimiento de dinero entre bolsillos de una cuenta. */
 export type CashMove = z.infer<typeof cashMoveSchema>;
+
+/** Lo que hizo un recálculo de los intereses de una cuenta. */
+export type CashRecalculation = z.infer<typeof cashRecalculationSchema>;
 
 // ---------------------------------------------------------------------------
 // Assets y tasas de cambio (mercado)

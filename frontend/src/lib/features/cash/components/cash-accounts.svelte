@@ -48,6 +48,8 @@
 		onMove: (account: CashAccount) => void;
 		/** Abre un depósito a tasa fija en la cuenta, o mira el que ya está abierto. */
 		onDeposit: (account: CashAccount, pocket: CashPocket | null) => void;
+		/** La cuenta que se acaba de recalcular, por su clave: su fila se resalta. */
+		highlight?: string | null;
 	}
 
 	let {
@@ -61,7 +63,8 @@
 		onRate,
 		onPocket,
 		onMove,
-		onDeposit
+		onDeposit,
+		highlight = null
 	}: Props = $props();
 
 	const platforms = $derived(groupCashPlatforms(balances));
@@ -113,6 +116,7 @@
 								{showPortfolio}
 								{today}
 								rail={drawers.length > 0}
+								highlighted={highlight === account.key}
 								onRecord={() => onRecord(account.balances[0])}
 								onRate={() => onRate(account)}
 								onPocket={() => onPocket(account, null)}
@@ -129,6 +133,7 @@
 									{today}
 									nested
 									last={index === drawers.length - 1}
+									highlighted={highlight === drawer.key}
 									onRecord={() => onRecord(drawer.balances[0])}
 									onRate={() => onRate(drawer)}
 									onPocket={() => onPocket(drawer, pocket)}

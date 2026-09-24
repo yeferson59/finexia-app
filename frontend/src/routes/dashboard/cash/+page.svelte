@@ -14,8 +14,11 @@
 		CashMovements,
 		CashPocketForm,
 		CashRateForm,
+		CashRecalcNotice,
 		CashSummary,
 		cashAccountRate,
+		cashInterestTotal,
+		cashRecalcChange,
 		cashYield,
 		cashYieldMap,
 		groupCashAccounts,
@@ -27,6 +30,7 @@
 		type CashMoveTarget,
 		type CashPocketTarget,
 		type CashRateTarget,
+		type CashRecalcDone,
 		type CashYieldBlock
 	} from '$lib/features/cash';
 	import type { CashMovement, CashPocket } from '$lib/api/types';
@@ -60,6 +64,28 @@
 
 	/* El depósito a tasa fija que se abre, o el que se está mirando. */
 	let depositTarget = $state<CashDepositTarget | null>(null);
+
+	/*
+	 * El último recálculo de intereses: se queda arriba hasta que se cierra, y
+	 * su fila destella un momento. Lo de después se lee de los saldos ya
+	 * refrescados, así que es lo mismo que enseña la fila.
+	 */
+	let recalc = $state<CashRecalcDone | null>(null);
+	let highlight = $state<string | null>(null);
+	let highlightTimer: ReturnType<typeof setTimeout> | undefined;
+
+	const recalcChange = $derived.by(() => {
+		if (!recalc) return null;
+		const account = accounts.find((a) => a.key === recalc?.key);
+		return cashRecalcChange(recalc, account ? cashInterestTotal(account.balances) : 0);
+	});
+
+	function recalculated(done: CashRecalcDone) {
+		recalc = done;
+		clearTimeout(highlightTimer);
+		highlight = done.key;
+		highlightTimer = setTimeout(() => (highlight = null), 2500);
+	}
 
 	function record() {
 		target = { mode: 'create' };
@@ -192,6 +218,10 @@
 {:else}
 	<CashSummary {summary} {yielding} map={yieldMap} onSelect={selectBlock} />
 
+	{#if recalc && recalcChange}
+		<CashRecalcNotice done={recalc} change={recalcChange} onDismiss={() => (recalc = null)} />
+	{/if}
+
 	<section class="block" aria-labelledby="cash-accounts-title">
 		<h2 id="cash-accounts-title">Cuentas</h2>
 		<CashAccounts
@@ -206,6 +236,7 @@
 			onPocket={openPocket}
 			onMove={openMove}
 			onDeposit={openDeposit}
+			{highlight}
 		/>
 	</section>
 {/if}
@@ -242,7 +273,12 @@
 	onClose={() => (target = null)}
 />
 
-<CashRateForm target={rateTarget} rates={data.rates} onClose={() => (rateTarget = null)} />
+<CashRateForm
+	target={rateTarget}
+	rates={data.rates}
+	onClose={() => (rateTarget = null)}
+	onRecalculated={recalculated}
+/>
 
 <CashPocketForm target={pocketTarget} onClose={() => (pocketTarget = null)} />
 

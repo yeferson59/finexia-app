@@ -34,6 +34,7 @@ export {
 	type CashFormTarget
 } from './components/cash-movement-form.svelte';
 export { default as CashRateForm, type CashRateTarget } from './components/cash-rate-form.svelte';
+export { default as CashRecalcNotice } from './components/cash-recalc-notice.svelte';
 export {
 	default as CashPocketForm,
 	type CashPocketTarget
