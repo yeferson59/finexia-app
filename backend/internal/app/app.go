@@ -485,7 +485,7 @@ func (a *App) registerJobs(sched *scheduler.Scheduler, mods *modules, persistent
 	// is over in the Americas too, and hours ahead of the snapshot, so the value
 	// the snapshot records already holds the interest. Persistent for the reason
 	// the snapshot is, and a run it misses is caught up by the next one.
-	sched.Register(portfolio.NewCashInterestJob(mods.portfolio.Service(), a.deps.Log), scheduler.DailyAt{Hour: 5, Minute: 30}, scheduler.WithStore(persistent))
+	sched.Register(portfolio.NewCashInterestJob(mods.portfolio.Service(), a.deps.Log), scheduler.DailyAt{Hour: portfolio.CashInterestHour, Minute: portfolio.CashInterestMinute}, scheduler.WithStore(persistent))
 	sched.Register(notification.NewWeeklySummaryScheduler(mods.notification, a.deps.Log), scheduler.WeeklyAt{Day: time.Monday, Hour: 8, Minute: 30}, scheduler.WithStore(persistent))
 	sched.Register(auth.NewCleanupJob(mods.auth.Service(), a.deps.Log), scheduler.Every{Interval: 5 * time.Hour}, scheduler.WithStore(persistent))
 

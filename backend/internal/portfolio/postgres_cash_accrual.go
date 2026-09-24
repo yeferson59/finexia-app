@@ -539,6 +539,10 @@ func (r *PostgresRepository) PostHeldCashInterest(ctx context.Context, entryID u
 // series alone — only what moves a quantity is retired (000038) — so what the
 // recalculation writes instead lands as return, exactly as the first run did.
 //
+// Before clearing it reads where every balance of the account stood — the last
+// day each had computed — so the recalculation can stop there and tell the days
+// it redid from the ones it computed for the first time.
+//
 // A filter that names a platform and an owner is checked against
 // investment_sources first, so someone else's account answers not found rather
 // than reporting that it cleared nothing — the same answer every other write to
@@ -567,6 +571,7 @@ func (r *PostgresRepository) ClearCashInterest(ctx context.Context, filter CashA
 
 		// Only the balances with a day to throw away, under the lock a credit
 		// takes and in a fixed order, so two runs queue rather than deadlock.
+		// The last day each had computed is read here, under that lock.
 		rows, err := tx.Query(ctx, `
 			SELECT pe.id
 			FROM portfolio_entries pe
@@ -602,15 +607,125 @@ func (r *PostgresRepository) ClearCashInterest(ctx context.Context, filter CashA
 			return err
 		}
 
-		cleared, err = clearCashInterestFrom(ctx, tx, entries, cleared.From)
+		// Where every balance of the account stood, the ones with nothing to
+		// clear too: a balance behind the rest computes days of its own.
+		marks, err := cashLedgerMarks(ctx, tx, userID, sourceID, cur, scoped, pocketID)
+		if err != nil {
+			return err
+		}
 
-		return err
+		cleared, err = clearCashInterestFrom(ctx, tx, entries, cleared.From)
+		if err != nil {
+			return err
+		}
+
+		clearedFrom := make(map[uuid.UUID]*time.Time, len(cleared.marks))
+		for _, m := range cleared.marks {
+			clearedFrom[m.EntryID] = m.ClearedFrom
+		}
+
+		for i := range marks {
+			marks[i].ClearedFrom = clearedFrom[marks[i].EntryID]
+
+			if last := marks[i].Last; last != nil && (cleared.ComputedThrough == nil || last.After(*cleared.ComputedThrough)) {
+				cleared.ComputedThrough = last
+			}
+		}
+
+		cleared.marks = marks
+
+		return nil
 	})
 	if err != nil {
 		return CashInterestCleared{}, err
 	}
 
 	return cleared, nil
+}
+
+// cashLedgerMarks reads the last day every cash balance of an account has
+// computed, nil for one that has computed none. The scope is cashAccountScope's,
+// which numbers its parameters from $2; $1 only holds the place.
+func cashLedgerMarks(ctx context.Context, tx pgx.Tx, userID, sourceID *uuid.UUID, cur *string, scoped bool, pocketID *uuid.UUID) ([]CashLedgerMark, error) {
+	rows, err := tx.Query(ctx, `
+		SELECT pe.id, (SELECT MAX(ac.accrual_date) FROM cash_interest_accruals ac WHERE ac.entry_id = pe.id)
+		FROM portfolio_entries pe
+		JOIN portfolios p ON p.id = pe.portfolio_id
+		JOIN assets a     ON a.id = pe.asset_id
+		WHERE $1::boolean
+		  AND a.asset_type = 'cash'
+		  AND a.currency = pe.cost_currency`+cashAccountScope+`
+		ORDER BY pe.id
+	`, true, userID, sourceID, cur, scoped, pocketID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	marks := make([]CashLedgerMark, 0)
+	for rows.Next() {
+		var m CashLedgerMark
+		if err := rows.Scan(&m.EntryID, &m.Last); err != nil {
+			return nil, err
+		}
+
+		marks = append(marks, m)
+	}
+
+	return marks, rows.Err()
+}
+
+// SumRecalculatedCashInterest reads what a recalculation wrote, against where
+// each balance stood before it (the cleared marks): the days it cleared, as they
+// are now, and the days no balance had computed yet, through the given day.
+func (r *PostgresRepository) SumRecalculatedCashInterest(ctx context.Context, cleared CashInterestCleared, through time.Time) (redone, fresh CashInterestDays, err error) {
+	if len(cleared.marks) == 0 {
+		return CashInterestDays{Net: "0"}, CashInterestDays{Net: "0"}, nil
+	}
+
+	ids := make([]uuid.UUID, len(cleared.marks))
+	lasts := make([]*string, len(cleared.marks))
+	froms := make([]*string, len(cleared.marks))
+	for i, m := range cleared.marks {
+		ids[i] = m.EntryID
+		if m.Last != nil {
+			day := m.Last.Format(time.DateOnly)
+			lasts[i] = &day
+		}
+		if m.ClearedFrom != nil {
+			day := m.ClearedFrom.Format(time.DateOnly)
+			froms[i] = &day
+		}
+	}
+
+	err = r.db.QueryRow(ctx, `
+		WITH marks AS (
+			SELECT * FROM unnest($1::uuid[], $2::date[], $3::date[]) AS m(entry_id, last_day, cleared_from)
+		),
+		days AS (
+			SELECT ac.accrual_date, ac.net_amount,
+			       (m.cleared_from IS NOT NULL AND ac.accrual_date BETWEEN m.cleared_from AND m.last_day) AS redone,
+			       (m.last_day IS NULL OR ac.accrual_date > m.last_day) AS fresh
+			FROM cash_interest_accruals ac
+			JOIN marks m ON m.entry_id = ac.entry_id
+			WHERE ac.accrual_date <= $4::date
+		)
+		SELECT
+			COUNT(*) FILTER (WHERE redone),
+			MIN(accrual_date) FILTER (WHERE redone),
+			MAX(accrual_date) FILTER (WHERE redone),
+			ROUND(COALESCE(SUM(net_amount) FILTER (WHERE redone), 0), 8)::text,
+			COUNT(*) FILTER (WHERE fresh),
+			MIN(accrual_date) FILTER (WHERE fresh),
+			MAX(accrual_date) FILTER (WHERE fresh),
+			ROUND(COALESCE(SUM(net_amount) FILTER (WHERE fresh), 0), 8)::text
+		FROM days
+	`, ids, lasts, froms, cashRateDay(through).Format(time.DateOnly)).Scan(
+		&redone.Days, &redone.From, &redone.Through, &redone.Net,
+		&fresh.Days, &fresh.From, &fresh.Through, &fresh.Net,
+	)
+
+	return redone, fresh, err
 }
 
 // clearCashInterestFrom throws away the days the given balances computed from a
@@ -651,16 +766,25 @@ func clearCashInterestFrom(ctx context.Context, tx pgx.Tx, entries []uuid.UUID, 
 			return CashInterestCleared{}, err
 		}
 
-		tag, err := tx.Exec(ctx, `
-			DELETE FROM cash_interest_accruals WHERE entry_id = $1 AND accrual_date >= $2::date
-		`, entryID, day)
-		if err != nil {
+		var (
+			days int
+			net  decimal.Decimal
+		)
+		if err := tx.QueryRow(ctx, `
+			WITH gone AS (
+				DELETE FROM cash_interest_accruals WHERE entry_id = $1 AND accrual_date >= $2::date
+				RETURNING net_amount
+			)
+			SELECT COUNT(*), COALESCE(SUM(net_amount), 0) FROM gone
+		`, entryID, day).Scan(&days, &net); err != nil {
 			return CashInterestCleared{}, err
 		}
 
-		if days := int(tag.RowsAffected()); days > 0 {
+		if days > 0 {
 			cleared.Balances++
 			cleared.Days += days
+			cleared.Net = cleared.Net.Add(net)
+			cleared.marks = append(cleared.marks, CashLedgerMark{EntryID: entryID, ClearedFrom: &first})
 
 			if first.Before(cleared.From) {
 				cleared.From = first

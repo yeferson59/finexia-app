@@ -23,6 +23,8 @@
 	} from '../pockets';
 	import type { CashRate } from '../rates';
 	import CashDrawer from './cash-drawer.svelte';
+	import CashRecalcNotice from './cash-recalc-notice.svelte';
+	import { cashRecalc } from '../recalc.svelte';
 
 	interface Props {
 		balances: CashBalance[];
@@ -48,8 +50,6 @@
 		onMove: (account: CashAccount) => void;
 		/** Abre un depósito a tasa fija en la cuenta, o mira el que ya está abierto. */
 		onDeposit: (account: CashAccount, pocket: CashPocket | null) => void;
-		/** La cuenta que se acaba de recalcular, por su clave: su fila se resalta. */
-		highlight?: string | null;
 	}
 
 	let {
@@ -63,11 +63,33 @@
 		onRate,
 		onPocket,
 		onMove,
-		onDeposit,
-		highlight = null
+		onDeposit
 	}: Props = $props();
 
 	const platforms = $derived(groupCashPlatforms(balances));
+
+	let list = $state<HTMLElement>();
+
+	/*
+	 * La fila recalculada destella y se apaga sola. Con la Web Animations API,
+	 * desde aquí: las filas no cargan un estado que solo dura un momento, y el
+	 * destello vuelve al fondo que tenga cada una.
+	 */
+	/* Salir de la página cierra el aviso: al volver ya no habla de lo último. */
+	$effect(() => () => cashRecalc.dismiss());
+
+	$effect(() => {
+		const highlight = cashRecalc.highlight;
+		if (!highlight || !list) return;
+
+		list.querySelector(`[data-account="${CSS.escape(highlight)}"]`)?.animate(
+			[
+				{ backgroundColor: 'rgba(34, 201, 126, 0.1)', offset: 0 },
+				{ backgroundColor: 'rgba(34, 201, 126, 0.1)', offset: 0.35 }
+			],
+			{ duration: 2400, easing: 'ease-out' }
+		);
+	});
 
 	const pocketOf = (account: CashAccount) => pockets.find((p) => p.id === account.pocketId) ?? null;
 
@@ -86,7 +108,10 @@
 		privacy.money(formatCurrency(amount, currency));
 </script>
 
-<div class="platforms">
+<!-- Arriba de las cuentas, que es donde cambiaron los números. -->
+<CashRecalcNotice feedback={cashRecalc} />
+
+<div class="platforms" bind:this={list}>
 	{#each platforms as platform (platform.sourceId)}
 		{@const name = platform.sourceName || 'Sin plataforma'}
 		{@const count = drawerCount(platform.accounts)}
@@ -116,7 +141,6 @@
 								{showPortfolio}
 								{today}
 								rail={drawers.length > 0}
-								highlighted={highlight === account.key}
 								onRecord={() => onRecord(account.balances[0])}
 								onRate={() => onRate(account)}
 								onPocket={() => onPocket(account, null)}
@@ -133,7 +157,6 @@
 									{today}
 									nested
 									last={index === drawers.length - 1}
-									highlighted={highlight === drawer.key}
 									onRecord={() => onRecord(drawer.balances[0])}
 									onRate={() => onRate(drawer)}
 									onPocket={() => onPocket(drawer, pocket)}

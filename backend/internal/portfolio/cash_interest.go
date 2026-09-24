@@ -241,6 +241,54 @@ type CashInterestCleared struct {
 	From     time.Time `json:"from"`
 	Balances int       `json:"balances"`
 	Days     int       `json:"days"`
+	// Net is what the cleared days had earned, after withholding.
+	Net decimal.Decimal `json:"-"`
+	// ComputedThrough is the last day any balance of the account had computed
+	// before clearing, nil when none had. Only ClearCashInterest reads it.
+	ComputedThrough *time.Time `json:"-"`
+
+	// marks is where each balance of the account stood before clearing, so what
+	// the recalculation writes can be told apart: the days it redid and the ones
+	// it computed for the first time.
+	marks []CashLedgerMark
+}
+
+// before is what the cleared days had earned, as a run of days: from the
+// first day cleared to the last one any balance had computed.
+func (c CashInterestCleared) before() CashInterestDays {
+	days := CashInterestDays{Days: c.Days, Net: c.Net.String()}
+	if c.Days == 0 {
+		return days
+	}
+
+	from := c.From
+	days.From = &from
+
+	for _, m := range c.marks {
+		if m.ClearedFrom != nil && m.Last != nil && (days.Through == nil || m.Last.After(*days.Through)) {
+			days.Through = m.Last
+		}
+	}
+
+	return days
+}
+
+// CashLedgerMark is where one balance's ledger stood before a recalculation:
+// the last day it had computed, nil for none, and the first day cleared, nil
+// when none of its days were.
+type CashLedgerMark struct {
+	EntryID     uuid.UUID
+	Last        *time.Time
+	ClearedFrom *time.Time
+}
+
+// CashInterestDays is the interest of a run of days: how many, from when to
+// when, and what they earned after withholding, as a decimal string.
+type CashInterestDays struct {
+	Days    int        `json:"days"`
+	From    *time.Time `json:"from"`
+	Through *time.Time `json:"through"`
+	Net     string     `json:"net"`
 }
 
 // CashRecalculation is what a recalculation did.
@@ -251,6 +299,13 @@ type CashRecalculation struct {
 	Through    time.Time `json:"through"`
 	Credited   int       `json:"credited"`
 	Recomputed int       `json:"recomputed"`
+	// Before is what the cleared days had earned and After what the same days
+	// earn now: the change the recalculation made. New is the days no balance
+	// had computed yet — a balance behind the rest of its account — which add
+	// interest without anything having changed, and are kept apart for that.
+	Before CashInterestDays `json:"before"`
+	After  CashInterestDays `json:"after"`
+	New    CashInterestDays `json:"new"`
 }
 
 // CashAccrualTarget is a cash balance whose account has a rate, and where its

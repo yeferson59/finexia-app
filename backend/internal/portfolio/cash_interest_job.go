@@ -8,13 +8,42 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
+// CashInterestHour and CashInterestMinute are when, in UTC, the nightly job
+// runs: 00:30 in Colombia, once the day before is over in the Americas too.
+// The composition root schedules the job with them, and lastClosedCashDay reads
+// them to tell a day that has closed from one that has not.
+const (
+	CashInterestHour   = 5
+	CashInterestMinute = 30
+)
+
+// lastClosedCashDay is the last day whose interest can be computed at now: the
+// day before, once the nightly run's hour has come, and the day before that
+// until then.
+//
+// Days are UTC, and the UTC day turns at 19:00 in Colombia. Computing "the day
+// before" by the UTC clock alone would close, every evening, a day that is still
+// open where the owner lives, on a balance that can still change. Every write
+// that computes interest on the spot — a rate from a past day, a rate moved, a
+// recalculation — stops where the nightly job would have stopped by now.
+func lastClosedCashDay(now time.Time) time.Time {
+	today := snapshotDay(now)
+
+	if now.UTC().Before(today.Add(CashInterestHour*time.Hour + CashInterestMinute*time.Minute)) {
+		return today.AddDate(0, 0, -2)
+	}
+
+	return today.AddDate(0, 0, -1)
+}
+
 type CashInterestService interface {
 	AccrueCashInterest(ctx context.Context, through time.Time) (int, []error)
 }
 
 // CashInterestJob credits the interest cash balances earned. It computes
-// through yesterday: a day earns on what the balance held at its close, so
-// today is not over. Days are UTC, like the snapshot's (snapshotDay).
+// through the last day closed (lastClosedCashDay) — yesterday, on its scheduled
+// run: a day earns on what the balance held at its close, so today is not over.
+// Days are UTC, like the snapshot's (snapshotDay).
 //
 // It is a plain scheduler.Job, and the composition root schedules it early in
 // the UTC day: after the day before has ended in the Americas too, and hours
@@ -40,7 +69,9 @@ func (j *CashInterestJob) Name() string {
 }
 
 func (j *CashInterestJob) Run(ctx context.Context) error {
-	through := snapshotDay(j.now()).AddDate(0, 0, -1)
+	// A run caught up at startup before its hour stops where the scheduled one
+	// would have: the day before has not closed in the Americas yet.
+	through := lastClosedCashDay(j.now())
 
 	n, errs := j.svc.AccrueCashInterest(ctx, through)
 	if len(errs) > 0 {

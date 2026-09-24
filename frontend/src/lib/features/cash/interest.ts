@@ -4,8 +4,9 @@
  * Svelte ni de red; los contratos vienen de `$lib/api/types`.
  */
 
-import type { CashBalance, CashMovement, CashRate, CashRecalculation } from '$lib/api/types';
+import type { CashMovement, CashRate, CashRecalculation } from '$lib/api/types';
 import { formatCalendarDate } from '$lib/shared/format/date';
+import type { CashAccount } from './cash';
 
 /** Los abonos automáticos de un saldo en un mes, como una sola fila. */
 export interface CashInterestGroup {
@@ -122,20 +123,6 @@ export function groupCashLedgerByMonth(rows: CashLedgerRow[]): CashLedgerMonth[]
 	return [...months.values()];
 }
 
-/**
- * Lo que una cuenta lleva generado: lo abonado —solo o a mano— y lo calculado
- * que espera su abono. Es lo que un recálculo puede mover: con abono mensual o
- * al vencer, lo del mes en curso está todo en lo pendiente.
- */
-export function cashInterestTotal(
-	balances: Pick<CashBalance, 'interestEarned' | 'pendingInterest'>[]
-): number {
-	return balances.reduce(
-		(sum, b) => sum + (parseFloat(b.interestEarned) || 0) + (parseFloat(b.pendingInterest) || 0),
-		0
-	);
-}
-
 /** El primer día en que rinde una cuenta: el de su versión de tasa más antigua. */
 export function firstRateDay(
 	rates: CashRate[],
@@ -154,15 +141,13 @@ export function firstRateDay(
 	);
 }
 
-/** Un recálculo hecho, con lo que hace falta para contarlo cuando la página se refresca. */
+/** Un recálculo hecho, con lo que hace falta para contarlo en la página. */
 export interface CashRecalcDone {
 	/** La cuenta, con la clave de `groupCashAccounts`. */
 	key: string;
 	/** «Rappi, education». */
 	where: string;
 	currency: string;
-	/** Lo que llevaba generado antes, según `cashInterestTotal`. */
-	before: number;
 	/** El día desde el que se pidió. */
 	from: string;
 	/** El primer día con tasa de la cuenta, si lo tiene. */
@@ -170,28 +155,61 @@ export interface CashRecalcDone {
 	result: CashRecalculation;
 }
 
-/** Cómo quedó una cuenta tras recalcular. */
+/** Un recálculo pedido, antes de que responda el servidor. */
+export type CashRecalcSent = Omit<CashRecalcDone, 'result'>;
+
+/**
+ * Lo que se guarda de una cuenta al pedir su recálculo. Se toma al enviar
+ * porque, cuando la página se refresca, el diálogo ya se cerró.
+ */
+export function cashRecalcSent(
+	account: Pick<
+		CashAccount,
+		'key' | 'sourceId' | 'sourceName' | 'currency' | 'pocketId' | 'pocketName'
+	>,
+	rates: CashRate[],
+	from: string
+): CashRecalcSent {
+	return {
+		key: account.key,
+		where: `${account.sourceName}, ${account.pocketId ? account.pocketName : account.currency}`,
+		currency: account.currency,
+		from,
+		rateFrom: firstRateDay(rates, account.sourceId, account.currency, account.pocketId)
+	};
+}
+
+/** Lo que cambió un recálculo, en números. */
 export interface CashRecalcChange {
+	/** Lo que rendían los días ya calculados, y lo que rinden ahora. */
+	before: number;
 	after: number;
 	/** `after - before`, cero si no se mueve ni medio centavo. */
 	delta: number;
+	/** Lo que suman los días que no estaban calculados. */
+	fresh: number;
 	/** Se pidió desde antes de que la cuenta rindiera: esos días no generan nada. */
 	beforeRate: boolean;
 }
 
 /**
- * Lo que cambió un recálculo: lo generado antes y después, y si se pidió desde
- * un día en que la cuenta todavía no rendía.
+ * Lo que cambió un recálculo, con los números del backend: los mismos días
+ * antes y después, y aparte los que se calcularon por primera vez. Mezclarlos
+ * haría pasar un día más de intereses por un cambio del recálculo.
  *
  * Una diferencia de menos de medio centavo es ruido de redondeo y se cuenta
  * como ninguna: anunciar «+0,00» diría que cambió algo que no se ve.
  */
-export function cashRecalcChange(done: CashRecalcDone, after: number): CashRecalcChange {
-	const delta = after - done.before;
+export function cashRecalcChange(done: CashRecalcDone): CashRecalcChange {
+	const before = parseFloat(done.result.before.net) || 0;
+	const after = parseFloat(done.result.after.net) || 0;
+	const delta = after - before;
 
 	return {
+		before,
 		after,
 		delta: Math.abs(delta) < 0.005 ? 0 : delta,
+		fresh: parseFloat(done.result.new.net) || 0,
 		beforeRate: !!done.rateFrom && done.from < done.rateFrom
 	};
 }

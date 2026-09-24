@@ -475,9 +475,14 @@ func cashAccountAccruedThrough(ctx context.Context, tx pgx.Tx, sourceID uuid.UUI
 	return accruedThrough, err
 }
 
-// RescheduleCashRate moves the first day of the latest version, while no day
-// has been computed at it: a change of rate announced for one day and made on
-// another.
+// RescheduleCashRate moves the first day of the latest version: a change of
+// rate announced for one day and made on another, or a rate recorded from the
+// wrong day.
+//
+// A version whose days were already computed moves only with in.Recompute: its
+// days are thrown away from the earlier of its old and its new first day, and
+// the service computes them again. Moved back, the days it gains had never been
+// computed at it; moved forward, the days it gives up are no longer its own.
 //
 // It moves within the room the versions around it leave. It starts after the
 // version before it does, and not after the day it stops earning if it was
@@ -528,7 +533,18 @@ func (r *PostgresRepository) RescheduleCashRate(ctx context.Context, userID, rat
 		}
 
 		if locked.accruedThrough != nil {
-			return cashRateInUse(*locked.accruedThrough, "record a new version instead")
+			if !in.Recompute {
+				return cashRateInUse(*locked.accruedThrough, "move it recomputing its days, or record a new version instead")
+			}
+
+			from := locked.effectiveFrom
+			if start.Before(from) {
+				from = start
+			}
+
+			if _, err := clearCashInterestFrom(ctx, tx, balances, from); err != nil {
+				return err
+			}
 		}
 
 		var endedOn *time.Time

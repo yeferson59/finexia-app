@@ -164,6 +164,9 @@ type CashAccrualStore interface {
 	// ClearCashInterest throws away the days computed from a day, so a
 	// recalculation can compute them again.
 	ClearCashInterest(ctx context.Context, filter CashAccrualFilter, from time.Time) (CashInterestCleared, error)
+	// SumRecalculatedCashInterest reads what a recalculation wrote: the days it
+	// cleared, as they are now, and the days no balance had computed yet.
+	SumRecalculatedCashInterest(ctx context.Context, cleared CashInterestCleared, through time.Time) (redone, fresh CashInterestDays, err error)
 }
 
 // Repository is the union of the module's stores, satisfied by

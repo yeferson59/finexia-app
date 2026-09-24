@@ -1,71 +1,107 @@
 <script lang="ts">
 	/**
-	 * Lo que hizo un recálculo de intereses, dicho en la página cuando ya trae
-	 * los números nuevos: cuánto llevaba generado la cuenta antes y cuánto
-	 * después, y cuántos días se volvieron a calcular.
+	 * Lo que hizo un recálculo de intereses: lo que rendían los días que ya
+	 * estaban calculados, lo que rinden ahora, y aparte los días que se
+	 * calcularon por primera vez.
 	 *
 	 * Un recálculo sobre el mismo saldo y la misma tasa da lo mismo, y sin este
 	 * aviso no se distingue de uno que no se hizo. Por eso, cuando no cambia
-	 * nada, dice por qué.
+	 * nada, dice por qué; y un día nuevo no se cuenta como cambio.
 	 */
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { formatCalendarDate } from '$lib/shared/format/date';
 	import type { CashRecalcChange, CashRecalcDone } from '../interest';
+	import type { CashRecalcFeedback } from '../recalc.svelte';
 
 	interface Props {
-		done: CashRecalcDone;
-		change: CashRecalcChange;
-		onDismiss: () => void;
+		/** El último recálculo; sin ninguno no se pinta nada. */
+		feedback: CashRecalcFeedback;
 	}
 
-	let { done, change, onDismiss }: Props = $props();
+	let { feedback }: Props = $props();
 
-	const money = (amount: number) => privacy.money(formatCurrency(amount, done.currency));
+	const money = (amount: number, currency: string) =>
+		privacy.money(formatCurrency(amount, currency));
 
-	const longDate = (iso: string) =>
-		formatCalendarDate(iso.slice(0, 10), { day: 'numeric', month: 'long' });
+	const shortDate = (iso: string) =>
+		formatCalendarDate(iso.slice(0, 10), { day: 'numeric', month: 'short' });
 
-	const days = $derived(done.result.recomputed);
-	const signed = $derived(`${change.delta > 0 ? '+' : '−'}${money(Math.abs(change.delta))}`);
+	/** «16 – 22 sep.», o un solo día si empieza y acaba en el mismo. */
+	function span(from: string | null, through: string | null): string {
+		if (!from || !through) return '';
+		return from.slice(0, 10) === through.slice(0, 10)
+			? shortDate(from)
+			: `${shortDate(from)} – ${shortDate(through)}`;
+	}
+
+	const plural = (n: number) => (n === 1 ? 'día' : 'días');
 </script>
 
-<div class="notice" class:changed={change.delta !== 0} role="status">
-	<div class="body">
-		<p class="head">Intereses recalculados · {done.where}</p>
+{#if feedback.done && feedback.change}
+	{@render notice(feedback.done, feedback.change)}
+{/if}
 
-		{#if change.delta !== 0}
-			<p class="figures">
-				<span class="before">{money(done.before)}</span>
-				<span class="arrow" aria-label="pasa a">→</span>
-				<span class="after">{money(change.after)}</span>
-				<span class="delta" class:down={change.delta < 0}>{signed}</span>
-			</p>
-		{:else}
-			<p class="figures">
-				Sin cambios: <span class="after">{money(change.after)}</span>
-			</p>
-		{/if}
+{#snippet notice(done: CashRecalcDone, change: CashRecalcChange)}
+	{@const redone = done.result.before}
+	{@const fresh = done.result.new}
+	{@const signed = `${change.delta > 0 ? '+' : '−'}${money(Math.abs(change.delta), done.currency)}`}
+	<div class="notice" class:changed={change.delta !== 0} role="status">
+		<div class="body">
+			<p class="head">Intereses recalculados · {done.where}</p>
 
-		<p class="detail">
-			{#if days > 0}
-				Se volvieron a calcular {days}
-				{days === 1 ? 'día' : 'días'}, hasta el {longDate(done.result.through)}.
+			{#if redone.days > 0}
+				<p class="figures">
+					<span class="label"
+						>{redone.days} {plural(redone.days)} ({span(redone.from, redone.through)})</span
+					>
+					{#if change.delta !== 0}
+						<span class="before">{money(change.before, done.currency)}</span>
+						<span class="arrow" aria-label="pasa a">→</span>
+						<span class="after">{money(change.after, done.currency)}</span>
+						<span class="delta" class:down={change.delta < 0}>{signed}</span>
+					{:else}
+						<span class="after">{money(change.after, done.currency)}</span>
+						<span class="same">sin cambios</span>
+					{/if}
+				</p>
 			{:else}
-				No había días con tasa que calcular desde el {longDate(done.from)}.
+				<p class="figures">No había días calculados que rehacer.</p>
 			{/if}
-			{#if change.delta === 0 && days > 0}
-				El saldo y la tasa de esos días son los mismos que ya se habían usado; el resultado cambia
-				cuando anotas un depósito o un retiro con fecha pasada, o cambias la tasa.
-			{/if}
-			{#if change.beforeRate && done.rateFrom}
-				La tasa empieza el {longDate(done.rateFrom)}: los días anteriores no generan intereses.
-			{/if}
-		</p>
-	</div>
 
-	<button type="button" class="dismiss" onclick={onDismiss} aria-label="Cerrar aviso">×</button>
-</div>
+			{#if fresh.days > 0}
+				<p class="figures fresh">
+					<span class="label">
+						{fresh.days}
+						{fresh.days === 1 ? 'día nuevo' : 'días nuevos'} ({span(fresh.from, fresh.through)})
+					</span>
+					<span class="delta">+{money(change.fresh, done.currency)}</span>
+				</p>
+			{/if}
+
+			<p class="detail">
+				{#if change.delta === 0 && redone.days > 0}
+					El saldo y la tasa de esos días son los mismos que ya se habían usado. El resultado cambia
+					si anotas un depósito o un retiro con fecha pasada.
+				{/if}
+				{#if fresh.days > 0}
+					Los días nuevos no estaban calculados todavía: suman aunque nada haya cambiado.
+				{/if}
+				{#if change.beforeRate && done.rateFrom}
+					La tasa empieza el {shortDate(done.rateFrom)} y los días anteriores no generan intereses. Si
+					la cuenta rendía desde antes, usa «Cambiar fecha» en su tasa.
+				{/if}
+			</p>
+		</div>
+
+		<button
+			type="button"
+			class="dismiss"
+			onclick={() => feedback.dismiss()}
+			aria-label="Cerrar aviso">×</button
+		>
+	</div>
+{/snippet}
 
 <style>
 	.notice {
@@ -107,8 +143,18 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	.before {
+	.label {
+		font-size: 0.83rem;
 		color: var(--text-muted);
+	}
+
+	.before,
+	.same {
+		color: var(--text-muted);
+	}
+
+	.same {
+		font-size: 0.83rem;
 	}
 
 	.arrow {

@@ -11,16 +11,18 @@
 	 *   llama «Reanudar». El día puede ser pasado —la tasa que la cuenta ya rendía
 	 *   antes de anotarla— y los intereses desde entonces se calculan al guardar;
 	 *   si ya había días calculados desde ese día, se rehacen con la tasa nueva.
-	 * - «Cambiar fecha» mueve el día en que empieza la versión más reciente,
-	 *   mientras no haya generado intereses: la anterior rige hasta la víspera del
-	 *   día nuevo. Es para un cambio que la entidad anunció para un día y aplicó
-	 *   otro, o que se anotó con la fecha equivocada.
+	 * - «Cambiar fecha» mueve el día en que empieza la versión más reciente: la
+	 *   anterior rige hasta la víspera del día nuevo. Es para un cambio que la
+	 *   entidad anunció para un día y aplicó otro, o que se anotó con la fecha
+	 *   equivocada. Si ya generó intereses, sus días se rehacen desde el primero
+	 *   que toca el cambio.
 	 * - «Corregir» reescribe los valores sin tocar las fechas: es para un error al
 	 *   escribirla, no para un cambio de la entidad.
 	 * - «Pausar» dice desde qué día la cuenta deja de rendir.
 	 * - «Borrar» quita la versión.
 	 * - «Recalcular» tira los días ya calculados desde una fecha y los vuelve a
-	 *   calcular sobre lo que la cuenta guarda hoy. Es lo que arregla un
+	 *   calcular sobre lo que la cuenta guarda hoy, hasta el último que ya estaba
+	 *   calculado. Es lo que arregla un
 	 *   movimiento anotado con fecha pasada, y solo aparece si hay días que
 	 *   recalcular.
 	 *
@@ -48,7 +50,8 @@
 		type RateTier
 	} from '../rates';
 	import { cashRateLines } from '../yield';
-	import { cashInterestTotal, firstRateDay, type CashRecalcDone } from '../interest';
+	import { cashRecalcSent, type CashRecalcSent } from '../interest';
+	import { cashRecalc } from '../recalc.svelte';
 	import type { CashRecalculation } from '$lib/api/types';
 	import CashChoice from './cash-choice.svelte';
 	import CashMoneyInput from './cash-money-input.svelte';
@@ -65,11 +68,9 @@
 		/** Todas las versiones de todas las cuentas; el formulario toma las de la suya. */
 		rates: CashRate[];
 		onClose: () => void;
-		/** Un recálculo terminó y la página ya trae los intereses nuevos. */
-		onRecalculated?: (done: CashRecalcDone) => void;
 	}
 
-	let { target, rates, onClose, onRecalculated }: Props = $props();
+	let { target, rates, onClose }: Props = $props();
 
 	type Mode = 'new' | 'move' | 'edit' | 'end' | 'delete' | 'recalc';
 	type Posting = 'daily' | 'monthly';
@@ -164,37 +165,26 @@
 	 * cuando la página se refresca, el diálogo ya se cerró y los saldos son los
 	 * nuevos: es contra esto que se ve si cambió algo.
 	 */
-	let recalcSent: Omit<CashRecalcDone, 'result'> | null = null;
+	let recalcSent: CashRecalcSent | null = null;
 
 	const submit = dialog.submit({
 		fallbackError: () => (mode === 'recalc' ? CASH_RECALCULATE_FALLBACK : CASH_RATE_FALLBACK),
 		apply: () => {
-			if (mode !== 'recalc' || !target) {
-				recalcSent = null;
-				return;
-			}
-
-			const { account } = target;
-			recalcSent = {
-				key: account.key,
-				where: `${account.sourceName}, ${account.pocketId ? account.pocketName : account.currency}`,
-				currency: account.currency,
-				before: cashInterestTotal(account.balances),
-				from: recalcFrom,
-				rateFrom: firstRateDay(rates, account.sourceId, account.currency, account.pocketId)
-			};
+			recalcSent =
+				mode === 'recalc' && target ? cashRecalcSent(target.account, rates, recalcFrom) : null;
 		},
 		onDone: close,
 		onSaved: (data) => {
 			const result = data?.recalculation as CashRecalculation | undefined;
-			if (recalcSent && result) onRecalculated?.({ ...recalcSent, result });
+			if (recalcSent && result) cashRecalc.show({ ...recalcSent, result });
 			recalcSent = null;
 		}
 	});
 
 	/*
 	 * Con intereses ya calculados la tasa no se corrige ni se borra: esos días se
-	 * ganaron a ella. Se cambia con una versión nueva, o se pausa.
+	 * ganaron a ella. Se cambia con una versión nueva, se pausa, o se mueve su
+	 * inicio rehaciendo sus días.
 	 */
 	const used = $derived(!!latest?.accruedThrough);
 
@@ -205,7 +195,7 @@
 		latest
 			? [
 					{ value: 'new', label: stopped ? 'Reanudar' : 'Cambiar tasa' },
-					...(used ? [] : [{ value: 'move' as const, label: 'Cambiar fecha' }]),
+					{ value: 'move' as const, label: 'Cambiar fecha' },
 					...(used ? [] : [{ value: 'edit' as const, label: 'Corregir' }]),
 					...(stopped ? [] : [{ value: 'end' as const, label: 'Pausar' }]),
 					...(used ? [] : [{ value: 'delete' as const, label: 'Borrar' }]),
@@ -242,12 +232,24 @@
 	 * Si ese día cae en días ya calculados, guardar los rehace: se borran los
 	 * abonos automáticos desde entonces y se calculan con esta tasa. El
 	 * formulario lo dice antes y manda el permiso; el backend no lo hace sin él.
+	 *
+	 * Mover una tasa que ya generó intereses los rehace siempre: hacia atrás gana
+	 * días que nunca se calcularon con ella, y hacia adelante los que deja ya no
+	 * son suyos.
 	 */
 	const recomputes = $derived(
-		(mode === 'new' || mode === 'move') &&
-			!!computed &&
-			!!startDay &&
-			startDay <= computed.slice(0, 10)
+		(mode === 'move' && used) ||
+			((mode === 'new' || mode === 'move') &&
+				!!computed &&
+				!!startDay &&
+				startDay <= computed.slice(0, 10))
+	);
+
+	/* El primer día que se rehace: al mover hacia adelante, el inicio de antes. */
+	const redoFrom = $derived(
+		mode === 'move' && used && latest && latest.effectiveFrom.slice(0, 10) < startDay
+			? latest.effectiveFrom.slice(0, 10)
+			: startDay
 	);
 
 	/* Un día pasado sin nada calculado: los intereses se calculan al guardar. */
@@ -258,9 +260,9 @@
 	/** Lo que pasa con los días pasados al guardar, detrás de lo que dice cada opción. */
 	const pastNote = $derived(
 		recomputes
-			? ` Los intereses ya calculados desde el ${longDate(startDay)} se borran y se vuelven a calcular con esta tasa.`
+			? ` Los intereses ya calculados desde el ${longDate(redoFrom)} se borran y se vuelven a calcular con las fechas nuevas.`
 			: backfills
-				? ` Los intereses desde el ${longDate(startDay)} hasta ayer se calculan al guardar, sobre lo que la cuenta tenía cada día.`
+				? ` Los intereses desde el ${longDate(startDay)} hasta el último día terminado se calculan al guardar, sobre lo que la cuenta tenía cada día.`
 				: ''
 	);
 
@@ -285,7 +287,7 @@
 			case 'delete':
 				return `Borra la tasa de ${formatAnnualRate(latest.annualRatePct)} anotada desde el ${longDate(latest.effectiveFrom)}. Si al empezar cerró otra, esa vuelve a regir.`;
 			case 'recalc':
-				return `Los intereses están calculados hasta el ${longDate(computed ?? today)}. Desde el día que elijas se borran los abonos automáticos y se vuelven a calcular sobre lo que la cuenta guarda ahora. Úsalo si anotaste un depósito o un retiro con fecha pasada.`;
+				return `Los intereses están calculados hasta el ${longDate(computed ?? today)}. Desde el día que elijas hasta ese se borran los abonos automáticos y se vuelven a calcular sobre lo que la cuenta guarda ahora. Úsalo si anotaste un depósito o un retiro con fecha pasada. Si la tasa empezó antes de lo anotado, usa «Cambiar fecha».`;
 		}
 	});
 

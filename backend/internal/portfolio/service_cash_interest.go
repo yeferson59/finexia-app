@@ -121,8 +121,14 @@ func (s *service) accrueCashInterest(ctx context.Context, through time.Time, fil
 // this is for: the days it should have earned on read the balance as it is
 // today.
 //
-// It computes through yesterday, as the nightly job does: today is not over,
-// and a day earns on what the balance held at its close.
+// It computes through the last day the account had computed, and never past
+// the last day closed (lastClosedCashDay): a recalculation redoes days, it does
+// not bring new ones forward. The nightly job computes the next one once it is
+// over where the owner lives.
+//
+// What it reports tells the days it redid — as they were and as they are now —
+// from the days no balance had computed yet: a balance behind the rest of its
+// account computes those, and they add interest without anything changing.
 func (s *service) RecalculateCashInterest(ctx context.Context, userID uuid.UUID, in RecalculateCashInterestInput) (CashRecalculation, error) {
 	if err := in.Validate(time.Now()); err != nil {
 		return CashRecalculation{}, err
@@ -137,11 +143,19 @@ func (s *service) RecalculateCashInterest(ctx context.Context, userID uuid.UUID,
 		return CashRecalculation{}, err
 	}
 
-	through := snapshotDay(time.Now()).AddDate(0, 0, -1)
+	through := lastClosedCashDay(time.Now())
+	if last := cleared.ComputedThrough; last != nil && last.Before(through) {
+		through = *last
+	}
 
 	credited, days, errs := s.accrueCashInterest(ctx, through, filter)
 	if len(errs) > 0 {
 		return CashRecalculation{}, errors.Join(errs...)
+	}
+
+	after, fresh, err := s.repo.SumRecalculatedCashInterest(ctx, cleared, through)
+	if err != nil {
+		return CashRecalculation{}, err
 	}
 
 	return CashRecalculation{
@@ -149,5 +163,8 @@ func (s *service) RecalculateCashInterest(ctx context.Context, userID uuid.UUID,
 		Through:    through,
 		Credited:   credited,
 		Recomputed: days,
+		Before:     cleared.before(),
+		After:      after,
+		New:        fresh,
 	}, nil
 }

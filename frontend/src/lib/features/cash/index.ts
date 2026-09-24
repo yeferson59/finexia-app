@@ -21,7 +21,7 @@
  *
  * Son internos —imports relativos, fuera de la superficie pública—
  * `cash-delete-confirm` y `cash-ledger-entry` de `cash-movements`;
- * `cash-drawer` y `cash-term-track` de `cash-accounts`; `cash-yield-chart` de
+ * `cash-drawer`, `cash-term-track` y `cash-recalc-notice` de `cash-accounts`; `cash-yield-chart` de
  * `cash-summary`; `cash-deposit-open` de `cash-deposit-form`;
  * `cash-rate-advanced` y `cash-rate-projection` de `cash-rate-form`; y las
  * piezas de formulario `cash-choice` y `cash-money-input`.
@@ -34,7 +34,6 @@ export {
 	type CashFormTarget
 } from './components/cash-movement-form.svelte';
 export { default as CashRateForm, type CashRateTarget } from './components/cash-rate-form.svelte';
-export { default as CashRecalcNotice } from './components/cash-recalc-notice.svelte';
 export {
 	default as CashPocketForm,
 	type CashPocketTarget

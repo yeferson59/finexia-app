@@ -45,12 +45,20 @@ func (s *service) RescheduleCashRate(ctx context.Context, userID, rateID uuid.UU
 		return CashRate{}, err
 	}
 
-	s.computeRatePast(ctx, userID, rate, in.EffectiveFrom, now)
+	// With Recompute the days thrown away can start before the new first day —
+	// a version moved forward clears from where it used to start — so whatever
+	// is pending is computed, whichever way it moved.
+	start := in.EffectiveFrom
+	if in.Recompute {
+		start = lastClosedCashDay(now)
+	}
+
+	s.computeRatePast(ctx, userID, rate, start, now)
 
 	return rate, nil
 }
 
-// computeRatePast computes, through yesterday, the days of the rate's account
+// computeRatePast computes, through the last day closed (lastClosedCashDay), the days of the rate's account
 // still pending once a version starts in the past, on start: the ones before today that
 // the ledger never computed, or that the write threw away to compute again.
 //
@@ -69,7 +77,7 @@ func (s *service) computeRatePast(ctx context.Context, userID uuid.UUID, rate Ca
 
 	filter := CashAccrualFilter{UserID: userID, SourceID: rate.SourceID, Currency: rate.Currency}.OnPocket(pocketID)
 
-	if _, _, errs := s.accrueCashInterest(ctx, snapshotDay(now).AddDate(0, 0, -1), filter); len(errs) > 0 {
+	if _, _, errs := s.accrueCashInterest(ctx, lastClosedCashDay(now), filter); len(errs) > 0 {
 		s.log.Error(ctx, "computing a past cash rate failed; the nightly job will catch up",
 			logger.Str("rateId", rate.ID.String()), logger.Int("errors", len(errs)))
 	}

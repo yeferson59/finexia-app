@@ -257,7 +257,7 @@ func TestRecalculateCashInterestRedoesTheDays(t *testing.T) {
 	f := newCashFixture(t)
 	ctx := context.Background()
 
-	today := time.Now().UTC().Truncate(24 * time.Hour)
+	today := cashToday()
 	start := today.AddDate(0, 0, -3)
 	yesterday := today.AddDate(0, 0, -1)
 

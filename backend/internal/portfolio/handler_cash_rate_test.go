@@ -315,8 +315,8 @@ func TestHandlerCreateCashRateInThePastComputesItsDays(t *testing.T) {
 		gotFilter.Pocket == nil || *gotFilter.Pocket != pocketID {
 		t.Errorf("filter = %+v, want the pocket's account", gotFilter)
 	}
-	if yesterday := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -1); !through.Equal(yesterday) {
-		t.Errorf("through = %v, want yesterday %v", through, yesterday)
+	if closed := lastClosedCashDay(time.Now()); !through.Equal(closed) {
+		t.Errorf("through = %v, want the last day closed %v", through, closed)
 	}
 }
 

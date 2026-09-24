@@ -1257,7 +1257,7 @@ depósito abierto el 1 de septiembre y registrado el 15 responde con
 - **`openedOn` puede estar en el pasado** —hasta cinco años atrás (**400**)— y no
   puede ser futuro (**400**). En un depósito no se anotan intereses a mano, así
   que no hay nada que contar dos veces: Finexia calcula de una vez los días
-  desde ese día hasta ayer y los abona como rendimiento. En la cuenta principal
+  desde ese día hasta el último día cerrado y los abona como rendimiento. En la cuenta principal
   y en los bolsillos flexibles sigue valiendo lo contrario: lo que la entidad ya
   pagó se anota como un movimiento de intereses.
 - `maturesOn` es opcional —sin él, el depósito rinde hasta que se cancele— y
@@ -1306,7 +1306,7 @@ abonan según `posting`; ver *Intereses* más abajo.
 | `POST /portfolios/cash/rates` | Anota una tasa, o una versión nueva que cierra la anterior |
 | `PUT /portfolios/cash/rates/:rateId` | Corrige `annualRatePct`, `withholdingPct`, `posting` y `tiers` de la versión más reciente; las fechas no cambian |
 | `POST /portfolios/cash/rates/:rateId/end` | La versión más reciente deja de rendir desde `endsOn` (`endedOn` queda en la víspera) |
-| `POST /portfolios/cash/rates/:rateId/reschedule` | Mueve el `effectiveFrom` de la versión más reciente mientras no haya generado intereses; la anterior rige hasta la víspera del día nuevo |
+| `POST /portfolios/cash/rates/:rateId/reschedule` | Mueve el `effectiveFrom` de la versión más reciente; la anterior rige hasta la víspera del día nuevo. Si ya generó intereses, pide `recompute` y los rehace |
 | `DELETE /portfolios/cash/rates/:rateId` | Borra la versión más reciente; si la anterior terminaba justo la víspera, vuelve a regir |
 | `POST /portfolios/cash/interest/recalculate` | Recalcula los días de una cuenta desde `from` |
 
@@ -1353,7 +1353,8 @@ pausar o borrar.
   devuelve.
 - `effectiveFrom` puede ser **pasado**, hasta cinco años atrás (**400** si va
   más allá): es la tasa que la cuenta ya rendía antes de anotarla. Al guardarla
-  se calculan en el acto los días desde entonces hasta ayer, sin esperar al job.
+  se calculan en el acto los días desde entonces hasta el último día cerrado,
+  sin esperar al job.
   Un saldo rinde desde su primer movimiento —o desde que se abrió en Finexia, si
   es antes—, así que un depósito anotado hoy con fecha pasada rinde desde esa
   fecha si la tasa ya regía.
@@ -1367,9 +1368,14 @@ pausar o borrar.
 - `reschedule` recibe `{"effectiveFrom": "…", "recompute": false}` con las
   mismas reglas de fecha. El día nuevo tiene que ser posterior al inicio de la
   versión anterior y, si la versión está pausada, no posterior a su `endedOn`
-  (**400**). Una versión que ya generó intereses no se mueve (**409**). Si la
-  anterior terminaba la víspera del inicio viejo, pasa a terminar la víspera
-  del nuevo; una pausa con días sin tasa en medio se conserva, salvo que el día
+  (**400**). Una versión que ya generó intereses solo se mueve con
+  `"recompute": true` (**409** sin él): sus días y sus abonos automáticos se
+  borran desde el primero que toca el cambio —el día nuevo si va hacia atrás, el
+  inicio viejo si va hacia adelante— y se vuelven a calcular hasta el último día
+  cerrado. Es lo
+  que arregla una tasa anotada desde un día posterior al que la cuenta empezó a
+  rendir. Si la anterior terminaba la víspera del inicio viejo, pasa a terminar
+  la víspera del nuevo; una pausa con días sin tasa en medio se conserva, salvo que el día
   nuevo caiga dentro de ella.
 - La plataforma tiene que ser del usuario (**404**) y estar activa (**400**).
 - Una versión que no empieza después de la más reciente responde **409**, igual
@@ -1383,6 +1389,13 @@ cuenta gana sobre lo que tenía al cierre del día, a la tasa diaria equivalente
 a las 05:30 UTC) calcula el día anterior y lo abona como un `cash_interest`:
 sube el saldo y cuenta como rentabilidad y como ganancia (000042). El abono se
 redondea a los decimales de la moneda, y lo que sobra se suma al día siguiente.
+
+El **último día cerrado** es el que el job ya alcanzó a esa hora: ayer en UTC
+desde las 05:30 UTC, y anteayer antes. Todo lo que calcula intereses en el acto
+—una tasa o un depósito desde un día pasado, una tasa movida, un recálculo— se
+detiene ahí. El día UTC cambia a las 19:00 en Colombia, y contar «ayer» con ese
+reloj cerraría cada noche un día que allí sigue abierto, sobre un saldo que
+todavía puede cambiar.
 
 Con **tramos**, el día es de la cuenta entera —plataforma, moneda y bolsillo—:
 se calcula sobre lo que guardan todos sus saldos juntos, cada tramo sobre la
@@ -1449,12 +1462,24 @@ después con fecha pasada cambia esa cifra.
 
 Borra los abonos automáticos de la cuenta desde ese día —borrar un
 `cash_interest` no toca la serie de crecimiento (000038)— y vuelve a calcular
-día por día hasta ayer, sobre lo que los saldos guardan ahora. La ventana se
+día por día, sobre lo que los saldos guardan ahora, **hasta el último día que la
+cuenta ya tenía calculado** (y nunca después del último día cerrado).
+Recalcular rehace días, no adelanta otros: el siguiente es del job. La ventana se
 ensancha hacia atrás hasta el primer día de un abono que cruce la fecha pedida:
 un abono mensual paga todo su mes, y medio abono no se puede deshacer.
 
 Responde con lo que hizo: `cleared` (`from` real, `balances` y `days`),
-`through`, `recomputed` y `credited`. `from` no puede ser futura (**400**) y la
+`through`, `recomputed` y `credited`, y tres rachas de días —`days`, `from`,
+`through` y `net`, lo rendido neto de retención como texto—:
+
+- `before`: los días que se borraron, con lo que rendían.
+- `after`: esos mismos días, con lo que rinden ahora. La diferencia con `before`
+  es lo que cambió el recálculo.
+- `new`: días que ningún saldo tenía calculados todavía —un saldo atrasado
+  respecto al resto de su cuenta—. Van aparte porque suman intereses sin que
+  nada haya cambiado.
+
+`from` no puede ser futura (**400**) y la
 moneda tiene que estar soportada (**400**). La plataforma tiene que ser del
 usuario (**404**), como en las demás escrituras de una tasa; que esté inactiva
 no importa, porque su pasado se sigue pudiendo corregir. Una cuenta del usuario

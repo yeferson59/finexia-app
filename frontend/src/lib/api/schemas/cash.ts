@@ -200,10 +200,24 @@ export const cashMoveSchema = z.object({
 });
 
 /**
- * Lo que hizo un recálculo de intereses (`POST /cash/interest/recalculate`):
- * cuántos días tiró desde `cleared.from` —que retrocede al primer día de un
- * abono que cruzaba la fecha pedida— y cuántos volvió a calcular hasta
- * `through`, con cuántos abonos escribió.
+ * Una racha de días de intereses: cuántos, de cuándo a cuándo y lo que
+ * rindieron netos de retención, como decimal en texto.
+ */
+const cashInterestDaysSchema = z.object({
+	days: z.number(),
+	from: z.string().nullable(),
+	through: z.string().nullable(),
+	net: z.string()
+});
+
+/**
+ * Lo que hizo un recálculo de intereses (`POST /cash/interest/recalculate`).
+ *
+ * Llega hasta el último día que la cuenta ya tenía calculado, no más: el día
+ * siguiente lo calcula el proceso nocturno. `before` es lo que rendían los días
+ * que se tiraron y `after` lo que rinden ahora esos mismos días: la diferencia
+ * es lo que cambió el recálculo. `new` son días que ningún saldo tenía
+ * calculados todavía, aparte porque suman sin que nada haya cambiado.
  */
 export const cashRecalculationSchema = z.object({
 	cleared: z.object({
@@ -213,5 +227,8 @@ export const cashRecalculationSchema = z.object({
 	}),
 	through: z.string(),
 	credited: z.number(),
-	recomputed: z.number()
+	recomputed: z.number(),
+	before: cashInterestDaysSchema,
+	after: cashInterestDaysSchema,
+	new: cashInterestDaysSchema
 });

@@ -389,12 +389,11 @@ func validateRateStart(day, today time.Time) error {
 	return nil
 }
 
-// computesPast reports whether a version starting on day reaches a day the
-// ledger may already have computed, or would compute on the next run: any day
-// before today. Those are computed when the version is written, instead of
-// waiting for the nightly job.
-func computesPast(day, today time.Time) bool {
-	return cashRateDay(day).Before(snapshotDay(today))
+// computesPast reports whether a version starting on day reaches a day that
+// has already closed (lastClosedCashDay). Those are computed when the version
+// is written, instead of waiting for the nightly job.
+func computesPast(day, now time.Time) bool {
+	return !cashRateDay(day).After(lastClosedCashDay(now))
 }
 
 // ValidateCashRateEnd checks the first day a rate stops earning.

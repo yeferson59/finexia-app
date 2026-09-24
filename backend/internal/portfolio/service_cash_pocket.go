@@ -73,9 +73,9 @@ func (s *service) OpenFixedDeposit(ctx context.Context, userID uuid.UUID, in New
 		return CashPocket{}, err
 	}
 
-	// Through yesterday, as the nightly job computes: today is not over, and a
-	// day earns on what the balance held at its close.
-	through := snapshotDay(time.Now()).AddDate(0, 0, -1)
+	// Through the last day closed, where the nightly job has reached by now: a
+	// day earns on what the balance held at its close (lastClosedCashDay).
+	through := lastClosedCashDay(time.Now())
 
 	if err := s.accrueFixedDeposit(ctx, userID, pocket, through); err != nil {
 		s.log.Error(ctx, "opening a fixed deposit could not compute the days it already earned",

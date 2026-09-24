@@ -520,7 +520,7 @@ Cuando la entidad cambia la tasa, vuelve a abrir la ventana y elige qué quieres
 | Opción | Qué hace |
 |---|---|
 | **Cambiar tasa** | Anota una versión nueva desde un día. La anterior termina la víspera y los días pasados conservan la suya |
-| **Cambiar fecha** | Mueve el día en que empieza la tasa más reciente. La anterior rige hasta la víspera del día nuevo. Solo mientras no haya generado intereses |
+| **Cambiar fecha** | Mueve el día en que empieza la tasa más reciente. La anterior rige hasta la víspera del día nuevo. Si ya generó intereses, se rehacen con las fechas nuevas: úsalo si la cuenta empezó a rendir antes de lo que anotaste |
 | **Corregir** | Reescribe lo que escribiste mal, sin crear otra versión. Solo mientras no haya generado intereses |
 | **Pausar** | Desde ese día la cuenta deja de rendir. **Reanudar** la vuelve a encender |
 | **Borrar** | Quita la versión. Si al anotarla cerró otra, esa vuelve a regir |
@@ -532,7 +532,7 @@ Cuando la entidad cambia la tasa, vuelve a abrir la ventana y elige qué quieres
 
 > **Cambios programados.** Si la entidad anuncia que la tasa cambia el 1 del mes que viene, anótala hoy con esa fecha en **Rige desde**. La cuenta sigue con la de ahora hasta la víspera y ese día pasa a la nueva sola. Si la entidad lo aplica otro día, usa **Cambiar fecha**.
 
-**Recalcular** es para una sola cosa: cuando anotas un depósito o un retiro **con fecha pasada**. Los días que ya estaban calculados rindieron sobre un saldo que ahora sabes que era otro. Elige desde qué día y Finexia borra esos abonos automáticos y los vuelve a calcular sobre lo que la cuenta guarda ahora. Los movimientos que anotaste tú no se tocan.
+**Recalcular** es para una sola cosa: cuando anotas un depósito o un retiro **con fecha pasada**. Los días que ya estaban calculados rindieron sobre un saldo que ahora sabes que era otro. Elige desde qué día y Finexia borra esos abonos automáticos y los vuelve a calcular sobre lo que la cuenta guarda ahora, hasta el último día que ya estaba calculado. Al terminar, un aviso encima de las cuentas muestra lo que rendían esos días antes y lo que rinden ahora. Los movimientos que anotaste tú no se tocan.
 
 Tu **resumen semanal** por correo trae también una línea con tu efectivo: cuánto tienes, cuánto rindió en el mes, la tasa media que estás sacando y cuántas cuentas están sin tasa, que suele ser el dinero que más fácil es poner a rendir.
 

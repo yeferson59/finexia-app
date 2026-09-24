@@ -178,6 +178,7 @@ type fakeRepository struct {
 	deleteCashRate                  func(ctx context.Context, userID, rateID uuid.UUID) error
 	getCashAccrualTargets           func(ctx context.Context, through time.Time, filter CashAccrualFilter) ([]CashAccrualTarget, error)
 	clearCashInterest               func(ctx context.Context, filter CashAccrualFilter, from time.Time) (CashInterestCleared, error)
+	sumRecalculatedCashInterest     func(ctx context.Context, cleared CashInterestCleared, through time.Time) (CashInterestDays, CashInterestDays, error)
 	accrueCashInterestDay           func(ctx context.Context, entryID, rateID uuid.UUID, day time.Time) (bool, error)
 	getHeldCashInterest             func(ctx context.Context, through time.Time, filter CashAccrualFilter) ([]uuid.UUID, error)
 	postHeldCashInterest            func(ctx context.Context, entryID uuid.UUID) (bool, error)
@@ -604,6 +605,14 @@ func (f *fakeRepository) GetCashAccrualTargets(ctx context.Context, through time
 
 func (f *fakeRepository) ClearCashInterest(ctx context.Context, filter CashAccrualFilter, from time.Time) (CashInterestCleared, error) {
 	return f.clearCashInterest(ctx, filter, from)
+}
+
+func (f *fakeRepository) SumRecalculatedCashInterest(ctx context.Context, cleared CashInterestCleared, through time.Time) (CashInterestDays, CashInterestDays, error) {
+	if f.sumRecalculatedCashInterest == nil {
+		return CashInterestDays{Net: "0"}, CashInterestDays{Net: "0"}, nil
+	}
+
+	return f.sumRecalculatedCashInterest(ctx, cleared, through)
 }
 
 func (f *fakeRepository) AccrueCashInterestDay(ctx context.Context, entryID, rateID uuid.UUID, day time.Time) (bool, error) {

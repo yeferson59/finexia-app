@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
-	cashInterestTotal,
 	cashRecalcChange,
+	cashRecalcSent,
 	firstRateDay,
 	groupAutomaticInterest,
 	groupCashLedgerByMonth,
 	type CashLedgerRow,
 	type CashRecalcDone
 } from './interest';
-import type { CashRate } from '$lib/api/types';
+import type { CashRate, CashRecalculation } from '$lib/api/types';
 import type { CashMovement } from './cash';
 
 const movement = (over: Partial<CashMovement> & { date: string }): CashMovement => ({
@@ -113,21 +113,6 @@ describe('groupCashLedgerByMonth', () => {
 	});
 });
 
-describe('cashInterestTotal', () => {
-	it('suma lo abonado y lo que espera abono', () => {
-		expect(
-			cashInterestTotal([
-				{ interestEarned: '0.01', pendingInterest: '0' },
-				{ interestEarned: '10', pendingInterest: '333.73619817' }
-			])
-		).toBeCloseTo(343.74619817, 8);
-	});
-
-	it('trata lo ilegible como cero', () => {
-		expect(cashInterestTotal([{ interestEarned: '', pendingInterest: 'x' }])).toBe(0);
-	});
-});
-
 describe('firstRateDay', () => {
 	const rate = (effectiveFrom: string, pocketId: string | null = null) =>
 		({ sourceId: 's1', currency: 'COP', pocketId, effectiveFrom }) as CashRate;
@@ -148,35 +133,83 @@ describe('firstRateDay', () => {
 });
 
 describe('cashRecalcChange', () => {
-	const done = (over: Partial<CashRecalcDone> = {}): CashRecalcDone => ({
-		key: 's1:COP',
-		where: 'Rappi, COP',
-		currency: 'COP',
-		before: 333.74,
-		from: '2026-09-01',
-		rateFrom: '2026-09-16',
-		result: {
-			cleared: { from: '2026-09-01', balances: 1, days: 7 },
-			through: '2026-09-22T00:00:00Z',
-			credited: 0,
-			recomputed: 7
-		},
-		...over
+	const days = (n: number, net: string) => ({
+		days: n,
+		from: n ? '2026-09-16T00:00:00Z' : null,
+		through: n ? '2026-09-22T00:00:00Z' : null,
+		net
 	});
 
-	it('da la diferencia con lo que había', () => {
-		const change = cashRecalcChange(done(), 380.12);
-		expect(change.after).toBe(380.12);
-		expect(change.delta).toBeCloseTo(46.38, 8);
+	const done = (over: Partial<CashRecalcDone> = {}, result: Partial<CashRecalculation> = {}) => ({
+		key: 's1:COP',
+		where: 'rappi, education',
+		currency: 'COP',
+		from: '2026-09-01',
+		rateFrom: '2026-09-16',
+		...over,
+		result: {
+			cleared: { from: '2026-09-16T00:00:00Z', balances: 1, days: 7 },
+			through: '2026-09-22T00:00:00Z',
+			credited: 0,
+			recomputed: 7,
+			before: days(7, '333.73619817'),
+			after: days(7, '333.73619817'),
+			new: days(0, '0'),
+			...result
+		}
+	});
+
+	it('compara los mismos días, sin contar los nuevos como cambio', () => {
+		const change = cashRecalcChange(done({}, { new: days(1, '47.72') }));
+		expect(change.delta).toBe(0);
+		expect(change.fresh).toBeCloseTo(47.72, 8);
+	});
+
+	it('da la diferencia de los días rehechos', () => {
+		const change = cashRecalcChange(done({}, { after: days(7, '380.12') }));
+		expect(change.before).toBeCloseTo(333.73619817, 8);
+		expect(change.delta).toBeCloseTo(46.38380183, 8);
 	});
 
 	it('no cuenta el ruido de redondeo como cambio', () => {
-		expect(cashRecalcChange(done(), 333.744).delta).toBe(0);
+		expect(cashRecalcChange(done({}, { after: days(7, '333.739') })).delta).toBe(0);
 	});
 
 	it('avisa si se pidió desde antes de que la cuenta rindiera', () => {
-		expect(cashRecalcChange(done(), 333.74).beforeRate).toBe(true);
-		expect(cashRecalcChange(done({ from: '2026-09-16' }), 333.74).beforeRate).toBe(false);
-		expect(cashRecalcChange(done({ rateFrom: null }), 333.74).beforeRate).toBe(false);
+		expect(cashRecalcChange(done()).beforeRate).toBe(true);
+		expect(cashRecalcChange(done({ from: '2026-09-16' })).beforeRate).toBe(false);
+		expect(cashRecalcChange(done({ rateFrom: null })).beforeRate).toBe(false);
+	});
+});
+
+describe('cashRecalcSent', () => {
+	const account = {
+		key: 's1:COP:p1',
+		sourceId: 's1',
+		sourceName: 'rappi',
+		currency: 'COP',
+		pocketId: 'p1' as string | null,
+		pocketName: 'education'
+	};
+	const rates = [
+		{ sourceId: 's1', currency: 'COP', pocketId: 'p1', effectiveFrom: '2026-09-16T00:00:00Z' }
+	] as CashRate[];
+
+	it('nombra el bolsillo y toma el primer día de su tasa', () => {
+		expect(cashRecalcSent(account, rates, '2026-09-01')).toEqual({
+			key: 's1:COP:p1',
+			where: 'rappi, education',
+			currency: 'COP',
+			from: '2026-09-01',
+			rateFrom: '2026-09-16'
+		});
+	});
+
+	it('en la cuenta principal nombra la moneda', () => {
+		const main = { ...account, key: 's1:COP', pocketId: null, pocketName: '' };
+		expect(cashRecalcSent(main, rates, '2026-09-01')).toMatchObject({
+			where: 'rappi, COP',
+			rateFrom: null
+		});
 	});
 });

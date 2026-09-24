@@ -19,10 +19,10 @@ import (
 // against it: one cannot be opened tomorrow, and one whose term ran out is
 // recorded as the movements it paid rather than as a deposit.
 
-// depositDay is a calendar day `days` from today, at midnight UTC — negative
-// for the past.
+// depositDay is a calendar day `days` from cashToday, the first day not yet
+// closed, at midnight UTC — negative for the past.
 func depositDay(days int) time.Time {
-	return cashRateDay(time.Now()).AddDate(0, 0, days)
+	return cashToday().AddDate(0, 0, days)
 }
 
 // deposit opens a fixed deposit on the fixture's account, through the service,
