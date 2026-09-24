@@ -6,7 +6,10 @@ import (
 
 	"uuid"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/platform/database"
 )
 
 // GetAllPortfolioSummaryRows reads what the snapshot job persists for each
@@ -31,6 +34,7 @@ func (r *PostgresRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]
 			COALESCE(ps.total_gain_loss,    0)::text,
 			COALESCE(ps.total_gain_loss_pct,0)::text,
 			COALESCE(alloc.allocation, '{}'::jsonb)::text,
+			COALESCE(funds.funds, '[]'::jsonb)::text,
 			-- The instant the totals above were read: a transaction recorded
 			-- after it is not in them, however soon the row gets written.
 			now()
@@ -62,6 +66,26 @@ func (r *PostgresRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]
 				GROUP BY a.asset_type
 			) byType
 		) alloc ON TRUE
+		LEFT JOIN LATERAL (
+			-- What each fund position was valued at, with the same price
+			-- fallback and rate as the slice above: a mark that arrives later
+			-- revalues the snapshot from exactly these (000057).
+			SELECT jsonb_agg(jsonb_build_object(
+				'entryId',   pe.id,
+				'assetId',   pe.asset_id,
+				'units',     pe.quantity::text,
+				'unitValue', COALESCE(uap.price, a.current_price, pe.price)::text,
+				'unitCost',  pe.price::text,
+				'fxRate',    COALESCE(fx_rate(p.user_id, COALESCE(a.currency, pe.cost_currency), p.base_currency), 1)::text
+			)) AS funds
+			FROM portfolio_entries pe
+			JOIN assets a ON a.id = pe.asset_id
+			LEFT JOIN user_asset_prices uap
+				ON uap.asset_id = pe.asset_id AND uap.user_id = p.user_id
+			WHERE pe.portfolio_id = p.id
+			  AND a.asset_type = 'fund'
+			  AND pe.quantity > 0
+		) funds ON TRUE
 	`)
 	if err != nil {
 		return nil, err
@@ -79,6 +103,7 @@ func (r *PostgresRepository) GetAllPortfolioSummaryRows(ctx context.Context) ([]
 			&row.TotalGainLoss,
 			&row.TotalGainLossPct,
 			&row.Allocation,
+			&row.Funds,
 			&row.ReadAt,
 		); err != nil {
 			return nil, err
@@ -126,29 +151,58 @@ func (r *PostgresRepository) UpsertPortfolioSnapshot(
 		readAt = &row.ReadAt
 	}
 
-	_, err := r.db.Exec(ctx, `
-		INSERT INTO portfolio_snapshots
-			(portfolio_id, snapshot_date, total_value, currency, allocation, total_gain_loss, total_gain_loss_pct, created_at)
-		VALUES ($1, $2::date, $3::numeric, $4, $5::jsonb, $6::numeric, $7::numeric, COALESCE($8::timestamptz, now()))
-		ON CONFLICT (portfolio_id, snapshot_date)
-		DO UPDATE SET
-			total_value         = EXCLUDED.total_value,
-			allocation          = EXCLUDED.allocation,
-			total_gain_loss     = EXCLUDED.total_gain_loss,
-			total_gain_loss_pct = EXCLUDED.total_gain_loss_pct,
-			created_at          = EXCLUDED.created_at
-	`,
-		row.PortfolioID,
-		snapshotDate,
-		row.TotalMarketValue,
-		row.BaseCurrency,
-		allocation,
-		row.TotalGainLoss,
-		row.TotalGainLossPct,
-		readAt,
-	)
+	funds := row.Funds
+	if funds == "" {
+		funds = "[]"
+	}
 
-	return err
+	return database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO portfolio_snapshots
+				(portfolio_id, snapshot_date, total_value, currency, allocation, total_gain_loss, total_gain_loss_pct, created_at)
+			VALUES ($1, $2::date, $3::numeric, $4, $5::jsonb, $6::numeric, $7::numeric, COALESCE($8::timestamptz, now()))
+			ON CONFLICT (portfolio_id, snapshot_date)
+			DO UPDATE SET
+				total_value         = EXCLUDED.total_value,
+				allocation          = EXCLUDED.allocation,
+				total_gain_loss     = EXCLUDED.total_gain_loss,
+				total_gain_loss_pct = EXCLUDED.total_gain_loss_pct,
+				created_at          = EXCLUDED.created_at
+		`,
+			row.PortfolioID,
+			snapshotDate,
+			row.TotalMarketValue,
+			row.BaseCurrency,
+			allocation,
+			row.TotalGainLoss,
+			row.TotalGainLossPct,
+			readAt,
+		); err != nil {
+			return err
+		}
+
+		// The fund rows are replaced with the snapshot, so a same-day re-run
+		// leaves the ones that describe the totals it just wrote. A position
+		// deleted since the read is skipped rather than failing the snapshot:
+		// its row would point at nothing.
+		if _, err := tx.Exec(ctx, `
+			DELETE FROM fund_snapshot_values WHERE portfolio_id = $1 AND snapshot_date = $2::date
+		`, row.PortfolioID, snapshotDate); err != nil {
+			return err
+		}
+
+		_, err := tx.Exec(ctx, `
+			INSERT INTO fund_snapshot_values
+				(entry_id, snapshot_date, portfolio_id, asset_id, units, unit_value, unit_cost, fx_rate)
+			SELECT f."entryId", $2::date, $1, f."assetId",
+			       f.units::numeric, f."unitValue"::numeric, f."unitCost"::numeric, f."fxRate"::numeric
+			FROM jsonb_to_recordset($3::jsonb)
+			     AS f("entryId" uuid, "assetId" uuid, units text, "unitValue" text, "unitCost" text, "fxRate" text)
+			JOIN portfolio_entries pe ON pe.id = f."entryId" AND pe.portfolio_id = $1
+		`, row.PortfolioID, snapshotDate, funds)
+
+		return err
+	})
 }
 
 // GetPortfolioValuesAsOf returns what each of the user's portfolios was worth

@@ -28,6 +28,7 @@ export const ASSET_TYPE_LABELS: Record<string, string> = {
 	cash: 'Efectivo',
 	real_estate: 'Inmobiliario',
 	commodity: 'Materias primas',
+	fund: 'Fondos',
 	other: 'Otros'
 };
 
@@ -39,6 +40,7 @@ export const ASSET_TYPE_COLORS: Record<string, string> = {
 	cash: '#8a8780',
 	real_estate: '#e0885a',
 	commodity: '#e0c15a',
+	fund: '#e07ab8',
 	other: '#5ab4e0'
 };
 

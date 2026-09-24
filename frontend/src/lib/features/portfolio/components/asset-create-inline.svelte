@@ -29,6 +29,7 @@
 		{ value: 'real_estate', label: 'Bienes raíces' },
 		{ value: 'commodity', label: 'Materias primas' },
 		{ value: 'cash', label: 'Efectivo' },
+		{ value: 'fund', label: 'Fondo de inversión' },
 		{ value: 'other', label: 'Otro' }
 	];
 

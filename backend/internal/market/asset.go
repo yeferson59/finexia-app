@@ -29,12 +29,16 @@ const (
 	Cash       AssetType = "cash"
 	RealEstate AssetType = "real_estate"
 	Commodity  AssetType = "commodity"
-	Other      AssetType = "other"
+	// Fund is a collective investment fund, a voluntary pension fund, a
+	// money-market pocket: units whose value the manager publishes and the owner
+	// writes down, because no market-data provider lists it (000056).
+	Fund  AssetType = "fund"
+	Other AssetType = "other"
 )
 
 func (a AssetType) IsValid() bool {
 	switch a {
-	case Stock, ETF, Crypto, Bond, Cash, RealEstate, Commodity, Other:
+	case Stock, ETF, Crypto, Bond, Cash, RealEstate, Commodity, Fund, Other:
 		return true
 	default:
 		return false
@@ -171,8 +175,14 @@ func normalizeCurrencyCode(raw string) (money.Currency, bool) {
 var categorySynonyms = map[string]AssetType{
 	"stock": Stock, "stocks": Stock, "accion": Stock, "acciones": Stock,
 	"equity": Stock, "equities": Stock,
-	"etf": ETF, "etfs": ETF, "fondo": ETF, "fondos": ETF,
-	"fund": ETF, "funds": ETF, "fondo indexado": ETF, "index fund": ETF,
+	"etf": ETF, "etfs": ETF, "fondo indexado": ETF, "index fund": ETF,
+	// A bare "fondo" is a FIC far more often than a listed fund, and as an ETF
+	// it sat at cost forever: no provider quotes it. A fund that trades on an
+	// exchange keeps saying so with the two labels above.
+	"fondo": Fund, "fondos": Fund, "fund": Fund, "funds": Fund,
+	"mutual fund": Fund, "fic": Fund, "fondo de inversion": Fund,
+	"fondo de inversion colectiva": Fund, "fondo de pensiones voluntarias": Fund,
+	"fpv": Fund, "money market": Fund,
 	"crypto": Crypto, "cripto": Crypto, "criptomoneda": Crypto,
 	"criptomonedas": Crypto, "cryptocurrency": Crypto, "criptos": Crypto,
 	"bond": Bond, "bonds": Bond, "bono": Bond, "bonos": Bond,

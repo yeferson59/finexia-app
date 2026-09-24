@@ -31,6 +31,7 @@ export const ASSET_TYPES = [
 	{ value: 'real_estate', label: 'Bienes raíces' },
 	{ value: 'commodity', label: 'Commodities' },
 	{ value: 'cash', label: 'Efectivo' },
+	{ value: 'fund', label: 'Fondo de inversión' },
 	{ value: 'other', label: 'Otro' }
 ];
 

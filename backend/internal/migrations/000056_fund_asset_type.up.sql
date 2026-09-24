@@ -1,0 +1,17 @@
+-- Investment funds: money that earns whatever it turns out to earn.
+--
+-- A collective investment fund (FIC), a voluntary pension fund or a neobank's
+-- money-market pocket looks like cash on the owner's screen, but it has no
+-- rate. The manager publishes the value of a unit every day and the return is
+-- how that value moved — which can be down. So it is a position of units times
+-- a unit value, like a share, and not a cash balance.
+--
+-- It gets a type of its own rather than borrowing one. As an 'etf' the price
+-- sync asks a market-data provider for a ticker no provider lists, and the
+-- position sits at cost forever; as 'cash' the accrual job would compute a rate
+-- it does not have; as 'other' it disappears into the allocation. The model is
+-- in docs/PLAN_FONDOS_INVERSION.md and migration 000057.
+--
+-- A value added with ADD VALUE cannot be used in the transaction that adds it,
+-- so this migration only adds it.
+ALTER TYPE asset_type ADD VALUE IF NOT EXISTS 'fund';

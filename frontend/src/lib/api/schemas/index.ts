@@ -20,6 +20,7 @@ export * from './portfolio';
 export * from './transactions';
 export * from './platforms';
 export * from './cash';
+export * from './funds';
 export * from './market';
 export * from './user';
 export * from './support';

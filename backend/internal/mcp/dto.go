@@ -87,7 +87,7 @@ type Holding struct {
 	AssetID   string `json:"assetId"`
 	Ticker    string `json:"ticker"`
 	Name      string `json:"name"`
-	AssetType string `json:"assetType" jsonschema:"stock, etf, crypto, bond, cash, real_estate, commodity or other"`
+	AssetType string `json:"assetType" jsonschema:"stock, etf, crypto, bond, cash, real_estate, commodity, fund (an investment fund priced by the unit value its owner records) or other"`
 	Exchange  string `json:"exchange,omitempty"`
 	Sector    string `json:"sector,omitempty" jsonschema:"the industry behind the asset. Empty means the catalog has no classification for it, not that it has none — get_sector_allocation tells the two apart."`
 	// SectorWeights is what an asset spread over several industries is made of —
@@ -125,7 +125,7 @@ type AllocationOutput struct {
 // AllocationSlice is one asset category and what the user holds of it. Every
 // slice is in the same currency, which is what makes the shares add up.
 type AllocationSlice struct {
-	Category    string `json:"category" jsonschema:"stock, etf, crypto, bond, cash, real_estate, commodity or other"`
+	Category    string `json:"category" jsonschema:"stock, etf, crypto, bond, cash, real_estate, commodity, fund (an investment fund priced by the unit value its owner records) or other"`
 	MarketValue string `json:"marketValue"`
 	Currency    string `json:"currency"`
 	Unconverted int64  `json:"positionsUnconverted" jsonschema:"positions in this category added at face value because no exchange rate reached currency"`
@@ -243,7 +243,7 @@ type Asset struct {
 	ID        string `json:"id"`
 	Ticker    string `json:"ticker"`
 	Name      string `json:"name"`
-	AssetType string `json:"assetType" jsonschema:"stock, etf, crypto, bond, cash, real_estate, commodity or other"`
+	AssetType string `json:"assetType" jsonschema:"stock, etf, crypto, bond, cash, real_estate, commodity, fund (an investment fund priced by the unit value its owner records) or other"`
 	Exchange  string `json:"exchange,omitempty"`
 	Sector    string `json:"sector,omitempty" jsonschema:"the industry behind the asset. Empty means the catalog has no classification for it, not that it has none — get_sector_allocation tells the two apart."`
 	Currency  string `json:"currency" jsonschema:"the currency the asset is quoted in"`

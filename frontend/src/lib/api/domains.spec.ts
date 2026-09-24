@@ -8,6 +8,7 @@ import * as market from './market';
 import * as user from './user';
 import * as auth from './auth';
 import * as support from './support';
+import * as funds from './funds';
 
 /** Authed event whose `fetch` is a spy returning `response`. */
 function authedEvent(response = jsonResponse({ success: true, data: [] })) {
@@ -76,6 +77,29 @@ describe('platforms module', () => {
 
 		const [url, init] = lastCall(fetch);
 		expect(url).toContain('/portfolios/sources/s1');
+		expect(init.method).toBe('DELETE');
+	});
+});
+
+describe('funds module', () => {
+	it('saveMark POSTs the mark to /portfolios/funds/:id/marks', async () => {
+		const { event, fetch } = authedEvent(jsonResponse({ success: true }));
+
+		await funds.saveMark(event, 'f1', { date: '2026-09-30T00:00:00Z', unitValue: 12431.22 });
+
+		const [url, init] = lastCall(fetch);
+		expect(url).toContain('/portfolios/funds/f1/marks');
+		expect(init.method).toBe('POST');
+		expect(init.body).toBe(JSON.stringify({ date: '2026-09-30T00:00:00Z', unitValue: 12431.22 }));
+	});
+
+	it('deleteMark names the day in the path', async () => {
+		const { event, fetch } = authedEvent(jsonResponse({ success: true }));
+
+		await funds.deleteMark(event, 'f1', '2026-09-30');
+
+		const [url, init] = lastCall(fetch);
+		expect(url).toContain('/portfolios/funds/f1/marks/2026-09-30');
 		expect(init.method).toBe('DELETE');
 	});
 });

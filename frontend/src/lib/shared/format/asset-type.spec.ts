@@ -14,7 +14,17 @@ import {
  * estaba tecleada con el vocabulario plural de `portfolio.type` y no acertaba
  * ni una clave, así que el donut perdía a la vez la etiqueta y el color.
  */
-const ASSET_TYPES = ['stock', 'etf', 'crypto', 'bond', 'cash', 'real_estate', 'commodity', 'other'];
+const ASSET_TYPES = [
+	'stock',
+	'etf',
+	'crypto',
+	'bond',
+	'cash',
+	'real_estate',
+	'commodity',
+	'fund',
+	'other'
+];
 
 describe('tablas de clases de activo', () => {
 	it('cubre exactamente el enum del backend', () => {

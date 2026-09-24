@@ -1485,6 +1485,99 @@ usuario (**404**), como en las demás escrituras de una tasa; que esté inactiva
 no importa, porque su pasado se sigue pudiendo corregir. Una cuenta del usuario
 sin días calculados no es un error: responde con `balances: 0`.
 
+#### Fondos de inversión
+
+Un fondo (migraciones 000056 y 000057) es una posición de **unidades** de un
+activo de tipo `fund`: un fondo de inversión colectiva, uno de pensiones
+voluntarias, un money market. No rinde a una tasa como el efectivo: la entidad
+publica el valor de la unidad y la rentabilidad es cómo se movió. Ningún
+proveedor de mercado lo cotiza, así que el valor lo escribe el dueño desde el
+extracto, como **marcas** por fecha. La marca más reciente se copia a
+`user_asset_prices` (`source: "user"`), y con eso el resumen, las posiciones,
+la asignación (categoría `fund`) y la serie de crecimiento lo valoran sin saber
+nada nuevo. Sin marcas, el fondo vale lo que costó (`priceSource: "cost"`).
+
+Comprar y vender unidades es una compra y una venta como cualquier otra
+(`POST /portfolios/entries/:entryId/transactions`). El job de precios no toca
+un fondo y `POST /market/assets/:assetId/refresh` responde que no se puede
+cotizar.
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET /portfolios/funds` | Los fondos del usuario, por nombre, con sus posiciones |
+| `GET /portfolios/funds/:assetId` | Uno |
+| `POST /portfolios/funds` | Crea el activo, la posición y la primera compra, y opcionalmente la marca de hoy |
+| `DELETE /portfolios/funds/:assetId` | Deja de seguir un fondo que ningún portafolio guarda (**409** si alguno lo guarda) |
+| `GET /portfolios/funds/:assetId/marks` | Sus marcas, de la más reciente a la más vieja |
+| `POST /portfolios/funds/:assetId/marks` | Escribe la marca de un día; otra el mismo día la reemplaza |
+| `DELETE /portfolios/funds/:assetId/marks/:date` | Borra la marca de un día (`YYYY-MM-DD`) |
+
+Cuerpo de `POST /portfolios/funds`:
+
+```json
+{
+  "portfolioId": "…",
+  "sourceId": "…",
+  "name": "FIC Renta Fija",
+  "currency": "COP",
+  "tracking": "units",
+  "date": "2026-09-01T00:00:00Z",
+  "units": "1000",
+  "unitValue": "12345.678901",
+  "currentUnitValue": "12431.22",
+  "currentDate": "2026-09-30T00:00:00Z"
+}
+```
+
+- `date`, `units` y `unitValue` son la primera compra. `currentUnitValue` y
+  `currentDate` son opcionales; sin `currentDate` la marca es de hoy. La marca se
+  escribe **antes** que la compra, para que el precio que registra 000036 sea lo
+  que el fondo vale y la ganancia que ya traía no cuente como rentabilidad del
+  día del alta.
+- `tracking: "balance"` (seguir solo el saldo) todavía no está abierto: **400**.
+- El activo es contribuido (000021): privado del usuario, con un ticker generado
+  `FND-XXXXXXXX`.
+- Un activo `fund` que el usuario guarda sin haberlo creado aquí —por ejemplo,
+  importado de un archivo con categoría «fondo»— también aparece en la lista, y
+  se sigue por unidades.
+
+Respuesta (un fondo):
+
+```json
+{
+  "assetId": "…",
+  "ticker": "FND-3F7C1D2E",
+  "name": "FIC Renta Fija",
+  "currency": "COP",
+  "tracking": "units",
+  "units": "1000",
+  "cost": "12345678.901",
+  "value": "12431220",
+  "pricedAtCost": false,
+  "unitValue": "12431.22",
+  "valuedOn": "2026-09-30T00:00:00Z",
+  "marks": 1,
+  "positions": [
+    { "entryId": "…", "portfolioId": "…", "portfolioName": "Ahorro", "sourceId": "…",
+      "sourceName": "Fiduciaria", "units": "1000", "cost": "12345678.901" }
+  ],
+  "createdAt": "…"
+}
+```
+
+Cuerpo de `POST /portfolios/funds/:assetId/marks`:
+`{"date": "2026-09-30T00:00:00Z", "unitValue": "12431.22", "notes": ""}`.
+La fecha no puede ser futura ni de hace más de 50 años (**400**).
+
+**Una marca con fecha pasada corrige la serie de crecimiento.** Cada snapshot
+guarda con qué unidades, valor de unidad y tasa de cambio valoró cada posición
+`fund` (`fund_snapshot_values`). Escribir o borrar una marca revalora, en la
+misma transacción, todos los snapshots de ese fondo desde su fecha: el valor de
+unidad que les toca es la última marca en o antes de su día (o el costo por
+unidad, si no hay ninguna), y la diferencia mueve `total_value`,
+`total_gain_loss`, `total_gain_loss_pct` y la porción `fund` de `allocation`.
+Los flujos no cambian: una marca no es dinero que entra ni que sale.
+
 ### 2.8 Assets (JWT; *admin* donde se indica)
 
 | Método | Path | Acceso | Descripción |

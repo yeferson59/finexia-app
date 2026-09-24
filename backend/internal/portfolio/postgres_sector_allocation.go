@@ -142,7 +142,7 @@ func (r *PostgresRepository) GetSectorAllocationByUserID(ctx context.Context, us
 			SELECT
 				CASE
 					WHEN a.sector IS NOT NULL AND a.sector <> '' THEN a.sector
-					WHEN a.asset_type IN ('stock', 'etf', 'bond', 'other') THEN $3::text
+					WHEN a.asset_type IN ('stock', 'etf', 'bond', 'fund', 'other') THEN $3::text
 					WHEN a.asset_type = 'cash' THEN $5::text
 					ELSE $4::text
 				END,

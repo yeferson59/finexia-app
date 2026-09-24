@@ -26,6 +26,7 @@ export const CATEGORY_OPTIONS: { value: string; label: string }[] = [
 	{ value: 'cash', label: 'Efectivo' },
 	{ value: 'real_estate', label: 'Bienes raíces' },
 	{ value: 'commodity', label: 'Materias primas' },
+	{ value: 'fund', label: 'Fondos de inversión' },
 	{ value: 'other', label: 'Otros' }
 ];
 

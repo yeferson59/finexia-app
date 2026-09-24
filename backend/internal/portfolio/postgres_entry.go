@@ -197,6 +197,24 @@ func (r *PostgresRepository) DeletePortfolioEntry(ctx context.Context, userID, e
 func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, portfolioID, assetID, sourceID uuid.UUID, costCurrency money.Currency, in TransactionInput) (Entry, error) {
 	var entry Entry
 
+	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		entry, err = createPortfolioEntryTx(ctx, tx, userID, portfolioID, assetID, sourceID, costCurrency, in)
+
+		return err
+	}); err != nil {
+		return entry, err
+	}
+
+	return entry, nil
+}
+
+// createPortfolioEntryTx is CreatePortfolioEntry inside a transaction the caller
+// holds, so a write that does more around the position — a fund, opened with
+// its asset and its first mark — commits or fails whole.
+func createPortfolioEntryTx(ctx context.Context, tx pgx.Tx, userID, portfolioID, assetID, sourceID uuid.UUID, costCurrency money.Currency, in TransactionInput) (Entry, error) {
+	var entry Entry
+
 	rate := in.Rate()
 	// The seeded price is in the position's currency, like the column it goes
 	// into. The trigger overwrites it from the transactions a moment later, so
@@ -207,111 +225,105 @@ func (r *PostgresRepository) CreatePortfolioEntry(ctx context.Context, userID, p
 	// be neither legal nor needed.
 	costPrice := in.Price.MulDecimal(rate)
 
-	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
-		var owned bool
+	var owned bool
 
-		if err := tx.QueryRow(ctx, `
-		SELECT EXISTS (SELECT 1 FROM portfolios WHERE id = $1 AND user_id = $2)
-		   AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM investment_sources WHERE id = $3 AND user_id = $2))
-	`, portfolioID, userID, sourceID).Scan(&owned); err != nil {
-			return err
-		}
-
-		if !owned {
-			return ErrPortfolioOrSourceNotFound
-		}
-
-		// cost_currency comes back from the upsert rather than being assumed to
-		// be the one that was asked for. On a conflict this row already existed
-		// and DO UPDATE deliberately leaves its currency alone — a position
-		// cannot change what it costs in halfway through its life — so the
-		// requested currency may simply not be the position's. Validating the
-		// rate against the requested one would then approve a conversion into a
-		// currency the entry does not use, and the trigger would average euros
-		// into a dollar column with a rate applied on top.
-		var entryID uuid.UUID
-		var entryCostCurrency money.Currency
-		if err := tx.QueryRow(ctx, `
-		INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date, notes)
-		VALUES ($1::uuid, $2::uuid, $3::uuid, 0, $4::numeric, $5::char(3), $6::date, $7)
-		ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, '')) WHERE pocket_id IS NULL
-		DO UPDATE SET updated_at = NOW()
-		RETURNING id, cost_currency
-	`, portfolioID, assetID, sourceID, costPrice.String(), costCurrency, in.TransactionDate, in.Notes).Scan(&entryID, &entryCostCurrency); err != nil {
-			return err
-		}
-
-		// A refusal here rolls the upsert back with it, so a rejected request
-		// leaves no half-opened position behind. `settled` is the input with
-		// every currency and the rate resolved; using it rather than `in` is
-		// what keeps a defaulted currency from being written as an empty string.
-		settled, err := in.Validate(entryCostCurrency)
-		if err != nil {
-			return err
-		}
-
-		if err := requireTypeAllowed(ctx, tx, entryID, settled.Type); err != nil {
-			return err
-		}
-
-		// The opening trade carries no commission: this endpoint has never taken
-		// one, so its fee currency is the trade's by the same default every
-		// other zero-fee row gets.
-		//
-		// Its id comes back because the trade may be paid out of the platform's
-		// cash, and the debit that records that has to name it. It is written
-		// inside this same database transaction, so a purchase the balance cannot
-		// cover opens no position at all.
-		var txnID uuid.UUID
-		if err := tx.QueryRow(ctx, `
-		INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes)
-		VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, 0, $7::char(3), $8::date, $9)
-		RETURNING id
-	`, entryID, settled.Type, settled.Quantity.String(), settled.Price.String(), settled.Currency,
-			settled.FXRate.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes).Scan(&txnID); err != nil {
-			return err
-		}
-
-		if settled.PayFromCash {
-			if err := syncCashLink(ctx, tx, userID, txnID, true, statedPocket(settled.CashPocketID)); err != nil {
-				return err
-			}
-		}
-
-		// On a position that was already there the trade moves the average cost
-		// its credited sales carried out.
-		if err := syncEntryCashLinks(ctx, tx, userID, entryID, true); err != nil {
-			return err
-		}
-
-		if err := tx.QueryRow(ctx, `
-		SELECT pe.id, pe.portfolio_id, pe.asset_id, pe.source_id, pe.quantity, pe.price, pe.cost_currency, a.asset_type, pe.entry_date, COALESCE(pe.notes, ''), pe.created_at, pe.updated_at
-		FROM portfolio_entries pe
-		JOIN assets a ON a.id = pe.asset_id
-		WHERE pe.id = $1
-	`, entryID).Scan(
-			&entry.ID,
-			&entry.PortfolioID,
-			&entry.AssetID,
-			&entry.SourceID,
-			&entry.Quantity,
-			&entry.Price,
-			&entry.CostCurrency,
-			&entry.Category,
-			&entry.EntryDate,
-			&entry.Notes,
-			&entry.CreatedAt,
-			&entry.UpdatedAt,
-		); err != nil {
-			return err
-		}
-
-		entry.Price.SetCurrency(entry.CostCurrency)
-
-		return nil
-	}); err != nil {
+	if err := tx.QueryRow(ctx, `
+	SELECT EXISTS (SELECT 1 FROM portfolios WHERE id = $1 AND user_id = $2)
+	   AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM investment_sources WHERE id = $3 AND user_id = $2))
+`, portfolioID, userID, sourceID).Scan(&owned); err != nil {
 		return entry, err
 	}
+
+	if !owned {
+		return entry, ErrPortfolioOrSourceNotFound
+	}
+
+	// cost_currency comes back from the upsert rather than being assumed to
+	// be the one that was asked for. On a conflict this row already existed
+	// and DO UPDATE deliberately leaves its currency alone — a position
+	// cannot change what it costs in halfway through its life — so the
+	// requested currency may simply not be the position's. Validating the
+	// rate against the requested one would then approve a conversion into a
+	// currency the entry does not use, and the trigger would average euros
+	// into a dollar column with a rate applied on top.
+	var entryID uuid.UUID
+	var entryCostCurrency money.Currency
+	if err := tx.QueryRow(ctx, `
+	INSERT INTO portfolio_entries (portfolio_id, asset_id, source_id, quantity, price, cost_currency, entry_date, notes)
+	VALUES ($1::uuid, $2::uuid, $3::uuid, 0, $4::numeric, $5::char(3), $6::date, $7)
+	ON CONFLICT (portfolio_id, asset_id, COALESCE(source_id::TEXT, '')) WHERE pocket_id IS NULL
+	DO UPDATE SET updated_at = NOW()
+	RETURNING id, cost_currency
+`, portfolioID, assetID, sourceID, costPrice.String(), costCurrency, in.TransactionDate, in.Notes).Scan(&entryID, &entryCostCurrency); err != nil {
+		return entry, err
+	}
+
+	// A refusal here rolls the upsert back with it, so a rejected request
+	// leaves no half-opened position behind. `settled` is the input with
+	// every currency and the rate resolved; using it rather than `in` is
+	// what keeps a defaulted currency from being written as an empty string.
+	settled, err := in.Validate(entryCostCurrency)
+	if err != nil {
+		return entry, err
+	}
+
+	if err := requireTypeAllowed(ctx, tx, entryID, settled.Type); err != nil {
+		return entry, err
+	}
+
+	// The opening trade carries no commission: this endpoint has never taken
+	// one, so its fee currency is the trade's by the same default every
+	// other zero-fee row gets.
+	//
+	// Its id comes back because the trade may be paid out of the platform's
+	// cash, and the debit that records that has to name it. It is written
+	// inside this same database transaction, so a purchase the balance cannot
+	// cover opens no position at all.
+	var txnID uuid.UUID
+	if err := tx.QueryRow(ctx, `
+	INSERT INTO transactions (entry_id, type, quantity, price, currency, fx_rate, fees, fees_currency, transaction_date, notes)
+	VALUES ($1::uuid, $2::transaction_type, $3::numeric, $4::numeric, $5::char(3), $6::numeric, 0, $7::char(3), $8::date, $9)
+	RETURNING id
+`, entryID, settled.Type, settled.Quantity.String(), settled.Price.String(), settled.Currency,
+		settled.FXRate.String(), settled.FeesCurrency, settled.TransactionDate, settled.Notes).Scan(&txnID); err != nil {
+		return entry, err
+	}
+
+	if settled.PayFromCash {
+		if err := syncCashLink(ctx, tx, userID, txnID, true, statedPocket(settled.CashPocketID)); err != nil {
+			return entry, err
+		}
+	}
+
+	// On a position that was already there the trade moves the average cost
+	// its credited sales carried out.
+	if err := syncEntryCashLinks(ctx, tx, userID, entryID, true); err != nil {
+		return entry, err
+	}
+
+	if err := tx.QueryRow(ctx, `
+	SELECT pe.id, pe.portfolio_id, pe.asset_id, pe.source_id, pe.quantity, pe.price, pe.cost_currency, a.asset_type, pe.entry_date, COALESCE(pe.notes, ''), pe.created_at, pe.updated_at
+	FROM portfolio_entries pe
+	JOIN assets a ON a.id = pe.asset_id
+	WHERE pe.id = $1
+`, entryID).Scan(
+		&entry.ID,
+		&entry.PortfolioID,
+		&entry.AssetID,
+		&entry.SourceID,
+		&entry.Quantity,
+		&entry.Price,
+		&entry.CostCurrency,
+		&entry.Category,
+		&entry.EntryDate,
+		&entry.Notes,
+		&entry.CreatedAt,
+		&entry.UpdatedAt,
+	); err != nil {
+		return entry, err
+	}
+
+	entry.Price.SetCurrency(entry.CostCurrency)
 
 	return entry, nil
 }

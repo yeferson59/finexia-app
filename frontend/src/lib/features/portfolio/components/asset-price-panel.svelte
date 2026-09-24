@@ -124,6 +124,14 @@
 			return 'Es efectivo: cada unidad vale una de su moneda, así que no hay precio que consultar.';
 		}
 
+		// Un fondo no lo cotiza ningún proveedor: su valor de unidad lo anota el
+		// dueño desde el extracto, en Fondos.
+		if (row.assetType === 'fund') {
+			return row.priceSource === 'own'
+				? 'Es un fondo: su precio es el último valor de unidad que anotaste de tu extracto.'
+				: 'Es un fondo y todavía no le has anotado un valor de unidad, así que vale lo que costó.';
+		}
+
 		if (row.priceSource === 'own') {
 			const who = row.priceProvider ? formatMarketProvider(row.priceProvider) : 'una de tus claves';
 			const when = formatTimeAgo(row.priceFetchedAt);
@@ -165,7 +173,12 @@
 			<p class="provenance">{provenance}</p>
 		</section>
 
-		{#if configured.length === 0}
+		{#if row.assetType === 'fund'}
+			<p class="hint fund-note">
+				Ningún proveedor de mercado cotiza un fondo.
+				<a href={resolve('/dashboard/funds')}>Actualiza su valor de unidad en Fondos</a>.
+			</p>
+		{:else if configured.length === 0}
 			<p class="feedback warning">
 				No tienes ninguna clave de proveedor, así que no hay a quién preguntar. Se añaden en
 				<a href={resolve('/dashboard/settings')}>Ajustes → Datos de mercado</a>.
@@ -246,6 +259,10 @@
 		font-size: 1.1rem;
 		font-weight: 400;
 		color: var(--text-dim);
+	}
+
+	.fund-note {
+		margin: 1.25rem 0 0;
 	}
 
 	.provenance {

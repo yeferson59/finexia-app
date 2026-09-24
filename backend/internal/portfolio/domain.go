@@ -656,6 +656,11 @@ type SnapshotRow struct {
 	// out of the same statement as TotalMarketValue so the parts add up to it
 	// by construction; see GetAllPortfolioSummaryRows.
 	Allocation string
+	// Funds is what the totals valued every fund position at, as a JSON array
+	// of {entryId, assetId, units, unitValue, unitCost, fxRate}. It comes out of
+	// the same statement as the totals so a late mark can revalue the snapshot
+	// knowing exactly what it used; see restateFundSnapshots.
+	Funds string
 	// ReadAt is when the totals above were read. The snapshot stores it as its
 	// created_at, which is what the growth series compares transactions against;
 	// see UpsertPortfolioSnapshot.

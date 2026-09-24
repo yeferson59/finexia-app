@@ -25,6 +25,7 @@ export const MAIN_NAV: NavItem[] = [
 		: []),
 	{ label: 'Plataformas', icon: 'layers', href: resolve('/dashboard/platforms') },
 	{ label: 'Efectivo', icon: 'cash', href: resolve('/dashboard/cash') },
+	{ label: 'Fondos', icon: 'fund', href: resolve('/dashboard/funds') },
 	{ label: 'Transacciones', icon: 'exchange', href: resolve('/dashboard/transactions') },
 	{ label: 'Reportes', icon: 'bars', href: resolve('/dashboard/reports') },
 	{ label: 'Notificaciones', icon: 'bell', href: resolve('/dashboard/notifications') },

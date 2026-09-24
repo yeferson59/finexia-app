@@ -165,6 +165,15 @@ func (m *Module) Routes(router fiber.Router) {
 	// Computing an account's days again, after a movement was recorded with a
 	// past date; see RecalculateCashInterest.
 	portfolios.Post("/cash/interest/recalculate", m.handler.RecalculateCashInterest)
+	// Investment funds: positions of units whose value the owner writes down
+	// from the statement, as marks by date; see FundStore.
+	portfolios.Get("/funds", m.handler.GetFunds)
+	portfolios.Post("/funds", m.handler.CreateFund)
+	portfolios.Get("/funds/:assetId", m.handler.GetFund)
+	portfolios.Delete("/funds/:assetId", m.handler.DeleteFund)
+	portfolios.Get("/funds/:assetId/marks", m.handler.GetFundMarks)
+	portfolios.Post("/funds/:assetId/marks", m.handler.SaveFundMark)
+	portfolios.Delete("/funds/:assetId/marks/:date", m.handler.DeleteFundMark)
 	portfolios.Post("", m.handler.CreatePortfolio)
 	portfolios.Post("/sources", m.handler.CreatePlatform)
 	portfolios.Post("/entries", m.handler.CreatePortfolioEntry)

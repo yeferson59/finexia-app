@@ -23,6 +23,7 @@ export const ICONS: Record<string, string[]> = {
 		'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
 		'M6 12h.01M18 12h.01'
 	],
+	fund: ['M22 12h-4l-3 9L9 3l-3 9H2'],
 	exchange: ['M12 5v14', 'M19 12l-7 7-7-7'],
 	bars: ['M12 20V10', 'M18 20V4', 'M6 20v-4'],
 	bell: ['M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9', 'M13.73 21a2 2 0 0 1-3.46 0'],

@@ -169,6 +169,21 @@ type CashAccrualStore interface {
 	SumRecalculatedCashInterest(ctx context.Context, cleared CashInterestCleared, through time.Time) (redone, fresh CashInterestDays, err error)
 }
 
+// FundStore persists the investment funds an owner follows and the marks that
+// price them (000057). Every write to a fund's marks locks its user_funds row
+// first, so the price copied to user_asset_prices is always the latest mark.
+type FundStore interface {
+	GetFundsByUserID(ctx context.Context, userID uuid.UUID) ([]Fund, error)
+	GetFund(ctx context.Context, userID, assetID uuid.UUID) (Fund, error)
+	CreateFund(ctx context.Context, userID uuid.UUID, in NewFundInput) (Fund, error)
+	DeleteFund(ctx context.Context, userID, assetID uuid.UUID) error
+	GetFundMarks(ctx context.Context, userID, assetID uuid.UUID) ([]FundMark, error)
+	// UpsertFundMark and DeleteFundMark also revalue every snapshot from the
+	// mark's day on, in the same transaction.
+	UpsertFundMark(ctx context.Context, userID, assetID uuid.UUID, in FundMarkInput) (FundMark, error)
+	DeleteFundMark(ctx context.Context, userID, assetID uuid.UUID, date time.Time) error
+}
+
 // Repository is the union of the module's stores, satisfied by
 // *PostgresRepository. The Service orchestrates across all of them.
 type Repository interface {
@@ -182,6 +197,7 @@ type Repository interface {
 	CashPocketStore
 	CashRateStore
 	CashAccrualStore
+	FundStore
 }
 
 // Ensure the concrete repository keeps satisfying the interface.

@@ -27,6 +27,9 @@ import type {
 	cashRecalculationSchema,
 	sectorWeightSchema,
 	exchangeRateSchema,
+	fundMarkSchema,
+	fundPositionSchema,
+	fundSchema,
 	growthDataPointSchema,
 	growthSummarySchema,
 	holdingSchema,
@@ -173,6 +176,19 @@ export type CashMove = z.infer<typeof cashMoveSchema>;
 
 /** Lo que hizo un recálculo de los intereses de una cuenta. */
 export type CashRecalculation = z.infer<typeof cashRecalculationSchema>;
+
+// ---------------------------------------------------------------------------
+// Fondos de inversión
+// ---------------------------------------------------------------------------
+
+/** Un fondo que el usuario sigue, con lo que guarda cada portafolio. */
+export type Fund = z.infer<typeof fundSchema>;
+
+/** Lo que un portafolio guarda de un fondo. */
+export type FundPosition = z.infer<typeof fundPositionSchema>;
+
+/** Lo que valía un fondo un día. */
+export type FundMark = z.infer<typeof fundMarkSchema>;
 
 // ---------------------------------------------------------------------------
 // Assets y tasas de cambio (mercado)
