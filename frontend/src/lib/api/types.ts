@@ -30,6 +30,8 @@ import type {
 	fundMarkSchema,
 	fundMovementSchema,
 	fundPerformanceSchema,
+	publicFundSchema,
+	publicFundLinkSchema,
 	fundPeriodSchema,
 	fundPositionSchema,
 	fundSchema,
@@ -195,6 +197,12 @@ export type FundMark = z.infer<typeof fundMarkSchema>;
 
 /** Un aporte o un retiro de un fondo. */
 export type FundMovement = z.infer<typeof fundMovementSchema>;
+
+/** Un fondo del catálogo de la Superintendencia Financiera. */
+export type PublicFund = z.infer<typeof publicFundSchema>;
+
+/** El fondo publicado al que está enlazado un fondo del usuario. */
+export type PublicFundLink = z.infer<typeof publicFundLinkSchema>;
 
 /** Cómo le fue a un fondo: rentabilidad por periodo, dinero y serie. */
 export type FundPerformance = z.infer<typeof fundPerformanceSchema>;

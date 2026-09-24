@@ -80,6 +80,7 @@ func TestFromDomainTypedKindWins(t *testing.T) {
 		{"AsBadRequest", AsBadRequest(errors.New("whatever")), fiber.StatusBadRequest},
 		{"AsConflict", AsConflict(errors.New("whatever")), fiber.StatusConflict},
 		{"AsTooManyRequests", AsTooManyRequests(errors.New("whatever")), fiber.StatusTooManyRequests},
+		{"AsUnavailable", AsUnavailable(errors.New("whatever")), fiber.StatusServiceUnavailable},
 		// A tag survives a further fmt.Errorf %w wrap.
 		{"tag survives wrapping", fmt.Errorf("loading portfolio: %w", AsNotFound(sentinel)), fiber.StatusNotFound},
 	}

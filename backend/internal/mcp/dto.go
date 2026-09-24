@@ -334,6 +334,7 @@ type FundRow struct {
 	PricedAtCost bool   `json:"pricedAtCost" jsonschema:"true when nobody has recorded what the fund is worth: its value is its cost and must not be reported as a zero return"`
 	UnitValue    string `json:"unitValue,omitempty" jsonschema:"the latest unit value; for a fund tracked by balance it is an index, base 100"`
 	ValuedOn     string `json:"valuedOn,omitempty" jsonschema:"the day of the latest mark, RFC 3339. Finexia does not estimate between marks, so an old date means an old value"`
+	PublishedBy  string `json:"publishedBy,omitempty" jsonschema:"the fund of the Superintendencia Financiera's open data whose published unit values price this one, as manager, fund and type of participation; empty when the owner records the unit value from the statement"`
 	Invested     string `json:"invested" jsonschema:"everything contributed, in currency"`
 	Withdrawn    string `json:"withdrawn" jsonschema:"everything withdrawn before fees, in currency"`
 	RealizedGain string `json:"realizedGain" jsonschema:"what the withdrawals made over what their units cost, net of fees"`

@@ -1660,6 +1660,50 @@ snapshots desde el día más temprano que cambió.
   saldo: sus cantidades son derivadas. Las rutas de aportes y retiros responden
   **409** sobre un fondo por unidades.
 
+**Valor publicado por la Superfinanciera** (migración 000059). La
+Superintendencia Financiera publica cada día, como dato abierto, el valor de
+unidad de todos los FIC (datos.gov.co, dataset `qhpu-8ixx`). Un fondo **por
+unidades, en COP** se puede enlazar a uno de ese catálogo, y desde entonces los
+valores publicados son sus marcas (`source: "public"`): el precio, los snapshots
+y la rentabilidad los siguen como a una marca escrita a mano. Un job los trae
+cada seis horas; la SFC publica con dos días de retraso, y cada valor revalora
+los snapshots desde su día.
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET /portfolios/funds/catalog?q=` | Busca en el catálogo por nombre de la entidad o del fondo, o por código; todas las palabras deben estar. Hasta 25, los de más inversionistas primero; oculta los que la SFC dejó de publicar hace más de 60 días. **400** con menos de dos letras |
+| `PUT /portfolios/funds/:assetId/link` | `{"publicFundId": "5-31-2852-1-800"}`. Enlaza el fondo y trae lo publicado desde su primera compra (o del último año, si no tiene compras). **409** si el fondo es por saldo o no está en COP; **404** si el id no está en el catálogo; **503** si la SFC no responde (y el fondo queda como estaba) |
+| `DELETE /portfolios/funds/:assetId/link` | Deshace el enlace y borra las marcas que trajo; las del dueño se quedan |
+
+Un fondo del catálogo:
+
+```json
+{
+  "id": "5-31-2852-1-800",
+  "entityName": "Fiduciaria Bancolombia S.A. Sociedad Fiduciaria",
+  "fundName": "FONDO DE INVERSIÓN COLECTIVA ABIERTO FIDUCUENTA",
+  "fundKind": "FIC DE MERCADO MONETARIO",
+  "fundCode": 2852,
+  "participation": 800,
+  "unitValue": "48354.83395300",
+  "valueDate": "2026-09-22T00:00:00Z",
+  "investors": 852578
+}
+```
+
+- El `id` son los cinco códigos de la SFC: tipo de entidad, entidad, fondo,
+  compartimento y **tipo de participación**. Cada tipo de participación tiene su
+  propio valor de unidad; el del extracto dice cuál es el del dueño.
+- Un fondo enlazado trae `publicFund: {id, entityName, fundName, participation}`
+  (`null` si no lo está), y cada marca trae `source: "user" | "public"`.
+- **Lo que escribe el dueño manda:** una marca suya nunca la reemplaza un valor
+  publicado, y una marca suya en un día que tenía uno publicado lo reemplaza.
+- `POST /portfolios/funds` acepta `publicFundId` en un fondo por unidades en
+  COP: el fondo nace enlazado, con lo publicado desde la compra, y `unitValue`
+  puede omitirse —toma el publicado ese día o, si no hubo, el más reciente de los
+  siete días anteriores— igual que `name`, que toma el del catálogo.
+- MCP: `get_funds` trae `publishedBy` en un fondo enlazado.
+
 ### 2.8 Assets (JWT; *admin* donde se indica)
 
 | Método | Path | Acceso | Descripción |

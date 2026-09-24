@@ -172,6 +172,15 @@ func TestFundRow(t *testing.T) {
 		t.Errorf("inception = %+v", r)
 	}
 
+	if row.PublishedBy != "" {
+		t.Errorf("a fund the owner marks says it is published by %q", row.PublishedBy)
+	}
+
+	fund.PublicFund = &portfolio.PublicFundLink{EntityName: "Fiduciaria Bancolombia", FundName: "FIC Renta Fija", Participation: 501}
+	if row := fundRow(fund, perf); row.PublishedBy != "Fiduciaria Bancolombia — FIC Renta Fija (participación 501)" {
+		t.Errorf("publishedBy = %q", row.PublishedBy)
+	}
+
 	fund.PricedAtCost = true
 	perf.UnrealizedGain = nil
 

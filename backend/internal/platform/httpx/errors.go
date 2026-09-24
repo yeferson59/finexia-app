@@ -24,6 +24,9 @@ const (
 	KindConflict
 	// KindTooManyRequests maps to 429.
 	KindTooManyRequests
+	// KindUnavailable maps to 503: an outside service the request depends on
+	// did not answer, and the same request can work later.
+	KindUnavailable
 )
 
 // httpStatus is the HTTP status a Kind maps to.
@@ -37,6 +40,8 @@ func (k Kind) httpStatus() int {
 		return fiber.StatusConflict
 	case KindTooManyRequests:
 		return fiber.StatusTooManyRequests
+	case KindUnavailable:
+		return fiber.StatusServiceUnavailable
 	default:
 		return fiber.StatusInternalServerError
 	}
@@ -69,13 +74,14 @@ func Tagged(kind Kind, err error) error {
 	return new(statusError{kind, err})
 }
 
-// AsBadRequest, AsNotFound, AsConflict and AsTooManyRequests read better at a
+// AsBadRequest, AsNotFound, AsConflict, AsTooManyRequests and AsUnavailable read better at a
 // call site than Tagged(KindX, err) and are the intended way to tag domain
 // errors. (There is no AsInternal: an untagged error already maps to 500.)
 func AsBadRequest(err error) error      { return Tagged(KindBadRequest, err) }
 func AsNotFound(err error) error        { return Tagged(KindNotFound, err) }
 func AsConflict(err error) error        { return Tagged(KindConflict, err) }
 func AsTooManyRequests(err error) error { return Tagged(KindTooManyRequests, err) }
+func AsUnavailable(err error) error     { return Tagged(KindUnavailable, err) }
 
 // domainStatus resolves the HTTP status for a domain error from its tagged
 // Kind (resolved through the errors.Is/As chain). Errors that carry no tag map

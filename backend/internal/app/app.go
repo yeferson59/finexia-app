@@ -34,6 +34,7 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata/dolarapi"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata/ecb"
 	"github.com/yeferson59/finexia-app/internal/platform/marketdata/providers"
+	"github.com/yeferson59/finexia-app/internal/platform/marketdata/sfc"
 	s3Store "github.com/yeferson59/finexia-app/internal/platform/objectstore/s3"
 	"github.com/yeferson59/finexia-app/internal/platform/secretbox"
 	"github.com/yeferson59/finexia-app/internal/portfolio"
@@ -325,6 +326,9 @@ func (a *App) buildModules() *modules {
 		Log:       a.deps.Log,
 		AuthMiddl: authModule,
 		Limiter:   userLimiter,
+		// The unit values of Colombia's FIC, open data of the SFC: keyless,
+		// like the TRM above, so one read serves every owner.
+		PublicFunds: sfc.New(nil),
 	})
 	marketModule := market.New(market.Deps{
 		Service:        marketService,
@@ -480,6 +484,21 @@ func (a *App) registerJobs(sched *scheduler.Scheduler, mods *modules, persistent
 	// seconds; the BYO-key sync walks every user at their own pace and can take
 	// hours, so a snapshot taken two minutes in would record yesterday's values.
 	sched.Register(portfolio.NewSnapshotJob(mods.portfolio.Service(), a.deps.Log), scheduler.DailyAt{Hour: 22, Minute: 0}, scheduler.WithStore(persistent))
+
+	// The unit values the SFC publishes, for the funds linked to them. Keyless
+	// and shared like the exchange rates, so retries are free; every six hours
+	// because the SFC publishes two days late at an hour it does not promise,
+	// and a run with nothing new writes nothing. It gets minutes, not the 30s
+	// default: a fund linked since years ago imports its whole history once.
+	sched.Register(
+		portfolio.NewPublicFundJob(mods.portfolio.Service(), a.deps.Log),
+		scheduler.Every{Interval: 6 * time.Hour},
+		scheduler.WithStore(persistent),
+		scheduler.WithRetry(scheduler.JobOptions{
+			Timeout:    10 * time.Minute,
+			MaxRetries: scheduler.Retries(2),
+		}),
+	)
 
 	// Cash interest runs early in the UTC day, for the day before: once that day
 	// is over in the Americas too, and hours ahead of the snapshot, so the value

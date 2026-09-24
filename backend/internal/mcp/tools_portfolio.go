@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"uuid"
@@ -219,6 +220,10 @@ func fundRow(f portfolio.Fund, perf portfolio.FundPerformance) FundRow {
 
 	if f.ValuedOn != nil {
 		row.ValuedOn = timeText(*f.ValuedOn)
+	}
+
+	if pf := f.PublicFund; pf != nil {
+		row.PublishedBy = fmt.Sprintf("%s — %s (participación %d)", pf.EntityName, pf.FundName, pf.Participation)
 	}
 
 	if perf.UnrealizedGain != nil {

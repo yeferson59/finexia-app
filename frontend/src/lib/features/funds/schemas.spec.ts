@@ -4,11 +4,15 @@ import {
 	fundContributionSchema,
 	fundCreateSchema,
 	fundErrorMessage,
+	fundLinkErrorMessage,
+	fundLinkSchema,
 	fundMarkErrorMessage,
 	fundMarkSchema,
 	fundMarksBulkSchema,
 	fundMovementErrorMessage,
+	fundUnlinkSchema,
 	fundWithdrawalSchema,
+	publicFundSearchErrorMessage,
 	toFundDateTime
 } from './schemas';
 
@@ -213,5 +217,50 @@ describe('fundMarksBulkSchema', () => {
 		expect(bulk('[]').success).toBe(false);
 		expect(bulk('{no').success).toBe(false);
 		expect(bulk(many).success).toBe(false);
+	});
+});
+
+describe('a fund linked to the Superfinanciera', () => {
+	const PUBLIC_ID = '5-31-2852-1-800';
+
+	it('may leave the unit value of the purchase to the published one', () => {
+		const parsed = fundCreateSchema.safeParse(fund({ unitValue: '', publicFundId: PUBLIC_ID }));
+
+		expect(parsed.success).toBe(true);
+		expect(parsed.data?.unitValue).toBeUndefined();
+		expect(parsed.data?.publicFundId).toBe(PUBLIC_ID);
+	});
+
+	it('still takes a unit value the owner wrote', () => {
+		const parsed = fundCreateSchema.safeParse(fund({ publicFundId: PUBLIC_ID }));
+
+		expect(parsed.data?.unitValue).toBe(12345.678901);
+	});
+
+	it.each([
+		['a fund in dollars', { currency: 'USD', publicFundId: PUBLIC_ID }],
+		['a malformed id', { publicFundId: '5-31-2852' }]
+	])('rejects %s', (_, over) => {
+		expect(fundCreateSchema.safeParse(fund(over)).success).toBe(false);
+	});
+
+	it('links and unlinks by id', () => {
+		expect(fundLinkSchema.safeParse({ id: ID, publicFundId: PUBLIC_ID }).success).toBe(true);
+		expect(fundLinkSchema.safeParse({ id: ID, publicFundId: '' }).success).toBe(false);
+		expect(fundUnlinkSchema.safeParse({ id: ID }).success).toBe(true);
+	});
+
+	it('explains why a link failed', () => {
+		expect(fundLinkErrorMessage(503)).toMatch(/no respondió/);
+		expect(fundLinkErrorMessage(409)).toMatch(/por unidades, en pesos/);
+		expect(fundLinkErrorMessage(404, 'public fund not found')).toMatch(/catálogo/);
+		expect(fundErrorMessage(503)).toMatch(/no respondió/);
+		expect(
+			fundErrorMessage(
+				400,
+				'invalid fund: unitValue is required: the SFC published none for 2026-09-20'
+			)
+		).toMatch(/no publicó un valor/);
+		expect(publicFundSearchErrorMessage(400)).toMatch(/dos letras/);
 	});
 });

@@ -1,8 +1,8 @@
 # Plan — Fondos de inversión (rentabilidad variable)
 
-> **Estado:** Fases 1 a 3 implementadas (000056 – 000058) · 23 sep 2026; la 4 (opcional) pendiente
+> **Estado:** Fases 1 a 3 implementadas (000056 – 000058) · 23 sep 2026; Fase 4 (000059) · 24 sep 2026
 > **Alcance:** módulos `market` y `portfolio` (backend), feature nueva `funds` (frontend)
-> **Migraciones:** 000056 – 000058 (+ 000059 opcional) · **Fases:** 3 + 1 opcional
+> **Migraciones:** 000056 – 000059 · **Fases:** 3 + 1 opcional
 > **Relacionado con:** [`PLAN_RENTABILIDAD_EFECTIVO.md`](./PLAN_RENTABILIDAD_EFECTIVO.md)
 > y [`PLAN_TASAS_MULTIPLES_EFECTIVO.md`](./PLAN_TASAS_MULTIPLES_EFECTIVO.md).
 > Esos planes cubren el dinero que rinde a una **tasa conocida**; este cubre el
@@ -331,18 +331,42 @@ CREATE TABLE IF NOT EXISTS fund_movements (
 Sin esta tabla, el replay tendría que partir de `quantity × price` de la vez
 anterior, y cada replay redondearía sobre el redondeo del anterior.
 
-### 000059 — `fund_public_values` (Fase 4, opcional)
+### 000059 — `public_funds` (Fase 4)
+
+El diseño cambió al implementarla (ver §10): en vez de una tabla de valores por
+activo, un catálogo compartido y un enlace desde el fondo del usuario, y los
+valores publicados se escriben como marcas.
 
 ```sql
--- Valores de unidad publicados (datos abiertos de la Superfinanciera). No son
--- datos de un proveedor con licencia, así que son compartidos, como
--- assets.current_price (000018).
-CREATE TABLE IF NOT EXISTS fund_public_values (
-  asset_id   UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
-  value_date DATE NOT NULL,
-  unit_value NUMERIC(20, 8) NOT NULL CHECK (unit_value > 0),
-  PRIMARY KEY (asset_id, value_date)
+-- El catálogo de la SFC: un fondo por tipo de participación, con el último
+-- valor publicado. Compartido: es dato abierto, sin llave de nadie.
+CREATE TABLE IF NOT EXISTS public_funds (
+  id            VARCHAR(40) PRIMARY KEY,   -- "5-31-2852-1-800"
+  entity_type   INTEGER NOT NULL,
+  entity_code   INTEGER NOT NULL,
+  fund_code     INTEGER NOT NULL,
+  compartment   INTEGER NOT NULL,
+  participation INTEGER NOT NULL,
+  entity_name   VARCHAR(255) NOT NULL,
+  fund_name     VARCHAR(255) NOT NULL,
+  fund_kind     VARCHAR(255) NOT NULL DEFAULT '',
+  search_text   TEXT NOT NULL,             -- nombres sin tildes + códigos
+  unit_value    NUMERIC(20, 8) NOT NULL CHECK (unit_value > 0),
+  value_date    DATE NOT NULL,
+  investors     INTEGER NOT NULL DEFAULT 0,
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- A qué fondo publicado está enlazado el del usuario; solo uno por unidades.
+ALTER TABLE user_funds ADD COLUMN public_fund_id VARCHAR(40)
+  REFERENCES public_funds(id) ON DELETE SET NULL;
+ALTER TABLE user_funds ADD CONSTRAINT user_funds_public_units
+  CHECK (public_fund_id IS NULL OR tracking = 'units');
+
+-- Quién escribió cada marca: el dueño o la SFC.
+ALTER TABLE fund_marks ADD COLUMN source VARCHAR(10) NOT NULL DEFAULT 'user';
+ALTER TABLE fund_marks ADD CONSTRAINT fund_marks_source
+  CHECK (source IN ('user', 'public'));
 ```
 
 ## 7. Backend, archivo por archivo
@@ -366,7 +390,8 @@ CREATE TABLE IF NOT EXISTS fund_public_values (
 | `portfolio/fund_performance.go` (nuevo) | Periodos, E.A., ganancia realizada y no realizada (D10) | 3 |
 | `portfolio/postgres_entry.go`, `mcp/tools_portfolio.go` | `valuedOn` (fecha de la última marca) en las filas de fondo; herramienta `get_funds` (rentabilidad por periodo) | 3 |
 | `notification/weekly_summary.go` | Fondos con marca en la semana: variación del periodo | 3 |
-| `market/fund_public_job.go` (nuevo) | Job diario que lee el dataset de rentabilidades de FIC y llena `fund_public_values` y `assets.current_price` de los FIC del catálogo | 4 |
+| `platform/marketdata/sfc` (nuevo) | Cliente sin llave del dataset `qhpu-8ixx` (Socrata): catálogo del último día e historia de un fondo, sin duplicados | 4 |
+| `portfolio/fund_public.go`, `service_fund_public.go`, `postgres_fund_public.go`, `fund_public_job.go` (nuevos) | Catálogo, búsqueda, enlace y desenlace, importación de valores como marcas `public`; job cada 6 h | 4 |
 | `docs/API.md`, `docs/MANUAL_DE_USUARIO.md` | Documentación | 1–3 |
 
 ## 8. API
@@ -505,6 +530,47 @@ Fase 3 solo lee lo que las dos primeras guardan.
 - **Pendiente de la Fase 1:** `docs/MANUAL_DE_USUARIO.md` (obliga a regenerar el
   PDF) y ver la pantalla en la app.
 
+**Lo que cambió al implementar la Fase 4:**
+
+- **Lo verificado del dataset** (24 sep 2026): unas 1.040 filas por día, una por
+  fondo y tipo de participación, desde 2016; `valor_unidad_operaciones` es el
+  valor de unidad del día; se publica con **dos días** de retraso y trae fines de
+  semana y festivos; algunos fondos salen dos o tres veces el mismo día con las
+  mismas cifras (el cliente los junta); los números llegan como texto. La API
+  responde sin llave en menos de 3 s, y la historia de un fondo cabe en una
+  página. El código de una entidad solo es único dentro de su tipo, así que la
+  clave son **cinco** códigos, no tres.
+- **El tipo de participación no trae nombre**, solo un número. El buscador
+  enseña, al lado de cada uno, su último valor de unidad y su número de
+  inversionistas: comparado con el extracto, dice cuál es el propio.
+- **No hay un activo por FIC ni `fund_public_values`.** El fondo sigue siendo el
+  activo del usuario, y `user_funds.public_fund_id` lo enlaza a una fila de
+  `public_funds`. Los valores publicados se escriben **como marcas** de cada
+  fondo enlazado, con `source = 'public'`. Así el precio (`syncFundPrice`), la
+  revaloración de snapshots (D9), la rentabilidad y la pantalla de marcas
+  funcionan sin cambios, y un fondo que ya existía se puede enlazar (y
+  desenlazar) sin mover posiciones de un activo a otro. `assets.current_price`
+  no se usa: con un activo por FIC, una marca vieja del dueño en
+  `user_asset_prices` habría tapado para siempre el valor publicado.
+- **Lo del dueño manda**: un valor publicado nunca pisa una marca suya, y una
+  suya el mismo día reemplaza la publicada. **Desenlazar borra** las marcas
+  publicadas, para que un enlace al tipo de participación equivocado no deje
+  nada.
+- **Solo fondos en COP**: los valores de la SFC están en pesos. Un FIC en
+  dólares que el usuario lleve en USD no se puede enlazar.
+- **El enlace lee antes de escribir**: si la SFC no responde, **503** y el fondo
+  queda como estaba. El job, en cambio, sigue con los demás fondos si uno falla.
+- **Alta enlazada**: `POST /portfolios/funds` con `publicFundId` trae lo
+  publicado desde la compra (solo desde la compra: una marca anterior inventaría
+  rentabilidad de antes de tenerlo), y el valor de unidad de la compra puede
+  omitirse (el del día, o el último de los siete anteriores).
+- **El job vive en `portfolio`**, no en `market`: escribe marcas, que son de
+  `portfolio`. El cliente HTTP está en `platform/marketdata/sfc`, como los de
+  tasas públicas. Corre cada 6 h (la SFC no promete hora) y una corrida sin
+  nada nuevo no escribe nada.
+- **Pendiente:** ver las pantallas en la app (el stub E2E no cubre fondos) y el
+  manual de usuario, como en las fases anteriores.
+
 **Lo que cambió al implementar la Fase 3:**
 
 - **La serie incluye lo que prueban los movimientos.** En un fondo por unidades,
@@ -604,9 +670,10 @@ valor de unidad diario de todos los FIC:
   marcas propias.
 - El modo `balance` no se beneficia: sus unidades son sintéticas.
 
-**Por verificar antes de comprometerla:** columnas exactas, con qué retraso se
-publica, límites de la API, y que el tipo de participación sea identificable
-(el extracto del usuario tiene que decirle cuál es el suyo).
+**Verificado al implementarla** (ver «Lo que cambió al implementar la Fase 4»
+en §10): columnas, retraso de dos días, sin llave ni límites que estorben, y el
+tipo de participación, que solo es un número, se reconoce por su valor de
+unidad.
 
 ## 13. Casos borde y riesgos
 
@@ -652,3 +719,13 @@ Fase 3:
 - [x] Septiembre del ejemplo muestra −0,4577 % (−5,43 % E.A.) y 180 días aparece como «—». *(TestFundPerformancePlanExample, TestFundPerformanceFromTheDatabase; 90 días sí tiene cifra, ver §10)*
 - [x] Pego 30 valores de unidad del extracto y la gráfica los muestra. *(TestFundMarksInBulk, `parseMarksTable`; la gráfica, en `fund-chart.svelte.spec.ts`)*
 - [x] MCP responde la rentabilidad a 30 días de un fondo. *(`get_funds`, TestFundRow)*
+
+Fase 4:
+
+- [x] Busco «fiducuenta» y aparecen sus tipos de participación con su valor de unidad y su día. *(TestPublicFundCatalog; contra la SFC real, 1.030 fondos)*
+- [x] Enlazo un fondo por unidades y sus valores publicados desde la compra son sus marcas; la gráfica de crecimiento sube el día de cada valor. *(TestLinkedFundIsPricedByThePublishedValues)*
+- [x] Un valor que escribí yo no lo pisa uno publicado; desenlazar borra solo los publicados. *(ídem)*
+- [x] Creo un fondo enlazado sin escribir el valor de unidad de la compra y entra al publicado ese día. *(TestCreateLinkedFund, TestCreateLinkedFundWalksInAtThePublishedValue)*
+- [x] Un fondo por saldo no se puede enlazar. *(TestBalanceFundCannotBeLinked, 409)*
+- [x] El job trae lo nuevo de cada fondo con una sola lectura por fondo publicado. *(TestImportPublicFundValues)*
+- [ ] Ver las pantallas en la app.

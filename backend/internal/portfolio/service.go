@@ -50,6 +50,9 @@ type service struct {
 	mail    mailer
 	user    userReader
 	log     logger.Logger
+	// publicFunds reads the SFC's published unit values. Nil leaves the
+	// catalog empty and a link refused as unavailable (fund_public.go).
+	publicFunds PublicFundSource
 
 	risksCache *risksCache
 }

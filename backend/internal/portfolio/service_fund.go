@@ -22,10 +22,18 @@ func (s *service) GetFund(ctx context.Context, userID, assetID uuid.UUID) (Fund,
 }
 
 // CreateFund records a fund with its first purchase and, when the owner knows
-// it, what a unit is worth now.
+// it, what a unit is worth now. A fund created linked to the SFC's catalog also
+// takes every unit value published since the purchase.
 func (s *service) CreateFund(ctx context.Context, userID uuid.UUID, in NewFundInput) (Fund, error) {
 	now := time.Now()
 	in = in.withDefaults(now)
+
+	if in.PublicFundID != "" {
+		var err error
+		if in, err = s.preparePublicFund(ctx, in, now); err != nil {
+			return Fund{}, err
+		}
+	}
 
 	if err := in.Validate(now); err != nil {
 		return Fund{}, err

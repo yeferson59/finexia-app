@@ -196,6 +196,14 @@ type fakeRepository struct {
 	withdrawFromFund                func(ctx context.Context, userID, assetID uuid.UUID, in FundWithdrawalInput) (FundMovement, error)
 	updateFundMovement              func(ctx context.Context, userID, txnID uuid.UUID, in FundMovementEdit) (FundMovement, error)
 	deleteFundMovement              func(ctx context.Context, userID, txnID uuid.UUID) error
+	upsertPublicFunds               func(ctx context.Context, funds []PublicFund) (int, error)
+	countPublicFunds                func(ctx context.Context) (int, error)
+	searchPublicFunds               func(ctx context.Context, words []string, since time.Time, limit int) ([]PublicFund, error)
+	getPublicFund                   func(ctx context.Context, id string) (PublicFund, error)
+	linkFund                        func(ctx context.Context, userID, assetID uuid.UUID, publicID string, values []PublicFundValue) (Fund, error)
+	unlinkFund                      func(ctx context.Context, userID, assetID uuid.UUID) (Fund, error)
+	getLinkedFunds                  func(ctx context.Context) ([]LinkedFund, error)
+	importPublicMarks               func(ctx context.Context, userID, assetID uuid.UUID, publicID string, values []PublicFundValue) (int, error)
 
 	// Consumed by fakeUserReader, not part of portfolio.Repository.
 	getUserPreferences func(ctx context.Context, userID uuid.UUID) (user.UserPreferences, error)
@@ -699,4 +707,36 @@ func (f *fakeRepository) DeleteFundMovement(ctx context.Context, userID, txnID u
 
 func (f *fakeRepository) UpsertFundMarks(ctx context.Context, userID, assetID uuid.UUID, in []FundMarkInput) (int, error) {
 	return f.upsertFundMarks(ctx, userID, assetID, in)
+}
+
+func (f *fakeRepository) UpsertPublicFunds(ctx context.Context, funds []PublicFund) (int, error) {
+	return f.upsertPublicFunds(ctx, funds)
+}
+
+func (f *fakeRepository) CountPublicFunds(ctx context.Context) (int, error) {
+	return f.countPublicFunds(ctx)
+}
+
+func (f *fakeRepository) SearchPublicFunds(ctx context.Context, words []string, since time.Time, limit int) ([]PublicFund, error) {
+	return f.searchPublicFunds(ctx, words, since, limit)
+}
+
+func (f *fakeRepository) GetPublicFund(ctx context.Context, id string) (PublicFund, error) {
+	return f.getPublicFund(ctx, id)
+}
+
+func (f *fakeRepository) LinkFund(ctx context.Context, userID, assetID uuid.UUID, publicID string, values []PublicFundValue) (Fund, error) {
+	return f.linkFund(ctx, userID, assetID, publicID, values)
+}
+
+func (f *fakeRepository) UnlinkFund(ctx context.Context, userID, assetID uuid.UUID) (Fund, error) {
+	return f.unlinkFund(ctx, userID, assetID)
+}
+
+func (f *fakeRepository) GetLinkedFunds(ctx context.Context) ([]LinkedFund, error) {
+	return f.getLinkedFunds(ctx)
+}
+
+func (f *fakeRepository) ImportPublicMarks(ctx context.Context, userID, assetID uuid.UUID, publicID string, values []PublicFundValue) (int, error) {
+	return f.importPublicMarks(ctx, userID, assetID, publicID, values)
 }

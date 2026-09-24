@@ -13,6 +13,10 @@
 	 * costó hasta la primera actualización. Con eso, un fondo de hace meses entra
 	 * con lo que vale, y lo que ya había ganado no se cuenta como rentabilidad del
 	 * día en que se registra.
+	 *
+	 * Un FIC por unidades se puede buscar en la Superintendencia Financiera. Si
+	 * está, lo de hoy sobra: sus valores publicados desde la compra se cargan
+	 * solos, y el valor de unidad de la compra también, si se deja vacío.
 	 */
 	import { enhance } from '$app/forms';
 	import Button from '$lib/ui/button.svelte';
@@ -24,6 +28,8 @@
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { formatSignedPercent } from '$lib/shared/format/percent';
 	import { todayLocalDateString } from '$lib/shared/format/date';
+	import { shortFundName, type PublicFund } from '../funds';
+	import PublicFundPicker from './public-fund-picker.svelte';
 
 	interface Option {
 		id: string;
@@ -54,6 +60,18 @@
 	let amount = $state<string | number | null>('');
 	let current = $state<string | number | null>('');
 	let currentDate = $state(today);
+	let publicFund = $state<PublicFund | null>(null);
+
+	/* Solo un fondo por unidades toma el valor publicado: uno por saldo lleva
+	   unidades propias de Finexia. */
+	const linked = $derived(tracking === 'units' ? publicFund : null);
+
+	/* Elegir el fondo publicado propone su nombre y su moneda, que es el peso. */
+	function onPublicFund(fund: PublicFund | null) {
+		if (!fund) return;
+		if (!name.trim()) name = shortFundName(fund.fundName);
+		fundCurrency = 'COP';
+	}
 
 	const dialog = new OptimisticDialog(() => open);
 
@@ -72,7 +90,13 @@
 	/* Lo que costó y lo que vale hoy, en los dos modos: por unidades se multiplica,
 	   por saldo se lee tal cual. */
 	const cost = $derived(tracking === 'units' ? num(units) * num(unitValue) : num(amount));
-	const worth = $derived(tracking === 'units' ? num(units) * num(current) : num(current));
+	const worth = $derived(
+		linked
+			? num(units) * num(linked.unitValue)
+			: tracking === 'units'
+				? num(units) * num(current)
+				: num(current)
+	);
 	const gainPct = $derived(cost > 0 && worth > 0 ? (worth / cost - 1) * 100 : null);
 
 	const money = (value: number) => privacy.money(formatCurrency(value, fundCurrency));
@@ -99,6 +123,23 @@
 					<span>No, solo el saldo</span>
 				</label>
 			</fieldset>
+
+			{#if tracking === 'units'}
+				<div class="field">
+					<label for="fund-public-search">
+						¿Está en la Superfinanciera? <span class="optional">(opcional)</span>
+					</label>
+					<PublicFundPicker
+						id="fund-public-search"
+						bind:selected={publicFund}
+						onSelect={onPublicFund}
+					/>
+					<p class="hint">
+						Si es un FIC, búscalo: su valor de unidad se actualiza solo cada día, sin que tengas que
+						copiarlo del extracto.
+					</p>
+				</div>
+			{/if}
 
 			<div class="field">
 				<label for="fund-name">Nombre</label>
@@ -171,8 +212,9 @@
 								inputmode="decimal"
 								step="any"
 								min="0"
+								placeholder={linked ? 'El publicado ese día' : undefined}
 								bind:value={unitValue}
-								required
+								required={!linked}
 							/>
 						</div>
 					</div>
@@ -214,31 +256,38 @@
 				</fieldset>
 			{/if}
 
-			<fieldset class="group">
-				<legend>Lo que vale hoy <span class="optional">(opcional)</span></legend>
-				<div class="pair">
-					<div class="field">
-						<label for="fund-current">{tracking === 'units' ? 'Valor de unidad' : 'Saldo'}</label>
-						<input
-							id="fund-current"
-							name={tracking === 'units' ? 'currentUnitValue' : 'currentBalance'}
-							type="number"
-							inputmode="decimal"
-							step="any"
-							min="0"
-							bind:value={current}
-						/>
-					</div>
-					<div class="field">
-						<span class="field-label">Al día</span>
-						<DatePicker name="currentDate" bind:value={currentDate} />
-					</div>
-				</div>
+			{#if linked}
 				<p class="hint">
-					Sin este dato, el fondo vale lo que costó hasta que lo actualices. Con él, lo que ya ganó
-					antes de registrarlo no se cuenta como rentabilidad de hoy.
+					Lo que vale hoy lo pone la Superfinanciera: se cargan todos sus valores desde el día de la
+					compra.
 				</p>
-			</fieldset>
+			{:else}
+				<fieldset class="group">
+					<legend>Lo que vale hoy <span class="optional">(opcional)</span></legend>
+					<div class="pair">
+						<div class="field">
+							<label for="fund-current">{tracking === 'units' ? 'Valor de unidad' : 'Saldo'}</label>
+							<input
+								id="fund-current"
+								name={tracking === 'units' ? 'currentUnitValue' : 'currentBalance'}
+								type="number"
+								inputmode="decimal"
+								step="any"
+								min="0"
+								bind:value={current}
+							/>
+						</div>
+						<div class="field">
+							<span class="field-label">Al día</span>
+							<DatePicker name="currentDate" bind:value={currentDate} />
+						</div>
+					</div>
+					<p class="hint">
+						Sin este dato, el fondo vale lo que costó hasta que lo actualices. Con él, lo que ya
+						ganó antes de registrarlo no se cuenta como rentabilidad de hoy.
+					</p>
+				</fieldset>
+			{/if}
 
 			{#if cost > 0}
 				<dl class="preview" aria-live="polite">

@@ -17,7 +17,10 @@
  * retiros de un fondo por saldo. `fund-performance` enseña la rentabilidad por
  * periodo, el dinero y la gráfica (`fund-chart`, interno, con la geometría de
  * `chart.ts`); `fund-marks-paste`, interno de `fund-mark-form`, lee la tabla que
- * se pega desde un extracto (`performance.ts`). `funds.ts` aporta los helpers puros y reexporta los contratos
+ * se pega desde un extracto (`performance.ts`). `fund-link`, interno de
+ * `fund-mark-form`, enlaza un fondo por unidades al que publica la
+ * Superintendencia Financiera (000059), y `public-fund-picker` busca en ese
+ * catálogo, también desde `fund-create-form`. `funds.ts` aporta los helpers puros y reexporta los contratos
  * `Fund` y `FundMark` de `$lib/api/types`.
  */
 export { default as FundList } from './components/fund-list.svelte';

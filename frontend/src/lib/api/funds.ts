@@ -3,8 +3,14 @@
  * escribe el dueño desde el extracto, como marcas por fecha.
  */
 import { apiRequest, apiRequestSafe, type ApiEvent, type ApiResult } from './client';
-import type { Fund, FundMark, FundMovement, FundPerformance } from './types';
-import { fundMarkSchema, fundMovementSchema, fundPerformanceSchema, fundSchema } from './schemas';
+import type { Fund, FundMark, FundMovement, FundPerformance, PublicFund } from './types';
+import {
+	fundMarkSchema,
+	fundMovementSchema,
+	fundPerformanceSchema,
+	fundSchema,
+	publicFundSchema
+} from './schemas';
 import { z } from 'zod';
 
 /** `GET /portfolios/funds` — los fondos del usuario, por nombre. */
@@ -136,4 +142,39 @@ export function saveMarks(
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(body)
 	});
+}
+
+/**
+ * `GET /portfolios/funds/catalog?q=` — los fondos cuyo valor de unidad publica
+ * la Superintendencia Financiera, por nombre o código; los más grandes primero.
+ */
+export function searchPublicFunds(event: ApiEvent, q: string): Promise<ApiResult<PublicFund[]>> {
+	return apiRequestSafe(
+		event,
+		`/portfolios/funds/catalog?q=${encodeURIComponent(q.trim())}`,
+		{},
+		z.array(publicFundSchema)
+	);
+}
+
+/**
+ * `PUT /portfolios/funds/:id/link` — enlaza un fondo por unidades a uno de la
+ * Superfinanciera: sus valores publicados, desde la primera compra, pasan a ser
+ * sus marcas. Las que escribió el dueño no se tocan.
+ */
+export function linkFund(
+	event: ApiEvent,
+	assetId: string,
+	publicFundId: string
+): Promise<ApiResult<Fund>> {
+	return apiRequest<Fund>(event, `/portfolios/funds/${assetId}/link`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ publicFundId })
+	});
+}
+
+/** `DELETE /portfolios/funds/:id/link` — deshace el enlace y borra los valores que trajo. */
+export function unlinkFund(event: ApiEvent, assetId: string): Promise<ApiResult<Fund>> {
+	return apiRequest<Fund>(event, `/portfolios/funds/${assetId}/link`, { method: 'DELETE' });
 }

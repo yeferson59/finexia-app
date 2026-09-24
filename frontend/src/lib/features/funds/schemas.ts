@@ -62,24 +62,52 @@ const fundIdentity = {
 		.max(100, 'El nombre no puede pasar de 100 caracteres.')
 };
 
+/** Un fondo del catálogo de la Superfinanciera: sus cinco códigos, «5-31-3644-1-501». */
+const publicFundIdField = z
+	.string('Elige el fondo de la Superfinanciera.')
+	.regex(/^\d+(-\d+){4}$/, 'Elige el fondo de la Superfinanciera.');
+
 /**
  * Alta de un fondo por unidades: qué es, dónde está y la primera compra. Lo que
  * vale hoy una unidad es opcional; sin eso el fondo vale lo que costó hasta la
  * primera marca.
+ *
+ * Enlazado a un fondo de la Superfinanciera (`publicFundId`), el valor de unidad
+ * de la compra también es opcional: el backend toma el publicado ese día.
  */
 export const fundCreateSchema = z
 	.object({
 		...fundIdentity,
 		date: z.iso.date('Elige el día en que compraste las unidades.'),
 		units: unitsField,
-		unitValue: unitValueField,
+		unitValue: z.preprocess(blankToUndefined, unitValueField.optional()),
 		currentUnitValue: z.preprocess(blankToUndefined, unitValueField.optional()),
-		currentDate: z.preprocess(blankToUndefined, z.iso.date().optional())
+		currentDate: z.preprocess(blankToUndefined, z.iso.date().optional()),
+		publicFundId: z.preprocess(blankToUndefined, publicFundIdField.optional())
+	})
+	.refine((v) => v.unitValue !== undefined || v.publicFundId !== undefined, {
+		path: ['unitValue'],
+		error: 'Escribe el valor de unidad de la compra.'
+	})
+	.refine((v) => !v.publicFundId || v.currency === 'COP', {
+		path: ['currency'],
+		error: 'Los valores de la Superfinanciera están en pesos: el fondo tiene que ser en COP.'
 	})
 	.refine((v) => !v.currentUnitValue || !v.currentDate || v.currentDate >= v.date, {
 		path: ['currentDate'],
 		error: 'El valor de hoy no puede ser de antes de la compra.'
 	});
+
+/** Enlazar un fondo a uno de la Superfinanciera. */
+export const fundLinkSchema = z.object({
+	id: z.uuid('No sabemos qué fondo enlazar.'),
+	publicFundId: publicFundIdField
+});
+
+/** Deshacer el enlace de un fondo. */
+export const fundUnlinkSchema = z.object({
+	id: z.uuid('No sabemos qué fondo desenlazar.')
+});
 
 /**
  * Alta de un fondo por saldo: lo que metiste desde un día y, si lo sabes, lo que
@@ -196,8 +224,21 @@ export function toFundDateTime(date: string): string {
 	return `${date}T00:00:00Z`;
 }
 
+/** La Superfinanciera no respondió: se puede volver a intentar. */
+const SFC_UNAVAILABLE =
+	'La Superintendencia Financiera no respondió. Vuelve a intentarlo en unos minutos.';
+
+/** Solo un fondo por unidades, en pesos, toma el valor publicado. */
+const NOT_LINKABLE =
+	'Solo un fondo que se sigue por unidades, en pesos, puede tomar el valor que publica la Superfinanciera.';
+
 /** Lo que se dice cuando un fondo no se puede crear ni quitar. */
 export function fundErrorMessage(status: number, details = ''): string {
+	if (status === 503) return SFC_UNAVAILABLE;
+	if (details.includes('can be linked to a published fund')) return NOT_LINKABLE;
+	if (details.includes('the SFC published none')) {
+		return 'La Superfinanciera no publicó un valor de unidad para ese día. Escribe el de tu extracto.';
+	}
 	if (details.includes('still has positions')) {
 		return 'Ese fondo todavía está en un portafolio. Borra primero su posición desde el portafolio.';
 	}
@@ -264,4 +305,24 @@ export function fundMovementErrorMessage(status: number, details = ''): string {
 	if (status === 404) return 'Ese fondo o ese movimiento ya no existen. Recarga la página.';
 
 	return details || 'No pudimos guardar el movimiento. Vuelve a intentarlo en un momento.';
+}
+
+/** Lo que se dice cuando un fondo no se puede enlazar ni desenlazar. */
+export function fundLinkErrorMessage(status: number, details = ''): string {
+	if (status === 503) return SFC_UNAVAILABLE;
+	if (status === 409 || details.includes('can be linked to a published fund')) return NOT_LINKABLE;
+	if (details.includes('public fund not found')) {
+		return 'Ese fondo ya no está en el catálogo de la Superfinanciera. Búscalo de nuevo.';
+	}
+	if (status === 404) return 'Ese fondo ya no existe. Recarga la página.';
+
+	return details || 'No pudimos enlazar el fondo. Vuelve a intentarlo en un momento.';
+}
+
+/** Lo que se dice cuando la búsqueda en la Superfinanciera no responde. */
+export function publicFundSearchErrorMessage(status: number): string {
+	if (status === 400) return 'Escribe al menos dos letras del nombre del fondo o de la entidad.';
+	if (status === 503) return SFC_UNAVAILABLE;
+
+	return 'No pudimos buscar en la Superfinanciera. Vuelve a intentarlo en un momento.';
 }

@@ -6,9 +6,16 @@
  * rentabilidad es cómo se movió. Finexia no estima entre marcas, así que todo
  * lo que se calcula aquí sale de marcas escritas por el dueño.
  */
-import type { Fund, FundMark } from '$lib/api/types';
+import type { Fund, FundMark, PublicFund } from '$lib/api/types';
 
-export type { Fund, FundMark, FundMovement, FundPosition } from '$lib/api/types';
+export type {
+	Fund,
+	FundMark,
+	FundMovement,
+	FundPosition,
+	PublicFund,
+	PublicFundLink
+} from '$lib/api/types';
 
 /**
  * Pasados estos días sin marca, el valor se avisa como viejo. Un extracto
@@ -110,4 +117,77 @@ export function markBefore(marks: FundMark[], date: string): FundMark | null {
 /** Las plataformas en que está el fondo, sin repetir, para la línea de la tarjeta. */
 export function fundPlatforms(fund: Pick<Fund, 'positions'>): string {
 	return [...new Set(fund.positions.map((p) => p.sourceName || 'Sin plataforma'))].join(' · ');
+}
+
+/** Palabras que en un nombre propio van en minúscula. */
+const SMALL_WORDS = new Set([
+	'de',
+	'del',
+	'la',
+	'las',
+	'los',
+	'el',
+	'y',
+	'e',
+	'en',
+	'con',
+	'para',
+	'por',
+	'a'
+]);
+
+/** Siglas que se quedan en mayúsculas aunque sean largas. */
+const ACRONYMS = new Set([
+	'BBVA',
+	'USD',
+	'COP',
+	'ESG',
+	'TES',
+	'CDT',
+	'SURA',
+	'BTG',
+	'ETF',
+	'S.A.',
+	'SA'
+]);
+
+/**
+ * El nombre de un fondo de la Superfinanciera como lo dice una persona. El
+ * catálogo lo trae en mayúsculas y con la figura legal delante («FONDO DE
+ * INVERSIÓN COLECTIVA ABIERTO FIDUCUENTA»); aquí queda «Fiducuenta».
+ */
+export function shortFundName(name: string): string {
+	const stripped = name
+		.trim()
+		.replace(/^fondos? de inversi[oó]n(es)? colectiva(s)?\s*/i, '')
+		.replace(/^fic\s+/i, '')
+		.replace(/^(abierto|cerrado)\s+/i, '')
+		.trim();
+
+	const words = (stripped || name.trim()).split(/\s+/);
+
+	return words
+		.map((word, i) => {
+			const lower = word.toLocaleLowerCase('es');
+			if (i > 0 && SMALL_WORDS.has(lower)) return lower;
+			if (ACRONYMS.has(word.toUpperCase())) return word.toUpperCase();
+
+			return lower.charAt(0).toLocaleUpperCase('es') + lower.slice(1);
+		})
+		.join(' ');
+}
+
+/** Si un fondo puede tomar el valor que publica la Superfinanciera. */
+export function canLinkFund(fund: Pick<Fund, 'tracking' | 'currency'>): boolean {
+	return fund.tracking === 'units' && fund.currency === 'COP';
+}
+
+/**
+ * La línea que distingue un tipo de participación de otro del mismo fondo: cada
+ * uno tiene su valor de unidad, y el del extracto delata cuál es el propio.
+ */
+export function publicFundDetail(fund: Pick<PublicFund, 'participation' | 'investors'>): string {
+	const investors = new Intl.NumberFormat('es-CO').format(fund.investors);
+
+	return `Participación ${fund.participation} · ${investors} ${fund.investors === 1 ? 'inversionista' : 'inversionistas'}`;
 }

@@ -308,3 +308,59 @@ func (h *handler) GetFundPerformance(c fiber.Ctx) error {
 
 	return httpx.OK(c, "Fund performance retrieved", "Fund performance retrieved successfully", perf)
 }
+
+// SearchPublicFunds finds funds of the SFC's catalog: GET /funds/catalog?q=.
+func (h *handler) SearchPublicFunds(c fiber.Ctx) error {
+	funds, err := h.service.SearchPublicFunds(c, c.Query("q"))
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error searching published funds", "Could not search published funds")
+	}
+
+	return httpx.OK(c, "Published funds retrieved", "Published funds retrieved successfully", funds)
+}
+
+// LinkFund links a fund to one of the SFC's catalog, whose published unit
+// values become its marks.
+func (h *handler) LinkFund(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	assetID, err := httpx.ParamUUID(c, "assetId")
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid fund ID", err.Error())
+	}
+
+	req, err := httpx.Bind[LinkFundRequestDTO](c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid request", err.Error())
+	}
+
+	fund, err := h.service.LinkFund(c, userID, assetID, req.PublicFundID)
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error linking fund", "Could not link fund")
+	}
+
+	return httpx.OK(c, "Fund linked", "Fund linked successfully", fund)
+}
+
+// UnlinkFund ends a fund's link and takes back the marks it brought.
+func (h *handler) UnlinkFund(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	assetID, err := httpx.ParamUUID(c, "assetId")
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid fund ID", err.Error())
+	}
+
+	fund, err := h.service.UnlinkFund(c, userID, assetID)
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error unlinking fund", "Could not unlink fund")
+	}
+
+	return httpx.OK(c, "Fund unlinked", "Fund unlinked successfully", fund)
+}

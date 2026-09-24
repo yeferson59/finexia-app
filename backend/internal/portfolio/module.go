@@ -32,6 +32,10 @@ type Deps struct {
 	// Limiter is the per-user rate limiter applied to the /portfolios routes,
 	// injected so every module shares one budget per user.
 	Limiter fiber.Handler
+	// PublicFunds reads the unit values the Superintendencia Financiera
+	// publishes, which a fund linked to its catalog is priced with. Optional:
+	// without it the catalog stays empty. Satisfied by *sfc.Client.
+	PublicFunds PublicFundSource
 }
 
 type authMiddleware interface {
@@ -73,6 +77,7 @@ func deprecatedAlias(successor string) fiber.Handler {
 func New(deps Deps) *Module {
 	pg := NewPostgresRepository(deps.DB)
 	service := newService(pg, deps.Cfg, deps.Storage, deps.Mail, deps.User, deps.Log)
+	service.publicFunds = deps.PublicFunds
 
 	return newModule(deps, service)
 }
@@ -169,6 +174,9 @@ func (m *Module) Routes(router fiber.Router) {
 	// from the statement, as marks by date; see FundStore.
 	portfolios.Get("/funds", m.handler.GetFunds)
 	portfolios.Post("/funds", m.handler.CreateFund)
+	// The funds the Superintendencia Financiera publishes a unit value for,
+	// before "/:assetId" so "catalog" is not read as a fund.
+	portfolios.Get("/funds/catalog", m.handler.SearchPublicFunds)
 	// The movements of a fund followed by balance, before "/:assetId" so the
 	// literal segment is not read as a fund. Their units are derived: every
 	// write replays the fund.
@@ -176,6 +184,8 @@ func (m *Module) Routes(router fiber.Router) {
 	portfolios.Delete("/funds/movements/:txnId", m.handler.DeleteFundMovement)
 	portfolios.Get("/funds/:assetId", m.handler.GetFund)
 	portfolios.Delete("/funds/:assetId", m.handler.DeleteFund)
+	portfolios.Put("/funds/:assetId/link", m.handler.LinkFund)
+	portfolios.Delete("/funds/:assetId/link", m.handler.UnlinkFund)
 	portfolios.Get("/funds/:assetId/marks", m.handler.GetFundMarks)
 	portfolios.Post("/funds/:assetId/marks", m.handler.SaveFundMark)
 	portfolios.Post("/funds/:assetId/marks/bulk", m.handler.SaveFundMarks)

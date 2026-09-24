@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	FUND_STALE_DAYS,
 	calendarDaysBetween,
+	canLinkFund,
 	daysSinceMark,
 	fundGain,
 	fundPlatforms,
@@ -9,6 +10,8 @@ import {
 	markBefore,
 	markChange,
 	marksWithChange,
+	publicFundDetail,
+	shortFundName,
 	type Fund,
 	type FundMark
 } from './funds';
@@ -19,6 +22,7 @@ function mark(date: string, unitValue: string): FundMark {
 		unitValue,
 		balance: null,
 		notes: '',
+		source: 'user',
 		createdAt: `${date}T12:00:00Z`,
 		updatedAt: `${date}T12:00:00Z`
 	};
@@ -107,5 +111,36 @@ describe('fundPlatforms', () => {
 		] as Fund['positions'];
 
 		expect(fundPlatforms({ positions })).toBe('Fiduciaria · Sin plataforma');
+	});
+});
+
+describe('the Superfinanciera', () => {
+	it.each([
+		['FONDO DE INVERSIÓN COLECTIVA ABIERTO FIDUCUENTA', 'Fiducuenta'],
+		['FONDO DE INVERSION COLECTIVA ABIERTO RENTA LIQUIDEZ', 'Renta Liquidez'],
+		['FIC BBVA VALORES MONEY MARKET', 'BBVA Valores Money Market'],
+		[
+			'FONDO DE INVERSION COLECTIVA ABIERTO CON PACTO DE PERMANENCIA FIDURENTA',
+			'Con Pacto de Permanencia Fidurenta'
+		],
+		['CREDICORP CAPITAL ALTA LIQUIDEZ', 'Credicorp Capital Alta Liquidez'],
+		['FONDO DE INVERSIÓN COLECTIVA', 'Fondo de Inversión Colectiva']
+	])('shortens %s', (name, want) => {
+		expect(shortFundName(name)).toBe(want);
+	});
+
+	it('links only a fund followed by units, in pesos', () => {
+		expect(canLinkFund({ tracking: 'units', currency: 'COP' })).toBe(true);
+		expect(canLinkFund({ tracking: 'balance', currency: 'COP' })).toBe(false);
+		expect(canLinkFund({ tracking: 'units', currency: 'USD' })).toBe(false);
+	});
+
+	it('tells one type of participation from another', () => {
+		expect(publicFundDetail({ participation: 800, investors: 852578 })).toBe(
+			'Participación 800 · 852.578 inversionistas'
+		);
+		expect(publicFundDetail({ participation: 802, investors: 1 })).toBe(
+			'Participación 802 · 1 inversionista'
+		);
 	});
 });

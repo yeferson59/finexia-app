@@ -65,12 +65,12 @@ func readFund(ctx context.Context, q fundQuerier, userID, assetID uuid.UUID) (Fu
 func readFunds(ctx context.Context, q fundQuerier, userID uuid.UUID, assetID *uuid.UUID) ([]Fund, error) {
 	rows, err := q.Query(ctx, `
 		WITH followed AS (
-			SELECT uf.asset_id, uf.tracking, uf.created_at
+			SELECT uf.asset_id, uf.tracking, uf.created_at, uf.public_fund_id
 			FROM user_funds uf
 			WHERE uf.user_id = $1
 			UNION ALL
 			-- A fund held without having been created here: followed by units.
-			SELECT pe.asset_id, 'units'::fund_tracking, MIN(pe.created_at)
+			SELECT pe.asset_id, 'units'::fund_tracking, MIN(pe.created_at), NULL
 			FROM portfolio_entries pe
 			JOIN portfolios p ON p.id = pe.portfolio_id
 			JOIN assets a     ON a.id = pe.asset_id
@@ -81,9 +81,11 @@ func readFunds(ctx context.Context, q fundQuerier, userID uuid.UUID, assetID *uu
 		)
 		SELECT a.id, a.ticker, a.name, a.currency, f.tracking, f.created_at,
 		       lm.unit_value::text, lm.mark_date,
-		       (SELECT COUNT(*) FROM fund_marks m WHERE m.user_id = $1 AND m.asset_id = f.asset_id)
+		       (SELECT COUNT(*) FROM fund_marks m WHERE m.user_id = $1 AND m.asset_id = f.asset_id),
+		       pf.id, pf.entity_name, pf.fund_name, pf.participation
 		FROM followed f
 		JOIN assets a ON a.id = f.asset_id
+		LEFT JOIN public_funds pf ON pf.id = f.public_fund_id
 		LEFT JOIN LATERAL (
 			SELECT m.unit_value, m.mark_date
 			FROM fund_marks m
@@ -102,12 +104,24 @@ func readFunds(ctx context.Context, q fundQuerier, userID uuid.UUID, assetID *uu
 	index := make(map[uuid.UUID]int)
 
 	for rows.Next() {
-		var f Fund
+		var (
+			f    Fund
+			link struct {
+				id, entity, name *string
+				participation    *int
+			}
+		)
+
 		if err := rows.Scan(&f.AssetID, &f.Ticker, &f.Name, &f.Currency, &f.Tracking, &f.CreatedAt,
-			&f.UnitValue, &f.ValuedOn, &f.Marks); err != nil {
+			&f.UnitValue, &f.ValuedOn, &f.Marks,
+			&link.id, &link.entity, &link.name, &link.participation); err != nil {
 			rows.Close()
 
 			return nil, err
+		}
+
+		if link.id != nil {
+			f.PublicFund = &PublicFundLink{ID: *link.id, EntityName: *link.entity, FundName: *link.name, Participation: *link.participation}
 		}
 
 		f.Positions = make([]FundPosition, 0)
@@ -250,8 +264,9 @@ func (r *PostgresRepository) CreateFund(ctx context.Context, userID uuid.UUID, i
 		}
 
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO user_funds (user_id, asset_id, tracking) VALUES ($1, $2, $3::fund_tracking)
-		`, userID, assetID, in.Tracking); err != nil {
+			INSERT INTO user_funds (user_id, asset_id, tracking, public_fund_id)
+			VALUES ($1, $2, $3::fund_tracking, NULLIF($4, ''))
+		`, userID, assetID, in.Tracking, in.PublicFundID); err != nil {
 			return err
 		}
 
@@ -264,7 +279,15 @@ func (r *PostgresRepository) CreateFund(ctx context.Context, userID uuid.UUID, i
 			if _, err := writeFundMark(ctx, tx, userID, assetID, *mark); err != nil {
 				return err
 			}
+		}
 
+		// The published values go after the owner's mark, which they never
+		// overwrite, and — like it — before the purchase (D13).
+		if _, err := writePublicMarks(ctx, tx, userID, assetID, in.publicValues); err != nil {
+			return err
+		}
+
+		if mark != nil || len(in.publicValues) > 0 {
 			if err := syncFundPrice(ctx, tx, userID, assetID); err != nil {
 				return err
 			}
@@ -590,17 +613,18 @@ func lockFund(ctx context.Context, tx pgx.Tx, userID, assetID uuid.UUID) (FundTr
 	return tracking, err
 }
 
-const fundMarkColumns = `mark_date, unit_value::text, balance::text, COALESCE(notes, ''), created_at, updated_at`
+const fundMarkColumns = `mark_date, unit_value::text, balance::text, COALESCE(notes, ''), source, created_at, updated_at`
 
 func scanFundMark(row pgx.Row) (FundMark, error) {
 	var m FundMark
 
-	err := row.Scan(&m.Date, &m.UnitValue, &m.Balance, &m.Notes, &m.CreatedAt, &m.UpdatedAt)
+	err := row.Scan(&m.Date, &m.UnitValue, &m.Balance, &m.Notes, &m.Source, &m.CreatedAt, &m.UpdatedAt)
 
 	return m, err
 }
 
-// writeFundMark writes one mark, replacing the one on its day.
+// writeFundMark writes one mark of the owner's, replacing the one on its day —
+// a published one too: what the owner says wins.
 func writeFundMark(ctx context.Context, tx pgx.Tx, userID, assetID uuid.UUID, in FundMarkInput) (FundMark, error) {
 	var balance *string
 	if in.Balance.IsPos() {
@@ -609,12 +633,13 @@ func writeFundMark(ctx context.Context, tx pgx.Tx, userID, assetID uuid.UUID, in
 	}
 
 	return scanFundMark(tx.QueryRow(ctx, `
-		INSERT INTO fund_marks (user_id, asset_id, mark_date, unit_value, balance, notes)
-		VALUES ($1, $2, $3::date, $4::numeric, $5::numeric, NULLIF($6, ''))
+		INSERT INTO fund_marks (user_id, asset_id, mark_date, unit_value, balance, notes, source)
+		VALUES ($1, $2, $3::date, $4::numeric, $5::numeric, NULLIF($6, ''), 'user')
 		ON CONFLICT (user_id, asset_id, mark_date) DO UPDATE SET
 			unit_value = EXCLUDED.unit_value,
 			balance    = EXCLUDED.balance,
 			notes      = EXCLUDED.notes,
+			source     = EXCLUDED.source,
 			updated_at = NOW()
 		RETURNING `+fundMarkColumns,
 		userID, assetID, cashRateDay(in.Date).Format(time.DateOnly), in.UnitValue.String(), balance, in.Notes))

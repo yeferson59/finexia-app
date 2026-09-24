@@ -10,12 +10,15 @@ import {
 	fundCreateSchema,
 	fundDeleteSchema,
 	fundErrorMessage,
+	fundLinkErrorMessage,
+	fundLinkSchema,
 	fundMarkDeleteSchema,
 	fundMarkErrorMessage,
 	fundMarkSchema,
 	fundMarksBulkSchema,
 	fundMovementDeleteSchema,
 	fundMovementErrorMessage,
+	fundUnlinkSchema,
 	fundWithdrawalSchema,
 	toFundDateTime,
 	type FundMark,
@@ -125,7 +128,8 @@ function createBody(formData: FormData) {
 		...common,
 		units: formData.get('units'),
 		unitValue: formData.get('unitValue'),
-		currentUnitValue: formData.get('currentUnitValue')
+		currentUnitValue: formData.get('currentUnitValue'),
+		publicFundId: formData.get('publicFundId')
 	});
 	if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -316,6 +320,45 @@ export const actions = {
 
 		if (!res.ok || !res.success) {
 			return failed(res, fundMovementErrorMessage(res.status, res.details));
+		}
+
+		return { success: true };
+	},
+
+	linkFund: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed = fundLinkSchema.safeParse({
+			id: formData.get('id'),
+			publicFundId: formData.get('publicFundId')
+		});
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const res = await funds.linkFund({ cookies, fetch }, parsed.data.id, parsed.data.publicFundId);
+
+		if (!res.ok || !res.success) {
+			return failed(res, fundLinkErrorMessage(res.status, res.details));
+		}
+
+		return { success: true };
+	},
+
+	unlinkFund: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed = fundUnlinkSchema.safeParse({ id: formData.get('id') });
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const res = await funds.unlinkFund({ cookies, fetch }, parsed.data.id);
+
+		if (!res.ok || !res.success) {
+			return failed(res, fundLinkErrorMessage(res.status, res.details));
 		}
 
 		return { success: true };

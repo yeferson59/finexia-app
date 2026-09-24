@@ -112,9 +112,12 @@ type Fund struct {
 	UnitValue *string    `json:"unitValue"`
 	ValuedOn  *time.Time `json:"valuedOn"`
 	// Marks is how many marks it has.
-	Marks     int64          `json:"marks"`
-	Positions []FundPosition `json:"positions"`
-	CreatedAt time.Time      `json:"createdAt"`
+	Marks int64 `json:"marks"`
+	// PublicFund is the SFC fund whose published unit values price it, nil
+	// when the owner writes them (fund_public.go).
+	PublicFund *PublicFundLink `json:"publicFund"`
+	Positions  []FundPosition  `json:"positions"`
+	CreatedAt  time.Time       `json:"createdAt"`
 }
 
 // FundPosition is what one portfolio holds of a fund, on one platform.
@@ -134,10 +137,12 @@ type FundMark struct {
 	Date      time.Time `json:"date"`
 	UnitValue string    `json:"unitValue"`
 	// Balance is the balance a FundBalance fund was marked with; nil in units.
-	Balance   *string   `json:"balance"`
-	Notes     string    `json:"notes"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	Balance *string `json:"balance"`
+	Notes   string  `json:"notes"`
+	// Source says whether the owner wrote it or the SFC published it.
+	Source    FundMarkSource `json:"source"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
 }
 
 func invalidFund(format string, args ...any) error {
@@ -179,6 +184,15 @@ type NewFundInput struct {
 	PayFromCash  bool
 	CashPocketID uuid.UUID
 	Notes        string
+	// PublicFundID links the fund to the SFC's catalog from the start: its
+	// published values become its marks, and a purchase stated without a unit
+	// value takes the one published for its day. Only for a fund followed by
+	// units, in COP.
+	PublicFundID string
+
+	// publicValues are the values published from the purchase on, read by the
+	// service before the write and written as marks with the fund.
+	publicValues []PublicFundValue
 }
 
 // CleanName is the name as it is stored.
@@ -218,6 +232,10 @@ func (in NewFundInput) Validate(today time.Time) error {
 
 	if err := validateFundDate(in.Date, today, invalidFund); err != nil {
 		return err
+	}
+
+	if in.PublicFundID != "" && (in.Tracking != FundUnits || in.Currency != publicFundCurrency) {
+		return ErrFundNotLinkable
 	}
 
 	switch in.Tracking {

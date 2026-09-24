@@ -195,6 +195,20 @@ type FundStore interface {
 	DeleteFundMovement(ctx context.Context, userID, txnID uuid.UUID) error
 }
 
+// PublicFundStore persists the SFC's catalog of funds and the links to it
+// (000059). A link writes the published values as marks of the fund, under the
+// same lock and with the same price and snapshot upkeep as FundStore's writes.
+type PublicFundStore interface {
+	UpsertPublicFunds(ctx context.Context, funds []PublicFund) (int, error)
+	CountPublicFunds(ctx context.Context) (int, error)
+	SearchPublicFunds(ctx context.Context, words []string, since time.Time, limit int) ([]PublicFund, error)
+	GetPublicFund(ctx context.Context, id string) (PublicFund, error)
+	LinkFund(ctx context.Context, userID, assetID uuid.UUID, publicID string, values []PublicFundValue) (Fund, error)
+	UnlinkFund(ctx context.Context, userID, assetID uuid.UUID) (Fund, error)
+	GetLinkedFunds(ctx context.Context) ([]LinkedFund, error)
+	ImportPublicMarks(ctx context.Context, userID, assetID uuid.UUID, publicID string, values []PublicFundValue) (int, error)
+}
+
 // Repository is the union of the module's stores, satisfied by
 // *PostgresRepository. The Service orchestrates across all of them.
 type Repository interface {
@@ -209,6 +223,7 @@ type Repository interface {
 	CashRateStore
 	CashAccrualStore
 	FundStore
+	PublicFundStore
 }
 
 // Ensure the concrete repository keeps satisfying the interface.

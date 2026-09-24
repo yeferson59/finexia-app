@@ -23,7 +23,15 @@
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { formatSignedPercent } from '$lib/shared/format/percent';
 	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
-	import { markBefore, markChange, marksWithChange, type Fund, type FundMark } from '../funds';
+	import {
+		canLinkFund,
+		markBefore,
+		markChange,
+		marksWithChange,
+		type Fund,
+		type FundMark
+	} from '../funds';
+	import FundLink from './fund-link.svelte';
 	import FundMarksPaste from './fund-marks-paste.svelte';
 
 	interface Props {
@@ -89,7 +97,9 @@
 	title={fund ? `Actualizar ${fund.name}` : 'Actualizar valor'}
 	description={byBalance
 		? 'Escribe el saldo que muestra tu app, con su fecha.'
-		: 'Escribe el valor de unidad que trae tu extracto, con su fecha.'}
+		: fund?.publicFund
+			? 'El valor de unidad llega solo desde la Superfinanciera. Si tu extracto dice otro, escríbelo: el tuyo manda.'
+			: 'Escribe el valor de unidad que trae tu extracto, con su fecha.'}
 	size="md"
 	onClose={close}
 >
@@ -158,7 +168,14 @@
 				<ul>
 					{#each history as { mark, change: delta } (mark.date)}
 						<li>
-							<span class="when">{day(mark.date)}</span>
+							<span class="when">
+								{day(mark.date)}
+								{#if mark.source === 'public'}
+									<span class="source" title="Publicado por la Superintendencia Financiera"
+										>SFC</span
+									>
+								{/if}
+							</span>
 							<span class="price">
 								{byBalance && mark.balance ? money(mark.balance) : price(mark.unitValue)}
 							</span>
@@ -187,6 +204,10 @@
 		</section>
 
 		<FundMarksPaste assetId={fund.assetId} {byBalance} />
+
+		{#if fund.publicFund || canLinkFund(fund)}
+			<FundLink {fund} />
+		{/if}
 
 		{#if canDelete}
 			<form method="POST" action="?/deleteFund" class="danger-zone" use:enhance={handler}>
@@ -254,6 +275,16 @@
 
 	.when {
 		color: var(--text-muted);
+	}
+
+	/* Un valor que publicó la Superfinanciera, no uno del extracto. */
+	.source {
+		margin-left: 0.3rem;
+		padding: 0 0.3rem;
+		border: 1px solid var(--border-strong);
+		border-radius: 4px;
+		font-size: 0.66rem;
+		color: var(--text-dim);
 	}
 
 	.price,

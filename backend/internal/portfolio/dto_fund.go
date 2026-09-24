@@ -1,6 +1,7 @@
 package portfolio
 
 import (
+	"strings"
 	"time"
 
 	"uuid"
@@ -33,6 +34,9 @@ type CreateFundRequestDTO struct {
 	PayFromCash    bool            `json:"payFromCash"`
 	CashPocketID   uuid.UUID       `json:"cashPocketId"`
 	Notes          string          `json:"notes"`
+	// PublicFundID links the fund to the SFC's catalog from the start; with it,
+	// name and unitValue may be left out.
+	PublicFundID string `json:"publicFundId"`
 }
 
 func (d CreateFundRequestDTO) Input() NewFundInput {
@@ -58,6 +62,7 @@ func (d CreateFundRequestDTO) Input() NewFundInput {
 		PayFromCash:      d.PayFromCash,
 		CashPocketID:     d.CashPocketID,
 		Notes:            d.Notes,
+		PublicFundID:     strings.TrimSpace(d.PublicFundID),
 	}
 }
 
@@ -133,4 +138,9 @@ func (d SaveFundMarksRequestDTO) Input() []FundMarkInput {
 	}
 
 	return marks
+}
+
+// LinkFundRequestDTO names the fund of the SFC's catalog a fund is linked to.
+type LinkFundRequestDTO struct {
+	PublicFundID string `json:"publicFundId"`
 }

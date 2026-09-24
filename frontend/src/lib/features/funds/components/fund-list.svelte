@@ -7,6 +7,10 @@
 	 * enseñar una ganancia de cero: no es que no se haya movido, es que nadie ha
 	 * dicho cuánto vale. Una marca vieja se avisa por lo mismo.
 	 *
+	 * Un fondo enlazado a la Superfinanciera lo dice: su valor no lo escribió el
+	 * dueño, llega solo. Si deja de llegar —un fondo liquidado o fusionado—, el
+	 * aviso de valor viejo lo dice con esas palabras.
+	 *
 	 * Un fondo que se sigue por saldo no enseña unidades: son de Finexia, no del
 	 * extracto, y no significan nada fuera de aquí. Lo que se anota en él son
 	 * saldos, aportes y retiros.
@@ -68,6 +72,14 @@
 							· {[...new Set(fund.positions.map((p) => p.portfolioName))].join(', ')}
 						{/if}
 					</p>
+					{#if fund.publicFund}
+						<p
+							class="published"
+							title="Valor de unidad publicado por la Superintendencia Financiera"
+						>
+							Valor de la Superfinanciera · Participación {fund.publicFund.participation}
+						</p>
+					{/if}
 				</div>
 				<div class="actions">
 					{#if byBalance}
@@ -114,9 +126,13 @@
 				</p>
 			{:else}
 				<p class="at-cost">
-					Sin valor actualizado: vale lo que costó. Escribe {byBalance
-						? 'el saldo que muestra tu app'
-						: 'el valor de unidad de tu extracto'} para ver lo que gana.
+					{#if fund.publicFund}
+						Sin valor todavía: vale lo que costó hasta que llegue el primero de la Superfinanciera.
+					{:else}
+						Sin valor actualizado: vale lo que costó. Escribe {byBalance
+							? 'el saldo que muestra tu app'
+							: 'el valor de unidad de tu extracto'} para ver lo que gana.
+					{/if}
 				</p>
 			{/if}
 
@@ -146,8 +162,13 @@
 
 			{#if stale && age !== null}
 				<p class="feedback warning stale">
-					El último valor es de hace {age} días. Actualízalo con tu extracto: Finexia no estima lo que
-					pasó desde entonces.
+					{#if fund.publicFund}
+						La Superfinanciera no publica un valor de este fondo desde hace {age} días. Si lo liquidaron
+						o lo fusionaron, desenlázalo y escribe el valor de tu extracto.
+					{:else}
+						El último valor es de hace {age} días. Actualízalo con tu extracto: Finexia no estima lo que
+						pasó desde entonces.
+					{/if}
 				</p>
 			{/if}
 		</li>
@@ -204,6 +225,12 @@
 		margin: 0.2rem 0 0;
 		font-size: 0.8rem;
 		color: var(--text-dim);
+	}
+
+	.published {
+		margin: 0.2rem 0 0;
+		font-size: 0.74rem;
+		color: var(--amber);
 	}
 
 	.value {

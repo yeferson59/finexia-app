@@ -20,6 +20,33 @@ export const fundPositionSchema = z.object({
 });
 
 /**
+ * Un fondo del catálogo de la Superintendencia Financiera
+ * (`GET /portfolios/funds/catalog`): un tipo de participación de un FIC, con el
+ * último valor de unidad que publicó. Cada tipo de participación tiene el suyo.
+ */
+export const publicFundSchema = z.object({
+	/** Los cinco códigos que lo identifican: «5-31-3644-1-501». */
+	id: z.string(),
+	entityName: z.string(),
+	fundName: z.string(),
+	/** «FIC DE MERCADO MONETARIO», «FIC DE TIPO GENERAL»… */
+	fundKind: z.string(),
+	fundCode: z.number(),
+	participation: z.number(),
+	unitValue: z.string(),
+	valueDate: z.string(),
+	investors: z.number()
+});
+
+/** El fondo publicado cuyos valores de unidad valoran un fondo del usuario. */
+export const publicFundLinkSchema = z.object({
+	id: z.string(),
+	entityName: z.string(),
+	fundName: z.string(),
+	participation: z.number()
+});
+
+/**
  * Un fondo que el usuario sigue (`GET /portfolios/funds`): unidades cuyo valor
  * escribe el dueño desde el extracto, porque ningún proveedor de mercado lo
  * cotiza.
@@ -43,6 +70,11 @@ export const fundSchema = z.object({
 	unitValue: z.string().nullable(),
 	valuedOn: z.string().nullable(),
 	marks: z.number(),
+	/**
+	 * El fondo de la Superfinanciera del que salen sus valores de unidad; `null`
+	 * cuando los escribe el dueño.
+	 */
+	publicFund: publicFundLinkSchema.nullable().default(null),
 	positions: z.array(fundPositionSchema),
 	createdAt: z.string()
 });
@@ -54,6 +86,8 @@ export const fundMarkSchema = z.object({
 	/** El saldo con que se marcó un fondo que se sigue por saldo. */
 	balance: z.string().nullable(),
 	notes: z.string(),
+	/** `user` la escribió el dueño; `public`, la publicó la Superfinanciera. */
+	source: z.enum(['user', 'public']).default('user'),
 	createdAt: z.string(),
 	updatedAt: z.string()
 });
