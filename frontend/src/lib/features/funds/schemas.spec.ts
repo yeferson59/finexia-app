@@ -6,6 +6,7 @@ import {
 	fundErrorMessage,
 	fundMarkErrorMessage,
 	fundMarkSchema,
+	fundMarksBulkSchema,
 	fundMovementErrorMessage,
 	fundWithdrawalSchema,
 	toFundDateTime
@@ -187,5 +188,30 @@ describe('movements', () => {
 				'the fund held no units on that day: leave out the balance before the first contribution'
 			)
 		).toContain('deja vacío');
+	});
+});
+
+describe('fundMarksBulkSchema', () => {
+	it('reads the table the browser already parsed', () => {
+		const parsed = fundMarksBulkSchema.safeParse({
+			id: ID,
+			tracking: 'units',
+			marks: JSON.stringify([{ date: '2026-09-30', value: 12431.22 }])
+		});
+
+		expect(parsed.success).toBe(true);
+		expect(parsed.data?.marks).toEqual([{ date: '2026-09-30', value: 12431.22 }]);
+	});
+
+	it('refuses an empty table, a broken one, or one too long', () => {
+		const bulk = (marks: string) =>
+			fundMarksBulkSchema.safeParse({ id: ID, tracking: 'balance', marks });
+		const many = JSON.stringify(
+			Array.from({ length: 401 }, () => ({ date: '2026-09-30', value: 1 }))
+		);
+
+		expect(bulk('[]').success).toBe(false);
+		expect(bulk('{no').success).toBe(false);
+		expect(bulk(many).success).toBe(false);
 	});
 });

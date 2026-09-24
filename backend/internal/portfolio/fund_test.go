@@ -423,3 +423,24 @@ func TestFundMovementInputsValidate(t *testing.T) {
 		check(t, edit.Validate(fundToday, FundContribution), "carries no fees")
 	})
 }
+
+func TestValidateFundMarks(t *testing.T) {
+	mark := func(day int) FundMarkInput {
+		return FundMarkInput{Date: time.Date(2026, time.September, day, 0, 0, 0, 0, time.UTC), UnitValue: mustDecimal(t, "10")}
+	}
+
+	if err := validateFundMarks([]FundMarkInput{mark(1), mark(2)}, fundToday, FundUnits); err != nil {
+		t.Fatalf("two days: %v", err)
+	}
+
+	for name, in := range map[string][]FundMarkInput{
+		"empty":         nil,
+		"a day twice":   {mark(1), mark(1)},
+		"one bad":       {mark(1), {Date: fundToday}},
+		"too many rows": make([]FundMarkInput, maxFundMarksBatch+1),
+	} {
+		if err := validateFundMarks(in, fundToday, FundUnits); !errors.Is(err, ErrInvalidFundMark) {
+			t.Errorf("%s = %v, want ErrInvalidFundMark", name, err)
+		}
+	}
+}

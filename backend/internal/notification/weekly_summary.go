@@ -44,6 +44,10 @@ type port interface {
 	// owner's preferred currency, which is the one the digest speaks.
 	GetCashBalances(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]portfolio.CashBalance, error)
 	GetCashRates(ctx context.Context, userID uuid.UUID) ([]portfolio.CashRate, error)
+	// The two below build the funds block: the funds the account follows, and
+	// how each one did.
+	GetFunds(ctx context.Context, userID uuid.UUID) ([]portfolio.Fund, error)
+	GetFundPerformance(ctx context.Context, userID, assetID uuid.UUID) (portfolio.FundPerformance, error)
 }
 
 type m interface {
@@ -149,6 +153,7 @@ func (s *Service) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
 		}
 
 		data.Cash = s.cashBlock(ctx, u.ID, now)
+		data.Funds = s.fundsBlock(ctx, u.ID, now)
 
 		if err := s.m.SendWeeklySummary(u.Email, data); err != nil {
 			errs = append(errs, fmt.Errorf("user %s: %w", u.ID, err))
@@ -278,6 +283,72 @@ func cashBlock(balances []portfolio.CashBalance, rates []portfolio.CashRate, now
 	}
 
 	return &block
+}
+
+// fundsBlock reads the funds the account follows and how each did. A read that
+// fails leaves the block, or that fund, out: the rest of the digest is worth
+// sending.
+func (s *Service) fundsBlock(ctx context.Context, userID uuid.UUID, now time.Time) []mail.WeeklySummaryFund {
+	funds, err := s.port.GetFunds(ctx, userID)
+	if err != nil || len(funds) == 0 {
+		return nil
+	}
+
+	rows := make([]mail.WeeklySummaryFund, 0, len(funds))
+
+	for _, f := range funds {
+		perf, err := s.port.GetFundPerformance(ctx, userID, f.AssetID)
+		if err != nil {
+			continue
+		}
+
+		rows = append(rows, fundRow(f, perf, now))
+	}
+
+	return rows
+}
+
+// fundRow is one fund of the digest. The return is the last 30 days', or the
+// one since the fund opened when it has no mark that far back: a fund with a
+// month of history says how the month went either way. A fund whose latest
+// value is older than portfolio.FundStaleDays — or that has none — is flagged,
+// because Finexia does not estimate between marks and the figure is as old as
+// the statement it came from.
+func fundRow(f portfolio.Fund, perf portfolio.FundPerformance, now time.Time) mail.WeeklySummaryFund {
+	row := mail.WeeklySummaryFund{
+		Name:     f.Name,
+		Value:    fixed(amount(f.Value)),
+		Currency: f.Currency.String(),
+		Stale:    f.ValuedOn == nil,
+	}
+
+	if f.ValuedOn != nil {
+		row.ValuedOn = formatDay(*f.ValuedOn)
+		row.Stale = now.Sub(*f.ValuedOn) > time.Duration(portfolio.FundStaleDays)*24*time.Hour
+	}
+
+	for _, key := range []string{"30d", "inception"} {
+		for _, p := range perf.Periods {
+			if p.Key != key || p.Pct == nil || row.ReturnPct != "" {
+				continue
+			}
+
+			pct := amount(*p.Pct)
+			row.ReturnPct = signed(pct)
+			row.ReturnLabel = "30 días"
+
+			if key == "inception" {
+				row.ReturnLabel = "desde el inicio"
+			}
+
+			row.ReturnColor = gainColor
+			if pct.IsNeg() {
+				row.ReturnColor = lossColor
+			}
+		}
+	}
+
+	return row
 }
 
 // digestPeriod is how far back the digest looks for the value it compares

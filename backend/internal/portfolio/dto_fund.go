@@ -120,3 +120,17 @@ type UpdateFundMovementRequestDTO struct {
 func (d UpdateFundMovementRequestDTO) Input() FundMovementEdit {
 	return FundMovementEdit(d)
 }
+
+// SaveFundMarksRequestDTO is a statement's table of marks.
+type SaveFundMarksRequestDTO struct {
+	Marks []SaveFundMarkRequestDTO `json:"marks"`
+}
+
+func (d SaveFundMarksRequestDTO) Input() []FundMarkInput {
+	marks := make([]FundMarkInput, len(d.Marks))
+	for i, m := range d.Marks {
+		marks[i] = m.Input()
+	}
+
+	return marks
+}

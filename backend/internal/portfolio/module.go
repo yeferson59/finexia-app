@@ -178,6 +178,8 @@ func (m *Module) Routes(router fiber.Router) {
 	portfolios.Delete("/funds/:assetId", m.handler.DeleteFund)
 	portfolios.Get("/funds/:assetId/marks", m.handler.GetFundMarks)
 	portfolios.Post("/funds/:assetId/marks", m.handler.SaveFundMark)
+	portfolios.Post("/funds/:assetId/marks/bulk", m.handler.SaveFundMarks)
+	portfolios.Get("/funds/:assetId/performance", m.handler.GetFundPerformance)
 	portfolios.Delete("/funds/:assetId/marks/:date", m.handler.DeleteFundMark)
 	portfolios.Get("/funds/:assetId/movements", m.handler.GetFundMovements)
 	portfolios.Post("/funds/:assetId/contributions", m.handler.ContributeToFund)

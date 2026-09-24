@@ -304,3 +304,45 @@ func TestWeeklySummaryRendersTheWeeklyChange(t *testing.T) {
 		}
 	})
 }
+
+func TestWeeklySummaryRendersTheFunds(t *testing.T) {
+	base := WeeklySummaryData{
+		UserName: "Ada", TotalValue: "1100.00", TotalGainLoss: "50.00", TotalGainLossPct: "4.76",
+		GainLossColor: "#22c97e", WeekLabel: "Semana 40 — 2026", DashboardURL: "http://localhost:8080/dashboard",
+	}
+
+	t.Run("a fund with its return and one waiting for its statement", func(t *testing.T) {
+		var got capturedEmail
+		s := newTestService(t, http.StatusOK, &got)
+
+		data := base
+		data.Funds = []WeeklySummaryFund{
+			{Name: "FIC Renta Fija", Value: "13050000.00", Currency: "COP", ReturnPct: "-0.46", ReturnLabel: "30 días", ReturnColor: "#e05a5a", ValuedOn: "30 sep"},
+			{Name: "Pensiones", Value: "5000000.00", Currency: "COP", Stale: true},
+		}
+
+		if err := s.SendWeeklySummary("ada@example.com", data); err != nil {
+			t.Fatalf("SendWeeklySummary: %v", err)
+		}
+
+		body := visibleText(got.req.Html)
+		for _, want := range []string{"Tus fondos", "FIC Renta Fija", "13050000.00 COP", "-0.46% · 30 días", "Valor al 30 sep", "Sin valor anotado", "actualízalo con tu"} {
+			if !strings.Contains(body, want) {
+				t.Errorf("rendered HTML missing %q", want)
+			}
+		}
+	})
+
+	t.Run("an account with no funds has no block", func(t *testing.T) {
+		var got capturedEmail
+		s := newTestService(t, http.StatusOK, &got)
+
+		if err := s.SendWeeklySummary("ada@example.com", base); err != nil {
+			t.Fatalf("SendWeeklySummary: %v", err)
+		}
+
+		if strings.Contains(got.req.Html, "Tus fondos") {
+			t.Error("the funds block should be hidden with no funds")
+		}
+	})
+}

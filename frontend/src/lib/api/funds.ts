@@ -3,8 +3,8 @@
  * escribe el dueño desde el extracto, como marcas por fecha.
  */
 import { apiRequest, apiRequestSafe, type ApiEvent, type ApiResult } from './client';
-import type { Fund, FundMark, FundMovement } from './types';
-import { fundMarkSchema, fundMovementSchema, fundSchema } from './schemas';
+import type { Fund, FundMark, FundMovement, FundPerformance } from './types';
+import { fundMarkSchema, fundMovementSchema, fundPerformanceSchema, fundSchema } from './schemas';
 import { z } from 'zod';
 
 /** `GET /portfolios/funds` — los fondos del usuario, por nombre. */
@@ -107,4 +107,33 @@ export function withdraw(
 /** `DELETE /portfolios/funds/movements/:txnId` — borra un aporte o un retiro. */
 export function deleteMovement(event: ApiEvent, txnId: string): Promise<ApiResult<unknown>> {
 	return apiRequest<unknown>(event, `/portfolios/funds/movements/${txnId}`, { method: 'DELETE' });
+}
+
+/** `GET /portfolios/funds/:id/performance` — rentabilidad por periodo, dinero y serie. */
+export function getPerformance(
+	event: ApiEvent,
+	assetId: string
+): Promise<ApiResult<FundPerformance>> {
+	return apiRequestSafe(
+		event,
+		`/portfolios/funds/${assetId}/performance`,
+		{},
+		fundPerformanceSchema
+	);
+}
+
+/**
+ * `POST /portfolios/funds/:id/marks/bulk` — varias marcas de una vez: la tabla
+ * que trae un extracto. Cada una reemplaza la de su día.
+ */
+export function saveMarks(
+	event: ApiEvent,
+	assetId: string,
+	body: Record<string, unknown>
+): Promise<ApiResult<{ saved: number }>> {
+	return apiRequest<{ saved: number }>(event, `/portfolios/funds/${assetId}/marks/bulk`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
 }

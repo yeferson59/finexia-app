@@ -80,3 +80,48 @@ export const fundMovementSchema = z.object({
 	notes: z.string(),
 	createdAt: z.string()
 });
+
+/**
+ * La rentabilidad de un fondo en un periodo. `from`, `days`, `pct` y `eaPct`
+ * van `null` cuando el historial no llega tan atrás; `eaPct` también en un
+ * periodo de menos de 28 días, donde anualizar exagera.
+ */
+export const fundPeriodSchema = z.object({
+	key: z.enum(['30d', '90d', '180d', '365d', 'ytd', 'inception']),
+	from: z.string().nullable(),
+	to: z.string(),
+	days: z.number().nullable(),
+	pct: z.string().nullable(),
+	eaPct: z.string().nullable()
+});
+
+/** El valor de unidad de un día: la serie que dibuja la gráfica del fondo. */
+export const fundPointSchema = z.object({
+	date: z.string(),
+	unitValue: z.string()
+});
+
+/**
+ * Cómo le fue a un fondo (`GET /portfolios/funds/:id/performance`): la
+ * rentabilidad por periodo, como la publica la entidad, y el dinero que entró y
+ * salió. En un fondo por saldo, `unitValue` y la serie son un índice base 100.
+ */
+export const fundPerformanceSchema = z.object({
+	assetId: z.string(),
+	tracking: z.enum(['units', 'balance']),
+	currency: z.string(),
+	valuedOn: z.string().nullable(),
+	unitValue: z.string().nullable(),
+	units: z.string(),
+	value: z.string(),
+	cost: z.string(),
+	pricedAtCost: z.boolean(),
+	invested: z.string(),
+	withdrawn: z.string(),
+	fees: z.string(),
+	realizedGain: z.string(),
+	/** `null` mientras el fondo vale lo que costó. */
+	unrealizedGain: z.string().nullable(),
+	periods: z.array(fundPeriodSchema),
+	series: z.array(fundPointSchema)
+});

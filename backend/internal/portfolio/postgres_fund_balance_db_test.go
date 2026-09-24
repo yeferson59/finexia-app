@@ -10,6 +10,8 @@ import (
 
 	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
+
+	"github.com/yeferson59/finexia-app/internal/platform/logger"
 )
 
 // Funds followed by balance, migration 000058. Same database contract as
@@ -392,5 +394,72 @@ func TestBalanceFundPositionDeleted(t *testing.T) {
 
 	if err := f.repo.DeleteFund(ctx, f.userID, fund.AssetID); err != nil {
 		t.Fatalf("DeleteFund: %v", err)
+	}
+}
+
+// The plan's example read back through the service: the returns of each period
+// and the money, from what the database keeps.
+func TestFundPerformanceFromTheDatabase(t *testing.T) {
+	f := newFundFixture(t)
+	ctx := context.Background()
+
+	fund, _, _ := f.planFund(t)
+	svc := newService(f.repo, testConfig(), nil, nil, nil, logger.Noop())
+
+	perf, err := svc.GetFundPerformance(ctx, f.userID, fund.AssetID)
+	if err != nil {
+		t.Fatalf("GetFundPerformance: %v", err)
+	}
+
+	wantPeriod(t, periodByKey(t, perf.Periods, "30d"), planDay(time.August, 31), 30, "-0.4577", "-5.43")
+	wantPeriod(t, periodByKey(t, perf.Periods, "inception"), planDay(time.July, 1), 91, "0.5383", "2.18")
+	wantEmptyPeriod(t, periodByKey(t, perf.Periods, "ytd"))
+
+	sameAmount(t, "invested", perf.Invested, "15000000")
+	sameAmount(t, "withdrawn", perf.Withdrawn, "2000000")
+	sameAmount(t, "realized", perf.RealizedGain, "14559.89")
+
+	if perf.UnrealizedGain == nil {
+		t.Fatal("no unrealized gain")
+	}
+
+	sameAmount(t, "unrealized", *perf.UnrealizedGain, "35440.11")
+
+	if len(perf.Series) != 4 {
+		t.Errorf("series = %d points, want the opening and three balances", len(perf.Series))
+	}
+}
+
+// A statement's table in one write: every day lands, the price is the latest,
+// and on a fund followed by balance a day with nothing held refuses the whole
+// table.
+func TestFundMarksInBulk(t *testing.T) {
+	f := newFundFixture(t)
+	ctx := context.Background()
+
+	units := f.create(t, "10", "100", "", time.Time{})
+
+	saved, err := f.repo.UpsertFundMarks(ctx, f.userID, units.AssetID, []FundMarkInput{
+		{Date: fundDay(10), UnitValue: mustDecimal(t, "101")},
+		{Date: fundDay(20), UnitValue: mustDecimal(t, "103")},
+		{Date: fundDay(15), UnitValue: mustDecimal(t, "102")},
+	})
+	if err != nil || saved != 3 {
+		t.Fatalf("UpsertFundMarks = %d, %v", saved, err)
+	}
+
+	sameAmount(t, "own price", f.ownPrice(t, units.AssetID), "103")
+
+	balance := f.createBalance(t, "1000", fundDay(5), "", time.Time{})
+
+	if _, err := f.repo.UpsertFundMarks(ctx, f.userID, balance.AssetID, []FundMarkInput{
+		{Date: fundDay(10), Balance: mustDecimal(t, "1010")},
+		{Date: fundDay(2), Balance: mustDecimal(t, "990")},
+	}); !errors.Is(err, ErrFundNoUnits) {
+		t.Fatalf("a table with a day before the first contribution = %v, want ErrFundNoUnits", err)
+	}
+
+	if marks, _ := f.repo.GetFundMarks(ctx, f.userID, balance.AssetID); len(marks) != 0 {
+		t.Errorf("marks = %d after a refused table, want none", len(marks))
 	}
 }

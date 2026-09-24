@@ -147,6 +147,33 @@ func (f *fakePortfolios) GetCashRates(_ context.Context, userID uuid.UUID) ([]po
 	}}, f.err
 }
 
+var fundAssetID = uuid.New()
+
+func (f *fakePortfolios) GetFunds(_ context.Context, userID uuid.UUID) ([]portfolio.Fund, error) {
+	f.sawUserID = userID
+
+	return []portfolio.Fund{{
+		AssetID: fundAssetID, Name: "FIC Renta Fija", Currency: money.COP, Tracking: portfolio.FundUnits,
+		Units: "1000", Cost: "12345678.90", Value: "12431220", UnitValue: new("12431.22"),
+		Positions: []portfolio.FundPosition{{SourceName: "Fiduciaria"}},
+	}}, f.err
+}
+
+func (f *fakePortfolios) GetFundPerformance(_ context.Context, userID, assetID uuid.UUID) (portfolio.FundPerformance, error) {
+	f.sawUserID = userID
+
+	days, pct, ea := 29, "0.6929", "9.08"
+	from := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+
+	return portfolio.FundPerformance{
+		AssetID: assetID, Invested: "12345678.90", Withdrawn: "0", RealizedGain: "0", UnrealizedGain: new("85541.10"),
+		Periods: []portfolio.FundPeriod{
+			{Key: "30d", To: from.AddDate(0, 0, 29)},
+			{Key: "inception", From: &from, To: from.AddDate(0, 0, 29), Days: &days, Pct: &pct, EAPct: &ea},
+		},
+	}, f.err
+}
+
 // fakeMarket records the CatalogView it was asked for: that view is the whole
 // of the catalog's per-user scoping, so it is what the audience test reads.
 type fakeMarket struct {
@@ -308,7 +335,7 @@ func TestToolsListIsReadOnly(t *testing.T) {
 		"list_portfolios": false, "get_holdings": false, "get_allocation": false,
 		"get_sector_allocation":    false,
 		"list_recent_transactions": false, "get_portfolio_growth": false,
-		"list_platforms": false, "get_cash_accounts": false,
+		"list_platforms": false, "get_cash_accounts": false, "get_funds": false,
 		"search_assets": false, "list_exchange_rates": false,
 	}
 

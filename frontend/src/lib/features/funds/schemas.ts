@@ -116,6 +116,31 @@ export const fundMarkSchema = z
 		error: 'Escribe el valor que trae tu extracto.'
 	});
 
+/**
+ * Varias marcas de una vez: la tabla ya leída en el navegador
+ * (`parseMarksTable`), que viaja como JSON en un campo oculto.
+ */
+export const fundMarksBulkSchema = z.object({
+	id: z.uuid('No sabemos qué fondo actualizar.'),
+	tracking: z.enum(['units', 'balance']),
+	marks: z.preprocess(
+		(v) => {
+			try {
+				return typeof v === 'string' ? JSON.parse(v) : v;
+			} catch {
+				return undefined;
+			}
+		},
+		z
+			.array(
+				z.object({ date: z.iso.date(), value: z.number().positive().lt(1e12) }),
+				'Pega al menos un valor.'
+			)
+			.min(1, 'Pega al menos un valor.')
+			.max(400, 'Son demasiados valores para una vez: pega como mucho 400.')
+	)
+});
+
 export const fundMarkDeleteSchema = z.object({
 	id: z.uuid('No sabemos de qué fondo es la marca.'),
 	date: z.iso.date('No sabemos qué marca borrar.')

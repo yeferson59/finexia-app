@@ -132,3 +132,50 @@ func TestCashAccountRows(t *testing.T) {
 		t.Errorf("pending interest = %q, want 1.5", rows[2].PendingInterest)
 	}
 }
+
+// A fund row carries its returns as the manager publishes them, leaves a period
+// the history does not cover without a figure, and keeps the gain of a fund
+// priced at cost out of the answer.
+func TestFundRow(t *testing.T) {
+	from := time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC)
+	days, pct, ea := 29, "0.6929", "9.08"
+	unrealized := "85541.10"
+
+	fund := portfolio.Fund{
+		Name: "FIC Renta Fija", Currency: money.COP, Tracking: portfolio.FundUnits,
+		Value: "12431220", Cost: "12345678.90", UnitValue: new("12431.22"), ValuedOn: new(from.AddDate(0, 0, 29)),
+		Positions: []portfolio.FundPosition{{SourceName: "Fiduciaria"}, {SourceName: "Fiduciaria"}},
+	}
+	perf := portfolio.FundPerformance{
+		Invested: "12345678.90", Withdrawn: "0", RealizedGain: "0", UnrealizedGain: &unrealized,
+		Periods: []portfolio.FundPeriod{
+			{Key: "30d", To: from.AddDate(0, 0, 29)},
+			{Key: "inception", From: &from, To: from.AddDate(0, 0, 29), Days: &days, Pct: &pct, EAPct: &ea},
+		},
+	}
+
+	row := fundRow(fund, perf)
+
+	if len(row.Platforms) != 1 || row.Platforms[0] != "Fiduciaria" {
+		t.Errorf("platforms = %v, want the one platform once", row.Platforms)
+	}
+
+	if row.UnitValue != "12431.22" || row.ValuedOn != "2026-09-30T00:00:00Z" || row.UnrealizedGain != unrealized {
+		t.Errorf("row = %+v", row)
+	}
+
+	if len(row.Returns) != 2 || row.Returns[0].Pct != "" || row.Returns[0].From != "" {
+		t.Errorf("an uncovered period has a figure: %+v", row.Returns)
+	}
+
+	if r := row.Returns[1]; r.Pct != pct || r.EAPct != ea || r.Days != days || r.From != "2026-09-01T00:00:00Z" {
+		t.Errorf("inception = %+v", r)
+	}
+
+	fund.PricedAtCost = true
+	perf.UnrealizedGain = nil
+
+	if row := fundRow(fund, perf); row.UnrealizedGain != "" || !row.PricedAtCost {
+		t.Errorf("a fund priced at cost = %+v", row)
+	}
+}

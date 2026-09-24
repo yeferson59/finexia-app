@@ -263,3 +263,48 @@ func (h *handler) DeleteFundMovement(c fiber.Ctx) error {
 
 	return httpx.OK(c, "Fund movement deleted", "Fund movement deleted successfully", nil)
 }
+
+// SaveFundMarks records several marks at once: the table a statement prints.
+func (h *handler) SaveFundMarks(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	assetID, err := httpx.ParamUUID(c, "assetId")
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid fund ID", err.Error())
+	}
+
+	req, err := httpx.Bind[SaveFundMarksRequestDTO](c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid request", err.Error())
+	}
+
+	saved, err := h.service.SaveFundMarks(c, userID, assetID, req.Input())
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error saving fund marks", "Could not save fund marks")
+	}
+
+	return httpx.OK(c, "Fund marks saved", "Fund marks saved successfully", map[string]int{"saved": saved})
+}
+
+// GetFundPerformance answers how a fund did: returns by period, money, series.
+func (h *handler) GetFundPerformance(c fiber.Ctx) error {
+	userID, _, _, err := httpx.Identity(c)
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid user ID", err.Error())
+	}
+
+	assetID, err := httpx.ParamUUID(c, "assetId")
+	if err != nil {
+		return httpx.BadRequest(c, "Invalid fund ID", err.Error())
+	}
+
+	perf, err := h.service.GetFundPerformance(c, userID, assetID)
+	if err != nil {
+		return httpx.FromDomain(c, err, "Error retrieving fund performance", "Could not retrieve fund performance")
+	}
+
+	return httpx.OK(c, "Fund performance retrieved", "Fund performance retrieved successfully", perf)
+}

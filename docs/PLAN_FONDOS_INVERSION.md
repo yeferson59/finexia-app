@@ -1,6 +1,6 @@
 # Plan — Fondos de inversión (rentabilidad variable)
 
-> **Estado:** Fases 1 y 2 implementadas (000056 – 000058) · 23 sep 2026; fases 3 y 4 pendientes
+> **Estado:** Fases 1 a 3 implementadas (000056 – 000058) · 23 sep 2026; la 4 (opcional) pendiente
 > **Alcance:** módulos `market` y `portfolio` (backend), feature nueva `funds` (frontend)
 > **Migraciones:** 000056 – 000058 (+ 000059 opcional) · **Fases:** 3 + 1 opcional
 > **Relacionado con:** [`PLAN_RENTABILIDAD_EFECTIVO.md`](./PLAN_RENTABILIDAD_EFECTIVO.md)
@@ -427,7 +427,8 @@ GET /portfolios/funds/:assetId/performance
   "unrealizedGain": "35440.11",
   "periods": [
     { "key": "30d", "from": "2026-08-31", "to": "2026-09-30", "days": 30, "pct": "-0.4577", "eaPct": "-5.43" },
-    { "key": "90d", "from": null, "to": "2026-09-30", "days": null, "pct": null, "eaPct": null },
+    { "key": "90d", "from": "2026-07-01", "to": "2026-09-30", "days": 91, "pct": "0.5383", "eaPct": "2.18" },
+    { "key": "180d", "from": null, "to": "2026-09-30", "days": null, "pct": null, "eaPct": null },
     { "key": "ytd", "from": null, "to": "2026-09-30", "days": null, "pct": null, "eaPct": null },
     { "key": "inception", "from": "2026-07-01", "to": "2026-09-30", "days": 91, "pct": "0.5383", "eaPct": "2.18" }
   ],
@@ -503,6 +504,32 @@ Fase 3 solo lee lo que las dos primeras guardan.
   a Fondos en vez de ofrecer un proveedor.
 - **Pendiente de la Fase 1:** `docs/MANUAL_DE_USUARIO.md` (obliga a regenerar el
   PDF) y ver la pantalla en la app.
+
+**Lo que cambió al implementar la Fase 3:**
+
+- **La serie incluye lo que prueban los movimientos.** En un fondo por unidades,
+  cada compra y venta es un punto (su precio es el valor de unidad de su día); en
+  uno por saldo, el primer aporte es el punto 100. Por eso «desde el inicio» existe
+  aunque solo haya una marca, y en el ejemplo de §4 **90 días sí tiene cifra**: el
+  2 jul no tiene marca, pero la última en o antes de ese día es el aporte del 1 jul
+  (91 días). El plan lo daba vacío porque no contaba ese punto.
+- **La ganancia realizada usa el costo como lo guarda la base**
+  (`recalculate_avg_cost`): el promedio de todas las compras de la posición, sin
+  comisiones y sin moverse con las ventas. Así realizada + sin realizar = lo que
+  salió + lo que queda − lo que entró, al centavo (50.000 en el ejemplo:
+  14.559,89 + 35.440,11).
+- **La rentabilidad se calcula en el servicio**, no en SQL: lee el fondo, sus
+  marcas y sus movimientos con las lecturas que ya existían
+  (`buildFundPerformance`, pura y probada con las cifras del plan).
+- **`valuedOn` en las posiciones no hizo falta:** la posición de un fondo ya trae
+  `priceFetchedAt`, que es el día de la marca (`syncFundPrice`).
+- **Correo semanal:** bloque «Tus fondos» con el valor, la rentabilidad de 30 días
+  (o desde el inicio) y el aviso de valor viejo (`portfolio.FundStaleDays`).
+- **Frontend:** la tarjeta enseña la rentabilidad de 30 días (E.A.) y «Ver
+  rentabilidad» abre la tabla por periodo, el dinero y la gráfica (una serie en el
+  ámbar de la app, eje de tiempo real, cursor con teclado y tabla para lector de
+  pantalla). Pegar la tabla del extracto vive en el diálogo de actualizar: acepta
+  «30/09/2026» o «2026-09-30» y cifras con coma o punto decimal.
 
 **Lo que cambió al implementar la Fase 2:**
 
@@ -622,6 +649,6 @@ Fase 2:
 
 Fase 3:
 
-- [ ] Septiembre del ejemplo muestra −0,4577 % (−5,43 % E.A.) y 90 días aparece como «—».
-- [ ] Pego 30 valores de unidad del extracto y la gráfica los muestra.
-- [ ] MCP responde la rentabilidad a 30 días de un fondo.
+- [x] Septiembre del ejemplo muestra −0,4577 % (−5,43 % E.A.) y 180 días aparece como «—». *(TestFundPerformancePlanExample, TestFundPerformanceFromTheDatabase; 90 días sí tiene cifra, ver §10)*
+- [x] Pego 30 valores de unidad del extracto y la gráfica los muestra. *(TestFundMarksInBulk, `parseMarksTable`; la gráfica, en `fund-chart.svelte.spec.ts`)*
+- [x] MCP responde la rentabilidad a 30 días de un fondo. *(`get_funds`, TestFundRow)*

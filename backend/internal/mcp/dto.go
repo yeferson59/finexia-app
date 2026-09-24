@@ -315,3 +315,38 @@ type CashAccountTier struct {
 	FromBalance   string `json:"fromBalance" jsonschema:"what the account holds from which the step applies, in currency"`
 	AnnualRatePct string `json:"annualRatePct" jsonschema:"the effective annual rate on the part of the account in the step, as a percentage"`
 }
+
+// FundsOutput is the answer of get_funds.
+type FundsOutput struct {
+	Funds []FundRow `json:"funds"`
+}
+
+// FundRow is one investment fund the user follows, with how it did.
+type FundRow struct {
+	Name      string   `json:"name"`
+	Platforms []string `json:"platforms"`
+	Currency  string   `json:"currency"`
+	Tracking  string   `json:"tracking" jsonschema:"units when the owner records units and the unit value from the statement; balance when they only record money and balances, and the units are Finexia's own index (base 100), meaningless outside it"`
+	Value     string   `json:"value" jsonschema:"what the fund is worth at its latest mark, in currency"`
+	Cost      string   `json:"cost" jsonschema:"what the units still held cost, in currency"`
+	// PricedAtCost is a fund with no mark: its value is its cost by
+	// construction, and its gain of zero says nothing.
+	PricedAtCost bool   `json:"pricedAtCost" jsonschema:"true when nobody has recorded what the fund is worth: its value is its cost and must not be reported as a zero return"`
+	UnitValue    string `json:"unitValue,omitempty" jsonschema:"the latest unit value; for a fund tracked by balance it is an index, base 100"`
+	ValuedOn     string `json:"valuedOn,omitempty" jsonschema:"the day of the latest mark, RFC 3339. Finexia does not estimate between marks, so an old date means an old value"`
+	Invested     string `json:"invested" jsonschema:"everything contributed, in currency"`
+	Withdrawn    string `json:"withdrawn" jsonschema:"everything withdrawn before fees, in currency"`
+	RealizedGain string `json:"realizedGain" jsonschema:"what the withdrawals made over what their units cost, net of fees"`
+	// UnrealizedGain is empty while the fund is priced at cost.
+	UnrealizedGain string       `json:"unrealizedGain,omitempty" jsonschema:"what the units still held are worth over their cost; empty when the fund is priced at cost"`
+	Returns        []FundReturn `json:"returns" jsonschema:"time-weighted return of the unit value over each period, the way a fund manager publishes it"`
+}
+
+// FundReturn is the return of a fund over one period.
+type FundReturn struct {
+	Period string `json:"period" jsonschema:"30d, 90d, 180d, 365d, ytd (since the close of last year) or inception"`
+	From   string `json:"from,omitempty" jsonschema:"the mark the period starts at, RFC 3339; empty when the history does not reach back that far, and then there is no figure"`
+	Days   int    `json:"days,omitempty"`
+	Pct    string `json:"pct,omitempty" jsonschema:"the return over the period, as a percentage"`
+	EAPct  string `json:"eaPct,omitempty" jsonschema:"the same, annualized as an effective annual rate (E.A.), as a percentage; only for periods of 28 days or more"`
+}

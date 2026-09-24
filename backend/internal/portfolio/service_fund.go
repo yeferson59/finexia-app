@@ -111,3 +111,43 @@ func (s *service) UpdateFundMovement(ctx context.Context, userID, txnID uuid.UUI
 func (s *service) DeleteFundMovement(ctx context.Context, userID, txnID uuid.UUID) error {
 	return s.repo.DeleteFundMovement(ctx, userID, txnID)
 }
+
+// SaveFundMarks records a statement's table of marks at once.
+func (s *service) SaveFundMarks(ctx context.Context, userID, assetID uuid.UUID, in []FundMarkInput) (int, error) {
+	fund, err := s.repo.GetFund(ctx, userID, assetID)
+	if err != nil {
+		return 0, err
+	}
+
+	if err := validateFundMarks(in, time.Now(), fund.Tracking); err != nil {
+		return 0, err
+	}
+
+	return s.repo.UpsertFundMarks(ctx, userID, assetID, in)
+}
+
+// GetFundPerformance is how a fund did: its return over each period, the
+// money that went in and out, and the series of its unit value.
+//
+// It reads the fund, its marks and its movements one after the other rather
+// than in one statement: a write that lands in between makes the figures of
+// one reload disagree by one mark, which the next reload fixes, and the three
+// reads are the ones the screens already make.
+func (s *service) GetFundPerformance(ctx context.Context, userID, assetID uuid.UUID) (FundPerformance, error) {
+	fund, err := s.repo.GetFund(ctx, userID, assetID)
+	if err != nil {
+		return FundPerformance{}, err
+	}
+
+	marks, err := s.repo.GetFundMarks(ctx, userID, assetID)
+	if err != nil {
+		return FundPerformance{}, err
+	}
+
+	movements, err := s.repo.GetFundMovements(ctx, userID, assetID)
+	if err != nil {
+		return FundPerformance{}, err
+	}
+
+	return buildFundPerformance(fund, marks, movements)
+}

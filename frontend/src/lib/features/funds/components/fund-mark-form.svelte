@@ -24,6 +24,7 @@
 	import { formatSignedPercent } from '$lib/shared/format/percent';
 	import { formatCalendarDate, todayLocalDateString } from '$lib/shared/format/date';
 	import { markBefore, markChange, marksWithChange, type Fund, type FundMark } from '../funds';
+	import FundMarksPaste from './fund-marks-paste.svelte';
 
 	interface Props {
 		fund: Fund | null;
@@ -184,6 +185,8 @@
 				</ul>
 			{/if}
 		</section>
+
+		<FundMarksPaste assetId={fund.assetId} {byBalance} />
 
 		{#if canDelete}
 			<form method="POST" action="?/deleteFund" class="danger-zone" use:enhance={handler}>

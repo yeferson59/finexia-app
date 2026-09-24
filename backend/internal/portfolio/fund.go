@@ -85,6 +85,12 @@ const (
 	fundPriceSource = "user"
 )
 
+// FundStaleDays is how many days a fund's latest mark can be old before its
+// value is flagged: a monthly statement arrives a few days after the close, so
+// this lets a month and its statement through. The funds screen uses the same
+// figure.
+const FundStaleDays = 35
+
 // maxFundUnitValue keeps a unit value inside NUMERIC(20, 8).
 var maxFundUnitValue = decimal.MustFromString("1000000000000")
 
@@ -388,6 +394,39 @@ func (in FundMarkInput) Validate(today time.Time, tracking FundTracking) error {
 
 	if utf8.RuneCountInString(in.Notes) > maxCashNotesLen {
 		return invalidFundMark("notes cannot exceed %d characters", maxCashNotesLen)
+	}
+
+	return nil
+}
+
+// maxFundMarksBatch is how many marks one upload takes: a year and a bit of
+// daily unit values, which is more than any statement prints.
+const maxFundMarksBatch = 400
+
+// validateFundMarks checks a batch of marks: each one as a single mark would be,
+// and no day twice — the batch would write one over the other.
+func validateFundMarks(in []FundMarkInput, today time.Time, tracking FundTracking) error {
+	if len(in) == 0 {
+		return invalidFundMark("marks is empty")
+	}
+
+	if len(in) > maxFundMarksBatch {
+		return invalidFundMark("at most %d marks at once", maxFundMarksBatch)
+	}
+
+	seen := make(map[time.Time]bool, len(in))
+
+	for i, mark := range in {
+		if err := mark.Validate(today, tracking); err != nil {
+			return fmt.Errorf("mark %d: %w", i+1, err)
+		}
+
+		day := cashRateDay(mark.Date)
+		if seen[day] {
+			return invalidFundMark("%s appears twice", day.Format(time.DateOnly))
+		}
+
+		seen[day] = true
 	}
 
 	return nil

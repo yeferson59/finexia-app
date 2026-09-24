@@ -454,6 +454,64 @@ func (r *PostgresRepository) UpsertFundMark(ctx context.Context, userID, assetID
 	return mark, nil
 }
 
+// UpsertFundMarks writes several marks at once, each replacing the one on its
+// day. It is UpsertFundMark over a statement's table, under one lock: the
+// price, the replay of a fund followed by balance and the revaluation of the
+// snapshots run once, from the earliest day written.
+func (r *PostgresRepository) UpsertFundMarks(ctx context.Context, userID, assetID uuid.UUID, in []FundMarkInput) (int, error) {
+	if len(in) == 0 {
+		return 0, nil
+	}
+
+	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		tracking, err := lockFund(ctx, tx, userID, assetID)
+		if err != nil {
+			return err
+		}
+
+		from := cashRateDay(in[0].Date)
+
+		for _, mark := range in {
+			if tracking == FundBalance {
+				mark.UnitValue = fundOpeningUnitValue
+			}
+
+			if _, err := writeFundMark(ctx, tx, userID, assetID, mark); err != nil {
+				return err
+			}
+
+			if day := cashRateDay(mark.Date); day.Before(from) {
+				from = day
+			}
+		}
+
+		if tracking != FundBalance {
+			if err := syncFundPrice(ctx, tx, userID, assetID); err != nil {
+				return err
+			}
+
+			return restateFundSnapshots(ctx, tx, userID, assetID, from)
+		}
+
+		replay, err := replayAndRestate(ctx, tx, userID, assetID, from)
+		if err != nil {
+			return err
+		}
+
+		for _, mark := range in {
+			if day := cashRateDay(mark.Date); replay.skipped(day) {
+				return fmt.Errorf("%w: %s", ErrFundNoUnits, day.Format(time.DateOnly))
+			}
+		}
+
+		return nil
+	}); err != nil {
+		return 0, err
+	}
+
+	return len(in), nil
+}
+
 // DeleteFundMark takes back what a fund was said to be worth on a day. The
 // price falls back to the mark before it, or to the cost when none is left,
 // and the snapshots from that day on are revalued the same way.

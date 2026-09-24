@@ -181,6 +181,9 @@ type FundStore interface {
 	// UpsertFundMark and DeleteFundMark also revalue every snapshot from the
 	// mark's day on, in the same transaction.
 	UpsertFundMark(ctx context.Context, userID, assetID uuid.UUID, in FundMarkInput) (FundMark, error)
+	// UpsertFundMarks writes several at once — the table of a statement — with
+	// one lock, one replay and one revaluation.
+	UpsertFundMarks(ctx context.Context, userID, assetID uuid.UUID, in []FundMarkInput) (int, error)
 	DeleteFundMark(ctx context.Context, userID, assetID uuid.UUID, date time.Time) error
 	// The movements of a fund followed by balance (000058). Every write replays
 	// the whole fund and revalues its snapshots in the same transaction.

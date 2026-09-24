@@ -13,12 +13,14 @@ import {
 	fundMarkDeleteSchema,
 	fundMarkErrorMessage,
 	fundMarkSchema,
+	fundMarksBulkSchema,
 	fundMovementDeleteSchema,
 	fundMovementErrorMessage,
 	fundWithdrawalSchema,
 	toFundDateTime,
 	type FundMark,
-	type FundMovement
+	type FundMovement,
+	type FundPerformance
 } from '$lib/features/funds';
 
 export const load: PageServerLoad = async ({ cookies, fetch, locals }) => {
@@ -36,14 +38,23 @@ export const load: PageServerLoad = async ({ cookies, fetch, locals }) => {
 	// para los diálogos. Un usuario sigue pocos fondos, así que se piden todos a
 	// la vez en vez de al abrir cada uno.
 	const byBalance = list.filter((f) => f.tracking === 'balance');
-	const [marksRes, movementsRes] = await Promise.all([
+	const [marksRes, movementsRes, performanceRes] = await Promise.all([
 		Promise.all(list.map((f) => funds.getMarks(event, f.assetId))),
-		Promise.all(byBalance.map((f) => funds.getMovements(event, f.assetId)))
+		Promise.all(byBalance.map((f) => funds.getMovements(event, f.assetId))),
+		Promise.all(list.map((f) => funds.getPerformance(event, f.assetId)))
 	]);
 
 	const marks: Record<string, FundMark[]> = {};
 	list.forEach((f, i) => {
 		marks[f.assetId] = marksRes[i].success ? (marksRes[i].data ?? []) : [];
+	});
+
+	// Sin la rentabilidad de un fondo su tarjeta se ve igual, solo que sin la
+	// cifra: no es un fallo de la página.
+	const performance: Record<string, FundPerformance> = {};
+	list.forEach((f, i) => {
+		const res = performanceRes[i];
+		if (res.success && res.data) performance[f.assetId] = res.data;
 	});
 
 	const movements: Record<string, FundMovement[]> = {};
@@ -57,6 +68,7 @@ export const load: PageServerLoad = async ({ cookies, fetch, locals }) => {
 		funds: list,
 		marks,
 		movements,
+		performance,
 		portfolios: (portfoliosRes.data ?? []).map((p) => ({
 			id: p.id,
 			name: p.name,
@@ -180,6 +192,34 @@ export const actions = {
 		}
 
 		return { success: true };
+	},
+
+	saveMarks: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed = fundMarksBulkSchema.safeParse({
+			id: formData.get('id'),
+			tracking: formData.get('tracking'),
+			marks: formData.get('marks')
+		});
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const { id, tracking, marks } = parsed.data;
+		const res = await funds.saveMarks({ cookies, fetch }, id, {
+			marks: marks.map((m) => ({
+				date: toFundDateTime(m.date),
+				...(tracking === 'balance' ? { balance: m.value } : { unitValue: m.value })
+			}))
+		});
+
+		if (!res.ok || !res.success) {
+			return failed(res, fundMarkErrorMessage(res.status, res.details));
+		}
+
+		return { success: true, saved: res.data?.saved ?? marks.length };
 	},
 
 	deleteMark: async ({ request, cookies, fetch }) => {

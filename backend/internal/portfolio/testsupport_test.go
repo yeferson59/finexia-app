@@ -188,6 +188,7 @@ type fakeRepository struct {
 	deleteFund                      func(ctx context.Context, userID, assetID uuid.UUID) error
 	getFundMarks                    func(ctx context.Context, userID, assetID uuid.UUID) ([]FundMark, error)
 	upsertFundMark                  func(ctx context.Context, userID, assetID uuid.UUID, in FundMarkInput) (FundMark, error)
+	upsertFundMarks                 func(ctx context.Context, userID, assetID uuid.UUID, in []FundMarkInput) (int, error)
 	deleteFundMark                  func(ctx context.Context, userID, assetID uuid.UUID, date time.Time) error
 	getFundMovements                func(ctx context.Context, userID, assetID uuid.UUID) ([]FundMovement, error)
 	getFundMovement                 func(ctx context.Context, userID, txnID uuid.UUID) (FundMovement, error)
@@ -694,4 +695,8 @@ func (f *fakeRepository) UpdateFundMovement(ctx context.Context, userID, txnID u
 
 func (f *fakeRepository) DeleteFundMovement(ctx context.Context, userID, txnID uuid.UUID) error {
 	return f.deleteFundMovement(ctx, userID, txnID)
+}
+
+func (f *fakeRepository) UpsertFundMarks(ctx context.Context, userID, assetID uuid.UUID, in []FundMarkInput) (int, error) {
+	return f.upsertFundMarks(ctx, userID, assetID, in)
 }

@@ -29,6 +29,8 @@ import type {
 	exchangeRateSchema,
 	fundMarkSchema,
 	fundMovementSchema,
+	fundPerformanceSchema,
+	fundPeriodSchema,
 	fundPositionSchema,
 	fundSchema,
 	growthDataPointSchema,
@@ -193,6 +195,12 @@ export type FundMark = z.infer<typeof fundMarkSchema>;
 
 /** Un aporte o un retiro de un fondo. */
 export type FundMovement = z.infer<typeof fundMovementSchema>;
+
+/** Cómo le fue a un fondo: rentabilidad por periodo, dinero y serie. */
+export type FundPerformance = z.infer<typeof fundPerformanceSchema>;
+
+/** La rentabilidad de un fondo en un periodo. */
+export type FundPeriod = z.infer<typeof fundPeriodSchema>;
 
 // ---------------------------------------------------------------------------
 // Assets y tasas de cambio (mercado)

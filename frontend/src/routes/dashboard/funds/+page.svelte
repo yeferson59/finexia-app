@@ -9,6 +9,7 @@
 		FundList,
 		FundMarkForm,
 		FundMovementForm,
+		FundPerformanceView,
 		type Fund
 	} from '$lib/features/funds';
 	import type { PageProps } from './$types';
@@ -30,6 +31,10 @@
 	/* El fondo por saldo cuyos aportes y retiros están abiertos. */
 	let movingId = $state<string | null>(null);
 	const moving = $derived<Fund | null>(data.funds.find((f) => f.assetId === movingId) ?? null);
+
+	/* El fondo cuya rentabilidad está abierta. */
+	let detailId = $state<string | null>(null);
+	const detail = $derived<Fund | null>(data.funds.find((f) => f.assetId === detailId) ?? null);
 </script>
 
 <svelte:head>
@@ -92,6 +97,8 @@
 		showPortfolio={data.portfolios.length > 1}
 		onMark={(fund) => (markingId = fund.assetId)}
 		onMove={(fund) => (movingId = fund.assetId)}
+		performance={data.performance}
+		onDetail={(fund) => (detailId = fund.assetId)}
 	/>
 {/if}
 
@@ -115,6 +122,12 @@
 	portfolios={data.portfolios}
 	platforms={data.platforms}
 	onClose={() => (movingId = null)}
+/>
+
+<FundPerformanceView
+	fund={detail}
+	performance={detail ? (data.performance[detail.assetId] ?? null) : null}
+	onClose={() => (detailId = null)}
 />
 
 <style>

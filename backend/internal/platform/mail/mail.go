@@ -102,6 +102,26 @@ type WeeklySummaryCash struct {
 	Idle     int
 }
 
+// WeeklySummaryFund is one investment fund in the digest: what it is worth at
+// its latest recorded value and how it did lately. Value is in Currency, the
+// fund's own.
+type WeeklySummaryFund struct {
+	Name     string
+	Value    string
+	Currency string
+	// ReturnPct is the return over ReturnLabel — the last 30 days, or since the
+	// fund opened when it is younger — signed; empty when there is no history
+	// to measure. ReturnColor paints it.
+	ReturnPct   string
+	ReturnLabel string
+	ReturnColor string
+	// ValuedOn is the day of the latest recorded value, empty when there is
+	// none. Stale is a value old enough to ask for the statement again, or no
+	// value at all.
+	ValuedOn string
+	Stale    bool
+}
+
 type WeeklySummaryData struct {
 	UserName         string
 	TotalValue       string
@@ -133,6 +153,10 @@ type WeeklySummaryData struct {
 	// Cash is the cash block, nil for an account with no cash balance; the
 	// template then leaves it out entirely.
 	Cash *WeeklySummaryCash
+
+	// Funds are the investment funds the account follows, empty for one that
+	// follows none; the template then leaves the block out.
+	Funds []WeeklySummaryFund
 }
 
 func New(apiKey, from string) (*Service, error) {

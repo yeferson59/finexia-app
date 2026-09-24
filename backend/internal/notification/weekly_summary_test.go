@@ -35,6 +35,25 @@ type fakePortfolioReader struct {
 	// the digest carries no cash block.
 	getCashBalances func(ctx context.Context, userID uuid.UUID, display money.Currency) ([]portfolio.CashBalance, error)
 	getCashRates    func(ctx context.Context, userID uuid.UUID) ([]portfolio.CashRate, error)
+	// Optional as well: left unset, the account follows no fund.
+	getFunds           func(ctx context.Context, userID uuid.UUID) ([]portfolio.Fund, error)
+	getFundPerformance func(ctx context.Context, userID, assetID uuid.UUID) (portfolio.FundPerformance, error)
+}
+
+func (f *fakePortfolioReader) GetFunds(ctx context.Context, userID uuid.UUID) ([]portfolio.Fund, error) {
+	if f.getFunds == nil {
+		return nil, nil
+	}
+
+	return f.getFunds(ctx, userID)
+}
+
+func (f *fakePortfolioReader) GetFundPerformance(ctx context.Context, userID, assetID uuid.UUID) (portfolio.FundPerformance, error) {
+	if f.getFundPerformance == nil {
+		return portfolio.FundPerformance{}, nil
+	}
+
+	return f.getFundPerformance(ctx, userID, assetID)
 }
 
 func (f *fakePortfolioReader) GetPortfoliosSummary(ctx context.Context, userID uuid.UUID) ([]portfolio.SummaryView, error) {
@@ -697,5 +716,47 @@ func TestCashBlockWeighsATieredRateAtWhatItComesTo(t *testing.T) {
 	// on all eight.
 	if block.AverageRatePct != "10.48" {
 		t.Errorf("average rate = %s, want 10.48", block.AverageRatePct)
+	}
+}
+
+// A fund in the digest says how the last 30 days went, or how it went since it
+// opened when it is younger, and asks for the statement when its value is old.
+func TestFundRowOfTheDigest(t *testing.T) {
+	now := time.Date(2026, time.October, 5, 9, 0, 0, 0, time.UTC)
+	valued := time.Date(2026, time.September, 30, 0, 0, 0, 0, time.UTC)
+	thirty, inception := "-0.4577", "0.5383"
+
+	fund := portfolio.Fund{Name: "Bolsillo", Currency: money.COP, Value: "13049999.99951645", ValuedOn: &valued}
+	perf := portfolio.FundPerformance{Periods: []portfolio.FundPeriod{
+		{Key: "30d", Pct: &thirty},
+		{Key: "inception", Pct: &inception},
+	}}
+
+	row := fundRow(fund, perf, now)
+
+	if row.Value != "13050000.00" || row.ValuedOn != "30 sep" || row.Stale {
+		t.Errorf("row = %+v", row)
+	}
+
+	if row.ReturnPct != "-0.46" || row.ReturnLabel != "30 días" || row.ReturnColor != lossColor {
+		t.Errorf("return = %s %s %s, want the 30 days, as a loss", row.ReturnPct, row.ReturnLabel, row.ReturnColor)
+	}
+
+	// Younger than a month: since it opened.
+	perf.Periods[0].Pct = nil
+
+	if row := fundRow(fund, perf, now); row.ReturnPct != "+0.54" || row.ReturnLabel != "desde el inicio" {
+		t.Errorf("young fund = %s %s", row.ReturnPct, row.ReturnLabel)
+	}
+
+	// Forty days without a statement, and a fund never valued, are both stale.
+	if row := fundRow(fund, perf, valued.AddDate(0, 0, 40)); !row.Stale {
+		t.Error("a 40-day-old value is not flagged")
+	}
+
+	fund.ValuedOn = nil
+
+	if row := fundRow(fund, perf, now); !row.Stale || row.ValuedOn != "" {
+		t.Errorf("a fund with no value = %+v", row)
 	}
 }

@@ -35,6 +35,8 @@ type PortfolioReader interface {
 	GetPlatforms(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]portfolio.PlatformStats, error)
 	GetCashBalances(ctx context.Context, userID uuid.UUID, displayCurrency money.Currency) ([]portfolio.CashBalance, error)
 	GetCashRates(ctx context.Context, userID uuid.UUID) ([]portfolio.CashRate, error)
+	GetFunds(ctx context.Context, userID uuid.UUID) ([]portfolio.Fund, error)
+	GetFundPerformance(ctx context.Context, userID, assetID uuid.UUID) (portfolio.FundPerformance, error)
 }
 
 // MarketReader is the slice of the market module the tools serve: the asset

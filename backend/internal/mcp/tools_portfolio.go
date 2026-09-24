@@ -166,6 +166,88 @@ func (m *Module) addPortfolioTools(s *mcpsdk.Server, c caller) {
 
 			return CashOutput{Accounts: cashAccountRows(balances, rates, time.Now())}, nil
 		})
+
+	readTool(s, "get_funds", "Get investment funds",
+		"List the user's investment funds — collective investment funds, voluntary pension funds, money-market pockets: money that earns whatever it turns out to earn, not a fixed rate — with what each is worth at its latest recorded value, the money that went in and out, and its return over 30, 90, 180 and 365 days, the year so far and since inception, also annualized. Use it for questions about how a fund did. A fund priced at cost has no recorded value yet, so its zero gain must not be reported as a return; a period with no figure is one the history does not cover.",
+		func(ctx context.Context, _ EmptyInput) (FundsOutput, error) {
+			funds, err := m.portfolios.GetFunds(ctx, c.userID)
+			if err != nil {
+				return FundsOutput{}, m.logToolError(ctx, "get_funds", c, err)
+			}
+
+			rows := make([]FundRow, 0, len(funds))
+
+			for _, f := range funds {
+				perf, err := m.portfolios.GetFundPerformance(ctx, c.userID, f.AssetID)
+				if err != nil {
+					return FundsOutput{}, m.logToolError(ctx, "get_funds", c, err)
+				}
+
+				rows = append(rows, fundRow(f, perf))
+			}
+
+			return FundsOutput{Funds: rows}, nil
+		})
+}
+
+func fundRow(f portfolio.Fund, perf portfolio.FundPerformance) FundRow {
+	row := FundRow{
+		Name:         f.Name,
+		Platforms:    make([]string, 0, len(f.Positions)),
+		Currency:     f.Currency.String(),
+		Tracking:     string(f.Tracking),
+		Value:        f.Value,
+		Cost:         f.Cost,
+		PricedAtCost: f.PricedAtCost,
+		Invested:     perf.Invested,
+		Withdrawn:    perf.Withdrawn,
+		RealizedGain: perf.RealizedGain,
+		Returns:      make([]FundReturn, 0, len(perf.Periods)),
+	}
+
+	seen := make(map[string]bool)
+	for _, p := range f.Positions {
+		if !seen[p.SourceName] {
+			seen[p.SourceName] = true
+			row.Platforms = append(row.Platforms, p.SourceName)
+		}
+	}
+
+	if f.UnitValue != nil {
+		row.UnitValue = *f.UnitValue
+	}
+
+	if f.ValuedOn != nil {
+		row.ValuedOn = timeText(*f.ValuedOn)
+	}
+
+	if perf.UnrealizedGain != nil {
+		row.UnrealizedGain = *perf.UnrealizedGain
+	}
+
+	for _, p := range perf.Periods {
+		r := FundReturn{Period: p.Key}
+
+		if p.From != nil {
+			r.From = timeText(*p.From)
+		}
+
+		if p.Days != nil {
+			r.Days = *p.Days
+		}
+
+		if p.Pct != nil {
+			r.Pct = *p.Pct
+		}
+
+		if p.EAPct != nil {
+			r.EAPct = *p.EAPct
+		}
+
+		row.Returns = append(row.Returns, r)
+	}
+
+	return row
 }
 
 // cashAccountKey names an account: a platform, a currency and a pocket of it,

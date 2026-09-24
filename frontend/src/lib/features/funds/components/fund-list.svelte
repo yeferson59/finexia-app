@@ -17,6 +17,7 @@
 	import { formatSignedPercent } from '$lib/shared/format/percent';
 	import { formatCalendarDate } from '$lib/shared/format/date';
 	import { daysSinceMark, fundGain, fundPlatforms, isStale, type Fund } from '../funds';
+	import { headlinePeriod, type FundPerformance } from '../performance';
 
 	interface Props {
 		funds: Fund[];
@@ -26,9 +27,12 @@
 		onMark: (fund: Fund) => void;
 		/** Aportes y retiros, solo en un fondo que se sigue por saldo. */
 		onMove: (fund: Fund) => void;
+		/** La rentabilidad de cada fondo, por id; falta la de uno que no cargó. */
+		performance: Record<string, FundPerformance>;
+		onDetail: (fund: Fund) => void;
 	}
 
-	let { funds, today, showPortfolio, onMark, onMove }: Props = $props();
+	let { funds, today, showPortfolio, onMark, onMove, performance, onDetail }: Props = $props();
 
 	const money = (value: string | number, currency: string) =>
 		privacy.money(
@@ -51,6 +55,9 @@
 		{@const stale = isStale(fund, today)}
 		{@const age = daysSinceMark(fund, today)}
 		{@const byBalance = fund.tracking === 'balance'}
+		{@const headline = performance[fund.assetId]
+			? headlinePeriod(performance[fund.assetId].periods)
+			: null}
 		<li class="fund">
 			<header>
 				<div class="title">
@@ -75,6 +82,27 @@
 			</header>
 
 			<p class="value">{money(fund.value, fund.currency)}</p>
+
+			{#if headline}
+				<p class="headline">
+					<span
+						class:gain-text={headline.pct !== null && headline.pct >= 0}
+						class:loss-text={headline.pct !== null && headline.pct < 0}
+					>
+						{formatSignedPercent(headline.ea ?? headline.pct ?? 0, 2)}{headline.ea !== null
+							? ' E.A.'
+							: ''}
+					</span>
+					<span class="dim">{headline.key === '30d' ? 'en 30 días' : 'desde el inicio'}</span>
+					<button type="button" class="link" onclick={() => onDetail(fund)}>Ver rentabilidad</button
+					>
+				</p>
+			{:else if fund.marks > 0}
+				<p class="headline">
+					<button type="button" class="link" onclick={() => onDetail(fund)}>Ver rentabilidad</button
+					>
+				</p>
+			{/if}
 
 			{#if gain}
 				<p class="gain" class:loss={gain.amount < 0}>
@@ -200,6 +228,40 @@
 
 	.dim {
 		color: var(--text-dim);
+	}
+
+	/* La cifra que publica la entidad: la rentabilidad del fondo, no la del dueño. */
+	.headline {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.25rem 0.5rem;
+		margin: 0;
+		font-size: 0.86rem;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.gain-text {
+		color: var(--green);
+	}
+
+	.loss-text {
+		color: var(--red);
+	}
+
+	.link {
+		margin-left: auto;
+		padding: 0;
+		border: 0;
+		background: none;
+		font: inherit;
+		font-size: 0.8rem;
+		color: var(--amber);
+		cursor: pointer;
+	}
+
+	.link:hover {
+		text-decoration: underline;
 	}
 
 	.at-cost {

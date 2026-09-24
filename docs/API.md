@@ -1580,6 +1580,52 @@ unidad, si no hay ninguna), y la diferencia mueve `total_value`,
 `total_gain_loss`, `total_gain_loss_pct` y la porción `fund` de `allocation`.
 Los flujos no cambian: una marca no es dinero que entra ni que sale.
 
+**Rentabilidad** (`GET /portfolios/funds/:assetId/performance`). Cómo le fue a
+un fondo, como lo publica la entidad: la rentabilidad del valor de unidad en 30,
+90, 180 y 365 días, el año corrido (desde el cierre del año anterior) y desde el
+inicio, más el dinero que entró y salió.
+
+```json
+{
+  "assetId": "…", "tracking": "balance", "currency": "COP",
+  "valuedOn": "2026-09-30T00:00:00Z", "unitValue": "100.53828551",
+  "units": "129801.29841401", "value": "13049999.99951645", "cost": "13014559.8941099",
+  "pricedAtCost": false,
+  "invested": "15000000", "withdrawn": "2000000", "fees": "0",
+  "realizedGain": "14559.89", "unrealizedGain": "35440.11",
+  "periods": [
+    { "key": "30d", "from": "2026-08-31T00:00:00Z", "to": "2026-09-30T00:00:00Z", "days": 30, "pct": "-0.4577", "eaPct": "-5.43" },
+    { "key": "180d", "from": null, "to": "2026-09-30T00:00:00Z", "days": null, "pct": null, "eaPct": null }
+  ],
+  "series": [{ "date": "2026-07-01T00:00:00Z", "unitValue": "100" }]
+}
+```
+
+- La serie son las marcas y lo que prueban los movimientos: en un fondo por
+  unidades, el precio de cada compra y venta (el valor de unidad de su día); en
+  uno por saldo, el primer aporte a 100. Una marca del mismo día manda.
+- Un periodo mide de la última marca en o antes de `hoy − n días` a la última
+  marca: `pct = VU_t / VU_s − 1`, y `eaPct = (VU_t / VU_s)^(365/días) − 1`. Sin
+  marca tan atrás, el periodo va con `null`: no se extrapola. `eaPct` solo con 28
+  días o más.
+- `realizedGain` es lo que dieron los retiros sobre el costo de sus unidades,
+  menos comisiones; el costo por unidad es el promedio de todas las compras de la
+  posición, como lo guarda la base. `unrealizedGain` es `value − cost`, y va
+  `null` mientras el fondo vale lo que costó.
+
+**Varias marcas** (`POST /portfolios/funds/:assetId/marks/bulk`):
+`{"marks": [{"date": …, "unitValue": …}, …]}` —o `balance` en un fondo por
+saldo—, hasta 400, sin días repetidos (**400**). Se escriben en una transacción;
+el precio, el replay y la revaloración de snapshots corren una vez. En un fondo
+por saldo, un día sin unidades rechaza la tabla entera (**409**). Responde
+`{"saved": n}`.
+
+**MCP.** `get_funds` lista los fondos con su valor, lo aportado y retirado, la
+ganancia realizada y sin realizar, y la rentabilidad por periodo. El correo
+semanal trae un bloque «Tus fondos»: el valor, la rentabilidad de 30 días (o desde
+el inicio en un fondo más joven) y un aviso cuando el último valor tiene más de
+35 días.
+
 **Fondos por saldo** (migración 000058). Un fondo con `tracking: "balance"`
 lleva unidades **sintéticas**: el primer aporte compra a valor de unidad 100
 (un índice), un saldo de un día fija `valor de unidad = saldo / unidades` de

@@ -14,13 +14,18 @@
  * `fund-list` los enseña como tarjetas, `fund-create-form` registra uno con su
  * primera compra, `fund-mark-form` anota el valor de unidad —o el saldo— de un
  * día y lista los que ya hay, y `fund-movement-form` anota los aportes y
- * retiros de un fondo por saldo. `funds.ts` aporta los helpers puros y reexporta los contratos
+ * retiros de un fondo por saldo. `fund-performance` enseña la rentabilidad por
+ * periodo, el dinero y la gráfica (`fund-chart`, interno, con la geometría de
+ * `chart.ts`); `fund-marks-paste`, interno de `fund-mark-form`, lee la tabla que
+ * se pega desde un extracto (`performance.ts`). `funds.ts` aporta los helpers puros y reexporta los contratos
  * `Fund` y `FundMark` de `$lib/api/types`.
  */
 export { default as FundList } from './components/fund-list.svelte';
 export { default as FundCreateForm } from './components/fund-create-form.svelte';
 export { default as FundMarkForm } from './components/fund-mark-form.svelte';
 export { default as FundMovementForm } from './components/fund-movement-form.svelte';
+export { default as FundPerformanceView } from './components/fund-performance.svelte';
 
 export * from './funds';
 export * from './schemas';
+export * from './performance';
