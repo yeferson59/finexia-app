@@ -799,9 +799,6 @@ func mixedPortfolio(t *testing.T, pool *pgxpool.Pool) (userID, portfolioID uuid.
 	return userID, portfolioID
 }
 
-//go:fix inline
-func ptr(v float64) *float64 { return new(v) }
-
 // The allocation a snapshot stores has to be a breakdown *of the total stored
 // beside it*. It is aggregated by a second expression, so nothing but a test
 // against real rows stops the two from drifting into a row that contradicts
