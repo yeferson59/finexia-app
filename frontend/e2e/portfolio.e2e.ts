@@ -82,14 +82,15 @@ test.describe('portfolio detail', () => {
 		await page.goto(`/dashboard/portfolios/${TEST_PORTFOLIO_ID}`);
 
 		const strip = page.getByRole('region', { name: 'Rentabilidad por periodo' });
-		await expect(strip.getByText('1 día', { exact: true })).toBeVisible();
-		await expect(strip.getByText('Desde el inicio', { exact: true })).toBeVisible();
+		await expect(strip.getByRole('tab', { name: /^1 día / })).toBeVisible();
+		await expect(strip.getByRole('tab', { name: /^Desde el inicio / })).toBeVisible();
 
 		// La serie del portafolio es la agregada a escala: el porcentaje no cambia
 		// con la escala y el dinero sí, en la moneda del portafolio.
-		const year = strip.locator('div', { has: page.getByText('1 año', { exact: true }) });
-		await expect(year.getByText('-1,21%')).toBeVisible();
-		await expect(year.getByText(/^−\$[\d,]+\.\d{2}$/)).toBeVisible();
+		const year = strip.getByRole('tab', { name: /^1 año / });
+		await expect(year).toContainText('-1,21%');
+		await year.click();
+		await expect(strip.getByRole('tabpanel')).toContainText(/perdiste \$[\d,]+\.\d{2},/);
 	});
 
 	// Cuatro tarjetas —mejor activo, peor activo, concentración y el donut por

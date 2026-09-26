@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { TRAILING_LABELS, hasTrailingReturns, toTrailingCells, trailingTone } from './trailing';
+import {
+	TRAILING_LABELS,
+	defaultTrailingPeriod,
+	hasTrailingReturns,
+	toTrailingCells,
+	trailingReading,
+	trailingTone
+} from './trailing';
 import type { TrailingReturn } from '$lib/api/types';
 
 const entry = (over: Partial<TrailingReturn> & Pick<TrailingReturn, 'period'>): TrailingReturn => ({
@@ -113,5 +120,74 @@ describe('hasTrailingReturns', () => {
 		expect(hasTrailingReturns(undefined)).toBe(false);
 		expect(hasTrailingReturns([])).toBe(false);
 		expect(hasTrailingReturns([{ period: 'ALL', available: false }])).toBe(false);
+	});
+});
+
+describe('defaultTrailingPeriod', () => {
+	it('opens on the last month', () => {
+		const cells = toTrailingCells([
+			entry({ period: '1D' }),
+			entry({ period: '1M' }),
+			entry({ period: 'ALL' })
+		]);
+
+		expect(defaultTrailingPeriod(cells)).toBe('1M');
+	});
+
+	it('falls back to the first window with a figure while the history is short', () => {
+		const cells = toTrailingCells([
+			{ period: '1D', available: false, historyStart: '2026-09-20' },
+			entry({ period: '1W' }),
+			{ period: '1M', available: false, historyStart: '2026-09-20' }
+		]);
+
+		expect(defaultTrailingPeriod(cells)).toBe('1W');
+	});
+
+	it('has nothing to open without windows', () => {
+		expect(defaultTrailingPeriod([])).toBeNull();
+	});
+});
+
+describe('trailingReading', () => {
+	const read = (over: Partial<TrailingReturn> & Pick<TrailingReturn, 'period'>) =>
+		trailingReading(toTrailingCells([entry(over)])[0]);
+
+	it('reads a gain from the start of the window', () => {
+		const reading = read({ period: '1M', from: '2026-08-25', gain: '219.88' });
+
+		expect(reading.before).toMatch(/^Desde el 25 de \p{L}+\.? de 2026 ganaste $/u);
+		expect(reading).toMatchObject({
+			amount: 219.88,
+			tone: 'up',
+			after: ', sin contar lo que metiste o sacaste.'
+		});
+	});
+
+	it('reads a loss without a sign: the verb carries it', () => {
+		const reading = read({ period: '1W', gain: '-107.90' });
+
+		expect(reading.before).toMatch(/perdiste $/);
+		expect(reading).toMatchObject({ amount: 107.9, tone: 'down' });
+	});
+
+	it('says there was no change instead of printing zero', () => {
+		const reading = read({ period: '1D', gain: '0.00' });
+
+		expect(reading.before).toMatch(/no ganaste ni perdiste, sin contar/);
+		expect(reading.amount).toBeNull();
+	});
+
+	it('explains a window the history does not reach', () => {
+		const [, year] = toTrailingCells([
+			entry({ period: '1D' }),
+			{ period: '1Y', available: false, historyStart: '2026-03-02' }
+		]);
+		const reading = trailingReading(year);
+
+		expect(reading.before).toMatch(
+			/^El historial empieza el 2 de \p{L}+\.? de 2026, así que todavía no hay cifra/u
+		);
+		expect(reading.amount).toBeNull();
 	});
 });

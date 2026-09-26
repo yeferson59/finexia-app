@@ -237,14 +237,11 @@ La franja **Rentabilidad por periodo** parte tu ganancia en ventanas de tiempo q
 | **En el año** | El cierre del 31 de diciembre pasado |
 | **Desde el inicio** | El primer día que Finexia tiene de tu cuenta |
 
-Cada periodo trae dos cifras:
+Los periodos van en fila, del más corto al más largo, y cada uno enseña su **porcentaje**: la rentabilidad del periodo, la misma que dibuja la gráfica en su vista **%** (apartado 5.2). Al abrir el Dashboard está elegido **1 mes**; toca otro periodo —o recórrelos con las flechas del teclado— y la frase de debajo lo lee en dinero: desde qué fecha se mide y cuánto ganaste o perdiste.
 
-- **El porcentaje** (arriba, más grande): la rentabilidad del periodo, la misma que dibuja la gráfica en su vista **%** (apartado 5.2).
-- **El importe** (debajo): lo que ganaste o perdiste en dinero.
+Las dos cifras **descuentan lo que metiste o sacaste** en ese periodo. Si esta semana depositaste $500 y el mercado no se movió, la semana dice **+0,00 %** y que no ganaste ni perdiste, no +$500: el depósito es tu dinero, no una ganancia.
 
-Las dos **descuentan lo que metiste o sacaste** en ese periodo. Si esta semana depositaste $500 y el mercado no se movió, la semana dice **+0,00 %** y **+$0**, no +$500: el depósito es tu dinero, no una ganancia.
-
-Si Finexia todavía no tiene historial suficiente para un periodo —por ejemplo **1 año** en una cuenta de dos meses— aparece una raya (**—**). Pasa el cursor por encima para ver desde qué fecha hay historial. Con el **modo oculto** activo, los importes se tapan y los porcentajes se siguen viendo.
+Si Finexia todavía no tiene historial suficiente para un periodo —por ejemplo **1 año** en una cuenta de dos meses— aparece una raya (**—**); al elegirlo, la frase dice desde qué fecha hay historial. En el teléfono la fila se desliza de lado para llegar a los periodos largos. Con el **modo oculto** activo, los importes se tapan y los porcentajes se siguen viendo.
 
 > **Por qué «Desde el inicio» no coincide con «sobre lo invertido».** La cifra de arriba compara lo que vale hoy tu patrimonio con lo que te costó, y eso incluye lo que tus posiciones ya habían ganado **antes** de registrarlas en Finexia. «Desde el inicio» solo cuenta lo que pasó desde que Finexia empezó a guardar cierres, y encadena día por día sin dejar que un aporte cuente como ganancia. Por eso una cartera puede ir **+14 %** sobre lo invertido y **−0,3 %** desde el inicio: ganó antes de llegar a Finexia y desde entonces ha estado casi plana.
 

@@ -77,6 +77,54 @@ export function hasTrailingReturns(returns: TrailingReturn[] | undefined): boole
 }
 
 /**
+ * La ventana que se lee al abrir: el último mes, que es la que menos baila de
+ * un día para otro sin quedarse tan lejos que ya no diga nada del presente. Si
+ * el historial no llega a un mes, la primera que tenga cifra.
+ */
+export function defaultTrailingPeriod(cells: TrailingCell[]): TrailingPeriod | null {
+	const month = cells.find((cell) => cell.period === '1M' && cell.available);
+	return (month ?? cells.find((cell) => cell.available) ?? cells[0])?.period ?? null;
+}
+
+/**
+ * La frase que lee la ventana elegida, partida alrededor del importe para que
+ * quien la pinta lo formatee (y lo tape en modo privado) a su manera.
+ */
+export interface TrailingReading {
+	before: string;
+	/** Sin signo: el verbo ya dice hacia dónde fue. `null` si no hay importe. */
+	amount: number | null;
+	tone: TrailingTone;
+	after: string;
+}
+
+const FLOWS_CAVEAT = ', sin contar lo que metiste o sacaste.';
+
+export function trailingReading(cell: TrailingCell): TrailingReading {
+	const none = { amount: null, tone: 'neutral' as const, after: '' };
+
+	if (!cell.available) {
+		return { ...none, before: `${cell.note}, así que todavía no hay cifra para este periodo.` };
+	}
+
+	const lead = cell.note || 'En este periodo';
+
+	if (cell.gain === null) {
+		return { ...none, before: `${lead} no hay cifra en dinero para este periodo.` };
+	}
+	if (cell.gainTone === 'neutral') {
+		return { ...none, before: `${lead} no ganaste ni perdiste${FLOWS_CAVEAT}` };
+	}
+
+	return {
+		before: `${lead} ${cell.gainTone === 'up' ? 'ganaste' : 'perdiste'} `,
+		amount: Math.abs(cell.gain),
+		tone: cell.gainTone,
+		after: FLOWS_CAVEAT
+	};
+}
+
+/**
  * Las ventanas en el orden en que llegan, que es de la más corta a la más
  * larga; ninguna mientras `hasTrailingReturns` diga que no hay qué enseñar.
  */

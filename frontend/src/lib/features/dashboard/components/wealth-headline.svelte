@@ -207,12 +207,12 @@
 		color: var(--text-muted);
 	}
 
-	/* Fila entera bajo la cifra y el selector de moneda. */
+	/* Fila entera bajo la cifra y el selector de moneda; el filete lo pone la
+	   propia regla de periodos. */
 	.returns {
 		flex-basis: 100%;
 		min-width: 0;
-		padding-top: 1.75rem;
-		border-top: 1px solid var(--border);
+		padding-top: 1.25rem;
 	}
 
 	.rate {
