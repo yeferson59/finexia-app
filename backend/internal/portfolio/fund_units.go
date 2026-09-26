@@ -40,9 +40,6 @@ var (
 	// ErrFundNoUnits refuses a balance on a day the fund held nothing: there
 	// are no units for it to value.
 	ErrFundNoUnits = httpx.AsConflict(errors.New("the fund held no units on that day"))
-	// ErrFundNotBalance refuses a balance-mode write on a fund followed by
-	// units, whose statement already gives units and unit values.
-	ErrFundNotBalance = httpx.AsConflict(errors.New("the fund is followed by units; record its purchases and sales as transactions"))
 	// ErrFundBalanceManaged refuses the generic transaction writers on a fund
 	// followed by balance: its quantities are derived from its movements, and a
 	// transaction written by hand would stop matching them (D12).

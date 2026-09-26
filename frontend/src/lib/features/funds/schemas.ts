@@ -174,8 +174,13 @@ export const fundMarkDeleteSchema = z.object({
 	date: z.iso.date('No sabemos qué marca borrar.')
 });
 
+/**
+ * Quitar un fondo. `withPositions` es la casilla que confirma que se van
+ * también sus posiciones, con todas sus compras y ventas.
+ */
 export const fundDeleteSchema = z.object({
-	id: z.uuid('No sabemos qué fondo quitar.')
+	id: z.uuid('No sabemos qué fondo quitar.'),
+	withPositions: checkboxField
 });
 
 /**
@@ -215,6 +220,85 @@ export const fundWithdrawalSchema = z
 		error: 'La comisión no puede ser mayor que el retiro.'
 	});
 
+/** La comisión de un retiro: lo que se quedó la entidad. Vacía es cero. */
+const feesField = z.preprocess(
+	(v) => (v === '' || v === null || v === undefined ? 0 : v),
+	z.coerce
+		.number('Escribe la comisión con números.')
+		.nonnegative('La comisión no puede ser negativa.')
+);
+
+/**
+ * Un aporte a un fondo por unidades: las unidades y el valor de unidad al que
+ * entraron, como los trae el extracto.
+ */
+export const fundUnitsContributionSchema = z.object({
+	id: z.uuid('No sabemos a qué fondo aportar.'),
+	portfolioId: z.uuid('Elige el portafolio.'),
+	sourceId: z.uuid('Elige la plataforma.'),
+	date: z.iso.date('Elige el día del aporte.'),
+	units: unitsField,
+	unitValue: unitValueField,
+	notes: notesField
+});
+
+/**
+ * Un retiro de una posición de un fondo por unidades. Con «Retirar todo» las
+ * unidades se pueden dejar vacías: salen todas las que tiene la posición.
+ */
+export const fundUnitsWithdrawalSchema = z
+	.object({
+		id: z.uuid('No sabemos de qué fondo retirar.'),
+		entryId: z.uuid('Elige de qué portafolio sale.'),
+		date: z.iso.date('Elige el día del retiro.'),
+		units: z.preprocess(blankToUndefined, unitsField.optional()),
+		unitValue: unitValueField,
+		fees: feesField,
+		all: checkboxField,
+		notes: notesField
+	})
+	.refine((v) => v.all || v.units !== undefined, {
+		path: ['units'],
+		error: 'Escribe cuántas unidades retiraste, o marca «Retirar todo».'
+	})
+	.refine((v) => v.units === undefined || v.fees < v.units * v.unitValue, {
+		path: ['fees'],
+		error: 'La comisión no puede ser mayor que el retiro.'
+	});
+
+/**
+ * Corregir un aporte o un retiro de un fondo por saldo: el día, el dinero, la
+ * comisión y la nota. De qué posición es y hacia dónde fue no cambian.
+ */
+export const fundMovementEditSchema = z
+	.object({
+		txnId: z.uuid('No sabemos qué movimiento corregir.'),
+		date: z.iso.date('Elige el día del movimiento.'),
+		amount: amountField,
+		fees: feesField,
+		all: checkboxField,
+		notes: notesField
+	})
+	.refine((v) => v.fees < v.amount, {
+		path: ['fees'],
+		error: 'La comisión no puede ser mayor que el retiro.'
+	});
+
+/** Corregir un aporte o un retiro de un fondo por unidades. */
+export const fundUnitsMovementEditSchema = z
+	.object({
+		txnId: z.uuid('No sabemos qué movimiento corregir.'),
+		date: z.iso.date('Elige el día del movimiento.'),
+		units: unitsField,
+		unitValue: unitValueField,
+		fees: feesField,
+		notes: notesField
+	})
+	.refine((v) => v.fees < v.units * v.unitValue, {
+		path: ['fees'],
+		error: 'La comisión no puede ser mayor que el retiro.'
+	});
+
 export const fundMovementDeleteSchema = z.object({
 	txnId: z.uuid('No sabemos qué movimiento borrar.')
 });
@@ -240,7 +324,10 @@ export function fundErrorMessage(status: number, details = ''): string {
 		return 'La Superfinanciera no publicó un valor de unidad para ese día. Escribe el de tu extracto.';
 	}
 	if (details.includes('still has positions')) {
-		return 'Ese fondo todavía está en un portafolio. Borra primero su posición desde el portafolio.';
+		return 'Ese fondo todavía está en un portafolio. Marca que quieres borrar también sus posiciones.';
+	}
+	if (details.includes('insufficient cash')) {
+		return 'El efectivo que abonaron sus retiros ya se gastó: no se puede borrar el fondo sin dejar la cuenta en negativo.';
 	}
 	if (details.includes('date cannot be in the future')) {
 		return 'La fecha no puede ser futura.';
@@ -293,8 +380,14 @@ export function fundMovementErrorMessage(status: number, details = ''): string {
 	if (details.includes('held no units on that day')) {
 		return 'Ese día el fondo no tenía nada para valorar. Revisa la fecha.';
 	}
-	if (details.includes('followed by units')) {
-		return 'Este fondo se sigue por unidades: anota sus compras y ventas desde el portafolio.';
+	if (details.includes('units must be')) {
+		return 'Las unidades tienen que ser más que cero.';
+	}
+	if (details.includes('unit value must be')) {
+		return 'El valor de unidad tiene que ser mayor que cero.';
+	}
+	if (details.includes('fees must be less')) {
+		return 'La comisión no puede ser mayor que el retiro.';
 	}
 	if (details.includes('insufficient cash')) {
 		return 'La cuenta de efectivo no tiene saldo suficiente para pagar el aporte.';

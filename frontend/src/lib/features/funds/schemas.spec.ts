@@ -3,13 +3,18 @@ import {
 	fundBalanceCreateSchema,
 	fundContributionSchema,
 	fundCreateSchema,
+	fundDeleteSchema,
 	fundErrorMessage,
 	fundLinkErrorMessage,
 	fundLinkSchema,
 	fundMarkErrorMessage,
 	fundMarkSchema,
 	fundMarksBulkSchema,
+	fundMovementEditSchema,
 	fundMovementErrorMessage,
+	fundUnitsContributionSchema,
+	fundUnitsMovementEditSchema,
+	fundUnitsWithdrawalSchema,
 	fundUnlinkSchema,
 	fundWithdrawalSchema,
 	publicFundSearchErrorMessage,
@@ -262,5 +267,90 @@ describe('a fund linked to the Superfinanciera', () => {
 			)
 		).toMatch(/no publicó un valor/);
 		expect(publicFundSearchErrorMessage(400)).toMatch(/dos letras/);
+	});
+});
+
+describe('movements of a fund followed by units', () => {
+	it('takes units and a unit value for a contribution', () => {
+		const parsed = fundUnitsContributionSchema.safeParse({
+			id: ID,
+			portfolioId: ID,
+			sourceId: ID,
+			date: '2026-09-10',
+			units: '150.5',
+			unitValue: '12345.678901',
+			notes: ' extracto '
+		});
+
+		expect(parsed.success).toBe(true);
+		expect(parsed.data?.units).toBe(150.5);
+		expect(parsed.data?.notes).toBe('extracto');
+		expect(
+			fundUnitsContributionSchema.safeParse({ ...parsed.data, id: ID, units: '0' }).success
+		).toBe(false);
+	});
+
+	it('lets «Retirar todo» leave the units out, and nothing else', () => {
+		const withdrawal = (over: Record<string, unknown> = {}) => ({
+			id: ID,
+			entryId: ID,
+			date: '2026-09-20',
+			units: '',
+			unitValue: '12000',
+			fees: '',
+			...over
+		});
+
+		const all = fundUnitsWithdrawalSchema.safeParse(withdrawal({ all: 'on' }));
+		expect(all.success).toBe(true);
+		expect(all.data?.units).toBeUndefined();
+		expect(all.data?.fees).toBe(0);
+
+		expect(fundUnitsWithdrawalSchema.safeParse(withdrawal()).success).toBe(false);
+		expect(fundUnitsWithdrawalSchema.safeParse(withdrawal({ units: '10' })).success).toBe(true);
+		expect(
+			fundUnitsWithdrawalSchema.safeParse(withdrawal({ units: '10', fees: '120000' })).success
+		).toBe(false);
+	});
+
+	it('corrects a movement by units or by money', () => {
+		const txn = { txnId: ID, date: '2026-09-12', notes: '' };
+
+		expect(
+			fundUnitsMovementEditSchema.safeParse({ ...txn, units: '10', unitValue: '100', fees: '' })
+				.success
+		).toBe(true);
+		expect(
+			fundUnitsMovementEditSchema.safeParse({ ...txn, units: '10', unitValue: '100', fees: '1000' })
+				.success
+		).toBe(false);
+		expect(fundMovementEditSchema.safeParse({ ...txn, amount: '500', fees: '5' }).success).toBe(
+			true
+		);
+		expect(fundMovementEditSchema.safeParse({ ...txn, amount: '', fees: '' }).success).toBe(false);
+	});
+
+	it('explains the refusals of a movement by units', () => {
+		expect(fundMovementErrorMessage(400, 'invalid fund: units must be greater than 0')).toContain(
+			'unidades'
+		);
+		expect(
+			fundMovementErrorMessage(400, 'invalid fund: unit value must be greater than 0')
+		).toContain('valor de unidad');
+	});
+});
+
+describe('deleting a fund', () => {
+	it('reads whether its positions go with it', () => {
+		expect(fundDeleteSchema.safeParse({ id: ID, withPositions: 'on' }).data?.withPositions).toBe(
+			true
+		);
+		expect(fundDeleteSchema.safeParse({ id: ID, withPositions: null }).data?.withPositions).toBe(
+			false
+		);
+	});
+
+	it('explains cash that was already spent', () => {
+		expect(fundErrorMessage(409, 'insufficient cash balance')).toContain('efectivo');
 	});
 });

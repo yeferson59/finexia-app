@@ -175,7 +175,7 @@ type FundStore interface {
 	GetFundsByUserID(ctx context.Context, userID uuid.UUID) ([]Fund, error)
 	GetFund(ctx context.Context, userID, assetID uuid.UUID) (Fund, error)
 	CreateFund(ctx context.Context, userID uuid.UUID, in NewFundInput) (Fund, error)
-	DeleteFund(ctx context.Context, userID, assetID uuid.UUID) error
+	DeleteFund(ctx context.Context, userID, assetID uuid.UUID, withPositions bool) error
 	GetFundMarks(ctx context.Context, userID, assetID uuid.UUID) ([]FundMark, error)
 	// UpsertFundMark and DeleteFundMark also revalue every snapshot from the
 	// mark's day on, in the same transaction.

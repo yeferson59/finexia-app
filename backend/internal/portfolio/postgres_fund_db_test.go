@@ -355,7 +355,7 @@ func TestDeleteFundWaitsForItsPositions(t *testing.T) {
 
 	fund := f.create(t, "100", "10", "10.5", fundDay(10))
 
-	if err := f.repo.DeleteFund(ctx, f.userID, fund.AssetID); !errors.Is(err, ErrFundHasPositions) {
+	if err := f.repo.DeleteFund(ctx, f.userID, fund.AssetID, false); !errors.Is(err, ErrFundHasPositions) {
 		t.Fatalf("DeleteFund while held = %v, want ErrFundHasPositions", err)
 	}
 
@@ -363,7 +363,7 @@ func TestDeleteFundWaitsForItsPositions(t *testing.T) {
 		t.Fatalf("DeletePortfolioEntry: %v", err)
 	}
 
-	if err := f.repo.DeleteFund(ctx, f.userID, fund.AssetID); err != nil {
+	if err := f.repo.DeleteFund(ctx, f.userID, fund.AssetID, false); err != nil {
 		t.Fatalf("DeleteFund: %v", err)
 	}
 

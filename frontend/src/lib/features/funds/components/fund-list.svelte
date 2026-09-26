@@ -29,14 +29,16 @@
 		/** Con un solo portafolio no hay otro sitio donde pueda estar: no se nombra. */
 		showPortfolio: boolean;
 		onMark: (fund: Fund) => void;
-		/** Aportes y retiros, solo en un fondo que se sigue por saldo. */
+		/** Aportes y retiros: dinero en un fondo por saldo, unidades en uno por unidades. */
 		onMove: (fund: Fund) => void;
+		onDelete: (fund: Fund) => void;
 		/** La rentabilidad de cada fondo, por id; falta la de uno que no cargó. */
 		performance: Record<string, FundPerformance>;
 		onDetail: (fund: Fund) => void;
 	}
 
-	let { funds, today, showPortfolio, onMark, onMove, performance, onDetail }: Props = $props();
+	let { funds, today, showPortfolio, onMark, onMove, onDelete, performance, onDetail }: Props =
+		$props();
 
 	const money = (value: string | number, currency: string) =>
 		privacy.money(
@@ -82,14 +84,21 @@
 					{/if}
 				</div>
 				<div class="actions">
-					{#if byBalance}
-						<Button type="button" variant="ghost" size="sm" onclick={() => onMove(fund)}>
-							Aportar o retirar
-						</Button>
-					{/if}
+					<Button type="button" variant="ghost" size="sm" onclick={() => onMove(fund)}>
+						Aportar o retirar
+					</Button>
 					<Button type="button" variant="ghost" size="sm" onclick={() => onMark(fund)}>
 						{byBalance ? 'Actualizar saldo' : 'Actualizar valor'}
 					</Button>
+					<button
+						type="button"
+						class="delete"
+						aria-label="Eliminar {fund.name}"
+						title="Eliminar fondo"
+						onclick={() => onDelete(fund)}
+					>
+						Eliminar
+					</button>
 				</div>
 			</header>
 
@@ -329,5 +338,21 @@
 
 	.stale {
 		margin: 0;
+	}
+
+	.delete {
+		padding: 0.3rem 0.6rem;
+		border: 1px solid transparent;
+		border-radius: 7px;
+		background: transparent;
+		font: inherit;
+		font-size: 0.8rem;
+		color: var(--text-dim);
+		cursor: pointer;
+	}
+
+	.delete:hover {
+		border-color: rgba(224, 90, 90, 0.35);
+		color: var(--red);
 	}
 </style>

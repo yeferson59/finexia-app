@@ -33,9 +33,18 @@ export function createFund(
 	});
 }
 
-/** `DELETE /portfolios/funds/:id` — deja de seguir un fondo que ya nadie guarda. */
-export function deleteFund(event: ApiEvent, assetId: string): Promise<ApiResult<unknown>> {
-	return apiRequest<unknown>(event, `/portfolios/funds/${assetId}`, { method: 'DELETE' });
+/**
+ * `DELETE /portfolios/funds/:id` — deja de seguir un fondo que ya nadie guarda.
+ * Con `withPositions`, también uno que sí: se lleva sus posiciones, con sus
+ * transacciones, en una sola transacción.
+ */
+export function deleteFund(
+	event: ApiEvent,
+	assetId: string,
+	withPositions = false
+): Promise<ApiResult<unknown>> {
+	const query = withPositions ? '?withPositions=true' : '';
+	return apiRequest<unknown>(event, `/portfolios/funds/${assetId}${query}`, { method: 'DELETE' });
 }
 
 /** `GET /portfolios/funds/:id/marks` — las marcas de un fondo, de la más reciente. */
@@ -82,8 +91,9 @@ export function getMovements(event: ApiEvent, assetId: string): Promise<ApiResul
 }
 
 /**
- * `POST /portfolios/funds/:id/contributions` — dinero que entra a un fondo que
- * se sigue por saldo. Las unidades las calcula el backend.
+ * `POST /portfolios/funds/:id/contributions` — dinero que entra a un fondo. En
+ * uno por saldo se dice el importe y las unidades las calcula el backend; en uno
+ * por unidades, las unidades y su valor de unidad.
  */
 export function contribute(
 	event: ApiEvent,
@@ -105,6 +115,22 @@ export function withdraw(
 ): Promise<ApiResult<FundMovement>> {
 	return apiRequest<FundMovement>(event, `/portfolios/funds/${assetId}/withdrawals`, {
 		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+}
+
+/**
+ * `PUT /portfolios/funds/movements/:txnId` — corrige un aporte o un retiro: su
+ * día, su importe (o unidades y valor de unidad), la comisión y la nota.
+ */
+export function updateMovement(
+	event: ApiEvent,
+	txnId: string,
+	body: Record<string, unknown>
+): Promise<ApiResult<FundMovement>> {
+	return apiRequest<FundMovement>(event, `/portfolios/funds/movements/${txnId}`, {
+		method: 'PUT',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(body)
 	});

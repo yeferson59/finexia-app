@@ -9,6 +9,7 @@ import (
 
 	"uuid"
 
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/platform/logger"
@@ -378,49 +379,90 @@ func TestFundMovementInputsValidate(t *testing.T) {
 	}
 
 	t.Run("contribution", func(t *testing.T) {
-		check(t, contribution().Validate(fundToday), "")
+		check(t, contribution().Validate(fundToday, FundBalance), "")
 
 		in := contribution()
 		in.SourceID = uuid.UUID{}
-		check(t, in.Validate(fundToday), "portfolioId and sourceId")
+		check(t, in.Validate(fundToday, FundBalance), "portfolioId and sourceId")
 
 		in = contribution()
 		in.Amount = mustDecimal(t, "0")
-		check(t, in.Validate(fundToday), "amount must be")
+		check(t, in.Validate(fundToday, FundBalance), "amount must be")
 
 		in = contribution()
 		in.BalanceBefore = mustDecimal(t, "-1")
-		check(t, in.Validate(fundToday), "balanceBefore cannot be negative")
+		check(t, in.Validate(fundToday, FundBalance), "balanceBefore cannot be negative")
 
 		in = contribution()
 		in.Date = fundToday.AddDate(0, 0, 1)
-		check(t, in.Validate(fundToday), "future")
+		check(t, in.Validate(fundToday, FundBalance), "future")
 	})
 
 	t.Run("withdrawal", func(t *testing.T) {
-		check(t, withdrawal().Validate(fundToday), "")
+		check(t, withdrawal().Validate(fundToday, FundBalance), "")
 
 		in := withdrawal()
 		in.EntryID = uuid.UUID{}
-		check(t, in.Validate(fundToday), "entryId is required")
+		check(t, in.Validate(fundToday, FundBalance), "entryId is required")
 
 		in = withdrawal()
 		in.Fees = mustDecimal(t, "2000000")
-		check(t, in.Validate(fundToday), "fees must be less")
+		check(t, in.Validate(fundToday, FundBalance), "fees must be less")
 
 		in = withdrawal()
 		in.Fees = mustDecimal(t, "-1")
-		check(t, in.Validate(fundToday), "fees cannot be negative")
+		check(t, in.Validate(fundToday, FundBalance), "fees cannot be negative")
 	})
 
 	t.Run("edit", func(t *testing.T) {
 		edit := FundMovementEdit{Date: day, Amount: mustDecimal(t, "100"), All: true}
-		check(t, edit.Validate(fundToday, FundWithdrawal), "")
-		check(t, edit.Validate(fundToday, FundContribution), "only a withdrawal")
+		check(t, edit.Validate(fundToday, FundWithdrawal, FundBalance), "")
+		check(t, edit.Validate(fundToday, FundContribution, FundBalance), "only a withdrawal")
 
 		edit.All = false
 		edit.Fees = mustDecimal(t, "1")
-		check(t, edit.Validate(fundToday, FundContribution), "carries no fees")
+		check(t, edit.Validate(fundToday, FundContribution, FundBalance), "carries no fees")
+	})
+
+	t.Run("units", func(t *testing.T) {
+		in := contribution()
+		in.Amount = decimal.Decimal{}
+		in.Units = mustDecimal(t, "1500.5")
+		in.UnitValue = mustDecimal(t, "12345.678")
+		check(t, in.Validate(fundToday, FundUnits), "")
+		check(t, in.Validate(fundToday, FundBalance), "takes amounts, not units")
+
+		in.Units = decimal.Decimal{}
+		check(t, in.Validate(fundToday, FundUnits), "units must be")
+
+		in = contribution()
+		in.Units = mustDecimal(t, "10")
+		in.UnitValue = mustDecimal(t, "10")
+		in.BalanceBefore = mustDecimal(t, "100")
+		check(t, in.Validate(fundToday, FundUnits), "balanceBefore is only")
+
+		out := withdrawal()
+		out.UnitValue = mustDecimal(t, "10")
+		out.All = true
+		check(t, out.Validate(fundToday, FundUnits), "")
+
+		out.All = false
+		check(t, out.Validate(fundToday, FundUnits), "units must be")
+
+		out.Units = mustDecimal(t, "5")
+		out.Fees = mustDecimal(t, "50")
+		check(t, out.Validate(fundToday, FundUnits), "fees must be less")
+
+		out.UnitValue = decimal.Decimal{}
+		out.Fees = decimal.Decimal{}
+		check(t, out.Validate(fundToday, FundUnits), "unit value must be")
+
+		edit := FundMovementEdit{Date: day, Units: mustDecimal(t, "5"), UnitValue: mustDecimal(t, "10")}
+		check(t, edit.Validate(fundToday, FundContribution, FundUnits), "")
+		check(t, edit.Validate(fundToday, FundContribution, FundBalance), "takes amounts, not units")
+
+		edit.All = true
+		check(t, edit.Validate(fundToday, FundWithdrawal, FundUnits), "states the units")
 	})
 }
 

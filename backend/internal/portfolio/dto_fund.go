@@ -79,14 +79,17 @@ func (d SaveFundMarkRequestDTO) Input() FundMarkInput {
 	return FundMarkInput(d)
 }
 
-// ContributeToFundRequestDTO is money put into a fund followed by balance, on
-// the position its portfolio holds on the platform.
+// ContributeToFundRequestDTO is money put into a fund, on the position its
+// portfolio holds on the platform: an amount in a fund followed by balance,
+// units and unitValue in one followed by units.
 type ContributeToFundRequestDTO struct {
 	PortfolioID   uuid.UUID       `json:"portfolioId"`
 	SourceID      uuid.UUID       `json:"sourceId"`
 	Date          time.Time       `json:"date"`
 	Amount        decimal.Decimal `json:"amount"`
 	BalanceBefore decimal.Decimal `json:"balanceBefore"`
+	Units         decimal.Decimal `json:"units"`
+	UnitValue     decimal.Decimal `json:"unitValue"`
 	PayFromCash   bool            `json:"payFromCash"`
 	CashPocketID  uuid.UUID       `json:"cashPocketId"`
 	Notes         string          `json:"notes"`
@@ -96,13 +99,16 @@ func (d ContributeToFundRequestDTO) Input() FundContributionInput {
 	return FundContributionInput(d)
 }
 
-// WithdrawFromFundRequestDTO is money taken out of one position of a fund
-// followed by balance.
+// WithdrawFromFundRequestDTO is money taken out of one position of a fund: an
+// amount in a fund followed by balance, units and unitValue in one followed by
+// units.
 type WithdrawFromFundRequestDTO struct {
 	EntryID      uuid.UUID       `json:"entryId"`
 	Date         time.Time       `json:"date"`
 	Amount       decimal.Decimal `json:"amount"`
 	Fees         decimal.Decimal `json:"fees"`
+	Units        decimal.Decimal `json:"units"`
+	UnitValue    decimal.Decimal `json:"unitValue"`
 	All          bool            `json:"all"`
 	CreditCash   bool            `json:"creditCash"`
 	CashPocketID uuid.UUID       `json:"cashPocketId"`
@@ -115,11 +121,13 @@ func (d WithdrawFromFundRequestDTO) Input() FundWithdrawalInput {
 
 // UpdateFundMovementRequestDTO restates a contribution or withdrawal.
 type UpdateFundMovementRequestDTO struct {
-	Date   time.Time       `json:"date"`
-	Amount decimal.Decimal `json:"amount"`
-	Fees   decimal.Decimal `json:"fees"`
-	All    bool            `json:"all"`
-	Notes  string          `json:"notes"`
+	Date      time.Time       `json:"date"`
+	Amount    decimal.Decimal `json:"amount"`
+	Fees      decimal.Decimal `json:"fees"`
+	Units     decimal.Decimal `json:"units"`
+	UnitValue decimal.Decimal `json:"unitValue"`
+	All       bool            `json:"all"`
+	Notes     string          `json:"notes"`
 }
 
 func (d UpdateFundMovementRequestDTO) Input() FundMovementEdit {

@@ -6,6 +6,7 @@
 	import { todayLocalDateString } from '$lib/shared/format/date';
 	import {
 		FundCreateForm,
+		FundDeleteConfirm,
 		FundList,
 		FundMarkForm,
 		FundMovementForm,
@@ -28,9 +29,13 @@
 	let markingId = $state<string | null>(null);
 	const marking = $derived<Fund | null>(data.funds.find((f) => f.assetId === markingId) ?? null);
 
-	/* El fondo por saldo cuyos aportes y retiros están abiertos. */
+	/* El fondo cuyos aportes y retiros están abiertos. */
 	let movingId = $state<string | null>(null);
 	const moving = $derived<Fund | null>(data.funds.find((f) => f.assetId === movingId) ?? null);
+
+	/* El fondo que se va a eliminar. */
+	let deletingId = $state<string | null>(null);
+	const deleting = $derived<Fund | null>(data.funds.find((f) => f.assetId === deletingId) ?? null);
 
 	/* El fondo cuya rentabilidad está abierta. */
 	let detailId = $state<string | null>(null);
@@ -97,6 +102,7 @@
 		showPortfolio={data.portfolios.length > 1}
 		onMark={(fund) => (markingId = fund.assetId)}
 		onMove={(fund) => (movingId = fund.assetId)}
+		onDelete={(fund) => (deletingId = fund.assetId)}
 		performance={data.performance}
 		onDetail={(fund) => (detailId = fund.assetId)}
 	/>
@@ -122,6 +128,12 @@
 	portfolios={data.portfolios}
 	platforms={data.platforms}
 	onClose={() => (movingId = null)}
+/>
+
+<FundDeleteConfirm
+	fund={deleting}
+	movements={deleting ? (data.movements[deleting.assetId]?.length ?? 0) : 0}
+	onClose={() => (deletingId = null)}
 />
 
 <FundPerformanceView

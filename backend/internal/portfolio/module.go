@@ -177,9 +177,9 @@ func (m *Module) Routes(router fiber.Router) {
 	// The funds the Superintendencia Financiera publishes a unit value for,
 	// before "/:assetId" so "catalog" is not read as a fund.
 	portfolios.Get("/funds/catalog", m.handler.SearchPublicFunds)
-	// The movements of a fund followed by balance, before "/:assetId" so the
-	// literal segment is not read as a fund. Their units are derived: every
-	// write replays the fund.
+	// The movements of a fund, before "/:assetId" so the literal segment is
+	// not read as a fund. In one followed by balance their units are derived:
+	// every write replays the fund.
 	portfolios.Put("/funds/movements/:txnId", m.handler.UpdateFundMovement)
 	portfolios.Delete("/funds/movements/:txnId", m.handler.DeleteFundMovement)
 	portfolios.Get("/funds/:assetId", m.handler.GetFund)

@@ -86,9 +86,6 @@
 
 	const day = (iso: string) =>
 		formatCalendarDate(iso, { day: 'numeric', month: 'short', year: 'numeric' });
-
-	/* Un fondo que ya nadie guarda se puede dejar de seguir; con posiciones, no. */
-	const canDelete = $derived(fund !== null && fund.positions.length === 0);
 </script>
 
 <Modal
@@ -208,17 +205,6 @@
 		{#if fund.publicFund || canLinkFund(fund)}
 			<FundLink {fund} />
 		{/if}
-
-		{#if canDelete}
-			<form method="POST" action="?/deleteFund" class="danger-zone" use:enhance={handler}>
-				<input type="hidden" name="id" value={fund.assetId} />
-				<p class="danger-note">
-					Ningún portafolio guarda este fondo. Puedes dejar de seguirlo; sus valores se borran con
-					él.
-				</p>
-				<button type="submit" class="danger-link">Dejar de seguirlo</button>
-			</form>
-		{/if}
 	{/if}
 </Modal>
 
@@ -309,41 +295,6 @@
 	.remove:hover {
 		border-color: var(--red);
 		color: var(--red);
-	}
-
-	.danger-zone {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.5rem 1rem;
-		margin-top: 1.25rem;
-		padding-top: 1rem;
-		border-top: 1px solid var(--border);
-	}
-
-	.danger-note {
-		flex: 1 1 16rem;
-		margin: 0;
-		font-size: 0.8rem;
-		line-height: 1.5;
-		color: var(--text-dim);
-	}
-
-	.danger-link {
-		padding: 0.4rem 0.7rem;
-		border: 1px solid rgba(224, 90, 90, 0.35);
-		border-radius: 7px;
-		background: transparent;
-		font: inherit;
-		font-size: 0.82rem;
-		color: var(--red);
-		cursor: pointer;
-	}
-
-	.danger-link:hover {
-		border-color: var(--red);
-		background: rgba(224, 90, 90, 0.08);
 	}
 
 	@media (max-width: 480px) {
