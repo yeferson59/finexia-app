@@ -657,7 +657,7 @@ func (f *fakeRepository) CreateFund(ctx context.Context, userID uuid.UUID, in Ne
 	return f.createFund(ctx, userID, in)
 }
 
-func (f *fakeRepository) DeleteFund(ctx context.Context, userID, assetID uuid.UUID) error {
+func (f *fakeRepository) DeleteFund(ctx context.Context, userID, assetID uuid.UUID, _ bool) error {
 	return f.deleteFund(ctx, userID, assetID)
 }
 

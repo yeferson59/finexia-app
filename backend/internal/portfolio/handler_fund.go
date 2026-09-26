@@ -74,7 +74,10 @@ func (h *handler) DeleteFund(c fiber.Ctx) error {
 		return httpx.BadRequest(c, "Invalid fund ID", err.Error())
 	}
 
-	if err := h.service.DeleteFund(c, userID, assetID); err != nil {
+	// ?withPositions=true also deletes the positions that still hold it.
+	withPositions := c.Query("withPositions") == "true"
+
+	if err := h.service.DeleteFund(c, userID, assetID, withPositions); err != nil {
 		return httpx.FromDomain(c, err, "Error deleting fund", "Could not delete fund")
 	}
 
@@ -170,7 +173,8 @@ func (h *handler) GetFundMovements(c fiber.Ctx) error {
 	return httpx.OK(c, "Fund movements retrieved", "Fund movements retrieved successfully", movements)
 }
 
-// ContributeToFund puts money into a fund followed by balance.
+// ContributeToFund puts money into a fund: an amount in one followed by
+// balance, units at a unit value in one followed by units.
 func (h *handler) ContributeToFund(c fiber.Ctx) error {
 	userID, _, _, err := httpx.Identity(c)
 	if err != nil {
@@ -195,7 +199,7 @@ func (h *handler) ContributeToFund(c fiber.Ctx) error {
 	return httpx.OK(c, "Contribution recorded", "Contribution recorded successfully", movement)
 }
 
-// WithdrawFromFund takes money out of a position of a fund followed by balance.
+// WithdrawFromFund takes money out of a position of a fund.
 func (h *handler) WithdrawFromFund(c fiber.Ctx) error {
 	userID, _, _, err := httpx.Identity(c)
 	if err != nil {

@@ -324,32 +324,47 @@ func (r *PostgresRepository) CreateFund(ctx context.Context, userID uuid.UUID, i
 // DeleteFund stops following a fund that no portfolio holds any more: its
 // marks go, and so does the price they put in user_asset_prices.
 //
-// A fund still held is refused. Its positions carry transactions, maybe paid
-// from cash, and they are deleted where every position is, one at a time and
-// with what each one undoes; doing it here in bulk would skip that.
+// A fund still held is refused unless withPositions says to take its
+// positions with it. Each one then goes the way DeletePortfolioEntry deletes
+// one — the cash its sales credited or its purchases debited is given back
+// first, and refused if already spent — all in this one transaction, so the
+// fund goes whole or not at all. Nothing is replayed: there is no fund left.
 //
 // The asset row goes too when nothing else needs it — nobody else holds or
 // lists it — which is the normal case for a fund created here. Otherwise it
 // stays in the catalog and only this user's membership goes.
-func (r *PostgresRepository) DeleteFund(ctx context.Context, userID, assetID uuid.UUID) error {
+func (r *PostgresRepository) DeleteFund(ctx context.Context, userID, assetID uuid.UUID, withPositions bool) error {
 	return database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		if _, err := lockFund(ctx, tx, userID, assetID); err != nil {
 			return err
 		}
 
-		var held bool
-		if err := tx.QueryRow(ctx, `
-			SELECT EXISTS (
-				SELECT 1 FROM portfolio_entries pe
-				JOIN portfolios p ON p.id = pe.portfolio_id
-				WHERE p.user_id = $1 AND pe.asset_id = $2
-			)
-		`, userID, assetID).Scan(&held); err != nil {
+		rows, err := tx.Query(ctx, `
+			SELECT pe.id FROM portfolio_entries pe
+			JOIN portfolios p ON p.id = pe.portfolio_id
+			WHERE p.user_id = $1 AND pe.asset_id = $2
+		`, userID, assetID)
+		if err != nil {
 			return err
 		}
 
-		if held {
+		entries, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+		if err != nil {
+			return err
+		}
+
+		if len(entries) > 0 && !withPositions {
 			return ErrFundHasPositions
+		}
+
+		for _, entryID := range entries {
+			if err := syncEntryCashLinks(ctx, tx, userID, entryID, false); err != nil {
+				return err
+			}
+
+			if _, err := tx.Exec(ctx, `DELETE FROM portfolio_entries WHERE id = $1`, entryID); err != nil {
+				return err
+			}
 		}
 
 		if _, err := tx.Exec(ctx, `
@@ -370,7 +385,7 @@ func (r *PostgresRepository) DeleteFund(ctx context.Context, userID, assetID uui
 			return err
 		}
 
-		_, err := tx.Exec(ctx, `
+		_, err = tx.Exec(ctx, `
 			DELETE FROM assets a
 			WHERE a.id = $1
 			  AND a.asset_type = 'fund'

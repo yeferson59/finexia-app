@@ -12,12 +12,14 @@ import (
 	"github.com/yeferson59/finexia-app/internal/platform/httpx"
 )
 
-// The contributions and withdrawals of a fund followed by balance. They are the
-// fund's purchases and sales, stated in money: the units are the replay's
-// business (fund_units.go), so the owner never types one.
+// The contributions and withdrawals of a fund: its purchases and sales. In a
+// fund followed by balance they are stated in money and the units are the
+// replay's business (fund_units.go), so the owner never types one. In a fund
+// followed by units they are stated as the statement shows them: units at a
+// unit value.
 
 // ErrFundMovementNotFound answers for a transaction that does not exist,
-// belongs to someone else, or is not a movement of a fund followed by balance.
+// belongs to someone else, or is not a purchase or sale of a fund.
 var ErrFundMovementNotFound = httpx.AsNotFound(errors.New("fund movement not found"))
 
 // FundMovementKind is which way the money went.
@@ -31,6 +33,7 @@ const (
 // FundMovement is one contribution or withdrawal, with the units it came to.
 type FundMovement struct {
 	TxnID         uuid.UUID        `json:"txnId"`
+	AssetID       uuid.UUID        `json:"assetId"`
 	EntryID       uuid.UUID        `json:"entryId"`
 	PortfolioID   uuid.UUID        `json:"portfolioId"`
 	PortfolioName string           `json:"portfolioName"`
@@ -49,7 +52,8 @@ type FundMovement struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-// FundContributionInput is money put into a fund followed by balance.
+// FundContributionInput is money put into a fund: an amount in one followed by
+// balance, units at a unit value in one followed by units.
 type FundContributionInput struct {
 	// PortfolioID and SourceID are the position it lands on, opened if the
 	// portfolio did not hold the fund on that platform yet.
@@ -62,19 +66,40 @@ type FundContributionInput struct {
 	// exact unit value of its day rather than the last one known. It is written
 	// as that day's balance.
 	BalanceBefore decimal.Decimal
-	PayFromCash   bool
-	CashPocketID  uuid.UUID
-	Notes         string
+	// Units and UnitValue are the purchase of a fund followed by units, which
+	// states no Amount: it is what they come to.
+	Units        decimal.Decimal
+	UnitValue    decimal.Decimal
+	PayFromCash  bool
+	CashPocketID uuid.UUID
+	Notes        string
 }
 
-// Validate checks what the contribution states. today is the server's clock.
-func (in FundContributionInput) Validate(today time.Time) error {
+// Validate checks what the contribution states against how the fund is
+// followed. today is the server's clock.
+func (in FundContributionInput) Validate(today time.Time, tracking FundTracking) error {
 	if in.PortfolioID == (uuid.UUID{}) || in.SourceID == (uuid.UUID{}) {
 		return invalidFund("portfolioId and sourceId are required")
 	}
 
 	if err := validateFundDate(in.Date, today, invalidFund); err != nil {
 		return err
+	}
+
+	if tracking == FundUnits {
+		if !in.BalanceBefore.IsZero() {
+			return invalidFund("balanceBefore is only for a fund followed by balance")
+		}
+
+		if err := validateFundUnits(in.Units, in.UnitValue); err != nil {
+			return err
+		}
+
+		return validateFundNotes(in.Notes)
+	}
+
+	if !in.Units.IsZero() || !in.UnitValue.IsZero() {
+		return invalidFund("a fund followed by balance takes amounts, not units")
 	}
 
 	if err := validateFundAmount(in.Amount, "amount", invalidFund); err != nil {
@@ -94,16 +119,20 @@ func (in FundContributionInput) Validate(today time.Time) error {
 	return validateFundNotes(in.Notes)
 }
 
-// FundWithdrawalInput is money taken out of a fund followed by balance.
+// FundWithdrawalInput is money taken out of a fund.
 type FundWithdrawalInput struct {
 	// EntryID is the position the units leave: a portfolio can only take out
 	// what it holds.
 	EntryID uuid.UUID
 	Date    time.Time
-	// Amount is what the fund paid out, before Fees: what the platform kept —
-	// a penalty for leaving early, the tax on the movement.
+	// Amount is what a fund followed by balance paid out, before Fees: what
+	// the platform kept — a penalty for leaving early, the tax on the movement.
 	Amount decimal.Decimal
 	Fees   decimal.Decimal
+	// Units and UnitValue are the sale of a fund followed by units; with All,
+	// Units may be left out and are every unit the position holds.
+	Units     decimal.Decimal
+	UnitValue decimal.Decimal
 	// All takes everything the position holds.
 	All          bool
 	CreditCash   bool
@@ -111,35 +140,86 @@ type FundWithdrawalInput struct {
 	Notes        string
 }
 
-// Validate checks what the withdrawal states. today is the server's clock.
-func (in FundWithdrawalInput) Validate(today time.Time) error {
+// Validate checks what the withdrawal states against how the fund is
+// followed. today is the server's clock.
+func (in FundWithdrawalInput) Validate(today time.Time, tracking FundTracking) error {
 	if in.EntryID == (uuid.UUID{}) {
 		return invalidFund("entryId is required")
+	}
+
+	if tracking == FundUnits {
+		units := in.Units
+		// Every unit is only known once the position is read; any positive
+		// quantity stands in for it here.
+		if in.All && units.IsZero() {
+			units = decimal.One
+		}
+
+		if err := validateFundUnits(units, in.UnitValue); err != nil {
+			return err
+		}
+
+		return validateFundMovementValues(today, in.Date, units.Mul(in.UnitValue), in.Fees, true, in.Notes)
+	}
+
+	if !in.Units.IsZero() || !in.UnitValue.IsZero() {
+		return invalidFund("a fund followed by balance takes amounts, not units")
 	}
 
 	return validateFundMovementValues(today, in.Date, in.Amount, in.Fees, true, in.Notes)
 }
 
 // FundMovementEdit is a contribution or withdrawal restated: its day, its
-// money and its note. Which position it is on and which way it went stay; that
-// is a deletion and a new movement.
+// money — or, in a fund followed by units, its units and unit value — and its
+// note. Which position it is on and which way it went stay; that is a deletion
+// and a new movement.
 type FundMovementEdit struct {
-	Date   time.Time
-	Amount decimal.Decimal
-	Fees   decimal.Decimal
-	All    bool
-	Notes  string
+	Date      time.Time
+	Amount    decimal.Decimal
+	Fees      decimal.Decimal
+	Units     decimal.Decimal
+	UnitValue decimal.Decimal
+	All       bool
+	Notes     string
 }
 
-// Validate checks the edit against the kind of movement it rewrites.
-func (in FundMovementEdit) Validate(today time.Time, kind FundMovementKind) error {
+// Validate checks the edit against the kind of movement it rewrites and how
+// its fund is followed.
+func (in FundMovementEdit) Validate(today time.Time, kind FundMovementKind, tracking FundTracking) error {
 	withdrawal := kind == FundWithdrawal
+
+	if tracking == FundUnits {
+		// A sale of everything is a quantity, and the edit states it.
+		if in.All {
+			return invalidFund("a fund followed by units states the units it withdraws")
+		}
+
+		if err := validateFundUnits(in.Units, in.UnitValue); err != nil {
+			return err
+		}
+
+		return validateFundMovementValues(today, in.Date, in.Units.Mul(in.UnitValue), in.Fees, withdrawal, in.Notes)
+	}
+
+	if !in.Units.IsZero() || !in.UnitValue.IsZero() {
+		return invalidFund("a fund followed by balance takes amounts, not units")
+	}
 
 	if !withdrawal && in.All {
 		return invalidFund("only a withdrawal can take everything")
 	}
 
 	return validateFundMovementValues(today, in.Date, in.Amount, in.Fees, withdrawal, in.Notes)
+}
+
+// validateFundUnits checks the units and unit value a movement of a fund
+// followed by units states.
+func validateFundUnits(units, unitValue decimal.Decimal) error {
+	if !units.IsPos() || !units.LessThan(maxFundUnitValue) {
+		return invalidFund("units must be greater than 0 and less than %s", maxFundUnitValue)
+	}
+
+	return validateUnitValue(unitValue, invalidFund)
 }
 
 func validateFundMovementValues(today, date time.Time, amount, fees decimal.Decimal, withdrawal bool, notes string) error {

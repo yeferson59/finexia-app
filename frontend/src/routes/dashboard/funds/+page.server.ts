@@ -17,7 +17,11 @@ import {
 	fundMarkSchema,
 	fundMarksBulkSchema,
 	fundMovementDeleteSchema,
+	fundMovementEditSchema,
 	fundMovementErrorMessage,
+	fundUnitsContributionSchema,
+	fundUnitsMovementEditSchema,
+	fundUnitsWithdrawalSchema,
 	fundUnlinkSchema,
 	fundWithdrawalSchema,
 	toFundDateTime,
@@ -37,13 +41,12 @@ export const load: PageServerLoad = async ({ cookies, fetch, locals }) => {
 
 	const list = fundsRes.success ? (fundsRes.data ?? []) : [];
 
-	// Las marcas de cada fondo, y los movimientos de los que se siguen por saldo,
-	// para los diálogos. Un usuario sigue pocos fondos, así que se piden todos a
-	// la vez en vez de al abrir cada uno.
-	const byBalance = list.filter((f) => f.tracking === 'balance');
+	// Las marcas y los movimientos de cada fondo, para los diálogos. Un usuario
+	// sigue pocos fondos, así que se piden todos a la vez en vez de al abrir cada
+	// uno.
 	const [marksRes, movementsRes, performanceRes] = await Promise.all([
 		Promise.all(list.map((f) => funds.getMarks(event, f.assetId))),
-		Promise.all(byBalance.map((f) => funds.getMovements(event, f.assetId))),
+		Promise.all(list.map((f) => funds.getMovements(event, f.assetId))),
 		Promise.all(list.map((f) => funds.getPerformance(event, f.assetId)))
 	]);
 
@@ -61,7 +64,7 @@ export const load: PageServerLoad = async ({ cookies, fetch, locals }) => {
 	});
 
 	const movements: Record<string, FundMovement[]> = {};
-	byBalance.forEach((f, i) => {
+	list.forEach((f, i) => {
 		movements[f.assetId] = movementsRes[i].success ? (movementsRes[i].data ?? []) : [];
 	});
 
@@ -250,6 +253,34 @@ export const actions = {
 	contribute: async ({ request, cookies, fetch }) => {
 		const formData = await request.formData();
 
+		if (formData.get('tracking') === 'units') {
+			const parsed = fundUnitsContributionSchema.safeParse({
+				id: formData.get('id'),
+				portfolioId: formData.get('portfolioId'),
+				sourceId: formData.get('sourceId'),
+				date: formData.get('date'),
+				units: formData.get('units'),
+				unitValue: formData.get('unitValue'),
+				notes: formData.get('notes')
+			});
+
+			if (!parsed.success) {
+				return fail(400, { error: parsed.error.issues[0].message });
+			}
+
+			const { id, date, ...contribution } = parsed.data;
+			const res = await funds.contribute({ cookies, fetch }, id, {
+				...contribution,
+				date: toFundDateTime(date)
+			});
+
+			if (!res.ok || !res.success) {
+				return failed(res, fundMovementErrorMessage(res.status, res.details));
+			}
+
+			return { success: true };
+		}
+
 		const parsed = fundContributionSchema.safeParse({
 			id: formData.get('id'),
 			portfolioId: formData.get('portfolioId'),
@@ -280,6 +311,37 @@ export const actions = {
 	withdraw: async ({ request, cookies, fetch }) => {
 		const formData = await request.formData();
 
+		if (formData.get('tracking') === 'units') {
+			const parsed = fundUnitsWithdrawalSchema.safeParse({
+				id: formData.get('id'),
+				entryId: formData.get('entryId'),
+				date: formData.get('date'),
+				units: formData.get('units'),
+				unitValue: formData.get('unitValue'),
+				fees: formData.get('fees'),
+				all: formData.get('all'),
+				notes: formData.get('notes')
+			});
+
+			if (!parsed.success) {
+				return fail(400, { error: parsed.error.issues[0].message });
+			}
+
+			const { id, date, units, ...withdrawal } = parsed.data;
+			const res = await funds.withdraw({ cookies, fetch }, id, {
+				...withdrawal,
+				// Con «Retirar todo» las unidades las pone el backend.
+				...(units !== undefined && !withdrawal.all ? { units } : {}),
+				date: toFundDateTime(date)
+			});
+
+			if (!res.ok || !res.success) {
+				return failed(res, fundMovementErrorMessage(res.status, res.details));
+			}
+
+			return { success: true };
+		}
+
 		const parsed = fundWithdrawalSchema.safeParse({
 			id: formData.get('id'),
 			entryId: formData.get('entryId'),
@@ -297,6 +359,45 @@ export const actions = {
 		const { id, date, ...withdrawal } = parsed.data;
 		const res = await funds.withdraw({ cookies, fetch }, id, {
 			...withdrawal,
+			date: toFundDateTime(date)
+		});
+
+		if (!res.ok || !res.success) {
+			return failed(res, fundMovementErrorMessage(res.status, res.details));
+		}
+
+		return { success: true };
+	},
+
+	updateMovement: async ({ request, cookies, fetch }) => {
+		const formData = await request.formData();
+
+		const parsed =
+			formData.get('tracking') === 'units'
+				? fundUnitsMovementEditSchema.safeParse({
+						txnId: formData.get('txnId'),
+						date: formData.get('date'),
+						units: formData.get('units'),
+						unitValue: formData.get('unitValue'),
+						fees: formData.get('fees'),
+						notes: formData.get('notes')
+					})
+				: fundMovementEditSchema.safeParse({
+						txnId: formData.get('txnId'),
+						date: formData.get('date'),
+						amount: formData.get('amount'),
+						fees: formData.get('fees'),
+						all: formData.get('all'),
+						notes: formData.get('notes')
+					});
+
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0].message });
+		}
+
+		const { txnId, date, ...edit } = parsed.data;
+		const res = await funds.updateMovement({ cookies, fetch }, txnId, {
+			...edit,
 			date: toFundDateTime(date)
 		});
 
@@ -367,13 +468,20 @@ export const actions = {
 	deleteFund: async ({ request, cookies, fetch }) => {
 		const formData = await request.formData();
 
-		const parsed = fundDeleteSchema.safeParse({ id: formData.get('id') });
+		const parsed = fundDeleteSchema.safeParse({
+			id: formData.get('id'),
+			withPositions: formData.get('withPositions')
+		});
 
 		if (!parsed.success) {
 			return fail(400, { error: parsed.error.issues[0].message });
 		}
 
-		const res = await funds.deleteFund({ cookies, fetch }, parsed.data.id);
+		const res = await funds.deleteFund(
+			{ cookies, fetch },
+			parsed.data.id,
+			parsed.data.withPositions
+		);
 
 		if (!res.ok || !res.success) {
 			return failed(res, fundErrorMessage(res.status, res.details));

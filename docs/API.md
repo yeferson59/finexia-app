@@ -1553,7 +1553,7 @@ cotizar.
 | `GET /portfolios/funds` | Los fondos del usuario, por nombre, con sus posiciones |
 | `GET /portfolios/funds/:assetId` | Uno |
 | `POST /portfolios/funds` | Crea el activo, la posición y la primera compra, y opcionalmente la marca de hoy |
-| `DELETE /portfolios/funds/:assetId` | Deja de seguir un fondo que ningún portafolio guarda (**409** si alguno lo guarda) |
+| `DELETE /portfolios/funds/:assetId` | Deja de seguir un fondo que ningún portafolio guarda (**409** si alguno lo guarda). Con `?withPositions=true` borra también sus posiciones, con sus transacciones y sus filas de efectivo, en una sola transacción (**409** si el efectivo ya gastó lo que abonó una venta) |
 | `GET /portfolios/funds/:assetId/marks` | Sus marcas, de la más reciente a la más vieja |
 | `POST /portfolios/funds/:assetId/marks` | Escribe la marca de un día; otra el mismo día la reemplaza |
 | `DELETE /portfolios/funds/:assetId/marks/:date` | Borra la marca de un día (`YYYY-MM-DD`) |
@@ -1685,8 +1685,8 @@ snapshots desde el día más temprano que cambió.
 | Método y ruta | Qué hace |
 |---|---|
 | `GET /portfolios/funds/:assetId/movements` | Compras y ventas del fondo, del más reciente; en uno por saldo, con el dinero que se dijo |
-| `POST /portfolios/funds/:assetId/contributions` | Aporte: `{portfolioId, sourceId, date, amount, balanceBefore?, payFromCash?, cashPocketId?, notes?}` |
-| `POST /portfolios/funds/:assetId/withdrawals` | Retiro de una posición: `{entryId, date, amount, fees?, all?, creditCash?, cashPocketId?, notes?}` |
+| `POST /portfolios/funds/:assetId/contributions` | Aporte: `{portfolioId, sourceId, date, amount, balanceBefore?, payFromCash?, cashPocketId?, notes?}` (por unidades, ver abajo) |
+| `POST /portfolios/funds/:assetId/withdrawals` | Retiro de una posición: `{entryId, date, amount, fees?, all?, creditCash?, cashPocketId?, notes?}` (por unidades, ver abajo) |
 | `PUT /portfolios/funds/movements/:txnId` | Corrige día, importe, comisión, `all` y nota; reproduce el fondo |
 | `DELETE /portfolios/funds/movements/:txnId` | Borra un aporte o retiro, con su fila de efectivo |
 
@@ -1703,8 +1703,29 @@ snapshots desde el día más temprano que cambió.
   como «todo»).
 - Las rutas genéricas de transacciones (`POST /portfolios/entries`,
   `POST/PUT/DELETE` de transacciones) responden **409** sobre un fondo por
-  saldo: sus cantidades son derivadas. Las rutas de aportes y retiros responden
-  **409** sobre un fondo por unidades.
+  saldo: sus cantidades son derivadas.
+
+**Aportes y retiros de un fondo por unidades.** Las mismas cinco rutas sirven
+para un fondo con `tracking: "units"`, que se dice en unidades y valor de
+unidad, como el extracto, en vez de en dinero:
+
+| Ruta | Cuerpo en un fondo por unidades |
+|---|---|
+| `POST …/contributions` | `{portfolioId, sourceId, date, units, unitValue, payFromCash?, cashPocketId?, notes?}` |
+| `POST …/withdrawals` | `{entryId, date, units, unitValue, fees?, all?, creditCash?, cashPocketId?, notes?}` |
+| `PUT /portfolios/funds/movements/:txnId` | `{date, units, unitValue, fees?, notes?}` |
+
+- Son compras y ventas normales al valor de unidad dicho: no hay replay, y la
+  moneda, la tasa y el lado de efectivo de la transacción se conservan al
+  editarla (el abono o cargo se ajusta al importe nuevo).
+- `all: true` en un retiro vende todas las unidades que la posición tiene hoy, y
+  `units` se puede omitir; más unidades de las que tiene responde **409**. En la
+  edición `all` no vale (**400**): se dicen las unidades.
+- `amount` o `balanceBefore` en un fondo por unidades, o `units`/`unitValue` en
+  uno por saldo, responden **400**.
+- `DELETE /portfolios/funds/movements/:txnId` borra la compra o venta con su
+  fila de efectivo, igual que en un fondo por saldo.
+- Cada movimiento trae `assetId`, el fondo al que pertenece.
 
 **Valor publicado por la Superfinanciera** (migración 000059). La
 Superintendencia Financiera publica cada día, como dato abierto, el valor de

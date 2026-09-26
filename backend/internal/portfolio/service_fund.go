@@ -42,9 +42,10 @@ func (s *service) CreateFund(ctx context.Context, userID uuid.UUID, in NewFundIn
 	return s.repo.CreateFund(ctx, userID, in)
 }
 
-// DeleteFund stops following a fund no portfolio holds any more.
-func (s *service) DeleteFund(ctx context.Context, userID, assetID uuid.UUID) error {
-	return s.repo.DeleteFund(ctx, userID, assetID)
+// DeleteFund stops following a fund no portfolio holds any more or, with
+// withPositions, one still held, taking its positions and their history.
+func (s *service) DeleteFund(ctx context.Context, userID, assetID uuid.UUID, withPositions bool) error {
+	return s.repo.DeleteFund(ctx, userID, assetID, withPositions)
 }
 
 // GetFundMarks lists a fund's marks, the most recent first.
@@ -81,18 +82,30 @@ func (s *service) GetFundMovements(ctx context.Context, userID, assetID uuid.UUI
 	return s.repo.GetFundMovements(ctx, userID, assetID)
 }
 
-// ContributeToFund puts money into a fund followed by balance.
+// ContributeToFund puts money into a fund. What the contribution may say
+// depends on how the fund is followed, so the fund is read first, outside the
+// write's lock, as SaveFundMark does: how a fund is followed never changes.
 func (s *service) ContributeToFund(ctx context.Context, userID, assetID uuid.UUID, in FundContributionInput) (FundMovement, error) {
-	if err := in.Validate(time.Now()); err != nil {
+	fund, err := s.repo.GetFund(ctx, userID, assetID)
+	if err != nil {
+		return FundMovement{}, err
+	}
+
+	if err := in.Validate(time.Now(), fund.Tracking); err != nil {
 		return FundMovement{}, err
 	}
 
 	return s.repo.ContributeToFund(ctx, userID, assetID, in)
 }
 
-// WithdrawFromFund takes money out of a position of a fund followed by balance.
+// WithdrawFromFund takes money out of a position of a fund.
 func (s *service) WithdrawFromFund(ctx context.Context, userID, assetID uuid.UUID, in FundWithdrawalInput) (FundMovement, error) {
-	if err := in.Validate(time.Now()); err != nil {
+	fund, err := s.repo.GetFund(ctx, userID, assetID)
+	if err != nil {
+		return FundMovement{}, err
+	}
+
+	if err := in.Validate(time.Now(), fund.Tracking); err != nil {
 		return FundMovement{}, err
 	}
 
@@ -101,14 +114,20 @@ func (s *service) WithdrawFromFund(ctx context.Context, userID, assetID uuid.UUI
 
 // UpdateFundMovement restates a contribution or withdrawal. Which of the two
 // it is decides what it may say — only a withdrawal takes fees or everything —
-// so the movement is read first; its kind never changes.
+// and so does how its fund is followed, so the movement and its fund are read
+// first; neither its kind nor the fund's tracking ever changes.
 func (s *service) UpdateFundMovement(ctx context.Context, userID, txnID uuid.UUID, in FundMovementEdit) (FundMovement, error) {
 	current, err := s.repo.GetFundMovement(ctx, userID, txnID)
 	if err != nil {
 		return FundMovement{}, err
 	}
 
-	if err := in.Validate(time.Now(), current.Kind); err != nil {
+	fund, err := s.repo.GetFund(ctx, userID, current.AssetID)
+	if err != nil {
+		return FundMovement{}, err
+	}
+
+	if err := in.Validate(time.Now(), current.Kind, fund.Tracking); err != nil {
 		return FundMovement{}, err
 	}
 

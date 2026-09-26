@@ -200,35 +200,40 @@ func readFundBalanceFacts(ctx context.Context, tx pgx.Tx, userID, assetID uuid.U
 	return facts, rows.Err()
 }
 
-// lockBalanceFund locks a fund and refuses one followed by units.
-func lockBalanceFund(ctx context.Context, tx pgx.Tx, userID, assetID uuid.UUID) (money.Currency, error) {
+// lockFundWithCurrency locks a fund and answers how it is followed and the
+// currency it is in.
+func lockFundWithCurrency(ctx context.Context, tx pgx.Tx, userID, assetID uuid.UUID) (FundTracking, money.Currency, error) {
 	tracking, err := lockFund(ctx, tx, userID, assetID)
 	if err != nil {
-		return money.XXX, err
-	}
-
-	if tracking != FundBalance {
-		return money.XXX, ErrFundNotBalance
+		return "", money.XXX, err
 	}
 
 	var cur money.Currency
 	err = tx.QueryRow(ctx, `SELECT currency FROM assets WHERE id = $1`, assetID).Scan(&cur)
 
-	return cur, err
+	return tracking, cur, err
 }
 
-// ContributeToFund puts money into a fund followed by balance, on the position
-// its portfolio holds on the platform — opened if there is none.
+// ContributeToFund puts money into a fund, on the position its portfolio holds
+// on the platform — opened if there is none.
 //
-// The purchase is written provisionally as its amount at a price of one, so it
-// moves exactly its amount through cash when it is paid from there; the replay
-// then gives it its real units at the unit value of its day.
+// In a fund followed by balance the purchase is written provisionally as its
+// amount at a price of one, so it moves exactly its amount through cash when
+// it is paid from there; the replay then gives it its real units at the unit
+// value of its day. In one followed by units it is the units at the unit value
+// the owner stated (contributeUnits).
 func (r *PostgresRepository) ContributeToFund(ctx context.Context, userID, assetID uuid.UUID, in FundContributionInput) (FundMovement, error) {
 	var movement FundMovement
 
 	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
-		cur, err := lockBalanceFund(ctx, tx, userID, assetID)
+		tracking, cur, err := lockFundWithCurrency(ctx, tx, userID, assetID)
 		if err != nil {
+			return err
+		}
+
+		if tracking == FundUnits {
+			movement, err = contributeUnits(ctx, tx, userID, assetID, cur, in)
+
 			return err
 		}
 
@@ -288,18 +293,19 @@ func (r *PostgresRepository) ContributeToFund(ctx context.Context, userID, asset
 // the fund held nothing the day before, so there was nothing to value.
 var errBalanceBeforeFirst = errors.New("leave out the balance before the first contribution")
 
-// WithdrawFromFund takes money out of one position of a fund followed by
-// balance.
+// WithdrawFromFund takes money out of one position of a fund.
 //
-// The sale is written provisionally for every unit the position holds, at the
-// price that makes it the amount, so a withdrawal paid into cash credits
-// exactly that; the replay then gives it its real units, and refuses it if the
-// position does not hold that much on its day.
+// In a fund followed by balance the sale is written provisionally for every
+// unit the position holds, at the price that makes it the amount, so a
+// withdrawal paid into cash credits exactly that; the replay then gives it its
+// real units, and refuses it if the position does not hold that much on its
+// day. In one followed by units it is the units at the unit value the owner
+// stated (withdrawUnits).
 func (r *PostgresRepository) WithdrawFromFund(ctx context.Context, userID, assetID uuid.UUID, in FundWithdrawalInput) (FundMovement, error) {
 	var movement FundMovement
 
 	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
-		cur, err := lockBalanceFund(ctx, tx, userID, assetID)
+		tracking, cur, err := lockFundWithCurrency(ctx, tx, userID, assetID)
 		if err != nil {
 			return err
 		}
@@ -320,6 +326,12 @@ func (r *PostgresRepository) WithdrawFromFund(ctx context.Context, userID, asset
 
 		units, err := decimal.NewFromString(held)
 		if err != nil {
+			return err
+		}
+
+		if tracking == FundUnits {
+			movement, err = withdrawUnits(ctx, tx, userID, cur, units, in)
+
 			return err
 		}
 
@@ -368,14 +380,15 @@ func (r *PostgresRepository) WithdrawFromFund(ctx context.Context, userID, asset
 
 // lockedFundMovement is what an edit or a deletion of a movement has to know.
 type lockedFundMovement struct {
-	assetID uuid.UUID
-	entryID uuid.UUID
-	date    time.Time
+	assetID  uuid.UUID
+	entryID  uuid.UUID
+	date     time.Time
+	tracking FundTracking
 }
 
-// lockFundMovement finds a movement of a fund the user follows by balance and
-// locks the fund. Anything else — another user's, a units fund's, a dividend —
-// is not found.
+// lockFundMovement finds a purchase or sale of a fund the user follows and
+// locks the fund. Anything else — another user's, another asset's, a
+// dividend — is not found.
 func lockFundMovement(ctx context.Context, tx pgx.Tx, userID, txnID uuid.UUID) (lockedFundMovement, error) {
 	var m lockedFundMovement
 
@@ -384,8 +397,8 @@ func lockFundMovement(ctx context.Context, tx pgx.Tx, userID, txnID uuid.UUID) (
 		FROM transactions t
 		JOIN portfolio_entries pe ON pe.id = t.entry_id
 		JOIN portfolios p         ON p.id = pe.portfolio_id
-		JOIN user_funds uf        ON uf.user_id = p.user_id AND uf.asset_id = pe.asset_id
-		WHERE t.id = $1 AND p.user_id = $2 AND uf.tracking = 'balance' AND t.type IN ('buy', 'sell')
+		JOIN assets a             ON a.id = pe.asset_id
+		WHERE t.id = $1 AND p.user_id = $2 AND a.asset_type = 'fund' AND t.type IN ('buy', 'sell')
 	`, txnID, userID).Scan(&m.assetID, &m.entryID, &m.date)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return m, ErrFundMovementNotFound
@@ -396,12 +409,12 @@ func lockFundMovement(ctx context.Context, tx pgx.Tx, userID, txnID uuid.UUID) (
 	}
 
 	m.date = cashRateDay(m.date)
-	_, err = lockBalanceFund(ctx, tx, userID, m.assetID)
+	m.tracking, err = lockFund(ctx, tx, userID, m.assetID)
 
 	return m, err
 }
 
-// GetFundMovement reads one movement of a fund followed by balance.
+// GetFundMovement reads one purchase or sale of a fund.
 func (r *PostgresRepository) GetFundMovement(ctx context.Context, userID, txnID uuid.UUID) (FundMovement, error) {
 	var movement FundMovement
 
@@ -417,13 +430,20 @@ func (r *PostgresRepository) GetFundMovement(ctx context.Context, userID, txnID 
 
 // UpdateFundMovement restates a contribution or withdrawal — its day, its
 // money, its fees, its note — and replays the fund from the earlier of its old
-// and new days.
+// and new days. In a fund followed by units it restates the units and unit
+// value instead, and there is nothing to replay (updateUnitsMovement).
 func (r *PostgresRepository) UpdateFundMovement(ctx context.Context, userID, txnID uuid.UUID, in FundMovementEdit) (FundMovement, error) {
 	var movement FundMovement
 
 	if err := database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		locked, err := lockFundMovement(ctx, tx, userID, txnID)
 		if err != nil {
+			return err
+		}
+
+		if locked.tracking == FundUnits {
+			movement, err = updateUnitsMovement(ctx, tx, userID, txnID, locked, in)
+
 			return err
 		}
 
@@ -461,7 +481,9 @@ func (r *PostgresRepository) UpdateFundMovement(ctx context.Context, userID, txn
 }
 
 // DeleteFundMovement takes a contribution or withdrawal back, with the cash
-// row it moved, and replays the fund from its day.
+// row it moved, and replays a fund followed by balance from its day. One
+// followed by units has nothing to replay: its position is recalculated from
+// what remains, as after any deleted transaction.
 func (r *PostgresRepository) DeleteFundMovement(ctx context.Context, userID, txnID uuid.UUID) error {
 	return database.WithinTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		locked, err := lockFundMovement(ctx, tx, userID, txnID)
@@ -475,6 +497,10 @@ func (r *PostgresRepository) DeleteFundMovement(ctx context.Context, userID, txn
 
 		if _, err := tx.Exec(ctx, `DELETE FROM transactions WHERE id = $1`, txnID); err != nil {
 			return err
+		}
+
+		if locked.tracking == FundUnits {
+			return syncEntryCashLinks(ctx, tx, userID, locked.entryID, true)
 		}
 
 		_, err = replayAndRestate(ctx, tx, userID, locked.assetID, locked.date)
@@ -523,7 +549,7 @@ func (r *PostgresRepository) GetFundMovements(ctx context.Context, userID, asset
 }
 
 const fundMovementSelect = `
-	SELECT t.id, pe.id, p.id, p.name, COALESCE(s.name, ''), t.type, t.transaction_date,
+	SELECT t.id, pe.asset_id, pe.id, p.id, p.name, COALESCE(s.name, ''), t.type, t.transaction_date,
 	       ROUND(COALESCE(fm.amount, t.quantity * t.price), 8)::text, t.fees::text,
 	       COALESCE(fm.withdraws_all, FALSE), t.quantity::text, t.price::text,
 	       COALESCE(t.notes, ''), t.created_at
@@ -539,7 +565,7 @@ func scanFundMovement(row pgx.Row) (FundMovement, error) {
 		txnType TransactionType
 	)
 
-	if err := row.Scan(&m.TxnID, &m.EntryID, &m.PortfolioID, &m.PortfolioName, &m.SourceName, &txnType, &m.Date,
+	if err := row.Scan(&m.TxnID, &m.AssetID, &m.EntryID, &m.PortfolioID, &m.PortfolioName, &m.SourceName, &txnType, &m.Date,
 		&m.Amount, &m.Fees, &m.All, &m.Units, &m.UnitValue, &m.Notes, &m.CreatedAt); err != nil {
 		return m, err
 	}
@@ -552,11 +578,11 @@ func scanFundMovement(row pgx.Row) (FundMovement, error) {
 	return m, nil
 }
 
-// readFundMovement reads one movement of a fund the user follows by balance.
+// readFundMovement reads one purchase or sale of a fund the user follows.
 func readFundMovement(ctx context.Context, tx pgx.Tx, userID, txnID uuid.UUID) (FundMovement, error) {
 	m, err := scanFundMovement(tx.QueryRow(ctx, fundMovementSelect+`
-		JOIN user_funds uf ON uf.user_id = p.user_id AND uf.asset_id = pe.asset_id
-		WHERE t.id = $1 AND p.user_id = $2 AND uf.tracking = 'balance' AND t.type IN ('buy', 'sell')
+		JOIN assets a ON a.id = pe.asset_id
+		WHERE t.id = $1 AND p.user_id = $2 AND a.asset_type = 'fund' AND t.type IN ('buy', 'sell')
 	`, txnID, userID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return m, ErrFundMovementNotFound

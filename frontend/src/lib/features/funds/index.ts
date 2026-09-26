@@ -13,8 +13,9 @@
  *
  * `fund-list` los enseña como tarjetas, `fund-create-form` registra uno con su
  * primera compra, `fund-mark-form` anota el valor de unidad —o el saldo— de un
- * día y lista los que ya hay, y `fund-movement-form` anota los aportes y
- * retiros de un fondo por saldo. `fund-performance` enseña la rentabilidad por
+ * día y lista los que ya hay, `fund-movement-form` anota, corrige y borra los
+ * aportes y retiros (con `fund-movement-history`, interno), y
+ * `fund-delete-confirm` elimina un fondo, con sus posiciones si aún las tiene. `fund-performance` enseña la rentabilidad por
  * periodo, el dinero y la gráfica (`fund-chart`, interno, con la geometría de
  * `chart.ts`); `fund-marks-paste`, interno de `fund-mark-form`, lee la tabla que
  * se pega desde un extracto (`performance.ts`). `fund-link`, interno de
@@ -28,6 +29,7 @@ export { default as FundCreateForm } from './components/fund-create-form.svelte'
 export { default as FundMarkForm } from './components/fund-mark-form.svelte';
 export { default as FundMovementForm } from './components/fund-movement-form.svelte';
 export { default as FundPerformanceView } from './components/fund-performance.svelte';
+export { default as FundDeleteConfirm } from './components/fund-delete-confirm.svelte';
 
 export * from './funds';
 export * from './schemas';

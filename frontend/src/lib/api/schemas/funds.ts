@@ -99,6 +99,8 @@ export const fundMarkSchema = z.object({
  */
 export const fundMovementSchema = z.object({
 	txnId: z.string(),
+	/** El fondo al que pertenece. */
+	assetId: z.string().optional(),
 	entryId: z.string(),
 	portfolioId: z.string(),
 	portfolioName: z.string(),

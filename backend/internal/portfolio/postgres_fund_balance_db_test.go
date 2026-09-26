@@ -242,12 +242,12 @@ func TestBalanceFundRefusesGenericWrites(t *testing.T) {
 		t.Errorf("DeleteTransaction = %v, want ErrFundBalanceManaged", err)
 	}
 
-	// And its own writes keep off a fund followed by units.
+	// And a fund followed by units is not told money: it takes units.
 	units := f.create(t, "10", "10", "", time.Time{})
 	if _, err := f.repo.ContributeToFund(ctx, f.userID, units.AssetID, FundContributionInput{
 		PortfolioID: f.portfolioID, SourceID: f.sourceID, Date: fundDay(2), Amount: mustDecimal(t, "5"),
-	}); !errors.Is(err, ErrFundNotBalance) {
-		t.Errorf("ContributeToFund on a fund by units = %v, want ErrFundNotBalance", err)
+	}); !errors.Is(err, ErrInvalidFund) {
+		t.Errorf("ContributeToFund of an amount on a fund by units = %v, want ErrInvalidFund", err)
 	}
 }
 
@@ -392,7 +392,7 @@ func TestBalanceFundPositionDeleted(t *testing.T) {
 		t.Fatalf("DeletePortfolioEntry: %v", err)
 	}
 
-	if err := f.repo.DeleteFund(ctx, f.userID, fund.AssetID); err != nil {
+	if err := f.repo.DeleteFund(ctx, f.userID, fund.AssetID, false); err != nil {
 		t.Fatalf("DeleteFund: %v", err)
 	}
 }
