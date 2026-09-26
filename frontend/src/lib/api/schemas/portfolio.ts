@@ -240,8 +240,34 @@ export const growthSummarySchema = z.object({
 	currency: z.string().optional()
 });
 
+/**
+ * Rentabilidad de una ventana hacia atrás: 1 día, 7 días, 1 mes… hasta hoy.
+ *
+ * `gain` es lo ganado en dinero —la variación del valor menos lo que entró o
+ * salió— y `returnPct` la rentabilidad ponderada por tiempo, la misma que dibuja
+ * la vista `%` de la gráfica. Sin `available` solo llega `historyStart`: el
+ * historial no alcanza la ventana y cualquier cifra sería la de otra.
+ * `returnPct` falta también cuando la cuenta estuvo vacía toda la ventana.
+ */
+export const trailingReturnSchema = z.object({
+	period: z.enum(['1D', '1W', '1M', '3M', 'YTD', '1Y', 'ALL']),
+	available: z.boolean(),
+	historyStart: z.string().optional(),
+	from: z.string().optional(),
+	to: z.string().optional(),
+	startValue: z.string().optional(),
+	endValue: z.string().optional(),
+	netFlow: z.string().optional(),
+	gain: z.string().optional(),
+	returnPct: z.string().optional()
+});
+
 /** Crecimiento (`GET /portfolios/growth` y `GET /portfolios/:id/growth`). */
 export const portfolioGrowthSchema = z.object({
 	points: z.array(growthDataPointSchema),
-	summary: growthSummarySchema
+	summary: growthSummarySchema,
+	// Las siete ventanas, de la más corta a la más larga, sobre todo el
+	// historial aunque `points` venga recortado. Opcional por si el backend va
+	// por detrás: sin ellas la franja del panel no se pinta.
+	returns: z.array(trailingReturnSchema).optional()
 });

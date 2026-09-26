@@ -366,6 +366,84 @@ function isoDate(year, month, day) {
 	return date.toISOString().slice(0, 10);
 }
 
+/*
+ * Rentabilidad por periodo (`returns`) con las reglas del backend
+ * (`trailing_returns.go`): cada ventana parte del último punto en o antes de su
+ * fecha objetivo, la ganancia descuenta los flujos y el porcentaje encadena los
+ * tramos de Dietz modificada. La serie del stub es semanal, así que «1 día»
+ * parte del punto anterior, como pasaría tras unos días sin snapshot.
+ */
+const TRAILING_PERIODS = ['1D', '1W', '1M', '3M', 'YTD', '1Y', 'ALL'];
+
+function monthsBefore(date, n) {
+	const [y, m, d] = [date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()];
+	const lastDay = new Date(Date.UTC(y, m - n + 1, 0)).getUTCDate();
+	return new Date(Date.UTC(y, m - n, Math.min(d, lastDay)));
+}
+
+function trailingTarget(last, period) {
+	const [y, m, d] = [last.getUTCFullYear(), last.getUTCMonth(), last.getUTCDate()];
+	switch (period) {
+		case '1D':
+			return new Date(Date.UTC(y, m, d - 1));
+		case '1W':
+			return new Date(Date.UTC(y, m, d - 7));
+		case '1M':
+			return monthsBefore(last, 1);
+		case '3M':
+			return monthsBefore(last, 3);
+		case 'YTD':
+			return new Date(Date.UTC(y - 1, 11, 31));
+		case '1Y':
+			return monthsBefore(last, 12);
+		default:
+			return last;
+	}
+}
+
+function trailingReturns(points) {
+	const dateOf = (point) => new Date(`${point.date}T00:00:00Z`);
+	const historyStart = points[0].date;
+	const last = points[points.length - 1];
+
+	return TRAILING_PERIODS.map((period) => {
+		let anchor = period === 'ALL' ? 0 : -1;
+		if (period !== 'ALL') {
+			const target = trailingTarget(dateOf(last), period);
+			points.slice(0, -1).forEach((point, i) => {
+				if (dateOf(point) <= target) anchor = i;
+			});
+		}
+		if (anchor < 0 || points.length < 2) return { period, available: false, historyStart };
+
+		const window = points.slice(anchor);
+		let flow = 0;
+		let index = 1;
+		for (let i = 1; i < window.length; i++) {
+			const begin = Number(window[i - 1].totalValue);
+			const stretchFlow = Number(window[i].netFlow);
+			flow += stretchFlow;
+			const base = begin + stretchFlow / 2;
+			if (base > 0) index *= 1 + (Number(window[i].totalValue) - begin - stretchFlow) / base;
+		}
+
+		const start = Number(window[0].totalValue);
+		const end = Number(last.totalValue);
+		return {
+			period,
+			available: true,
+			historyStart,
+			from: window[0].date,
+			to: last.date,
+			startValue: money(start),
+			endValue: money(end),
+			netFlow: money(flow),
+			gain: money(end - start - flow),
+			returnPct: ((index - 1) * 100).toFixed(2)
+		};
+	});
+}
+
 export const growth = (() => {
 	const points = [];
 	let wobbleIndex = 0;
@@ -413,7 +491,8 @@ export const growth = (() => {
 			initialValue: first.totalValue,
 			currentValue: last.totalValue,
 			totalGrowthPct: (((current - initial) / initial) * 100).toFixed(2)
-		}
+		},
+		returns: trailingReturns(points)
 	};
 })();
 
@@ -443,7 +522,8 @@ export function growthFor(portfolioId) {
 			initialValue: points[0].totalValue,
 			currentValue: points[points.length - 1].totalValue,
 			totalGrowthPct: growth.summary.totalGrowthPct
-		}
+		},
+		returns: trailingReturns(points)
 	};
 }
 

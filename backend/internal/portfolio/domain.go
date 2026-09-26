@@ -705,15 +705,9 @@ type GrowthSummary struct {
 	GainLoss       string
 	GainLossPct    string
 	Currency       money.Currency
-}
-
-// PortfolioValuePoint is what one portfolio was worth on one snapshot date,
-// in its own base currency. Date is carried alongside the amount because the
-// snapshot found is the most recent one on or before the date asked for, not
-// necessarily that date itself — a caller reporting "since last week" has to
-// be able to say which day it actually compared against.
-type PortfolioValuePoint struct {
-	PortfolioID uuid.UUID
-	Date        time.Time
-	TotalValue  string
+	// Trailing is the return over the last day, week, month… measured on the
+	// whole history whatever period the series above was cut to. It is a third
+	// reading, and the one that answers "how much did I make this month": flows
+	// netted out, unlike TotalGrowthPct, and over a window, unlike GainLoss.
+	Trailing []TrailingReturn
 }

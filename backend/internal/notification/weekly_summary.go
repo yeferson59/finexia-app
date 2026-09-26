@@ -35,10 +35,12 @@ type user interface {
 
 type port interface {
 	GetPortfoliosSummary(ctx context.Context, userID uuid.UUID) ([]portfolio.SummaryView, error)
-	// GetPortfolioValuesAsOf gives the digest the figures this week's are
-	// compared against, one per portfolio. Portfolios with no history that far
-	// back are simply absent.
-	GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]portfolio.PortfolioValuePoint, error)
+	// The two below give the digest the week's movement: each portfolio's in
+	// its own currency, and the account's in the preferred one (money.XXX). Both
+	// net out what the owner paid in or took out, so a deposit is not reported
+	// as the week's gain.
+	GetPortfolioTrailingReturns(ctx context.Context, userID, portfolioID uuid.UUID) ([]portfolio.TrailingReturn, error)
+	GetTrailingReturns(ctx context.Context, userID uuid.UUID, currency money.Currency) ([]portfolio.TrailingReturn, error)
 	// The two below build the cash block: what the account keeps in cash, and
 	// the rate each account earns on it. money.XXX asks for the figures in the
 	// owner's preferred currency, which is the one the digest speaks.
@@ -92,13 +94,14 @@ func (s *Service) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
 			continue
 		}
 
-		// One lookup covers both the per-portfolio rows and the account total:
-		// the total's baseline is the sum of the same figures, so what the rows
-		// say adds up to what the headline says.
-		baseline := s.weekBaseline(ctx, u.ID, now)
-
+		// The account's week is the sum of the rows' weeks, so what the rows say
+		// adds up to what the headline says; weekCount is how many rows had a
+		// week to report, and weekSince the most recent day any was measured
+		// from.
 		totalValue, totalGain := decimal.Zero, decimal.Zero
-		baseTotal, baseCount := decimal.Zero, 0
+		weekGain, weekCount := decimal.Zero, 0
+
+		var weekSince time.Time
 		portfolios := make([]mail.WeeklySummaryPortfolio, 0, len(summaries))
 
 		for _, p := range summaries {
@@ -122,10 +125,18 @@ func (s *Service) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
 				GainLossColor:    color,
 			}
 
-			if was, ok := baseline.values[p.ID]; ok {
-				baseTotal = baseTotal.Add(was)
-				baseCount++
-				applyChange(mv, was, &row.HasWeekChange, &row.WeekChangeValue, &row.WeekChangePct, &row.WeekChangeColor)
+			if week, ok := s.portfolioWeek(ctx, u.ID, p.ID); ok {
+				weekGain = weekGain.Add(week.Gain)
+				weekCount++
+
+				if week.From.After(weekSince) {
+					weekSince = week.From
+				}
+
+				row.HasWeekChange = true
+				row.WeekChangeValue = signed(week.Gain)
+				row.WeekChangeColor = signColor(week.Gain)
+				row.WeekChangePct = weekPct(week)
 			}
 
 			portfolios = append(portfolios, row)
@@ -147,9 +158,12 @@ func (s *Service) SendWeeklySummaryEmails(ctx context.Context) (int, []error) {
 			WeekLabel:        weekLabel,
 		}
 
-		if baseCount > 0 {
-			applyChange(totalValue, baseTotal, &data.HasWeekChange, &data.WeekChangeValue, &data.WeekChangePct, &data.WeekChangeColor)
-			data.WeekChangeSince = formatDay(baseline.date)
+		if weekCount > 0 {
+			data.HasWeekChange = true
+			data.WeekChangeValue = signed(weekGain)
+			data.WeekChangeColor = signColor(weekGain)
+			data.WeekChangePct = s.accountWeekPct(ctx, u.ID)
+			data.WeekChangeSince = formatDay(weekSince)
 		}
 
 		data.Cash = s.cashBlock(ctx, u.ID, now)
@@ -351,78 +365,77 @@ func fundRow(f portfolio.Fund, perf portfolio.FundPerformance, now time.Time) ma
 	return row
 }
 
-// digestPeriod is how far back the digest looks for the value it compares
-// against. The job runs weekly, so a week back is the previous digest's figure.
-const digestPeriod = 7 * 24 * time.Hour
-
-// weekBaseline is what each portfolio was worth at the last digest, keyed by
-// portfolio, plus the day those figures come from.
-type weekBaseline struct {
-	values map[uuid.UUID]decimal.Decimal
-	date   time.Time
-}
-
-// weekBaseline reads the values this week's figures are compared against.
-//
-// The comparison is against the stored daily snapshots from a week ago, not
-// against anything the mailer remembers, so a digest that failed to send — or
-// a user who enabled the summary midway — still gets a truthful "since" date
-// instead of a gap.
-//
-// A lookup that fails returns an empty baseline rather than an error: the
-// digest is worth sending without the comparison. Callers then leave
-// HasWeekChange false and the blocks stay hidden, because an account with no
-// history has nothing to compare against and a 0.00% would claim the portfolio
-// stood still when it simply was not being watched yet.
-//
-// The date reported is the most recent one across the portfolios found. They
-// share a date in practice — SyncPortfolioSnapshots writes them in one pass —
-// but a portfolio that missed a day would otherwise date the whole digest to
-// its own older snapshot.
-func (s *Service) weekBaseline(ctx context.Context, userID uuid.UUID, now time.Time) weekBaseline {
-	out := weekBaseline{values: map[uuid.UUID]decimal.Decimal{}}
-
-	points, err := s.port.GetPortfolioValuesAsOf(ctx, userID, now.Add(-digestPeriod))
-	if err != nil {
-		return out
-	}
-
-	for _, point := range points {
-		out.values[point.PortfolioID] = amount(point.TotalValue)
-		if point.Date.After(out.date) {
-			out.date = point.Date
+// weekOf picks the last week out of a set of trailing returns, if the history
+// reaches that far back. A portfolio opened this week has no week to report
+// and shows none, rather than a gain from nothing.
+func weekOf(trailing []portfolio.TrailingReturn) (portfolio.TrailingReturn, bool) {
+	for _, t := range trailing {
+		if t.Period == portfolio.TrailingWeek && t.Available {
+			return t, true
 		}
 	}
 
-	return out
+	return portfolio.TrailingReturn{}, false
 }
 
-// applyChange fills in one movement — a portfolio row's or the account's —
-// from what a figure is worth now and what it was worth at the baseline.
+// portfolioWeek is one portfolio's last week. A lookup that fails leaves that
+// row without a comparison: the digest is worth sending without it.
 //
-// The percentage is returns.ROI: the same "profit over amount invested" as the
-// all-time figure, with last week's value standing in for the amount invested.
-// ROI refuses a non-positive base, which is exactly the case where a
-// percentage means nothing — there was no value to grow from, so any gain is
-// an infinite one — and the pct is then left empty. The absolute change still
-// says what happened.
-func applyChange(now, before decimal.Decimal, has *bool, value, pct, color *string) {
-	change := now.Sub(before)
-
-	*has = true
-	*value = signed(change)
-
-	*color = gainColor
-	if change.IsNeg() {
-		*color = lossColor
-	}
-
-	roi, err := returns.ROI(money.NewFromDecimal(before, digestUnit), money.NewFromDecimal(now, digestUnit))
+// The week is the growth series' own (portfolio.BuildTrailingReturns): it
+// nets out the money the owner moved, where the comparison it replaces set
+// this week's value against last week's and reported a deposit as the week's
+// gain. It is measured from the last snapshot on or before a week ago — the
+// stored series, not anything the mailer remembers — so a digest that failed
+// to send, or a user who enabled the summary midway, still gets a truthful
+// "since" date instead of a gap.
+func (s *Service) portfolioWeek(ctx context.Context, userID, portfolioID uuid.UUID) (portfolio.TrailingReturn, bool) {
+	trailing, err := s.port.GetPortfolioTrailingReturns(ctx, userID, portfolioID)
 	if err != nil {
-		return
+		return portfolio.TrailingReturn{}, false
 	}
 
-	*pct = signed(roi.Mul(oneHundred))
+	return weekOf(trailing)
+}
+
+// accountWeekPct is the account's return over the week, or empty when there is
+// none to give.
+//
+// It comes from the account-wide series rather than from the rows: returns do
+// not add up the way amounts do, and chaining the account's own subperiods is
+// what weighs each portfolio by what it held. That series is in the preferred
+// currency, and a percentage is the one figure the unit does not change.
+func (s *Service) accountWeekPct(ctx context.Context, userID uuid.UUID) string {
+	trailing, err := s.port.GetTrailingReturns(ctx, userID, money.XXX)
+	if err != nil {
+		return ""
+	}
+
+	week, ok := weekOf(trailing)
+	if !ok {
+		return ""
+	}
+
+	return weekPct(week)
+}
+
+// weekPct renders a week's time-weighted return, or nothing when it has none:
+// a portfolio that held nothing all week has no capital a percentage could be
+// of, and the amount stands on its own.
+func weekPct(week portfolio.TrailingReturn) string {
+	if !week.HasRate {
+		return ""
+	}
+
+	return signed(week.Rate.Mul(oneHundred))
+}
+
+// signColor is the color a movement is painted by its sign.
+func signColor(d decimal.Decimal) string {
+	if d.IsNeg() {
+		return lossColor
+	}
+
+	return gainColor
 }
 
 // signed renders a movement with an explicit sign, so a gain reads as "+12.50"

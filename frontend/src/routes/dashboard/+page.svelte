@@ -23,6 +23,7 @@
 	summaries={data.portfolioSummaries}
 	currency={data.currency}
 	displayRate={data.displayRate}
+	returns={data.portfolioGrowth.returns}
 />
 
 <Breakdown

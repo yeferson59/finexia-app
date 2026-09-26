@@ -206,13 +206,28 @@ func (s *service) UpdatePortfolio(ctx context.Context, userID, portfolioID uuid.
 	return s.repo.UpdatePortfolio(ctx, userID, portfolioID, name, description, portfolioType, riskID, isDefault)
 }
 
-// GetPortfolioValuesAsOf returns what each of the user's portfolios was worth
-// at the last snapshot on or before asOf. Portfolios with no history that far
-// back are absent from the result, and an empty result means the account has
-// none at all — a caller comparing against a past value falls back to showing
-// no comparison.
-func (s *service) GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error) {
-	return s.repo.GetPortfolioValuesAsOf(ctx, userID, asOf)
+// GetTrailingReturns is the account's return over the last day, week, month…
+// in currency (money.XXX for the preferred one), as GetPortfolioGrowth reports
+// it next to the series. It is for callers that want the figures and not the
+// chart, such as the weekly digest.
+func (s *service) GetTrailingReturns(ctx context.Context, userID uuid.UUID, currency money.Currency) ([]TrailingReturn, error) {
+	_, summary, err := s.GetPortfolioGrowth(ctx, userID, currency, "ALL")
+	if err != nil {
+		return nil, err
+	}
+
+	return summary.Trailing, nil
+}
+
+// GetPortfolioTrailingReturns is GetTrailingReturns for one portfolio, in its
+// base currency.
+func (s *service) GetPortfolioTrailingReturns(ctx context.Context, userID, portfolioID uuid.UUID) ([]TrailingReturn, error) {
+	_, summary, err := s.GetPortfolioGrowthByID(ctx, userID, portfolioID, "ALL")
+	if err != nil {
+		return nil, err
+	}
+
+	return summary.Trailing, nil
 }
 
 // GetPortfolioGrowth builds the account-wide series. An empty currency means
@@ -221,22 +236,59 @@ func (s *service) GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, 
 // The series closes on today read live, not on the last snapshot, so its
 // closing figures are the ones the summary endpoint reports next to it.
 func (s *service) GetPortfolioGrowth(ctx context.Context, userID uuid.UUID, currency money.Currency, period string) ([]GrowthPoint, GrowthSummary, error) {
-	hasSince, since := parsePeriod(period)
-
-	points, err := s.repo.GetPortfolioGrowthByUserID(ctx, userID, currency, hasSince, since, snapshotDay(time.Now()))
+	history, err := s.repo.GetPortfolioGrowthByUserID(ctx, userID, currency, false, time.Time{}, snapshotDay(time.Now()))
 	if err != nil {
 		return nil, GrowthSummary{}, err
 	}
-	return points, buildGrowthSummary(points), nil
+
+	points, summary := growthWindow(history, period)
+
+	return points, summary, nil
 }
 
 func (s *service) GetPortfolioGrowthByID(ctx context.Context, userID, portfolioID uuid.UUID, period string) ([]GrowthPoint, GrowthSummary, error) {
-	hasSince, since := parsePeriod(period)
-	points, err := s.repo.GetPortfolioGrowthByPortfolioID(ctx, userID, portfolioID, hasSince, since, snapshotDay(time.Now()))
+	history, err := s.repo.GetPortfolioGrowthByPortfolioID(ctx, userID, portfolioID, false, time.Time{}, snapshotDay(time.Now()))
 	if err != nil {
 		return nil, GrowthSummary{}, err
 	}
-	return points, buildGrowthSummary(points), nil
+
+	points, summary := growthWindow(history, period)
+
+	return points, summary, nil
+}
+
+// growthWindow cuts the whole history down to the asked-for period and
+// summarizes it, except for the trailing returns, which always come from the
+// whole history: a one-month series has no anchor for the year, and the
+// dashboard's "1 year" must not depend on how much of the chart was asked for.
+//
+// The cut is the one the query used to make (snapshot_date >= since), moved
+// here so the history is read once. It gives the same points: a point's
+// netFlow is attributed by landing date, not by window.
+func growthWindow(history []GrowthPoint, period string) ([]GrowthPoint, GrowthSummary) {
+	points := history
+	if hasSince, since := parsePeriod(period); hasSince {
+		points = pointsSince(history, since)
+	}
+
+	summary := buildGrowthSummary(points)
+	summary.Trailing = BuildTrailingReturns(history)
+
+	return points, summary
+}
+
+// pointsSince drops the points dated before since's UTC day. The series is in
+// date order, so the kept points are a suffix of it.
+func pointsSince(points []GrowthPoint, since time.Time) []GrowthPoint {
+	cut := since.UTC().Truncate(24 * time.Hour)
+
+	for i, p := range points {
+		if !p.Date.Before(cut) {
+			return points[i:]
+		}
+	}
+
+	return []GrowthPoint{}
 }
 
 func parsePeriod(period string) (bool, time.Time) {

@@ -176,7 +176,21 @@ type Transaction struct {
 // GrowthOutput is the answer of get_portfolio_growth.
 type GrowthOutput struct {
 	Summary GrowthSummary `json:"summary"`
-	Points  []GrowthPoint `json:"points"`
+	// Returns is measured on the whole history whatever period was asked for:
+	// the period only cuts Points.
+	Returns []TrailingReturn `json:"returns" jsonschema:"what the account earned over the last day, week, month, quarter, year to date, year and whole history, shortest first; the figures to quote for 'how much did I make this month'"`
+	Points  []GrowthPoint    `json:"points"`
+}
+
+// TrailingReturn is what the account earned over one look-back window, with
+// the money paid in or taken out netted out.
+type TrailingReturn struct {
+	Period string `json:"period" jsonschema:"1D, 1W (7 days), 1M, 3M, YTD (since the close of last year), 1Y or ALL (since the history starts)"`
+	From   string `json:"from,omitempty" jsonschema:"the snapshot the window starts at, RFC 3339; empty when the history does not reach back that far, and then there is no figure"`
+	Gain   string `json:"gain,omitempty" jsonschema:"what was earned over the window in summary.currency: the change in value less the money paid in or taken out"`
+	// NetFlow is what was netted out of the change in value to leave Gain.
+	NetFlow string `json:"netFlow,omitempty" jsonschema:"money paid in (positive) or taken out (negative) during the window; it is not part of the gain"`
+	Pct     string `json:"pct,omitempty" jsonschema:"time-weighted return over the window, as a percentage; empty when nothing was invested during it"`
 }
 
 // GrowthSummary carries two readings of the same series that must not be

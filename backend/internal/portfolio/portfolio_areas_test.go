@@ -2,6 +2,7 @@ package portfolio
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -46,7 +47,7 @@ func TestParsePeriod(t *testing.T) {
 func TestBuildGrowthSummary(t *testing.T) {
 	t.Run("empty input returns zero summary", func(t *testing.T) {
 		got := buildGrowthSummary(nil)
-		if got != (GrowthSummary{}) {
+		if !reflect.DeepEqual(got, GrowthSummary{}) {
 			t.Errorf("buildGrowthSummary(nil) = %+v, want zero value", got)
 		}
 	})
@@ -148,25 +149,29 @@ func TestGetAssetTransactionsPaginated(t *testing.T) {
 	}
 }
 
-func TestGetPortfolioGrowthUsesPeriodFilter(t *testing.T) {
+func TestGetPortfolioGrowthCutsThePointsButNotTheReturns(t *testing.T) {
 	userID := uuid.New()
 	var gotHasSince bool
-	var gotSince time.Time
 	var gotCurrency money.Currency
 	var gotAsOf time.Time
 
+	today := snapshotDay(time.Now())
+	history := []GrowthPoint{
+		{Date: today.AddDate(-1, 0, -10), TotalValue: "100.00", Currency: money.COP},
+		{Date: today.AddDate(0, -2, 0), TotalValue: "100.00", Currency: money.COP},
+		{Date: today.AddDate(0, 0, -7), TotalValue: "100.00", Currency: money.COP},
+		{Date: today, TotalValue: "110.00", Currency: money.COP},
+	}
+
 	repo := new(fakeRepository{
-		getPortfolioGrowthByUserID: func(_ context.Context, uid uuid.UUID, currency money.Currency, hasSince bool, since, asOf time.Time) ([]GrowthPoint, error) {
+		getPortfolioGrowthByUserID: func(_ context.Context, uid uuid.UUID, currency money.Currency, hasSince bool, _, asOf time.Time) ([]GrowthPoint, error) {
 			if uid != userID {
 				t.Errorf("userID = %s, want %s", uid, userID)
 			}
 
-			gotHasSince, gotSince, gotCurrency, gotAsOf = hasSince, since, currency, asOf
+			gotHasSince, gotCurrency, gotAsOf = hasSince, currency, asOf
 
-			return []GrowthPoint{
-				{TotalValue: "100.00", Currency: money.COP},
-				{TotalValue: "110.00", Currency: money.COP},
-			}, nil
+			return history, nil
 		},
 	})
 	svc := newTestServices(repo, newMemStorage())
@@ -175,11 +180,10 @@ func TestGetPortfolioGrowthUsesPeriodFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPortfolioGrowth: %v", err)
 	}
-	if !gotHasSince {
-		t.Error("expected the 1M period to enable the since filter")
-	}
-	if gotSince.After(time.Now().UTC()) {
-		t.Error("since must be in the past")
+	// La historia se lee entera: las ventanas de rentabilidad la necesitan
+	// aunque la gráfica pida solo un mes.
+	if gotHasSince {
+		t.Error("hasSince = true; the repository must read the whole history")
 	}
 	if gotCurrency != money.COP {
 		t.Errorf("currency = %q, want COP", gotCurrency)
@@ -190,14 +194,39 @@ func TestGetPortfolioGrowthUsesPeriodFilter(t *testing.T) {
 		t.Errorf("asOf = %v, want today's UTC midnight", gotAsOf)
 	}
 	if len(points) != 2 {
-		t.Errorf("len(points) = %d, want 2", len(points))
+		t.Errorf("len(points) = %d, want the 2 of the last month", len(points))
 	}
 	if summary.TotalGrowthPct != "10.00" {
 		t.Errorf("TotalGrowthPct = %q, want 10.00", summary.TotalGrowthPct)
 	}
-
 	if summary.Currency != money.COP {
 		t.Errorf("Currency = %q, want COP", summary.Currency)
+	}
+
+	if len(summary.Trailing) != len(TrailingPeriods) {
+		t.Fatalf("len(Trailing) = %d, want %d", len(summary.Trailing), len(TrailingPeriods))
+	}
+	for _, tr := range summary.Trailing {
+		if tr.Period == TrailingYear {
+			if !tr.Available || !tr.From.Equal(history[0].Date) {
+				t.Errorf("1Y = %+v, want it anchored on the first point, outside the 1M cut", tr)
+			}
+		}
+	}
+}
+
+func TestPointsSinceKeepsTheDayItself(t *testing.T) {
+	day0 := time.Date(2026, time.August, 25, 0, 0, 0, 0, time.UTC)
+	points := []GrowthPoint{{Date: day0.AddDate(0, 0, -1)}, {Date: day0}, {Date: day0.AddDate(0, 0, 1)}}
+
+	// since lleva hora; el filtro compara días, como hacía el ::date de SQL.
+	got := pointsSince(points, day0.Add(15*time.Hour))
+	if len(got) != 2 || !got[0].Date.Equal(day0) {
+		t.Errorf("pointsSince = %v, want from %v on", got, day0)
+	}
+
+	if got := pointsSince(points, day0.AddDate(0, 0, 5)); got == nil || len(got) != 0 {
+		t.Errorf("pointsSince past the end = %v, want an empty, non-nil slice", got)
 	}
 }
 
@@ -233,5 +262,57 @@ func TestGetPortfolioGrowthByIDScopesToPortfolio(t *testing.T) {
 	}
 	if summary.TotalGrowthPct != "10.00" {
 		t.Errorf("TotalGrowthPct = %q, want 10.00", summary.TotalGrowthPct)
+	}
+}
+
+func TestTrailingReturnReadersMeasureTheWholeHistory(t *testing.T) {
+	userID, portfolioID := uuid.New(), uuid.New()
+	today := snapshotDay(time.Now())
+	history := []GrowthPoint{
+		{Date: today.AddDate(0, 0, -8), TotalValue: "1000", NetFlow: "0"},
+		{Date: today, TotalValue: "1100", NetFlow: "100"},
+	}
+
+	var gotCurrency money.Currency
+	var gotPortfolioID uuid.UUID
+	repo := new(fakeRepository{
+		getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, currency money.Currency, hasSince bool, _, _ time.Time) ([]GrowthPoint, error) {
+			if hasSince {
+				t.Error("hasSince = true; the account's returns need the whole history")
+			}
+			gotCurrency = currency
+			return history, nil
+		},
+		getPortfolioGrowthByPortfolioID: func(_ context.Context, _, pid uuid.UUID, hasSince bool, _, _ time.Time) ([]GrowthPoint, error) {
+			if hasSince {
+				t.Error("hasSince = true; the portfolio's returns need the whole history")
+			}
+			gotPortfolioID = pid
+			return history, nil
+		},
+	})
+	svc := newTestServices(repo, newMemStorage())
+
+	account, err := svc.GetTrailingReturns(context.Background(), userID, money.XXX)
+	if err != nil {
+		t.Fatalf("GetTrailingReturns: %v", err)
+	}
+	one, err := svc.GetPortfolioTrailingReturns(context.Background(), userID, portfolioID)
+	if err != nil {
+		t.Fatalf("GetPortfolioTrailingReturns: %v", err)
+	}
+
+	if gotCurrency != money.XXX || gotPortfolioID != portfolioID {
+		t.Errorf("currency/portfolio = %s/%s, want XXX/%s", gotCurrency, gotPortfolioID, portfolioID)
+	}
+
+	for _, trailing := range [][]TrailingReturn{account, one} {
+		if len(trailing) != len(TrailingPeriods) {
+			t.Fatalf("len = %d, want %d", len(trailing), len(TrailingPeriods))
+		}
+		// The week earned nothing: the 100 on top is the deposit.
+		if week := trailing[1]; week.Period != TrailingWeek || !week.Available || !week.Gain.IsZero() {
+			t.Errorf("1W = %+v, want an available week with no gain", week)
+		}
 	}
 }

@@ -55,6 +55,7 @@ import type {
 	platformSchema,
 	portfolioDetailSchema,
 	portfolioGrowthSchema,
+	trailingReturnSchema,
 	portfolioSummarySchema,
 	riskSchema,
 	adminContributionSchema,
@@ -137,6 +138,12 @@ export type GrowthSummary = z.infer<typeof growthSummarySchema>;
 
 /** Crecimiento (`GET /portfolios/growth` y `GET /portfolios/:id/growth`). */
 export type PortfolioGrowth = z.infer<typeof portfolioGrowthSchema>;
+
+/** Rentabilidad de una ventana hacia atrás (`returns` de la serie de crecimiento). */
+export type TrailingReturn = z.infer<typeof trailingReturnSchema>;
+
+/** Las ventanas: `1D`, `1W`, `1M`, `3M`, `YTD`, `1Y`, `ALL`. */
+export type TrailingPeriod = TrailingReturn['period'];
 
 // ---------------------------------------------------------------------------
 // Transacciones

@@ -114,7 +114,20 @@ func (f *fakePortfolios) GetPortfolioGrowth(_ context.Context, userID uuid.UUID,
 	f.sawUserID, f.sawCurrency, f.sawPeriod = userID, cur, period
 
 	return []portfolio.GrowthPoint{{Date: time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC), TotalValue: "1200.00", Currency: money.USD}},
-		portfolio.GrowthSummary{CurrentValue: "1200.00", Currency: money.USD}, f.err
+		portfolio.GrowthSummary{
+			CurrentValue: "1200.00",
+			Currency:     money.USD,
+			Trailing: []portfolio.TrailingReturn{
+				{
+					Period: portfolio.TrailingWeek, Available: true, HasRate: true,
+					From:    time.Date(2026, 2, 22, 0, 0, 0, 0, time.UTC),
+					Gain:    decimal.MustFromString("12.345"),
+					NetFlow: decimal.MustFromString("500"),
+					Rate:    decimal.MustFromString("0.01034"),
+				},
+				{Period: portfolio.TrailingYear},
+			},
+		}, f.err
 }
 
 func (f *fakePortfolios) GetPlatforms(_ context.Context, userID uuid.UUID, display money.Currency) ([]portfolio.PlatformStats, error) {
@@ -473,6 +486,34 @@ func TestBlankSearchListsTheCatalog(t *testing.T) {
 
 	if ta.assets.sawLimit != defaultAssetLimit {
 		t.Errorf("limit = %d, want the default %d", ta.assets.sawLimit, defaultAssetLimit)
+	}
+}
+
+// TestGrowthCarriesTheTrailingReturns: "how much did I make this week" has a
+// figure of its own, deposits netted out, and a window the history does not
+// reach says so by having none.
+func TestGrowthCarriesTheTrailingReturns(t *testing.T) {
+	ta := newTestApp(t, "user", true)
+
+	out := structured(t, callTool(t, ta.app, "get_portfolio_growth", map[string]any{"period": "1M"}))
+
+	if ta.portfolios.sawPeriod != "1M" {
+		t.Errorf("period reached the service as %q, want 1M", ta.portfolios.sawPeriod)
+	}
+
+	rows, ok := out["returns"].([]any)
+	if !ok || len(rows) != 2 {
+		t.Fatalf("returns: %v", out)
+	}
+
+	week, _ := rows[0].(map[string]any)
+	if week["period"] != "1W" || week["gain"] != "12.34" || week["netFlow"] != "500.00" || week["pct"] != "1.03" || week["from"] != "2026-02-22T00:00:00Z" {
+		t.Errorf("week = %v", week)
+	}
+
+	year, _ := rows[1].(map[string]any)
+	if _, has := year["gain"]; has || year["period"] != "1Y" || year["from"] != nil {
+		t.Errorf("year = %v, want only its period", year)
 	}
 }
 

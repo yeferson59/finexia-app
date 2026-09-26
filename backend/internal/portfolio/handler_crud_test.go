@@ -844,21 +844,59 @@ func TestHandlerGetPortfolioGrowth(t *testing.T) {
 		}
 	})
 
-	t.Run("a period query bounds the range", func(t *testing.T) {
+	t.Run("a period query cuts the points, not the returns", func(t *testing.T) {
+		today := snapshotDay(time.Now())
 		var gotHasSince bool
 		repo := new(fakeRepository{
 			getPortfolioGrowthByUserID: func(_ context.Context, _ uuid.UUID, _ money.Currency, hasSince bool, _, _ time.Time) ([]GrowthPoint, error) {
 				gotHasSince = hasSince
-				return nil, nil
+				return []GrowthPoint{
+					{Date: today.AddDate(0, -3, -5), TotalValue: "1000", NetFlow: "0", Currency: money.USD},
+					{Date: today.AddDate(0, 0, -1), TotalValue: "1500", NetFlow: "400", Currency: money.USD},
+					{Date: today, TotalValue: "1530", NetFlow: "0", Currency: money.USD},
+				}, nil
 			},
 		})
 		app := newTestModule(t, repo, userID, "user")
 
-		if resp := do(t, app, http.MethodGet, "/portfolios/growth?period=1M"); resp.StatusCode != fiber.StatusOK {
+		resp := do(t, app, http.MethodGet, "/portfolios/growth?period=1M")
+		if resp.StatusCode != fiber.StatusOK {
 			t.Fatalf("status = %d, want 200", resp.StatusCode)
 		}
-		if !gotHasSince {
-			t.Error("hasSince = false, want true for period=1M")
+		if gotHasSince {
+			t.Error("hasSince = true; the returns need the whole history")
+		}
+
+		_, data := decodeEnvelope(t, resp)
+
+		var got GrowthResponseDTO
+		if err := json.Unmarshal(data, &got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if len(got.Points) != 2 {
+			t.Errorf("len(points) = %d, want the 2 of the last month", len(got.Points))
+		}
+		if len(got.Returns) != len(TrailingPeriods) {
+			t.Fatalf("len(returns) = %d, want %d", len(got.Returns), len(TrailingPeriods))
+		}
+
+		byPeriod := map[string]TrailingReturnDTO{}
+		for _, r := range got.Returns {
+			byPeriod[r.Period] = r
+		}
+
+		// 1 día: de 1500 a 1530 sin flujos, +30 y +2 %.
+		if d := byPeriod["1D"]; !d.Available || d.Gain != "30.00" || d.ReturnPct != "2.00" || d.NetFlow != "0.00" {
+			t.Errorf("1D = %+v, want +30.00 / 2.00%%", d)
+		}
+		// 3 meses: el depósito de 400 no es ganancia; 1530 − 1000 − 400 = 130.
+		if q := byPeriod["3M"]; !q.Available || q.Gain != "130.00" || q.NetFlow != "400.00" {
+			t.Errorf("3M = %+v, want gain 130.00 with 400.00 of flow", q)
+		}
+		// 1 año: el historial no llega; solo viaja cuándo empieza.
+		wantStart := today.AddDate(0, -3, -5).Format("2006-01-02")
+		if y := byPeriod["1Y"]; y.Available || y.Gain != "" || y.HistoryStart != wantStart {
+			t.Errorf("1Y = %+v, want unavailable with historyStart %s", y, wantStart)
 		}
 	})
 

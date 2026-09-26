@@ -193,6 +193,7 @@ El Dashboard es la primera pantalla tras iniciar sesión y ofrece una fotografí
 Sus bloques principales son:
 
 - **Patrimonio Neto:** el valor total de todos tus portafolios, con la ganancia acumulada en importe y porcentaje, el número de portafolios y de posiciones. Con el selector de moneda (p. ej. **USD/COP**) puedes ver el total consolidado en la moneda que prefieras.
+- **Rentabilidad por periodo:** debajo del patrimonio, cuánto ganaste el último día, los últimos 7 días, el último mes, los últimos 3 meses, en lo que va del año, en el último año y desde el inicio, en porcentaje y en dinero. Lo explica el apartado 5.4.
 - **Crecimiento del portafolio:** gráfica de evolución de tu patrimonio que compara el **valor de mercado** (línea continua ámbar) con el **capital invertido** (línea discontinua). Puedes cambiar el periodo mostrado (1M, 3M, 6M, 1Y o Todo), pasar la gráfica a **porcentaje** con el conmutador **Valor / %**, y ver la ganancia total, el rendimiento, la **rentabilidad real** del periodo y el valor actual.
 - **Portafolios:** tabla resumen con cada portafolio, su tipo, valor actual, importe invertido y ganancia/pérdida (en verde si es positiva, en rojo si es negativa), junto con los totales. El nombre de cada fila lleva a su detalle.
 - **Asignación de Activos:** gráfica de dona con la distribución porcentual de tu dinero entre tipos de activos (acciones, ETF, criptomonedas, fondos…).
@@ -224,6 +225,28 @@ Sobre la gráfica, la métrica **Rentabilidad real** lleva el periodo en su etiq
 ### 5.3 Leer la asignación de activos
 
 En la dona, al señalar una porción —o su entrada en la leyenda— el resto se atenúa y el centro pasa a mostrar **esa categoría** con su porcentaje, en lugar del total. La leyenda funciona igual con el teclado y con un clic: cada entrada indica el importe y el peso de esa categoría dentro de tu patrimonio.
+
+### 5.4 Cuánto ganaste el último día, semana, mes…
+
+La franja **Rentabilidad por periodo** parte tu ganancia en ventanas de tiempo que terminan hoy:
+
+| Periodo | Desde cuándo |
+|---|---|
+| **1 día** | El cierre anterior (Finexia guarda un cierre por día) |
+| **7 días** · **1 mes** · **3 meses** · **1 año** | El cierre de ese día hacia atrás |
+| **En el año** | El cierre del 31 de diciembre pasado |
+| **Desde el inicio** | El primer día que Finexia tiene de tu cuenta |
+
+Cada periodo trae dos cifras:
+
+- **El porcentaje** (arriba, más grande): la rentabilidad del periodo, la misma que dibuja la gráfica en su vista **%** (apartado 5.2).
+- **El importe** (debajo): lo que ganaste o perdiste en dinero.
+
+Las dos **descuentan lo que metiste o sacaste** en ese periodo. Si esta semana depositaste $500 y el mercado no se movió, la semana dice **+0,00 %** y **+$0**, no +$500: el depósito es tu dinero, no una ganancia.
+
+Si Finexia todavía no tiene historial suficiente para un periodo —por ejemplo **1 año** en una cuenta de dos meses— aparece una raya (**—**). Pasa el cursor por encima para ver desde qué fecha hay historial. Con el **modo oculto** activo, los importes se tapan y los porcentajes se siguen viendo.
+
+> **Por qué «Desde el inicio» no coincide con «sobre lo invertido».** La cifra de arriba compara lo que vale hoy tu patrimonio con lo que te costó, y eso incluye lo que tus posiciones ya habían ganado **antes** de registrarlas en Finexia. «Desde el inicio» solo cuenta lo que pasó desde que Finexia empezó a guardar cierres, y encadena día por día sin dejar que un aporte cuente como ganancia. Por eso una cartera puede ir **+14 %** sobre lo invertido y **−0,3 %** desde el inicio: ganó antes de llegar a Finexia y desde entonces ha estado casi plana.
 
 > **Consejo:** si acabas de crear tu cuenta, el Dashboard aparecerá vacío. Cada bloque te dirá qué falta y te ofrecerá el siguiente paso (crear un portafolio, importar transacciones…). El orden recomendado es: (1) registra tus **Plataformas**, (2) crea un **Portafolio**, (3) añade **posiciones** y (4) registra o importa tus **transacciones**.
 
@@ -274,9 +297,10 @@ Solo el nombre y el nivel de riesgo hay que rellenarlos a mano: el resto llega c
 
 ![Detalle de un portafolio con su valor, la gráfica de crecimiento y las posiciones](img/manual/05-portafolio-detalle.png)
 
-La página de detalle tiene tres partes, en este orden:
+La página de detalle tiene cuatro partes, en este orden:
 
 - **Valor de mercado:** lo que vale hoy el portafolio, y debajo de qué capital viene: *«+$7.884,60 sobre los $37.150,50 que invertiste (+21,22%)»*. La barra reparte esa cifra entre lo que pusiste y lo que ha ganado, igual que en el listado (apartado 6.1).
+- **Rentabilidad por periodo:** la misma franja del Dashboard (apartado 5.4), solo para este portafolio y en su moneda base.
 - **Crecimiento:** la evolución del portafolio, con el mismo conmutador **Valor / %** y los mismos periodos que la gráfica del Dashboard. Sus cuatro cifras se refieren al **periodo elegido**, no a toda la vida del portafolio, así que la ganancia que muestran puede no coincidir con la de arriba. Entre ellas está la **rentabilidad real**: la del portafolio limpia de aportes y retiros —la misma cuenta que explica el apartado 5.2—, que aparece como `—` hasta que el portafolio acumule al menos dos cierres diarios.
 - **Posiciones:** los activos del portafolio, de mayor a menor peso.
 
@@ -785,7 +809,7 @@ Lo primero que aparece es **la dirección a la que llegan**, que es la de tu cue
 Debajo están los dos correos que Finexia envía hoy:
 
 - **Alertas de actividad:** un correo cuando ocurra algo que deberías saber en tu cuenta.
-- **Resumen semanal:** un correo cada semana con cómo se movieron tus portafolios.
+- **Resumen semanal:** un correo cada semana con lo que ganó cada portafolio en la semana, **sin contar lo que metiste o sacaste**: un depósito no aparece como ganancia.
 
 Marca o desmarca los que quieras y pulsa **Guardar preferencias**. Los cambios no se aplican hasta que guardas.
 

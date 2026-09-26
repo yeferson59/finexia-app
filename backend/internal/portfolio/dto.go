@@ -730,9 +730,65 @@ type GrowthSummaryDTO struct {
 	Currency       string `json:"currency"`
 }
 
+// TrailingReturnDTO es la rentabilidad de un periodo hacia atrás: 1 día, 7
+// días, 1 mes… hasta hoy. Sin `available` solo viajan `period` e
+// `historyStart`: el historial no llega tan atrás y cualquier cifra sería la
+// de otro periodo con la etiqueta de este.
+type TrailingReturnDTO struct {
+	Period    string `json:"period"`
+	Available bool   `json:"available"`
+	// Primer día del historial; dice desde cuándo se llenará el periodo.
+	HistoryStart string `json:"historyStart,omitempty"`
+	// Punto de partida real —el último en o antes del objetivo— y cierre.
+	From       string `json:"from,omitempty"`
+	To         string `json:"to,omitempty"`
+	StartValue string `json:"startValue,omitempty"`
+	EndValue   string `json:"endValue,omitempty"`
+	// Lo que entró (+) o salió (−) en el periodo.
+	NetFlow string `json:"netFlow,omitempty"`
+	// Lo ganado en dinero: la variación del valor menos NetFlow.
+	Gain string `json:"gain,omitempty"`
+	// Rentabilidad ponderada por tiempo, en porcentaje. Se omite cuando la
+	// cuenta estuvo vacía todo el periodo y no hubo capital que midiera nada.
+	ReturnPct string `json:"returnPct,omitempty"`
+}
+
 type GrowthResponseDTO struct {
 	Points  []GrowthDataPointDTO `json:"points"`
 	Summary GrowthSummaryDTO     `json:"summary"`
+	// Returns lleva siempre las siete ventanas y en orden, de la más corta a la
+	// más larga, calculadas sobre todo el historial aunque `points` venga
+	// recortado a `?period=`.
+	Returns []TrailingReturnDTO `json:"returns"`
+}
+
+// newTrailingReturnDTOs rounds each window to the two decimals the rest of the
+// summary uses.
+func newTrailingReturnDTOs(trailing []TrailingReturn) []TrailingReturnDTO {
+	out := make([]TrailingReturnDTO, 0, len(trailing))
+	for _, t := range trailing {
+		dto := TrailingReturnDTO{Period: string(t.Period), Available: t.Available}
+		if !t.HistoryStart.IsZero() {
+			dto.HistoryStart = t.HistoryStart.Format("2006-01-02")
+		}
+
+		if t.Available {
+			dto.From = t.From.Format("2006-01-02")
+			dto.To = t.To.Format("2006-01-02")
+			dto.StartValue = t.StartValue.RoundBank(2).StringFixed(2)
+			dto.EndValue = t.EndValue.RoundBank(2).StringFixed(2)
+			dto.NetFlow = t.NetFlow.RoundBank(2).StringFixed(2)
+			dto.Gain = t.Gain.RoundBank(2).StringFixed(2)
+
+			if t.HasRate {
+				dto.ReturnPct = t.Rate.Mul(oneHundred).RoundBank(2).StringFixed(2)
+			}
+		}
+
+		out = append(out, dto)
+	}
+
+	return out
 }
 
 // netFlowOrZero keeps the payload's amount fields all numeric strings: a point
@@ -774,6 +830,7 @@ func NewGrowthResponse(points []GrowthPoint, summary GrowthSummary) GrowthRespon
 			GainLossPct:    summary.GainLossPct,
 			Currency:       summary.Currency.String(),
 		},
+		Returns: newTrailingReturnDTOs(summary.Trailing),
 	}
 }
 

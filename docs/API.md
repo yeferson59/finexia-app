@@ -294,13 +294,13 @@ anterior deja de valer en el acto, sin ventana de gracia.
 | DELETE | `/portfolios/sources/:id` | usuario | Elimina plataforma |
 | GET | `/portfolios/assets` | usuario, paginada | Catálogo de assets (curados + los que aportó el llamante; §2.8) |
 | PATCH | `/portfolios/assets/:id/price` | admin | Fija precio manual de un asset |
-| GET | `/portfolios/growth` | usuario | Crecimiento agregado (`?since=`, `?currency=`) |
+| GET | `/portfolios/growth` | usuario | Crecimiento agregado y rentabilidad por periodo (`?since=`, `?currency=`) |
 | GET | `/portfolios/export/summary` | usuario | XLSX `resumen-mensual.xlsx` |
 | GET | `/portfolios/export/transactions` | usuario | XLSX `transacciones.xlsx` |
 | GET | `/portfolios/export/risk` | usuario | XLSX `riesgo-volatilidad.xlsx` |
 | PATCH | `/portfolios/:id` | usuario | Actualiza portfolio |
 | GET | `/portfolios/:id/top-transaction` | usuario | Mayor transacción |
-| GET | `/portfolios/:id/growth` | usuario | Crecimiento del portfolio |
+| GET | `/portfolios/:id/growth` | usuario | Crecimiento y rentabilidad por periodo del portfolio |
 | GET | `/portfolios/:id/assets/:symbol/transactions` | usuario, paginada | Transacciones por asset |
 | GET | `/portfolios/:id` | usuario | Portfolio por id |
 
@@ -819,6 +819,52 @@ snapshots entre esos dos puntos siguen teniendo su valor; sin esto, el día de
 entrada se leía como una ganancia y el de salida como una pérdida que nadie
 tuvo. Corregir solo el precio, la fecha, la comisión o un dividendo sigue siendo
 retroactivo, porque no cambia el valor de ningún snapshot.
+
+#### Rentabilidad por periodo: `returns`
+
+Las dos series de crecimiento traen, junto a `points` y `summary`, la
+rentabilidad de los últimos `1D` (1 día), `1W` (7 días), `1M`, `3M`, `YTD` (en
+lo que va del año), `1Y` y `ALL` (desde el inicio). Van siempre los siete, en
+ese orden:
+
+```json
+"returns": [
+  { "period": "1D", "available": true, "from": "2026-09-24", "to": "2026-09-25",
+    "startValue": "10250.00", "endValue": "10292.10", "netFlow": "0.00",
+    "gain": "42.10", "returnPct": "0.41" },
+  { "period": "1Y", "available": false, "historyStart": "2026-03-02" }
+]
+```
+
+- `gain` es lo ganado en dinero: `endValue − startValue − netFlow`. Un depósito
+  no es ganancia ni un retiro es pérdida.
+- `returnPct` es la rentabilidad **ponderada por tiempo** de la ventana: encadena
+  los tramos de Dietz modificada, igual que la vista `%` de la gráfica y el
+  centro de reportes. En casos raros tiene signo distinto de `gain` (entró mucho
+  dinero justo antes de una caída). Se omite si la cuenta estuvo vacía toda la
+  ventana: no había capital que midiera nada.
+- `from` es el punto de partida real: el último en o antes de la fecha objetivo
+  (hoy − 1 día, − 7 días, − 1, 3 o 12 meses con el día acotado a fin de mes, o
+  el 31 de diciembre del año anterior para `YTD`). Si el job de snapshots se
+  saltó días, queda antes del objetivo. `to` es hoy, el punto en vivo.
+- Si el historial no llega a la fecha objetivo, el periodo va
+  `available: false` con `historyStart` y nada más: publicar la historia entera
+  como «1 año» sería inventarse el año. `ALL` está disponible desde dos puntos.
+- Se calculan sobre la historia completa aunque se pida `?period=`: el servicio
+  lee la serie entera y recorta `points` en Go, de modo que `period=1M` sigue
+  trayendo un `1Y`.
+- `1D` compara el punto en vivo con el snapshot anterior, que se escribe una vez
+  al día en UTC: es «1 día», no «hoy desde que abrió el mercado».
+- En la serie agregada, la conversión a la tasa de hoy (ver «Moneda de la serie
+  de crecimiento») hace que la variación cambiaria no cuente como rentabilidad.
+
+Las mismas ventanas salen en `returns` de la herramienta MCP
+`get_portfolio_growth`, y el resumen semanal por correo toma de ellas su
+«ganancia desde el …». Cada portafolio muestra su `1W`. El total en dinero es la
+suma de las filas, igual que el total del correo suma los portafolios, y su
+porcentaje es el `1W` de la serie agregada, porque los porcentajes no se suman.
+Antes el correo restaba el valor de hace una semana del de hoy, así que un
+depósito salía como ganancia de la semana.
 
 #### Moneda de los holdings
 
@@ -2007,7 +2053,7 @@ argumento con el que nombrar a otro:
 | `get_allocation` | Reparto por categoría de activo, todo en una moneda |
 | `get_sector_allocation` | Reparto por industria, todo en una moneda, con los activos sin clasificar en su propio cubo y los fondos repartidos entre las suyas |
 | `list_recent_transactions` | Últimas transacciones (`limit`, máx. 200) |
-| `get_portfolio_growth` | Serie de valor desde los snapshots (`period`: `1M`/`3M`/`6M`/`1Y`) |
+| `get_portfolio_growth` | Serie de valor desde los snapshots (`period`: `1M`/`3M`/`6M`/`1Y`) y `returns`: lo ganado en 1 día, 7 días, 1 mes, 3 meses, el año, 1 año y desde el inicio, sin contar aportes ni retiros, sobre todo el historial |
 | `list_platforms` | Plataformas con lo que se tiene en cada una |
 | `get_cash_accounts` | Saldos de efectivo con la tasa que rinde cada cuenta, lo que ha pagado y lo pendiente de abonar |
 | `search_assets` | Catálogo de activos (`query`, `limit`, máx. 100) |

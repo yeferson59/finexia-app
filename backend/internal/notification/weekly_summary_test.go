@@ -8,6 +8,7 @@ import (
 
 	"uuid"
 
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	"github.com/yeferson59/finexia-app/internal/identity"
@@ -24,20 +25,21 @@ func (f *fakeUserReader) GetUsersWithWeeklySummary(ctx context.Context) ([]ident
 	return f.getUsers(ctx)
 }
 
-// fakePortfolioReader stubs the per-user portfolio summaries and the past
-// total the weekly change is measured against.
+// fakePortfolioReader stubs the per-user portfolio summaries and the week each
+// portfolio, and the account, earned.
 type fakePortfolioReader struct {
 	getSummary func(ctx context.Context, userID uuid.UUID) ([]portfolio.SummaryView, error)
-	// getPortfolioValuesAsOf is optional: left unset, the account reads as
-	// having no history, which is what an unstubbed test wants.
-	getPortfolioValuesAsOf func(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]portfolio.PortfolioValuePoint, error)
-	// The two below are optional too: left unset, the account holds no cash and
+	// The two below are optional: left unset, the account holds no cash and
 	// the digest carries no cash block.
 	getCashBalances func(ctx context.Context, userID uuid.UUID, display money.Currency) ([]portfolio.CashBalance, error)
 	getCashRates    func(ctx context.Context, userID uuid.UUID) ([]portfolio.CashRate, error)
 	// Optional as well: left unset, the account follows no fund.
 	getFunds           func(ctx context.Context, userID uuid.UUID) ([]portfolio.Fund, error)
 	getFundPerformance func(ctx context.Context, userID, assetID uuid.UUID) (portfolio.FundPerformance, error)
+	// The last two are optional as well: left unset, the account reads as having no
+	// history, which is what an unstubbed test wants.
+	getPortfolioTrailingReturns func(ctx context.Context, userID, portfolioID uuid.UUID) ([]portfolio.TrailingReturn, error)
+	getTrailingReturns          func(ctx context.Context, userID uuid.UUID, cur money.Currency) ([]portfolio.TrailingReturn, error)
 }
 
 func (f *fakePortfolioReader) GetFunds(ctx context.Context, userID uuid.UUID) ([]portfolio.Fund, error) {
@@ -60,11 +62,20 @@ func (f *fakePortfolioReader) GetPortfoliosSummary(ctx context.Context, userID u
 	return f.getSummary(ctx, userID)
 }
 
-func (f *fakePortfolioReader) GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]portfolio.PortfolioValuePoint, error) {
-	if f.getPortfolioValuesAsOf == nil {
+func (f *fakePortfolioReader) GetPortfolioTrailingReturns(ctx context.Context, userID, portfolioID uuid.UUID) ([]portfolio.TrailingReturn, error) {
+	if f.getPortfolioTrailingReturns == nil {
 		return nil, nil
 	}
-	return f.getPortfolioValuesAsOf(ctx, userID, asOf)
+
+	return f.getPortfolioTrailingReturns(ctx, userID, portfolioID)
+}
+
+func (f *fakePortfolioReader) GetTrailingReturns(ctx context.Context, userID uuid.UUID, cur money.Currency) ([]portfolio.TrailingReturn, error) {
+	if f.getTrailingReturns == nil {
+		return nil, nil
+	}
+
+	return f.getTrailingReturns(ctx, userID, cur)
 }
 
 func (f *fakePortfolioReader) GetCashBalances(ctx context.Context, userID uuid.UUID, display money.Currency) ([]portfolio.CashBalance, error) {
@@ -359,36 +370,61 @@ func TestWeeklySummaryWeekOverWeekChange(t *testing.T) {
 	stocksID, cryptoID := uuid.New(), uuid.New()
 	lastMonday := time.Date(2026, time.July, 29, 0, 0, 0, 0, time.UTC)
 
-	// send runs the digest with a stubbed baseline and returns the email data.
-	send := func(t *testing.T, summaries []portfolio.SummaryView, baseline func(context.Context, uuid.UUID, time.Time) ([]portfolio.PortfolioValuePoint, error)) mail.WeeklySummaryData {
+	// weekFrom is a history whose last week opens on from and earned gain; pct
+	// is its time-weighted return in percent, "" for a week with none.
+	weekFrom := func(from time.Time, gain, pct string) []portfolio.TrailingReturn {
+		week := portfolio.TrailingReturn{
+			Period:    portfolio.TrailingWeek,
+			Available: true,
+			From:      from,
+			Gain:      decimal.MustFromString(gain),
+		}
+
+		if pct != "" {
+			rate, err := decimal.MustFromString(pct).Div(decimal.MustFromString("100"))
+			if err != nil {
+				panic(err)
+			}
+
+			week.Rate, week.HasRate = rate, true
+		}
+
+		// The day before, which a week's digest must not pick up instead.
+		day := portfolio.TrailingReturn{Period: portfolio.TrailingDay, Available: true, Gain: decimal.MustFromString("999")}
+
+		return []portfolio.TrailingReturn{day, week}
+	}
+	week := func(gain, pct string) []portfolio.TrailingReturn { return weekFrom(lastMonday, gain, pct) }
+
+	// byPortfolio stubs each portfolio's trailing returns; one absent from the
+	// map has no history.
+	byPortfolio := func(weeks map[uuid.UUID][]portfolio.TrailingReturn) func(context.Context, uuid.UUID, uuid.UUID) ([]portfolio.TrailingReturn, error) {
+		return func(_ context.Context, _, portfolioID uuid.UUID) ([]portfolio.TrailingReturn, error) {
+			return weeks[portfolioID], nil
+		}
+	}
+
+	account := func(trailing []portfolio.TrailingReturn) func(context.Context, uuid.UUID, money.Currency) ([]portfolio.TrailingReturn, error) {
+		return func(context.Context, uuid.UUID, money.Currency) ([]portfolio.TrailingReturn, error) {
+			return trailing, nil
+		}
+	}
+
+	// send runs the digest with stubbed weeks and returns the email data.
+	send := func(t *testing.T, summaries []portfolio.SummaryView, ports *fakePortfolioReader) mail.WeeklySummaryData {
 		t.Helper()
 		users := new(fakeUserReader{getUsers: func(context.Context) ([]identity.User, error) {
 			return []identity.User{{ID: userID, Name: "Ada", Email: "ada@example.com"}}, nil
 		}})
-		ports := new(fakePortfolioReader{
-			getSummary: func(context.Context, uuid.UUID) ([]portfolio.SummaryView, error) {
-				return summaries, nil
-			},
-			getPortfolioValuesAsOf: baseline,
-		})
+		ports.getSummary = func(context.Context, uuid.UUID) ([]portfolio.SummaryView, error) {
+			return summaries, nil
+		}
 		mailer := new(fakeMailer{})
 		sent, errs := newTestService(users, ports, mailer).SendWeeklySummaryEmails(context.Background())
 		if sent != 1 || len(errs) != 0 {
 			t.Fatalf("sent/errs = %d/%v, want 1/none", sent, errs)
 		}
 		return mailer.weekly[0].Data
-	}
-
-	// at builds a baseline stub from portfolio/value pairs, all dated the same
-	// day, which is how SyncPortfolioSnapshots writes them.
-	at := func(values map[uuid.UUID]string) func(context.Context, uuid.UUID, time.Time) ([]portfolio.PortfolioValuePoint, error) {
-		return func(context.Context, uuid.UUID, time.Time) ([]portfolio.PortfolioValuePoint, error) {
-			points := make([]portfolio.PortfolioValuePoint, 0, len(values))
-			for id, v := range values {
-				points = append(points, portfolio.PortfolioValuePoint{PortfolioID: id, Date: lastMonday, TotalValue: v})
-			}
-			return points, nil
-		}
 	}
 
 	twoPortfolios := []portfolio.SummaryView{
@@ -398,11 +434,13 @@ func TestWeeklySummaryWeekOverWeekChange(t *testing.T) {
 
 	onePortfolio := []portfolio.SummaryView{twoPortfolios[0]}
 
-	t.Run("each portfolio reports its own movement", func(t *testing.T) {
-		data := send(t, twoPortfolios, at(map[uuid.UUID]string{
-			stocksID: "1000.00",
-			cryptoID: "500.00",
-		}))
+	t.Run("each portfolio reports its own week", func(t *testing.T) {
+		data := send(t, twoPortfolios, &fakePortfolioReader{
+			getPortfolioTrailingReturns: byPortfolio(map[uuid.UUID][]portfolio.TrailingReturn{
+				stocksID: week("100", "10"),
+				cryptoID: week("-100", "-20"),
+			}),
+		})
 
 		if len(data.Portfolios) != 2 {
 			t.Fatalf("portfolios = %d, want 2", len(data.Portfolios))
@@ -428,13 +466,34 @@ func TestWeeklySummaryWeekOverWeekChange(t *testing.T) {
 		}
 	})
 
+	// The reason the digest reads the growth series: the stocks portfolio is
+	// worth 1100 against 1000 a week ago, but 100 of that was a deposit. The
+	// old comparison of the two values reported +100.00 (+10%) as the week's
+	// gain; the week the series measures earned nothing.
+	t.Run("a deposit is not the week's gain", func(t *testing.T) {
+		data := send(t, onePortfolio, &fakePortfolioReader{
+			getPortfolioTrailingReturns: byPortfolio(map[uuid.UUID][]portfolio.TrailingReturn{stocksID: week("0", "0")}),
+			getTrailingReturns:          account(week("0", "0")),
+		})
+
+		if data.WeekChangeValue != "+0.00" || data.WeekChangePct != "+0.00" {
+			t.Errorf("change = %q/%q, want +0.00/+0.00", data.WeekChangeValue, data.WeekChangePct)
+		}
+		if data.TotalValue != "1100.00" {
+			t.Errorf("TotalValue = %q, want the value as it stands, deposit included", data.TotalValue)
+		}
+	})
+
 	t.Run("the rows add up to the account total", func(t *testing.T) {
 		// +100 on stocks and -100 on crypto net out: the headline has to say
 		// so, or the reader can add up the rows and catch the digest lying.
-		data := send(t, twoPortfolios, at(map[uuid.UUID]string{
-			stocksID: "1000.00",
-			cryptoID: "500.00",
-		}))
+		data := send(t, twoPortfolios, &fakePortfolioReader{
+			getPortfolioTrailingReturns: byPortfolio(map[uuid.UUID][]portfolio.TrailingReturn{
+				stocksID: week("100", "10"),
+				cryptoID: week("-100", "-20"),
+			}),
+			getTrailingReturns: account(week("0", "0")),
+		})
 
 		if data.WeekChangeValue != "+0.00" {
 			t.Errorf("total change = %q, want +0.00 (the rows cancel out)", data.WeekChangeValue)
@@ -447,10 +506,36 @@ func TestWeeklySummaryWeekOverWeekChange(t *testing.T) {
 		}
 	})
 
-	t.Run("a portfolio opened this week has no comparison but still counts in the total", func(t *testing.T) {
-		// Only the stocks portfolio existed a week ago. Crypto's row shows no
-		// change, and the account baseline is the stocks figure alone.
-		data := send(t, twoPortfolios, at(map[uuid.UUID]string{stocksID: "1000.00"}))
+	// Returns do not add up: +10% on a big portfolio and -20% on a small one is
+	// not -10% for the account. The account's own series weighs them.
+	t.Run("the account percentage comes from the account's series", func(t *testing.T) {
+		var asked money.Currency
+		data := send(t, twoPortfolios, &fakePortfolioReader{
+			getPortfolioTrailingReturns: byPortfolio(map[uuid.UUID][]portfolio.TrailingReturn{
+				stocksID: week("100", "10"),
+				cryptoID: week("-100", "-20"),
+			}),
+			getTrailingReturns: func(_ context.Context, uid uuid.UUID, cur money.Currency) ([]portfolio.TrailingReturn, error) {
+				if uid != userID {
+					t.Errorf("userID = %s, want %s", uid, userID)
+				}
+				asked = cur
+				return week("0", "3.25"), nil
+			},
+		})
+
+		if data.WeekChangePct != "+3.25" {
+			t.Errorf("total pct = %q, want the account's +3.25", data.WeekChangePct)
+		}
+		if asked != money.XXX {
+			t.Errorf("currency = %q, want the preferred one (XXX)", asked)
+		}
+	})
+
+	t.Run("a portfolio opened this week has no comparison and stays out of the total", func(t *testing.T) {
+		data := send(t, twoPortfolios, &fakePortfolioReader{
+			getPortfolioTrailingReturns: byPortfolio(map[uuid.UUID][]portfolio.TrailingReturn{stocksID: week("100", "10")}),
+		})
 
 		if !data.Portfolios[0].HasWeekChange {
 			t.Error("the portfolio with history should carry a comparison")
@@ -458,31 +543,16 @@ func TestWeeklySummaryWeekOverWeekChange(t *testing.T) {
 		if data.Portfolios[1].HasWeekChange {
 			t.Error("a portfolio with no history should show no comparison")
 		}
-		// 1500 now against a 1000 baseline.
-		if data.WeekChangeValue != "+500.00" || data.WeekChangePct != "+50.00" {
-			t.Errorf("total change = %q/%q, want +500.00/+50.00", data.WeekChangeValue, data.WeekChangePct)
+		if data.WeekChangeValue != "+100.00" {
+			t.Errorf("total change = %q, want the stocks' +100.00 alone", data.WeekChangeValue)
 		}
 	})
 
-	t.Run("a week that gained reports the amount, the percentage and the date", func(t *testing.T) {
-		data := send(t, onePortfolio, at(map[uuid.UUID]string{stocksID: "1000.00"}))
-
-		if !data.HasWeekChange {
-			t.Fatal("HasWeekChange = false, want the comparison to be shown")
-		}
-		if data.WeekChangeValue != "+100.00" || data.WeekChangePct != "+10.00" {
-			t.Errorf("change = %q/%q, want +100.00/+10.00", data.WeekChangeValue, data.WeekChangePct)
-		}
-		if data.WeekChangeColor != gainColor {
-			t.Errorf("WeekChangeColor = %q, want the gain color", data.WeekChangeColor)
-		}
-		if data.WeekChangeSince != "29 jul" {
-			t.Errorf("WeekChangeSince = %q, want '29 jul'", data.WeekChangeSince)
-		}
-	})
-
-	t.Run("a week that lost value reports a negative amount in the loss color", func(t *testing.T) {
-		data := send(t, onePortfolio, at(map[uuid.UUID]string{stocksID: "1250.00"}))
+	t.Run("a week that lost money reports a negative amount in the loss color", func(t *testing.T) {
+		data := send(t, onePortfolio, &fakePortfolioReader{
+			getPortfolioTrailingReturns: byPortfolio(map[uuid.UUID][]portfolio.TrailingReturn{stocksID: week("-150", "-12")}),
+			getTrailingReturns:          account(week("-150", "-12")),
+		})
 
 		if data.WeekChangeValue != "-150.00" || data.WeekChangePct != "-12.00" {
 			t.Errorf("change = %q/%q, want -150.00/-12.00", data.WeekChangeValue, data.WeekChangePct)
@@ -492,20 +562,25 @@ func TestWeeklySummaryWeekOverWeekChange(t *testing.T) {
 		}
 	})
 
-	t.Run("a flat week reports zero rather than hiding the comparison", func(t *testing.T) {
-		data := send(t, onePortfolio, at(map[uuid.UUID]string{stocksID: "1100.00"}))
+	t.Run("a week with no capital at work shows the amount but no percentage", func(t *testing.T) {
+		data := send(t, onePortfolio, &fakePortfolioReader{
+			getPortfolioTrailingReturns: byPortfolio(map[uuid.UUID][]portfolio.TrailingReturn{stocksID: week("0", "")}),
+			getTrailingReturns:          account(week("0", "")),
+		})
 
-		if !data.HasWeekChange {
-			t.Fatal("a week with no movement is still a real comparison")
+		if !data.HasWeekChange || data.WeekChangeValue != "+0.00" {
+			t.Errorf("WeekChangeValue = %q, want +0.00", data.WeekChangeValue)
 		}
-		if data.WeekChangeValue != "+0.00" || data.WeekChangePct != "+0.00" {
-			t.Errorf("change = %q/%q, want +0.00/+0.00", data.WeekChangeValue, data.WeekChangePct)
+		if data.WeekChangePct != "" || data.Portfolios[0].WeekChangePct != "" {
+			t.Errorf("pct = %q / row %q, want both empty", data.WeekChangePct, data.Portfolios[0].WeekChangePct)
 		}
 	})
 
 	t.Run("an account with no history hides the comparison", func(t *testing.T) {
-		data := send(t, onePortfolio, func(context.Context, uuid.UUID, time.Time) ([]portfolio.PortfolioValuePoint, error) {
-			return nil, nil
+		data := send(t, onePortfolio, &fakePortfolioReader{
+			getPortfolioTrailingReturns: byPortfolio(map[uuid.UUID][]portfolio.TrailingReturn{
+				stocksID: {{Period: portfolio.TrailingWeek, Available: false}},
+			}),
 		})
 
 		if data.HasWeekChange {
@@ -519,9 +594,11 @@ func TestWeeklySummaryWeekOverWeekChange(t *testing.T) {
 		}
 	})
 
-	t.Run("a baseline lookup failure does not stop the digest", func(t *testing.T) {
-		data := send(t, onePortfolio, func(context.Context, uuid.UUID, time.Time) ([]portfolio.PortfolioValuePoint, error) {
-			return nil, errors.New("snapshots table on fire")
+	t.Run("a failed lookup does not stop the digest", func(t *testing.T) {
+		data := send(t, onePortfolio, &fakePortfolioReader{
+			getPortfolioTrailingReturns: func(context.Context, uuid.UUID, uuid.UUID) ([]portfolio.TrailingReturn, error) {
+				return nil, errors.New("snapshots table on fire")
+			},
 		})
 
 		if data.HasWeekChange {
@@ -532,77 +609,55 @@ func TestWeeklySummaryWeekOverWeekChange(t *testing.T) {
 		}
 	})
 
-	t.Run("starting from nothing shows the amount but no percentage", func(t *testing.T) {
-		// The portfolio was worth nothing a week ago, so the move is not a
-		// percentage of anything — returns.ROI refuses the division and the
-		// amount stands on its own.
-		data := send(t, onePortfolio, at(map[uuid.UUID]string{stocksID: "0"}))
+	t.Run("a failed account lookup leaves only the percentage out", func(t *testing.T) {
+		data := send(t, onePortfolio, &fakePortfolioReader{
+			getPortfolioTrailingReturns: byPortfolio(map[uuid.UUID][]portfolio.TrailingReturn{stocksID: week("100", "10")}),
+			getTrailingReturns: func(context.Context, uuid.UUID, money.Currency) ([]portfolio.TrailingReturn, error) {
+				return nil, errors.New("no rate")
+			},
+		})
 
-		if !data.HasWeekChange || data.WeekChangeValue != "+1100.00" {
-			t.Errorf("WeekChangeValue = %q, want +1100.00", data.WeekChangeValue)
-		}
-		if data.WeekChangePct != "" {
-			t.Errorf("WeekChangePct = %q, want it empty when there is no base", data.WeekChangePct)
-		}
-		if data.Portfolios[0].WeekChangePct != "" {
-			t.Errorf("row pct = %q, want it empty too", data.Portfolios[0].WeekChangePct)
+		if !data.HasWeekChange || data.WeekChangeValue != "+100.00" || data.WeekChangePct != "" {
+			t.Errorf("change = %v %q/%q, want +100.00 with no percentage", data.HasWeekChange, data.WeekChangeValue, data.WeekChangePct)
 		}
 	})
 
-	t.Run("the digest is dated by the most recent baseline snapshot", func(t *testing.T) {
+	t.Run("the digest is dated by the most recent week start", func(t *testing.T) {
 		// One portfolio missed a day. The digest should say the newer date
 		// rather than backdating everything to the stale one.
-		older := lastMonday.AddDate(0, 0, -3)
-		data := send(t, twoPortfolios, func(context.Context, uuid.UUID, time.Time) ([]portfolio.PortfolioValuePoint, error) {
-			return []portfolio.PortfolioValuePoint{
-				{PortfolioID: stocksID, Date: older, TotalValue: "1000.00"},
-				{PortfolioID: cryptoID, Date: lastMonday, TotalValue: "500.00"},
-			}, nil
+		data := send(t, twoPortfolios, &fakePortfolioReader{
+			getPortfolioTrailingReturns: byPortfolio(map[uuid.UUID][]portfolio.TrailingReturn{
+				stocksID: weekFrom(lastMonday.AddDate(0, 0, -3), "100", "10"),
+				cryptoID: week("-100", "-20"),
+			}),
 		})
 
 		if data.WeekChangeSince != "29 jul" {
-			t.Errorf("WeekChangeSince = %q, want the most recent baseline date", data.WeekChangeSince)
+			t.Errorf("WeekChangeSince = %q, want the most recent week start", data.WeekChangeSince)
 		}
 	})
 
-	t.Run("the baseline is looked up a week back", func(t *testing.T) {
-		var asked time.Time
-		before := time.Now()
-		send(t, onePortfolio, func(_ context.Context, uid uuid.UUID, asOf time.Time) ([]portfolio.PortfolioValuePoint, error) {
-			if uid != userID {
-				t.Errorf("userID = %s, want %s", uid, userID)
-			}
-			asked = asOf
-			return []portfolio.PortfolioValuePoint{{PortfolioID: stocksID, Date: lastMonday, TotalValue: "1000.00"}}, nil
-		})
-
-		want := before.Add(-digestPeriod)
-		if diff := asked.Sub(want); diff < -time.Minute || diff > time.Minute {
-			t.Errorf("asOf = %v, want ~%v (a week back)", asked, want)
-		}
-	})
-
-	t.Run("the comparison uses exact decimals, not float64", func(t *testing.T) {
-		// 0.07 a hundred times is 7 exactly; in float64 it is 7.000000000000005,
-		// which would report a change of -0.00 against a 7.00 baseline.
+	t.Run("the total adds exact decimals, not float64", func(t *testing.T) {
+		// 0.07 a hundred times is 7 exactly; in float64 it is 7.000000000000005.
 		summaries := make([]portfolio.SummaryView, 0, 100)
-		baseline := map[uuid.UUID]string{}
+		weeks := map[uuid.UUID][]portfolio.TrailingReturn{}
 		for range 100 {
 			id := uuid.New()
 			summaries = append(summaries, portfolio.SummaryView{
 				ID: id, Name: "P", BaseCurrency: money.USD,
 				TotalMarketValue: "0.07", TotalGainLoss: "0.00", TotalGainLossPct: "0.00",
 			})
-			baseline[id] = "0.07"
+			weeks[id] = week("0.07", "")
 		}
 
-		data := send(t, summaries, at(baseline))
+		data := send(t, summaries, &fakePortfolioReader{getPortfolioTrailingReturns: byPortfolio(weeks)})
 
-		if data.WeekChangeValue != "+0.00" {
-			t.Errorf("WeekChangeValue = %q, want +0.00", data.WeekChangeValue)
+		if data.WeekChangeValue != "+7.00" {
+			t.Errorf("WeekChangeValue = %q, want +7.00", data.WeekChangeValue)
 		}
 	})
 }
+
 func TestFormatDay(t *testing.T) {
 	cases := []struct {
 		date time.Time

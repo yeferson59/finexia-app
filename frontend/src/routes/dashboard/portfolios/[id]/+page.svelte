@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Modal from '$lib/ui/modal.svelte';
-	import { PortfolioGrowth } from '$lib/features/dashboard';
+	import { PeriodReturns, PortfolioGrowth, hasTrailingReturns } from '$lib/features/dashboard';
 	import { flash } from '$lib/shared/flash.svelte';
 	import {
 		PortfolioEditForm,
@@ -127,6 +127,14 @@
 
 <PortfolioHeadline value={totalValue} cost={totalCost} {baseCurrency} />
 
+{#if growth && hasTrailingReturns(growth.returns)}
+	<!-- Lo mismo que la cabecera del panel, para este portafolio: su serie ya
+	     viene en su moneda base, así que no hay conversión que avisar. -->
+	<div class="returns">
+		<PeriodReturns returns={growth.returns} currency={baseCurrency} />
+	</div>
+{/if}
+
 {#if growth}
 	<section class="growth" aria-label="Crecimiento del portafolio">
 		<!-- `bare`, como en el panel: ya no hay tarjetas alrededor con las que
@@ -172,6 +180,11 @@
 	.notice.fx {
 		border-color: rgba(212, 145, 42, 0.45);
 		color: var(--text-muted);
+	}
+
+	.returns {
+		padding: 1.75rem 0;
+		border-bottom: 1px solid var(--border);
 	}
 
 	.growth {

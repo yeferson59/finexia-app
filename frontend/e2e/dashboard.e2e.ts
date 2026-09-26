@@ -1,6 +1,26 @@
 import { expect, test } from '@playwright/test';
 import { login } from './helpers';
 
+test.describe('dashboard summary', () => {
+	test('el resumen parte la ganancia en periodos', async ({ page }) => {
+		await login(page);
+
+		const strip = page.getByRole('region', { name: 'Rentabilidad por periodo' });
+		await expect(strip).toBeVisible();
+
+		const labels = ['1 día', '7 días', '1 mes', '3 meses', 'En el año', '1 año', 'Desde el inicio'];
+		for (const label of labels) {
+			await expect(strip.getByText(label, { exact: true })).toBeVisible();
+		}
+
+		// En el año del stub entró más dinero del que se ganó: la franja lo cuenta
+		// como aporte, no como ganancia, y el año sale en pérdida.
+		const year = strip.locator('div', { has: page.getByText('1 año', { exact: true }) });
+		await expect(year.getByText('-1,21%')).toBeVisible();
+		await expect(year.getByText(/^−\D*937/)).toBeVisible();
+	});
+});
+
 test.describe('dashboard charts', () => {
 	test('la gráfica de crecimiento se recorre con el teclado', async ({ page }) => {
 		await login(page);

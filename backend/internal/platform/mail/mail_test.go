@@ -189,7 +189,7 @@ func TestWeeklySummaryRendersTheWeeklyChange(t *testing.T) {
 			t.Fatalf("SendWeeklySummary: %v", err)
 		}
 		body := visibleText(got.req.Html)
-		for _, want := range []string{"+42.50", "(+4.02%)", "Desde el 29 jul"} {
+		for _, want := range []string{"+42.50", "(+4.02%)", "Desde el 29 jul · sin contar aportes ni retiros"} {
 			if !strings.Contains(body, want) {
 				t.Errorf("rendered HTML missing %q", want)
 			}
@@ -253,7 +253,7 @@ func TestWeeklySummaryRendersTheWeeklyChange(t *testing.T) {
 			t.Fatalf("SendWeeklySummary: %v", err)
 		}
 		body := visibleText(got.req.Html)
-		for _, want := range []string{"+150.20", "(+1.87%)", "19.40% total", "· variación desde el 29 jul"} {
+		for _, want := range []string{"+150.20", "(+1.87%)", "19.40% total", "· ganancia desde el 29 jul"} {
 			if !strings.Contains(body, want) {
 				t.Errorf("rendered HTML missing %q", want)
 			}

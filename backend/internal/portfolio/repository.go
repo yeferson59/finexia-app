@@ -100,7 +100,6 @@ type SnapshotStore interface {
 	UpsertPortfolioSnapshot(ctx context.Context, row SnapshotRow, snapshotDate time.Time) error
 	GetPortfolioGrowthByUserID(ctx context.Context, userID uuid.UUID, currency money.Currency, hasSince bool, since, asOf time.Time) ([]GrowthPoint, error)
 	GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since, asOf time.Time) ([]GrowthPoint, error)
-	GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error)
 }
 
 // CashStore persists cash balances: positions of type cash and the movements

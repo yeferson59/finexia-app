@@ -7,6 +7,7 @@ import (
 
 	"uuid"
 
+	"github.com/yeferson59/gofinance/v2/decimal"
 	"github.com/yeferson59/gofinance/v2/money"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -116,7 +117,7 @@ func (m *Module) addPortfolioTools(s *mcpsdk.Server, c caller) {
 		})
 
 	readTool(s, "get_portfolio_growth", "Get portfolio growth",
-		"Return the account-wide value series from the daily snapshots, with the summary that separates how the total moved (deposits included) from what was actually earned.",
+		"Return the account-wide value series from the daily snapshots, with the summary that separates how the total moved (deposits included) from what was actually earned, and what was earned over the last day, week, month, quarter, year to date and year.",
 		func(ctx context.Context, in GrowthInput) (GrowthOutput, error) {
 			cur, err := parseCurrency(in.Currency)
 			if err != nil {
@@ -128,7 +129,11 @@ func (m *Module) addPortfolioTools(s *mcpsdk.Server, c caller) {
 				return GrowthOutput{}, m.logToolError(ctx, "get_portfolio_growth", c, err)
 			}
 
-			return GrowthOutput{Summary: growthSummary(summary), Points: growthPoints(points)}, nil
+			return GrowthOutput{
+				Summary: growthSummary(summary),
+				Returns: trailingReturns(summary.Trailing),
+				Points:  growthPoints(points),
+			}, nil
 		})
 
 	readTool(s, "list_platforms", "List platforms",
@@ -486,6 +491,33 @@ func growthSummary(s portfolio.GrowthSummary) GrowthSummary {
 		GainLossPct:  s.GainLossPct,
 		Currency:     s.Currency.String(),
 	}
+}
+
+// oneHundred turns a fractional return into the percentage the tools speak.
+var oneHundred = decimal.MustFromString("100")
+
+// trailingReturns rounds each window to the two decimals the rest of the
+// summary uses. A window the history does not reach carries only its period.
+func trailingReturns(trailing []portfolio.TrailingReturn) []TrailingReturn {
+	out := make([]TrailingReturn, 0, len(trailing))
+
+	for _, t := range trailing {
+		row := TrailingReturn{Period: string(t.Period)}
+
+		if t.Available {
+			row.From = timeText(t.From)
+			row.Gain = t.Gain.RoundBank(2).StringFixed(2)
+			row.NetFlow = t.NetFlow.RoundBank(2).StringFixed(2)
+
+			if t.HasRate {
+				row.Pct = t.Rate.Mul(oneHundred).RoundBank(2).StringFixed(2)
+			}
+		}
+
+		out = append(out, row)
+	}
+
+	return out
 }
 
 func growthPoints(points []portfolio.GrowthPoint) []GrowthPoint {

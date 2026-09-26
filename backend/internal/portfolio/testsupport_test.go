@@ -149,7 +149,6 @@ type fakeRepository struct {
 	upsertPortfolioSnapshot         func(ctx context.Context, row SnapshotRow, snapshotDate time.Time) error
 	getPortfolioGrowthByUserID      func(ctx context.Context, userID uuid.UUID, currency money.Currency, hasSince bool, since, asOf time.Time) ([]GrowthPoint, error)
 	getPortfolioGrowthByPortfolioID func(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since, asOf time.Time) ([]GrowthPoint, error)
-	getPortfolioValuesAsOf          func(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error)
 	getExchangeRateByPair           func(ctx context.Context, from, to money.Currency) (decimal.Decimal, error)
 	getUserExchangeRateByPair       func(ctx context.Context, userID uuid.UUID, from, to money.Currency) (decimal.Decimal, error)
 	getHeldAssetIDs                 func(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
@@ -340,13 +339,6 @@ func (f *fakeRepository) GetPortfolioGrowthByUserID(ctx context.Context, userID 
 
 func (f *fakeRepository) GetPortfolioGrowthByPortfolioID(ctx context.Context, userID, portfolioID uuid.UUID, hasSince bool, since, asOf time.Time) ([]GrowthPoint, error) {
 	return f.getPortfolioGrowthByPortfolioID(ctx, userID, portfolioID, hasSince, since, asOf)
-}
-
-func (f *fakeRepository) GetPortfolioValuesAsOf(ctx context.Context, userID uuid.UUID, asOf time.Time) ([]PortfolioValuePoint, error) {
-	if f.getPortfolioValuesAsOf == nil {
-		return nil, nil
-	}
-	return f.getPortfolioValuesAsOf(ctx, userID, asOf)
 }
 
 func (f *fakeRepository) GetExchangeRateByPair(ctx context.Context, from, to money.Currency) (decimal.Decimal, error) {

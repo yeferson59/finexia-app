@@ -73,7 +73,7 @@ type WeeklySummaryPortfolio struct {
 	TotalGainLossPct string
 	GainLossColor    string
 
-	// Movement since the previous weekly summary, on the same terms as the
+	// Gain since the previous weekly summary, on the same terms as the
 	// account-wide fields on WeeklySummaryData: signed figures, and a false
 	// HasWeekChange for a portfolio that did not exist a week ago. When it is
 	// false the row falls back to showing the all-time return on its own.
@@ -132,15 +132,16 @@ type WeeklySummaryData struct {
 	DashboardURL     string
 	WeekLabel        string
 
-	// Movement since the previous weekly summary. HasWeekChange is false for
-	// an account with no history to compare against — its first digest — and
-	// the template hides the whole block rather than showing a zero that would
-	// read as "nothing moved".
+	// What the account earned since the previous weekly summary, with the
+	// money paid in or taken out netted out: a deposit is not the week's gain.
+	// HasWeekChange is false for an account with no history to compare
+	// against — its first digest — and the template hides the whole block
+	// rather than showing a zero that would read as "nothing moved".
 	//
 	// WeekChangeValue and WeekChangePct carry their own sign ("+1250.00",
-	// "-3.42"). WeekChangePct is empty when the comparison had nothing to
-	// divide by, i.e. the portfolios were worth nothing a week ago; the
-	// absolute change is still shown in that case.
+	// "-3.42"). WeekChangeValue is the sum of the rows'; WeekChangePct is the
+	// account's time-weighted return, empty when there was no capital at work
+	// to measure it on. The absolute figure is still shown in that case.
 	HasWeekChange   bool
 	WeekChangeValue string
 	WeekChangePct   string

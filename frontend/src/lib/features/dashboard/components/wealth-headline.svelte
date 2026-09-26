@@ -14,21 +14,30 @@
 	import { resolve } from '$app/paths';
 	import CurrencySelect from '$lib/ui/currency-select.svelte';
 	import ExchangeRateNote from './exchange-rate-note.svelte';
+	import PeriodReturns from './period-returns.svelte';
 	import { privacy } from '$lib/shared/privacy.svelte';
 	import { formatCurrency } from '$lib/shared/format/money';
 	import { formatSignedPercent } from '$lib/shared/format/percent';
 	import { FALLBACK_CURRENCY, partitionByCurrency } from '$lib/shared/currency';
 	import { plural } from '../breakdown';
-	import type { ExchangeRate, PortfolioSummary } from '$lib/api/types';
+	import { hasTrailingReturns } from '../trailing';
+	import type { ExchangeRate, PortfolioSummary, TrailingReturn } from '$lib/api/types';
 
 	interface Props {
 		summaries: PortfolioSummary[];
 		currency?: string;
 		/** Tasa con la que están convertidas estas cifras; `null` si no hay conversión. */
 		displayRate?: ExchangeRate | null;
+		/** Rentabilidad por periodo de la serie de crecimiento, en la misma moneda. */
+		returns?: TrailingReturn[];
 	}
 
-	let { summaries = [], currency = FALLBACK_CURRENCY, displayRate = null }: Props = $props();
+	let {
+		summaries = [],
+		currency = FALLBACK_CURRENCY,
+		displayRate = null,
+		returns = []
+	}: Props = $props();
 
 	// Un portafolio que el backend no pudo convertir viene en su propia moneda.
 	// Sumarlo daría un patrimonio que no está en ninguna: se deja fuera y se
@@ -105,6 +114,14 @@
 		<CurrencySelect {currency} />
 		<ExchangeRateNote rate={displayRate} />
 	</div>
+
+	<!-- La misma ganancia, partida en ventanas de tiempo. Sin portafolios que
+	     sumar no hay nada que partir. -->
+	{#if counted.length > 0 && hasTrailingReturns(returns)}
+		<div class="returns">
+			<PeriodReturns {returns} {currency} />
+		</div>
+	{/if}
 </section>
 
 <style>
@@ -188,6 +205,14 @@
 		font-size: 0.8rem;
 		line-height: 1.5;
 		color: var(--text-muted);
+	}
+
+	/* Fila entera bajo la cifra y el selector de moneda. */
+	.returns {
+		flex-basis: 100%;
+		min-width: 0;
+		padding-top: 1.75rem;
+		border-top: 1px solid var(--border);
 	}
 
 	.rate {
